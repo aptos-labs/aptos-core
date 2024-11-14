@@ -6,7 +6,6 @@
 
 mod genesis_context;
 
-use std::hash::{Hash, Hasher};
 use crate::genesis_context::GenesisStateView;
 use aptos_crypto::{
     ed25519,
@@ -17,6 +16,7 @@ use aptos_framework::{ReleaseBundle, ReleasePackage};
 use aptos_gas_schedule::{
     AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
 };
+use aptos_types::account_address::{create_resource_address, create_seed_for_pbo_module};
 use aptos_types::{
     account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
@@ -54,7 +54,10 @@ use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
-use aptos_types::account_address::{create_resource_address, create_seed_for_pbo_module};
+use std::{
+    collections::BTreeSet,
+    hash::{Hash, Hasher},
+};
 
 // The seed is arbitrarily picked to produce a consistent key. XXX make this more formal?
 const GENESIS_SEED: [u8; 32] = [42; 32];
@@ -122,7 +125,7 @@ pub fn default_gas_schedule() -> GasScheduleV2 {
 }
 
 pub fn encode_supra_mainnet_genesis_transaction(
-    accounts: &[AccountBalance],
+    accounts: &BTreeSet<AccountBalance>,
     multisig_accounts: &[MultiSigAccountWithBalance],
     owner_group: Option<MultiSigAccountSchema>,
     delegation_pools: &[PboDelegatorConfiguration],
@@ -243,29 +246,31 @@ pub fn encode_genesis_transaction_for_testnet(
     gas_schedule: &GasScheduleV2,
     supra_config_bytes: Vec<u8>,
 ) -> Transaction {
-    Transaction::GenesisTransaction(WriteSetPayload::Direct(encode_genesis_change_set_for_testnet(
-        &aptos_root_key,
-        &[],
-        &[],
-        owner_group,
-        validators,
-        delegation_pools,
-        owner_stake_for_pbo_pool,
-        vesting_pools,
-        initial_unlock_vesting_pools,
-        framework,
-        chain_id,
-        genesis_config,
-        consensus_config,
-        execution_config,
-        gas_schedule,
-        supra_config_bytes,
-    )))
+    Transaction::GenesisTransaction(WriteSetPayload::Direct(
+        encode_genesis_change_set_for_testnet(
+            &aptos_root_key,
+            &BTreeSet::new(),
+            &[],
+            owner_group,
+            validators,
+            delegation_pools,
+            owner_stake_for_pbo_pool,
+            vesting_pools,
+            initial_unlock_vesting_pools,
+            framework,
+            chain_id,
+            genesis_config,
+            consensus_config,
+            execution_config,
+            gas_schedule,
+            supra_config_bytes,
+        ),
+    ))
 }
 
 pub fn encode_genesis_change_set_for_testnet(
     core_resources_key: &Ed25519PublicKey,
-    accounts: &[AccountBalance],
+    accounts: &BTreeSet<AccountBalance>,
     multisig_account: &[MultiSigAccountWithBalance],
     owner_group: Option<MultiSigAccountSchema>,
     validators: &[Validator],
@@ -342,7 +347,11 @@ pub fn encode_genesis_change_set_for_testnet(
         // All PBO delegated validators are initialized here
         create_pbo_delegation_pools(&mut session, delegation_pools);
 
-        add_owner_stakes_for_delegation_pools(&mut session, delegation_pools, owner_stake_for_pbo_pool);
+        add_owner_stakes_for_delegation_pools(
+            &mut session,
+            delegation_pools,
+            owner_stake_for_pbo_pool,
+        );
 
         // PBO vesting accounts, employees, investors etc. are placed in their vesting pools
         create_vesting_without_staking_pools(&mut session, vesting_pools);
@@ -417,7 +426,8 @@ fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
         "Recurring lockup duration must be at least as long as epoch duration"
     );
     assert!(
-        genesis_config.rewards_apy_percentage > 0 && genesis_config.rewards_apy_percentage < APY_PRECISION,
+        genesis_config.rewards_apy_percentage > 0
+            && genesis_config.rewards_apy_percentage < APY_PRECISION,
         "Rewards APY must between >= 1 (i.e. 0.01%) and < 10,000 (i.e. 100%)"
     );
     assert!(
@@ -740,17 +750,23 @@ fn initialize_keyless_accounts(session: &mut SessionExt, chain_id: ChainId) {
     }
 }
 
-fn create_accounts(session: &mut SessionExt, accounts: &[AccountBalance]) {
-    let accounts_bytes = bcs::to_bytes(accounts).expect("AccountMaps can be serialized");
-    let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
-    serialized_values.push(accounts_bytes);
-    exec_function(
-        session,
-        GENESIS_MODULE_NAME,
-        "create_accounts",
-        vec![],
-        serialized_values,
-    );
+fn create_accounts(session: &mut SessionExt, accounts: &BTreeSet<AccountBalance>) {
+    // Creating accounts one by one avoids the quadratic complexity of the Move function create_accounts,
+    // which checks uniqueness.
+    for account in accounts {
+        let accounts = vec![account];
+        let accounts_bytes =
+            bcs::to_bytes(accounts.as_slice()).expect("Accounts must be serialized");
+        let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
+        serialized_values.push(accounts_bytes);
+        exec_function(
+            session,
+            GENESIS_MODULE_NAME,
+            "create_accounts",
+            vec![],
+            serialized_values,
+        );
+    }
 }
 
 /// Creates and initializes each validator owner and validator operator. This method creates all
@@ -773,40 +789,43 @@ fn create_multiple_multisig_accounts_with_schema(
     session: &mut SessionExt,
     multiple_multi_sig_account_with_balance: MultiSigAccountSchema,
 ) {
-    let mut serialized_values = serialize_values(&vec![
-        MoveValue::Signer(CORE_CODE_ADDRESS),
-    ]);
+    let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
 
     let owners_bytes = bcs::to_bytes(&multiple_multi_sig_account_with_balance.owner)
         .expect("Owner address for MultiSig accounts should be serializable");
     serialized_values.push(owners_bytes);
 
-    let additional_owners_bytes = bcs::to_bytes(&multiple_multi_sig_account_with_balance.additional_owners)
-        .expect("Additional owners addresses for MultiSig accounts should be serializable");
+    let additional_owners_bytes =
+        bcs::to_bytes(&multiple_multi_sig_account_with_balance.additional_owners)
+            .expect("Additional owners addresses for MultiSig accounts should be serializable");
     serialized_values.push(additional_owners_bytes);
 
-    let num_signatures_required_bytes = bcs::to_bytes(&multiple_multi_sig_account_with_balance.num_signatures_required)
-        .expect("num_signatures_required for MultiSig accounts should be serializable");
+    let num_signatures_required_bytes =
+        bcs::to_bytes(&multiple_multi_sig_account_with_balance.num_signatures_required)
+            .expect("num_signatures_required for MultiSig accounts should be serializable");
     serialized_values.push(num_signatures_required_bytes);
 
     let metadata_keys_bytes = bcs::to_bytes(&multiple_multi_sig_account_with_balance.metadata_keys)
         .expect("metadata_keys for MultiSig accounts should be serializable");
     serialized_values.push(metadata_keys_bytes);
 
-    let metadata_values_bytes = bcs::to_bytes(&multiple_multi_sig_account_with_balance.metadata_values)
-        .expect("metadata_values for MultiSig accounts should be serializable");
+    let metadata_values_bytes =
+        bcs::to_bytes(&multiple_multi_sig_account_with_balance.metadata_values)
+            .expect("metadata_values for MultiSig accounts should be serializable");
     serialized_values.push(metadata_values_bytes);
 
-    let timeout_duration_bytes = bcs::to_bytes(&multiple_multi_sig_account_with_balance.timeout_duration)
-        .expect("timeout_duration for MultiSig accounts should be serializable");
+    let timeout_duration_bytes =
+        bcs::to_bytes(&multiple_multi_sig_account_with_balance.timeout_duration)
+            .expect("timeout_duration for MultiSig accounts should be serializable");
     serialized_values.push(timeout_duration_bytes);
 
     let balance_bytes = bcs::to_bytes(&multiple_multi_sig_account_with_balance.balance)
         .expect("balance for MultiSig accounts should be serializable");
     serialized_values.push(balance_bytes);
 
-    let num_of_accounts_bytes = bcs::to_bytes(&multiple_multi_sig_account_with_balance.num_of_accounts)
-        .expect("num_of_accounts for MultiSig accounts should be serializable");
+    let num_of_accounts_bytes =
+        bcs::to_bytes(&multiple_multi_sig_account_with_balance.num_of_accounts)
+            .expect("num_of_accounts for MultiSig accounts should be serializable");
     serialized_values.push(num_of_accounts_bytes);
 
     exec_function(
@@ -823,9 +842,7 @@ fn create_multisig_accounts_with_balance(
     multisig_accounts: &[MultiSigAccountWithBalance],
 ) {
     for account_configuration in multisig_accounts {
-        let mut serialized_values = serialize_values(&vec![
-            MoveValue::Signer(CORE_CODE_ADDRESS),
-        ]);
+        let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
 
         let owners_bytes = bcs::to_bytes(&account_configuration.owner)
             .expect("Owner for MultiSig accounts should be serializable");
@@ -871,9 +888,8 @@ fn create_pbo_delegation_pools(
 ) {
     let pbo_config_bytes = bcs::to_bytes(pbo_delegator_configuration)
         .expect("PboDelegatorConfiguration can be serialized");
-    let mut serialized_values = serialize_values(&vec![
-        MoveValue::U64(PBO_DELEGATION_POOL_LOCKUP_PERCENTAGE),
-    ]);
+    let mut serialized_values =
+        serialize_values(&vec![MoveValue::U64(PBO_DELEGATION_POOL_LOCKUP_PERCENTAGE)]);
     serialized_values.insert(0, pbo_config_bytes);
     exec_function(
         session,
@@ -890,17 +906,14 @@ fn add_owner_stakes_for_delegation_pools(
     owner_stake_for_pbo_pool: u64,
 ) {
     for pool_config in pbo_delegator_configuration {
-        let pbo_pool_seed = create_seed_for_pbo_module(
-            &pool_config.delegator_config.delegation_pool_creation_seed
-        );
-        let pool_address = create_resource_address(
-            pool_config.delegator_config.owner_address,
-            &pbo_pool_seed
-        );
+        let pbo_pool_seed =
+            create_seed_for_pbo_module(&pool_config.delegator_config.delegation_pool_creation_seed);
+        let pool_address =
+            create_resource_address(pool_config.delegator_config.owner_address, &pbo_pool_seed);
         let serialized_values = serialize_values(&vec![
             MoveValue::Signer(pool_config.delegator_config.owner_address),
             MoveValue::Address(pool_address),
-            MoveValue::U64(owner_stake_for_pbo_pool)
+            MoveValue::U64(owner_stake_for_pbo_pool),
         ]);
         exec_function(
             session,
@@ -1149,7 +1162,7 @@ pub fn generate_test_genesis(
 
     let genesis = encode_genesis_change_set_for_testnet(
         &GENESIS_KEYPAIR.1,
-        &[],
+        &BTreeSet::new(),
         &[],
         None,
         validators,
@@ -1174,7 +1187,7 @@ pub fn generate_test_genesis(
             voters: vec![
                 AccountAddress::from_hex_literal("0xdd1").unwrap(),
                 AccountAddress::from_hex_literal("0xdd2").unwrap(),
-                AccountAddress::from_hex_literal("0xdd3").unwrap()
+                AccountAddress::from_hex_literal("0xdd3").unwrap(),
             ],
             voting_power_increase_limit: 50,
             genesis_timestamp_in_microseconds: 0,
@@ -1203,7 +1216,7 @@ pub fn generate_mainnet_genesis(
 
     let genesis = encode_genesis_change_set_for_testnet(
         &GENESIS_KEYPAIR.1,
-        &[],
+        &BTreeSet::new(),
         &[],
         None,
         validators,
@@ -1239,7 +1252,7 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         voters: vec![
             AccountAddress::from_hex_literal("0xdd1").unwrap(),
             AccountAddress::from_hex_literal("0xdd2").unwrap(),
-            AccountAddress::from_hex_literal("0xdd3").unwrap()
+            AccountAddress::from_hex_literal("0xdd3").unwrap(),
         ],
         voting_power_increase_limit: 30,
         genesis_timestamp_in_microseconds: 0,
@@ -1469,7 +1482,7 @@ pub fn test_mainnet_end_to_end() {
     let employee9 = AccountAddress::from_hex_literal("0xe9").unwrap();
 
     // All the above accounts to be created at genesis
-    let accounts = vec![
+    let accounts = BTreeSet::from([
         AccountBalance {
             account_address: supra_foundation,
             balance: supra_foundation_balance,
@@ -1650,7 +1663,8 @@ pub fn test_mainnet_end_to_end() {
             account_address: employee9,
             balance: employee_balance,
         },
-    ];
+    ]);
+    
 
     let pbo_config_val0 = PboDelegatorConfiguration {
         delegator_config: DelegatorConfiguration {
@@ -1662,7 +1676,11 @@ pub fn test_mainnet_end_to_end() {
                 join_during_genesis: true,
             },
             delegator_addresses: vec![pbo_account01, pbo_account02, pbo_account03],
-            delegator_stakes: vec![PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE],
+            delegator_stakes: vec![
+                PBO_DELEGATOR_STAKE,
+                PBO_DELEGATOR_STAKE,
+                PBO_DELEGATOR_STAKE,
+            ],
         },
         multisig_admin: multisig_account01,
         unlock_schedule_numerators: vec![],
@@ -1681,7 +1699,11 @@ pub fn test_mainnet_end_to_end() {
                 join_during_genesis: true,
             },
             delegator_addresses: vec![pbo_account11, pbo_account12, pbo_account13],
-            delegator_stakes: vec![PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE],
+            delegator_stakes: vec![
+                PBO_DELEGATOR_STAKE,
+                PBO_DELEGATOR_STAKE,
+                PBO_DELEGATOR_STAKE,
+            ],
         },
         multisig_admin: multisig_account02,
         unlock_schedule_numerators: vec![],
@@ -1700,7 +1722,11 @@ pub fn test_mainnet_end_to_end() {
                 join_during_genesis: true,
             },
             delegator_addresses: vec![pbo_account21, pbo_account22, pbo_account13],
-            delegator_stakes: vec![PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE],
+            delegator_stakes: vec![
+                PBO_DELEGATOR_STAKE,
+                PBO_DELEGATOR_STAKE,
+                PBO_DELEGATOR_STAKE,
+            ],
         },
         multisig_admin: multisig_account03,
         unlock_schedule_numerators: vec![],
@@ -1719,7 +1745,11 @@ pub fn test_mainnet_end_to_end() {
                 join_during_genesis: true,
             },
             delegator_addresses: vec![pbo_account31, pbo_account32, pbo_account33],
-            delegator_stakes: vec![PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE],
+            delegator_stakes: vec![
+                PBO_DELEGATOR_STAKE,
+                PBO_DELEGATOR_STAKE,
+                PBO_DELEGATOR_STAKE,
+            ],
         },
         multisig_admin: multisig_account04,
         unlock_schedule_numerators: vec![],
@@ -1738,7 +1768,11 @@ pub fn test_mainnet_end_to_end() {
                 join_during_genesis: true,
             },
             delegator_addresses: vec![pbo_account41, pbo_account42, pbo_account43],
-            delegator_stakes: vec![PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE],
+            delegator_stakes: vec![
+                PBO_DELEGATOR_STAKE,
+                PBO_DELEGATOR_STAKE,
+                PBO_DELEGATOR_STAKE,
+            ],
         },
         multisig_admin: multisig_account05,
         unlock_schedule_numerators: vec![],
@@ -1757,7 +1791,11 @@ pub fn test_mainnet_end_to_end() {
                 join_during_genesis: true,
             },
             delegator_addresses: vec![pbo_account51, pbo_account52, pbo_account53],
-            delegator_stakes: vec![PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE],
+            delegator_stakes: vec![
+                PBO_DELEGATOR_STAKE,
+                PBO_DELEGATOR_STAKE,
+                PBO_DELEGATOR_STAKE,
+            ],
         },
         multisig_admin: multisig_account06,
         unlock_schedule_numerators: vec![],
@@ -1776,7 +1814,11 @@ pub fn test_mainnet_end_to_end() {
                 join_during_genesis: true,
             },
             delegator_addresses: vec![pbo_account61, pbo_account62, pbo_account63],
-            delegator_stakes: vec![PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE, PBO_DELEGATOR_STAKE],
+            delegator_stakes: vec![
+                PBO_DELEGATOR_STAKE,
+                PBO_DELEGATOR_STAKE,
+                PBO_DELEGATOR_STAKE,
+            ],
         },
         multisig_admin: multisig_account07,
         unlock_schedule_numerators: vec![],
@@ -1791,7 +1833,10 @@ pub fn test_mainnet_end_to_end() {
         vesting_numerators: vec![3, 3, 3, 3, 1],
         vesting_denominator: 100,
         withdrawal_address: supra_foundation,
-        shareholders: vec![employee1, employee2, employee3, employee4, employee5, employee6, employee7, employee8, employee9],
+        shareholders: vec![
+            employee1, employee2, employee3, employee4, employee5, employee6, employee7, employee8,
+            employee9,
+        ],
         cliff_period_in_seconds: 0,
         period_duration_in_seconds: 94608000, // 3 years in seconds
     };
