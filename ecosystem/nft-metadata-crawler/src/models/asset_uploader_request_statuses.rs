@@ -40,6 +40,7 @@ pub struct AssetUploaderRequestStatuses {
 impl Hash for AssetUploaderRequestStatuses {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.idempotency_key.hash(state);
+        self.application_id.hash(state);
         self.asset_uri.hash(state);
     }
 }
