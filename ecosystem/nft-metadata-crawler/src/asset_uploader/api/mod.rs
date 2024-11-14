@@ -28,17 +28,29 @@ pub struct AssetUploaderApiContext {
     pool: Pool<ConnectionManager<PgConnection>>,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct IdempotencyTuple {
+    pub idempotency_key: String,
+    pub application_id: String,
+}
+
 #[derive(Debug, Deserialize)]
 struct BatchUploadRequest {
-    application_id: String,
+    #[serde(flatten)]
+    idempotency_tuple: IdempotencyTuple,
     urls: Vec<Url>,
 }
 
 #[derive(Serialize)]
 #[serde(untagged)]
 enum BatchUploadResponse {
-    Success { request_id: String },
-    Error { error: String },
+    Success {
+        #[serde(flatten)]
+        idempotency_tuple: IdempotencyTuple,
+    },
+    Error {
+        error: String,
+    },
 }
 
 #[derive(Serialize)]
@@ -58,7 +70,8 @@ pub enum GetStatusResponseSuccess {
 #[serde(untagged)]
 enum GetStatusResponse {
     Success {
-        request_id: String,
+        idempotency_key: String,
+        application_id: String,
         urls: AHashMap<String, GetStatusResponseSuccess>,
     },
     Error {
@@ -76,9 +89,9 @@ impl AssetUploaderApiContext {
         Json(request): Json<BatchUploadRequest>,
     ) -> impl IntoResponse {
         match upload_batch(context.pool.clone(), &request) {
-            Ok(request_id) => (
+            Ok(idempotency_tuple) => (
                 StatusCode::OK,
-                Json(BatchUploadResponse::Success { request_id }),
+                Json(BatchUploadResponse::Success { idempotency_tuple }),
             ),
             Err(e) => {
                 error!(error = ?e, "Error uploading asset");
@@ -94,13 +107,14 @@ impl AssetUploaderApiContext {
 
     async fn handle_get_status(
         Extension(context): Extension<Arc<AssetUploaderApiContext>>,
-        Path(request_id): Path<String>, // Extracts request_id from the URL
+        Path((application_id, idempotency_key)): Path<(String, String)>, // Extracts application_id and idempotency_key from the URL
     ) -> impl IntoResponse {
-        match get_status(context.pool.clone(), &request_id) {
+        match get_status(context.pool.clone(), &idempotency_key, &application_id) {
             Ok(statuses) => (
                 StatusCode::OK,
                 Json(GetStatusResponse::Success {
-                    request_id,
+                    idempotency_key,
+                    application_id,
                     urls: statuses,
                 }),
             ),
@@ -122,7 +136,10 @@ impl Server for AssetUploaderApiContext {
         let self_arc = Arc::new(self.clone());
         axum::Router::new()
             .route("/upload", post(Self::handle_upload_batch))
-            .route("/status/:request_id", get(Self::handle_get_status))
+            .route(
+                "/status/:application_id/:idempotency_key",
+                get(Self::handle_get_status),
+            )
             .layer(Extension(self_arc.clone()))
     }
 }

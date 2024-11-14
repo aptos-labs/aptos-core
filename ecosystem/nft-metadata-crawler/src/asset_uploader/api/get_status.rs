@@ -9,20 +9,18 @@ use ahash::AHashMap;
 use axum::http::StatusCode;
 use diesel::{
     r2d2::{ConnectionManager, Pool, PooledConnection},
-    ExpressionMethods, PgConnection, QueryDsl, RunQueryDsl,
+    BoolExpressionMethods, ExpressionMethods, PgConnection, QueryDsl, RunQueryDsl,
 };
 use tracing::debug;
-use uuid::Uuid;
 
 pub fn get_status(
     pool: Pool<ConnectionManager<PgConnection>>,
-    request_id: &str,
+    idempotency_key: &str,
+    application_id: &str,
 ) -> anyhow::Result<AHashMap<String, GetStatusResponseSuccess>> {
     let mut conn = pool.get()?;
-    let request_id = Uuid::parse_str(request_id)?;
-
     let mut status_response = AHashMap::new();
-    let rows = query_status(&mut conn, &request_id)?;
+    let rows = query_status(&mut conn, idempotency_key, application_id)?;
     for row in rows {
         if row.status_code == StatusCode::OK.as_u16() as i64 {
             status_response.insert(row.asset_uri, GetStatusResponseSuccess::Success {
@@ -42,11 +40,13 @@ pub fn get_status(
 
 fn query_status(
     conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
-    uuid: &Uuid,
+    id_key: &str,
+    app_id: &str,
 ) -> anyhow::Result<Vec<AssetUploaderRequestStatusesQuery>> {
     use schema::nft_metadata_crawler::asset_uploader_request_statuses::dsl::*;
 
-    let query = asset_uploader_request_statuses.filter(request_id.eq(uuid));
+    let query = asset_uploader_request_statuses
+        .filter(idempotency_key.eq(id_key).and(application_id.eq(app_id)));
 
     let debug_query = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();
     debug!("Executing Query: {}", debug_query);
