@@ -49,7 +49,10 @@ impl InMemoryStateCalculatorV2 {
 
         // If there are multiple checkpoints in the chunk, we only calculate the SMT (and its root
         // hash) for the last one.
-        let last_checkpoint_index = execution_output.to_commit.get_last_checkpoint_index();
+        let last_checkpoint_index = {
+            let _timer = OTHER_TIMERS.timer_with(&["get_last_checkpoint_index"]);
+            execution_output.to_commit.get_last_checkpoint_index()
+        };
 
         Self::calculate_impl(
             parent_state,
@@ -371,14 +374,6 @@ impl InMemoryStateCalculatorV2 {
             "Base state is corrupted, updates_since_base is not empty at a checkpoint."
         );
 
-        for (i, (txn, _txn_out, is_reconfig)) in to_commit.iter().enumerate() {
-            ensure!(
-                TransactionsWithOutput::need_checkpoint(txn, is_reconfig) ^ (i != num_txns - 1),
-                "Checkpoint is allowed iff it's the last txn in the block. index: {i}, num_txns: {num_txns}, is_last: {}, txn: {txn:?}, is_reconfig: {}",
-                i == num_txns - 1,
-                is_reconfig,
-            );
-        }
         Ok(())
     }
 }

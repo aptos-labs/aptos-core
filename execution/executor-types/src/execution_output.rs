@@ -38,11 +38,7 @@ impl ExecutionOutput {
     ) -> Self {
         if is_block {
             // If it's a block, ensure it ends with state checkpoint.
-            assert!(
-                next_epoch_state.is_some()
-                    || to_commit.is_empty() // reconfig suffix
-                    || to_commit.transactions.last().unwrap().is_non_reconfig_block_ending()
-            );
+            assert!(to_commit.is_empty() || to_commit.ends_with_sole_checkpoint());
         } else {
             // If it's not, there shouldn't be any transaction to be discarded or retried.
             assert!(to_discard.is_empty() && to_retry.is_empty());
@@ -168,31 +164,29 @@ impl Inner {
         let aborts = self
             .to_commit
             .iter()
-            .flat_map(
-                |(txn, output, _is_reconfig)| match output.status().status() {
-                    Ok(execution_status) => {
-                        if execution_status.is_success() {
-                            None
-                        } else {
-                            Some(format!("{:?}: {:?}", txn, output.status()))
-                        }
-                    },
-                    Err(_) => None,
+            .flat_map(|(txn, output)| match output.status().status() {
+                Ok(execution_status) => {
+                    if execution_status.is_success() {
+                        None
+                    } else {
+                        Some(format!("{:?}: {:?}", txn, output.status()))
+                    }
                 },
-            )
+                Err(_) => None,
+            })
             .collect::<Vec<_>>();
 
         let discards_3 = self
             .to_discard
             .iter()
             .take(3)
-            .map(|(txn, output, _is_reconfig)| format!("{:?}: {:?}", txn, output.status()))
+            .map(|(txn, output)| format!("{:?}: {:?}", txn, output.status()))
             .collect::<Vec<_>>();
         let retries_3 = self
             .to_retry
             .iter()
             .take(3)
-            .map(|(txn, output, _is_reconfig)| format!("{:?}: {:?}", txn, output.status()))
+            .map(|(txn, output)| format!("{:?}: {:?}", txn, output.status()))
             .collect::<Vec<_>>();
 
         if !aborts.is_empty() || !discards_3.is_empty() || !retries_3.is_empty() {

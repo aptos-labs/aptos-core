@@ -1600,6 +1600,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-drop-helper",
  "aptos-infallible",
+ "aptos-metrics-core",
  "aptos-scratchpad",
  "aptos-secure-net",
  "aptos-storage-interface",
