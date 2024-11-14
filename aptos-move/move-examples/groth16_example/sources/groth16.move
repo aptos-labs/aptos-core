@@ -128,20 +128,191 @@ module groth16_example::groth16 {
         vector::append(&mut vk_alpha_bytes, vk_alpha_y_bytes);
         let vk_alpha = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&vk_alpha_bytes));
 
-        let vk_beta_2_x1 = 6375614351688725206403948262868962793625744043794305715222011528459656738731u256;
-        let vk_beta_2_y1 = 4252822878758300859123897981450591353533073413197771768651442665752259397132u256;
-        let vk_beta_2_x2 = 10505242626370262277552901082094356697409835680220590971873171140371331206856u256;
-        let vk_beta_2_y2 = 21847035105528745403288232691147584728191162732299865338377159692350059136679u256;
+        let vk_beta_x1 = 6375614351688725206403948262868962793625744043794305715222011528459656738731u256;
+        let vk_beta_y1 = 4252822878758300859123897981450591353533073413197771768651442665752259397132u256;
+        let vk_beta_x2 = 10505242626370262277552901082094356697409835680220590971873171140371331206856u256;
+        let vk_beta_y2 = 21847035105528745403288232691147584728191162732299865338377159692350059136679u256;
+        let vk_beta_bytes = bcs::to_bytes<u256>(&vk_beta_x1);
+        let vk_beta_y1_bytes = bcs::to_bytes<u256>(&vk_beta_y1);
+        let vk_beta_x2_bytes = bcs::to_bytes<u256>(&vk_beta_x2);
+        let vk_beta_y2_bytes = bcs::to_bytes<u256>(&vk_beta_y2);
+        vector::append(&mut vk_beta_bytes, vk_beta_y1_bytes);
+        vector::append(&mut vk_beta_bytes, vk_beta_x2_bytes);
+        vector::append(&mut vk_beta_bytes, vk_beta_y2_bytes);
+        let vk_beta = std::option::extract(&mut deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Uncompr>(&vk_beta_bytes));
 
-        let vk_gamma_2_x1 = 10857046999023057135944570762232829481370756359578518086990519993285655852781u256;
-        let vk_gamma_2_y1 = 11559732032986387107991004021392285783925812861821192530917403151452391805634u256;
-        let vk_gamma_2_x2 = 8495653923123431417604973247489272438418190587263600148770280649306958101930u256;
-        let vk_gamma_2_y2 = 4082367875863433681332203403145435568316851327593401208105741076214120093531u256;
+        let vk_gamma_x1 = 10857046999023057135944570762232829481370756359578518086990519993285655852781u256;
+        let vk_gamma_y1 = 11559732032986387107991004021392285783925812861821192530917403151452391805634u256;
+        let vk_gamma_x2 = 8495653923123431417604973247489272438418190587263600148770280649306958101930u256;
+        let vk_gamma_y2 = 4082367875863433681332203403145435568316851327593401208105741076214120093531u256;
+        let vk_gamma_bytes = bcs::to_bytes<u256>(&vk_gamma_x1);
+        let vk_gamma_y1_bytes = bcs::to_bytes<u256>(&vk_gamma_y1);
+        let vk_gamma_x2_bytes = bcs::to_bytes<u256>(&vk_gamma_x2);
+        let vk_gamma_y2_bytes = bcs::to_bytes<u256>(&vk_gamma_y2);
+        vector::append(&mut vk_gamma_bytes, vk_gamma_y1_bytes);
+        vector::append(&mut vk_gamma_bytes, vk_gamma_x2_bytes);
+        vector::append(&mut vk_gamma_bytes, vk_gamma_y2_bytes);
+        let vk_gamma = std::option::extract(&mut deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Uncompr>(&vk_gamma_bytes));
 
-        let vk_delta_2_x1 = 11733257046589851891850695012146277477007262722187040969185039828348964552798u256;
-        let vk_delta_2_y1 = 4027038803827470819590008730534113934894139311083936102089700708335772383417u256;
-        let vk_delta_2_x2 = 4501048010313692533367858190733760821904297928029128233318781536412685771070u256;
-        let vk_delta_2_y2 = 7929485975251451284651333169168875690528578182699769192928243180764480545757u256;
+        let vk_delta_x1 = 11733257046589851891850695012146277477007262722187040969185039828348964552798u256;
+        let vk_delta_y1 = 4027038803827470819590008730534113934894139311083936102089700708335772383417u256;
+        let vk_delta_x2 = 4501048010313692533367858190733760821904297928029128233318781536412685771070u256;
+        let vk_delta_y2 = 7929485975251451284651333169168875690528578182699769192928243180764480545757u256;
+        let vk_delta_bytes = bcs::to_bytes<u256>(&vk_delta_x1);
+        let vk_delta_y1_bytes = bcs::to_bytes<u256>(&vk_delta_y1);
+        let vk_delta_x2_bytes = bcs::to_bytes<u256>(&vk_delta_x2);
+        let vk_delta_y2_bytes = bcs::to_bytes<u256>(&vk_delta_y2);
+        vector::append(&mut vk_delta_bytes, vk_delta_y1_bytes);
+        vector::append(&mut vk_delta_bytes, vk_delta_x2_bytes);
+        vector::append(&mut vk_delta_bytes, vk_delta_y2_bytes);
+        let vk_delta = std::option::extract(&mut deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Uncompr>(&vk_delta_bytes));
+
+        let vk_alphabeta_x11 = 2029413683389138792403550203267699914886160938906632433982220835551125967885u256;
+        let vk_alphabeta_x12 = 21072700047562757817161031222997517981543347628379360635925549008442030252106u256;
+        let vk_alphabeta_x21 = 5940354580057074848093997050200682056184807770593307860589430076672439820312u256;
+        let vk_alphabeta_x22 = 12156638873931618554171829126792193045421052652279363021382169897324752428276u256;
+        let vk_alphabeta_x31 = 7898200236362823042373859371574133993780991612861777490112507062703164551277u256;
+        let vk_alphabeta_x32 = 7074218545237549455313236346927434013100842096812539264420499035217050630853u256;
+        let vk_alphabeta_bytes = bcs::to_bytes<u256>(&vk_alphabeta_x11);
+        let vk_alphabeta_x12_bytes = bcs::to_bytes<u256>(&vk_alphabeta_x12);
+        let vk_alphabeta_x21_bytes = bcs::to_bytes<u256>(&vk_alphabeta_x21);
+        let vk_alphabeta_x22_bytes = bcs::to_bytes<u256>(&vk_alphabeta_x22);
+        let vk_alphabeta_x31_bytes = bcs::to_bytes<u256>(&vk_alphabeta_x31);
+        let vk_alphabeta_x32_bytes = bcs::to_bytes<u256>(&vk_alphabeta_x32);
+        vector::append(&mut vk_alphabeta_bytes, vk_alphabeta_x12_bytes);
+        vector::append(&mut vk_alphabeta_bytes, vk_alphabeta_x21_bytes);
+        vector::append(&mut vk_alphabeta_bytes, vk_alphabeta_x22_bytes);
+        vector::append(&mut vk_alphabeta_bytes, vk_alphabeta_x31_bytes);
+        vector::append(&mut vk_alphabeta_bytes, vk_alphabeta_x32_bytes);
+
+        let vk_alphabeta_y11 = 7077479683546002997211712695946002074877511277312570035766170199895071832130u256;
+        let vk_alphabeta_y12 = 10093483419865920389913245021038182291233451549023025229112148274109565435465u256;
+        let vk_alphabeta_y21 = 4595479056700221319381530156280926371456704509942304414423590385166031118820u256;
+        let vk_alphabeta_y22 = 19831328484489333784475432780421641293929726139240675179672856274388269393268u256;
+        let vk_alphabeta_y31 = 11934129596455521040620786944827826205713621633706285934057045369193958244500u256;
+        let vk_alphabeta_y32 = 8037395052364110730298837004334506829870972346962140206007064471173334027475u256;
+        let vk_alphabeta_y11_bytes = bcs::to_bytes<u256>(&vk_alphabeta_y11);
+        let vk_alphabeta_y12_bytes = bcs::to_bytes<u256>(&vk_alphabeta_y12);
+        let vk_alphabeta_y21_bytes = bcs::to_bytes<u256>(&vk_alphabeta_y21);
+        let vk_alphabeta_y22_bytes = bcs::to_bytes<u256>(&vk_alphabeta_y22);
+        let vk_alphabeta_y31_bytes = bcs::to_bytes<u256>(&vk_alphabeta_y31);
+        let vk_alphabeta_y32_bytes = bcs::to_bytes<u256>(&vk_alphabeta_y32);
+        vector::append(&mut vk_alphabeta_bytes, vk_alphabeta_y11_bytes);
+        vector::append(&mut vk_alphabeta_bytes, vk_alphabeta_y12_bytes);
+        vector::append(&mut vk_alphabeta_bytes, vk_alphabeta_y21_bytes);
+        vector::append(&mut vk_alphabeta_bytes, vk_alphabeta_y22_bytes);
+        vector::append(&mut vk_alphabeta_bytes, vk_alphabeta_y31_bytes);
+        vector::append(&mut vk_alphabeta_bytes, vk_alphabeta_y32_bytes);
+        let vk_alphabeta = std::option::extract(&mut deserialize<bn254_algebra::Gt, bn254_algebra::FormatGt>(&vk_alphabeta_bytes));
+
+        let vk_gamma_abc_1_x = 9301933260370907965380929235907744187309044275532228633956723711236164592702u256;
+        let vk_gamma_abc_1_y = 16430819258686105004298644553325509170608676387027348203797023622583733864344u256;
+        let vk_gamma_abc_2_x = 15788660278421993534955189104796829710153510462607851239961905416961864489081u256;
+        let vk_gamma_abc_2_y = 15949953543860974252716711139898663592700226282992131841266708887108944899694u256;
+        let vk_gamma_abc_3_x = 2752114278074204756951480614592040829268118205913128303990769829555505490153u256;
+        let vk_gamma_abc_3_y = 73756394237398953482375632482393116165824820760002925371208078608366682284u256;
+        let vk_gamma_abc_4_x = 6831852747912655055472532439405874457935232091421568713540315004023659266911u256;
+        let vk_gamma_abc_4_y = 17612881006477748801680400530139134796116043408186867599538777507587075595161u256;
+        let vk_gamma_abc_5_x = 17635013362332631023685688861083101650289128874790189338507065664254475202088u256;
+        let vk_gamma_abc_5_y = 6682655906896444146648448177201874759860197304706943082757442475451670349909u256;
+        let vk_gamma_abc_6_x = 9475873236009016297956856337772183876551495716493352835259515853844766276811u256;
+        let vk_gamma_abc_6_y = 354515196483384658424215379959670593913045973021122448612086705709310867552u256;
+        let vk_gamma_abc_7_x = 7739081130943509516619482455397124703705394954310688728375429231271874275446u256;
+        let vk_gamma_abc_7_y = 20649108686175166181372170979134000369449535282768431130801436273782009562466u256;
+        let vk_gamma_abc_8_x = 19048468636913770448398586085397679668705519948654488617907272996340406724088u256;
+        let vk_gamma_abc_8_y = 16091090919051613132321664644473341983081123954146774949203587504747978913249u256;
+        let vk_gamma_abc_9_x = 15589510145441310638849264936668688491890711017850837908639714876170500087371u256;
+        let vk_gamma_abc_9_y = 160324255716095477979225131314833211463231522810162446268019950262710535809u256;
+
+        let vk_gamma_abc_1_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_1_x);
+        let vk_gamma_abc_1_y_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_1_y);
+        vector::append(&mut vk_gamma_abc_1_bytes, vk_gamma_abc_1_y_bytes);
+        let vk_gamma_abc_1 = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&vk_gamma_abc_1_bytes));
+
+        let vk_gamma_abc_2_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_2_x);
+        let vk_gamma_abc_2_y_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_2_y);
+        vector::append(&mut vk_gamma_abc_2_bytes, vk_gamma_abc_2_y_bytes);
+        let vk_gamma_abc_2 = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&vk_gamma_abc_2_bytes));
+
+        let vk_gamma_abc_3_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_3_x);
+        let vk_gamma_abc_3_y_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_3_y);
+        vector::append(&mut vk_gamma_abc_3_bytes, vk_gamma_abc_3_y_bytes);
+        let vk_gamma_abc_3 = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&vk_gamma_abc_3_bytes));
+
+        let vk_gamma_abc_4_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_4_x);
+        let vk_gamma_abc_4_y_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_4_y);
+        vector::append(&mut vk_gamma_abc_4_bytes, vk_gamma_abc_4_y_bytes);
+        let vk_gamma_abc_4 = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&vk_gamma_abc_4_bytes));
+
+        let vk_gamma_abc_5_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_5_x);
+        let vk_gamma_abc_5_y_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_5_y);
+        vector::append(&mut vk_gamma_abc_5_bytes, vk_gamma_abc_5_y_bytes);
+        let vk_gamma_abc_5 = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&vk_gamma_abc_5_bytes));
+
+        let vk_gamma_abc_6_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_6_x);
+        let vk_gamma_abc_6_y_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_6_y);
+        vector::append(&mut vk_gamma_abc_6_bytes, vk_gamma_abc_6_y_bytes);
+        let vk_gamma_abc_6 = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&vk_gamma_abc_6_bytes));
+
+        let vk_gamma_abc_7_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_7_x);
+        let vk_gamma_abc_7_y_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_7_y);
+        vector::append(&mut vk_gamma_abc_7_bytes, vk_gamma_abc_7_y_bytes);
+        let vk_gamma_abc_7 = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&vk_gamma_abc_7_bytes));
+
+        let vk_gamma_abc_8_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_8_x);
+        let vk_gamma_abc_8_y_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_8_y);
+        vector::append(&mut vk_gamma_abc_8_bytes, vk_gamma_abc_8_y_bytes);
+        let vk_gamma_abc_8 = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&vk_gamma_abc_8_bytes));
+
+        let vk_gamma_abc_9_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_9_x);
+        let vk_gamma_abc_9_y_bytes = bcs::to_bytes<u256>(&vk_gamma_abc_9_y);
+        vector::append(&mut vk_gamma_abc_9_bytes, vk_gamma_abc_9_y_bytes);
+        let vk_gamma_abc_9 = std::option::extract(&mut deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Uncompr>(&vk_gamma_abc_9_bytes));
+
+        let vk_gamma_abc: vector<Element<bn254_algebra::G1>> = vector[
+            vk_gamma_abc_1, vk_gamma_abc_2, vk_gamma_abc_3, vk_gamma_abc_4, vk_gamma_abc_5, vk_gamma_abc_6, vk_gamma_abc_7, vk_gamma_abc_8, vk_gamma_abc_9
+        ];
+
+        let public_1_val = 0u256;
+        let public_2_val = 7714357208561315320836530795186262204499958856333073618293621003566744654598u256;
+        let public_3_val = 91557130945874u256;
+        let public_4_val = 34458076785421617u256;
+        let public_5_val = 2800000u256;
+        let public_6_val = 5591876u256;
+        let public_7_val = 5591876u256;
+        let public_8_val = 751199308u256;
+        let public_1_bytes = bcs::to_bytes<u256>(&public_1_val);
+        let public_2_bytes = bcs::to_bytes<u256>(&public_2_val);
+        let public_3_bytes = bcs::to_bytes<u256>(&public_3_val);
+        let public_4_bytes = bcs::to_bytes<u256>(&public_4_val);
+        let public_5_bytes = bcs::to_bytes<u256>(&public_5_val);
+        let public_6_bytes = bcs::to_bytes<u256>(&public_6_val);
+        let public_7_bytes = bcs::to_bytes<u256>(&public_7_val);
+        let public_8_bytes = bcs::to_bytes<u256>(&public_8_val);
+        let public_1 = std::option::extract(&mut deserialize<bn254_algebra::Fr, bn254_algebra::FormatFrLsb>(&public_1_bytes));
+        let public_2 = std::option::extract(&mut deserialize<bn254_algebra::Fr, bn254_algebra::FormatFrLsb>(&public_2_bytes));
+        let public_3 = std::option::extract(&mut deserialize<bn254_algebra::Fr, bn254_algebra::FormatFrLsb>(&public_3_bytes));
+        let public_4 = std::option::extract(&mut deserialize<bn254_algebra::Fr, bn254_algebra::FormatFrLsb>(&public_4_bytes));
+        let public_5 = std::option::extract(&mut deserialize<bn254_algebra::Fr, bn254_algebra::FormatFrLsb>(&public_5_bytes));
+        let public_6 = std::option::extract(&mut deserialize<bn254_algebra::Fr, bn254_algebra::FormatFrLsb>(&public_6_bytes));
+        let public_7 = std::option::extract(&mut deserialize<bn254_algebra::Fr, bn254_algebra::FormatFrLsb>(&public_7_bytes));
+        let public_8 = std::option::extract(&mut deserialize<bn254_algebra::Fr, bn254_algebra::FormatFrLsb>(&public_8_bytes));
+
+        let public_inputs: vector<Element<bn254_algebra::Fr>> = vector[
+            public_1, public_2, public_3, public_4, public_5, public_6, public_7, public_8
+        ];
+
+        assert!(verify_proof<bn254_algebra::G1, bn254_algebra::G2, bn254_algebra::Gt, bn254_algebra::Fr>(
+            &vk_alpha,
+            &vk_beta,
+            &vk_gamma,
+            &vk_delta,
+            &vk_gamma_abc,
+            &public_inputs,
+            &a,
+            &b,
+            &c,
+        ), 1);
     }
 
     #[test(fx = @std)]
