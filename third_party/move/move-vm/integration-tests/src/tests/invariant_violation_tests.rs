@@ -76,13 +76,13 @@ fn merge_borrow_states_infinite_loop() {
     let runtime_environment = RuntimeEnvironment::new(vec![]);
     let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
 
-    let storage: InMemoryStorage = InMemoryStorage::new();
+    let storage: InMemoryStorage = InMemoryStorage::new(runtime_environment);
     let mut session = vm.new_session(&storage);
     let mut script_bytes = vec![];
     cs.serialize(&mut script_bytes).unwrap();
 
     let traversal_storage = TraversalStorage::new();
-    let code_storage = storage.as_unsync_code_storage(runtime_environment);
+    let code_storage = storage.as_unsync_code_storage();
 
     let err = session
         .execute_script(

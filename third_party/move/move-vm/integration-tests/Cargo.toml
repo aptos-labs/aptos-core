@@ -13,6 +13,7 @@ edition = "2021"
 [dependencies]
 anyhow = { workspace = true }
 bytes = { workspace = true }
+claims = { workspace = true }
 memory-stats = { workspace = true }
 move-binary-format = { path = "../../move-binary-format", features = ["testing"] }
 move-bytecode-verifier = { path = "../../move-bytecode-verifier" }

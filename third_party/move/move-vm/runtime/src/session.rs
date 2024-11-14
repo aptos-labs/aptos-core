@@ -178,7 +178,7 @@ impl<'r, 'l> Session<'r, 'l> {
         )
     }
 
-    /// Publish the given module.
+    /// Publish a series of modules.
     ///
     /// The Move VM MUST return a user error, i.e., an error that's not an invariant violation, if
     ///   - The module fails to deserialize or verify.
@@ -186,56 +186,16 @@ impl<'r, 'l> Session<'r, 'l> {
     ///   - (Republishing-only) the module to be updated is not backward compatible with the old module.
     ///   - (Republishing-only) the module to be updated introduces cyclic dependencies.
     ///
-    /// The Move VM should not be able to produce other user errors.
-    /// Besides, no user input should cause the Move VM to return an invariant violation.
+    /// The publishing of the module series is an all-or-nothing action: either all modules are
+    /// published to the data store or none is.
     ///
-    /// In case an invariant violation occurs, the whole Session should be considered corrupted and
-    /// one shall not proceed with effect generation.
-    #[deprecated]
-    pub fn publish_module(
-        &mut self,
-        module: Vec<u8>,
-        sender: AccountAddress,
-        gas_meter: &mut impl GasMeter,
-    ) -> VMResult<()> {
-        #[allow(deprecated)]
-        self.publish_module_bundle(vec![module], sender, gas_meter)
-    }
-
-    /// Publish a series of modules.
-    ///
-    /// The Move VM MUST return a user error, i.e., an error that's not an invariant violation, if
-    /// any module fails to deserialize or verify (see the full list of  failing conditions in the
-    /// `publish_module` API). The publishing of the module series is an all-or-nothing action:
-    /// either all modules are published to the data store or none is.
-    ///
-    /// Similar to the `publish_module` API, the Move VM should not be able to produce other user
-    /// errors. Besides, no user input should cause the Move VM to return an invariant violation.
+    /// The Move VM should not be able to produce other user errors. Besides, no user input should
+    /// cause the Move VM to return an invariant violation.
     ///
     /// In case an invariant violation occurs, the whole Session should be considered corrupted and
     /// one shall not proceed with effect generation.
     ///
-    /// This operation performs compatibility checks if a module is replaced. See also
-    /// `move_binary_format::compatibility`.
-    #[deprecated]
-    pub fn publish_module_bundle(
-        &mut self,
-        modules: Vec<Vec<u8>>,
-        sender: AccountAddress,
-        gas_meter: &mut impl GasMeter,
-    ) -> VMResult<()> {
-        #[allow(deprecated)]
-        self.move_vm.runtime.publish_module_bundle(
-            modules,
-            sender,
-            &mut self.data_cache,
-            &self.module_store,
-            gas_meter,
-            Compatibility::full_check(),
-        )
-    }
-
-    /// Same like `publish_module_bundle` but with a custom compatibility check.
+    /// This operation performs compatibility checks if a module is replaced.
     #[deprecated]
     pub fn publish_module_bundle_with_compat_config(
         &mut self,
@@ -252,24 +212,6 @@ impl<'r, 'l> Session<'r, 'l> {
             &self.module_store,
             gas_meter,
             compat_config,
-        )
-    }
-
-    #[deprecated]
-    pub fn publish_module_bundle_relax_compatibility(
-        &mut self,
-        modules: Vec<Vec<u8>>,
-        sender: AccountAddress,
-        gas_meter: &mut impl GasMeter,
-    ) -> VMResult<()> {
-        #[allow(deprecated)]
-        self.move_vm.runtime.publish_module_bundle(
-            modules,
-            sender,
-            &mut self.data_cache,
-            &self.module_store,
-            gas_meter,
-            Compatibility::no_check(),
         )
     }
 

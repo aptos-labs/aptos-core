@@ -1,7 +1,9 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{loader::Script, logging::expect_no_verification_errors, ModuleStorage};
+use crate::{
+    loader::Script, logging::expect_no_verification_errors, storage::module_storage::ModuleStorage,
+};
 use ambassador::delegatable_trait;
 use move_binary_format::{errors::VMResult, file_format::CompiledScript};
 use move_vm_types::{

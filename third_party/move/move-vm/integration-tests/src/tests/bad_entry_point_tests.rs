@@ -12,8 +12,9 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     module_traversal::*, move_vm::MoveVM, AsUnsyncModuleStorage, RuntimeEnvironment,
+    WithRuntimeEnvironment,
 };
-use move_vm_test_utils::{BlankStorage, InMemoryStorage};
+use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
@@ -22,13 +23,13 @@ const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGT
 fn call_non_existent_module() {
     let runtime_environment = RuntimeEnvironment::new(vec![]);
     let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
-    let storage = BlankStorage;
+    let storage = InMemoryStorage::new(runtime_environment);
 
     let mut sess = vm.new_session(&storage);
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
     let fun_name = Identifier::new("foo").unwrap();
     let traversal_storage = TraversalStorage::new();
-    let module_storage = storage.as_unsync_module_storage(runtime_environment);
+    let module_storage = storage.as_unsync_module_storage();
 
     let err = sess
         .execute_function_bypass_visibility(
@@ -57,18 +58,19 @@ fn call_non_existent_function() {
     let mut blob = vec![];
     m.serialize(&mut blob).unwrap();
 
-    let mut storage = InMemoryStorage::new();
+    let runtime_environment = RuntimeEnvironment::new(vec![]);
+    let mut storage = InMemoryStorage::new(runtime_environment);
+
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
     storage.add_module_bytes(module_id.address(), module_id.name(), blob.into());
 
-    let runtime_environment = RuntimeEnvironment::new(vec![]);
-    let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
+    let vm = MoveVM::new_with_runtime_environment(storage.runtime_environment());
     let mut sess = vm.new_session(&storage);
 
     let fun_name = Identifier::new("foo").unwrap();
 
     let traversal_storage = TraversalStorage::new();
-    let module_storage = storage.as_unsync_module_storage(runtime_environment);
+    let module_storage = storage.as_unsync_module_storage();
 
     let err = sess
         .execute_function_bypass_visibility(

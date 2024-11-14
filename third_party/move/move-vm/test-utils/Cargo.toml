@@ -20,6 +20,7 @@ move-binary-format = { path = "../../move-binary-format" }
 move-bytecode-utils = { path = "../../tools/move-bytecode-utils" }
 move-core-types = { path = "../../move-core/types" }
 move-table-extension = { path = "../../extensions/move-table-extension", optional = true }
+move-vm-runtime = { path = "../runtime" }
 move-vm-types = { path = "../types" }
 
 [features]

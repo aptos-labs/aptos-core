@@ -6,8 +6,8 @@ use crate::{
     loader::{Function, LoadedFunctionOwner, Module},
     logging::expect_no_verification_errors,
     module_traversal::TraversalContext,
-    storage::module_storage::ModuleStorage,
-    CodeStorage, LoadedFunction,
+    storage::{code_storage::CodeStorage, module_storage::ModuleStorage},
+    LoadedFunction,
 };
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},

@@ -1,7 +1,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{loader::Module, WithRuntimeEnvironment};
+use crate::{loader::Module, storage::environment::WithRuntimeEnvironment};
 use ambassador::delegatable_trait;
 use bytes::Bytes;
 use hashbrown::HashSet;

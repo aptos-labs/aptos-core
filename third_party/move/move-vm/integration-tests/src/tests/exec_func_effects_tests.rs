@@ -95,12 +95,12 @@ fn run(
 ) -> VMResult<(ChangeSet, SerializedReturnValues)> {
     let module_id = &module.0;
     let modules = vec![module.clone()];
-    let (runtime_environment, vm, storage) = setup_vm(&modules);
+    let (vm, storage) = setup_vm(&modules);
     let mut session = vm.new_session(&storage);
 
     let fun_name = Identifier::new(fun_name).unwrap();
     let traversal_storage = TraversalStorage::new();
-    let module_storage = storage.as_unsync_module_storage(runtime_environment);
+    let module_storage = storage.as_unsync_module_storage();
 
     session
         .execute_function_bypass_visibility(
@@ -121,12 +121,14 @@ fn run(
 type ModuleCode = (ModuleId, String);
 
 // TODO - move some utility functions to where test infra lives, see about unifying with similar code
-fn setup_vm(modules: &[ModuleCode]) -> (RuntimeEnvironment, MoveVM, InMemoryStorage) {
-    let mut storage = InMemoryStorage::new();
-    compile_modules(&mut storage, modules);
+fn setup_vm(modules: &[ModuleCode]) -> (MoveVM, InMemoryStorage) {
     let runtime_environment = RuntimeEnvironment::new(vec![]);
     let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
-    (runtime_environment, vm, storage)
+
+    let mut storage = InMemoryStorage::new(runtime_environment);
+    compile_modules(&mut storage, modules);
+
+    (vm, storage)
 }
 
 fn compile_modules(storage: &mut InMemoryStorage, modules: &[ModuleCode]) {

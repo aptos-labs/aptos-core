@@ -2,8 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment, AsUnsyncModuleStorage,
-    Module, ModuleStorage, RuntimeEnvironment, UnsyncModuleStorage, WithRuntimeEnvironment,
+    storage::{
+        environment::{
+            ambassador_impl_WithRuntimeEnvironment, RuntimeEnvironment, WithRuntimeEnvironment,
+        },
+        implementations::unsync_module_storage::{AsUnsyncModuleStorage, UnsyncModuleStorage},
+        module_storage::{ambassador_impl_ModuleStorage, ModuleStorage},
+    },
+    Module,
 };
 use ambassador::Delegate;
 use bytes::Bytes;
@@ -43,10 +49,19 @@ impl<K: Ord, V: Clone> IntoIterator for VerifiedModuleBundle<K, V> {
 /// An implementation of [ModuleBytesStorage] that stores some additional staged changes. If used
 /// by [ModuleStorage], the most recent version of a module will be fetched.
 struct StagingModuleBytesStorage<'a, M> {
+    // Runtime environment that shadows the runtime environment of the ground-truth module storage.
+    staged_runtime_environment: RuntimeEnvironment,
     // Modules to be published, staged temporarily.
     staged_module_bytes: BTreeMap<AccountAddress, BTreeMap<Identifier, Bytes>>,
+
     // Underlying ground-truth module storage, used as a raw byte storage.
     module_storage: &'a M,
+}
+
+impl<'a, M: ModuleStorage> WithRuntimeEnvironment for StagingModuleBytesStorage<'a, M> {
+    fn runtime_environment(&self) -> &RuntimeEnvironment {
+        &self.staged_runtime_environment
+    }
 }
 
 impl<'a, M: ModuleStorage> ModuleBytesStorage for StagingModuleBytesStorage<'a, M> {
@@ -75,7 +90,7 @@ impl<'a, M: ModuleStorage> ModuleBytesStorage for StagingModuleBytesStorage<'a, 
 #[delegate(WithRuntimeEnvironment, where = "M: ModuleStorage")]
 #[delegate(ModuleStorage, where = "M: ModuleStorage")]
 pub struct StagingModuleStorage<'a, M> {
-    storage: UnsyncModuleStorage<'a, StagingModuleBytesStorage<'a, M>, RuntimeEnvironment>,
+    storage: UnsyncModuleStorage<'a, StagingModuleBytesStorage<'a, M>>,
 }
 
 impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
@@ -110,8 +125,8 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
         // TODO(loader_v2):
         //   Avoid clone and instead stage runtime environment so that higher order indices are
         //   resolved through some temporary data structure.
-        let runtime_environment = existing_module_storage.runtime_environment().clone();
-        let deserializer_config = &runtime_environment.vm_config().deserializer_config;
+        let staged_runtime_environment = existing_module_storage.runtime_environment().clone();
+        let deserializer_config = &staged_runtime_environment.vm_config().deserializer_config;
 
         // For every module in bundle, run compatibility checks and construct a new bytes storage
         // view such that added modules shadow any existing ones.
@@ -153,7 +168,10 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
                     existing_module_storage.fetch_deserialized_module(addr, name)?
                 {
                     let old_module = old_module_ref.as_ref();
-                    if runtime_environment.vm_config().use_compatibility_checker_v2 {
+                    if staged_runtime_environment
+                        .vm_config()
+                        .use_compatibility_checker_v2
+                    {
                         compatibility
                             .check(old_module, &compiled_module)
                             .map_err(|e| e.finish(Location::Undefined))?;
@@ -197,12 +215,13 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
         // At this point, we have successfully created a new module storage that also contains the
         // newly published bundle.
         let staged_module_bytes_storage = StagingModuleBytesStorage {
+            staged_runtime_environment,
             staged_module_bytes,
             module_storage: existing_module_storage,
         };
 
         let staged_module_storage = StagingModuleStorage {
-            storage: staged_module_bytes_storage.into_unsync_module_storage(runtime_environment),
+            storage: staged_module_bytes_storage.into_unsync_module_storage(),
         };
 
         // Finally, verify the bundle, performing linking checks for all staged modules.

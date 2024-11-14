@@ -31,11 +31,14 @@ use move_vm_types::{
 use std::{ops::Deref, sync::Arc};
 
 /// Avoids orphan rule to implement [ModuleBytesStorage] for [StateView].
-struct StateViewAdapter<'s, S> {
+struct StateViewAdapter<'s, S, E> {
+    environment: E,
     state_view: BorrowedOrOwned<'s, S>,
 }
 
-impl<'s, S: StateView> ModuleBytesStorage for StateViewAdapter<'s, S> {
+impl<'s, S: StateView, E: WithRuntimeEnvironment> ModuleBytesStorage
+    for StateViewAdapter<'s, S, E>
+{
     fn fetch_module_bytes(
         &self,
         address: &AccountAddress,
@@ -48,7 +51,15 @@ impl<'s, S: StateView> ModuleBytesStorage for StateViewAdapter<'s, S> {
     }
 }
 
-impl<'s, S: StateView> Deref for StateViewAdapter<'s, S> {
+impl<'s, S: StateView, E: WithRuntimeEnvironment> WithRuntimeEnvironment
+    for StateViewAdapter<'s, S, E>
+{
+    fn runtime_environment(&self) -> &RuntimeEnvironment {
+        self.environment.runtime_environment()
+    }
+}
+
+impl<'s, S: StateView, E: WithRuntimeEnvironment> Deref for StateViewAdapter<'s, S, E> {
     type Target = S;
 
     fn deref(&self) -> &Self::Target {
@@ -67,27 +78,29 @@ impl<'s, S: StateView> Deref for StateViewAdapter<'s, S> {
 #[delegate(ModuleStorage, where = "S: StateView, E: WithRuntimeEnvironment")]
 #[delegate(CodeStorage, where = "S: StateView, E: WithRuntimeEnvironment")]
 pub struct AptosCodeStorageAdapter<'s, S, E> {
-    storage: UnsyncCodeStorage<UnsyncModuleStorage<'s, StateViewAdapter<'s, S>, E>>,
+    storage: UnsyncCodeStorage<UnsyncModuleStorage<'s, StateViewAdapter<'s, S, E>>>,
 }
 
 impl<'s, S: StateView, E: WithRuntimeEnvironment> AptosCodeStorageAdapter<'s, S, E> {
     /// Creates new instance of [AptosCodeStorageAdapter] built on top of the passed state view and
     /// the provided runtime environment.
-    fn from_borrowed(state_view: &'s S, runtime_environment: E) -> Self {
+    fn from_borrowed(state_view: &'s S, environment: E) -> Self {
         let adapter = StateViewAdapter {
+            environment,
             state_view: BorrowedOrOwned::Borrowed(state_view),
         };
-        let storage = adapter.into_unsync_code_storage(runtime_environment);
+        let storage = adapter.into_unsync_code_storage();
         Self { storage }
     }
 
     /// Creates new instance of [AptosCodeStorageAdapter] capturing the passed state view and the
     /// provided environment.
-    fn from_owned(state_view: S, runtime_environment: E) -> Self {
+    fn from_owned(state_view: S, environment: E) -> Self {
         let adapter = StateViewAdapter {
+            environment,
             state_view: BorrowedOrOwned::Owned(state_view),
         };
-        let storage = adapter.into_unsync_code_storage(runtime_environment);
+        let storage = adapter.into_unsync_code_storage();
         Self { storage }
     }
 

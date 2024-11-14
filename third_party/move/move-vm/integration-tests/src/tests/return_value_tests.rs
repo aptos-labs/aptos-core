@@ -49,11 +49,11 @@ fn run(
     let mut blob = vec![];
     m.serialize(&mut blob).unwrap();
 
-    let mut storage = InMemoryStorage::new();
-    storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
-
     let runtime_environment = RuntimeEnvironment::new(vec![]);
     let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
+    let mut storage = InMemoryStorage::new(runtime_environment);
+    storage.add_module_bytes(m.self_addr(), m.self_name(), blob.into());
+
     let mut sess = vm.new_session(&storage);
 
     let fun_name = Identifier::new("foo").unwrap();
@@ -63,7 +63,7 @@ fn run(
         .map(|val| val.simple_serialize().unwrap())
         .collect();
 
-    let module_storage = storage.as_unsync_module_storage(runtime_environment);
+    let module_storage = storage.as_unsync_module_storage();
     let traversal_storage = TraversalStorage::new();
 
     let SerializedReturnValues {
