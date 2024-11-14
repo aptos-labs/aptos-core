@@ -50,5 +50,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
 
         [vector_move_range_base: InternalGas, { RELEASE_V1_24.. => "vector.move_range.base" }, 4000],
         [vector_move_range_per_index_moved: InternalGasPerArg, { RELEASE_V1_24.. => "vector.move_range.per_index_moved" }, 10],
+
+        [mem_swap_base: InternalGas, { RELEASE_V1_24.. => "mem.swap.base" }, 1500],
     ]
 );
