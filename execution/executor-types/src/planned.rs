@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::metrics::TIMER;
 use aptos_infallible::Mutex;
+use aptos_metrics_core::TimerHelper;
 use once_cell::sync::OnceCell;
 use rayon::ThreadPool;
 use std::{ops::Deref, sync::mpsc::Receiver};
@@ -40,10 +42,12 @@ impl<T> Planned<T> {
         }
     }
 
-    pub fn get(&self) -> &T {
+    pub fn get(&self, name_for_timer: Option<&str>) -> &T {
         if let Some(t) = self.value.get() {
             t
         } else {
+            let _timer = name_for_timer.map(|name| TIMER.timer_with(&[name]));
+
             let rx = self.rx.get().expect("Not planned").lock();
             if self.value.get().is_none() {
                 let t = rx.recv().expect("Plan failed.");
@@ -58,7 +62,7 @@ impl<T> Deref for Planned<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        self.get()
+        self.get(None)
     }
 }
 

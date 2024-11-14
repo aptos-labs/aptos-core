@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::metrics::TIMER;
+use aptos_metrics_core::TimerHelper;
 use aptos_types::transaction::{Transaction, TransactionOutput};
 use itertools::izip;
 
@@ -8,21 +10,20 @@ use itertools::izip;
 pub struct TransactionsWithOutput {
     pub transactions: Vec<Transaction>,
     pub transaction_outputs: Vec<TransactionOutput>,
-    pub epoch_ending_flags: Vec<bool>,
+    pub is_reconfig: bool,
 }
 
 impl TransactionsWithOutput {
     pub fn new(
         transactions: Vec<Transaction>,
         transaction_outputs: Vec<TransactionOutput>,
-        epoch_ending_flags: Vec<bool>,
+        is_reconfig: bool,
     ) -> Self {
         assert_eq!(transactions.len(), transaction_outputs.len());
-        assert_eq!(transactions.len(), epoch_ending_flags.len());
         Self {
             transactions,
             transaction_outputs,
-            epoch_ending_flags,
+            is_reconfig,
         }
     }
 
@@ -32,8 +33,7 @@ impl TransactionsWithOutput {
 
     pub fn new_dummy_success(txns: Vec<Transaction>) -> Self {
         let txn_outputs = vec![TransactionOutput::new_empty_success(); txns.len()];
-        let epoch_ending_flags = vec![false; txns.len()];
-        Self::new(txns, txn_outputs, epoch_ending_flags)
+        Self::new(txns, txn_outputs, false)
     }
 
     pub fn push(
@@ -42,9 +42,12 @@ impl TransactionsWithOutput {
         transaction_output: TransactionOutput,
         is_reconfig: bool,
     ) {
+        // can't add more txns after reconfig
+        assert!(!self.is_reconfig);
+
         self.transactions.push(transaction);
         self.transaction_outputs.push(transaction_output);
-        self.epoch_ending_flags.push(is_reconfig);
+        self.is_reconfig = is_reconfig;
     }
 
     pub fn len(&self) -> usize {
@@ -64,31 +67,31 @@ impl TransactionsWithOutput {
     }
 
     pub fn get_last_checkpoint_index(&self) -> Option<usize> {
+        if self.is_reconfig {
+            return Some(self.len() - 1);
+        }
+
         (0..self.len())
             .rev()
-            .find(|&i| Self::need_checkpoint(&self.transactions[i], self.epoch_ending_flags[i]))
+            .find(|&i| self.transactions[i].is_non_reconfig_block_ending())
     }
 
-    pub fn need_checkpoint(txn: &Transaction, is_reconfig: bool) -> bool {
-        if is_reconfig {
-            return true;
-        }
-        match txn {
-            Transaction::BlockMetadata(_)
-            | Transaction::BlockMetadataExt(_)
-            | Transaction::UserTransaction(_)
-            | Transaction::ValidatorTransaction(_) => false,
-            Transaction::GenesisTransaction(_)
-            | Transaction::StateCheckpoint(_)
-            | Transaction::BlockEpilogue(_) => true,
-        }
+    pub fn iter(&self) -> impl Iterator<Item = (&Transaction, &TransactionOutput)> {
+        izip!(self.transactions.iter(), self.transaction_outputs.iter(),)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&Transaction, &TransactionOutput, bool)> {
-        izip!(
-            self.transactions.iter(),
-            self.transaction_outputs.iter(),
-            self.epoch_ending_flags.iter().cloned()
-        )
+    pub fn ends_with_sole_checkpoint(&self) -> bool {
+        let _timer = TIMER.timer_with(&["ends_with_sole_checkpoint"]);
+        if self.is_reconfig {
+            !self
+                .txns()
+                .iter()
+                .any(Transaction::is_non_reconfig_block_ending)
+        } else {
+            self.txns()
+                .iter()
+                .position(Transaction::is_non_reconfig_block_ending)
+                == Some(self.len() - 1)
+        }
     }
 }

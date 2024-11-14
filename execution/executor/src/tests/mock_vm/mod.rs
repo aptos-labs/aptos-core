@@ -57,6 +57,8 @@ pub static KEEP_STATUS: Lazy<TransactionStatus> =
 pub static DISCARD_STATUS: Lazy<TransactionStatus> =
     Lazy::new(|| TransactionStatus::Discard(StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE));
 
+pub static RETRY_STATUS: Lazy<TransactionStatus> = Lazy::new(|| TransactionStatus::Retry);
+
 pub struct MockVM;
 
 impl VMBlockExecutor for MockVM {
@@ -76,7 +78,19 @@ impl VMBlockExecutor for MockVM {
         let mut output_cache = HashMap::new();
         let mut outputs = vec![];
 
+        let mut skip_rest = false;
         for idx in 0..txn_provider.num_txns() {
+            if skip_rest {
+                outputs.push(TransactionOutput::new(
+                    WriteSet::default(),
+                    vec![],
+                    0,
+                    RETRY_STATUS.clone(),
+                    TransactionAuxiliaryData::default(),
+                ));
+                continue;
+            }
+
             let txn = txn_provider.get_txn(idx as u32).expect_valid();
             if matches!(txn, Transaction::StateCheckpoint(_)) {
                 outputs.push(TransactionOutput::new(
@@ -110,6 +124,7 @@ impl VMBlockExecutor for MockVM {
                     KEEP_STATUS.clone(),
                     TransactionAuxiliaryData::default(),
                 ));
+                skip_rest = true;
                 continue;
             }
 

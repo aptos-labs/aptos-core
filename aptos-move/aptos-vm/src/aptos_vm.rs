@@ -3080,13 +3080,44 @@ pub(crate) fn fetch_module_metadata_for_struct_tag(
     }
 }
 
-#[test]
-fn vm_thread_safe() {
-    fn assert_send<T: Send>() {}
-    fn assert_sync<T: Sync>() {}
+#[cfg(test)]
+mod tests {
+    use crate::{move_vm_ext::MoveVmExt, AptosVM};
+    use aptos_types::{
+        account_address::AccountAddress,
+        account_config::{NEW_EPOCH_EVENT_MOVE_TYPE_TAG, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG},
+        contract_event::ContractEvent,
+        event::EventKey,
+    };
 
-    assert_send::<AptosVM>();
-    assert_sync::<AptosVM>();
-    assert_send::<MoveVmExt>();
-    assert_sync::<MoveVmExt>();
+    #[test]
+    fn vm_thread_safe() {
+        fn assert_send<T: Send>() {}
+        fn assert_sync<T: Sync>() {}
+
+        assert_send::<AptosVM>();
+        assert_sync::<AptosVM>();
+        assert_send::<MoveVmExt>();
+        assert_sync::<MoveVmExt>();
+    }
+
+    #[test]
+    fn should_restart_execution_on_new_epoch() {
+        let new_epoch_event = ContractEvent::new_v1(
+            EventKey::new(0, AccountAddress::ONE),
+            0,
+            NEW_EPOCH_EVENT_MOVE_TYPE_TAG.clone(),
+            vec![],
+        );
+        let new_epoch_event_v2 =
+            ContractEvent::new_v2(NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(), vec![]);
+        assert!(AptosVM::should_restart_execution(&[(
+            new_epoch_event,
+            None
+        )]));
+        assert!(AptosVM::should_restart_execution(&[(
+            new_epoch_event_v2,
+            None
+        )]));
+    }
 }
