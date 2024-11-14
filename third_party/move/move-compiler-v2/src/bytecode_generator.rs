@@ -485,16 +485,6 @@ impl<'env> Generator<'env> {
                 "Function-typed values not yet supported except as parameters to calls to inline functions",
             ),
             // TODO(LAMBDA)
-            ExpData::MoveFunctionExp(id, _mid, _fid) => self.error(
-                *id,
-                "Function-typed values not yet supported except as parameters to calls to inline functions",
-            ),
-            // TODO(LAMBDA)
-            ExpData::Curry(id, _mask, _fnexp, _args) => self.error(
-                *id,
-                "Function-typed values not yet supported except as parameters to calls to inline functions",
-            ),
-            // TODO(LAMBDA)
             ExpData::Invoke(id, _exp, _) => self.error(
                 *id,
                 "Calls to function values other than inline function parameters not yet supported",
@@ -573,6 +563,12 @@ impl<'env> Generator<'env> {
                     self.internal_error(id, format!("inconsistent vector type: {:?}", ty));
                     Constant::Bool(false)
                 }
+            },
+            Value::Function(_mid, _fid) => {
+                self.error(
+                    id,
+                    "Function-typed values not yet supported except as parameters to calls to inline functions");
+                Constant::Bool(false)
             },
         }
     }
@@ -795,6 +791,11 @@ impl<'env> Generator<'env> {
             Operation::MoveFunction(m, f) => {
                 self.gen_function_call(targets, id, m.qualified(*f), args)
             },
+            // TODO(LAMBDA)
+            Operation::Bind(_mask) => self.error(
+                id,
+                "Function-typed values not yet supported except as parameters to calls to inline functions",
+            ),
             Operation::TestVariants(mid, sid, variants) => {
                 self.gen_test_variants(targets, id, mid.qualified(*sid), variants, args)
             },
@@ -1335,9 +1336,12 @@ impl<'env> Generator<'env> {
         };
         self.gen_borrow_field_operation(id, borrow_dest, str, fields, oper_temp);
         if need_read_ref {
-            self.emit_call(id, vec![target], BytecodeOperation::ReadRef, vec![
-                borrow_dest,
-            ])
+            self.emit_call(
+                id,
+                vec![target],
+                BytecodeOperation::ReadRef,
+                vec![borrow_dest],
+            )
         }
     }
 
@@ -1525,10 +1529,13 @@ enum MatchMode {
 impl MatchMode {
     /// Whether this match is in probing mode.
     fn is_probing(&self) -> bool {
-        matches!(self, MatchMode::Refutable {
-            probing_vars: Some(_),
-            ..
-        })
+        matches!(
+            self,
+            MatchMode::Refutable {
+                probing_vars: Some(_),
+                ..
+            }
+        )
     }
 
     /// Whether a variable appearing in the pattern should be bound to a temporary.
@@ -1656,9 +1663,12 @@ impl<'env> Generator<'env> {
                         ReferenceKind::Immutable,
                         Box::new(value_ty.clone()),
                     ));
-                    self.emit_call(id, vec![value_ref], BytecodeOperation::BorrowLoc, vec![
-                        value,
-                    ]);
+                    self.emit_call(
+                        id,
+                        vec![value_ref],
+                        BytecodeOperation::BorrowLoc,
+                        vec![value],
+                    );
                     needs_probing = true;
                     value_ref
                 }
@@ -1780,10 +1790,11 @@ impl<'env> Generator<'env> {
                             ),
                         );
                         return Some(
-                            ExpData::Call(id, Operation::Deref, vec![ExpData::LocalVar(
-                                new_id, var,
+                            ExpData::Call(
+                                id,
+                                Operation::Deref,
+                                vec![ExpData::LocalVar(new_id, var).into_exp()],
                             )
-                            .into_exp()])
                             .into_exp(),
                         );
                     }

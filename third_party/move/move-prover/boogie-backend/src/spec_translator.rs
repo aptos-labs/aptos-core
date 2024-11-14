@@ -689,14 +689,6 @@ impl<'env> SpecTranslator<'env> {
                 &self.env.get_node_loc(*node_id),
                 "`|x|e` (lambda) currently only supported as argument for `all` or `any`",
             ),
-            ExpData::MoveFunctionExp(node_id, ..) => self.error(
-                &self.env.get_node_loc(*node_id),
-                "Function values not yet supported",
-            ),
-            ExpData::Curry(node_id, ..) => self.error(
-                &self.env.get_node_loc(*node_id),
-                "Function values not yet supported",
-            ),
             ExpData::Quant(node_id, kind, ranges, _, _, exp) if kind.is_choice() => {
                 // The parser ensures that len(ranges) = 1 and triggers and condition are
                 // not present.
@@ -781,6 +773,10 @@ impl<'env> SpecTranslator<'env> {
             Value::Tuple(val) => {
                 let loc = self.env.get_node_loc(node_id);
                 self.error(&loc, &format!("tuple value not yet supported: {:#?}", val))
+            },
+            Value::Function(_mid, _fid) => {
+                let loc = self.env.get_node_loc(node_id);
+                self.error(&loc, "Function values not yet supported") // TODO(LAMBDA)
             },
         }
     }
@@ -1019,6 +1015,7 @@ impl<'env> SpecTranslator<'env> {
             | Operation::Deref
             | Operation::MoveTo
             | Operation::MoveFrom
+            | Operation::Bind(..)
             | Operation::Old => {
                 self.env.error(
                     &self.env.get_node_loc(node_id),

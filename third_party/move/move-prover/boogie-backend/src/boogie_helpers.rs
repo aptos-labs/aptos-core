@@ -592,6 +592,7 @@ pub fn boogie_value(env: &GlobalEnv, _options: &BoogieOptions, val: &Value) -> S
                 .collect_vec(),
         ),
         Value::Tuple(vec) => format!("<<unsupported Tuple({:?})>>", vec),
+        Value::Function(mid, fid) => format!("<unsupported Function({:?}, {:?}>", mid, fid), // TODO(LAMBDA)
     }
 }
 
@@ -706,10 +707,14 @@ impl TypeIdentToken {
         fn get_char_array(tokens: &[TypeIdentToken], start: usize, end: usize) -> String {
             let elements = (start..end)
                 .map(|k| {
-                    format!("[{} := {}]", k - start, match &tokens[k] {
-                        TypeIdentToken::Char(c) => *c,
-                        TypeIdentToken::Variable(_) => unreachable!(),
-                    })
+                    format!(
+                        "[{} := {}]",
+                        k - start,
+                        match &tokens[k] {
+                            TypeIdentToken::Char(c) => *c,
+                            TypeIdentToken::Variable(_) => unreachable!(),
+                        }
+                    )
                 })
                 .join("");
             format!("Vec(DefaultVecMap(){}, {})", elements, end - start)

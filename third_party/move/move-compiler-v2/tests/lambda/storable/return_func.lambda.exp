@@ -6,6 +6,18 @@ error: type `|u64|u64` is missing required ability `store`
 21 │         multiply(x, _)
    │         ^^^^^^^^^^^^^^
 
+error: type `|u64|u64:copy+drop` is missing required ability `store`
+   ┌─ tests/lambda/storable/return_func.move:26:13
+   │
+26 │             double
+   │             ^^^^^^
+
+error: type `|u64|u64:copy+drop` is missing required ability `store`
+   ┌─ tests/lambda/storable/return_func.move:28:13
+   │
+28 │             triple
+   │             ^^^^^^
+
 error: type `|u64|u64` is missing required ability `store`
    ┌─ tests/lambda/storable/return_func.move:36:13
    │

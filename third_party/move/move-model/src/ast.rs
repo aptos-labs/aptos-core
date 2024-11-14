@@ -350,6 +350,8 @@ impl Spec {
         self.any(move |c| c.kind == kind)
     }
 
+    /// Returns the functions used (called or loaded as a function value) in this spec, along with
+    /// the sites of the calls or loads.
     pub fn used_funs_with_uses(&self) -> BTreeMap<QualifiedId<FunId>, BTreeSet<NodeId>> {
         let mut result = BTreeMap::new();
         for cond in self.conditions.iter().chain(self.update_map.values()) {
@@ -363,6 +365,8 @@ impl Spec {
         result
     }
 
+    /// Returns the functions called in this spec.  Does not include any functions used
+    /// as function values.
     pub fn called_funs_with_callsites(&self) -> BTreeMap<QualifiedId<FunId>, BTreeSet<NodeId>> {
         let mut result = BTreeMap::new();
         for cond in self.conditions.iter().chain(self.update_map.values()) {
@@ -641,19 +645,6 @@ pub enum ExpData {
     Invoke(NodeId, Exp, Vec<Exp>),
     /// Represents a lambda.
     Lambda(NodeId, Pattern, Exp, LambdaCaptureKind, AbilitySet),
-    /// Represents a reference to a Move Function as a function value.
-    MoveFunctionExp(NodeId, ModuleId, FunId),
-    /// Represents a Curry expression.  mask has a 1 bit for position of each delayed
-    /// parameter in the function call (e.g.:
-    ///     (move |x, y| f(x, y, z)) === Curry(0b110, f, vec![z])
-    ///     (move |y, z| f(x, y, z)) === Curry(0b011, f, vec![x])
-    /// note that arity(f) = args.len() + bitcount(mask)
-    Curry(
-        NodeId,
-        u128,     // mask: 1 bit for arg position of each delayed paramter
-        Exp,      // f
-        Vec<Exp>, // args to bind early
-    ),
     /// Represents a quantified formula over multiple variables and ranges.
     Quant(
         NodeId,
@@ -834,8 +825,6 @@ impl ExpData {
             | Call(node_id, ..)
             | Invoke(node_id, ..)
             | Lambda(node_id, ..)
-            | MoveFunctionExp(node_id, ..)
-            | Curry(node_id, ..)
             | Quant(node_id, ..)
             | Block(node_id, ..)
             | IfElse(node_id, ..)
@@ -1106,10 +1095,8 @@ impl ExpData {
         let mut used = BTreeSet::new();
         let mut visitor = |e: &ExpData| {
             match e {
-                ExpData::Call(_, Operation::MoveFunction(mid, fid), _) => {
-                    used.insert(mid.qualified(*fid));
-                },
-                ExpData::MoveFunctionExp(_, mid, fid) => {
+                ExpData::Call(_, Operation::MoveFunction(mid, fid), _)
+                | ExpData::Value(_, Value::Function(mid, fid)) => {
                     used.insert(mid.qualified(*fid));
                 },
                 _ => {},
@@ -1126,7 +1113,7 @@ impl ExpData {
         let mut visitor = |e: &ExpData| {
             match e {
                 ExpData::Call(node_id, Operation::MoveFunction(mid, fid), _)
-                | ExpData::MoveFunctionExp(node_id, mid, fid) => {
+                | ExpData::Value(node_id, Value::Function(mid, fid)) => {
                     used.entry(mid.qualified(*fid))
                         .or_default()
                         .insert(*node_id);
@@ -1145,9 +1132,6 @@ impl ExpData {
         let mut visitor = |e: &ExpData| {
             match e {
                 ExpData::Call(_, Operation::MoveFunction(mid, fid), _) => {
-                    called.insert(mid.qualified(*fid));
-                },
-                ExpData::MoveFunctionExp(_, mid, fid) => {
                     called.insert(mid.qualified(*fid));
                 },
                 _ => {},
@@ -1464,12 +1448,6 @@ impl ExpData {
                 }
             },
             Lambda(_, _, body, _, _) => body.visit_positions_impl(visitor)?,
-            Curry(_, _, fnexp, args) => {
-                fnexp.visit_positions_impl(visitor)?;
-                for exp in args {
-                    exp.visit_positions_impl(visitor)?;
-                }
-            },
             Quant(_, _, ranges, triggers, condition, body) => {
                 for (_, range) in ranges {
                     range.visit_positions_impl(visitor)?;
@@ -1532,8 +1510,7 @@ impl ExpData {
             },
             SpecBlock(_, spec) => Self::visit_positions_spec_impl(spec, visitor)?,
             // Explicitly list all enum variants
-            MoveFunctionExp(..) | LoopCont(..) | Value(..) | LocalVar(..) | Temporary(..)
-            | Invalid(..) => {},
+            LoopCont(..) | Value(..) | LocalVar(..) | Temporary(..) | Invalid(..) => {},
         }
         visitor(VisitorPosition::Post, self)
     }
@@ -1843,6 +1820,14 @@ impl ExpRewriterFunctions for LoopNestRewriter {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Operation {
     MoveFunction(ModuleId, FunId),
+    /// Build a closure by binding 1 or more parameters to a function value.
+    /// First argument to the operation must be a function; the next bitcount(mask)
+    /// arguments will be bound to corresponding parameters of that function.
+    ///     (move |x, y| f(x, y, z)) === ExpData::Call(_, Bind(0b001u64), vec![f, z])
+    ///     (move |y, z| f(x, z, y)) === ExpData::Call(_, Bind(0b100u64), vec![f, x])
+    Bind(
+        u64, // mask: 1 bit for arg position of each early-bound parameter
+    ),
     Pack(ModuleId, StructId, /*variant*/ Option<Symbol>),
     Tuple,
     Select(ModuleId, StructId, FieldId),
@@ -2506,6 +2491,8 @@ pub enum Value {
     AddressArray(Vec<Address>), // TODO: merge AddressArray to Vector type in the future
     Vector(Vec<Value>),
     Tuple(Vec<Value>),
+    /// Represents a reference to a Move Function as a function value.
+    Function(ModuleId, FunId),
 }
 
 impl Value {
@@ -2594,6 +2581,9 @@ impl Value {
                         Some(false)
                     }
                 },
+                (Value::Function(mid1, sid1), Value::Function(mid2, sid2)) => {
+                    Some(mid1 == mid2 && sid1 == sid2)
+                },
                 _ => Some(false),
             }
         } else {
@@ -2614,6 +2604,14 @@ impl<'a> fmt::Display for EnvDisplay<'a, Value> {
             Value::AddressArray(array) => write!(f, "a{:?}", array),
             Value::Vector(array) => write!(f, "{:?}", array),
             Value::Tuple(array) => write!(f, "({:?})", array),
+            Value::Function(mid, fid) => write!(
+                f,
+                "{}",
+                self.env
+                    .get_function_opt(mid.qualified(*fid))
+                    .map(|fun| fun.get_full_name_str())
+                    .unwrap_or_else(|| "<?unknown function?>".to_string())
+            ),
         }
     }
 }
@@ -2682,6 +2680,7 @@ impl Operation {
             Select(..) => false,         // Move-related
             SelectVariants(..) => false, // Move-related
             UpdateField(..) => false,    // Move-related
+            Bind(..) => true,
 
             // Specification specific
             Result(..) => false, // Spec
@@ -2907,8 +2906,6 @@ impl ExpData {
                         is_pure = pure_stack.pop().expect("unbalanced");
                     }
                 },
-                MoveFunctionExp(..) => {}, // Like Value(), keep going
-                Curry(..) => {},           // Like a pure Call, keep going.
                 Quant(..) => {
                     // Technically pure, but we don't want to eliminate it.
                     is_pure = false;
@@ -3300,38 +3297,6 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     Ok(())
                 }
             },
-            MoveFunctionExp(id, mid, fid) => {
-                write!(
-                    f,
-                    "{}",
-                    self.env
-                        .get_function_opt(mid.qualified(*fid))
-                        .map(|fun| fun.get_full_name_str())
-                        .unwrap_or_else(|| "None".to_string())
-                )?;
-                let type_inst = self.env.get_node_instantiation(*id);
-                if !type_inst.is_empty() {
-                    write!(
-                        f,
-                        "<{}>",
-                        type_inst
-                            .iter()
-                            .map(|ty| ty.display(self.get_tctx()))
-                            .join(", ")
-                    )
-                } else {
-                    Ok(())
-                }
-            },
-            Curry(_id, mask, fnexp, args) => {
-                write!(
-                    f,
-                    "curry({}, {:b}, {})",
-                    fnexp.display_cont(self),
-                    mask,
-                    self.fmt_exps(args)
-                )
-            },
             Block(id, pat, binding, body) => {
                 if self.verbose {
                     write!(
@@ -3607,10 +3572,12 @@ impl<'a> fmt::Display for OperationDisplay<'a> {
                     f,
                     "{}",
                     self.env
-                        .get_function_opt(mid.qualified(*fid))
-                        .map(|fun| fun.get_full_name_str())
-                        .unwrap_or_else(|| "None".to_string())
+                        .get_function(mid.qualified(*fid))
+                        .get_full_name_str()
                 )
+            },
+            Bind(mask) => {
+                write!(f, "bind({:b})", mask)
             },
             Global(label_opt) => {
                 write!(f, "global")?;

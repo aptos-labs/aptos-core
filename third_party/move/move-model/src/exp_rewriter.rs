@@ -209,9 +209,6 @@ pub trait ExpRewriterFunctions {
     ) -> Option<Exp> {
         None
     }
-    fn rewrite_curry(&mut self, id: NodeId, mask: &u128, fnexp: &Exp, args: &[Exp]) -> Option<Exp> {
-        None
-    }
     // Optionally can rewrite pat and return new value, otherwise is unchanged.
     fn rewrite_enter_block_scope(
         &mut self,
@@ -382,38 +379,6 @@ pub trait ExpRewriterFunctions {
                     exp
                 }
             },
-            MoveFunctionExp(id, mid, fid) => {
-                let (id_changed, new_id) = self.internal_rewrite_id(*id);
-                if let Some(new_exp) = self.rewrite_move_function(new_id, *mid, *fid) {
-                    new_exp
-                } else if id_changed {
-                    MoveFunctionExp(new_id, *mid, *fid).into_exp()
-                } else {
-                    exp
-                }
-            },
-            Curry(id, mask, fnexp, args) => {
-                let (id_changed, new_id) = self.internal_rewrite_id(*id);
-                let (fn_changed, new_fnexp) = self.internal_rewrite_exp(fnexp);
-                let new_args_opt = self.internal_rewrite_vec(args);
-                let args_ref = if let Some(new_args) = &new_args_opt {
-                    new_args.as_slice()
-                } else {
-                    args.as_slice()
-                };
-                if let Some(new_exp) = self.rewrite_curry(new_id, mask, &new_fnexp, args_ref) {
-                    new_exp
-                } else if new_args_opt.is_some() || id_changed || fn_changed {
-                    let args_owned = if let Some(new_args) = new_args_opt {
-                        new_args
-                    } else {
-                        args.to_owned()
-                    };
-                    Curry(new_id, *mask, new_fnexp, args_owned).into_exp()
-                } else {
-                    exp
-                }
-            },
             Block(id, pat, binding, body) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 // Note that `binding` expr must be evaluated *before* we enter new pattern scope.
@@ -528,12 +493,15 @@ pub trait ExpRewriterFunctions {
                     {
                         (true, new_exp)
                     } else {
-                        (false, MatchArm {
-                            loc: arm.loc.clone(),
-                            pattern: newer_pat,
-                            condition: new_cond,
-                            body: new_body,
-                        })
+                        (
+                            false,
+                            MatchArm {
+                                loc: arm.loc.clone(),
+                                pattern: newer_pat,
+                                condition: new_cond,
+                                body: new_body,
+                            },
+                        )
                     };
                     new_arms.push(new_arm);
                     arms_changed =
@@ -672,18 +640,24 @@ pub trait ExpRewriterFunctions {
         let new_exp = self.rewrite_exp(condition.exp.clone());
         let maybe_new_additional_exps = self.internal_rewrite_vec(&condition.additional_exps);
         if let Some(new_additional_exps) = maybe_new_additional_exps {
-            (true, Condition {
-                exp: new_exp,
-                additional_exps: new_additional_exps,
-                ..condition
-            })
+            (
+                true,
+                Condition {
+                    exp: new_exp,
+                    additional_exps: new_additional_exps,
+                    ..condition
+                },
+            )
         } else {
             let changed = !ExpData::ptr_eq(&condition.exp, &new_exp);
             if changed {
-                (true, Condition {
-                    exp: new_exp,
-                    ..condition
-                })
+                (
+                    true,
+                    Condition {
+                        exp: new_exp,
+                        ..condition
+                    },
+                )
             } else {
                 (false, condition)
             }

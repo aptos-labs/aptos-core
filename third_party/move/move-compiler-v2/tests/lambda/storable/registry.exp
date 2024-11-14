@@ -1,9 +1,10 @@
 
 Diagnostics:
 error: unexpected token
-  ┌─ tests/lambda/storable/registry.move:7:22
-  │
-6 │     struct Function {
-  │                     - To match this '{'
-7 │         f: |u64| u64 has store,
-  │                      ^ Expected '}'
+   ┌─ tests/lambda/storable/registry.move:29:16
+   │
+29 │             if f.key == k {
+   │                ^
+   │                │
+   │                Unexpected 'f'
+   │                Expected '('
