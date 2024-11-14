@@ -3,6 +3,7 @@
 
 use crate::{
     captured_reads::CacheRead,
+    counters::GLOBAL_MODULE_CACHE_NUM_MISSES_PER_BLOCK,
     view::{LatestView, ViewState},
 };
 use ambassador::delegate_to_methods;
@@ -28,7 +29,6 @@ use move_vm_types::code::{
     WithBytes,
 };
 use std::sync::Arc;
-use crate::counters::GLOBAL_MODULE_CACHE_NUM_MISSES_PER_BLOCK;
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> WithRuntimeEnvironment
     for LatestView<'a, T, S, X>

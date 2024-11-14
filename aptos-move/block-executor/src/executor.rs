@@ -6,9 +6,9 @@ use crate::{
     code_cache_global::GlobalModuleCache,
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     counters::{
-        self, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK, PARALLEL_EXECUTION_SECONDS,
-        RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS, VM_INIT_SECONDS,
-        WORK_WITH_TASK_SECONDS,
+        self, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK, GLOBAL_MODULE_CACHE_NUM_MISSES_PER_BLOCK,
+        PARALLEL_EXECUTION_SECONDS, RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS,
+        TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
     },
     errors::*,
     executor_utilities::*,
@@ -71,7 +71,6 @@ use std::{
         Arc,
     },
 };
-use crate::counters::GLOBAL_MODULE_CACHE_NUM_MISSES_PER_BLOCK;
 
 pub struct BlockExecutor<T, E, S, L, X, TP> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon

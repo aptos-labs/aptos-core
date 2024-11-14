@@ -10,7 +10,8 @@ use crate::{
 };
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorModuleCacheLocalConfig, execution_state::TransactionSliceMetadata,
+        config::BlockExecutorModuleCacheLocalConfig,
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     error::PanicError,
     state_store::StateView,

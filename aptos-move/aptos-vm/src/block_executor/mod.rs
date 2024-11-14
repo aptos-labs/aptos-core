@@ -18,7 +18,9 @@ use aptos_block_executor::{
 };
 use aptos_infallible::Mutex;
 use aptos_types::{
-    block_executor::{config::BlockExecutorConfig, execution_state::TransactionSliceMetadata},
+    block_executor::{
+        config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
+    },
     contract_event::ContractEvent,
     error::PanicError,
     executable::ExecutableTestType,

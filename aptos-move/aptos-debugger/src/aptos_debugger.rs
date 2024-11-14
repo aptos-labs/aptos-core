@@ -13,7 +13,7 @@ use aptos_types::{
     account_address::AccountAddress,
     block_executor::{
         config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
-        execution_state::TransactionSliceMetadata,
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     contract_event::ContractEvent,
     state_store::TStateView,

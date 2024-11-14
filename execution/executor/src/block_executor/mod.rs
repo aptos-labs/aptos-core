@@ -31,8 +31,8 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
-        partitioner::ExecutableBlock,
+        config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock,
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     ledger_info::LedgerInfoWithSignatures,
     state_store::StateViewId,
