@@ -89,6 +89,8 @@ module groth16_example::groth16 {
     #[test_only]
     use std::vector;
 
+    // This test gives an example of how to take a proof, verification key, and public input in the decimal string format
+    // output by snarkjs and verify the proof.
     #[test(fx = @std)]
     fun test_verify_circom_proof(fx: signer) {
         enable_cryptography_algebra_natives(&fx);
