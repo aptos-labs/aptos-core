@@ -12,6 +12,7 @@ use crate::{
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
+use log::debug;
 use move_binary_format::{
     file_format as FF,
     file_format::{AccessKind, FunctionHandle, ModuleHandle, StructDefinitionIndex, TableIndex},
@@ -209,6 +210,14 @@ impl ModuleGenerator {
             assert!(compile_test_code || !fun_env.is_test_only());
             let acquires_list = &acquires_map[&fun_env.get_id()];
             FunctionGenerator::run(self, ctx, fun_env, acquires_list);
+        }
+
+        let module_name = module_env.get_full_name_str();
+        if module_name == "0xabc::red_black_map" {
+            debug!(
+                "After generating module {}, source_map is {:#?}",
+                module_name, self.source_map
+            );
         }
 
         // At handles of friend modules

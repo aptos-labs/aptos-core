@@ -211,10 +211,11 @@ impl<'a> FunctionGenerator<'a> {
             let code_offset = i as FF::CodeOffset;
             let bc = &bytecode[i];
             debug!(
-                "Generating code for bytecode {:?} ({}) at offset {}",
+                "Generating code for bytecode {:?} ({}) at offset {} with attr_id {:?}",
                 bc,
                 bc.display(&ctx.fun, &BTreeMap::new()),
-                i
+                i,
+                bc.get_attr_id(),
             );
             let bytecode_ctx = BytecodeContext {
                 fun_ctx: ctx,
@@ -250,6 +251,14 @@ impl<'a> FunctionGenerator<'a> {
             } else {
                 ctx.internal_error("inconsistent bytecode label info")
             }
+        }
+
+        let func_name = ctx.fun.func_env.get_full_name_str();
+        if func_name == "red_black_map::add" {
+            debug!(
+                "After Function {} source_map is {:#?}",
+                func_name, self.gen.source_map
+            );
         }
 
         // Deliver result
