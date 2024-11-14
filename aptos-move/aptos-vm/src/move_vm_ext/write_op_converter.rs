@@ -210,7 +210,6 @@ impl<'r> WriteOpConverter<'r> {
         legacy_creation_as_modification: bool,
     ) -> PartialVMResult<WriteOp> {
         use MoveStorageOp::*;
-        use WriteOp::*;
         let write_op = match (state_value_metadata, move_storage_op) {
             (None, Modify(_) | Delete) => {
                 // Possible under speculative execution, returning speculative error waiting for re-execution.
@@ -238,18 +237,12 @@ impl<'r> WriteOpConverter<'r> {
                         WriteOp::legacy_creation(data)
                     }
                 },
-                Some(metadata) => Creation {
-                    data,
-                    metadata: metadata.clone(),
-                },
+                Some(metadata) => WriteOp::creation(data, metadata.clone()),
             },
-            (Some(metadata), Modify(data)) => {
-                // Inherit metadata even if the feature flags is turned off, for compatibility.
-                Modification { data, metadata }
-            },
+            (Some(metadata), Modify(data)) => WriteOp::modification(data, metadata),
             (Some(metadata), Delete) => {
                 // Inherit metadata even if the feature flags is turned off, for compatibility.
-                Deletion { metadata }
+                WriteOp::deletion(metadata)
             },
         };
         Ok(write_op)
@@ -270,13 +263,10 @@ impl<'r> WriteOpConverter<'r> {
                 match &self.new_slot_metadata {
                     // n.b. Aggregator writes historically did not distinguish Create vs Modify.
                     None => WriteOp::legacy_modification(data),
-                    Some(metadata) => WriteOp::Creation {
-                        data,
-                        metadata: metadata.clone(),
-                    },
+                    Some(metadata) => WriteOp::creation(data, metadata.clone()),
                 }
             },
-            Some(metadata) => WriteOp::Modification { data, metadata },
+            Some(metadata) => WriteOp::modification(data, metadata),
         };
 
         Ok(op)
@@ -292,10 +282,7 @@ mod tests {
     };
     use aptos_types::{
         account_address::AccountAddress,
-        state_store::{
-            errors::StateviewError, state_storage_usage::StateStorageUsage,
-            state_value::StateValue, TStateView,
-        },
+        state_store::{state_value::StateValue, MockStateView},
         write_set::TransactionWrite,
     };
     use aptos_vm_environment::environment::AptosEnvironment;
@@ -311,6 +298,7 @@ mod tests {
         identifier::Identifier,
         language_storage::{StructTag, TypeTag},
     };
+    use std::collections::HashMap;
 
     fn raw_metadata(v: u64) -> StateValueMetadata {
         StateValueMetadata::legacy(v, &CurrentTimeMicroseconds { microseconds: v })
@@ -341,31 +329,6 @@ mod tests {
             module: Identifier::new("abcdex").unwrap(),
             name: Identifier::new("fghx").unwrap(),
             type_args: vec![TypeTag::U128],
-        }
-    }
-
-    struct MockStateView {
-        data: BTreeMap<StateKey, StateValue>,
-    }
-
-    impl MockStateView {
-        fn new(data: BTreeMap<StateKey, StateValue>) -> Self {
-            Self { data }
-        }
-    }
-
-    impl TStateView for MockStateView {
-        type Key = StateKey;
-
-        fn get_state_value(
-            &self,
-            state_key: &Self::Key,
-        ) -> Result<Option<StateValue>, StateviewError> {
-            Ok(self.data.get(state_key).cloned())
-        }
-
-        fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
-            unimplemented!();
         }
     }
 
@@ -410,7 +373,7 @@ mod tests {
         let state_value = StateValue::new_legacy(bytes.into());
 
         // Setting up the state.
-        let state_view = MockStateView::new(BTreeMap::from([
+        let state_view = MockStateView::new(HashMap::from([
             (state_key, state_value),
             (a_state_key.clone(), a_state_value.clone()),
             (b_state_key.clone(), b_state_value.clone()),
@@ -482,7 +445,7 @@ mod tests {
         let metadata = raw_metadata(100);
         let key = StateKey::raw(&[0]);
 
-        let data = BTreeMap::from([(
+        let data = HashMap::from([(
             key.clone(),
             StateValue::new_with_metadata(bcs::to_bytes(&group).unwrap().into(), metadata.clone()),
         )]);
@@ -538,7 +501,7 @@ mod tests {
         let metadata = raw_metadata(100);
         let key = StateKey::raw(&[0]);
 
-        let data = BTreeMap::from([(
+        let data = HashMap::from([(
             key.clone(),
             StateValue::new_with_metadata(bcs::to_bytes(&group).unwrap().into(), metadata.clone()),
         )]);
@@ -572,7 +535,7 @@ mod tests {
     // #[test]
     #[allow(unused)]
     fn size_computation_new_group() {
-        let s = MockStateView::new(BTreeMap::new());
+        let s = MockStateView::empty();
         let resolver = as_resolver_with_group_size_kind(&s, GroupSizeKind::AsSum);
 
         // TODO[agg_v2](test): Layout hardcoded to None. Test with layout = Some(..)
@@ -605,7 +568,7 @@ mod tests {
         let metadata = raw_metadata(100);
         let key = StateKey::raw(&[0]);
 
-        let data = BTreeMap::from([(
+        let data = HashMap::from([(
             key.clone(),
             StateValue::new_with_metadata(bcs::to_bytes(&group).unwrap().into(), metadata.clone()),
         )]);
@@ -623,7 +586,7 @@ mod tests {
 
         // Deletion should still contain the metadata - for storage refunds.
         assert_eq!(group_write.metadata_op().metadata(), &metadata);
-        assert_eq!(group_write.metadata_op(), &WriteOp::Deletion { metadata });
+        assert_eq!(group_write.metadata_op(), &WriteOp::deletion(metadata));
         assert_none!(group_write.metadata_op().bytes());
     }
 }

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(unused)]
 
+use crate::publishing::publish_util::Package;
 use aptos_framework::natives::code::{MoveOption, PackageMetadata};
 use aptos_sdk::{
     bcs,
@@ -11,7 +12,7 @@ use aptos_sdk::{
     },
     types::{
         serde_helper::bcs_utils::bcs_size_of_byte_array,
-        transaction::{EntryFunction, TransactionPayload},
+        transaction::{EntryFunction, Script, TransactionPayload},
     },
 };
 use move_binary_format::{
@@ -267,6 +268,10 @@ pub enum EntryPoints {
         num_points_per_txn: usize,
     },
     DeserializeU256,
+    /// No-op script with dependencies in *::simple.move. The script has unreachable code that is
+    /// there to slow down deserialization & verification, effectively making it more expensive to
+    /// load it into code cache.
+    SimpleScript,
 }
 
 impl EntryPoints {
@@ -291,7 +296,8 @@ impl EntryPoints {
             | EntryPoints::BytesMakeOrChange { .. }
             | EntryPoints::EmitEvents { .. }
             | EntryPoints::MakeOrChangeTable { .. }
-            | EntryPoints::MakeOrChangeTableRandom { .. } => "simple",
+            | EntryPoints::MakeOrChangeTableRandom { .. }
+            | EntryPoints::SimpleScript => "simple",
             EntryPoints::IncGlobal
             | EntryPoints::IncGlobalAggV2
             | EntryPoints::ModifyGlobalBoundedAggV2 { .. }
@@ -347,7 +353,8 @@ impl EntryPoints {
             | EntryPoints::BytesMakeOrChange { .. }
             | EntryPoints::EmitEvents { .. }
             | EntryPoints::MakeOrChangeTable { .. }
-            | EntryPoints::MakeOrChangeTableRandom { .. } => "simple",
+            | EntryPoints::MakeOrChangeTableRandom { .. }
+            | EntryPoints::SimpleScript => "simple",
             EntryPoints::IncGlobal
             | EntryPoints::IncGlobalAggV2
             | EntryPoints::ModifyGlobalBoundedAggV2 { .. } => "aggregator_example",
@@ -411,6 +418,9 @@ impl EntryPoints {
             },
             EntryPoints::Double => get_payload_void(module_id, ident_str!("double").to_owned()),
             EntryPoints::Half => get_payload_void(module_id, ident_str!("half").to_owned()),
+            EntryPoints::SimpleScript => {
+                Package::script(*other.expect("Must provide sender's address"))
+            },
             // 1 arg
             EntryPoints::Loop {
                 loop_count,
@@ -791,7 +801,8 @@ impl EntryPoints {
             | EntryPoints::BytesMakeOrChange { .. }
             | EntryPoints::EmitEvents { .. }
             | EntryPoints::MakeOrChangeTable { .. }
-            | EntryPoints::MakeOrChangeTableRandom { .. } => AutomaticArgs::Signer,
+            | EntryPoints::MakeOrChangeTableRandom { .. }
+            | EntryPoints::SimpleScript => AutomaticArgs::Signer,
             EntryPoints::Nop2Signers | EntryPoints::Nop5Signers => AutomaticArgs::SignerAndMultiSig,
             EntryPoints::IncGlobal
             | EntryPoints::IncGlobalAggV2

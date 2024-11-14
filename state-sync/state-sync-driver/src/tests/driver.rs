@@ -34,7 +34,7 @@ use aptos_types::{
     transaction::{Transaction, WriteSetPayload},
     waypoint::Waypoint,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use claims::{assert_err, assert_none};
 use futures::{channel::mpsc::UnboundedSender, FutureExt, SinkExt, StreamExt};
 use ntest::timeout;
@@ -340,7 +340,7 @@ async fn create_driver_for_tests(
     // Bootstrap the genesis transaction
     let (genesis, _) = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
-    bootstrap_genesis::<AptosVM>(&db_rw, &genesis_txn).unwrap();
+    bootstrap_genesis::<AptosVMBlockExecutor>(&db_rw, &genesis_txn).unwrap();
 
     // Create the event subscription service and subscribe to events and reconfigurations
     let mut event_subscription_service =
@@ -365,7 +365,7 @@ async fn create_driver_for_tests(
         aptos_storage_service_notifications::new_storage_service_notifier_listener_pair();
 
     // Create the chunk executor
-    let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
+    let chunk_executor = Arc::new(ChunkExecutor::<AptosVMBlockExecutor>::new(db_rw.clone()));
 
     // Create a streaming service client
     let (streaming_service_client, _) = new_streaming_service_client_listener_pair();

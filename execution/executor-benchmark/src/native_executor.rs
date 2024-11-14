@@ -6,19 +6,12 @@ use crate::{
     metrics::TIMER,
 };
 use anyhow::Result;
-use aptos_crypto::HashValue;
-use aptos_executor::{
-    block_executor::TransactionBlockExecutor,
-    workflow::do_get_execution_output::DoGetExecutionOutput,
-};
-use aptos_executor_types::execution_output::ExecutionOutput;
-use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{deposit::DepositEvent, withdraw::WithdrawEvent},
+    account_config::{DepositEvent, WithdrawEvent},
     block_executor::{
-        config::BlockExecutorConfigFromOnchain,
-        partitioner::{ExecutableTransactions, PartitionedTransactions},
+        config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
+        partitioner::PartitionedTransactions,
     },
     contract_event::ContractEvent,
     event::EventKey,
@@ -32,7 +25,7 @@ use aptos_types::{
 };
 use aptos_vm::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
-    VMExecutor,
+    VMBlockExecutor,
 };
 use move_core_types::{
     ident_str,
@@ -76,7 +69,7 @@ impl IncrementalOutput {
     }
 }
 
-pub struct NativeExecutor {}
+pub struct NativeExecutor;
 
 static NATIVE_EXECUTOR_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NATIVE_EXECUTOR_POOL: Lazy<ThreadPool> = Lazy::new(|| {
@@ -357,11 +350,17 @@ impl NativeExecutor {
     }
 }
 
-impl VMExecutor for NativeExecutor {
+impl VMBlockExecutor for NativeExecutor {
+    fn new() -> Self {
+        Self
+    }
+
     fn execute_block(
+        &self,
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
+        _transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let transaction_outputs = NATIVE_EXECUTOR_POOL
             .install(|| {
@@ -445,21 +444,5 @@ impl VMExecutor for NativeExecutor {
         _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> std::result::Result<Vec<TransactionOutput>, VMStatus> {
         unimplemented!()
-    }
-}
-
-impl TransactionBlockExecutor for NativeExecutor {
-    fn execute_transaction_block(
-        transactions: ExecutableTransactions,
-        state_view: CachedStateView,
-        onchain_config: BlockExecutorConfigFromOnchain,
-        append_state_checkpoint_to_block: Option<HashValue>,
-    ) -> Result<ExecutionOutput> {
-        DoGetExecutionOutput::by_transaction_execution::<NativeExecutor>(
-            transactions,
-            state_view,
-            onchain_config,
-            append_state_checkpoint_to_block,
-        )
     }
 }

@@ -95,7 +95,6 @@ pub(crate) fn update_store(
                 &ledger_batch,
                 &sharded_state_kv_batches,
                 /*put_state_value_indices=*/ enable_sharding,
-                /*skip_usage=*/ false,
                 /*last_checkpoint_index=*/ None,
             )
             .unwrap();
@@ -319,10 +318,7 @@ fn gen_snapshot_version(
     let mut snapshot_version = None;
     let last_checkpoint = txns_to_commit
         .iter()
-        .enumerate()
-        .filter(|(_idx, x)| x.has_state_checkpoint_hash())
-        .last()
-        .map(|(idx, _)| idx);
+        .rposition(TransactionToCommit::has_state_checkpoint_hash);
     if let Some(idx) = last_checkpoint {
         updates.extend(
             txns_to_commit[0..=idx]
@@ -331,7 +327,7 @@ fn gen_snapshot_version(
                 .flatten()
                 .collect::<HashMap<_, _>>(),
         );
-        if updates.len() >= threshold {
+        if updates.len() >= threshold || txns_to_commit[idx].is_reconfig {
             snapshot_version = Some(cur_ver + idx as u64);
             updates.clear();
         }
@@ -362,12 +358,7 @@ pub fn test_save_blocks_impl(
     let db =
         AptosDB::new_for_test_with_buffered_state_target_items(&tmp_dir, snapshot_size_threshold);
 
-    let mut in_memory_state = db
-        .state_store
-        .buffered_state()
-        .lock()
-        .current_state()
-        .clone();
+    let mut in_memory_state = db.state_store.current_state_cloned();
     let _ancester = in_memory_state.current.clone();
     let _usage = _ancester.usage();
     let num_batches = input.len();
@@ -945,12 +936,7 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
         .metadata_db()
         .put::<StateValueSchema>(&(key.clone(), version), &Some(value.clone()))
         .unwrap();
-    let mut in_memory_state = db
-        .state_store
-        .buffered_state()
-        .lock()
-        .current_state()
-        .clone();
+    let mut in_memory_state = db.state_store.current_state_cloned();
     in_memory_state.current = smt;
     in_memory_state.current_version = Some(version);
     in_memory_state.updates_since_base[key.get_shard_id() as usize].insert(key, Some(value));
@@ -969,12 +955,7 @@ pub fn test_sync_transactions_impl(
     let db =
         AptosDB::new_for_test_with_buffered_state_target_items(&tmp_dir, snapshot_size_threshold);
 
-    let mut in_memory_state = db
-        .state_store
-        .buffered_state()
-        .lock()
-        .current_state()
-        .clone();
+    let mut in_memory_state = db.state_store.current_state_cloned();
     let _ancester = in_memory_state.current.clone();
     let num_batches = input.len();
     let mut cur_ver: Version = 0;

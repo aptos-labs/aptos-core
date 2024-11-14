@@ -24,8 +24,6 @@ error: abort not covered by any of the `aborts_if` clauses
     =     at tests/sources/functional/loop_unroll.move:97: t6_failure
     =         <redacted> = <redacted>
     =     at tests/sources/functional/loop_unroll.move:97: t6_failure
-    =     at tests/sources/functional/loop_unroll.move:95: t6_failure
-    =     at tests/sources/functional/loop_unroll.move:90: t6_failure
     =     at tests/sources/functional/loop_unroll.move:92: t6_failure
     =     at tests/sources/functional/loop_unroll.move:94: t6_failure
     =     at tests/sources/functional/loop_unroll.move:90: t6_failure
@@ -34,8 +32,6 @@ error: abort not covered by any of the `aborts_if` clauses
     =         i = <redacted>
     =     at tests/sources/functional/loop_unroll.move:97: t6_failure
     =         <redacted> = <redacted>
-    =     at tests/sources/functional/loop_unroll.move:95: t6_failure
-    =     at tests/sources/functional/loop_unroll.move:90: t6_failure
     =     at tests/sources/functional/loop_unroll.move:91: t6_failure
     =     at tests/sources/functional/loop_unroll.move:92: t6_failure
     =     at tests/sources/functional/loop_unroll.move:94: t6_failure
@@ -45,8 +41,6 @@ error: abort not covered by any of the `aborts_if` clauses
     =         i = <redacted>
     =     at tests/sources/functional/loop_unroll.move:97: t6_failure
     =         <redacted> = <redacted>
-    =     at tests/sources/functional/loop_unroll.move:95: t6_failure
-    =     at tests/sources/functional/loop_unroll.move:90: t6_failure
     =     at tests/sources/functional/loop_unroll.move:91: t6_failure
     =     at tests/sources/functional/loop_unroll.move:92: t6_failure
     =     at tests/sources/functional/loop_unroll.move:94: t6_failure
@@ -56,8 +50,6 @@ error: abort not covered by any of the `aborts_if` clauses
     =         i = <redacted>
     =     at tests/sources/functional/loop_unroll.move:97: t6_failure
     =         <redacted> = <redacted>
-    =     at tests/sources/functional/loop_unroll.move:95: t6_failure
-    =     at tests/sources/functional/loop_unroll.move:90: t6_failure
     =     at tests/sources/functional/loop_unroll.move:91: t6_failure
     =     at tests/sources/functional/loop_unroll.move:92: t6_failure
     =     at tests/sources/functional/loop_unroll.move:94: t6_failure

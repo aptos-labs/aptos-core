@@ -9,10 +9,13 @@ This module provides the foundation for transferring of Tokens
 -  [Resource `PendingClaims`](#0x3_token_transfers_PendingClaims)
 -  [Struct `TokenOfferId`](#0x3_token_transfers_TokenOfferId)
 -  [Struct `TokenOffer`](#0x3_token_transfers_TokenOffer)
--  [Struct `TokenOfferEvent`](#0x3_token_transfers_TokenOfferEvent)
+-  [Struct `Offer`](#0x3_token_transfers_Offer)
 -  [Struct `TokenCancelOfferEvent`](#0x3_token_transfers_TokenCancelOfferEvent)
--  [Struct `TokenCancelOffer`](#0x3_token_transfers_TokenCancelOffer)
+-  [Struct `CancelOffer`](#0x3_token_transfers_CancelOffer)
 -  [Struct `TokenClaimEvent`](#0x3_token_transfers_TokenClaimEvent)
+-  [Struct `Claim`](#0x3_token_transfers_Claim)
+-  [Struct `TokenOfferEvent`](#0x3_token_transfers_TokenOfferEvent)
+-  [Struct `TokenCancelOffer`](#0x3_token_transfers_TokenCancelOffer)
 -  [Struct `TokenClaim`](#0x3_token_transfers_TokenClaim)
 -  [Constants](#@Constants_0)
 -  [Function `initialize_token_transfers`](#0x3_token_transfers_initialize_token_transfers)
@@ -165,14 +168,14 @@ This module provides the foundation for transferring of Tokens
 
 </details>
 
-<a id="0x3_token_transfers_TokenOfferEvent"></a>
+<a id="0x3_token_transfers_Offer"></a>
 
-## Struct `TokenOfferEvent`
+## Struct `Offer`
 
 
 
 <pre><code>#[<a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event">event</a>]
-<b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenOfferEvent">TokenOfferEvent</a> <b>has</b> drop, store
+<b>struct</b> <a href="token_transfers.md#0x3_token_transfers_Offer">Offer</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -182,6 +185,12 @@ This module provides the foundation for transferring of Tokens
 
 
 <dl>
+<dt>
+<code><a href="../../../aptos-framework/tests/compiler-v2-doc/account.md#0x1_account">account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
 <dt>
 <code>to_address: <b>address</b></code>
 </dt>
@@ -245,14 +254,14 @@ This module provides the foundation for transferring of Tokens
 
 </details>
 
-<a id="0x3_token_transfers_TokenCancelOffer"></a>
+<a id="0x3_token_transfers_CancelOffer"></a>
 
-## Struct `TokenCancelOffer`
+## Struct `CancelOffer`
 
 
 
 <pre><code>#[<a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event">event</a>]
-<b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenCancelOffer">TokenCancelOffer</a> <b>has</b> drop, store
+<b>struct</b> <a href="token_transfers.md#0x3_token_transfers_CancelOffer">CancelOffer</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -262,6 +271,12 @@ This module provides the foundation for transferring of Tokens
 
 
 <dl>
+<dt>
+<code><a href="../../../aptos-framework/tests/compiler-v2-doc/account.md#0x1_account">account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
 <dt>
 <code>to_address: <b>address</b></code>
 </dt>
@@ -325,6 +340,134 @@ This module provides the foundation for transferring of Tokens
 
 </details>
 
+<a id="0x3_token_transfers_Claim"></a>
+
+## Struct `Claim`
+
+
+
+<pre><code>#[<a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event">event</a>]
+<b>struct</b> <a href="token_transfers.md#0x3_token_transfers_Claim">Claim</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="../../../aptos-framework/tests/compiler-v2-doc/account.md#0x1_account">account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>to_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>token_id: <a href="token.md#0x3_token_TokenId">token::TokenId</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>amount: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x3_token_transfers_TokenOfferEvent"></a>
+
+## Struct `TokenOfferEvent`
+
+
+
+<pre><code>#[<a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event">event</a>]
+#[deprecated]
+<b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenOfferEvent">TokenOfferEvent</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>to_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>token_id: <a href="token.md#0x3_token_TokenId">token::TokenId</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>amount: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x3_token_transfers_TokenCancelOffer"></a>
+
+## Struct `TokenCancelOffer`
+
+
+
+<pre><code>#[<a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event">event</a>]
+#[deprecated]
+<b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenCancelOffer">TokenCancelOffer</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>to_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>token_id: <a href="token.md#0x3_token_TokenId">token::TokenId</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>amount: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="0x3_token_transfers_TokenClaim"></a>
 
 ## Struct `TokenClaim`
@@ -332,6 +475,7 @@ This module provides the foundation for transferring of Tokens
 
 
 <pre><code>#[<a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event">event</a>]
+#[deprecated]
 <b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenClaim">TokenClaim</a> <b>has</b> drop, store
 </code></pre>
 
@@ -511,21 +655,23 @@ Token offer doesn't exist
 
     <b>if</b> (std::features::module_event_migration_enabled()) {
         <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit">event::emit</a>(
-            <a href="token_transfers.md#0x3_token_transfers_TokenOffer">TokenOffer</a> {
+            <a href="token_transfers.md#0x3_token_transfers_Offer">Offer</a> {
+                <a href="../../../aptos-framework/tests/compiler-v2-doc/account.md#0x1_account">account</a>: sender_addr,
                 to_address: receiver,
                 token_id,
                 amount,
             }
         )
-    };
-    <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenOfferEvent">TokenOfferEvent</a>&gt;(
-        &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr).offer_events,
-        <a href="token_transfers.md#0x3_token_transfers_TokenOfferEvent">TokenOfferEvent</a> {
-            to_address: receiver,
-            token_id,
-            amount,
-        },
-    );
+    } <b>else</b> {
+        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenOfferEvent">TokenOfferEvent</a>&gt;(
+            &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr).offer_events,
+            <a href="token_transfers.md#0x3_token_transfers_TokenOfferEvent">TokenOfferEvent</a> {
+                to_address: receiver,
+                token_id,
+                amount,
+            },
+        );
+    }
 }
 </code></pre>
 
@@ -596,21 +742,23 @@ Token offer doesn't exist
 
     <b>if</b> (std::features::module_event_migration_enabled()) {
         <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit">event::emit</a>(
-            <a href="token_transfers.md#0x3_token_transfers_TokenClaim">TokenClaim</a> {
+            <a href="token_transfers.md#0x3_token_transfers_Claim">Claim</a> {
+                <a href="../../../aptos-framework/tests/compiler-v2-doc/account.md#0x1_account">account</a>: sender,
                 to_address: <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer_address_of">signer::address_of</a>(receiver),
                 token_id,
                 amount,
             }
         )
+    } <b>else</b> {
+        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenClaimEvent">TokenClaimEvent</a>&gt;(
+            &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender).claim_events,
+            <a href="token_transfers.md#0x3_token_transfers_TokenClaimEvent">TokenClaimEvent</a> {
+                to_address: <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer_address_of">signer::address_of</a>(receiver),
+                token_id,
+                amount,
+            },
+        );
     };
-    <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenClaimEvent">TokenClaimEvent</a>&gt;(
-        &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender).claim_events,
-        <a href="token_transfers.md#0x3_token_transfers_TokenClaimEvent">TokenClaimEvent</a> {
-            to_address: <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer_address_of">signer::address_of</a>(receiver),
-            token_id,
-            amount,
-        },
-    );
 }
 </code></pre>
 
@@ -681,21 +829,23 @@ Token offer doesn't exist
 
     <b>if</b> (std::features::module_event_migration_enabled()) {
         <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit">event::emit</a>(
-            <a href="token_transfers.md#0x3_token_transfers_TokenCancelOffer">TokenCancelOffer</a> {
+            <a href="token_transfers.md#0x3_token_transfers_CancelOffer">CancelOffer</a> {
+                <a href="../../../aptos-framework/tests/compiler-v2-doc/account.md#0x1_account">account</a>: sender_addr,
                 to_address: receiver,
                 token_id,
                 amount,
             },
         )
-    };
-    <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenCancelOfferEvent">TokenCancelOfferEvent</a>&gt;(
-        &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr).cancel_offer_events,
-        <a href="token_transfers.md#0x3_token_transfers_TokenCancelOfferEvent">TokenCancelOfferEvent</a> {
-            to_address: receiver,
-            token_id,
-            amount,
-        },
-    );
+    } <b>else</b> {
+        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_transfers.md#0x3_token_transfers_TokenCancelOfferEvent">TokenCancelOfferEvent</a>&gt;(
+            &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token_transfers.md#0x3_token_transfers_PendingClaims">PendingClaims</a>&gt;(sender_addr).cancel_offer_events,
+            <a href="token_transfers.md#0x3_token_transfers_TokenCancelOfferEvent">TokenCancelOfferEvent</a> {
+                to_address: receiver,
+                token_id,
+                amount,
+            },
+        );
+    }
 }
 </code></pre>
 
@@ -711,6 +861,30 @@ Token offer doesn't exist
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
+</code></pre>
+
+
+Get the amount from sender token
+
+
+<a id="0x3_token_transfers_spce_get"></a>
+
+
+<pre><code><b>fun</b> <a href="token_transfers.md#0x3_token_transfers_spce_get">spce_get</a>(
+   account_addr: <b>address</b>,
+   id: TokenId,
+   amount: u64
+): u64 {
+   <b>use</b> aptos_token::token::{TokenStore};
+   <b>use</b> aptos_std::table::{<b>Self</b>};
+   <b>let</b> tokens = <b>global</b>&lt;TokenStore&gt;(account_addr).tokens;
+   <b>let</b> balance = <a href="../../../aptos-framework/../aptos-stdlib/tests/compiler-v2-doc/table.md#0x1_table_spec_get">table::spec_get</a>(tokens, id).amount;
+   <b>if</b> (balance &gt; amount) {
+       amount
+   } <b>else</b> {
+       <a href="../../../aptos-framework/../aptos-stdlib/tests/compiler-v2-doc/table.md#0x1_table_spec_get">table::spec_get</a>(tokens, id).amount
+   }
+}
 </code></pre>
 
 
@@ -807,30 +981,6 @@ Abort according to the code
 <b>let</b> a = <a href="../../../aptos-framework/../aptos-stdlib/tests/compiler-v2-doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(pending_claims, token_offer_id);
 <b>let</b> dst_token = <a href="../../../aptos-framework/../aptos-stdlib/tests/compiler-v2-doc/table.md#0x1_table_spec_get">table::spec_get</a>(pending_claims, token_offer_id);
 <b>aborts_if</b> dst_token.amount + <a href="token_transfers.md#0x3_token_transfers_spce_get">spce_get</a>(<a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender), token_id, amount) &gt; MAX_U64;
-</code></pre>
-
-
-Get the amount from sender token
-
-
-<a id="0x3_token_transfers_spce_get"></a>
-
-
-<pre><code><b>fun</b> <a href="token_transfers.md#0x3_token_transfers_spce_get">spce_get</a>(
-   account_addr: <b>address</b>,
-   id: TokenId,
-   amount: u64
-): u64 {
-   <b>use</b> aptos_token::token::{TokenStore};
-   <b>use</b> aptos_std::table::{<b>Self</b>};
-   <b>let</b> tokens = <b>global</b>&lt;TokenStore&gt;(account_addr).tokens;
-   <b>let</b> balance = <a href="../../../aptos-framework/../aptos-stdlib/tests/compiler-v2-doc/table.md#0x1_table_spec_get">table::spec_get</a>(tokens, id).amount;
-   <b>if</b> (balance &gt; amount) {
-       amount
-   } <b>else</b> {
-       <a href="../../../aptos-framework/../aptos-stdlib/tests/compiler-v2-doc/table.md#0x1_table_spec_get">table::spec_get</a>(tokens, id).amount
-   }
-}
 </code></pre>
 
 

@@ -4,6 +4,12 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 - Determine network from URL to make explorer links better for legacy users
+- Add support for AIP-80 compliant strings when importing using the CLI arguments or manual input.
+
+## [4.4.0] - 2024/11/06
+- Fix typos in `aptos move compile` help text.
+- Update the default version of `movefmt` to be installed from 1.0.5 to 1.0.6
+- Add `--host-postgres-host` flag: https://github.com/aptos-labs/aptos-core/pull/15216.
 
 ## [4.3.0] - 2024/10/30
 - Allow for setting large-packages module for chunking publish mode with `--large-packages-module-address`

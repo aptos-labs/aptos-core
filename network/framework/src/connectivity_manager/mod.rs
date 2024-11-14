@@ -31,6 +31,7 @@ use crate::{
     application::storage::PeersAndMetadata,
     counters,
     logging::NetworkSchema,
+    peer::DisconnectReason,
     peer_manager::{self, conn_notifs_channel, ConnectionRequestSender, PeerManagerError},
     transport::ConnectionMetadata,
 };
@@ -511,8 +512,10 @@ where
                     stale_peer.short_str()
                 );
 
-                if let Err(disconnect_error) =
-                    self.connection_reqs_tx.disconnect_peer(stale_peer).await
+                if let Err(disconnect_error) = self
+                    .connection_reqs_tx
+                    .disconnect_peer(stale_peer, DisconnectReason::StaleConnection)
+                    .await
                 {
                     info!(
                         NetworkSchema::new(&self.network_context)

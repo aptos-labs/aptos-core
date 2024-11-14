@@ -28,7 +28,9 @@ use aptos_storage_interface::{
     state_delta::StateDelta, DbReaderWriter,
 };
 use aptos_types::{
-    block_executor::config::BlockExecutorConfigFromOnchain,
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
+    },
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     state_store::StateViewId,
@@ -39,7 +41,7 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-use aptos_vm::VMExecutor;
+use aptos_vm::VMBlockExecutor;
 use chunk_commit_queue::{ChunkCommitQueue, ChunkToUpdateLedger};
 use chunk_result_verifier::{ChunkResultVerifier, ReplayChunkVerifier, StateSyncChunkVerifier};
 use fail::fail_point;
@@ -64,7 +66,7 @@ pub struct ChunkExecutor<V> {
     inner: RwLock<Option<ChunkExecutorInner<V>>>,
 }
 
-impl<V: VMExecutor> ChunkExecutor<V> {
+impl<V: VMBlockExecutor> ChunkExecutor<V> {
     pub fn new(db: DbReaderWriter) -> Self {
         Self {
             db,
@@ -103,7 +105,7 @@ impl<V: VMExecutor> ChunkExecutor<V> {
     }
 }
 
-impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
+impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
     fn enqueue_chunk_by_execution(
         &self,
         txn_list_with_proof: TransactionListWithProof,
@@ -220,7 +222,7 @@ struct ChunkExecutorInner<V> {
     _phantom: PhantomData<V>,
 }
 
-impl<V: VMExecutor> ChunkExecutorInner<V> {
+impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
     pub fn new(db: DbReaderWriter) -> Result<Self> {
         let commit_queue = ChunkCommitQueue::new_from_db(&db.reader)?;
 
@@ -406,7 +408,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
     }
 }
 
-impl<V: VMExecutor> TransactionReplayer for ChunkExecutor<V> {
+impl<V: VMBlockExecutor> TransactionReplayer for ChunkExecutor<V> {
     fn enqueue_chunks(
         &self,
         transactions: Vec<Transaction>,
@@ -438,7 +440,7 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutor<V> {
     }
 }
 
-impl<V: VMExecutor> ChunkExecutorInner<V> {
+impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
     fn enqueue_chunks(
         &self,
         mut transactions: Vec<Transaction>,
@@ -599,10 +601,11 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
 
         // State sync executor shouldn't have block gas limit.
         let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
+            &V::new(),
             txns.into(),
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
-            None,
+            TransactionSliceMetadata::chunk(begin_version, end_version),
         )?;
         // not `zip_eq`, deliberately
         for (version, txn_out, txn_info, write_set, events) in multizip((

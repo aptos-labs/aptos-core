@@ -8,6 +8,7 @@ use crate::{
     },
     code_writer::CodeWriter,
     emit, emitln,
+    exp_builder::ExpBuilder,
     model::{
         AbilitySet, FieldEnv, FunId, FunctionEnv, GlobalEnv, ModuleId, NodeId, Parameter,
         QualifiedId, QualifiedInstId, StructId, TypeParameter, Visibility,
@@ -25,7 +26,7 @@ use std::collections::BTreeMap;
 /// A type which allows to convert function, struct, and module definitions into
 /// Move source.
 pub struct Sourcifier<'a> {
-    env: &'a GlobalEnv,
+    builder: ExpBuilder<'a>,
     writer: CodeWriter,
 }
 
@@ -33,14 +34,14 @@ impl<'a> Sourcifier<'a> {
     /// Creates a new sourcifier.
     pub fn new(env: &'a GlobalEnv) -> Self {
         Self {
-            env,
+            builder: ExpBuilder::new(env),
             // Location not used, but required by the constructor
             writer: CodeWriter::new(env.unknown_loc()),
         }
     }
 
     pub fn env(&self) -> &GlobalEnv {
-        self.env
+        self.builder.env()
     }
 
     pub fn writer(&self) -> &CodeWriter {
@@ -54,7 +55,7 @@ impl<'a> Sourcifier<'a> {
 
     /// Prints a module.
     pub fn print_module(&self, module_id: ModuleId) {
-        let module_env = self.env.get_module(module_id);
+        let module_env = self.env().get_module(module_id);
         if module_env.is_script_module() {
             emitln!(self.writer, "script {")
         } else {
@@ -65,14 +66,14 @@ impl<'a> Sourcifier<'a> {
             emitln!(
                 self.writer,
                 "use {};",
-                self.env.get_module(use_).get_full_name_str()
+                self.env().get_module(use_).get_full_name_str()
             )
         }
         for friend in module_env.get_friend_modules() {
             emitln!(
                 self.writer,
                 "friend {};",
-                self.env.get_module(friend).get_full_name_str()
+                self.env().get_module(friend).get_full_name_str()
             )
         }
         if module_env.get_struct_count() > 0 {
@@ -92,7 +93,7 @@ impl<'a> Sourcifier<'a> {
     /// Prints a function definition, where the defining expression is passed
     /// as a parameter.
     pub fn print_fun(&self, fun_id: QualifiedId<FunId>, def: Option<&Exp>) {
-        let fun_env = self.env.get_function(fun_id);
+        let fun_env = self.env().get_function(fun_id);
         match fun_env.visibility() {
             Visibility::Private => {},
             Visibility::Public => {
@@ -235,7 +236,7 @@ impl<'a> Sourcifier<'a> {
 
     pub fn print_value(&self, value: &Value, ty: Option<&Type>) {
         match value {
-            Value::Address(address) => emit!(self.writer, "{}", self.env.display(address)),
+            Value::Address(address) => emit!(self.writer, "{}", self.env().display(address)),
             Value::Number(int) => {
                 emit!(self.writer, "{}", int);
                 if let Some(Type::Primitive(prim)) = ty {
@@ -280,7 +281,7 @@ impl<'a> Sourcifier<'a> {
             },
             Value::AddressArray(addresses) => {
                 self.print_list("vector[", ", ", "]", addresses.iter(), |address| {
-                    emit!(self.writer, "{}", self.env.display(address))
+                    emit!(self.writer, "{}", self.env().display(address))
                 })
             },
         }
@@ -288,7 +289,7 @@ impl<'a> Sourcifier<'a> {
 
     /// Prints a struct (or enum) declaration.
     pub fn print_struct(&self, struct_id: QualifiedId<StructId>) {
-        let struct_env = self.env.get_struct(struct_id);
+        let struct_env = self.env().get_struct(struct_id);
         let type_display_ctx = struct_env.get_type_display_ctx();
         let ability_str = if !struct_env.get_abilities().is_empty() {
             format!(" has {}", self.abilities(", ", struct_env.get_abilities()))
@@ -344,7 +345,7 @@ impl<'a> Sourcifier<'a> {
         let spec = struct_env.get_spec();
         if !spec.is_empty() {
             // TODO: support specs, the output below is debug output
-            emitln!(self.writer, "/*\n {}\n*/", self.env.display(&*spec))
+            emitln!(self.writer, "/*\n {}\n*/", self.env().display(&*spec))
         }
     }
 
@@ -390,7 +391,7 @@ impl<'a> Sourcifier<'a> {
     }
 
     fn sym(&self, sym: Symbol) -> String {
-        sym.display(self.env.symbol_pool()).to_string()
+        sym.display(self.env().symbol_pool()).to_string()
     }
 
     fn print_block(&self, content_printer: impl Fn()) {
@@ -498,7 +499,7 @@ impl<'a> ExpSourcifier<'a> {
                     let loop_label_count = loop_labels.len();
                     let label = *loop_labels.entry(loop_id).or_insert_with(|| {
                         parent
-                            .env
+                            .env()
                             .symbol_pool()
                             .make(&format!("l{}", loop_label_count))
                     });
@@ -573,7 +574,7 @@ impl<'a> ExpSourcifier<'a> {
                                     LetOrStm::Stm(stm) => {
                                         if last &&
                                             (stm.is_unit_exp() ||
-                                            matches!(stm.as_ref(), Return(_, e) if e.is_unit_exp())) {
+                                            is_result && matches!(stm.as_ref(), Return(_, e) if e.is_unit_exp())) {
                                             // We can omit it
                                         } else {
                                             self.print_exp(Prio::General, last && is_result, stm);
@@ -669,14 +670,25 @@ impl<'a> ExpSourcifier<'a> {
 
                 // Detect while loop
                 match body.as_ref() {
-                    // Pattern 1: loop if (c) e else break
+                    // Pattern 1: loop { if (c) e else break }
                     IfElse(_, cond, if_true, if_false) if if_false.is_loop_cont(Some(0), false) => {
                         emit!(self.wr(), "while (");
                         self.print_exp(Prio::General, false, cond);
                         emit!(self.wr(), ") ");
                         print_loop_body(if_true)
                     },
-                    // Pattern 2: loop { if (c) e; break }
+                    // Pattern 2: loop { if (c) break else e }
+                    IfElse(_, cond, if_true, if_false) if if_true.is_loop_cont(Some(0), false) => {
+                        emit!(self.wr(), "while (");
+                        self.print_exp(
+                            Prio::General,
+                            false,
+                            &self.parent.builder.not(cond.clone()),
+                        );
+                        emit!(self.wr(), ") ");
+                        print_loop_body(if_false)
+                    },
+                    // Pattern 3: loop { if (c) e; break }
                     Sequence(_, stms)
                         if stms.len() == 2 && stms[1].is_loop_cont(Some(0), false) =>
                     {
@@ -688,6 +700,19 @@ impl<'a> ExpSourcifier<'a> {
                                 print_loop_body(if_true)
                             },
                             _ => general_loop(),
+                        }
+                    },
+                    // Pattern 4: loop { ( if (c) break )+; e }
+                    Sequence(_, stms) if !stms.is_empty() => {
+                        if let Some((cond, rest)) =
+                            self.parent.builder.match_if_break_list(body.clone())
+                        {
+                            emit!(self.wr(), "while (");
+                            self.print_exp(Prio::General, false, &self.parent.builder.not(cond));
+                            emit!(self.wr(), ") ");
+                            print_loop_body(&rest)
+                        } else {
+                            general_loop()
                         }
                     },
                     _ => general_loop(),
@@ -1093,6 +1118,6 @@ impl<'a> ExpSourcifier<'a> {
     }
 
     fn env(&self) -> &GlobalEnv {
-        self.parent.env
+        self.parent.env()
     }
 }

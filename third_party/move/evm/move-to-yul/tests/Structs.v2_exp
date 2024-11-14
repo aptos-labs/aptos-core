@@ -54,7 +54,7 @@ object "test_A2_M_test_drop" {
             $t1 := false
             // $t2 := M::pack_S($t0, $t1)
             $t2 := A2_M_pack_S($t0, $t1)
-            // $t3 := pack M::S3($t2)
+            // $t3 := pack 0x2::M::S3($t2)
             {
                 let $mem := $Malloc(32)
                 $MemoryStoreU256(add($mem, 0), $t2)
@@ -79,7 +79,7 @@ object "test_A2_M_test_drop" {
             $t2 := $CastU128(a)
             // $t3 := M::pack_S2($t2)
             $t3 := A2_M_pack_S2($t2)
-            // $t4 := pack M::S($t0, $t1, $t3)
+            // $t4 := pack 0x2::M::S($t0, $t1, $t3)
             {
                 let $mem := $Malloc(41)
                 $MemoryStoreU64(add($mem, 32), a)
@@ -93,7 +93,7 @@ object "test_A2_M_test_drop" {
 
         function A2_M_pack_S2(x) -> $result {
             let $t1
-            // $t1 := pack M::S2($t0)
+            // $t1 := pack 0x2::M::S2($t0)
             {
                 let $mem := $Malloc(16)
                 $MemoryStoreU128(add($mem, 0), x)
@@ -330,7 +330,7 @@ object "test_A2_M_test_equality" {
             $t2 := $CastU128(a)
             // $t3 := M::pack_S2($t2)
             $t3 := A2_M_pack_S2($t2)
-            // $t4 := pack M::S($t0, $t1, $t3)
+            // $t4 := pack 0x2::M::S($t0, $t1, $t3)
             {
                 let $mem := $Malloc(41)
                 $MemoryStoreU64(add($mem, 32), a)
@@ -344,7 +344,7 @@ object "test_A2_M_test_equality" {
 
         function A2_M_pack_S2(x) -> $result {
             let $t1
-            // $t1 := pack M::S2($t0)
+            // $t1 := pack 0x2::M::S2($t0)
             {
                 let $mem := $Malloc(16)
                 $MemoryStoreU128(add($mem, 0), x)
@@ -460,7 +460,7 @@ object "test_A2_M_test_pack_S" {
                     s := A2_M_pack_S($t1, $t2)
                     // $t3 := borrow_local($t0)
                     $t3 := $MakePtr(false, s)
-                    // $t4 := borrow_field<M::S>.a($t3)
+                    // $t4 := borrow_field<0x2::M::S>.a($t3)
                     $t4 := $IndexPtr($t3, 32)
                     // $t5 := read_ref($t4)
                     $t5 := $LoadU64($t4)
@@ -477,7 +477,7 @@ object "test_A2_M_test_pack_S" {
                     // label L2
                     // $t9 := borrow_local($t0)
                     $t9 := $MakePtr(false, s)
-                    // $t10 := borrow_field<M::S>.b($t9)
+                    // $t10 := borrow_field<0x2::M::S>.b($t9)
                     $t10 := $IndexPtr($t9, 40)
                     // $t11 := read_ref($t10)
                     $t11 := $LoadU8($t10)
@@ -506,11 +506,11 @@ object "test_A2_M_test_pack_S" {
                     // label L5
                     // $t15 := borrow_local($t0)
                     $t15 := $MakePtr(false, s)
-                    // $t16 := borrow_field<M::S>.c($t15)
+                    // $t16 := borrow_field<0x2::M::S>.c($t15)
                     {
                         $t16 := $MakePtr($IsStoragePtr($t15), $LoadU256($t15))
                     }
-                    // $t17 := borrow_field<M::S2>.x($t16)
+                    // $t17 := borrow_field<0x2::M::S2>.x($t16)
                     $t17 := $t16
                     // $t18 := read_ref($t17)
                     $t18 := $LoadU128($t17)
@@ -549,7 +549,7 @@ object "test_A2_M_test_pack_S" {
             $t2 := $CastU128(a)
             // $t3 := M::pack_S2($t2)
             $t3 := A2_M_pack_S2($t2)
-            // $t4 := pack M::S($t0, $t1, $t3)
+            // $t4 := pack 0x2::M::S($t0, $t1, $t3)
             {
                 let $mem := $Malloc(41)
                 $MemoryStoreU64(add($mem, 32), a)
@@ -563,7 +563,7 @@ object "test_A2_M_test_pack_S" {
 
         function A2_M_pack_S2(x) -> $result {
             let $t1
-            // $t1 := pack M::S2($t0)
+            // $t1 := pack 0x2::M::S2($t0)
             {
                 let $mem := $Malloc(16)
                 $MemoryStoreU128(add($mem, 0), x)
@@ -780,7 +780,7 @@ object "test_A2_M_test_pack_S2" {
                     s := A2_M_pack_S2($t1)
                     // $t2 := borrow_local($t0)
                     $t2 := $MakePtr(false, s)
-                    // $t3 := borrow_field<M::S2>.x($t2)
+                    // $t3 := borrow_field<0x2::M::S2>.x($t2)
                     $t3 := $t2
                     // $t4 := read_ref($t3)
                     $t4 := $LoadU128($t3)
@@ -803,7 +803,7 @@ object "test_A2_M_test_pack_S2" {
 
         function A2_M_pack_S2(x) -> $result {
             let $t1
-            // $t1 := pack M::S2($t0)
+            // $t1 := pack 0x2::M::S2($t0)
             {
                 let $mem := $Malloc(16)
                 $MemoryStoreU128(add($mem, 0), x)
@@ -952,7 +952,7 @@ object "test_A2_M_test_pack_S2_fail" {
                     s := A2_M_pack_S2($t1)
                     // $t2 := borrow_local($t0)
                     $t2 := $MakePtr(false, s)
-                    // $t3 := borrow_field<M::S2>.x($t2)
+                    // $t3 := borrow_field<0x2::M::S2>.x($t2)
                     $t3 := $t2
                     // $t4 := read_ref($t3)
                     $t4 := $LoadU128($t3)
@@ -975,7 +975,7 @@ object "test_A2_M_test_pack_S2_fail" {
 
         function A2_M_pack_S2(x) -> $result {
             let $t1
-            // $t1 := pack M::S2($t0)
+            // $t1 := pack 0x2::M::S2($t0)
             {
                 let $mem := $Malloc(16)
                 $MemoryStoreU128(add($mem, 0), x)
@@ -1147,15 +1147,15 @@ object "test_A2_M_test_read_S" {
 
         function A2_M_read_S(s) -> $result {
             let $t1, $t2, $t3, $t4, $t5, $t6, $t7
-            // $t1 := borrow_field<M::S>.a($t0)
+            // $t1 := borrow_field<0x2::M::S>.a($t0)
             $t1 := $IndexPtr(s, 32)
             // $t2 := read_ref($t1)
             $t2 := $LoadU64($t1)
-            // $t3 := borrow_field<M::S>.c($t0)
+            // $t3 := borrow_field<0x2::M::S>.c($t0)
             {
                 $t3 := $MakePtr($IsStoragePtr(s), $LoadU256(s))
             }
-            // $t4 := borrow_field<M::S2>.x($t3)
+            // $t4 := borrow_field<0x2::M::S2>.x($t3)
             $t4 := $t3
             // $t5 := read_ref($t4)
             $t5 := $LoadU128($t4)
@@ -1173,7 +1173,7 @@ object "test_A2_M_test_read_S" {
             $t2 := $CastU128(a)
             // $t3 := M::pack_S2($t2)
             $t3 := A2_M_pack_S2($t2)
-            // $t4 := pack M::S($t0, $t1, $t3)
+            // $t4 := pack 0x2::M::S($t0, $t1, $t3)
             {
                 let $mem := $Malloc(41)
                 $MemoryStoreU64(add($mem, 32), a)
@@ -1187,7 +1187,7 @@ object "test_A2_M_test_read_S" {
 
         function A2_M_pack_S2(x) -> $result {
             let $t1
-            // $t1 := pack M::S2($t0)
+            // $t1 := pack 0x2::M::S2($t0)
             {
                 let $mem := $Malloc(16)
                 $MemoryStoreU128(add($mem, 0), x)
@@ -1394,7 +1394,7 @@ object "test_A2_M_test_read_and_write_S" {
                     s := A2_M_read_and_write_S()
                     // $t1 := borrow_local($t0)
                     $t1 := $MakePtr(false, s)
-                    // $t2 := borrow_field<M::S>.a($t1)
+                    // $t2 := borrow_field<0x2::M::S>.a($t1)
                     $t2 := $IndexPtr($t1, 32)
                     // $t3 := read_ref($t2)
                     $t3 := $LoadU64($t2)
@@ -1411,11 +1411,11 @@ object "test_A2_M_test_read_and_write_S" {
                     // label L2
                     // $t7 := borrow_local($t0)
                     $t7 := $MakePtr(false, s)
-                    // $t8 := borrow_field<M::S>.c($t7)
+                    // $t8 := borrow_field<0x2::M::S>.c($t7)
                     {
                         $t8 := $MakePtr($IsStoragePtr($t7), $LoadU256($t7))
                     }
-                    // $t9 := borrow_field<M::S2>.x($t8)
+                    // $t9 := borrow_field<0x2::M::S2>.x($t8)
                     $t9 := $t8
                     // $t10 := read_ref($t9)
                     $t10 := $LoadU128($t9)
@@ -1472,21 +1472,21 @@ object "test_A2_M_test_read_and_write_S" {
 
         function A2_M_write_S(s, v) {
             let $t2, $t3, $t4, $t5, $t6, $t7
-            // $t2 := borrow_field<M::S>.a($t0)
+            // $t2 := borrow_field<0x2::M::S>.a($t0)
             $t2 := $IndexPtr(s, 32)
             // write_ref($t2, $t1)
             $StoreU64($t2, v)
-            // $t3 := borrow_field<M::S>.a($t0)
+            // $t3 := borrow_field<0x2::M::S>.a($t0)
             $t3 := $IndexPtr(s, 32)
             // $t4 := read_ref($t3)
             $t4 := $LoadU64($t3)
             // $t5 := (u128)($t4)
             $t5 := $CastU128($t4)
-            // $t6 := borrow_field<M::S>.c($t0)
+            // $t6 := borrow_field<0x2::M::S>.c($t0)
             {
                 $t6 := $MakePtr($IsStoragePtr(s), $LoadU256(s))
             }
-            // $t7 := borrow_field<M::S2>.x($t6)
+            // $t7 := borrow_field<0x2::M::S2>.x($t6)
             $t7 := $t6
             // write_ref($t7, $t5)
             $StoreU128($t7, $t5)
@@ -1495,15 +1495,15 @@ object "test_A2_M_test_read_and_write_S" {
 
         function A2_M_read_S(s) -> $result {
             let $t1, $t2, $t3, $t4, $t5, $t6, $t7
-            // $t1 := borrow_field<M::S>.a($t0)
+            // $t1 := borrow_field<0x2::M::S>.a($t0)
             $t1 := $IndexPtr(s, 32)
             // $t2 := read_ref($t1)
             $t2 := $LoadU64($t1)
-            // $t3 := borrow_field<M::S>.c($t0)
+            // $t3 := borrow_field<0x2::M::S>.c($t0)
             {
                 $t3 := $MakePtr($IsStoragePtr(s), $LoadU256(s))
             }
-            // $t4 := borrow_field<M::S2>.x($t3)
+            // $t4 := borrow_field<0x2::M::S2>.x($t3)
             $t4 := $t3
             // $t5 := read_ref($t4)
             $t5 := $LoadU128($t4)
@@ -1521,7 +1521,7 @@ object "test_A2_M_test_read_and_write_S" {
             $t2 := $CastU128(a)
             // $t3 := M::pack_S2($t2)
             $t3 := A2_M_pack_S2($t2)
-            // $t4 := pack M::S($t0, $t1, $t3)
+            // $t4 := pack 0x2::M::S($t0, $t1, $t3)
             {
                 let $mem := $Malloc(41)
                 $MemoryStoreU64(add($mem, 32), a)
@@ -1535,7 +1535,7 @@ object "test_A2_M_test_read_and_write_S" {
 
         function A2_M_pack_S2(x) -> $result {
             let $t1
-            // $t1 := pack M::S2($t0)
+            // $t1 := pack 0x2::M::S2($t0)
             {
                 let $mem := $Malloc(16)
                 $MemoryStoreU128(add($mem, 0), x)
@@ -1800,7 +1800,7 @@ object "test_A2_M_test_unpack" {
                     s1 := A2_M_unpack($t3)
                     // $t4 := borrow_local($t0)
                     $t4 := $MakePtr(false, s1)
-                    // $t5 := borrow_field<M::S2>.x($t4)
+                    // $t5 := borrow_field<0x2::M::S2>.x($t4)
                     $t5 := $t4
                     // $t6 := read_ref($t5)
                     $t6 := $LoadU128($t5)
@@ -1823,7 +1823,7 @@ object "test_A2_M_test_unpack" {
 
         function A2_M_unpack(s) -> $result {
             let c, $t2, $t3, $t4
-            // ($t2, $t3, $t4) := unpack M::S($t0)
+            // ($t2, $t3, $t4) := unpack 0x2::M::S($t0)
             $t2 := $MemoryLoadU64(add(s, 32))
             $t3 := $MemoryLoadU8(add(s, 40))
             $t4 := $MemoryLoadU256(add(s, 0))
@@ -1840,7 +1840,7 @@ object "test_A2_M_test_unpack" {
             $t2 := $CastU128(a)
             // $t3 := M::pack_S2($t2)
             $t3 := A2_M_pack_S2($t2)
-            // $t4 := pack M::S($t0, $t1, $t3)
+            // $t4 := pack 0x2::M::S($t0, $t1, $t3)
             {
                 let $mem := $Malloc(41)
                 $MemoryStoreU64(add($mem, 32), a)
@@ -1854,7 +1854,7 @@ object "test_A2_M_test_unpack" {
 
         function A2_M_pack_S2(x) -> $result {
             let $t1
-            // $t1 := pack M::S2($t0)
+            // $t1 := pack 0x2::M::S2($t0)
             {
                 let $mem := $Malloc(16)
                 $MemoryStoreU128(add($mem, 0), x)
@@ -2039,7 +2039,7 @@ object "test_A2_M_test_write_S" {
                     A2_M_write_S($t3, $t4)
                     // $t5 := borrow_local($t0)
                     $t5 := $MakePtr(false, s)
-                    // $t6 := borrow_field<M::S>.a($t5)
+                    // $t6 := borrow_field<0x2::M::S>.a($t5)
                     $t6 := $IndexPtr($t5, 32)
                     // $t7 := read_ref($t6)
                     $t7 := $LoadU64($t6)
@@ -2056,11 +2056,11 @@ object "test_A2_M_test_write_S" {
                     // label L2
                     // $t11 := borrow_local($t0)
                     $t11 := $MakePtr(false, s)
-                    // $t12 := borrow_field<M::S>.c($t11)
+                    // $t12 := borrow_field<0x2::M::S>.c($t11)
                     {
                         $t12 := $MakePtr($IsStoragePtr($t11), $LoadU256($t11))
                     }
-                    // $t13 := borrow_field<M::S2>.x($t12)
+                    // $t13 := borrow_field<0x2::M::S2>.x($t12)
                     $t13 := $t12
                     // $t14 := read_ref($t13)
                     $t14 := $LoadU128($t13)
@@ -2095,21 +2095,21 @@ object "test_A2_M_test_write_S" {
 
         function A2_M_write_S(s, v) {
             let $t2, $t3, $t4, $t5, $t6, $t7
-            // $t2 := borrow_field<M::S>.a($t0)
+            // $t2 := borrow_field<0x2::M::S>.a($t0)
             $t2 := $IndexPtr(s, 32)
             // write_ref($t2, $t1)
             $StoreU64($t2, v)
-            // $t3 := borrow_field<M::S>.a($t0)
+            // $t3 := borrow_field<0x2::M::S>.a($t0)
             $t3 := $IndexPtr(s, 32)
             // $t4 := read_ref($t3)
             $t4 := $LoadU64($t3)
             // $t5 := (u128)($t4)
             $t5 := $CastU128($t4)
-            // $t6 := borrow_field<M::S>.c($t0)
+            // $t6 := borrow_field<0x2::M::S>.c($t0)
             {
                 $t6 := $MakePtr($IsStoragePtr(s), $LoadU256(s))
             }
-            // $t7 := borrow_field<M::S2>.x($t6)
+            // $t7 := borrow_field<0x2::M::S2>.x($t6)
             $t7 := $t6
             // write_ref($t7, $t5)
             $StoreU128($t7, $t5)
@@ -2122,7 +2122,7 @@ object "test_A2_M_test_write_S" {
             $t2 := $CastU128(a)
             // $t3 := M::pack_S2($t2)
             $t3 := A2_M_pack_S2($t2)
-            // $t4 := pack M::S($t0, $t1, $t3)
+            // $t4 := pack 0x2::M::S($t0, $t1, $t3)
             {
                 let $mem := $Malloc(41)
                 $MemoryStoreU64(add($mem, 32), a)
@@ -2136,7 +2136,7 @@ object "test_A2_M_test_write_S" {
 
         function A2_M_pack_S2(x) -> $result {
             let $t1
-            // $t1 := pack M::S2($t0)
+            // $t1 := pack 0x2::M::S2($t0)
             {
                 let $mem := $Malloc(16)
                 $MemoryStoreU128(add($mem, 0), x)

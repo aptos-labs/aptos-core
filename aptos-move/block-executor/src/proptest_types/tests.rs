@@ -3,22 +3,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    code_cache_global::ImmutableModuleCache,
+    code_cache_global_manager::AptosModuleCacheManagerGuard,
     errors::SequentialBlockExecutionError,
     executor::BlockExecutor,
     proptest_types::{
         baseline::BaselineOutput,
         types::{
-            DeltaDataView, EmptyDataView, KeyType, MockEnvironment, MockEvent, MockOutput,
-            MockTask, MockTransaction, NonEmptyGroupDataView, TransactionGen, TransactionGenParams,
-            MAX_GAS_PER_TXN,
+            DeltaDataView, KeyType, MockEvent, MockOutput, MockTask, MockTransaction,
+            NonEmptyGroupDataView, TransactionGen, TransactionGenParams, MAX_GAS_PER_TXN,
         },
     },
     txn_commit_hook::NoOpTransactionCommitHook,
 };
 use aptos_types::{
     block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
-    executable::ExecutableTestType,
+    executable::ExecutableTestType, state_store::MockStateView,
 };
 use claims::{assert_matches, assert_ok};
 use num_cpus;
@@ -60,9 +59,7 @@ fn run_transactions<K, V, E>(
         *transactions.get_mut(i.index(length)).unwrap() = MockTransaction::SkipRest(0);
     }
 
-    let data_view = EmptyDataView::<KeyType<K>> {
-        phantom: PhantomData,
-    };
+    let state_view = MockStateView::empty();
 
     let executor_thread_pool = Arc::new(
         rayon::ThreadPoolBuilder::new()
@@ -72,20 +69,20 @@ fn run_transactions<K, V, E>(
     );
 
     for _ in 0..num_repeat {
-        let env = MockEnvironment::new();
+        let mut guard = AptosModuleCacheManagerGuard::none();
+
         let output = BlockExecutor::<
             MockTransaction<KeyType<K>, E>,
             MockTask<KeyType<K>, E>,
-            EmptyDataView<KeyType<K>>,
+            MockStateView<KeyType<K>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
             ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
             executor_thread_pool.clone(),
-            Arc::new(ImmutableModuleCache::empty()),
             None,
         )
-        .execute_transactions_parallel(&env, &transactions, &data_view);
+        .execute_transactions_parallel(&transactions, &state_view, &mut guard);
 
         if module_access.0 && module_access.1 {
             assert_matches!(output, Err(()));
@@ -209,7 +206,8 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
     );
 
     for _ in 0..20 {
-        let env = MockEnvironment::new();
+        let mut guard = AptosModuleCacheManagerGuard::none();
+
         let output = BlockExecutor::<
             MockTransaction<KeyType<[u8; 32]>, MockEvent>,
             MockTask<KeyType<[u8; 32]>, MockEvent>,
@@ -219,10 +217,9 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
             executor_thread_pool.clone(),
-            Arc::new(ImmutableModuleCache::empty()),
             None,
         )
-        .execute_transactions_parallel(&env, &transactions, &data_view);
+        .execute_transactions_parallel(&transactions, &data_view, &mut guard);
 
         BaselineOutput::generate(&transactions, maybe_block_gas_limit)
             .assert_parallel_output(&output);
@@ -262,7 +259,8 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
     );
 
     for _ in 0..20 {
-        let env = MockEnvironment::new();
+        let mut guard = AptosModuleCacheManagerGuard::none();
+
         let output = BlockExecutor::<
             MockTransaction<KeyType<[u8; 32]>, MockEvent>,
             MockTask<KeyType<[u8; 32]>, MockEvent>,
@@ -272,10 +270,9 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
             executor_thread_pool.clone(),
-            Arc::new(ImmutableModuleCache::empty()),
             None,
         )
-        .execute_transactions_parallel(&env, &transactions, &data_view);
+        .execute_transactions_parallel(&transactions, &data_view, &mut guard);
 
         BaselineOutput::generate(&transactions, maybe_block_gas_limit)
             .assert_parallel_output(&output);
@@ -420,7 +417,7 @@ fn publishing_fixed_params_with_block_gas_limit(
     );
 
     // Confirm still no intersection
-    let env = MockEnvironment::new();
+    let mut guard = AptosModuleCacheManagerGuard::none();
     let output = BlockExecutor::<
         MockTransaction<KeyType<[u8; 32]>, MockEvent>,
         MockTask<KeyType<[u8; 32]>, MockEvent>,
@@ -430,10 +427,9 @@ fn publishing_fixed_params_with_block_gas_limit(
     >::new(
         BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
         executor_thread_pool,
-        Arc::new(ImmutableModuleCache::empty()),
         None,
     )
-    .execute_transactions_parallel(&env, &transactions, &data_view);
+    .execute_transactions_parallel(&transactions, &data_view, &mut guard);
     assert_ok!(output);
 
     // Adjust the reads of txn indices[2] to contain module read to key 42.
@@ -464,7 +460,8 @@ fn publishing_fixed_params_with_block_gas_limit(
     );
 
     for _ in 0..200 {
-        let env = MockEnvironment::new();
+        let mut guard = AptosModuleCacheManagerGuard::none();
+
         let output = BlockExecutor::<
             MockTransaction<KeyType<[u8; 32]>, MockEvent>,
             MockTask<KeyType<[u8; 32]>, MockEvent>,
@@ -477,10 +474,9 @@ fn publishing_fixed_params_with_block_gas_limit(
                 Some(max(w_index, r_index) as u64 * MAX_GAS_PER_TXN + 1),
             ),
             executor_thread_pool.clone(),
-            Arc::new(ImmutableModuleCache::empty()),
             None,
         ) // Ensure enough gas limit to commit the module txns (4 is maximum gas per txn)
-        .execute_transactions_parallel(&env, &transactions, &data_view);
+        .execute_transactions_parallel(&transactions, &data_view, &mut guard);
 
         assert_matches!(output, Err(()));
     }
@@ -548,7 +544,8 @@ fn non_empty_group(
     );
 
     for _ in 0..num_repeat_parallel {
-        let env = MockEnvironment::new();
+        let mut guard = AptosModuleCacheManagerGuard::none();
+
         let output = BlockExecutor::<
             MockTransaction<KeyType<[u8; 32]>, MockEvent>,
             MockTask<KeyType<[u8; 32]>, MockEvent>,
@@ -558,16 +555,16 @@ fn non_empty_group(
         >::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
             executor_thread_pool.clone(),
-            Arc::new(ImmutableModuleCache::empty()),
             None,
         )
-        .execute_transactions_parallel(&env, &transactions, &data_view);
+        .execute_transactions_parallel(&transactions, &data_view, &mut guard);
 
         BaselineOutput::generate(&transactions, None).assert_parallel_output(&output);
     }
 
     for _ in 0..num_repeat_sequential {
-        let env = MockEnvironment::new();
+        let mut guard = AptosModuleCacheManagerGuard::none();
+
         let output = BlockExecutor::<
             MockTransaction<KeyType<[u8; 32]>, MockEvent>,
             MockTask<KeyType<[u8; 32]>, MockEvent>,
@@ -577,10 +574,9 @@ fn non_empty_group(
         >::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
             executor_thread_pool.clone(),
-            Arc::new(ImmutableModuleCache::empty()),
             None,
         )
-        .execute_transactions_sequential(&env, &transactions, &data_view, false);
+        .execute_transactions_sequential(&transactions, &data_view, &mut guard, false);
         // TODO: test dynamic disabled as well.
 
         BaselineOutput::generate(&transactions, None).assert_output(&output.map_err(|e| match e {

@@ -81,6 +81,6 @@ module 0x2::M {
     }
     fun t4() {
         let () = loop break;
-        let () = loop if (false) break;
+        let () = while (!false) ();
     }
 }
