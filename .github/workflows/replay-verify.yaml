@@ -72,7 +72,7 @@ jobs:
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
       # workflow config
       RUNS_ON: "high-perf-docker-with-local-ssd"
-      TIMEOUT_MINUTES: 240
+      TIMEOUT_MINUTES: 180
       MAX_VERSIONS_PER_RANGE: 2000000
 
   replay-mainnet:
@@ -96,7 +96,7 @@ jobs:
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
       # workflow config
       RUNS_ON: "high-perf-docker-with-local-ssd"
-      TIMEOUT_MINUTES: 240
+      TIMEOUT_MINUTES: 180
       MAX_VERSIONS_PER_RANGE: 800000
 
   test-replay:

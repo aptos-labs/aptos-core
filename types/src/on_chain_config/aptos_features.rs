@@ -178,8 +178,7 @@ impl FeatureFlag {
             FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
             FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
             FeatureFlag::NATIVE_MEMORY_OPERATIONS,
-            // TODO(loader_v2): Enable V2 loader.
-            // FeatureFlag::ENABLE_LOADER_V2,
+            FeatureFlag::ENABLE_LOADER_V2,
         ]
     }
 }
