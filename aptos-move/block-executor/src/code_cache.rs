@@ -28,6 +28,7 @@ use move_vm_types::code::{
     WithBytes,
 };
 use std::sync::Arc;
+use crate::counters::GLOBAL_MODULE_CACHE_NUM_MISSES_PER_BLOCK;
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> WithRuntimeEnvironment
     for LatestView<'a, T, S, X>
@@ -152,6 +153,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCache
                     return Ok(Some((module, Self::Version::default())));
                 }
 
+                GLOBAL_MODULE_CACHE_NUM_MISSES_PER_BLOCK.inc();
+
                 // If not global cache, check per-block cache.
                 let read = state
                     .versioned_map
@@ -168,6 +171,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCache
                     state.read_set.borrow_mut().capture_module_read(key.clone());
                     return Ok(Some((module, Self::Version::default())));
                 }
+
+                GLOBAL_MODULE_CACHE_NUM_MISSES_PER_BLOCK.inc();
 
                 let read = state
                     .unsync_map
