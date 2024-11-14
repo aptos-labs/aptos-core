@@ -9,6 +9,7 @@ use crate::{
 };
 use aptos_gas_algebra::{
     InternalGas, InternalGasPerAbstractValueUnit, InternalGasPerArg, InternalGasPerByte,
+    InternalGasPerTypeNode,
 };
 
 crate::gas_schedule::macros::define_gas_parameters!(
@@ -41,6 +42,8 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [bcs_serialized_size_base: InternalGas, { RELEASE_V1_18.. => "bcs.serialized_size.base" }, 735],
         [bcs_serialized_size_per_byte_serialized: InternalGasPerByte, { RELEASE_V1_18.. => "bcs.serialized_size.per_byte_serialized" }, 36],
         [bcs_serialized_size_failure: InternalGas, { RELEASE_V1_18.. => "bcs.serialized_size.failure" }, 3676],
+        [bcs_constant_serialized_size_base: InternalGas, { RELEASE_V1_24.. => "bcs.constant_serialized_size.base" }, 735],
+        [bcs_constant_serialized_size_per_type_node: InternalGasPerTypeNode, { RELEASE_V1_24.. => "bcs.constant_serialized_size.per_type_node" }, 40],
 
         [cmp_compare_base: InternalGas, { RELEASE_V1_24.. => "cmp.compare.base" }, 367],
         [cmp_compare_per_abs_val_unit: InternalGasPerAbstractValueUnit, { RELEASE_V1_24.. => "cmp.compare.per_abs_val_unit"}, 14],
