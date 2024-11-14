@@ -858,20 +858,6 @@ impl Type {
         matches!(self, Type::TypeParameter(..))
     }
 
-    /// Returns true if the type depends on type parameters.
-    pub fn depends_from_type_parameter(&self) -> bool {
-        use Type::*;
-        match self {
-            TypeParameter(_) => true,
-            Tuple(ts) | Struct(_, _, ts) | ResourceDomain(_, _, Some(ts)) => {
-                ts.iter().any(|t| t.depends_from_type_parameter())
-            },
-            Vector(t) | Reference(_, t) | TypeDomain(t) => t.depends_from_type_parameter(),
-            Fun(t, r, _) => t.depends_from_type_parameter() || r.depends_from_type_parameter(),
-            _ => false,
-        }
-    }
-
     /// Determines whether this is a primitive.
     pub fn is_primitive(&self) -> bool {
         matches!(self, Type::Primitive(_))
@@ -2069,7 +2055,10 @@ impl Substitution {
                     Ok(())
                 }
             },
-            Fun(_, _, abilities) => check(AbilitySet::FUNCTIONS.union(*abilities)),
+            Fun(_, _, abilities) => {
+                assert!(AbilitySet::FUNCTIONS.is_subset(*abilities));
+                check(*abilities)
+            },
             Reference(_, _) => check(AbilitySet::REFERENCES),
             TypeDomain(_) | ResourceDomain(_, _, _) => check(AbilitySet::EMPTY),
             Error => Ok(()),

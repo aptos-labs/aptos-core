@@ -214,7 +214,7 @@ fn find_possibly_modified_vars(
     exp.visit_positions(&mut |pos, e| {
         use ExpData::*;
         match e {
-            Invalid(_) | Value(..) | LoopCont(..) | MoveFunctionExp(..) => {
+            Invalid(_) | Value(..) | LoopCont(..) => {
                 // Nothing happens inside these expressions, so don't bother `modifying` state.
             },
             LocalVar(id, sym) => {
@@ -379,19 +379,6 @@ fn find_possibly_modified_vars(
                     },
                     _ => {},
                 };
-            },
-            Curry(_, _mask, _fnexp, _explist) => {
-                // Turn off `modifying` inside.
-                match pos {
-                    VisitorPosition::Pre => {
-                        modifying_stack.push(modifying);
-                        modifying = false;
-                    },
-                    VisitorPosition::Post => {
-                        modifying = modifying_stack.pop().expect("unbalanced visit 10");
-                    },
-                    _ => {},
-                }
             },
             Block(node_id, pat, _, _) => {
                 // Define a new scope for bound vars, and turn off `modifying` within.

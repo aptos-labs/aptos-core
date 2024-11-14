@@ -14,14 +14,17 @@
 //!
 //! Lambda lifting rewrites lambda expressions into construction
 //! of *closures*. A closure refers to a function and contains a partial list
-//! of arguments for that function, essentially currying it. Example:
+//! of arguments for that function, essentially currying it.  We use the
+//! `Bind` operation to construct a closure from a function and set of arguemnts,
+//! qualified by a mask which allows early-bound arguments to be anywhere in
+//! the function argument list.
 //!
 //! ```ignore
 //! let c = 1;
 //! vec.any(|x| x > c)
 //! ==>
 //! let c = 1;
-//! vec.any(Closure(lifted, c))
+//! vec.any(Bind(0x10u64)(lifted, c))
 //! where
 //!   fun lifted(c: u64, x: u64): bool { x > c }
 //! ```
@@ -34,7 +37,7 @@
 //! vec.any(|S{x}| x > c)
 //! ==>
 //! let c = 1;
-//! vec.any(Closure(lifted, c))
+//! vec.any(Bind(0x10)(lifted, c))
 //! where
 //!   fun lifted(c: u64, arg$2: S): bool { let S{x} = arg$2; x > y }
 //! ```
@@ -42,7 +45,7 @@
 use itertools::Itertools;
 use move_binary_format::file_format::{Ability, AbilitySet, Visibility};
 use move_model::{
-    ast::{Exp, ExpData, LambdaCaptureKind, Operation, Pattern, TempIndex},
+    ast::{self, Exp, ExpData, LambdaCaptureKind, Operation, Pattern, TempIndex},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, Parameter, TypeParameter},
     symbol::Symbol,
@@ -197,11 +200,11 @@ impl<'a> LambdaLifter<'a> {
         }
     }
 
-    // For the current state, calculate: (params, closure_args, param_index_mapping), where
-    //    params = new Parameter for each free var to represent it in the lifted function
-    //    closure_args = corresponding expressions to provide as actual arg for each param
-    //    param_index_mapping = for each free var which is a Parameter from the enclosing function,
-    //          a mapping from index there to index in the params list
+    /// For the current state, calculate: (params, closure_args, param_index_mapping), where
+    /// - `params` = new Parameter for each free var to represent it in the lifted function
+    /// - `closure_args` = corresponding expressions to provide as actual arg for each param
+    /// - `param_index_mapping` = for each free var which is a Parameter from the enclosing function,
+    ///    a mapping from index there to index in the params list
     fn get_params_for_freevars(&mut self) -> (Vec<Parameter>, Vec<Exp>, BTreeMap<usize, usize>) {
         let env = self.fun_env.module_env.env;
         let mut closure_args = vec![];
@@ -264,7 +267,7 @@ impl<'a> LambdaLifter<'a> {
     fn get_arg_if_simple(arg: &Exp) -> Option<&Exp> {
         use ExpData::*;
         match &arg.as_ref() {
-            Value(..) | LocalVar(..) | Temporary(..) | MoveFunctionExp(..) => Some(arg),
+            Value(..) | LocalVar(..) | Temporary(..) => Some(arg),
             Sequence(_, exp_vec) => {
                 if let [exp] = &exp_vec[..] {
                     Self::get_arg_if_simple(exp)
@@ -272,9 +275,9 @@ impl<'a> LambdaLifter<'a> {
                     None
                 }
             },
-            Invalid(..) | Call(..) | Invoke(..) | Lambda(..) | Curry(..) | Quant(..)
-            | Block(..) | IfElse(..) | Match(..) | Return(..) | Loop(..) | LoopCont(..)
-            | Assign(..) | Mutate(..) | SpecBlock(..) => None,
+            Invalid(..) | Call(..) | Invoke(..) | Lambda(..) | Quant(..) | Block(..)
+            | IfElse(..) | Match(..) | Return(..) | Loop(..) | LoopCont(..) | Assign(..)
+            | Mutate(..) | SpecBlock(..) => None,
         }
     }
 
@@ -283,7 +286,8 @@ impl<'a> LambdaLifter<'a> {
             .iter()
             .filter_map(|exp| Self::get_arg_if_simple(exp))
             .collect();
-        if result.len() == args.len() {
+        if result.len() == args.len() && result.len() <= 64 {
+            // Curry/Bind bitmask is only a u64, so we limit to 64 args here.
             Some(result)
         } else {
             None
@@ -293,13 +297,19 @@ impl<'a> LambdaLifter<'a> {
     fn get_fun_if_simple(fn_exp: &Exp) -> Option<Exp> {
         use ExpData::*;
         match fn_exp.as_ref() {
-            MoveFunctionExp(..) => Some(fn_exp.clone()),
-            Curry(id, mask, fn_exp, args) => Self::get_fun_if_simple(fn_exp).and_then(|fn_exp| {
-                Self::get_args_if_simple(args).map(|args| {
-                    let args = args.iter().map(|expref| (*expref).clone()).collect();
-                    ExpData::Curry(*id, *mask, fn_exp, args).into_exp()
+            Value(_, ast::Value::Function(..)) => Some(fn_exp.clone()),
+            Call(id, Operation::Bind(mask), args) => {
+                let mut args_iter = args.iter();
+                args_iter.next().and_then(|fn_exp| {
+                    let fn_args: Vec<_> = args_iter.cloned().collect();
+                    Self::get_args_if_simple(&fn_args).map(|simp_args| {
+                        let mut bind_args: Vec<_> =
+                            simp_args.iter().map(|expref| (*expref).clone()).collect();
+                        bind_args.insert(0, fn_exp.clone());
+                        ExpData::Call(*id, Operation::Bind(*mask), bind_args).into_exp()
+                    })
                 })
-            }),
+            },
             Sequence(_, exp_vec) => {
                 if let [exp] = &exp_vec[..] {
                     Self::get_fun_if_simple(exp)
@@ -331,7 +341,7 @@ impl<'a> LambdaLifter<'a> {
         if let Some(inst) = instantiation {
             env.set_node_instantiation(id, inst);
         }
-        let fn_exp = ExpData::MoveFunctionExp(id, module_id, fun_id);
+        let fn_exp = ExpData::Value(id, ast::Value::Function(module_id, fun_id));
         fn_exp.into_exp()
     }
 
@@ -366,27 +376,30 @@ impl<'a> LambdaLifter<'a> {
         let env = self.fun_env.module_env.env;
         match body.as_ref() {
             Call(id, oper, args) => {
-                if let Operation::MoveFunction(mid, fid) = oper {
-                    Self::get_args_if_simple(args).map(|args| {
-                        let fn_type = self.get_move_fn_type(*id, *mid, *fid);
-                        let loc = env.get_node_loc(*id);
-                        let fn_exp = self.make_move_fn_exp(
-                            loc,
-                            fn_type,
-                            *mid,
-                            *fid,
-                            env.get_node_instantiation_opt(*id),
-                        );
-                        (fn_exp, args)
-                    })
-                } else {
-                    None
+                match oper {
+                    Operation::Bind(_mask) => {
+                        // TODO(LAMBDA): We may be able to do something with this.
+                        None
+                    },
+                    Operation::MoveFunction(mid, fid) => {
+                        Self::get_args_if_simple(args).map(|args| {
+                            let fn_type = self.get_move_fn_type(*id, *mid, *fid);
+                            let loc = env.get_node_loc(*id);
+                            let fn_exp = self.make_move_fn_exp(
+                                loc,
+                                fn_type,
+                                *mid,
+                                *fid,
+                                env.get_node_instantiation_opt(*id),
+                            );
+                            (fn_exp, args)
+                        })
+                    },
+                    _ => None,
                 }
             },
             Invoke(_id, fn_exp, args) => Self::get_args_if_simple(args)
                 .and_then(|args| Self::get_fun_if_simple(fn_exp).map(|exp| (exp, args))),
-            Curry(_id, _mask, _fn_exp, _args) => None,
-            MoveFunctionExp(_id, _mid, _fid) => None,
             ExpData::Sequence(_id, exp_vec) => {
                 if let [exp] = &exp_vec[..] {
                     self.lambda_reduces_to_curry(exp)
@@ -420,12 +433,12 @@ impl<'a> LambdaLifter<'a> {
             // lambda has form |lambda_params| fn_exp(args)
             // where each arg is a constant or simple variable
             let mut new_args = vec![];
-            let mut mask: u128 = 0; // has a 1 bit for the position of each lambda parameter in call
+            let mut mask: u64 = 0; // has a 1 bit for the position of each lambda parameter in call
             let mut param_cursor = 0; // tracks which lambda param we are expecting
             let mut has_mismatch = false;
             let param_syms: BTreeSet<Symbol> =
                 lambda_params.iter().map(|param| param.get_name()).collect();
-            let mut mask_cursor = 1u128; // = 1u128<<(loop index)
+            let mut mask_cursor = 1u64; // = 1u64<<(loop index)
             for arg in args.iter() {
                 let this_arg_is_lambda_param = if let ExpData::LocalVar(_id, name) = arg.as_ref() {
                     if param_syms.contains(name) {
@@ -450,16 +463,30 @@ impl<'a> LambdaLifter<'a> {
                 if !this_arg_is_lambda_param {
                     // this arg is a free var and is provided as an arg to curry
                     new_args.push((*arg).clone());
+                    mask |= mask_cursor;
                 } else {
                     // this arg is a lambda parameter
-                    mask |= mask_cursor;
                 }
                 mask_cursor <<= 1;
             }
             if !has_mismatch {
                 let env = self.fun_env.module_env.env;
-                let id = env.clone_node(id);
-                return Some(ExpData::Curry(id, mask, fn_exp, new_args).into_exp());
+                let bind_id = env.clone_node(id);
+                match fn_exp.as_ref() {
+                    ExpData::Value(_, ast::Value::Function(..)) => {
+                        new_args.insert(0, fn_exp);
+                        return Some(
+                            ExpData::Call(bind_id, Operation::Bind(mask), new_args).into_exp(),
+                        );
+                    },
+                    ExpData::Call(_id2, Operation::Bind(_mask2), _bind_args) => {
+                        // TODO: LAMBDA
+                        // We can convert this into a single bind, but we need to build a let
+                        // expression to be sure to evaluate args in the right order.  Skip it for
+                        // now.
+                    },
+                    _ => {},
+                }
             };
         };
         None
@@ -531,10 +558,13 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
 
     fn rewrite_assign(&mut self, _node_id: NodeId, lhs: &Pattern, _rhs: &Exp) -> Option<Exp> {
         for (node_id, name) in lhs.vars() {
-            self.free_locals.insert(name, VarInfo {
-                node_id,
-                modified: true,
-            });
+            self.free_locals.insert(
+                name,
+                VarInfo {
+                    node_id,
+                    modified: true,
+                },
+            );
         }
         None
     }
@@ -543,16 +573,22 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         if matches!(oper, Operation::Borrow(ReferenceKind::Mutable)) {
             match args[0].as_ref() {
                 ExpData::LocalVar(node_id, name) => {
-                    self.free_locals.insert(*name, VarInfo {
-                        node_id: *node_id,
-                        modified: true,
-                    });
+                    self.free_locals.insert(
+                        *name,
+                        VarInfo {
+                            node_id: *node_id,
+                            modified: true,
+                        },
+                    );
                 },
                 ExpData::Temporary(node_id, param) => {
-                    self.free_params.insert(*param, VarInfo {
-                        node_id: *node_id,
-                        modified: true,
-                    });
+                    self.free_params.insert(
+                        *param,
+                        VarInfo {
+                            node_id: *node_id,
+                            modified: true,
+                        },
+                    );
                 },
                 _ => {},
             }
@@ -594,7 +630,7 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         // param_index_mapping = for each free var which is a Parameter from the enclosing function,
         //      a mapping from index there to index in the params list; other free vars are
         //      substituted automatically by using the same symbol for the param
-        let (params, closure_args, param_index_mapping) = self.get_params_for_freevars();
+        let (params, mut closure_args, param_index_mapping) = self.get_params_for_freevars();
 
         // Some(ExpData::Invalid(env.clone_node(id)).into_exp());
         // Add lambda args. For dealing with patterns in lambdas (`|S{..}|e`) we need
@@ -668,11 +704,13 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
             Box::new(result_type),
             abilities,
         );
-        let id = env.new_node(lambda_loc.clone(), fn_type);
-        if let Some(inst) = &lambda_inst_opt {
-            env.set_node_instantiation(id, inst.clone());
-        }
-        let fn_exp = ExpData::MoveFunctionExp(id, module_id, fun_id).into_exp();
+        let fn_exp = self.make_move_fn_exp(
+            lambda_loc.clone(),
+            fn_type,
+            module_id,
+            fun_id,
+            lambda_inst_opt.clone(),
+        );
 
         let bound_param_count = closure_args.len();
         if bound_param_count == 0 {
@@ -680,14 +718,15 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
             Some(fn_exp)
         } else {
             // Create a bitmask for the early-bound parameters.
-            let bitmask: u128 = (1u128 << bound_param_count) - 1;
+            let bitmask: u64 = (1u64 << bound_param_count) - 1;
 
             // Create and return closure expression
             let id = env.new_node(lambda_loc, lambda_type);
             if let Some(inst) = lambda_inst_opt {
                 env.set_node_instantiation(id, inst);
             }
-            Some(ExpData::Curry(id, bitmask, fn_exp, closure_args).into_exp())
+            closure_args.insert(0, fn_exp);
+            Some(ExpData::Call(id, Operation::Bind(bitmask), closure_args).into_exp())
         }
     }
 }

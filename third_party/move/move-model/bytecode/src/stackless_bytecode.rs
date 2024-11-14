@@ -1142,11 +1142,15 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
                     .global_env()
                     .get_module(*mid)
                     .into_function(*fid);
-                write!(f, "{}", match self.oper {
-                    OpaqueCallBegin(_, _, _) => "opaque begin: ",
-                    OpaqueCallEnd(_, _, _) => "opaque end: ",
-                    _ => "",
-                })?;
+                write!(
+                    f,
+                    "{}",
+                    match self.oper {
+                        OpaqueCallBegin(_, _, _) => "opaque begin: ",
+                        OpaqueCallEnd(_, _, _) => "opaque end: ",
+                        _ => "",
+                    }
+                )?;
                 write!(
                     f,
                     "{}::{}",
@@ -1345,11 +1349,15 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
             )?,
 
             Havoc(kind) => {
-                write!(f, "havoc[{}]", match kind {
-                    HavocKind::Value => "val",
-                    HavocKind::MutationValue => "mut",
-                    HavocKind::MutationAll => "mut_all",
-                })?;
+                write!(
+                    f,
+                    "havoc[{}]",
+                    match kind {
+                        HavocKind::Value => "val",
+                        HavocKind::MutationValue => "mut",
+                        HavocKind::MutationAll => "mut_all",
+                    }
+                )?;
             },
             Stop => {
                 write!(f, "stop")?;

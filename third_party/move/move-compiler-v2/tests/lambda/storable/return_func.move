@@ -17,11 +17,11 @@ module 0x42::test {
         x * y * z
     }
 
-    fun multiply_by_x(x: u64): |u64|u64: store {
+    fun multiply_by_x(x: u64): |u64|u64 with store {
         multiply(x, _)
     }
 
-    fun choose_function(key: u64) : |u64|u64: store {
+    fun choose_function(key: u64) : |u64|u64 with store {
         if (key == 0) {
             double
         } else if (key == 1) {
@@ -31,7 +31,7 @@ module 0x42::test {
         }
     }
 
-    fun choose_function2(key: u64): |u64|u64: store {
+    fun choose_function2(key: u64): |u64|u64 with store {
         if (key == 0) {
             move |x| double(x)
         } else if (key == 1) {
@@ -58,7 +58,7 @@ module 0x42::test {
         }
     }
 
-    fun choose_function3(key: u64) : |u64|u64: store {
+    fun choose_function3(key: u64) : |u64|u64 with store {
         if (key == 0) {
             let f = move |x| double(x);
             f
@@ -71,7 +71,7 @@ module 0x42::test {
         }
     }
 
-    public fun test_functions(choose_function: |u64|(|u64|u64: store)) {
+    public fun test_functions(choose_function: |u64|(|u64|u64 with store)) {
         let sum = vector<u64>[];
         let x = 3;
         vector::push_back(&mut sum, (choose_function(0))(x));

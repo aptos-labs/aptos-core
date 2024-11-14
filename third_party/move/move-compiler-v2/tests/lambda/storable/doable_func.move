@@ -61,16 +61,19 @@ module 0x42::test {
                 move |z| multiply3(x, y, z)
             } else if (key == 10) {
                 let z = 11;
-                move |x| alt_multiply(x, z)
+                move |x| alt_multiply(x, z) with copy
             } else if (key == 11) {
-                let g = move |x, y| mod3::multiply(x, y);
+                let g = move |x, y| mod3::multiply(x, y) with copy+drop;
                 g(_, 11)
             } else if (key == 12) {
                 let h = mod3::multiply(_, 12);
-                move |x| h(x)
-            } else {
+                move |x| { h(x) } with copy + drop
+            } else if (key == 14) {
                 let i = multiply3(2, _, 2);
                 move |z| i(z)
+            } else {
+                let i = move |x, y| { let q = y - 1; 0x42::mod3::multiply(x, q + 1)  };
+                i(_, 15)
             };
         f(x)
     }
@@ -83,7 +86,7 @@ module 0x42::test {
         // let sum = vector[];
         let x = 3;
 
-        for (i in 0..14) {
+        for (i in 0..15) {
             let y = choose_function1(i, 3);
             assert!(y == (i + 2) * x, i);
         }

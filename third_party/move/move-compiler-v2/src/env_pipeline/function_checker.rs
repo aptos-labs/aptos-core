@@ -12,7 +12,7 @@ use move_model::{
     model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, NodeId, Parameter, QualifiedId},
     ty::Type,
 };
-use std::{collections::BTreeSet, iter::Iterator, ops::Deref, vec::Vec};
+use std::{collections::BTreeSet, iter::Iterator, vec::Vec};
 
 type QualifiedFunId = QualifiedId<FunId>;
 
@@ -22,7 +22,7 @@ fn identify_function_types_with_functions_in_args(func_types: Vec<Type>) -> Vec<
         .into_iter()
         .filter_map(|ty| {
             if let Type::Fun(args, _, _) = &ty {
-                if args.deref().has_function() {
+                if args.as_ref().has_function() {
                     Some(ty)
                 } else {
                     None
@@ -43,7 +43,7 @@ fn identify_function_typed_params_with_functions_in_rets(
         .iter()
         .filter_map(|param| {
             if let Type::Fun(_args, result, _) = &param.1 {
-                let rest_unboxed = result.deref();
+                let rest_unboxed = result.as_ref();
                 if rest_unboxed.has_function() {
                     Some((*param, rest_unboxed))
                 } else {

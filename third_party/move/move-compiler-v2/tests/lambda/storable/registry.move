@@ -4,27 +4,27 @@ module 0x42::test {
     }
 
     struct Function {
-        f: |u64| u64 has store,
+        f: |u64| u64 with store,
         key: u64
     }
 
     enum Option<T> {
         None(),
         Some(T)
-    };
+    }
 
     fun get_function(v: &vector<Function>, k: u64): Option<Function> {
-        mut x = Option<Function>::None;
+        let x = Option::None;
         vector::for_each_ref(v, |f: &Function| {
-            if f.key == k {
-                x = f.f
+            if (f.key == k) {
+                x = Option::Some(f.f)
             }
         });
         x
     }
 
-    fun replace_or_add_function(v: &mut vector<Function>, k: u64, f: |u64| u64 has store): Option<Function> {
-        mut done = false;
+    fun replace_or_add_function(v: &mut vector<Function>, k: u64, f: |u64| u64 with store): Option<Function> {
+        let done = false;
         vector::for_each_mut(v, |f: &mut Function| {
             if f.key == k {
                 f.f = f;
@@ -37,7 +37,7 @@ module 0x42::test {
         }
     }
 
-    fun register(owner: &signer, f: |u64| u64 has store, k: u64) acquires Registry {
+    fun register(owner: &signer, f: |u64| u64 with store, k: u64) acquires Registry {
         let addr = owner.address;
         if !exists<Registry>(addr) {
             let new_registry = Registry {
@@ -77,11 +77,11 @@ module 0x42::test {
         x * y
     }
 
-    fun multiply_by_x(x: u64): |u64|u64 has store {
+    fun multiply_by_x(x: u64): |u64|u64 with store {
         multiply(x..)
     }
 
-    fun multiply_by_x2(x: u64): |u64|u64 has store {
+    fun multiply_by_x2(x: u64): |u64|u64 with store {
         move |y| multiply(x, y)
     }
 

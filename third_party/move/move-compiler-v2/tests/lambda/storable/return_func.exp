@@ -1,10 +1,28 @@
 
 Diagnostics:
-error: type `|u64|u64` is missing required ability `store`
+error: undeclared `_`
+   ┌─ tests/lambda/storable/return_func.move:21:21
+   │
+21 │         multiply(x, _)
+   │                     ^
+
+error: cannot return `u64` from a function with result type `|u64|u64:store`
    ┌─ tests/lambda/storable/return_func.move:21:9
    │
 21 │         multiply(x, _)
    │         ^^^^^^^^^^^^^^
+
+error: type `|u64|u64:copy+drop` is missing required ability `store`
+   ┌─ tests/lambda/storable/return_func.move:26:13
+   │
+26 │             double
+   │             ^^^^^^
+
+error: type `|u64|u64:copy+drop` is missing required ability `store`
+   ┌─ tests/lambda/storable/return_func.move:28:13
+   │
+28 │             triple
+   │             ^^^^^^
 
 error: type `|u64|u64` is missing required ability `store`
    ┌─ tests/lambda/storable/return_func.move:36:13
@@ -30,17 +48,41 @@ error: type `|u64|u64` is missing required ability `store`
 44 │             move |x| f(x)
    │             ^^^^^^^^^^^^^
 
-error: type `|u64|u64` is missing required ability `store`
+error: undeclared `_`
+   ┌─ tests/lambda/storable/return_func.move:46:33
+   │
+46 │             let f = multiply(6, _);
+   │                                 ^
+
+error: cannot return `u64` from a function with result type `|u64|u64:store`
    ┌─ tests/lambda/storable/return_func.move:47:13
    │
 47 │             f
    │             ^
 
-error: type `|u64|u64` is missing required ability `store`
+error: undeclared `_`
+   ┌─ tests/lambda/storable/return_func.move:49:22
+   │
+49 │             multiply(_, 7)
+   │                      ^
+
+error: cannot return `u64` from a function with result type `|u64|u64:store`
    ┌─ tests/lambda/storable/return_func.move:49:13
    │
 49 │             multiply(_, 7)
    │             ^^^^^^^^^^^^^^
+
+error: undeclared `_`
+   ┌─ tests/lambda/storable/return_func.move:51:33
+   │
+51 │             let f = multiply(6, _);
+   │                                 ^
+
+error: expected `|u64|u64` but found a value of type `u64`
+   ┌─ tests/lambda/storable/return_func.move:52:22
+   │
+52 │             move |x| f(x)
+   │                      ^^^^
 
 error: type `|u64|u64` is missing required ability `store`
    ┌─ tests/lambda/storable/return_func.move:52:13
@@ -54,7 +96,13 @@ error: type `|u64|u64` is missing required ability `store`
 55 │             move |x| f(x)
    │             ^^^^^^^^^^^^^
 
-error: type `|u64|u64` is missing required ability `store`
+error: undeclared `_`
+   ┌─ tests/lambda/storable/return_func.move:57:23
+   │
+57 │             multiply3(_, 3, 4)
+   │                       ^
+
+error: cannot return `u64` from a function with result type `|u64|u64:store`
    ┌─ tests/lambda/storable/return_func.move:57:13
    │
 57 │             multiply3(_, 3, 4)
