@@ -27,7 +27,6 @@ use move_core_types::{
 };
 #[cfg(any(test, feature = "testing"))]
 use move_vm_types::loaded_data::runtime_types::{StructIdentifier, StructNameIndex};
-use move_vm_types::sha3_256;
 use std::sync::Arc;
 
 /// [MoveVM] runtime environment encapsulating different configurations. Shared between the VM and
@@ -192,21 +191,15 @@ impl RuntimeEnvironment {
         result.map_err(|e| e.finish(Location::Undefined))
     }
 
-    /// Deserializes bytes into a compiled module, also returning its size and hash.
-    pub fn deserialize_into_compiled_module(
-        &self,
-        bytes: &Bytes,
-    ) -> VMResult<(CompiledModule, usize, [u8; 32])> {
-        let compiled_module =
-            CompiledModule::deserialize_with_config(bytes, &self.vm_config().deserializer_config)
-                .map_err(|err| {
+    /// Deserializes bytes into a compiled module.
+    pub fn deserialize_into_compiled_module(&self, bytes: &Bytes) -> VMResult<CompiledModule> {
+        CompiledModule::deserialize_with_config(bytes, &self.vm_config().deserializer_config)
+            .map_err(|err| {
                 let msg = format!("Deserialization error: {:?}", err);
                 PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
                     .with_message(msg)
                     .finish(Location::Undefined)
-            })?;
-
-        Ok((compiled_module, bytes.len(), sha3_256(bytes)))
+            })
     }
 
     /// Deserializes bytes into a compiled script.

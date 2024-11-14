@@ -54,9 +54,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCodeB
             .map_err(|err| err.finish(Location::Undefined))?
             .map(|state_value| {
                 let extension = Arc::new(AptosModuleExtension::new(state_value));
-
-                // TODO(loader_v2): This recomputes module hash twice, we should avoid it.
-                let (compiled_module, _, _) = self
+                let compiled_module = self
                     .runtime_environment()
                     .deserialize_into_compiled_module(extension.bytes())?;
                 Ok(ModuleCode::from_deserialized(compiled_module, extension))
