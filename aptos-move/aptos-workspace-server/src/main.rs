@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{Context, Result};
-use common::{make_shared, IP_LOCAL_HOST};
+use common::make_shared;
 use futures::TryFutureExt;
-use services::processors::start_all_processors;
+use services::{
+    docker_common::create_docker_network, indexer_api::start_indexer_api,
+    processors::start_all_processors,
+};
 use std::path::Path;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -42,9 +45,18 @@ async fn run_all_services(test_dir: &Path) -> Result<()> {
         fut_indexer_grpc.clone(),
     );
 
+    // Docker Network
+    let docker_network_name = format!("aptos-workspace-{}-postgres", instance_id);
+    let (fut_docker_network, fut_docker_network_clean_up) =
+        create_docker_network(shutdown.clone(), docker_network_name);
+
     // Postgres
-    let (fut_postgres, fut_postgres_finish, fut_postgres_cancel) =
-        services::postgres::start_postgres(instance_id)?;
+    let (fut_postgres, fut_postgres_finish, fut_postgres_clean_up) =
+        services::postgres::start_postgres(
+            shutdown.clone(),
+            fut_docker_network.clone(),
+            instance_id,
+        );
     let fut_postgres = make_shared(fut_postgres);
 
     // Processors
@@ -52,6 +64,16 @@ async fn run_all_services(test_dir: &Path) -> Result<()> {
         fut_node_api.clone(),
         fut_indexer_grpc.clone(),
         fut_postgres.clone(),
+    );
+    let fut_all_processors_ready = make_shared(fut_all_processors_ready);
+
+    // Indexer API
+    let (fut_indexer_api, fut_indexer_api_finish, fut_indexer_api_clean_up) = start_indexer_api(
+        instance_id,
+        shutdown.clone(),
+        fut_docker_network.clone(),
+        fut_postgres.clone(),
+        fut_all_processors_ready.clone(),
     );
 
     // Step 2: wait for all services to be up.
@@ -61,25 +83,32 @@ async fn run_all_services(test_dir: &Path) -> Result<()> {
             fut_indexer_grpc.map_err(anyhow::Error::msg),
             fut_faucet,
             fut_postgres.map_err(anyhow::Error::msg),
-            fut_all_processors_ready,
+            fut_all_processors_ready.map_err(anyhow::Error::msg),
+            fut_indexer_api,
         )
+    };
+    let clean_up_all = async move {
+        fut_indexer_api_clean_up.await;
+        fut_postgres_clean_up.await;
+        fut_docker_network_clean_up.await;
     };
     tokio::select! {
         _ = shutdown.cancelled() => {
             eprintln!("Running shutdown steps");
-            fut_postgres_cancel.await?;
+            clean_up_all.await;
 
             return Ok(())
         }
         res = all_services_up => {
-            res.context("one or more services failed to start")?;
+            match res.context("one or more services failed to start") {
+                Ok(_) => println!("ALL SERVICES UP"),
+                Err(err) => {
+                    eprintln!("\nOne or more services failed to start, running shutdown steps\n");
+                    clean_up_all.await;
 
-            println!(
-                "Indexer API is ready. Endpoint: http://{}:0/",
-                IP_LOCAL_HOST
-            );
-
-            println!("ALL SERVICES UP");
+                    return Err(err)
+                }
+            }
         }
     }
 
@@ -87,25 +116,31 @@ async fn run_all_services(test_dir: &Path) -> Result<()> {
     tokio::select! {
         _ = shutdown.cancelled() => (),
         res = fut_node_finish => {
-            eprintln!("Node existed unexpectedly");
+            eprintln!("Node exited unexpectedly");
             if let Err(err) = res {
                 eprintln!("Error: {}", err);
             }
         }
         res = fut_faucet_finish => {
-            eprintln!("Faucet existed unexpectedly");
+            eprintln!("Faucet exited unexpectedly");
             if let Err(err) = res {
                 eprintln!("Error: {}", err);
             }
         }
         res = fut_postgres_finish => {
-            eprintln!("Postgres existed unexpectedly");
+            eprintln!("Postgres exited unexpectedly");
             if let Err(err) = res {
                 eprintln!("Error: {}", err);
             }
         }
         res = fut_any_processor_finish => {
-            eprintln!("One of the processors existed unexpectedly");
+            eprintln!("One of the processors exited unexpectedly");
+            if let Err(err) = res {
+                eprintln!("Error: {}", err);
+            }
+        }
+        res = fut_indexer_api_finish => {
+            eprintln!("Indexer API exited unexpectedly");
             if let Err(err) = res {
                 eprintln!("Error: {}", err);
             }
@@ -113,7 +148,7 @@ async fn run_all_services(test_dir: &Path) -> Result<()> {
     }
 
     eprintln!("Running shutdown steps");
-    fut_postgres_cancel.await?;
+    clean_up_all.await;
 
     Ok(())
 }

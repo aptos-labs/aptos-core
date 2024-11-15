@@ -176,6 +176,9 @@ impl ProcessorManager {
     /// Create the necessary tables in the DB for the processors to work.
     async fn run_migrations(&self) -> Result<()> {
         let connection_string = self.config.postgres_connection_string.clone();
+
+        println!(">>>> {}", connection_string);
+
         tokio::task::spawn_blocking(move || {
             // This lets us use the connection like a normal diesel connection. See more:
             // https://docs.rs/diesel-async/latest/diesel_async/async_connection_wrapper/type.AsyncConnectionWrapper.html
