@@ -29,6 +29,7 @@ use move_stackless_bytecode::{
     function_target_pipeline::FunctionVariant,
     stackless_bytecode::{AssignKind, AttrId, Bytecode, Constant, Label, Operation},
 };
+use std::backtrace::{Backtrace, BacktraceStatus};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub struct FunctionGenerator<'a> {
@@ -145,6 +146,7 @@ impl<'a> FunctionGenerator<'a> {
                 code: vec![],
             };
             let target = ctx.targets.get_target(&fun_env, &FunctionVariant::Baseline);
+            let func_name = target.func_env.get_full_name_str();
             let mut code = fun_gen.gen_code(&FunctionContext {
                 module: ctx.clone(),
                 fun: target,
@@ -152,6 +154,13 @@ impl<'a> FunctionGenerator<'a> {
                 type_parameters: fun_env.get_type_parameters(),
                 def_idx,
             });
+            if func_name == "red_black_map::add" {
+                let bt = Backtrace::capture();
+                if BacktraceStatus::Captured == bt.status() {
+                    debug!("Backtrace: {:#?}", bt)
+                };
+                debug!("After fun_gen.gen_code code is  {:#?}", &code);
+            }
             if fun_gen.spec_blocks.is_empty() {
                 // Currently, peephole optimizations require that there are no inline spec blocks.
                 // This is to ensure that spec-related data structures do not refer to code
@@ -167,6 +176,9 @@ impl<'a> FunctionGenerator<'a> {
             } else {
                 // Write the spec block table back to the environment.
                 fun_env.get_mut_spec().on_impl = fun_gen.spec_blocks;
+            }
+            if func_name == "red_black_map::add" {
+                debug!("After peephole_optimizer,code is  {:#?}", &code);
             }
             (fun_gen.gen, Some(code))
         } else {
@@ -926,6 +938,7 @@ impl<'a> FunctionGenerator<'a> {
 
     /// Emits a file-format bytecode.
     fn emit(&mut self, bc: FF::Bytecode) {
+        debug!("Generating bytecode {:?} at offset {}", bc, self.code.len());
         self.code.push(bc)
     }
 

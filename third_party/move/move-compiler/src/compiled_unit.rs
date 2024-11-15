@@ -11,6 +11,7 @@ use crate::{
     shared::{unique_map::UniqueMap, Name, NumericalAddress},
     typing::ast as T,
 };
+use log::debug;
 use move_binary_format::file_format as F;
 use move_bytecode_source_map::source_map::SourceMap;
 use move_core_types::{
@@ -19,6 +20,7 @@ use move_core_types::{
 };
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
+use std::backtrace::{Backtrace, BacktraceStatus};
 use std::collections::BTreeMap;
 
 //**************************************************************************************************
@@ -217,9 +219,15 @@ impl CompiledUnit {
     pub fn serialize_source_map(&self) -> Vec<u8> {
         match self {
             Self::Module(NamedCompiledModule { source_map, .. }) => {
+                let bt = Backtrace::capture();
+                if BacktraceStatus::Captured == bt.status() {
+                    debug!("Backtrace: {:#?}", bt)
+                };
+                debug!("writing source_map {:#?}", &source_map);
                 bcs::to_bytes(source_map).unwrap()
             },
             Self::Script(NamedCompiledScript { source_map, .. }) => {
+                debug!("writing source_map {:#?}", &source_map);
                 bcs::to_bytes(source_map).unwrap()
             },
         }
