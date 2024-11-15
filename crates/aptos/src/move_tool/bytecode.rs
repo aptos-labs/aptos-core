@@ -33,7 +33,6 @@ use move_model::metadata::{
     CompilationMetadata, CompilerVersion, LanguageVersion, COMPILATION_METADATA_KEY,
 };
 use std::{
-    collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
     process::Command,
@@ -91,9 +90,9 @@ pub struct BytecodeCommand {
     pub(crate) prompt_options: PromptOptions,
 
     /// When `--bytecode-path` is set with this option,
-    /// print out the metadata and bytecode version of the target bytecode
+    /// only print out the metadata and bytecode version of the target bytecode
     #[clap(long)]
-    pub print_metadata: bool,
+    pub print_metadata_only: bool,
 }
 
 /// Allows to ensure that either one of both is selected (via  the `group` attribute).
@@ -155,7 +154,7 @@ impl BytecodeCommand {
             unreachable!("arguments required by clap")
         };
 
-        if self.print_metadata && self.input.bytecode_path.is_some() {
+        if self.print_metadata_only && self.input.bytecode_path.is_some() {
             return self.print_metadata(&inputs[0]);
         }
 
@@ -222,59 +221,51 @@ impl BytecodeCommand {
     fn print_metadata(&self, bytecode_path: &Path) -> Result<String, CliError> {
         let bytecode_bytes = read_from_file(bytecode_path)?;
 
-        let module: CompiledModule;
-        let script: CompiledScript;
         let v1_metadata = CompilationMetadata {
             unstable: false,
             compiler_version: CompilerVersion::V1.to_string(),
             language_version: LanguageVersion::V1.to_string(),
         };
-        let mut metadata_map = BTreeMap::new();
         let compilation_metadata_string;
         let mut aptos_metadata_string = "".to_string();
         let bytecode_version_string;
         if self.is_script {
-            script = CompiledScript::deserialize(&bytecode_bytes)
+            let script = CompiledScript::deserialize(&bytecode_bytes)
                 .context("Script blob can't be deserialized")?;
             compilation_metadata_string =
                 if let Some(data) = get_compilation_metadata_from_compiled_script(&script) {
-                    serde_json::to_string_pretty(&data).unwrap()
+                    serde_json::to_string_pretty(&data).expect("expect compilation metadata")
                 } else {
-                    serde_json::to_string_pretty(&v1_metadata).unwrap()
+                    serde_json::to_string_pretty(&v1_metadata).expect("expect compilation metadata")
                 };
             if let Some(data) = get_metadata_from_compiled_script(&script) {
-                aptos_metadata_string = serde_json::to_string(&data).unwrap();
+                aptos_metadata_string = serde_json::to_string(&data).expect("expect metadata");
             };
             bytecode_version_string = script.version.to_string();
         } else {
-            module = CompiledModule::deserialize(&bytecode_bytes)
+            let module = CompiledModule::deserialize(&bytecode_bytes)
                 .context("Module blob can't be deserialized")?;
             compilation_metadata_string =
                 if let Some(data) = get_compilation_metadata_from_compiled_module(&module) {
-                    serde_json::to_string_pretty(&data).unwrap()
+                    serde_json::to_string_pretty(&data).expect("expect compilation metadata")
                 } else {
-                    serde_json::to_string_pretty(&v1_metadata).unwrap()
+                    serde_json::to_string_pretty(&v1_metadata).expect("expect compilation metadata")
                 };
             if let Some(data) = get_metadata_from_compiled_module(&module) {
-                aptos_metadata_string = serde_json::to_string(&data).unwrap();
+                aptos_metadata_string = serde_json::to_string(&data).expect("expect metadata");
             };
             bytecode_version_string = module.version.to_string();
         };
-
-        metadata_map.insert(
-            str::from_utf8(COMPILATION_METADATA_KEY)
-                .unwrap()
-                .to_string(),
-            compilation_metadata_string,
-        );
-        metadata_map.insert(
-            str::from_utf8(APTOS_METADATA_KEY_V1).unwrap().to_string(),
-            aptos_metadata_string,
-        );
-        metadata_map.insert("bytecode_version".to_string(), bytecode_version_string);
+        println!("bytecode_version: {}", bytecode_version_string);
         println!(
-            "Metadata: {}",
-            serde_json::to_string_pretty(&metadata_map).unwrap()
+            "{}: {}",
+            str::from_utf8(COMPILATION_METADATA_KEY).expect("expect compilation_metadata"),
+            compilation_metadata_string
+        );
+        println!(
+            "{}: {}",
+            str::from_utf8(APTOS_METADATA_KEY_V1).expect("expect aptos_metadata_key_v1"),
+            aptos_metadata_string
         );
         Ok("ok".to_string())
     }
