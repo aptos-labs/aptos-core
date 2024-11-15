@@ -542,7 +542,7 @@ async fn test_db_restart() {
             if rand::random::<usize>() % 3 == 0 {
                 info!("{LINE} Triggering reconfig right before restarting.");
                 reconfig(
-                    &validator.rest_client(),
+                    &client,
                     &pub_chain_info.transaction_factory(),
                     pub_chain_info.root_account(),
                 )
