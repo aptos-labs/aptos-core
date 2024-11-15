@@ -269,11 +269,13 @@ impl InMemoryStateCalculatorV2 {
             *items_delta += 1;
             *bytes_delta += (key_size + value.size()) as i64;
         }
-        if let Some(old_entry) = state_cache.get(k) {
-            if let (_, Some(old_v)) = old_entry.value() {
-                *items_delta -= 1;
-                *bytes_delta -= (key_size + old_v.size()) as i64;
-            }
+
+        // n.b. all updated state items must be read and recorded in the state cache,
+        // otherwise we can't calculate the correct usage.
+        let old_entry = state_cache.get(k).expect("Must cache read");
+        if let (_, Some(old_v)) = old_entry.value() {
+            *items_delta -= 1;
+            *bytes_delta -= (key_size + old_v.size()) as i64;
         }
     }
 
