@@ -3645,32 +3645,21 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
         let type_opt = convert_name_to_type(&resource_ty_exp.loc, resource_ty_exp.clone().value);
         if let Some(ty) = type_opt {
-            let resource_ty = self.translate_type(&ty);
-            let ref_t = Type::Reference(
-                ReferenceKind::from_is_mut(mutable),
-                Box::new(resource_ty.clone()),
-            );
-            let ty = self.check_type(loc, &ref_t, expected_type, context);
-            if ty.is_error() {
-                return self.new_error_exp();
-            }
-            let addr = self.translate_exp_in_context(
-                addr_exp,
-                &Type::Primitive(PrimitiveType::Address),
-                context,
-            );
-            let node = self.new_node_id_with_type_loc(
-                &Type::Reference(
-                    ReferenceKind::from_is_mut(mutable),
-                    Box::new(resource_ty.clone()),
-                ),
+            let name = if mutable {
+                self.symbol_pool().make("borrow_global_mut")
+            } else {
+                self.symbol_pool().make("borrow_global")
+            };
+            self.translate_call(
                 loc,
-            );
-            self.set_node_instantiation(node, vec![resource_ty.clone()]);
-            ExpData::Call(
-                node,
-                Operation::BorrowGlobal(ReferenceKind::from_is_mut(mutable)),
-                vec![addr.into()],
+                &self.to_loc(&resource_ty_exp.loc),
+                CallKind::Regular,
+                &Some(self.parent.parent.builtin_module()),
+                name,
+                &Some(vec![ty]),
+                &[addr_exp],
+                expected_type,
+                context,
             )
         } else {
             self.new_error_exp()
