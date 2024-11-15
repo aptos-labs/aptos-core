@@ -21,6 +21,7 @@ use crate::{
     analyzer::PtxAnalyzer, finalizer::PtxFinalizer, metrics::TIMER, runner::PtxRunner,
     scheduler::PtxScheduler, sorter::PtxSorter, state_reader::PtxStateReader,
 };
+use aptos_block_executor::txn_provider::{default::DefaultTxnProvider, TxnProvider};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::TimerHelper;
@@ -51,7 +52,7 @@ impl VMBlockExecutor for PtxBlockExecutor {
 
     fn execute_block(
         &self,
-        transactions: &[SignatureVerifiedTransaction],
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
         _transaction_slice_metadata: TransactionSliceMetadata,
@@ -75,7 +76,7 @@ impl VMBlockExecutor for PtxBlockExecutor {
         let ret = Arc::new(Mutex::new(None));
         let ret_clone = ret.clone();
         THREAD_MANAGER.get_exe_cpu_pool().scope(move |scope| {
-            let num_txns = transactions.len();
+            let num_txns = txn_provider.num_txns();
             let (result_tx, result_rx) = channel();
 
             // Spawn all the components.
@@ -88,8 +89,10 @@ impl VMBlockExecutor for PtxBlockExecutor {
             let analyzer = PtxAnalyzer::spawn(scope, sorter);
 
             // Feed the transactions down the pipeline.
-            for txn in transactions {
-                analyzer.analyze_transaction(txn.clone());
+            //for txn in transactions {
+            for idx in 0..num_txns {
+                let txn = txn_provider.get_txn(idx as u32);
+                analyzer.analyze_transaction((*txn).clone());
             }
             analyzer.finish_block();
 

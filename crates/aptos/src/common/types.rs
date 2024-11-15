@@ -1860,11 +1860,29 @@ impl TransactionOptions {
             .await
             .map_err(|err| CliError::ApiError(err.to_string()))?;
         let transaction_hash = transaction.clone().committed_hash();
-        let network = self
-            .profile_options
-            .profile()
-            .ok()
-            .and_then(|profile| profile.network);
+        let network = self.profile_options.profile().ok().and_then(|profile| {
+            if let Some(network) = profile.network {
+                Some(network)
+            } else {
+                // Approximate network from URL
+                match profile.rest_url {
+                    None => None,
+                    Some(url) => {
+                        if url.contains("mainnet") {
+                            Some(Network::Mainnet)
+                        } else if url.contains("testnet") {
+                            Some(Network::Testnet)
+                        } else if url.contains("devnet") {
+                            Some(Network::Devnet)
+                        } else if url.contains("localhost") || url.contains("127.0.0.1") {
+                            Some(Network::Local)
+                        } else {
+                            None
+                        }
+                    },
+                }
+            }
+        });
         eprintln!(
             "Transaction submitted: {}",
             explorer_transaction_link(transaction_hash, network)
