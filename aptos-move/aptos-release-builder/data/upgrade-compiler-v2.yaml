@@ -11,5 +11,5 @@ proposals:
       - Gas:
           new: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/v1.23.1-rc.json
       - Framework:
-          bytecode_version: 6
+          bytecode_version: 7
           git_hash: ~
