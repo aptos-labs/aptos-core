@@ -629,6 +629,7 @@ where
                         Self::publish_module_writes(
                             txn_idx,
                             module_write_set,
+                            base_view,
                             global_module_cache,
                             versioned_cache,
                             scheduler,
@@ -671,6 +672,7 @@ where
                     Self::publish_module_writes(
                         txn_idx,
                         module_write_set,
+                        base_view,
                         global_module_cache,
                         versioned_cache,
                         scheduler,
@@ -760,6 +762,7 @@ where
     fn publish_module_writes(
         txn_idx: TxnIndex,
         module_write_set: BTreeMap<T::Key, ModuleWrite<T::Value>>,
+        base_view: &S,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
             CompiledModule,
@@ -773,11 +776,13 @@ where
         // Turn on the flag for module read validation.
         scheduler.validate_module_reads();
 
-        for (_, write) in module_write_set {
+        for (key, write) in module_write_set {
             Self::add_module_write_to_module_cache(
+                key,
                 write,
                 txn_idx,
                 runtime_environment,
+                base_view,
                 global_module_cache,
                 versioned_cache.module_cache(),
             )?;
@@ -1216,9 +1221,11 @@ where
 
     /// Converts module write into cached module representation, and adds it to the module cache.
     fn add_module_write_to_module_cache(
+        key: T::Key,
         write: ModuleWrite<T::Value>,
         txn_idx: TxnIndex,
         runtime_environment: &RuntimeEnvironment,
+        base_view: &S,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
             CompiledModule,
@@ -1233,8 +1240,17 @@ where
             Version = Option<TxnIndex>,
         >,
     ) -> Result<(), PanicError> {
-        let (id, write_op) = write.unpack();
+        // Enforce read-before-write because storage (DB) relies on this assumption.
+        let _ = base_view.get_state_value(&key).map_err(|err| {
+            PanicError::CodeInvariantError(format!(
+                "Unexpected storage error for module {}::{} to enforce read-before-write: {:?}",
+                write.module_address(),
+                write.module_name(),
+                err
+            ))
+        })?;
 
+        let (id, write_op) = write.unpack();
         let state_value = write_op.as_state_value().ok_or_else(|| {
             PanicError::CodeInvariantError("Modules cannot be deleted".to_string())
         })?;
@@ -1268,6 +1284,7 @@ where
     fn apply_output_sequential(
         txn_idx: TxnIndex,
         runtime_environment: &RuntimeEnvironment,
+        base_view: &S,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
             CompiledModule,
@@ -1296,9 +1313,11 @@ where
         for (key, write) in output.module_write_set().into_iter() {
             if runtime_environment.vm_config().use_loader_v2 {
                 Self::add_module_write_to_module_cache(
+                    key,
                     write,
                     txn_idx,
                     runtime_environment,
+                    base_view,
                     global_module_cache,
                     unsync_map.module_cache(),
                 )?;
@@ -1580,6 +1599,7 @@ where
                     Self::apply_output_sequential(
                         idx as TxnIndex,
                         runtime_environment,
+                        base_view,
                         module_cache_manager_guard.module_cache(),
                         &unsync_map,
                         &output,
