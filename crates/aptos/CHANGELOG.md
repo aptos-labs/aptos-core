@@ -3,6 +3,7 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+- Determine network from URL to make explorer links better for legacy users
 - Add support for AIP-80 compliant strings when importing using the CLI arguments or manual input.
 
 ## [4.4.0] - 2024/11/06
