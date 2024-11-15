@@ -21,6 +21,7 @@ pub enum TransactionTypeArg {
     AccountGenerationLargePool,
     Batch100Transfer,
     PublishPackage,
+    RepublishAndCall,
     // Simple EntryPoints
     NoOp,
     NoOpFeePayer,
@@ -165,6 +166,11 @@ impl TransactionTypeArg {
                 call_custom_module(EntryPoints::IncGlobalMilestoneAggV2 {
                     milestone_every: 1000,
                 })
+            },
+            TransactionTypeArg::RepublishAndCall => TransactionType::CallCustomModulesMix {
+                entry_points: vec![(EntryPoints::Nop, 1), (EntryPoints::Republish, 1)],
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::NoOp => call_custom_module(EntryPoints::Nop),
             TransactionTypeArg::NoOpFeePayer => call_custom_module(EntryPoints::NopFeePayer),
