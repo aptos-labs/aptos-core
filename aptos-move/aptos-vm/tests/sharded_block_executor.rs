@@ -186,6 +186,7 @@ fn test_partitioner_v2_connected_component_sharded_block_executor_with_random_tr
 }
 
 mod test_utils {
+    use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
     use aptos_block_partitioner::BlockPartitioner;
     use aptos_language_e2e_tests::{
         account::AccountData, common_transactions::peer_to_peer_txn, data_store::FakeDataStore,
@@ -308,8 +309,9 @@ mod test_utils {
                 .into_iter()
                 .map(|t| t.into_txn())
                 .collect();
+        let txn_provider = DefaultTxnProvider::new(ordered_txns);
         let unsharded_txn_output = AptosVMBlockExecutor::new()
-            .execute_block_no_limit(&ordered_txns, executor.data_store())
+            .execute_block_no_limit(&txn_provider, executor.data_store())
             .unwrap();
         compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     }
@@ -358,8 +360,9 @@ mod test_utils {
             )
             .unwrap();
 
+        let txn_provider = DefaultTxnProvider::new(execution_ordered_txns);
         let unsharded_txn_output = AptosVMBlockExecutor::new()
-            .execute_block_no_limit(&execution_ordered_txns, executor.data_store())
+            .execute_block_no_limit(&txn_provider, executor.data_store())
             .unwrap();
         compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     }
@@ -412,8 +415,9 @@ mod test_utils {
             )
             .unwrap();
 
+        let txn_provider = DefaultTxnProvider::new(execution_ordered_txns);
         let unsharded_txn_output = AptosVMBlockExecutor::new()
-            .execute_block_no_limit(&execution_ordered_txns, executor.data_store())
+            .execute_block_no_limit(&txn_provider, executor.data_store())
             .unwrap();
         compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     }

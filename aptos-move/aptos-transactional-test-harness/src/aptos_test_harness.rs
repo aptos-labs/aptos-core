@@ -4,6 +4,7 @@
 
 use anyhow::{bail, format_err, Result};
 use aptos_api_types::AsConverter;
+use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     hash::HashValue,
@@ -515,8 +516,9 @@ impl<'a> AptosTestAdapter<'a> {
     fn run_transaction(&mut self, txn: Transaction) -> Result<TransactionOutput> {
         let txn_block = vec![txn];
         let sig_verified_block = into_signature_verified_block(txn_block);
+        let txn_provider = DefaultTxnProvider::new(sig_verified_block);
         let mut outputs = AptosVMBlockExecutor::new()
-            .execute_block_no_limit(&sig_verified_block, &self.storage.clone())?;
+            .execute_block_no_limit(&txn_provider, &self.storage.clone())?;
 
         assert_eq!(outputs.len(), 1);
 
