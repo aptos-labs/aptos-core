@@ -12,7 +12,7 @@ The `--check` flag can be used to check if the code is formatted correctly.
 ./scripts/rust_lint.sh
 ```
 
-> **Note:** xclippy is an alias for `cargo clippy` with additional flags to enable more lints.
+> **Note:** clippy is an alias for `cargo clippy` with additional flags to enable more lints.
 
 ## Code documentation
 
