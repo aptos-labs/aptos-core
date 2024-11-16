@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 /// Struct that represents a SentPaymentEvent.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WithdrawEvent {
-    amount: u64,
+    pub amount: u64,
 }
 
 impl WithdrawEvent {

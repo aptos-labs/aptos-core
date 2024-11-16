@@ -171,6 +171,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     aggr_overridden_state_view.as_ref(),
                     config,
                     cross_shard_commit_sender,
+                    false,
                 )
                 .map(BlockOutput::into_transaction_outputs_forced);
                 if let Some(shard_id) = shard_id {
@@ -330,6 +331,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                             onchain: onchain_config,
                         },
                         None::<CrossShardCommitSender>,
+                        false,
                     ).map(BlockOutput::into_transaction_outputs_forced);
 
                     // Wrap the 1D result as a 2D result so we can reuse the existing `result_rxs`.
@@ -406,6 +408,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                             onchain: onchain_config,
                         },
                         None::<CrossShardCommitSender>,
+                        true,
                     ).map(BlockOutput::into_transaction_outputs_forced);
                     drop(state_view);
                     drop(exe_timer);

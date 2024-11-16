@@ -106,6 +106,16 @@ impl CoinInfoResource {
         }
     }
 
+    pub fn supply_aggregator_state_key(&self) -> StateKey {
+        self.supply
+            .as_ref()
+            .unwrap()
+            .aggregator
+            .as_ref()
+            .unwrap()
+            .state_key()
+    }
+
     /// Returns a writeset corresponding to the creation of CoinInfo in Move.
     /// This can be passed to data store for testing total supply.
     pub fn to_writeset(&self, supply: u128) -> anyhow::Result<WriteSet> {

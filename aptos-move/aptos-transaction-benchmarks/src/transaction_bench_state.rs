@@ -225,6 +225,7 @@ where
             self.state_view.as_ref(),
             BlockExecutorConfig::new_maybe_block_limit(1, maybe_block_gas_limit),
             None,
+            false,
         )
         .expect("VM should not fail to start")
         .into_transaction_outputs_forced();

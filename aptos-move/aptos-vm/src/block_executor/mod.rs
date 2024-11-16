@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub(crate) mod vm_wrapper;
+mod native;
 
 use crate::{
     block_executor::vm_wrapper::AptosExecutorTask,
@@ -12,12 +13,7 @@ use crate::{
 use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
 };
-use aptos_block_executor::{
-    errors::BlockExecutionError, executor::BlockExecutor,
-    task::TransactionOutput as BlockExecutorTransactionOutput,
-    txn_commit_hook::TransactionCommitHook, types::InputOutputKey,
-    txn_provider::{BlockSTMPlugin, TxnIndexProvider},
-};
+use aptos_block_executor::{errors::BlockExecutionError, executor::BlockExecutor, task::TransactionOutput as BlockExecutorTransactionOutput, txn_commit_hook::TransactionCommitHook, types::InputOutputKey, txn_provider::{BlockSTMPlugin, TxnIndexProvider}, executor};
 use aptos_infallible::Mutex;
 use aptos_types::{
     block_executor::config::BlockExecutorConfig,
@@ -47,6 +43,8 @@ use std::{
     sync::Arc,
 };
 use aptos_block_executor::transaction_provider::TxnProvider;
+use aptos_logger::info;
+use crate::block_executor::native::native_vm::NativeVMExecutorTask;
 
 /// Output type wrapper used by block executor. VM output is stored first, then
 /// transformed into TransactionOutput type that is returned.
@@ -58,7 +56,7 @@ pub struct AptosTransactionOutput {
 }
 
 impl AptosTransactionOutput {
-    pub(crate) fn new(output: VMOutput) -> Self {
+    pub fn new(output: VMOutput) -> Self {
         Self {
             vm_output: Mutex::new(Some(output)),
             committed_output: OnceCell::new(),
@@ -411,6 +409,7 @@ impl BlockAptosVM {
         state_view: &S,
         config: BlockExecutorConfig,
         transaction_commit_listener: Option<L>,
+        is_native_vm: bool,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         let num_txns = txn_provider.num_txns();
@@ -421,16 +420,31 @@ impl BlockAptosVM {
         }
 
         BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
-        let executor = BlockExecutor::<
-            SignatureVerifiedTransaction,
-            AptosExecutorTask<S>,
-            S,
-            L,
-            ExecutableTestType,
-            TP,
-        >::new(config, executor_thread_pool, transaction_commit_listener);
+        let ret = if is_native_vm {
+            info!("Using native VM for block execution; num txns: {}", num_txns);
+            let executor = BlockExecutor::<
+                SignatureVerifiedTransaction,
+                NativeVMExecutorTask,
+                S,
+                L,
+                ExecutableTestType,
+                TP,
+            >::new(config, executor_thread_pool, transaction_commit_listener);
+            executor.execute_block((), txn_provider.clone(), state_view)
+        } else {
+            info!("Using Move VM for block execution; num txns: {}", num_txns);
+            let executor = BlockExecutor::<
+                SignatureVerifiedTransaction,
+                AptosExecutorTask<S>,
+                S,
+                L,
+                ExecutableTestType,
+                TP,
+            >::new(config, executor_thread_pool, transaction_commit_listener);
+            executor.execute_block(state_view, txn_provider.clone(), state_view)
+        };
 
-        let ret = executor.execute_block(state_view, txn_provider.clone(), state_view);
+        //let ret = executor.execute_block(state_view, txn_provider.clone(), state_view);
         match ret {
             Ok(block_output) => {
                 let transaction_outputs = block_output.into_inner();

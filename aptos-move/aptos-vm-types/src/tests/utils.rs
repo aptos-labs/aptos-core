@@ -28,7 +28,7 @@ use move_core_types::{
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{collections::BTreeMap, sync::Arc};
 
-pub(crate) struct MockChangeSetChecker;
+pub struct MockChangeSetChecker;
 
 impl CheckChangeSet for MockChangeSetChecker {
     fn check_change_set(&self, _change_set: &VMChangeSet) -> PartialVMResult<()> {

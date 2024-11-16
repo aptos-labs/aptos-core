@@ -558,6 +558,7 @@ impl FakeExecutor {
             &state_view,
             config,
             None,
+            false,
         )
         .map(BlockOutput::into_transaction_outputs_forced)
     }

@@ -2579,6 +2579,7 @@ impl VMExecutor for AptosVM {
                 onchain: onchain_config,
             },
             None,
+            false,
         );
         if ret.is_ok() {
             // Record the histogram count for transactions per block.
