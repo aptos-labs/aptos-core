@@ -425,14 +425,14 @@ impl NetworkSender {
             id: 0,
             consensus_msg: msg.clone()
         };
-        let msg_1 = ConsensusMsg {
-            id: 1,
-            consensus_msg: msg.clone()
-        };
-        let _ = self.send_rpc(recipient.clone(), msg_0, Duration::from_millis(500))
-            .await
-            .map(|_| ());
-        self.send_rpc(recipient, msg_1, Duration::from_millis(500))
+        // let msg_1 = ConsensusMsg {
+        //     id: 1,
+        //     consensus_msg: msg.clone()
+        // };
+        // let _ = self.send_rpc(recipient.clone(), msg_0, Duration::from_millis(500))
+        //     .await
+        //     .map(|_| ());
+        self.send_rpc(recipient, msg_0, Duration::from_millis(500))
             .await
             .map(|_| ())
     }
@@ -504,27 +504,27 @@ impl NetworkSender {
             id: 0,
             consensus_msg: msg.clone()
         };
-        let msg_1 = ConsensusMsg {
-            id: 1,
-            consensus_msg: msg.clone()
-        };
-        self.send(msg_0, recipients.clone()).await;
-        self.send(msg_1, recipients).await
+        // let msg_1 = ConsensusMsg {
+        //     id: 1,
+        //     consensus_msg: msg.clone()
+        // };
+        // self.send(msg_0, recipients.clone()).await;
+        self.send(msg_0, recipients).await
     }
 
-    pub async fn send_epoch_change(&self, proof: EpochChangeProof) {
+    pub async fn send_epoch_change(&self, proof: EpochChangeProof, id: usize) {
         fail_point!("consensus::send::epoch_change", |_| ());
         let msg = ConsensusMsg_::EpochChangeProof(Box::new(proof));
-        let msg_0 = ConsensusMsg {
-            id: 0,
+        let msg = ConsensusMsg {
+            id,
             consensus_msg: msg.clone()
         };
-        let msg_1 = ConsensusMsg {
-            id: 1,
-            consensus_msg: msg.clone()
-        };
-        self.send(msg_0, vec![self.author]).await;
-        self.send(msg_1, vec![self.author]).await
+        // let msg_1 = ConsensusMsg {
+        //     id: 1,
+        //     consensus_msg: msg.clone()
+        // };
+        // self.send(msg_0, vec![self.author]).await;
+        self.send(msg, vec![self.author]).await
     }
 
     /// Sends the ledger info to self buffer manager
@@ -595,12 +595,12 @@ impl QuorumStoreSender for NetworkSender {
             id: 0,
             consensus_msg: msg.clone()
         };
-        let msg_1 = ConsensusMsg {
-            id: 1,
-            consensus_msg: msg.clone()
-        };
-        self.send(msg_0, recipients.clone()).await;
-        self.send(msg_1, recipients).await
+        // let msg_1 = ConsensusMsg {
+        //     id: 1,
+        //     consensus_msg: msg.clone()
+        // };
+        // self.send(msg_0, recipients.clone()).await;
+        self.send(msg_0, recipients).await
     }
 
     async fn broadcast_batch_msg(&mut self, batches: Vec<Batch>) {
@@ -610,12 +610,12 @@ impl QuorumStoreSender for NetworkSender {
             id: 0,
             consensus_msg: msg.clone()
         };
-        let msg_1 = ConsensusMsg {
-            id: 1,
-            consensus_msg: msg.clone()
-        };
-        self.broadcast(msg_0).await;
-        self.broadcast(msg_1).await
+        // let msg_1 = ConsensusMsg {
+        //     id: 1,
+        //     consensus_msg: msg.clone()
+        // };
+        // self.broadcast(msg_0).await;
+        self.broadcast(msg_0).await
     }
 
     async fn broadcast_proof_of_store_msg(&mut self, proofs: Vec<ProofOfStore>) {
@@ -625,12 +625,12 @@ impl QuorumStoreSender for NetworkSender {
             id: 0,
             consensus_msg: msg.clone()
         };
-        let msg_1 = ConsensusMsg {
-            id: 1,
-            consensus_msg: msg.clone()
-        };
-        self.broadcast(msg_0).await;
-        self.broadcast(msg_1).await
+        // let msg_1 = ConsensusMsg {
+        //     id: 1,
+        //     consensus_msg: msg.clone()
+        // };
+        // self.broadcast(msg_0).await;
+        self.broadcast(msg_0).await
     }
 
     async fn send_proof_of_store_msg_to_self(&mut self, proofs: Vec<ProofOfStore>) {
@@ -640,12 +640,12 @@ impl QuorumStoreSender for NetworkSender {
             id: 0,
             consensus_msg: msg.clone()
         };
-        let msg_1 = ConsensusMsg {
-            id: 1,
-            consensus_msg: msg.clone()
-        };
-        self.send(msg_0, vec![self.author.clone()]).await;
-        self.send(msg_1, vec![self.author]).await
+        // let msg_1 = ConsensusMsg {
+        //     id: 1,
+        //     consensus_msg: msg.clone()
+        // };
+        // self.send(msg_0, vec![self.author.clone()]).await;
+        self.send(msg_0, vec![self.author]).await
     }
 }
 
@@ -733,8 +733,8 @@ impl<Req: TConsensusMsg + RBMessage + 'static, Res: TConsensusMsg + RBMessage + 
 
 #[async_trait]
 impl ProofNotifier for NetworkSender {
-    async fn send_epoch_change(&self, proof: EpochChangeProof) {
-        self.send_epoch_change(proof).await
+    async fn send_epoch_change(&self, proof: EpochChangeProof, id: usize) {
+        self.send_epoch_change(proof, id).await
     }
 
     async fn send_commit_proof(&self, ledger_info: LedgerInfoWithSignatures, id: usize) {

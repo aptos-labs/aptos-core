@@ -57,7 +57,7 @@ pub trait OrderedNotifier: Send + Sync {
 
 #[async_trait]
 pub trait ProofNotifier: Send + Sync {
-    async fn send_epoch_change(&self, proof: EpochChangeProof);
+    async fn send_epoch_change(&self, proof: EpochChangeProof, id: usize);
 
     async fn send_commit_proof(&self, ledger_info: LedgerInfoWithSignatures, id: usize);
 }

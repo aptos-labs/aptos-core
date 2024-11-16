@@ -543,7 +543,7 @@ impl BufferManager {
                 // this needs to be done after creating the persisting request to avoid it being lost
                 if commit_proof.ledger_info().ends_epoch() {
                     self.commit_msg_tx
-                        .send_epoch_change(EpochChangeProof::new(vec![commit_proof], false))
+                        .send_epoch_change(EpochChangeProof::new(vec![commit_proof], false), 0)
                         .await;
                 }
                 info!("Advance head to {:?}", self.buffer.head_cursor());

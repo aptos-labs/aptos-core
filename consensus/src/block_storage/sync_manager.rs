@@ -296,7 +296,7 @@ impl BlockStore {
                 .send_epoch_change(EpochChangeProof::new(
                     vec![highest_quorum_cert.ledger_info().clone()],
                     /* more = */ false,
-                ))
+                ), id)
                 .await;
         }
         Ok(())

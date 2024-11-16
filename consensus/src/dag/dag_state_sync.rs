@@ -97,7 +97,7 @@ impl StateSyncTrigger {
                 .send_epoch_change(EpochChangeProof::new(
                     vec![ledger_info_with_sigs.clone()],
                     /* more = */ false,
-                ))
+                ), 0)
                 .await;
             return Ok(SyncOutcome::EpochEnds);
         }

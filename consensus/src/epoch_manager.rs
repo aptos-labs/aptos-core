@@ -808,6 +808,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             epoch = epoch_state.epoch,
             validators = epoch_state.verifier.to_string(),
             root_block = %recovery_data.root_block(),
+            id = id,
             "Starting new epoch",
         );
 
