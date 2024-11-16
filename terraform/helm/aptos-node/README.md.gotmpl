@@ -31,7 +31,7 @@ Deployments:
 
 PersistentVolumeClaim:
 * `<RELEASE_NAME>-0-validator-e<ERA>` - The validator PersistentVolumeClaim
-* `fn-<RELEASE_NAME>-0-fullnode-e<ERA>-0` - The fullnode PersistentVolumeClaim. Note the difference in naming scheme between validator and fullnode PVC, which is due to the fact that you can spin up multiple fullnodes, but only a single validator.
+* `fn-<RELEASE_NAME>-0-fullnode-e<ERA>-0` - The fullnode PersistentVolumeClaim. Note the difference in naming scheme between valdiator and fullnode PVC, which is due to the fact that you can spin up multiple fullnodes, but only a single validator.
 
 Services:
 * `<RELEASE_NAME>-aptos-node-0-validator-lb` - Inbound load balancer service that routes to the validator
