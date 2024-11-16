@@ -21,6 +21,7 @@ const POSTGRES_IMAGE: &str = "postgres:14.11";
 const POSTGRES_USER: &str = "postgres";
 const POSTGRES_DB_NAME: &str = "local-testnet";
 
+/// Extracts the host port assigned to the postgres container from its inspection data.
 fn get_postgres_assigned_port(container_info: &ContainerInspectResponse) -> Option<u16> {
     if let Some(port_bindings) = container_info
         .network_settings
@@ -39,6 +40,11 @@ fn get_postgres_assigned_port(container_info: &ContainerInspectResponse) -> Opti
     None
 }
 
+/// Constructs a connection string for accessing the postgres database from the host.
+///
+/// Note: This connection string is intended for use on the host only.
+///       If you want to access the database from within another docker container,
+///       use [`get_postgres_connection_string_within_docker_network`] instead.
 pub fn get_postgres_connection_string(postgres_port: u16) -> String {
     format!(
         "postgres://{}@{}:{}/{}",
@@ -46,6 +52,12 @@ pub fn get_postgres_connection_string(postgres_port: u16) -> String {
     )
 }
 
+/// Constructs a connection string for accessing the postgres database from within
+/// another docker container.
+///
+/// Note: This connection string is intended for use within a docker network only.
+///       If you want to access the database from clients running on the host directly,
+///       use [`get_postgres_connection_string`] instead.
 pub fn get_postgres_connection_string_within_docker_network(instance_id: Uuid) -> String {
     format!(
         "postgres://{}@aptos-workspace-{}-postgres:{}/{}",
@@ -53,6 +65,14 @@ pub fn get_postgres_connection_string_within_docker_network(instance_id: Uuid) -
     )
 }
 
+/// Returns the Docker container options and configuration to start a postgres container with
+/// - The container bound to a Docker network (`network_name`).
+/// - [`POSTGRES_DEFAULT_PORT`] mapped to a random OS-assigned host port.
+/// - A volume (`volume_name`) mounted for data storage.
+/// - Environment variables to configure postgres with
+///   - Authentication method: trust
+///   - User: [`POSTGRES_USER`],
+///   - Database: [`POSTGRES_DB_NAME`].
 fn create_container_options_and_config(
     instance_id: Uuid,
     network_name: String,
@@ -74,7 +94,7 @@ fn create_container_options_and_config(
         }),
         // Mount the volume in to the container. We use a volume because they are
         // more performant and easier to manage via the Docker API.
-        binds: Some(vec![format!("{}:/var/lib/postgresql/data", volume_name,)]),
+        binds: Some(vec![format!("{}:/var/lib/postgresql/data", volume_name)]),
         ..Default::default()
     });
 
@@ -123,6 +143,20 @@ fn create_container_options_and_config(
     (options, config)
 }
 
+/// Starts a postgres container within a docker network.
+///
+/// Prerequisites
+/// - This depends on a previous task to create the docker network
+///
+/// The function returns three futures:
+/// - One that resolves to the host port that can be used to access the postgres container when
+///   it's fully up.
+/// - One that resolves when the container stops (which it should not under normal operation).
+/// - A cleanup task that stops the container and removes the associated data volume.
+///
+/// As the caller, you should always await the cleanup task when you are ready to shutdown the
+/// service. The cleanup is a "best-effort" operation -- success is not guaranteed
+/// as it relies on external commands that may fail for various reasons.
 pub fn start_postgres(
     shutdown: CancellationToken,
     fut_network: impl Future<Output = Result<String, Arc<anyhow::Error>>>,
@@ -138,7 +172,7 @@ pub fn start_postgres(
     let (fut_volume, fut_volume_clean_up) = create_docker_volume(shutdown.clone(), volume_name);
 
     let fut_container_clean_up = Arc::new(Mutex::new(None));
-    //
+
     let fut_create_postgres = make_shared({
         let fut_container_clean_up = fut_container_clean_up.clone();
 
@@ -205,6 +239,10 @@ pub fn start_postgres(
     };
 
     let fut_postgres_clean_up = {
+        // Note: The creation task must be allowed to finish, even if a shutdown signal or other
+        //       early abort signal is received. This is to prevent race conditions.
+        //
+        //       Do not abort the creation task prematurely -- let it either finish or handle its own abort.
         let fut_create_postgres = fut_create_postgres.clone();
 
         async move {

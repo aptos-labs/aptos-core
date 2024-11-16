@@ -1,6 +1,31 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! This binary runs and manages a set of services that makes up a local Aptos network.
+//! - node
+//!     - node API
+//!     - indexer grpc
+//! - faucet
+//! - indexer
+//!     - postgres db
+//!     - processors
+//!     - indexer API
+//!
+//! The services are bound to unique OS-assigned ports to allow for multiple local networks
+//! to operate simultaneously, enabling testing and development in isolated environments.
+//!
+//! ## Key Features:
+//! - Shared Futures
+//!     - The code makes extensive use of shared futures across multiple services,
+//!       ensuring orderly startup while maximizing parallel execution.
+//! - Graceful Shutdown
+//!     - When a `Ctrl-C` signal is received or if any of the services fail to start
+//!       or exit unexpectedly, the system attempts to gracefully shut down all services,
+//!       cleaning up resources like Docker containers, volumes and networks.
+
+mod common;
+mod services;
+
 use anyhow::{Context, Result};
 use common::make_shared;
 use futures::TryFutureExt;
@@ -12,15 +37,14 @@ use std::path::Path;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-mod common;
-mod services;
-
 async fn run_all_services(test_dir: &Path) -> Result<()> {
     let instance_id = Uuid::new_v4();
 
-    // Step 0: register the signal handler for ctrl-c.
+    // Phase 0: Register the signal handler for ctrl-c.
     let shutdown = CancellationToken::new();
     {
+        // TODO: Find a way to register the signal handler in a blocking manner without
+        //       waiting for it to trigger.
         let shutdown = shutdown.clone();
         tokio::spawn(async move {
             tokio::signal::ctrl_c().await.unwrap();
@@ -31,7 +55,7 @@ async fn run_all_services(test_dir: &Path) -> Result<()> {
         });
     }
 
-    // Step 1: spawn all services.
+    // Phase 1: Start all services.
     // Node
     let (fut_node_api, fut_indexer_grpc, fut_node_finish) = services::node::start_node(test_dir)?;
 
@@ -46,11 +70,11 @@ async fn run_all_services(test_dir: &Path) -> Result<()> {
     );
 
     // Docker Network
-    let docker_network_name = format!("aptos-workspace-{}-postgres", instance_id);
+    let docker_network_name = format!("aptos-workspace-{}", instance_id);
     let (fut_docker_network, fut_docker_network_clean_up) =
         create_docker_network(shutdown.clone(), docker_network_name);
 
-    // Postgres
+    // Indexer part 1: postgres db
     let (fut_postgres, fut_postgres_finish, fut_postgres_clean_up) =
         services::postgres::start_postgres(
             shutdown.clone(),
@@ -59,7 +83,7 @@ async fn run_all_services(test_dir: &Path) -> Result<()> {
         );
     let fut_postgres = make_shared(fut_postgres);
 
-    // Processors
+    // Indexer part 2: processors
     let (fut_all_processors_ready, fut_any_processor_finish) = start_all_processors(
         fut_node_api.clone(),
         fut_indexer_grpc.clone(),
@@ -67,7 +91,7 @@ async fn run_all_services(test_dir: &Path) -> Result<()> {
     );
     let fut_all_processors_ready = make_shared(fut_all_processors_ready);
 
-    // Indexer API
+    // Indexer part 3: indexer API
     let (fut_indexer_api, fut_indexer_api_finish, fut_indexer_api_clean_up) = start_indexer_api(
         instance_id,
         shutdown.clone(),
@@ -76,7 +100,7 @@ async fn run_all_services(test_dir: &Path) -> Result<()> {
         fut_all_processors_ready.clone(),
     );
 
-    // Step 2: wait for all services to be up.
+    // Phase 2: Wait for all services to be up.
     let all_services_up = async move {
         tokio::try_join!(
             fut_node_api.map_err(anyhow::Error::msg),
@@ -88,13 +112,13 @@ async fn run_all_services(test_dir: &Path) -> Result<()> {
         )
     };
     let clean_up_all = async move {
+        eprintln!("Running shutdown steps");
         fut_indexer_api_clean_up.await;
         fut_postgres_clean_up.await;
         fut_docker_network_clean_up.await;
     };
     tokio::select! {
         _ = shutdown.cancelled() => {
-            eprintln!("Running shutdown steps");
             clean_up_all.await;
 
             return Ok(())
@@ -103,7 +127,7 @@ async fn run_all_services(test_dir: &Path) -> Result<()> {
             match res.context("one or more services failed to start") {
                 Ok(_) => println!("ALL SERVICES UP"),
                 Err(err) => {
-                    eprintln!("\nOne or more services failed to start, running shutdown steps\n");
+                    eprintln!("\nOne or more services failed to start, will run shutdown steps\n");
                     clean_up_all.await;
 
                     return Err(err)
@@ -112,7 +136,8 @@ async fn run_all_services(test_dir: &Path) -> Result<()> {
         }
     }
 
-    // Step 3: wait for services to stop.
+    // Phase 3: Wait for services to stop, which should only happen in case of an error, or
+    //          the shutdown signal to be received.
     tokio::select! {
         _ = shutdown.cancelled() => (),
         res = fut_node_finish => {
@@ -147,7 +172,6 @@ async fn run_all_services(test_dir: &Path) -> Result<()> {
         }
     }
 
-    eprintln!("Running shutdown steps");
     clean_up_all.await;
 
     Ok(())

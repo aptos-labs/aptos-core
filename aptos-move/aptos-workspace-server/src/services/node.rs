@@ -38,14 +38,19 @@ fn zero_all_ports(config: &mut NodeConfig) {
     }
 }
 
+/// Returns the URL for connecting to the indexer grpc service.
+///
+/// Note: This can only be used by clients running directly on the host machine,
+///       not from within a docker container.
 pub fn get_data_service_url(indexer_grpc_port: u16) -> Url {
     Url::parse(&format!("http://{}:{}", IP_LOCAL_HOST, indexer_grpc_port)).unwrap()
 }
 
 /// Starts a local node and returns three futures:
-/// 1. A future for the node API, which resolves to the port number once the service is fully up.
-/// 2. A future for the indexer gRPC, which resolves to the port number once the service is fully up.
-/// 3. A final future that resolves when the node stops.
+/// - A future for the node API, which resolves to the port number once the service is fully up.
+/// - A future for the indexer gRPC, which resolves to the port number once the service is fully up.
+/// - A future that resolves when the node stops, which should not normally happen unless there is
+///   an error.
 pub fn start_node(
     test_dir: &Path,
 ) -> Result<(

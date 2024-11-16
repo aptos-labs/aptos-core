@@ -9,9 +9,16 @@ use futures::channel::oneshot;
 use std::{future::Future, path::PathBuf, sync::Arc};
 use url::Url;
 
-/// Starts the faucet service and returns two futures.
-/// 1. A future that resolves to the port used, once the faucet service is fully up.
-/// 2. A future that resolves, when the service stops.
+/// Starts the faucet service.
+///
+/// Prerequisites
+/// - Node API
+/// - Node indexer grpc
+///
+/// This function returns two futures
+/// - One that resolves to the port the faucet service is running on, once it has fully started.
+/// - One that resolves when the faucet service stops, which  should not normally happen unless
+///   there is an error.
 pub fn start_faucet(
     test_dir: PathBuf,
     fut_node_api: impl Future<Output = Result<u16, Arc<anyhow::Error>>> + Send + 'static,

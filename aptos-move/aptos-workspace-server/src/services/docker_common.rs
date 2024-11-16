@@ -14,6 +14,20 @@ use std::{future::Future, sync::Arc};
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
+/// Creates a Docker network asynchronously and provides a cleanup task for network removal.
+///
+/// A cancellation token can be used to signal an early shutdown, allowing the creation task to
+/// abort without performing any additional steps.
+///
+/// It returns two futures
+/// 1. One that creates the Docker network
+/// 2. Another that handles the cleanup (removal of the network)
+///
+/// As the caller, you should always await the cleanup task when you are ready to shutdown the
+/// service. The cleanup task will only attempt to remove the network if it may have been created.
+///
+/// Note that the cleanup is a "best-effort" operation -- success is not guaranteed due to
+/// reliance on external commands, which may fail for various reasons.
 pub fn create_docker_network(
     shutdown: CancellationToken,
     name: String,
@@ -21,6 +35,10 @@ pub fn create_docker_network(
     impl Future<Output = Result<String, Arc<anyhow::Error>>> + Clone,
     impl Future<Output = ()>,
 ) {
+    // Flag indicating whether cleanup is needed.
+    //
+    // Note: The `Arc<Mutex<..>>` is used to satisfy Rust's borrow checking rules.
+    //       Exclusive access is ensured by the sequencing of the futures.
     let needs_cleanup = Arc::new(Mutex::new(false));
 
     let fut_create_network = make_shared({
@@ -62,6 +80,10 @@ pub fn create_docker_network(
     });
 
     let fut_clean_up = {
+        // Note: The creation task must be allowed to finish, even if a shutdown signal or other
+        //       early abort signal is received. This is to prevent race conditions.
+        //
+        //       Do not abort the creation task prematurely -- let it either finish or handle its own abort.
         let fut_create_network = fut_create_network.clone();
 
         async move {
@@ -91,6 +113,21 @@ pub fn create_docker_network(
     (fut_create_network, fut_clean_up)
 }
 
+/// Creates a Docker volume asynchronously and provides a cleanup task for volume removal.
+///
+/// A cancellation token can be used to signal an early shutdown, allowing the creation task to
+/// abort without performing any additional steps.
+///
+/// It returns two futures
+/// 1. One that creates the Docker volume
+/// 2. Another that handles the cleanup (removal of the volume)
+///
+/// As the caller, you should always await the cleanup task when you are ready to shutdown the
+/// service. The cleanup task will only attempt to remove the volume if it may have been created.
+///
+/// Note that the cleanup is a "best-effort" operation -- success is not guaranteed due to
+/// success is not guaranteed due to the reliance on external commands, which may fail for
+/// various reasons.
 pub fn create_docker_volume(
     shutdown: CancellationToken,
     name: String,
@@ -98,6 +135,10 @@ pub fn create_docker_volume(
     impl Future<Output = Result<String, Arc<anyhow::Error>>> + Clone,
     impl Future<Output = ()>,
 ) {
+    // Flag indicating whether cleanup is needed.
+    //
+    // Note: The `Arc<Mutex<..>>` is used to satisfy Rust's borrow checking rules.
+    //       Exclusive access is ensured by the sequencing of the futures.
     let needs_cleanup = Arc::new(Mutex::new(false));
 
     let fut_create_volume = make_shared({
@@ -137,6 +178,10 @@ pub fn create_docker_volume(
     });
 
     let fut_clean_up = {
+        // Note: The creation task must be allowed to finish, even if a shutdown signal or other
+        //       early abort signal is received. This is to prevent race conditions.
+        //
+        //       Do not abort the creation task prematurely -- let it either finish or handle its own abort.
         let fut_create_volume = fut_create_volume.clone();
 
         async move {
@@ -166,6 +211,24 @@ pub fn create_docker_volume(
     (fut_create_volume, fut_clean_up)
 }
 
+/// Creates, starts, and inspects a Docker container asynchronously, and provides a cleanup task
+/// for stopping and removing the container.
+///
+/// A cancellation token can be used to signal an early shutdown, allowing the creation task to
+/// abort without performing any additional steps.
+///
+/// It returns two futures
+/// 1. One that creates the container, starts it, and inspects it.
+///    It resolves with the container's inspection info, such as port binding.
+/// 2. Another that handles the cleanup (stopping and removing the container)
+///
+/// As the caller, you should always await the cleanup task when you are ready to shutdown the
+/// service. The cleanup task will only attempt to stop or remove the container if it may have
+/// gotten past the respective states.
+///
+/// Note that the cleanup is a "best-effort" operation -- success is not guaranteed due to
+/// success is not guaranteed due to the reliance on external commands, which may fail for
+/// various reasons.
 pub fn create_start_and_inspect_container(
     shutdown: CancellationToken,
     options: CreateContainerOptions<String>,
@@ -181,6 +244,11 @@ pub fn create_start_and_inspect_container(
         Started = 2,
     }
 
+    // Flag indicating the current stage of the creation task and which resources need
+    // to be cleaned up.
+    //
+    // Note: The `Arc<Mutex<..>>` is used to satisfy Rust's borrow checking rules.
+    //       Exclusive access is ensured by the sequencing of the futures.
     let state = Arc::new(Mutex::new(State::Initial));
     let name = options.name.clone();
 
@@ -204,8 +272,7 @@ pub fn create_start_and_inspect_container(
             docker
                 .create_container(Some(options), config)
                 .await
-                .context("failed to create docker container")?
-                .id;
+                .context("failed to create docker container")?;
             println!("Created docker container {}", name);
 
             if shutdown.is_cancelled() {
@@ -240,6 +307,10 @@ pub fn create_start_and_inspect_container(
         let fut_run = fut_run.clone();
 
         async move {
+            // Note: The creation task must be allowed to finish, even if a shutdown signal or other
+            //       early abort signal is received. This is to prevent race conditions.
+            //
+            //       Do not abort the creation task prematurely -- let it either finish or handle its own abort.
             _ = fut_run.await;
 
             let state = state.lock().await;

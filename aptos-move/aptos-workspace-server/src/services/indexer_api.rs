@@ -9,7 +9,7 @@ use crate::common::{make_shared, IP_LOCAL_HOST};
 use anyhow::{anyhow, Context, Result};
 use aptos::node::local_testnet::{
     docker,
-    indexer_api::{post_metadata, HASURA_METADATA},
+    indexer_api::{post_metadata, HASURA_IMAGE, HASURA_METADATA},
     HealthChecker,
 };
 use bollard::{
@@ -24,9 +24,9 @@ use tokio_util::sync::CancellationToken;
 use url::Url;
 use uuid::Uuid;
 
-const HASURA_IMAGE: &str = "hasura/graphql-engine:v2.40.2-ce";
 const HASURA_DEFAULT_PORT: u16 = 8080;
 
+/// Extracts the host port assigned to the hasura container from its inspection data.
 fn get_hasura_assigned_port(container_info: &ContainerInspectResponse) -> Option<u16> {
     if let Some(port_bindings) = container_info
         .network_settings
@@ -45,6 +45,9 @@ fn get_hasura_assigned_port(container_info: &ContainerInspectResponse) -> Option
     None
 }
 
+/// Returns the Docker container options and configuration to start a hasura container with
+/// - The container bound to a Docker network (`network_name`).
+/// - [`HASURA_DEFAULT_PORT`] mapped to a random OS-assigned host port.
 fn create_container_options_and_config(
     instance_id: Uuid,
     network_name: String,
@@ -101,6 +104,23 @@ fn create_container_options_and_config(
     (options, config)
 }
 
+/// Starts the indexer API service, running in a docker container.
+///
+/// Prerequisites
+/// - Previous task to create the docker network
+///   - Needs to be the same one the postgres container connects to
+/// - Postgres DB (container)
+/// - Indexer processors
+///
+/// The function returns three futures:
+/// - One that resolves to the host port that can be used to access the indexer API service
+///   when it's fully up.
+/// - One that resolves when the container stops  (which it should not under normal operation).
+/// - A cleanup task that stops the container and removes the associated data volume.
+///
+/// As the caller, you should always await the cleanup task when you are ready to shutdown the
+/// service. The cleanup is a "best-effort" operation -- success is not guaranteed
+/// as it relies on external commands that may fail for various reasons.
 pub fn start_indexer_api(
     instance_id: Uuid,
     shutdown: CancellationToken,
@@ -163,6 +183,7 @@ pub fn start_indexer_api(
             let url =
                 Url::parse(&format!("http://{}:{}", IP_LOCAL_HOST, indexer_api_port)).unwrap();
 
+            // The first health checker waits for the service to be up at all.
             let health_checker = HealthChecker::Http(url.clone(), "Indexer API".to_string());
             health_checker
                 .wait(None)
@@ -171,6 +192,7 @@ pub fn start_indexer_api(
 
             println!("Indexer API is up, applying hasura metadata..");
 
+            // Apply the hasura metadata, with the second health checker waiting for it to succeed.
             post_metadata(url.clone(), HASURA_METADATA)
                 .await
                 .context("failed to apply hasura metadata")?;
@@ -211,6 +233,10 @@ pub fn start_indexer_api(
     };
 
     let fut_indexer_api_clean_up = {
+        // Note: The creation task must be allowed to finish, even if a shutdown signal or other
+        //       early abort signal is received. This is to prevent race conditions.
+        //
+        //       Do not abort the creation task prematurely -- let it either finish or handle its own abort.
         let fut_create_indexer_api = fut_create_indexer_api.clone();
 
         async move {

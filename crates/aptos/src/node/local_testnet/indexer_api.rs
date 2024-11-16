@@ -24,7 +24,7 @@ use std::{collections::HashSet, path::PathBuf, time::Duration};
 use tracing::{info, warn};
 
 const INDEXER_API_CONTAINER_NAME: &str = "local-testnet-indexer-api";
-const HASURA_IMAGE: &str = "hasura/graphql-engine:v2.44.0-ce";
+pub const HASURA_IMAGE: &str = "hasura/graphql-engine:v2.44.0-ce";
 
 /// This Hasura metadata originates from the aptos-indexer-processors repo.
 ///

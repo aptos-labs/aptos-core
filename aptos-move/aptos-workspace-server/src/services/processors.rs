@@ -16,6 +16,31 @@ use server_framework::RunnableConfig;
 use std::{future::Future, sync::Arc};
 use tokio::try_join;
 
+/// Names of the processors to enable in the local network.
+const PROCESSOR_NAMES: &[ProcessorName] = {
+    use ProcessorName::*;
+
+    &[
+        AccountTransactionsProcessor,
+        DefaultProcessor,
+        EventsProcessor,
+        FungibleAssetProcessor,
+        ObjectsProcessor,
+        StakeProcessor,
+        TokenV2Processor,
+        TransactionMetadataProcessor,
+        UserTransactionProcessor,
+    ]
+};
+
+/// Starts a single processor.
+///
+/// Needs to await a task to bring up the prerequisite services and perform the DB migration,
+/// shared among all processors.
+///
+/// The function returns two futures:
+/// - One that resolves when the processor is up.
+/// - One that resolves when the processor stops (which it should not under normal operation).
 fn start_processor(
     fut_prerequisites: &(impl Future<Output = Result<(u16, u16), Arc<anyhow::Error>>>
           + Clone
@@ -87,6 +112,16 @@ fn start_processor(
     (fut_processor_ready, fut_processor_finish)
 }
 
+/// Starts the indexer processor services. See [`PROCESSOR_NAMES`] for the full list.
+///
+/// Prerequisites
+/// - Node API
+/// - Node indexer gRPC
+/// - Postgres DB
+///
+/// The function returns two futures:
+/// - One that resolves when all processors are up.
+/// - One that resolves when any of the processors stops (which it should not under normal operation).
 pub fn start_all_processors(
     fut_node_api: impl Future<Output = Result<u16, Arc<anyhow::Error>>> + Clone + Send + 'static,
     fut_indexer_grpc: impl Future<Output = Result<u16, Arc<anyhow::Error>>> + Clone + Send + 'static,
@@ -95,8 +130,6 @@ pub fn start_all_processors(
     impl Future<Output = Result<()>>,
     impl Future<Output = Result<()>>,
 ) {
-    use ProcessorName::*;
-
     let fut_migration = async move {
         let postgres_port = fut_postgres
             .await
@@ -126,12 +159,15 @@ pub fn start_all_processors(
     };
 
     let fut_prerequisites = make_shared::<_, _, anyhow::Error>(async move {
-        let (_node_api_port, indexer_grpc_port, postgres_port) =
-            try_join!(fut_node_api, fut_indexer_grpc, fut_migration)
-                .map_err(anyhow::Error::msg)
-                .context(format!(
+        let (_node_api_port, indexer_grpc_port, postgres_port) = try_join!(
+            fut_node_api,
+            fut_indexer_grpc,
+            fut_migration
+        )
+        .map_err(anyhow::Error::msg)
+        .context(
             "failed to start processors: one or more prerequisites did not start successfully",
-        ))?;
+        )?;
 
         Ok((postgres_port, indexer_grpc_port))
     });
@@ -139,19 +175,7 @@ pub fn start_all_processors(
     let mut futs_ready = vec![];
     let mut futs_finish = vec![];
 
-    let processor_names = [
-        AccountTransactionsProcessor,
-        DefaultProcessor,
-        EventsProcessor,
-        FungibleAssetProcessor,
-        ObjectsProcessor,
-        StakeProcessor,
-        TokenV2Processor,
-        TransactionMetadataProcessor,
-        UserTransactionProcessor,
-    ];
-
-    for processor_name in &processor_names {
+    for processor_name in PROCESSOR_NAMES {
         let (fut_ready, fut_finish) = start_processor(&fut_prerequisites, processor_name);
 
         futs_ready.push(fut_ready);
