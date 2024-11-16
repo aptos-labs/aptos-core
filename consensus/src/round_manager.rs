@@ -470,7 +470,7 @@ impl RoundManager {
                 .await?;
             }
         };
-        network.broadcast_proposal(proposal_msg).await;
+        network.broadcast_proposal(proposal_msg, id).await;
         counters::PROPOSALS_COUNT.inc();
         Ok(())
     }
@@ -683,7 +683,7 @@ impl RoundManager {
             SYNC_INFO_RECEIVED_WITH_NEWER_CERT.inc();
             let result = self
                 .block_store
-                .add_certs(sync_info, self.create_block_retriever(author))
+                .add_certs(sync_info, self.create_block_retriever(author), self.id)
                 .await;
             self.process_certificates().await?;
             result
@@ -1585,7 +1585,7 @@ impl RoundManager {
     ) -> anyhow::Result<()> {
         let result = self
             .block_store
-            .insert_quorum_cert(&qc, &mut self.create_block_retriever(preferred_peer))
+            .insert_quorum_cert(&qc, &mut self.create_block_retriever(preferred_peer), self.id)
             .await
             .context("[RoundManager] Failed to process a newly aggregated QC");
         self.process_certificates().await?;
@@ -1609,6 +1609,7 @@ impl RoundManager {
                     .insert_quorum_cert(
                         verified_qc.as_ref(),
                         &mut self.create_block_retriever(preferred_peer),
+                        self.id
                     )
                     .await
                     .context("[RoundManager] Failed to process the QC from order vote msg");

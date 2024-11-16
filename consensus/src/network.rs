@@ -229,6 +229,7 @@ impl NetworkSender {
         retrieval_request: BlockRetrievalRequest,
         from: Author,
         timeout: Duration,
+        id: usize
     ) -> anyhow::Result<BlockRetrievalResponse> {
         fail_point!("consensus::send::any", |_| {
             Err(anyhow::anyhow!("Injected error in request_block"))
@@ -240,7 +241,7 @@ impl NetworkSender {
         ensure!(from != self.author, "Retrieve block from self");
         let msg_ = ConsensusMsg_::BlockRetrievalRequest(Box::new(retrieval_request.clone()));
         let msg = ConsensusMsg {
-            id: 0,
+            id,
             consensus_msg: msg_
         };
         counters::CONSENSUS_SENT_MSGS
@@ -372,19 +373,14 @@ impl NetworkSender {
         }
     }
 
-    pub async fn broadcast_proposal(&self, proposal_msg: ProposalMsg) {
+    pub async fn broadcast_proposal(&self, proposal_msg: ProposalMsg, id: usize) {
         fail_point!("consensus::send::broadcast_proposal", |_| ());
         let msg = ConsensusMsg_::ProposalMsg(Box::new(proposal_msg));
-        let msg_0 = ConsensusMsg {
-            id: 0,
+        let msg = ConsensusMsg {
+            id,
             consensus_msg: msg.clone()
         };
-        let msg_1 = ConsensusMsg {
-            id: 1,
-            consensus_msg: msg.clone()
-        };
-        self.broadcast(msg_0).await;
-        self.broadcast(msg_1).await
+        self.broadcast(msg).await
     }
 
     pub async fn broadcast_sync_info(&self, sync_info_msg: SyncInfo, id: usize) {
@@ -407,19 +403,14 @@ impl NetworkSender {
         self.broadcast(msg).await
     }
 
-    pub async fn broadcast_epoch_change(&self, epoch_change_proof: EpochChangeProof) {
+    pub async fn broadcast_epoch_change(&self, epoch_change_proof: EpochChangeProof, id: usize) {
         fail_point!("consensus::send::broadcast_epoch_change", |_| ());
         let msg = ConsensusMsg_::EpochChangeProof(Box::new(epoch_change_proof));
-        let msg_0 = ConsensusMsg {
-            id: 0,
+        let msg = ConsensusMsg {
+            id,
             consensus_msg: msg.clone()
         };
-        let msg_1 = ConsensusMsg {
-            id: 1,
-            consensus_msg: msg.clone()
-        };
-        self.broadcast(msg_0).await;
-        self.broadcast(msg_1).await
+        self.broadcast(msg).await
     }
 
     #[allow(dead_code)]
@@ -537,24 +528,17 @@ impl NetworkSender {
     }
 
     /// Sends the ledger info to self buffer manager
-    pub async fn send_commit_proof(&self, ledger_info: LedgerInfoWithSignatures) {
+    pub async fn send_commit_proof(&self, ledger_info: LedgerInfoWithSignatures, id: usize) {
         fail_point!("consensus::send::commit_decision", |_| ());
         let msg = ConsensusMsg_::CommitMessage(Box::new(CommitMessage::Decision(
             CommitDecision::new(ledger_info),
         )));
-        let msg_0 = ConsensusMsg {
-            id: 0,
-            consensus_msg: msg.clone()
-        };
-        let msg_1 = ConsensusMsg {
-            id: 1,
+        let msg = ConsensusMsg {
+            id: id,
             consensus_msg: msg.clone()
         };
         let _ = self
-            .send_rpc(self.author, msg_0, Duration::from_millis(500))
-            .await;
-        let _ = self
-            .send_rpc(self.author, msg_1, Duration::from_millis(500))
+            .send_rpc(self.author, msg, Duration::from_millis(500))
             .await;
     }
 
@@ -753,8 +737,8 @@ impl ProofNotifier for NetworkSender {
         self.send_epoch_change(proof).await
     }
 
-    async fn send_commit_proof(&self, ledger_info: LedgerInfoWithSignatures) {
-        self.send_commit_proof(ledger_info).await
+    async fn send_commit_proof(&self, ledger_info: LedgerInfoWithSignatures, id: usize) {
+        self.send_commit_proof(ledger_info, id).await
     }
 }
 

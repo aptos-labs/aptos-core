@@ -121,7 +121,7 @@ impl StateSyncTrigger {
                 >= ledger_info.commit_info().round()
         {
             self.proof_notifier
-                .send_commit_proof(ledger_info.clone())
+                .send_commit_proof(ledger_info.clone(), 0)
                 .await
         }
     }

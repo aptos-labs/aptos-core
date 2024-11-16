@@ -718,7 +718,7 @@ mod tests {
                     _ => panic!("unexpected messages"),
                 }
             }
-            nodes[0].broadcast_proposal(proposal.clone()).await;
+            nodes[0].broadcast_proposal(proposal.clone(), 0).await;
             playground
                 .wait_for_messages(4, NetworkPlayground::take_all)
                 .await;
@@ -845,6 +845,7 @@ mod tests {
                     BlockRetrievalRequest::new(HashValue::zero(), 1),
                     peer,
                     Duration::from_secs(5),
+                0
                 )
                 .await
                 .unwrap();

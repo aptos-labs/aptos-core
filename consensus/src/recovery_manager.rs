@@ -106,6 +106,7 @@ impl RecoveryManager {
             self.execution_client.clone(),
             self.payload_manager.clone(),
             self.order_vote_enabled,
+            0
         )
         .await?;
 

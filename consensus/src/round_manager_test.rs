@@ -335,6 +335,7 @@ impl NodeSetup {
             onchain_jwk_consensus_config.clone(),
             None,
             Arc::new(MockPastProposalStatusTracker {}),
+            0
         );
         block_on(round_manager.init(last_vote_sent));
         Self {
@@ -549,7 +550,7 @@ fn start_replying_to_block_retreival(nodes: Vec<NodeSetup>) -> ReplyingRPCHandle
                         node.identity_desc()
                     );
                     node.block_store
-                        .process_block_retrieval(request)
+                        .process_block_retrieval(request, 0)
                         .await
                         .unwrap();
                 } else {
@@ -1321,7 +1322,7 @@ fn response_on_block_retrieval() {
             response_sender: tx1,
         };
         node.block_store
-            .process_block_retrieval(single_block_request)
+            .process_block_retrieval(single_block_request, 0)
             .await
             .unwrap();
         match rx1.await {
@@ -1351,7 +1352,7 @@ fn response_on_block_retrieval() {
         };
 
         node.block_store
-            .process_block_retrieval(missing_block_request)
+            .process_block_retrieval(missing_block_request, 0)
             .await
             .unwrap();
         match rx2.await {
@@ -1380,7 +1381,7 @@ fn response_on_block_retrieval() {
             response_sender: tx3,
         };
         node.block_store
-            .process_block_retrieval(many_block_request)
+            .process_block_retrieval(many_block_request, 0)
             .await
             .unwrap();
         match rx3.await {

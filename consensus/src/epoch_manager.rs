@@ -586,6 +586,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         epoch: u64,
         block_store: Arc<BlockStore>,
         max_blocks_allowed: u64,
+        id: usize
     ) {
         let (request_tx, mut request_rx) = aptos_channel::new::<_, IncomingBlockRetrievalRequest>(
             QueueStyle::KLAST,
@@ -604,7 +605,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 }
                 if let Err(e) = monitor!(
                     "process_block_retrieval",
-                    block_store.process_block_retrieval(request).await
+                    block_store.process_block_retrieval(request, id).await
                 ) {
                     warn!(epoch = epoch, error = ?e, kind = error_kind(&e));
                 }
@@ -864,6 +865,22 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 recovery_data.root_block().round(),
             )
             .await;
+        } else {
+            self.dummy_client
+            .start_epoch(
+                consensus_key,
+                epoch_state.clone(),
+                safety_rules_container.clone(),
+                payload_manager.clone(),
+                &onchain_consensus_config,
+                &onchain_execution_config,
+                &onchain_randomness_config,
+                rand_config,
+                fast_rand_config.clone(),
+                rand_msg_rx,
+                recovery_data.root_block().round(),
+            )
+            .await;
         }
 
 
@@ -977,7 +994,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
         tokio::spawn(round_manager.start(round_manager_rx, buffered_proposal_rx, close_rx));
 
-        self.spawn_block_retrieval_task(epoch, block_store, max_blocks_allowed);
+        self.spawn_block_retrieval_task(epoch, block_store, max_blocks_allowed, id);
     }
 
     fn start_quorum_store(&mut self, quorum_store_builder: QuorumStoreBuilder) {

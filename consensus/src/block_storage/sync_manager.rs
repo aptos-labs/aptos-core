@@ -96,10 +96,12 @@ impl BlockStore {
         &self,
         sync_info: &SyncInfo,
         mut retriever: BlockRetriever,
+        id: usize
     ) -> anyhow::Result<()> {
         self.sync_to_highest_commit_cert(
             sync_info.highest_commit_cert().ledger_info(),
             retriever.network.clone(),
+            id
         )
         .await;
 
@@ -113,6 +115,7 @@ impl BlockStore {
             sync_info.highest_quorum_cert().clone(),
             sync_info.highest_commit_cert().clone(),
             &mut retriever,
+            id
         )
         .await?;
 
@@ -120,7 +123,7 @@ impl BlockStore {
         // is already stored in block_store. So, we first call insert_quorum_cert(highest_quorum_cert).
         // This call will ensure that the highest ceritified block along with all its ancestors are inserted
         // into the block store.
-        self.insert_quorum_cert(sync_info.highest_quorum_cert(), &mut retriever)
+        self.insert_quorum_cert(sync_info.highest_quorum_cert(), &mut retriever, id)
             .await?;
 
         // Even though we inserted the highest_quorum_cert (and its ancestors) in the above step,
@@ -141,6 +144,7 @@ impl BlockStore {
                     .clone()
                     .into_quorum_cert(self.order_vote_enabled)?,
                 &mut retriever,
+                id
             )
             .await?;
         }
@@ -155,9 +159,10 @@ impl BlockStore {
         &self,
         qc: &QuorumCert,
         retriever: &mut BlockRetriever,
+        id: usize
     ) -> anyhow::Result<()> {
         match self.need_fetch_for_quorum_cert(qc) {
-            NeedFetchResult::NeedFetch => self.fetch_quorum_cert(qc.clone(), retriever).await?,
+            NeedFetchResult::NeedFetch => self.fetch_quorum_cert(qc.clone(), retriever, id).await?,
             NeedFetchResult::QCBlockExist => self.insert_single_quorum_cert(qc.clone())?,
             NeedFetchResult::QCAlreadyExist => return Ok(()),
             _ => (),
@@ -172,7 +177,9 @@ impl BlockStore {
                     .broadcast_epoch_change(EpochChangeProof::new(
                         vec![qc.ledger_info().clone()],
                         /* more = */ false,
-                    ))
+                    ),
+                    id
+                )
                     .await;
             }
         }
@@ -213,6 +220,7 @@ impl BlockStore {
         &self,
         qc: QuorumCert,
         retriever: &mut BlockRetriever,
+        id: usize
     ) -> anyhow::Result<()> {
         let mut pending = vec![];
         let mut retrieve_qc = qc.clone();
@@ -228,6 +236,7 @@ impl BlockStore {
                     retrieve_qc.certified_block().id(),
                     qc.ledger_info()
                         .get_voters(&retriever.validator_addresses()),
+                        id
                 )
                 .await?;
             // retrieve_blocks_in_range guarantees that blocks has exactly 1 element
@@ -256,6 +265,7 @@ impl BlockStore {
         highest_quorum_cert: QuorumCert,
         highest_commit_cert: WrappedLedgerInfo,
         retriever: &mut BlockRetriever,
+        id: usize
     ) -> anyhow::Result<()> {
         if !self.need_sync_for_ledger_info(highest_commit_cert.ledger_info()) {
             return Ok(());
@@ -268,6 +278,7 @@ impl BlockStore {
             self.execution_client.clone(),
             self.payload_manager.clone(),
             self.order_vote_enabled,
+            id
         )
         .await?
         .take();
@@ -299,6 +310,7 @@ impl BlockStore {
         execution_client: Arc<dyn TExecutionClient>,
         payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
+        id: usize
     ) -> anyhow::Result<RecoveryData> {
         info!(
             LogSchema::new(LogEvent::StateSync).remote_peer(retriever.preferred_peer),
@@ -324,6 +336,7 @@ impl BlockStore {
                 highest_quorum_cert
                     .ledger_info()
                     .get_voters(&retriever.validator_addresses()),
+                    id
             )
             .await?;
 
@@ -372,6 +385,7 @@ impl BlockStore {
                         highest_commit_cert
                             .ledger_info()
                             .get_voters(&retriever.validator_addresses()),
+                            id
                     )
                     .await?;
 
@@ -452,6 +466,7 @@ impl BlockStore {
         &self,
         ledger_info: &LedgerInfoWithSignatures,
         network: Arc<NetworkSender>,
+        id: usize
     ) {
         // if the block exists between commit root and ordered root
         if self.commit_root().round() < ledger_info.commit_info().round()
@@ -459,7 +474,7 @@ impl BlockStore {
             && self.ordered_root().round() >= ledger_info.commit_info().round()
         {
             let proof = ledger_info.clone();
-            tokio::spawn(async move { network.send_commit_proof(proof).await });
+            tokio::spawn(async move { network.send_commit_proof(proof, id).await });
         }
     }
 
@@ -472,6 +487,7 @@ impl BlockStore {
     pub async fn process_block_retrieval(
         &self,
         request: IncomingBlockRetrievalRequest,
+        round_manager_id: usize
     ) -> anyhow::Result<()> {
         fail_point!("consensus::process_block_retrieval", |_| {
             Err(anyhow::anyhow!("Injected error in process_block_retrieval"))
@@ -500,7 +516,7 @@ impl BlockStore {
         let response = Box::new(BlockRetrievalResponse::new(status, blocks));
         let response_msg_ = ConsensusMsg_::BlockRetrievalResponse(response);
         let response_msg = ConsensusMsg {
-            id: 0,
+            id: round_manager_id,
             consensus_msg: response_msg_
         };
         let response_bytes = request
@@ -549,6 +565,7 @@ impl BlockRetriever {
         target_block_id: HashValue,
         retrieve_batch_size: u64,
         mut peers: Vec<AccountAddress>,
+        id: usize
     ) -> anyhow::Result<BlockRetrievalResponse> {
         let mut failed_attempt = 0_u32;
         let mut cur_retry = 0;
@@ -621,6 +638,7 @@ impl BlockRetriever {
                                 request.clone(),
                                 peer,
                                 rpc_timeout,
+                                id
                             );
                             futures.push(async move { (remote_peer, future.await) }.boxed());
                         }
@@ -659,6 +677,7 @@ impl BlockRetriever {
         target_block_id: HashValue,
         peers: Vec<AccountAddress>,
         num_blocks: u64,
+        id: usize
     ) -> anyhow::Result<Vec<Block>> {
         info!(
             "Retrieving {} blocks starting from {}",
@@ -686,6 +705,7 @@ impl BlockRetriever {
                     target_block_id,
                     retrieve_batch_size,
                     peers.clone(),
+                    id
                 )
                 .await;
             match response {
@@ -730,9 +750,10 @@ impl BlockRetriever {
         num_blocks: u64,
         target_block_id: HashValue,
         peers: Vec<AccountAddress>,
+        id: usize
     ) -> anyhow::Result<Vec<Block>> {
         BLOCKS_FETCHED_FROM_NETWORK_IN_BLOCK_RETRIEVER.inc_by(num_blocks);
-        self.retrieve_block_for_id(initial_block_id, target_block_id, peers, num_blocks)
+        self.retrieve_block_for_id(initial_block_id, target_block_id, peers, num_blocks, id)
             .await
     }
 
