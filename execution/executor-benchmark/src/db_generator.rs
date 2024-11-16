@@ -13,17 +13,16 @@ use aptos_config::{
 use aptos_db::AptosDB;
 use aptos_executor::db_bootstrapper::{generate_waypoint, maybe_bootstrap};
 use aptos_storage_interface::DbReaderWriter;
-use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
 use aptos_types::{
     jwks::{jwk::JWK, patch::IssuerJWK},
     keyless::{
-        circuit_constants::TEST_GROTH16_KEYS,
+        circuit_constants::TEST_GROTH16_SETUP,
         test_utils::{get_sample_iss, get_sample_jwk},
         Groth16VerificationKey,
     },
     on_chain_config::Features,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
 use std::{fs, path::Path, sync::Arc};
 
 pub fn create_db_with_accounts<V>(
@@ -82,8 +81,9 @@ pub(crate) fn bootstrap_with_genesis(
                 issuer: get_sample_iss(),
                 jwk: JWK::RSA(get_sample_jwk()),
             }];
-            config.keyless_groth16_vk_override =
-                Some(Groth16VerificationKey::from(&TEST_GROTH16_KEYS.prepared_vk));
+            config.keyless_groth16_vk_override = Some(Groth16VerificationKey::from(
+                &TEST_GROTH16_SETUP.prepared_vk,
+            ));
         })));
 
     let mut rocksdb_configs = RocksdbConfigs::default();

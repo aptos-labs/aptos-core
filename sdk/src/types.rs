@@ -245,7 +245,7 @@ impl LocalAccount {
                 &config,
             )
             .unwrap();
-            let groth16_proof = keyless::proof_simulation::Groth16SimulatorBn254::create_random_proof_with_trapdoor(&[public_inputs], &keyless::circuit_constants::TEST_GROTH16_KEYS.pk, rng).unwrap();
+            let groth16_proof = keyless::proof_simulation::Groth16SimulatorBn254::create_random_proof_with_trapdoor(&[public_inputs], &keyless::circuit_constants::TEST_GROTH16_SETUP.simulation_pk, rng).unwrap();
             let zk_sig = ZeroKnowledgeSig {
                 proof: keyless::ZKP::Groth16(groth16_proof),
                 exp_horizon_secs,

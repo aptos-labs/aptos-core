@@ -98,20 +98,18 @@ pub fn devnet_prepared_vk() -> PreparedVerifyingKey<Bn254> {
     PreparedVerifyingKey::from(vk)
 }
 
-pub struct Groth16Keys {
-    pub pk: Trapdoor<Bn254>,
-    pub vk: VerifyingKey<Bn254>,
+pub struct Groth16TrapdoorSetup {
+    pub simulation_pk: Trapdoor<Bn254>,
     pub prepared_vk: PreparedVerifyingKey<Bn254>,
 }
 
-pub static TEST_GROTH16_KEYS: Lazy<Groth16Keys> = Lazy::new(|| {
+pub static TEST_GROTH16_SETUP: Lazy<Groth16TrapdoorSetup> = Lazy::new(|| {
     let mut rng = StdRng::seed_from_u64(999);
-    let (pk, vk) =
+    let (simulation_pk, vk) =
         Groth16SimulatorBn254::circuit_agnostic_setup_with_trapdoor(&mut rng, 1).unwrap();
     let prepared_vk = PreparedVerifyingKey::from(vk.clone());
-    Groth16Keys {
-        pk,
-        vk,
+    Groth16TrapdoorSetup {
+        simulation_pk,
         prepared_vk,
     }
 });
