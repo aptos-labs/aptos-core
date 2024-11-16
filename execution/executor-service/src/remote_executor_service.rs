@@ -28,6 +28,7 @@ impl ExecutorService {
         self_address: SocketAddr,
         coordinator_address: SocketAddr,
         remote_shard_addresses: Vec<SocketAddr>,
+        native_vm: bool,
     ) -> Self {
         let service_name = format!("executor_service-{}", shard_id);
         let mut controller = NetworkController::new(service_name, self_address, 5000);
@@ -51,6 +52,7 @@ impl ExecutorService {
                 coordinator_client,
                 cross_shard_client,
                 v3_client,
+                native_vm,
         )));
 
         Self {

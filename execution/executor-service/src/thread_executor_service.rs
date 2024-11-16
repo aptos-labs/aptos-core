@@ -27,6 +27,7 @@ impl ThreadExecutorService {
             self_address,
             coordinator_address,
             remote_shard_addresses,
+            false,
         );
         executor_service.start();
         Self {

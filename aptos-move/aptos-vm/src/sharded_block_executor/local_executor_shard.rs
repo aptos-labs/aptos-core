@@ -58,6 +58,7 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorService<S> {
             coordinator_client,
             Arc::new(cross_shard_client),
             Arc::new(v3_client),
+            false,
         );
         let join_handle = thread::Builder::new()
             .name(format!("executor-shard-{}", shard_id))

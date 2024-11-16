@@ -67,6 +67,7 @@ pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     coordinator_client: Arc<Mutex<dyn CoordinatorClient<S>>>,
     cross_shard_client: Arc<dyn CrossShardClient>,
     v3_client: Arc<dyn CrossShardClientForV3<SignatureVerifiedTransaction, VMStatus>>,
+    native_vm: bool,
 }
 
 impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
@@ -77,6 +78,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         coordinator_client: Arc<Mutex<dyn CoordinatorClient<S>>>,
         cross_shard_client: Arc<dyn CrossShardClient>,
         v3_client: Arc<dyn CrossShardClientForV3<SignatureVerifiedTransaction, VMStatus>>,
+        native_vm: bool,
     ) -> Self {
         let executor_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
@@ -94,6 +96,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             coordinator_client,
             cross_shard_client,
             v3_client,
+            native_vm,
         }
     }
 
@@ -408,7 +411,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                             onchain: onchain_config,
                         },
                         None::<CrossShardCommitSender>,
-                        true,
+                        self.native_vm,
                     ).map(BlockOutput::into_transaction_outputs_forced);
                     drop(state_view);
                     drop(exe_timer);

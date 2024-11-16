@@ -19,6 +19,7 @@ impl ProcessExecutorService {
         num_threads: usize,
         coordinator_address: SocketAddr,
         remote_shard_addresses: Vec<SocketAddr>,
+        native_vm: bool,
     ) -> Self {
         let self_address = remote_shard_addresses[shard_id];
         info!(
@@ -34,6 +35,7 @@ impl ProcessExecutorService {
             self_address,
             coordinator_address,
             remote_shard_addresses,
+            native_vm,
         );
         executor_service.start();
         Self { executor_service }

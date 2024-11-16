@@ -23,6 +23,9 @@ struct Args {
 
     #[clap(long)]
     pub coordinator_address: SocketAddr,
+
+    #[clap(long)]
+    pub native_vm: bool,
 }
 
 fn main() {
@@ -46,6 +49,7 @@ fn main() {
         args.num_executor_threads,
         args.coordinator_address,
         args.remote_executor_addresses,
+        args.native_vm,
     );
 
     rx.recv()
