@@ -292,13 +292,16 @@ impl DelayedFieldRead {
     }
 }
 
-/// Represents a module read, either from immutable cross-block cache, or from code [SyncCodeCache]
-/// used by block executor (per-block cache). This way, when transaction needs to read a module
-/// from [SyncCodeCache] it can first check the read-set here.
+/// Represents a module read, either from global module cache that spans multiple blocks, or from
+/// per-block cache used by block executor to add committed modules. When transaction reads a
+/// module, it should first check the read-set here, to ensure that if some module A has been read,
+/// the same A is read again within the same transaction.
 enum ModuleRead<DC, VC, S> {
-    /// Read from the cross-block module cache.
+    /// Read from the global module cache. Modules in this cache have storage version, but require
+    /// different validation - a check that they have not been overridden.
     GlobalCache(Arc<ModuleCode<DC, VC, S>>),
-    /// Read from per-block cache ([SyncCodeCache]) used by parallel execution.
+    /// Read from per-block cache that contains committed (by specified transaction) and newly
+    /// loaded from storage (i.e., not yet moved to global module cache) modules.
     PerBlockCache(Option<(Arc<ModuleCode<DC, VC, S>>, Option<TxnIndex>)>),
 }
 

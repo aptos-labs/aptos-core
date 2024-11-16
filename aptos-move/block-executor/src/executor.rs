@@ -1234,6 +1234,7 @@ where
         >,
     ) -> Result<(), PanicError> {
         let (id, write_op) = write.unpack();
+
         let state_value = write_op.as_state_value().ok_or_else(|| {
             PanicError::CodeInvariantError("Modules cannot be deleted".to_string())
         })?;
