@@ -360,7 +360,6 @@ pub fn test_save_blocks_impl(
 
     let mut in_memory_state = db.state_store.current_state_cloned();
     let _ancester = in_memory_state.current.clone();
-    let _usage = _ancester.usage();
     let num_batches = input.len();
     let mut cur_ver: Version = 0;
     let mut all_committed_txns = vec![];

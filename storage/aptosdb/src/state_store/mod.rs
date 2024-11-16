@@ -923,6 +923,13 @@ impl StateStore {
                         {
                             old_value_opt.map(|value| (old_version, value))
                         } else {
+                            // n.b. all updated state items must be read and recorded in the state cache,
+                            // otherwise we can't calculate the correct usage. The is_untracked() hack
+                            // is to allow some db tests without real execution layer to pass.
+                            assert!(
+                                expected_usage.is_untracked() || base_version.is_none(),
+                                "Must cache read."
+                            );
                             None
                         };
 
