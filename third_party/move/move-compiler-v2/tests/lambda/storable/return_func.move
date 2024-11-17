@@ -87,9 +87,9 @@ module 0x42::test {
         vector::push_back(&mut sum, h(6));
 
         let funcs = vector[choose_function(0), choose_function(1), choose_function(2)];
-        vector::push_back(&mut sum, f[0](9));
-        vector::push_back(&mut sum, f[1](11));
-        vector::push_back(&mut sum, f[2](13));
+        vector::push_back(&mut sum, funcs[0](9));
+        vector::push_back(&mut sum, funcs[1](11));
+        vector::push_back(&mut sum, funcs[2](13));
 
         assert!(sum == vector<u64>[6, 9, 12, 10, 21, 24, 18, 33, 52])
     }

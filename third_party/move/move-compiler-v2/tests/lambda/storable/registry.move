@@ -26,7 +26,7 @@ module 0x42::test {
     fun replace_or_add_function(v: &mut vector<Function>, k: u64, f: |u64| u64 with store): Option<Function> {
         let done = false;
         vector::for_each_mut(v, |f: &mut Function| {
-            if f.key == k {
+            if (f.key == k) {
                 f.f = f;
                 done = true;
             }

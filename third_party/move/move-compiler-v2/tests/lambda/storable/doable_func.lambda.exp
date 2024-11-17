@@ -74,7 +74,7 @@ module 0x42::test {
                               if Eq<u64>(key, 10) {
                                 {
                                   let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(x, z) has copy
+                                   move|x: u64| mod4::alt_multiply(x, z) has copy, drop
                                 }
                               } else {
                                 if Eq<u64>(key, 11) {
@@ -241,7 +241,7 @@ module 0x42::test {
                               if Eq<u64>(key, 10) {
                                 {
                                   let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(x, z) has copy
+                                   move|x: u64| mod4::alt_multiply(x, z) has copy, drop
                                 }
                               } else {
                                 if Eq<u64>(key, 11) {
@@ -408,7 +408,7 @@ module 0x42::test {
                               if Eq<u64>(key, 10) {
                                 {
                                   let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(x, z) has copy
+                                   move|x: u64| mod4::alt_multiply(x, z) has copy, drop
                                 }
                               } else {
                                 if Eq<u64>(key, 11) {
@@ -575,7 +575,7 @@ module 0x42::test {
                               if Eq<u64>(key, 10) {
                                 {
                                   let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(x, z) has copy
+                                   move|x: u64| mod4::alt_multiply(x, z) has copy, drop
                                 }
                               } else {
                                 if Eq<u64>(key, 11) {
@@ -742,7 +742,7 @@ module 0x42::test {
                               if Eq<u64>(key, 10) {
                                 {
                                   let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(x, z) has copy
+                                   move|x: u64| mod4::alt_multiply(x, z) has copy, drop
                                 }
                               } else {
                                 if Eq<u64>(key, 11) {
@@ -909,7 +909,7 @@ module 0x42::test {
                               if Eq<u64>(key, 10) {
                                 {
                                   let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(x, z) has copy
+                                   move|x: u64| mod4::alt_multiply(x, z) has copy, drop
                                 }
                               } else {
                                 if Eq<u64>(key, 11) {
@@ -1076,7 +1076,7 @@ module 0x42::test {
                               if Eq<u64>(key, 10) {
                                 {
                                   let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(x, z) has copy
+                                   move|x: u64| mod4::alt_multiply(x, z) has copy, drop
                                 }
                               } else {
                                 if Eq<u64>(key, 11) {
@@ -1243,7 +1243,7 @@ module 0x42::test {
                               if Eq<u64>(key, 10) {
                                 {
                                   let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(x, z) has copy
+                                   move|x: u64| mod4::alt_multiply(x, z) has copy, drop
                                 }
                               } else {
                                 if Eq<u64>(key, 11) {
@@ -1410,7 +1410,7 @@ module 0x42::test {
                               if Eq<u64>(key, 10) {
                                 {
                                   let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(x, z) has copy
+                                   move|x: u64| mod4::alt_multiply(x, z) has copy, drop
                                 }
                               } else {
                                 if Eq<u64>(key, 11) {
@@ -1577,7 +1577,7 @@ module 0x42::test {
                               if Eq<u64>(key, 10) {
                                 {
                                   let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(x, z) has copy
+                                   move|x: u64| mod4::alt_multiply(x, z) has copy, drop
                                 }
                               } else {
                                 if Eq<u64>(key, 11) {
@@ -1730,7 +1730,7 @@ module 0x42::test {
                                move|z: u64| test::multiply3(2, 5, z)
                             } else {
                               if Eq<u64>(key, 10) {
-                                 move|x: u64| mod4::alt_multiply(x, 11) has copy
+                                 move|x: u64| mod4::alt_multiply(x, 11) has copy, drop
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {

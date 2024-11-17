@@ -1,10 +1,10 @@
 
 Diagnostics:
 error: unexpected token
-   ┌─ tests/lambda/storable/registry.move:29:16
+   ┌─ tests/lambda/storable/registry.move:34:12
    │
-29 │             if f.key == k {
-   │                ^
-   │                │
-   │                Unexpected 'f'
-   │                Expected '('
+34 │         if !done {
+   │            ^
+   │            │
+   │            Unexpected '!'
+   │            Expected '('
