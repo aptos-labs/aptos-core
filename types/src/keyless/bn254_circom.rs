@@ -277,31 +277,18 @@ pub fn cached_jwk_hash(jwk: &RSA_JWK) -> anyhow::Result<Fr> {
 }
 
 pub fn hash_public_inputs(
+    config: &Configuration,
     epk: &EphemeralPublicKey,
     idc: &IdCommitment,
     exp_timestamp_secs: u64,
     exp_horizon_secs: u64,
     iss: &str,
-    extra_field: Option<String>,
-    jwt_header: &str,
+    extra_field: Option<&str>,
+    jwt_header_json: &str,
     jwk: &RSA_JWK,
-    override_aud_val: Option<String>,
-    config: &Configuration,
+    override_aud_val: Option<&str>,
 ) -> anyhow::Result<Fr> {
-    let mut epk_frs = poseidon_bn254::keyless::pad_and_pack_bytes_to_scalars_with_len(
-        epk.to_bytes().as_slice(),
-        config.max_commited_epk_bytes as usize,
-    )?;
-
-    let idc = Fr::from_le_bytes_mod_order(&idc.0);
-
-    let exp_timestamp_secs = Fr::from(exp_timestamp_secs);
-
-    let exp_horizon_secs = Fr::from(exp_horizon_secs);
-
-    let iss_field_hash = cached_pad_and_hash_string(iss, config.max_iss_val_bytes as usize)?;
-
-    let (has_extra_field, extra_field_hash) = match &extra_field {
+    let (has_extra_field, extra_field_hash) = match extra_field {
         None => (Fr::zero(), *EMPTY_EXTRA_FIELD_HASH),
         Some(extra_field) => (
             Fr::one(),
@@ -312,7 +299,16 @@ pub fn hash_public_inputs(
         ),
     };
 
-    let jwt_header_b64_with_separator = format!("{}.", base64url_encode_str(jwt_header));
+    let (override_aud_val_hash, use_override_aud) = match override_aud_val {
+        Some(override_aud_val) => (
+            cached_pad_and_hash_string(override_aud_val, IdCommitment::MAX_AUD_VAL_BYTES)?,
+            ark_bn254::Fr::from(1),
+        ),
+        None => (*EMPTY_OVERRIDE_AUD_FIELD_HASH, ark_bn254::Fr::from(0)),
+    };
+
+    // Add the hash of the jwt_header with the "." separator appended
+    let jwt_header_b64_with_separator = format!("{}.", base64url_encode_str(jwt_header_json));
     let jwt_header_hash = cached_pad_and_hash_string(
         &jwt_header_b64_with_separator,
         config.max_jwt_header_b64_bytes as usize,
@@ -320,13 +316,22 @@ pub fn hash_public_inputs(
 
     let jwk_hash = cached_jwk_hash(jwk)?;
 
-    let (override_aud_val_hash, use_override_aud) = match &override_aud_val {
-        Some(override_aud_val) => (
-            cached_pad_and_hash_string(override_aud_val, IdCommitment::MAX_AUD_VAL_BYTES)?,
-            ark_bn254::Fr::from(1),
-        ),
-        None => (*EMPTY_OVERRIDE_AUD_FIELD_HASH, ark_bn254::Fr::from(0)),
-    };
+    // Add the hash of the value of the `iss` field
+    let iss_field_hash = cached_pad_and_hash_string(iss, config.max_iss_val_bytes as usize)?;
+
+    // Add the id_commitment as a scalar
+    let idc = Fr::from_le_bytes_mod_order(&idc.0);
+
+    // Add the exp_timestamp_secs as a scalar
+    let exp_timestamp_secs = Fr::from(exp_timestamp_secs);
+
+    // Add the epk lifespan as a scalar
+    let exp_horizon_secs = Fr::from(exp_horizon_secs);
+
+    let mut epk_frs = poseidon_bn254::keyless::pad_and_pack_bytes_to_scalars_with_len(
+        epk.to_bytes().as_slice(),
+        config.max_commited_epk_bytes as usize,
+    )?;
 
     // println!("Num EPK scalars:    {}", epk_frs.len());
     // for (i, e) in epk_frs.iter().enumerate() {
@@ -371,16 +376,16 @@ pub fn get_public_inputs_hash(
 ) -> anyhow::Result<Fr> {
     if let EphemeralCertificate::ZeroKnowledgeSig(proof) = &sig.cert {
         hash_public_inputs(
+            config,
             &sig.ephemeral_pubkey,
             &pk.idc,
             sig.exp_date_secs,
             proof.exp_horizon_secs,
             &pk.iss_val,
-            proof.extra_field.clone(),
+            proof.extra_field.as_ref().map(String::as_str),
             &sig.jwt_header_json,
             jwk,
-            proof.override_aud_val.clone(),
-            config,
+            proof.override_aud_val.as_ref().map(String::as_str),
         )
     } else {
         bail!("Can only call `get_public_inputs_hash` on keyless::Signature with Groth16 ZK proof")

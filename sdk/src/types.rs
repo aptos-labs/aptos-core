@@ -233,6 +233,7 @@ impl LocalAccount {
             let idc = keyless::IdCommitment::new_from_preimage(&pepper, &aud, &uid_key, &uid_val)
                 .unwrap();
             let public_inputs = keyless::bn254_circom::hash_public_inputs(
+                &config,
                 &eph_key_pair.public_key,
                 &idc,
                 exp_timestamp_secs,
@@ -242,7 +243,6 @@ impl LocalAccount {
                 &jwt_header,
                 &jwk,
                 None,
-                &config,
             )
             .unwrap();
             let groth16_proof = keyless::proof_simulation::Groth16SimulatorBn254::create_random_proof_with_trapdoor(&[public_inputs], &keyless::circuit_constants::TEST_GROTH16_SETUP.simulation_pk, rng).unwrap();
