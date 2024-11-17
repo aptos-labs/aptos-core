@@ -44,7 +44,6 @@ use move_ir_types::{
 };
 use num::{BigInt, FromPrimitive, Zero};
 use std::{
-    backtrace::{Backtrace, BacktraceStatus},
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, LinkedList},
     fmt, mem,
@@ -4290,7 +4289,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         context: &ErrorMessageContext,
     ) -> ExpData {
         // Translate arguments.
-        let (mut arg_types, mut translated_args) = self.translate_exp_list(args);
+
+        // Also do First part of curry check; arg_types is needed to do candidate matching.
+        // Mask is set to Some(mask) if some parameters were `_`, indicating that building
+        // a closure is desired.
+        // eprintln!("kind is {:?}", kind);
+        let (mut arg_types, mut translated_args, mask) =
+            self.translate_possible_curry_exp_list(args, matches!(kind, ModelCallKind::Regular));
 
         // Special handling of receiver call functions
         if kind == ModelCallKind::Receiver {
@@ -4388,15 +4393,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             self.error(loc, &format!("no function named `{}` found", display));
             return self.new_error_exp();
         }
-
-        // First part of curry check; arg_types is needed to do candidate matching.
-        // Mask is set to Some(mask) if some parameters were `_`, indicating that building
-        // a closure is desired.
-        // eprintln!("kind is {:?}", kind);
-        let (arg_types, translated_args, mask) = self.translate_possible_curry_exp_list(
-            args,
-            matches!(kind, ModelCallKind::Regular | ModelCallKind::Receiver),
-        );
 
         // Partition candidates in those which matched and which have been outruled.
         let mut outruled = vec![];
@@ -4937,7 +4933,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     /// Given a list of n parameter types to a function, and a non-empty bit-mask
     /// with k bits set, returns:
     /// (1) a list of n-k new type variables (lambda param types)
-    /// (2) the input list of k parameter types, with each element corresponding
+    /// (2) the input list of k curry parameter types, with each element corresponding
     ///     to a set bit in the mask replaced by the corresponding type variable.
     /// #1 can be used as the parameter types for a corresponding lambda function type,
     /// while #2 is the parameter types for the function passed to curry.

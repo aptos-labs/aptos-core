@@ -49,7 +49,7 @@ use move_model::{
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, Parameter, TypeParameter},
     symbol::Symbol,
-    ty::{ReferenceKind, Type},
+    ty::{AbilityInference, AbilityInferer, ReferenceKind, Type},
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -428,6 +428,7 @@ impl<'a> LambdaLifter<'a> {
         id: NodeId,
         body: &Exp,
         lambda_params: Vec<Parameter>,
+        abilities: &AbilitySet,
     ) -> Option<Exp> {
         if let Some((fn_exp, args)) = self.lambda_reduces_to_curry(body) {
             // lambda has form |lambda_params| fn_exp(args)
@@ -470,11 +471,54 @@ impl<'a> LambdaLifter<'a> {
                 mask_cursor <<= 1;
             }
             if !has_mismatch {
-                let env = self.fun_env.module_env.env;
-                let bind_id = env.clone_node(id);
                 match fn_exp.as_ref() {
                     ExpData::Value(_, ast::Value::Function(..)) => {
+                        let env = self.fun_env.module_env.env;
+                        let bind_id = env.clone_node(id);
                         new_args.insert(0, fn_exp);
+                        let ty_params = self.fun_env.get_type_parameters_ref();
+                        let ability_inferer = AbilityInferer::new(env, ty_params);
+                        let bound_value_abilities: Vec<_> = new_args
+                            .iter()
+                            .map(|exp| {
+                                let node = exp.as_ref().node_id();
+                                let ty = env.get_node_type(node);
+                                let node_abilities = ability_inferer.infer_abilities(&ty).1;
+                                (env.get_node_loc(node), node_abilities)
+                            })
+                            .collect();
+                        let bound_value_missing_abilities: Vec<_> = bound_value_abilities
+                            .iter()
+                            .filter_map(|(loc, node_abilities)| {
+                                if !abilities.is_subset(*node_abilities) {
+                                    let missing = abilities.setminus(*node_abilities);
+                                    Some((
+                                        loc.clone(),
+                                        format!(
+                                            "Captured free value is missing abilities: {}",
+                                            missing
+                                        ),
+                                    ))
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+                        let closure_abilities = bound_value_abilities.iter()
+                            .map(|(_loc, node_abilities)| *node_abilities)
+                            .reduce(|abs1, abs2| abs1.intersect(abs2))
+                            .unwrap_or(AbilitySet::PRIMITIVES)  // no bound vars, can assume anything.
+                            | AbilitySet::FUNCTIONS;
+                        if !bound_value_missing_abilities.is_empty() {
+                            let missing_abilities = abilities.setminus(closure_abilities);
+                            let loc = env.get_node_loc(id);
+                            env.error_with_labels(
+                                &loc,
+                                &format!("Lambda captures free variables with types that do not have some declared abilities: {}",
+                                         missing_abilities),
+                                bound_value_missing_abilities);
+                            return None;
+                        };
                         return Some(
                             ExpData::Call(bind_id, Operation::Bind(mask), new_args).into_exp(),
                         );
@@ -661,7 +705,8 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         //   - each lambda parameter used exactly once as a call argument, in order (possibly with gaps)
         //   - every other argument is a simple expression containing only constants and free variables
         if bindings.is_empty() {
-            let possible_curry_exp = self.try_to_reduce_lambda_to_curry(id, body, lambda_params);
+            let possible_curry_exp =
+                self.try_to_reduce_lambda_to_curry(id, body, lambda_params, &abilities);
             if possible_curry_exp.is_some() {
                 return possible_curry_exp;
             }

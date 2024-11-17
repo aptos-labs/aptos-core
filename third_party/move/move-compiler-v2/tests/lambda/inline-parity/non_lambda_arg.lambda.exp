@@ -404,13 +404,3 @@ error: local `a_less_b` of type `|(T, T)|bool` does not have the `copy` ability
    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ copy needed here because value is still in use
 13 │             incorrect_sort_recursive(arr, pi + 1, high, a_less_b);
    │             ----------------------------------------------------- used here
-
-error: local `a_less_b` of type `|(T, T)|bool` does not have the `drop` ability
-   ┌─ tests/lambda/inline-parity/non_lambda_arg.move:10:9
-   │
-10 │ ╭         if (low < high) {
-11 │ │             let pi = low + high / 2;
-12 │ │             incorrect_sort_recursive(arr, low, pi - 1, a_less_b);
-13 │ │             incorrect_sort_recursive(arr, pi + 1, high, a_less_b);
-14 │ │         };
-   │ ╰─────────^ implicitly dropped here since it is no longer used

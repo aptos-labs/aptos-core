@@ -854,7 +854,7 @@ impl AbilitySet {
     /// The empty ability set
     pub const EMPTY: Self = Self(0);
     /// Abilities for `Functions`
-    pub const FUNCTIONS: AbilitySet = Self(0);
+    pub const FUNCTIONS: AbilitySet = Self(Ability::Drop as u8);
     /// Abilities for `Bool`, `U8`, `U64`, `U128`, and `Address`
     pub const PRIMITIVES: AbilitySet =
         Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));
