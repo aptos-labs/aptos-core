@@ -808,11 +808,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             epoch = epoch_state.epoch,
             validators = epoch_state.verifier.to_string(),
             root_block = %recovery_data.root_block(),
-            id = id,
+            round_manager_id = id,
             "Starting new epoch",
         );
 
-        info!(epoch = epoch, "Update SafetyRules");
+        info!(epoch = epoch, round_manager_id = id, "Update SafetyRules");
 
         let mut safety_rules =
             MetricsSafetyRules::new(self.safety_rules_manager.client(), self.storage.clone());
@@ -834,11 +834,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             Ok(()) => (),
         }
 
-        info!(epoch = epoch, "Create RoundState");
+        info!(epoch = epoch, round_manager_id = id, "Create RoundState", );
         let round_state =
             self.create_round_state(self.time_service.clone(), self.timeout_sender.clone());
 
-        info!(epoch = epoch, "Create ProposerElection");
+        info!(epoch = epoch, round_manager_id = id, "Create ProposerElection", );
         let proposer_election =
             self.create_proposer_election(&epoch_state, &onchain_consensus_config);
         let chain_health_backoff_config =
@@ -885,7 +885,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
 
 
-        info!(epoch = epoch, "Create BlockStore");
+        info!(epoch = epoch, round_manager_id = id, "Create BlockStore", );
         // Read the last vote, before "moving" `recovery_data`
         let last_vote = recovery_data.last_vote();
         let block_store = Arc::new(BlockStore::new(
@@ -1825,14 +1825,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     fn process_local_timeout(&mut self, round: u64) {
         let Some(sender) = self.round_manager_tx.as_mut() else {
             warn!(
-                "Received local timeout for round {} without Round Manager",
-                round
-            );
-            return;
-        };
-        let Some(sender_1) = self.round_manager_tx_1.as_mut() else {
-            warn!(
-                "Received local timeout for round {} without Round Manager",
+                "Received local timeout for round {} without Round Manager with id 0",
                 round
             );
             return;
@@ -1841,11 +1834,20 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let peer_id = self.author;
         let event = VerifiedEvent::LocalTimeout(round);
         if let Err(e) = sender.push((peer_id, discriminant(&event)), (peer_id, event)) {
-            error!("Failed to send event to round manager {:?}", e);
+            error!("Failed to send event to round manager with id 0 {:?} ", e);
         }
+
+        let Some(sender_1) = self.round_manager_tx_1.as_mut() else {
+            warn!(
+                "Received local timeout for round {} without Round Manager with id 0",
+                round
+            );
+            return;
+        };
+
         let event = VerifiedEvent::LocalTimeout(round);
         if let Err(e) = sender_1.push((peer_id, discriminant(&event)), (peer_id, event)) {
-            error!("Failed to send event to round manager {:?}", e);
+            error!("Failed to send event to round manager with id 1 {:?} ", e);
         }
     }
 

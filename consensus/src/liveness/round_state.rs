@@ -235,7 +235,7 @@ impl RoundState {
         if round != self.current_round {
             return false;
         }
-        warn!(round = round, "Local timeout");
+        warn!(round = round, current_round = self.current_round, "Local timeout");
         counters::TIMEOUT_COUNT.inc();
         self.setup_timeout(1);
         true

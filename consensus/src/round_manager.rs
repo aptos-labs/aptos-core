@@ -303,7 +303,7 @@ impl RoundManager {
             .gauge("decoupled_execution")
             .set(onchain_config.decoupled_execution() as i64);
         let vtxn_config = onchain_config.effective_validator_txn_config();
-        debug!("vtxn_config={:?}", vtxn_config);
+        debug!(round_manager_id = id, "vtxn_config={:?}", vtxn_config);
         Self {
             epoch_state,
             block_store,
@@ -399,7 +399,8 @@ impl RoundManager {
         };
         info!(
             self.new_log(LogEvent::NewRound),
-            reason = new_round_event.reason
+            reason = new_round_event.reason,
+            round_manager_id = self.id
         );
         self.pending_order_votes
             .garbage_collect(self.block_store.sync_info().highest_ordered_round());
@@ -594,6 +595,7 @@ impl RoundManager {
             Block::new_proposal_from_block_data_and_signature(proposal, signature);
         observe_block(signed_proposal.timestamp_usecs(), BlockStage::SIGNED);
         info!(
+            round_manager_id = id,
             Self::new_log_with_round_epoch(
                 LogEvent::Propose,
                 new_round_event.round,
@@ -622,6 +624,7 @@ impl RoundManager {
             block_round = proposal_msg.proposal().round(),
             block_hash = proposal_msg.proposal().id(),
             block_parent_hash = proposal_msg.proposal().quorum_cert().certified_block().id(),
+            round_manager_id = self.id
         );
 
         let in_correct_round = self
@@ -667,7 +670,8 @@ impl RoundManager {
             info!(
                 self.new_log(LogEvent::ReceiveNewCertificate)
                     .remote_peer(author),
-                "Local state {},\n remote state {}", local_sync_info, sync_info
+                round_manager_id = self.id,
+                "Local state {},\n remote state {}", local_sync_info, sync_info,
             );
             // Some information in SyncInfo is ahead of what we have locally.
             // First verify the SyncInfo (didn't verify it in the yet).
@@ -731,7 +735,8 @@ impl RoundManager {
         });
         info!(
             self.new_log(LogEvent::ReceiveSyncInfo).remote_peer(peer),
-            "{}", sync_info
+            round_manager_id = self.id,
+            "{}", sync_info,
         );
         self.ensure_round_and_sync_up(checked!((sync_info.highest_round()) + 1)?, &sync_info, peer)
             .await
@@ -740,6 +745,9 @@ impl RoundManager {
     }
 
     fn sync_only(&self) -> bool {
+        if self.id != 0 {
+            return false;
+        }
         let sync_or_not = self.local_config.sync_only || self.block_store.vote_back_pressure();
         if self.block_store.vote_back_pressure() {
             warn!("Vote back pressure is set");
@@ -781,11 +789,13 @@ impl RoundManager {
             return Ok(());
         }
 
+        info!(round_manager_id = self.id, "timeout round: {}, current round:{}", round, self.round_state.current_round());
+
         if self.sync_only() {
             self.network
                 .broadcast_sync_info(self.block_store.sync_info(), self.id)
                 .await;
-            bail!("[RoundManager] sync_only flag is set, broadcasting SyncInfo");
+            bail!("[RoundManager] sync_only flag is set, broadcasting SyncInfo at round manager:{}", self.id);
         }
 
         if self.local_config.enable_round_timeout_msg {
@@ -823,6 +833,7 @@ impl RoundManager {
                 .await;
             warn!(
                 round = round,
+                round_manager_id = self.id,
                 remote_peer = self.proposer_election.get_valid_proposer(round),
                 event = LogEvent::Timeout,
             );
@@ -839,7 +850,8 @@ impl RoundManager {
                         .generate_nil_block(round, self.proposer_election.clone())?;
                     info!(
                         self.new_log(LogEvent::VoteNIL),
-                        "Planning to vote for a NIL block {}", nil_block
+                        round_manager_id = self.id,
+                        "Planning to vote for a NIL block {}", nil_block,
                     );
                     counters::VOTE_NIL_COUNT.inc();
                     let nil_vote = self.vote_block(nil_block).await?;
@@ -938,6 +950,7 @@ impl RoundManager {
             .with_label_values(&[&author_hex])
             .inc_by(validator_txns_total_bytes);
         info!(
+            round_manager_id = self.id,
             vtxn_count_limit = vtxn_count_limit,
             vtxn_count_proposed = num_validator_txns,
             vtxn_bytes_limit = vtxn_bytes_limit,
@@ -1024,7 +1037,7 @@ impl RoundManager {
 
         let block_store = self.block_store.clone();
         if block_store.check_payload(&proposal).is_err() {
-            debug!("Payload not available locally for block: {}", proposal.id());
+            debug!(round_manager_id = self.id, "Payload not available locally for block: {}", proposal.id());
             counters::CONSENSUS_PROPOSAL_PAYLOAD_AVAILABILITY
                 .with_label_values(&["missing"])
                 .inc();
@@ -1116,7 +1129,7 @@ impl RoundManager {
                 let fast_share = FastShare::new(self_share);
                 info!(LogSchema::new(LogEvent::BroadcastRandShareFastPath)
                     .epoch(fast_share.epoch())
-                    .round(fast_share.round()));
+                    .round(fast_share.round()), round_manager_id = self.id,);
                 self.network.broadcast_fast_share(fast_share, self.id).await;
                 self.blocks_with_broadcasted_fast_shares
                     .put(block_info.id(), ());
@@ -1153,7 +1166,8 @@ impl RoundManager {
             .await;
 
         if self.local_config.broadcast_vote {
-            info!(self.new_log(LogEvent::Vote), "{}", vote);
+            info!(self.new_log(LogEvent::Vote),
+            round_manager_id = self.id, "{}", vote);
             PROPOSAL_VOTE_BROADCASTED.inc();
             self.network.broadcast_vote(vote_msg, self.id).await;
         } else {
@@ -1162,6 +1176,7 @@ impl RoundManager {
                 .get_valid_proposer(proposal_round + 1);
             info!(
                 self.new_log(LogEvent::Vote).remote_peer(recipient),
+                round_manager_id = self.id,
                 "{}", vote
             );
             self.network.send_vote(vote_msg, vec![recipient], self.id).await;
@@ -1226,6 +1241,7 @@ impl RoundManager {
                 epoch = order_vote.ledger_info().epoch(),
                 round = order_vote.ledger_info().round(),
                 id = order_vote.ledger_info().consensus_block_id(),
+                round_manager_id = self.id,
             );
 
             if self
@@ -1275,12 +1291,14 @@ impl RoundManager {
                 sample!(
                     SampleRate::Duration(Duration::from_secs(1)),
                     info!(
+                        round_manager_id = self.id,
                         "[sampled] Received an order vote not in the 100 rounds. Order vote round: {:?}, Highest ordered round: {:?}",
                         order_vote_msg.order_vote().ledger_info().round(),
                         self.block_store.sync_info().highest_ordered_round()
                     )
                 );
                 debug!(
+                    round_manager_id = self.id,
                     "Received an order vote not in the next 100 rounds. Order vote round: {:?}, Highest ordered round: {:?}",
                     order_vote_msg.order_vote().ledger_info().round(),
                     self.block_store.sync_info().highest_ordered_round()
@@ -1336,6 +1354,7 @@ impl RoundManager {
             let order_vote_msg = OrderVoteMsg::new(order_vote, qc.as_ref().clone());
             info!(
                 self.new_log(LogEvent::BroadcastOrderVote),
+                round_manager_id = self.id,
                 "{}", order_vote_msg
             );
             self.network.broadcast_order_vote(order_vote_msg, self.id).await;
@@ -1388,6 +1407,7 @@ impl RoundManager {
                 id = vote.vote_data().proposed().id(),
                 state = vote.vote_data().proposed().executed_state_id(),
                 is_timeout = vote.is_timeout(),
+                round_manager_id = self.id,
             );
         } else {
             debug!(
@@ -1396,6 +1416,7 @@ impl RoundManager {
                 epoch = vote.vote_data().proposed().epoch(),
                 round = vote.vote_data().proposed().round(),
                 id = vote.vote_data().proposed().id(),
+                round_manager_id = self.id
             );
         }
 
@@ -1475,6 +1496,7 @@ impl RoundManager {
                 self.new_2chain_tc_aggregated(tc).await
             },
             VoteReceptionResult::EchoTimeout(_) if !self.round_state.is_timeout_sent() => {
+                info!(round_manager_id = self.id, "process_vote_reception_result: VoteReceptionResult::EchoTimeout");
                 self.process_local_timeout(round).await
             },
             VoteReceptionResult::VoteAdded(_) => {
@@ -1497,6 +1519,7 @@ impl RoundManager {
                 self.new_2chain_tc_aggregated(tc).await
             },
             VoteReceptionResult::EchoTimeout(_) if !self.round_state.is_timeout_sent() => {
+                info!(round_manager_id = self.id, "process_timeout_reception_result: VoteReceptionResult::EchoTimeout");
                 self.process_local_timeout(round).await
             },
             VoteReceptionResult::VoteAdded(_) | VoteReceptionResult::EchoTimeout(_) => Ok(()),
@@ -1541,6 +1564,7 @@ impl RoundManager {
             vote = %timeout,
             epoch = timeout.epoch(),
             round = timeout.round(),
+            round_manager_id = self.id,
         );
 
         let vote_reception_result = self
@@ -1625,6 +1649,7 @@ impl RoundManager {
                 sample!(
                     SampleRate::Duration(Duration::from_millis(200)),
                     info!(
+                        round_manager_id = self.id,
                         "Ordered certificate created without block in block store: {:?}",
                         verified_qc.certified_block()
                     );
@@ -1724,7 +1749,7 @@ impl RoundManager {
         mut buffered_proposal_rx: aptos_channel::Receiver<Author, VerifiedEvent>,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
-        info!(epoch = self.epoch_state.epoch, "RoundManager started");
+        info!(epoch = self.epoch_state.epoch, round_manager_id = self.id, "RoundManager started");
         let mut close_rx = close_rx.into_stream();
         loop {
             tokio::select! {
@@ -1812,10 +1837,13 @@ impl RoundManager {
                                 self.process_sync_info_msg(*sync_info, peer_id).await
                             )
                         }
-                        VerifiedEvent::LocalTimeout(round) => monitor!(
+                        VerifiedEvent::LocalTimeout(round) => {
+                            info!(round_manager_id = self.id, "VerifiedEvent::LocalTimeout {}", round);
+                            monitor!(
                             "process_local_timeout",
                             self.process_local_timeout(round).await
-                        ),
+                        )
+                    },
                         unexpected_event => unreachable!("Unexpected event: {:?}", unexpected_event),
                     }
                     .with_context(|| format!("from peer {}", peer_id));
@@ -1825,13 +1853,13 @@ impl RoundManager {
                         Ok(_) => trace!(RoundStateLogSchema::new(round_state)),
                         Err(e) => {
                             counters::ERROR_COUNT.inc();
-                            warn!(kind = error_kind(&e), RoundStateLogSchema::new(round_state), "Error: {:#}", e);
+                            warn!(kind = error_kind(&e), round_manager_id = self.id, RoundStateLogSchema::new(round_state), "Error: {:#}", e);
                         }
                     }
                 },
             }
         }
-        info!(epoch = self.epoch_state.epoch, "RoundManager stopped");
+        info!(epoch = self.epoch_state.epoch, round_manager_id = self.id, "RoundManager stopped");
     }
 
     #[cfg(feature = "failpoints")]
