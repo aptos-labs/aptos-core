@@ -24,6 +24,16 @@ module aptos_framework::ethereum {
         EthereumAddress { inner: ethereum_address }
     }
 
+    /// Returns a new `EthereumAddress` without EIP-55 validation.
+    ///
+    /// @param ethereum_address A 40-byte vector of unsigned 8-bit integers (hexadecimal format).
+    /// @return A validated `EthereumAddress` struct.
+    /// @abort If the address does not conform to EIP-55 standards.
+    public fun ethereum_address_no_eip55(ethereum_address: vector<u8>): EthereumAddress {
+        assert_40_char_hex(&ethereum_address);
+        EthereumAddress { inner: ethereum_address }
+    }
+
     /// Converts uppercase ASCII characters in a vector to their lowercase equivalents.
     ///
     /// @param input A reference to a vector of ASCII characters.
@@ -94,6 +104,39 @@ module aptos_framework::ethereum {
         };
     }
 
+    /// Checks if an Ethereum address is a nonzero 40-character hexadecimal string.
+    ///
+    /// @param ethereum_address A reference to a vector of bytes representing the Ethereum address as characters.
+    /// @abort If the address is not 40 characters long, contains invalid characters, or is all zeros.
+    public fun assert_40_char_hex(ethereum_address: &vector<u8>) {
+        let len = vector::length(ethereum_address);
+
+        // Ensure the address is exactly 40 characters long
+        assert!(len == 40, 1);
+
+        // Ensure the address contains only valid hexadecimal characters
+        let is_zero = true;
+        for (index in 0..len) {
+            let char = *vector::borrow(ethereum_address, index);
+
+            // Check if the character is a valid hexadecimal character (0-9, a-f, A-F)
+            assert!(
+                (char >= 0x30 && char <= 0x39) || // '0' to '9'
+                (char >= 0x41 && char <= 0x46) || // 'A' to 'F'
+                (char >= 0x61 && char <= 0x66),  // 'a' to 'f'
+                2
+            );
+
+            // Check if the address is nonzero
+            if (char != 0x30) { // '0'
+                is_zero = false;
+            };
+        };
+
+        // Abort if the address is all zeros
+        assert!(!is_zero, 3);
+    }
+
     #[test_only]
     public fun valid_eip55(): vector<u8> {
         b"32Be343B94f860124dC4fEe278FDCBD38C102D88"
@@ -123,7 +166,7 @@ module aptos_framework::ethereum {
 }
 
 module aptos_framework::atomic_bridge_initiator {
-    use std::signer;
+    use aptos_framework::account;
     use aptos_framework::atomic_bridge;
     use aptos_framework::atomic_bridge_configuration;
     use aptos_framework::atomic_bridge_configuration::assert_is_caller_operator;
@@ -131,7 +174,8 @@ module aptos_framework::atomic_bridge_initiator {
     use aptos_framework::atomic_bridge_store::{create_hashlock, bridge_transfer_id};
     use aptos_framework::ethereum;
     use aptos_framework::ethereum::EthereumAddress;
-    use aptos_framework::event;
+    use aptos_framework::event::{Self, EventHandle}; 
+    use aptos_framework::signer;
     #[test_only]
     use std::vector;
     #[test_only]
@@ -168,6 +212,22 @@ module aptos_framework::atomic_bridge_initiator {
         bridge_transfer_id: vector<u8>,
     }
 
+    /// This struct will store the event handles for bridge events.
+    struct BridgeInitiatorEvents has key, store {
+        bridge_transfer_initiated_events: EventHandle<BridgeTransferInitiatedEvent>,
+        bridge_transfer_completed_events: EventHandle<BridgeTransferCompletedEvent>,
+        bridge_transfer_refunded_events: EventHandle<BridgeTransferRefundedEvent>,
+    }
+
+    /// Initializes the module and stores the `EventHandle`s in the resource.
+    public fun initialize(aptos_framework: &signer) {
+        move_to(aptos_framework, BridgeInitiatorEvents {
+            bridge_transfer_initiated_events: account::new_event_handle<BridgeTransferInitiatedEvent>(aptos_framework),
+            bridge_transfer_completed_events: account::new_event_handle<BridgeTransferCompletedEvent>(aptos_framework),
+            bridge_transfer_refunded_events: account::new_event_handle<BridgeTransferRefundedEvent>(aptos_framework),
+        });
+    }
+
     /// Initiate a bridge transfer of ETH from Movement to the base layer
     /// Anyone can initiate a bridge transfer from the source chain
     /// The amount is burnt from the initiator
@@ -176,8 +236,8 @@ module aptos_framework::atomic_bridge_initiator {
         recipient: vector<u8>,
         hash_lock: vector<u8>,
         amount: u64
-    ) {
-        let ethereum_address = ethereum::ethereum_address(recipient);
+    ) acquires BridgeInitiatorEvents {
+        let ethereum_address = ethereum::ethereum_address_no_eip55(recipient);
         let initiator_address = signer::address_of(initiator);
         let time_lock = atomic_bridge_configuration::initiator_timelock_duration();
 
@@ -193,7 +253,9 @@ module aptos_framework::atomic_bridge_initiator {
         atomic_bridge_store::add(bridge_transfer_id, details);
         atomic_bridge::burn(initiator_address, amount);
 
-        event::emit(
+        let bridge_initiator_events = borrow_global_mut<BridgeInitiatorEvents>(@aptos_framework);
+        event::emit_event(
+            &mut bridge_initiator_events.bridge_transfer_initiated_events,
             BridgeTransferInitiatedEvent {
                 bridge_transfer_id,
                 initiator: initiator_address,
@@ -206,15 +268,17 @@ module aptos_framework::atomic_bridge_initiator {
     }
 
     /// Bridge operator can complete the transfer
-    public entry fun complete_bridge_transfer(
+    public entry fun complete_bridge_transfer (
         caller: &signer,
         bridge_transfer_id: vector<u8>,
         pre_image: vector<u8>,
-    ) {
+    ) acquires BridgeInitiatorEvents {
         assert_is_caller_operator(caller);
         let (_, _) = atomic_bridge_store::complete_transfer<address, EthereumAddress>(bridge_transfer_id, create_hashlock(pre_image));
 
-        event::emit(
+        let bridge_initiator_events = borrow_global_mut<BridgeInitiatorEvents>(@aptos_framework);
+        event::emit_event(
+            &mut bridge_initiator_events.bridge_transfer_completed_events,
             BridgeTransferCompletedEvent {
                 bridge_transfer_id,
                 pre_image,
@@ -223,14 +287,16 @@ module aptos_framework::atomic_bridge_initiator {
     }
 
     /// Anyone can refund the transfer on the source chain once time lock has passed
-    public entry fun refund_bridge_transfer(
+    public entry fun refund_bridge_transfer (
         _caller: &signer,
         bridge_transfer_id: vector<u8>,
-    ) {
+    ) acquires BridgeInitiatorEvents {
         let (receiver, amount) = atomic_bridge_store::cancel_transfer<address, EthereumAddress>(bridge_transfer_id);
         atomic_bridge::mint(receiver, amount);
 
-        event::emit(
+        let bridge_initiator_events = borrow_global_mut<BridgeInitiatorEvents>(@aptos_framework);
+        event::emit_event(
+            &mut bridge_initiator_events.bridge_transfer_refunded_events,
             BridgeTransferRefundedEvent {
                 bridge_transfer_id,
             },
@@ -241,11 +307,12 @@ module aptos_framework::atomic_bridge_initiator {
     fun test_initiate_bridge_transfer(
         sender: &signer,
         aptos_framework: &signer,
-    ) {
+    ) acquires BridgeInitiatorEvents {
         let sender_address = signer::address_of(sender);
         // Create an account for our recipient
         atomic_bridge::initialize_for_test(aptos_framework);
         aptos_account::create_account(sender_address);
+        initialize(aptos_framework);
 
         let recipient = valid_eip55();
         let hash_lock = valid_hash_lock();
@@ -266,7 +333,12 @@ module aptos_framework::atomic_bridge_initiator {
 
         assert!(coin::balance<AptosCoin>(sender_address) == 1, 0);
 
-        let bridge_transfer_initiated_event = vector::borrow(&event::emitted_events<BridgeTransferInitiatedEvent>(), 0);
+        let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(@aptos_framework);
+        let bridge_transfer_initiated_events = event::emitted_events_by_handle(
+            &bridge_initiator_events.bridge_transfer_initiated_events
+        );   
+        let bridge_transfer_initiated_event = vector::borrow(&bridge_transfer_initiated_events, 0);
+
         assert_valid_bridge_transfer_id(&bridge_transfer_initiated_event.bridge_transfer_id);
         assert!(bridge_transfer_initiated_event.recipient == recipient, 0);
         assert!(bridge_transfer_initiated_event.amount == amount, 0);
@@ -280,7 +352,7 @@ module aptos_framework::atomic_bridge_initiator {
     fun test_initiate_bridge_transfer_insufficient_balance(
         sender: &signer,
         aptos_framework: &signer,
-    ) {
+    ) acquires BridgeInitiatorEvents {
         let sender_address = signer::address_of(sender);
         // Create an account for our recipient
         atomic_bridge::initialize_for_test(aptos_framework);
@@ -302,10 +374,11 @@ module aptos_framework::atomic_bridge_initiator {
     fun test_complete_bridge_transfer(
         sender: &signer,
         aptos_framework: &signer
-    ) {
+    ) acquires BridgeInitiatorEvents {
         let sender_address = signer::address_of(sender);
         // Create an account for our recipient
         atomic_bridge::initialize_for_test(aptos_framework);
+        initialize(aptos_framework);
         aptos_account::create_account(sender_address);
 
         let recipient = valid_eip55();
@@ -326,7 +399,13 @@ module aptos_framework::atomic_bridge_initiator {
             amount
         );
 
-        let bridge_transfer_id = vector::borrow(&event::emitted_events<BridgeTransferInitiatedEvent>(), 0).bridge_transfer_id;
+        let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(@aptos_framework);
+        let bridge_transfer_initiated_events = event::emitted_events_by_handle(
+            &bridge_initiator_events.bridge_transfer_initiated_events
+        );   
+        let bridge_transfer_initiated_event = vector::borrow(&bridge_transfer_initiated_events, 0);
+
+        let bridge_transfer_id = bridge_transfer_initiated_event.bridge_transfer_id;
 
         complete_bridge_transfer(
             aptos_framework,
@@ -334,13 +413,14 @@ module aptos_framework::atomic_bridge_initiator {
             plain_secret(),
         );
 
-        assert!(
-            event::was_event_emitted<BridgeTransferCompletedEvent>(
-                &BridgeTransferCompletedEvent {
-                    bridge_transfer_id,
-                    pre_image: plain_secret(),
-                }
-            ), 0);
+        let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(signer::address_of(aptos_framework));
+        let complete_events = event::emitted_events_by_handle(&bridge_initiator_events.bridge_transfer_completed_events);
+        let expected_event = BridgeTransferCompletedEvent {
+            bridge_transfer_id,
+            pre_image: plain_secret(),
+        };
+        assert!(std::vector::contains(&complete_events, &expected_event), 0);
+
     }
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
@@ -348,10 +428,11 @@ module aptos_framework::atomic_bridge_initiator {
     fun test_complete_bridge_transfer_by_sender(
         sender: &signer,
         aptos_framework: &signer
-    ) {
+    ) acquires BridgeInitiatorEvents {
         let sender_address = signer::address_of(sender);
         // Create an account for our recipient
         atomic_bridge::initialize_for_test(aptos_framework);
+        initialize(aptos_framework);
         aptos_account::create_account(sender_address);
 
         let recipient = valid_eip55();
@@ -371,7 +452,13 @@ module aptos_framework::atomic_bridge_initiator {
             amount
         );
 
-        let bridge_transfer_id = vector::borrow(&event::emitted_events<BridgeTransferInitiatedEvent>(), 0).bridge_transfer_id;
+        let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(@aptos_framework);
+        let bridge_transfer_initiated_events = event::emitted_events_by_handle(
+            &bridge_initiator_events.bridge_transfer_initiated_events
+        );   
+        let bridge_transfer_initiated_event = vector::borrow(&bridge_transfer_initiated_events, 0);
+
+        let bridge_transfer_id = bridge_transfer_initiated_event.bridge_transfer_id;
 
         complete_bridge_transfer(
             sender,
@@ -385,10 +472,11 @@ module aptos_framework::atomic_bridge_initiator {
     fun test_complete_bridge_transfer_with_invalid_preimage(
         sender: &signer,
         aptos_framework: &signer
-    ) {
+    ) acquires BridgeInitiatorEvents {
         let sender_address = signer::address_of(sender);
         // Create an account for our recipient
         atomic_bridge::initialize_for_test(aptos_framework);
+        initialize(aptos_framework);
         aptos_account::create_account(sender_address);
 
         let recipient = valid_eip55();
@@ -408,7 +496,13 @@ module aptos_framework::atomic_bridge_initiator {
             amount
         );
 
-        let bridge_transfer_id = vector::borrow(&event::emitted_events<BridgeTransferInitiatedEvent>(), 0).bridge_transfer_id;
+        let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(@aptos_framework);
+        let bridge_transfer_initiated_events = event::emitted_events_by_handle(
+            &bridge_initiator_events.bridge_transfer_initiated_events
+        );   
+        let bridge_transfer_initiated_event = vector::borrow(&bridge_transfer_initiated_events, 0);
+
+        let bridge_transfer_id = bridge_transfer_initiated_event.bridge_transfer_id;
 
         complete_bridge_transfer(
             aptos_framework,
@@ -422,7 +516,7 @@ module aptos_framework::atomic_bridge_initiator {
     fun test_complete_bridge_with_errorneous_bridge_id_by_operator(
         sender: &signer,
         aptos_framework: &signer
-    ) {
+    ) acquires BridgeInitiatorEvents {
         let sender_address = signer::address_of(sender);
         // Create an account for our recipient
         atomic_bridge::initialize_for_test(aptos_framework);
@@ -442,10 +536,11 @@ module aptos_framework::atomic_bridge_initiator {
     fun test_refund_bridge_transfer(
         sender: &signer,
         aptos_framework: &signer
-    ) {
+    ) acquires BridgeInitiatorEvents {
         let sender_address = signer::address_of(sender);
         // Create an account for our recipient
         atomic_bridge::initialize_for_test(aptos_framework);
+        initialize(aptos_framework);
         aptos_account::create_account(sender_address);
 
         let recipient = valid_eip55();
@@ -467,7 +562,13 @@ module aptos_framework::atomic_bridge_initiator {
 
         assert!(coin::balance<AptosCoin>(sender_address) == account_balance - amount, 0);
 
-        let bridge_transfer_id = vector::borrow(&event::emitted_events<BridgeTransferInitiatedEvent>(), 0).bridge_transfer_id;
+        let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(@aptos_framework);
+        let bridge_transfer_initiated_events = event::emitted_events_by_handle(
+            &bridge_initiator_events.bridge_transfer_initiated_events
+        );   
+        let bridge_transfer_initiated_event = vector::borrow(&bridge_transfer_initiated_events, 0);
+
+        let bridge_transfer_id = bridge_transfer_initiated_event.bridge_transfer_id;
 
         timestamp::fast_forward_seconds(atomic_bridge_configuration::initiator_timelock_duration() + 1);
 
@@ -475,12 +576,12 @@ module aptos_framework::atomic_bridge_initiator {
 
         assert!(coin::balance<AptosCoin>(sender_address) == account_balance, 0);
 
-        assert!(
-            event::was_event_emitted<BridgeTransferRefundedEvent>(
-                &BridgeTransferRefundedEvent {
-                    bridge_transfer_id,
-                }
-            ), 0);
+        let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(signer::address_of(aptos_framework));
+        let refund_events = event::emitted_events_by_handle(&bridge_initiator_events.bridge_transfer_refunded_events);
+        let expected_event = BridgeTransferRefundedEvent { bridge_transfer_id };
+        let was_event_emitted = std::vector::contains(&refund_events, &expected_event);
+        
+        assert!(was_event_emitted, 0);
     }
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
@@ -488,10 +589,11 @@ module aptos_framework::atomic_bridge_initiator {
     fun test_refund_bridge_transfer_before_timelock(
         sender: &signer,
         aptos_framework: &signer
-    ) {
+    ) acquires BridgeInitiatorEvents {
         let sender_address = signer::address_of(sender);
         // Create an account for our recipient
         atomic_bridge::initialize_for_test(aptos_framework);
+        initialize(aptos_framework);
         aptos_account::create_account(sender_address);
 
         let recipient = valid_eip55();
@@ -513,7 +615,14 @@ module aptos_framework::atomic_bridge_initiator {
 
         assert!(coin::balance<AptosCoin>(sender_address) == account_balance - amount, 0);
 
-        let bridge_transfer_id = vector::borrow(&event::emitted_events<BridgeTransferInitiatedEvent>(), 0).bridge_transfer_id;
+
+        let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(@aptos_framework);
+        let bridge_transfer_initiated_events = event::emitted_events_by_handle(
+            &bridge_initiator_events.bridge_transfer_initiated_events
+        );   
+        let bridge_transfer_initiated_event = vector::borrow(&bridge_transfer_initiated_events, 0);
+
+        let bridge_transfer_id = bridge_transfer_initiated_event.bridge_transfer_id;
 
         refund_bridge_transfer(sender, bridge_transfer_id);
     }
@@ -526,7 +635,6 @@ module aptos_framework::atomic_bridge_store {
     use aptos_std::aptos_hash::keccak256;
     use aptos_std::smart_table;
     use aptos_std::smart_table::SmartTable;
-    use aptos_framework::atomic_bridge_configuration;
     use aptos_framework::ethereum::EthereumAddress;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
@@ -540,6 +648,8 @@ module aptos_framework::atomic_bridge_store {
     use std::hash::sha3_256;
     #[test_only]
     use aptos_framework::ethereum;
+    #[test_only]
+    use aptos_framework::atomic_bridge_configuration;
 
     /// Error codes
     const EINVALID_PRE_IMAGE : u64 = 0x1;
@@ -828,24 +938,24 @@ module aptos_framework::atomic_bridge_store {
         keccak256(combined_bytes)
     }
 
+    #[view]
     /// Gets initiator bridge transfer details given a bridge transfer ID
     ///
     /// @param bridge_transfer_id A 32-byte vector of unsigned 8-bit integers.
     /// @return A `BridgeTransferDetails` struct.
     /// @abort If there is no transfer in the atomic bridge store.
-    #[view]
     public fun get_bridge_transfer_details_initiator(
         bridge_transfer_id: vector<u8>
     ): BridgeTransferDetails<address, EthereumAddress> acquires SmartTableWrapper {
         get_bridge_transfer_details(bridge_transfer_id)
     }
-
+    
+    #[view]
     /// Gets counterparty bridge transfer details given a bridge transfer ID
     ///
     /// @param bridge_transfer_id A 32-byte vector of unsigned 8-bit integers.
     /// @return A `BridgeTransferDetails` struct.
     /// @abort If there is no transfer in the atomic bridge store.
-    #[view]
     public fun get_bridge_transfer_details_counterparty(
         bridge_transfer_id: vector<u8>
     ): BridgeTransferDetails<EthereumAddress, address> acquires SmartTableWrapper {
@@ -1037,7 +1147,8 @@ module aptos_framework::atomic_bridge_configuration {
     /// @param aptos_framework The signer representing the Aptos framework.
     /// @param new_operator The new address to be set as the bridge operator.
     /// @abort If the current operator is the same as the new operator.
-    public fun update_bridge_operator(aptos_framework: &signer, new_operator: address) acquires BridgeConfig {
+    public fun update_bridge_operator(aptos_framework: &signer, new_operator: address
+    )   acquires BridgeConfig {
         system_addresses::assert_aptos_framework(aptos_framework);
         let bridge_config = borrow_global_mut<BridgeConfig>(@aptos_framework);
         let old_operator = bridge_config.bridge_operator;
@@ -1053,7 +1164,8 @@ module aptos_framework::atomic_bridge_configuration {
         );
     }
 
-    public fun set_initiator_time_lock_duration(aptos_framework: &signer, time_lock: u64) acquires BridgeConfig {
+    public fun set_initiator_time_lock_duration(aptos_framework: &signer, time_lock: u64
+    ) acquires BridgeConfig {
         system_addresses::assert_aptos_framework(aptos_framework);
         borrow_global_mut<BridgeConfig>(@aptos_framework).initiator_time_lock = time_lock;
 
@@ -1064,7 +1176,8 @@ module aptos_framework::atomic_bridge_configuration {
         );
     }
 
-    public fun set_counterparty_time_lock_duration(aptos_framework: &signer, time_lock: u64) acquires BridgeConfig {
+    public fun set_counterparty_time_lock_duration(aptos_framework: &signer, time_lock: u64
+    ) acquires BridgeConfig {
         system_addresses::assert_aptos_framework(aptos_framework);
         borrow_global_mut<BridgeConfig>(@aptos_framework).counterparty_time_lock = time_lock;
 
@@ -1097,7 +1210,8 @@ module aptos_framework::atomic_bridge_configuration {
     ///
     /// @param caller The signer whose authority is being checked.
     /// @abort If the caller is not the current bridge operator.
-    public(friend) fun assert_is_caller_operator(caller: &signer) acquires BridgeConfig {
+    public(friend) fun assert_is_caller_operator(caller: &signer
+    ) acquires BridgeConfig {
         assert!(borrow_global<BridgeConfig>(@aptos_framework).bridge_operator == signer::address_of(caller), EINVALID_BRIDGE_OPERATOR);
     }
 
@@ -1110,7 +1224,8 @@ module aptos_framework::atomic_bridge_configuration {
 
     #[test(aptos_framework = @aptos_framework, new_operator = @0xcafe)]
     /// Tests updating the bridge operator and emitting the corresponding event.
-    fun test_update_bridge_operator(aptos_framework: &signer, new_operator: address) acquires BridgeConfig {
+    fun test_update_bridge_operator(aptos_framework: &signer, new_operator: address
+    ) acquires BridgeConfig {
         initialize(aptos_framework);
         update_bridge_operator(aptos_framework, new_operator);
 
@@ -1128,7 +1243,8 @@ module aptos_framework::atomic_bridge_configuration {
     #[test(aptos_framework = @aptos_framework, bad = @0xbad, new_operator = @0xcafe)]
     #[expected_failure(abort_code = 0x50003, location = 0x1::system_addresses)]
     /// Tests that updating the bridge operator with an invalid signer fails.
-    fun test_failing_update_bridge_operator(aptos_framework: &signer, bad: &signer, new_operator: address) acquires BridgeConfig {
+    fun test_failing_update_bridge_operator(aptos_framework: &signer, bad: &signer, new_operator: address
+    ) acquires BridgeConfig {
         initialize(aptos_framework);
         update_bridge_operator(bad, new_operator);
     }
@@ -1301,14 +1417,14 @@ module aptos_framework::atomic_bridge {
 }
 
 module aptos_framework::atomic_bridge_counterparty {
-    use std::event;
+    use aptos_framework::account;
     use aptos_framework::atomic_bridge;
     use aptos_framework::atomic_bridge_configuration;
     use aptos_framework::atomic_bridge_store;
     use aptos_framework::atomic_bridge_store::create_hashlock;
     use aptos_framework::ethereum;
     use aptos_framework::ethereum::EthereumAddress;
-
+    use aptos_framework::event::{Self, EventHandle}; 
     #[test_only]
     use aptos_framework::aptos_account;
     #[test_only]
@@ -1317,6 +1433,8 @@ module aptos_framework::atomic_bridge_counterparty {
     use aptos_framework::atomic_bridge_store::{valid_bridge_transfer_id, valid_hash_lock, plain_secret};
     #[test_only]
     use aptos_framework::ethereum::valid_eip55;
+    #[test_only]
+    use aptos_framework::signer;
     #[test_only]
     use aptos_framework::timestamp;
 
@@ -1344,6 +1462,22 @@ module aptos_framework::atomic_bridge_counterparty {
         bridge_transfer_id: vector<u8>,
     }
 
+    /// This struct will store the event handles for bridge events.
+    struct BridgeCounterpartyEvents has key, store {
+        bridge_transfer_locked_events: EventHandle<BridgeTransferLockedEvent>,
+        bridge_transfer_completed_events: EventHandle<BridgeTransferCompletedEvent>,
+        bridge_transfer_cancelled_events: EventHandle<BridgeTransferCancelledEvent>,
+    }
+
+    /// Initializes the module and stores the `EventHandle`s in the resource.
+    public fun initialize(aptos_framework: &signer) {
+        move_to(aptos_framework, BridgeCounterpartyEvents {
+            bridge_transfer_locked_events: account::new_event_handle<BridgeTransferLockedEvent>(aptos_framework),
+            bridge_transfer_completed_events: account::new_event_handle<BridgeTransferCompletedEvent>(aptos_framework),
+            bridge_transfer_cancelled_events: account::new_event_handle<BridgeTransferCancelledEvent>(aptos_framework),
+        });
+    }
+
     /// Locks assets for a bridge transfer by the initiator.
     ///
     /// @param caller The signer representing the bridge operator.
@@ -1354,16 +1488,16 @@ module aptos_framework::atomic_bridge_counterparty {
     /// @param recipient The address of the recipient on the Aptos blockchain.
     /// @param amount The amount of assets to be locked.
     /// @abort If the caller is not the bridge operator.
-    public entry fun lock_bridge_transfer_assets(
+    public entry fun lock_bridge_transfer_assets (
         caller: &signer,
         initiator: vector<u8>,
         bridge_transfer_id: vector<u8>,
         hash_lock: vector<u8>,
         recipient: address,
         amount: u64
-    ) {
+    ) acquires BridgeCounterpartyEvents {
         atomic_bridge_configuration::assert_is_caller_operator(caller);
-        let ethereum_address = ethereum::ethereum_address(initiator);
+        let ethereum_address = ethereum::ethereum_address_no_eip55(initiator);
         let time_lock = atomic_bridge_configuration::counterparty_timelock_duration();
         let details = atomic_bridge_store::create_details(
             ethereum_address,
@@ -1376,7 +1510,10 @@ module aptos_framework::atomic_bridge_counterparty {
         // bridge_store::add_counterparty(bridge_transfer_id, details);
         atomic_bridge_store::add(bridge_transfer_id, details);
 
-        event::emit(
+        let bridge_events = borrow_global_mut<BridgeCounterpartyEvents>(@aptos_framework);
+
+        event::emit_event(
+            &mut bridge_events.bridge_transfer_locked_events,
             BridgeTransferLockedEvent {
                 bridge_transfer_id,
                 initiator,
@@ -1393,10 +1530,10 @@ module aptos_framework::atomic_bridge_counterparty {
     /// @param bridge_transfer_id The unique identifier for the bridge transfer.
     /// @param pre_image The pre-image that matches the hash lock to complete the transfer.
     /// @abort If the caller is not the bridge operator or the hash lock validation fails.
-    public entry fun complete_bridge_transfer(
+    public entry fun complete_bridge_transfer (
         bridge_transfer_id: vector<u8>,
         pre_image: vector<u8>,
-    ) {
+    ) acquires BridgeCounterpartyEvents {
         let (recipient, amount) = atomic_bridge_store::complete_transfer<EthereumAddress, address>(
             bridge_transfer_id,
             create_hashlock(pre_image)
@@ -1404,8 +1541,10 @@ module aptos_framework::atomic_bridge_counterparty {
 
         // Mint, fails silently
         atomic_bridge::mint(recipient, amount);
-
-        event::emit(
+        
+        let bridge_counterparty_events = borrow_global_mut<BridgeCounterpartyEvents>(@aptos_framework);
+        event::emit_event(
+            &mut bridge_counterparty_events.bridge_transfer_completed_events,
             BridgeTransferCompletedEvent {
                 bridge_transfer_id,
                 pre_image,
@@ -1418,15 +1557,17 @@ module aptos_framework::atomic_bridge_counterparty {
     /// @param caller The signer representing the bridge operator.
     /// @param bridge_transfer_id The unique identifier for the bridge transfer.
     /// @abort If the caller is not the bridge operator or if the time lock has not expired.
-    public entry fun abort_bridge_transfer(
+    public entry fun abort_bridge_transfer (
         caller: &signer,
         bridge_transfer_id: vector<u8>
-    ) {
+    ) acquires BridgeCounterpartyEvents {
         atomic_bridge_configuration::assert_is_caller_operator(caller);
 
         atomic_bridge_store::cancel_transfer<EthereumAddress, address>(bridge_transfer_id);
 
-        event::emit(
+        let bridge_counterparty_events = borrow_global_mut<BridgeCounterpartyEvents>(@aptos_framework);
+        event::emit_event(
+            &mut bridge_counterparty_events.bridge_transfer_cancelled_events,
             BridgeTransferCancelledEvent {
                 bridge_transfer_id,
             },
@@ -1434,9 +1575,9 @@ module aptos_framework::atomic_bridge_counterparty {
     }
 
     #[test(aptos_framework = @aptos_framework)]
-    fun test_lock_assets(aptos_framework: &signer) {
+    fun test_lock_assets(aptos_framework: &signer) acquires BridgeCounterpartyEvents {
         initialize_for_test(aptos_framework);
-
+        initialize(aptos_framework);
         let initiator = valid_eip55();
         let bridge_transfer_id = valid_bridge_transfer_id();
         let hash_lock = valid_hash_lock();
@@ -1450,23 +1591,26 @@ module aptos_framework::atomic_bridge_counterparty {
                                     recipient,
                                     amount);
 
-        assert!(
-            event::was_event_emitted<BridgeTransferLockedEvent>(
-                &BridgeTransferLockedEvent {
-                    bridge_transfer_id,
-                    initiator,
-                    recipient,
-                    amount,
-                    hash_lock,
-                    time_lock: atomic_bridge_configuration::counterparty_timelock_duration(),
-                }
-            ), 0);
+        let bridge_counterparty_events = borrow_global<BridgeCounterpartyEvents>(signer::address_of(aptos_framework));
+        let lock_events = event::emitted_events_by_handle(&bridge_counterparty_events.bridge_transfer_locked_events);
+
+        // Assert that the event was emitted
+        let expected_event = BridgeTransferLockedEvent {
+            bridge_transfer_id,
+            initiator,
+            recipient,
+            amount,
+            hash_lock,
+            time_lock: atomic_bridge_configuration::counterparty_timelock_duration(),
+        };
+        assert!(std::vector::contains(&lock_events, &expected_event), 0);
+
     }
 
     #[test(aptos_framework = @aptos_framework)]
-    fun test_abort_transfer_of_assets(aptos_framework: &signer) {
+    fun test_abort_transfer_of_assets(aptos_framework: &signer) acquires BridgeCounterpartyEvents {
         initialize_for_test(aptos_framework);
-
+        initialize(aptos_framework);
         let initiator = valid_eip55();
         let bridge_transfer_id = valid_bridge_transfer_id();
         let hash_lock = valid_hash_lock();
@@ -1483,18 +1627,16 @@ module aptos_framework::atomic_bridge_counterparty {
         timestamp::fast_forward_seconds(atomic_bridge_configuration::counterparty_timelock_duration() + 1);
         abort_bridge_transfer(aptos_framework, bridge_transfer_id);
 
-        assert!(
-            event::was_event_emitted<BridgeTransferCancelledEvent>(
-                &BridgeTransferCancelledEvent {
-                    bridge_transfer_id,
-                }
-            ), 0);
+        let bridge_counterparty_events = borrow_global<BridgeCounterpartyEvents>(signer::address_of(aptos_framework));
+        let cancel_events = event::emitted_events_by_handle(&bridge_counterparty_events.bridge_transfer_cancelled_events);
+        let expected_event = BridgeTransferCancelledEvent { bridge_transfer_id };
+        assert!(std::vector::contains(&cancel_events, &expected_event), 0);
     }
 
     #[test(aptos_framework = @aptos_framework)]
-    fun test_complete_transfer_of_assets(aptos_framework: &signer) {
+    fun test_complete_transfer_of_assets(aptos_framework: &signer) acquires BridgeCounterpartyEvents {
         initialize_for_test(aptos_framework);
-
+        initialize(aptos_framework);
         let initiator = valid_eip55();
         let bridge_transfer_id = valid_bridge_transfer_id();
         let hash_lock = valid_hash_lock();
@@ -1513,19 +1655,21 @@ module aptos_framework::atomic_bridge_counterparty {
 
         complete_bridge_transfer(bridge_transfer_id, plain_secret());
 
-        assert!(
-            event::was_event_emitted<BridgeTransferCompletedEvent>(
-                &BridgeTransferCompletedEvent {
-                    bridge_transfer_id,
-                    pre_image: plain_secret(),
-                }
-            ), 0);
+        let bridge_counterparty_events = borrow_global<BridgeCounterpartyEvents>(signer::address_of(aptos_framework));
+        let complete_events = event::emitted_events_by_handle(&bridge_counterparty_events.bridge_transfer_completed_events);
+        let expected_event = BridgeTransferCompletedEvent {
+            bridge_transfer_id,
+            pre_image: plain_secret(),
+        };
+        assert!(std::vector::contains(&complete_events, &expected_event), 0);
+
     }
 
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x1, location = atomic_bridge_store)]
-    fun test_failing_complete_transfer_of_assets(aptos_framework: &signer) {
+    fun test_failing_complete_transfer_of_assets(aptos_framework: &signer) acquires BridgeCounterpartyEvents {
         initialize_for_test(aptos_framework);
+        initialize(aptos_framework);
         timestamp::set_time_has_started_for_testing(aptos_framework);
         let initiator = valid_eip55();
         let bridge_transfer_id = valid_bridge_transfer_id();
