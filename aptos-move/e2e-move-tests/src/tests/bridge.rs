@@ -206,7 +206,6 @@ fn test_initiator() {
     let events = harness.get_events();
     let bridge_transfer_initiated_event_tag = TypeTag::from_str("0x1::atomic_bridge_initiator::BridgeTransferInitiatedEvent").unwrap();
     let bridge_transfer_initiated_event = events.iter().find(|element| element.type_tag() == &bridge_transfer_initiated_event_tag).unwrap();
-    println!("Bridge transfer initiated event: {bridge_transfer_initiated_event:?}");
     let bridge_transfer_initiated_event = bcs::from_bytes::<BridgeTransferInitiatedEvent>(bridge_transfer_initiated_event.event_data()).unwrap();
     let bridge_transfer_id = bridge_transfer_initiated_event.bridge_transfer_id;
 
