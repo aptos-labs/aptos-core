@@ -64,7 +64,7 @@ impl Default for ConsensusObserverConfig {
         Self {
             observer_enabled: false,
             publisher_enabled: false,
-            enable_pipeline: false,
+            enable_pipeline: true,
             max_network_channel_size: 1000,
             max_parallel_serialization_tasks: num_cpus::get(), // Default to the number of CPUs
             network_request_timeout_ms: 5_000,                 // 5 seconds

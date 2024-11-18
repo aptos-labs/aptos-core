@@ -268,7 +268,11 @@ impl PipelineBuilder {
         } = rx;
 
         let prepare_fut = spawn_shared_fut(
-            Self::prepare(self.block_preparer.clone(), block.clone()),
+            Self::prepare(
+                parent.prepare_fut.clone(),
+                self.block_preparer.clone(),
+                block.clone(),
+            ),
             &mut abort_handles,
         );
         let execute_fut = spawn_shared_fut(
@@ -377,19 +381,25 @@ impl PipelineBuilder {
 
     /// Precondition: Block is inserted into block tree (all ancestors are available)
     /// What it does: Wait for all data becomes available and verify transaction signatures
-    async fn prepare(preparer: Arc<BlockPreparer>, block: Arc<Block>) -> TaskResult<PrepareResult> {
+    async fn prepare(
+        parent_prepare: TaskFuture<PrepareResult>,
+        preparer: Arc<BlockPreparer>,
+        block: Arc<Block>,
+    ) -> TaskResult<PrepareResult> {
+        parent_prepare.await?;
+
         let _tracker = Tracker::new("prepare", &block);
         // the loop can only be abort by the caller
         let input_txns = loop {
             match preparer.prepare_block(&block).await {
                 Ok(input_txns) => break input_txns,
                 Err(e) => {
-                    warn!(
-                        "[BlockPreparer] failed to prepare block {}, retrying: {}",
-                        block.id(),
-                        e
-                    );
-                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    // warn!(
+                    //     "[BlockPreparer] failed to prepare block {}, retrying: {}",
+                    //     block.id(),
+                    //     e
+                    // );
+                    tokio::time::sleep(Duration::from_millis(5)).await;
                 },
             }
         };
