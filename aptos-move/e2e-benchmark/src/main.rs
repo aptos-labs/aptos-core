@@ -50,7 +50,8 @@ fn execute_and_time_entry_point(
     let mut rng = StdRng::seed_from_u64(14);
     let entry_fun = entry_point
         .create_payload(
-            package.get_module_id(entry_point.module_name()),
+            package,
+            entry_point.module_name(),
             Some(&mut rng),
             Some(publisher_address),
         )
@@ -221,7 +222,8 @@ fn main() {
                 &publisher,
                 1,
                 init_entry_point.create_payload(
-                    package.get_module_id(init_entry_point.module_name()),
+                    &package,
+                    init_entry_point.module_name(),
                     Some(&mut rng),
                     Some(publisher.address()),
                 ),

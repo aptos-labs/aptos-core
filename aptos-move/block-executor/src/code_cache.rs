@@ -136,44 +136,39 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCache
             Self::Version,
         )>,
     > {
-        // First, look up the module in the cross-block global module cache. Record the read for
-        // later validation in case the read module is republished.
-        if let Some(module) = self.global_module_cache.get_valid(key) {
-            match &self.latest_view {
-                ViewState::Sync(state) => state
-                    .captured_reads
-                    .borrow_mut()
-                    .capture_global_cache_read(key.clone()),
-                ViewState::Unsync(state) => {
-                    state.read_set.borrow_mut().capture_module_read(key.clone())
-                },
-            }
-            return Ok(Some((module, Self::Version::default())));
-        }
-
-        // Global cache miss: check module cache in versioned/unsync maps.
         match &self.latest_view {
             ViewState::Sync(state) => {
                 // Check the transaction-level cache with already read modules first.
-                let cache_read = state.captured_reads.borrow().get_module_read(key)?;
-                match cache_read {
-                    CacheRead::Hit(read) => Ok(read),
-                    CacheRead::Miss => {
-                        // If the module has not been accessed by this transaction, go to the
-                        // module cache and record the read.
-                        let read = state
-                            .versioned_map
-                            .module_cache()
-                            .get_module_or_build_with(key, builder)?;
-                        state
-                            .captured_reads
-                            .borrow_mut()
-                            .capture_per_block_cache_read(key.clone(), read.clone());
-                        Ok(read)
-                    },
+                if let CacheRead::Hit(read) = state.captured_reads.borrow().get_module_read(key) {
+                    return Ok(read);
                 }
+
+                // Otherwise, it is a miss. Check global cache.
+                if let Some(module) = self.global_module_cache.get_valid(key) {
+                    state
+                        .captured_reads
+                        .borrow_mut()
+                        .capture_global_cache_read(key.clone(), module.clone());
+                    return Ok(Some((module, Self::Version::default())));
+                }
+
+                // If not global cache, check per-block cache.
+                let read = state
+                    .versioned_map
+                    .module_cache()
+                    .get_module_or_build_with(key, builder)?;
+                state
+                    .captured_reads
+                    .borrow_mut()
+                    .capture_per_block_cache_read(key.clone(), read.clone());
+                Ok(read)
             },
             ViewState::Unsync(state) => {
+                if let Some(module) = self.global_module_cache.get_valid(key) {
+                    state.read_set.borrow_mut().capture_module_read(key.clone());
+                    return Ok(Some((module, Self::Version::default())));
+                }
+
                 let read = state
                     .unsync_map
                     .module_cache()

@@ -1622,8 +1622,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorageView
     for LatestView<'a, T, S, X>
 {
+    type Key = T::Key;
+
     fn id(&self) -> StateViewId {
         self.base_view.id()
+    }
+
+    fn read_state_value(&self, state_key: &Self::Key) -> Result<(), StateviewError> {
+        self.base_view.get_state_value(state_key)?;
+        Ok(())
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {

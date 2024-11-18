@@ -292,13 +292,16 @@ impl DelayedFieldRead {
     }
 }
 
-/// Represents a module read, either from immutable cross-block cache, or from code [SyncCodeCache]
-/// used by block executor (per-block cache). This way, when transaction needs to read a module
-/// from [SyncCodeCache] it can first check the read-set here.
+/// Represents a module read, either from global module cache that spans multiple blocks, or from
+/// per-block cache used by block executor to add committed modules. When transaction reads a
+/// module, it should first check the read-set here, to ensure that if some module A has been read,
+/// the same A is read again within the same transaction.
 enum ModuleRead<DC, VC, S> {
-    /// Read from the cross-block module cache.
-    GlobalCache,
-    /// Read from per-block cache ([SyncCodeCache]) used by parallel execution.
+    /// Read from the global module cache. Modules in this cache have storage version, but require
+    /// different validation - a check that they have not been overridden.
+    GlobalCache(Arc<ModuleCode<DC, VC, S>>),
+    /// Read from per-block cache that contains committed (by specified transaction) and newly
+    /// loaded from storage (i.e., not yet moved to global module cache) modules.
     PerBlockCache(Option<(Arc<ModuleCode<DC, VC, S>>, Option<TxnIndex>)>),
 }
 
@@ -615,8 +618,8 @@ where
     }
 
     /// Records the read to global cache that spans across multiple blocks.
-    pub(crate) fn capture_global_cache_read(&mut self, key: K) {
-        self.module_reads.insert(key, ModuleRead::GlobalCache);
+    pub(crate) fn capture_global_cache_read(&mut self, key: K, read: Arc<ModuleCode<DC, VC, S>>) {
+        self.module_reads.insert(key, ModuleRead::GlobalCache(read));
     }
 
     /// Records the read to per-block level cache.
@@ -629,22 +632,19 @@ where
             .insert(key, ModuleRead::PerBlockCache(read));
     }
 
-    /// If the module has been previously read from [SyncCodeCache], returns it. Returns a panic
-    /// error if the read was cached for the global cross-module cache (we do not capture values
-    /// for those).
+    /// If the module has been previously read, returns it.
     pub(crate) fn get_module_read(
         &self,
         key: &K,
-    ) -> Result<CacheRead<Option<(Arc<ModuleCode<DC, VC, S>>, Option<TxnIndex>)>>, PanicError> {
-        Ok(match self.module_reads.get(key) {
+    ) -> CacheRead<Option<(Arc<ModuleCode<DC, VC, S>>, Option<TxnIndex>)>> {
+        match self.module_reads.get(key) {
             Some(ModuleRead::PerBlockCache(read)) => CacheRead::Hit(read.clone()),
-            Some(ModuleRead::GlobalCache) => {
-                return Err(PanicError::CodeInvariantError(
-                    "Global module cache reads do not capture values".to_string(),
-                ));
+            Some(ModuleRead::GlobalCache(read)) => {
+                // From global cache, we return a storage version.
+                CacheRead::Hit(Some((read.clone(), None)))
             },
             None => CacheRead::Miss,
-        })
+        }
     }
 
     /// For every module read that was captured, checks if the reads are still the same:
@@ -661,7 +661,7 @@ where
         }
 
         self.module_reads.iter().all(|(key, read)| match read {
-            ModuleRead::GlobalCache => global_module_cache.contains_valid(key),
+            ModuleRead::GlobalCache(_) => global_module_cache.contains_valid(key),
             ModuleRead::PerBlockCache(previous) => {
                 let current_version = per_block_module_cache.get_module_version(key);
                 let previous_version = previous.as_ref().map(|(_, version)| *version);
@@ -1538,20 +1538,6 @@ mod test {
     }
 
     #[test]
-    fn test_global_cache_module_reads_are_not_recorded() {
-        let mut captured_reads = CapturedReads::<
-            TestTransactionType,
-            u32,
-            MockDeserializedCode,
-            MockVerifiedCode,
-            MockExtension,
-        >::new();
-
-        captured_reads.capture_global_cache_read(0);
-        assert!(captured_reads.get_module_read(&0).is_err())
-    }
-
-    #[test]
     fn test_global_cache_module_reads() {
         let mut captured_reads = CapturedReads::<
             TestTransactionType,
@@ -1563,11 +1549,13 @@ mod test {
         let mut global_module_cache = GlobalModuleCache::empty();
         let per_block_module_cache = SyncModuleCache::empty();
 
-        global_module_cache.insert(0, mock_verified_code(0, MockExtension::new(8)));
-        captured_reads.capture_global_cache_read(0);
+        let module_0 = mock_verified_code(0, MockExtension::new(8));
+        global_module_cache.insert(0, module_0.clone());
+        captured_reads.capture_global_cache_read(0, module_0);
 
-        global_module_cache.insert(1, mock_verified_code(1, MockExtension::new(8)));
-        captured_reads.capture_global_cache_read(1);
+        let module_1 = mock_verified_code(1, MockExtension::new(8));
+        global_module_cache.insert(1, module_1.clone());
+        captured_reads.capture_global_cache_read(1, module_1);
 
         assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
 
@@ -1613,18 +1601,18 @@ mod test {
         captured_reads.capture_per_block_cache_read(0, Some((a, Some(2))));
         assert!(matches!(
             captured_reads.get_module_read(&0),
-            Ok(CacheRead::Hit(Some(_)))
+            CacheRead::Hit(Some(_))
         ));
 
         captured_reads.capture_per_block_cache_read(1, None);
         assert!(matches!(
             captured_reads.get_module_read(&1),
-            Ok(CacheRead::Hit(None))
+            CacheRead::Hit(None)
         ));
 
         assert!(matches!(
             captured_reads.get_module_read(&2),
-            Ok(CacheRead::Miss)
+            CacheRead::Miss
         ));
     }
 
@@ -1701,8 +1689,9 @@ mod test {
         let per_block_module_cache = SyncModuleCache::empty();
 
         // Module exists in global cache.
-        global_module_cache.insert(0, mock_verified_code(0, MockExtension::new(8)));
-        captured_reads.capture_global_cache_read(0);
+        let m = mock_verified_code(0, MockExtension::new(8));
+        global_module_cache.insert(0, m.clone());
+        captured_reads.capture_global_cache_read(0, m);
         assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
 
         // Assume we republish this module: validation must fail.
