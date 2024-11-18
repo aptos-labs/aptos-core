@@ -117,14 +117,14 @@ pub async fn execute_transactions(
     }
 
     // Always ensure that at least one reconfiguration transaction is executed
-    if !execute_epoch_changes {
-        aptos_forge::reconfig(
-            client,
-            &transaction_factory,
-            swarm.chain_info().root_account,
-        )
-        .await;
-    }
+    // if !execute_epoch_changes {
+    //     aptos_forge::reconfig(
+    //         client,
+    //         &transaction_factory,
+    //         swarm.chain_info().root_account,
+    //     )
+    //     .await;
+    // }
 }
 
 /// Executes transactions and waits for all nodes to catch up
