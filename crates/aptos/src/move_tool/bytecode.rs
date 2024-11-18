@@ -14,7 +14,7 @@ use crate::{
 use anyhow::Context;
 use aptos_framework::{
     get_compilation_metadata_from_compiled_module, get_compilation_metadata_from_compiled_script,
-    get_metadata_from_compiled_module, get_metadata_from_compiled_script, APTOS_METADATA_KEY_V1,
+    get_metadata_from_compiled_module, get_metadata_from_compiled_script, RuntimeModuleMetadataV1,
 };
 use async_trait::async_trait;
 use clap::{Args, Parser};
@@ -29,9 +29,8 @@ use move_command_line_common::files::{
 use move_coverage::coverage_map::CoverageMap;
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
-use move_model::metadata::{
-    CompilationMetadata, CompilerVersion, LanguageVersion, COMPILATION_METADATA_KEY,
-};
+use move_model::metadata::{CompilationMetadata, CompilerVersion, LanguageVersion};
+use serde::{Deserialize, Serialize};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -140,6 +139,13 @@ impl CliCommand<String> for Decompile {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct BytecodeMetadata {
+    aptos_metadata: Option<RuntimeModuleMetadataV1>,
+    bytecode_version: u32,
+    compilation_metadata: CompilationMetadata,
+}
+
 impl BytecodeCommand {
     async fn execute(self, command_type: BytecodeCommandType) -> CliTypedResult<String> {
         let inputs = if let Some(path) = self.input.bytecode_path.clone() {
@@ -226,46 +232,33 @@ impl BytecodeCommand {
             compiler_version: CompilerVersion::V1.to_string(),
             language_version: LanguageVersion::V1.to_string(),
         };
-        let compilation_metadata_string;
-        let mut aptos_metadata_string = "".to_string();
-        let bytecode_version_string;
-        if self.is_script {
+        let metadata = if self.is_script {
             let script = CompiledScript::deserialize(&bytecode_bytes)
                 .context("Script blob can't be deserialized")?;
-            compilation_metadata_string =
-                if let Some(data) = get_compilation_metadata_from_compiled_script(&script) {
-                    serde_json::to_string_pretty(&data).expect("expect compilation metadata")
-                } else {
-                    serde_json::to_string_pretty(&v1_metadata).expect("expect compilation metadata")
-                };
-            if let Some(data) = get_metadata_from_compiled_script(&script) {
-                aptos_metadata_string = serde_json::to_string(&data).expect("expect metadata");
+            if let Some(data) = get_compilation_metadata_from_compiled_script(&script) {
+                serde_json::to_string_pretty(&data).expect("expect compilation metadata")
+            } else {
+                serde_json::to_string_pretty(&v1_metadata).expect("expect compilation metadata")
             };
-            bytecode_version_string = script.version.to_string();
+            BytecodeMetadata {
+                aptos_metadata: get_metadata_from_compiled_script(&script),
+                bytecode_version: script.version,
+                compilation_metadata: get_compilation_metadata_from_compiled_script(&script)
+                    .unwrap_or(v1_metadata),
+            }
         } else {
             let module = CompiledModule::deserialize(&bytecode_bytes)
                 .context("Module blob can't be deserialized")?;
-            compilation_metadata_string =
-                if let Some(data) = get_compilation_metadata_from_compiled_module(&module) {
-                    serde_json::to_string_pretty(&data).expect("expect compilation metadata")
-                } else {
-                    serde_json::to_string_pretty(&v1_metadata).expect("expect compilation metadata")
-                };
-            if let Some(data) = get_metadata_from_compiled_module(&module) {
-                aptos_metadata_string = serde_json::to_string(&data).expect("expect metadata");
-            };
-            bytecode_version_string = module.version.to_string();
+            BytecodeMetadata {
+                aptos_metadata: get_metadata_from_compiled_module(&module),
+                bytecode_version: module.version,
+                compilation_metadata: get_compilation_metadata_from_compiled_module(&module)
+                    .unwrap_or(v1_metadata),
+            }
         };
-        println!("bytecode_version: {}", bytecode_version_string);
         println!(
-            "{}: {}",
-            str::from_utf8(COMPILATION_METADATA_KEY).expect("expect compilation_metadata"),
-            compilation_metadata_string
-        );
-        println!(
-            "{}: {}",
-            str::from_utf8(APTOS_METADATA_KEY_V1).expect("expect aptos_metadata_key_v1"),
-            aptos_metadata_string
+            "Metadata: {}",
+            serde_json::to_string_pretty(&metadata).expect("expect metadata")
         );
         Ok("ok".to_string())
     }
