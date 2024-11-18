@@ -2,6 +2,7 @@
 module std::mem {
     // TODO - functions here are `public(friend)` here for one release,
     // and to be changed to `public` one release later.
+    friend std::vector;
     #[test_only]
     friend std::mem_tests;
 
