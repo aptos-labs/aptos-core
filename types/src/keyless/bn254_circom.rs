@@ -382,10 +382,10 @@ pub fn get_public_inputs_hash(
             sig.exp_date_secs,
             proof.exp_horizon_secs,
             &pk.iss_val,
-            proof.extra_field.as_ref().map(String::as_str),
+            proof.extra_field.as_deref(),
             &sig.jwt_header_json,
             jwk,
-            proof.override_aud_val.as_ref().map(String::as_str),
+            proof.override_aud_val.as_deref(),
         )
     } else {
         bail!("Can only call `get_public_inputs_hash` on keyless::Signature with Groth16 ZK proof")
