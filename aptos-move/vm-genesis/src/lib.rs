@@ -719,7 +719,7 @@ fn initialize_keyless_accounts(
             issuer: get_sample_iss(),
             jwk: JWK::RSA(secure_test_rsa_jwk()),
         };
-        initial_jwks.push(additional_jwk_patch);
+        initial_jwks.insert(0, additional_jwk_patch);
 
         let jwk_patches: Vec<PatchJWKMoveStruct> = initial_jwks
             .into_iter()
