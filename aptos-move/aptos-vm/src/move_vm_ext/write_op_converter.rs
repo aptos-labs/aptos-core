@@ -105,6 +105,22 @@ impl<'r> WriteOpConverter<'r> {
             )?;
 
             let state_key = StateKey::module_id(&module_id);
+
+            // Enforce read-before-write:
+            //   Modules can live in global cache, and so the DB may not see a module read even
+            //   when it gets republished. This violates read-before-write property. Here, we on
+            //   purpose enforce this by registering a read to the DB directly.
+            //   Note that we also do it here so that in case of storage errors, only a  single
+            //   transaction fails (e.g., if doing this read before commit in block executor we
+            //   have no way to alter the transaction outputs at that point).
+            self.remote.read_state_value(&state_key).map_err(|err| {
+                let msg = format!(
+                    "Error when enforcing read-before-write for module {}::{}: {:?}",
+                    addr, name, err
+                );
+                PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(msg)
+            })?;
+
             writes.insert(state_key, ModuleWrite::new(module_id, write_op));
         }
         Ok(writes)
