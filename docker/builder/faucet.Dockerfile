@@ -2,11 +2,11 @@
 FROM debian-base AS faucet
 
 # Current debian base used in build is bullseye, pin to prevent unexpected changes
-RUN echo "deb https://cloudfront.debian.net/debian/ bullseye main contrib" > /etc/apt/sources.list.d/bullseye.list && \
-    echo "Package: *\nPin: release n=bullseye\nPin-Priority: 50" > /etc/apt/preferences.d/bullseye
+
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    sed -i 's|http://security.debian.org/debian-security|https://cloudfront.debian.net/debian-security|g' /etc/apt/sources.list &&  \
     apt-get update && apt-get --no-install-recommends install -y \
         libssl1.1 \
         ca-certificates \

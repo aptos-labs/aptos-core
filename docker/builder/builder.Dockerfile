@@ -4,12 +4,12 @@ FROM rust as rust-base
 WORKDIR /aptos
 
 # Current debian base used in build is bullseye, pin to prevent unexpected changes
-RUN echo "deb https://cloudfront.debian.net/debian/ bullseye main contrib" > /etc/apt/sources.list.d/bullseye.list && \
-    echo "Package: *\nPin: release n=bullseye\nPin-Priority: 50" > /etc/apt/preferences.d/bullseye
+
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    sed -i 's|http://deb.debian.org/debian|http://cloudfront.debian.net/debian|g' /etc/apt/sources.list &&  \
     apt update && apt-get --no-install-recommends install -y \
     cmake \
     curl \
