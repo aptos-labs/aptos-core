@@ -1770,22 +1770,18 @@ module aptos_framework::atomic_bridge_counterparty {
         recipient: address,  
         amount: u64,  
         nonce: u64  
-    ) {  
+    ) acquires BridgeCounterpartyEvents {  
         atomic_bridge_configuration::assert_is_caller_operator(caller);  
-        let ethereum_address = ethereum::ethereum_address(initiator);
-        let details = atomic_bridge_store::create_details_simplified(  
-            ethereum_address,  
-            recipient,  
-            amount,  
-            nonce  
-        );
-        // asserts that parameters are correct  
-        assert!(bridge_transfer_id == atomic_bridge_store::bridge_transfer_id_simplified(&details), 0x1);
-        atomic_bridge_store::add_simplified(bridge_transfer_id, details);
-        
+        let ethereum_address = ethereum::ethereum_address_no_eip55(initiator);
+
+        // Todo: asserts that parameters are correct  
+ 
         // Mint to recipient  
         atomic_bridge::mint(recipient, amount);  
-        event::emit(  
+
+        let bridge_counterparty_events = borrow_global_mut<BridgeCounterpartyEvents>(@aptos_framework);
+        event::emit_event(  
+            &mut bridge_counterparty_events.bridge_transfer_completed_simplified_events,
             BridgeTransferCompletedSimplifiedEvent {  
                 bridge_transfer_id,  
                 initiator,  
@@ -1929,6 +1925,44 @@ module aptos_framework::atomic_bridge_counterparty {
             amount);
 
         complete_bridge_transfer(bridge_transfer_id, b"not the secret");
+    }
+
+    #[test(aptos_framework = @aptos_framework)]
+    fun test_complete_bridge_transfer_simplified(aptos_framework: &signer) acquires BridgeCounterpartyEvents {
+        initialize_for_test(aptos_framework);
+        initialize(aptos_framework);
+        let initiator = valid_eip55();
+        let bridge_transfer_id = valid_bridge_transfer_id();
+        let hash_lock = valid_hash_lock();
+        let recipient = @0xcafe;
+        let amount = 1;
+        let nonce = 5;
+
+        // Create an account for our recipient
+        aptos_account::create_account(recipient);
+
+        complete_bridge_transfer_simplified(
+            aptos_framework,
+            bridge_transfer_id,
+            initiator,
+            recipient,
+            amount,
+            nonce
+        );
+
+        let bridge_counterparty_events = borrow_global<BridgeCounterpartyEvents>(signer::address_of(aptos_framework));
+        let complete_events = event::emitted_events_by_handle(&bridge_counterparty_events.bridge_transfer_completed_simplified_events);
+
+        // Assert that the event was emitted
+        let expected_event = BridgeTransferCompletedSimplifiedEvent {
+            bridge_transfer_id,
+            initiator,
+            recipient,
+            amount,
+            nonce,
+        };
+        assert!(std::vector::contains(&complete_events, &expected_event), 0);
+
     }
 }
 
