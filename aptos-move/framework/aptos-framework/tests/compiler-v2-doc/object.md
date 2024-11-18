@@ -604,6 +604,16 @@ generate_unique_address uses this for domain separation within its native implem
 
 
 
+<a id="0x1_object_EBURN_NOT_ALLOWED"></a>
+
+Objects cannot be burnt
+
+
+<pre><code><b>const</b> <a href="object.md#0x1_object_EBURN_NOT_ALLOWED">EBURN_NOT_ALLOWED</a>: u64 = 10;
+</code></pre>
+
+
+
 <a id="0x1_object_ECANNOT_DELETE"></a>
 
 The object does not allow for deletion
@@ -1887,15 +1897,16 @@ Transfer to the destination address using a LinearTransferRef.
                 <b>to</b>,
             },
         );
+    } <b>else</b> {
+        <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
+            &<b>mut</b> <a href="object.md#0x1_object">object</a>.transfer_events,
+            <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
+                <a href="object.md#0x1_object">object</a>: ref.self,
+                from: <a href="object.md#0x1_object">object</a>.owner,
+                <b>to</b>,
+            },
+        );
     };
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
-        &<b>mut</b> <a href="object.md#0x1_object">object</a>.transfer_events,
-        <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
-            <a href="object.md#0x1_object">object</a>: ref.self,
-            from: <a href="object.md#0x1_object">object</a>.owner,
-            <b>to</b>,
-        },
-    );
     <a href="object.md#0x1_object">object</a>.owner = <b>to</b>;
 }
 </code></pre>
@@ -2023,15 +2034,16 @@ hierarchy.
                     <b>to</b>,
                 },
             );
+        } <b>else</b> {
+            <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
+                &<b>mut</b> object_core.transfer_events,
+                <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
+                    <a href="object.md#0x1_object">object</a>,
+                    from: object_core.owner,
+                    <b>to</b>,
+                },
+            );
         };
-        <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
-            &<b>mut</b> object_core.transfer_events,
-            <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
-                <a href="object.md#0x1_object">object</a>,
-                from: object_core.owner,
-                <b>to</b>,
-            },
-        );
         object_core.owner = <b>to</b>;
     };
 }
@@ -2130,12 +2142,13 @@ objects may have cyclic dependencies.
 
 ## Function `burn`
 
-Forcefully transfer an unwanted object to BURN_ADDRESS, ignoring whether ungated_transfer is allowed.
-This only works for objects directly owned and for simplicity does not apply to indirectly owned objects.
-Original owners can reclaim burnt objects any time in the future by calling unburn.
+Previously allowed to burn objects, has now been disabled.  Objects can still be unburnt.
+
+Please use the test only [<code>object::burn_object</code>] for testing with previously burned objects.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(owner: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
+<pre><code>#[deprecated]
+<b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(_owner: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>, _object: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
 </code></pre>
 
 
@@ -2144,12 +2157,8 @@ Original owners can reclaim burnt objects any time in the future by calling unbu
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(owner: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
-    <b>let</b> original_owner = <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
-    <b>assert</b>!(<a href="object.md#0x1_object_is_owner">is_owner</a>(<a href="object.md#0x1_object">object</a>, original_owner), <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_OBJECT_OWNER">ENOT_OBJECT_OWNER</a>));
-    <b>let</b> object_addr = <a href="object.md#0x1_object">object</a>.inner;
-    <b>move_to</b>(&<a href="create_signer.md#0x1_create_signer">create_signer</a>(object_addr), <a href="object.md#0x1_object_TombStone">TombStone</a> { original_owner });
-    <a href="object.md#0x1_object_transfer_raw_inner">transfer_raw_inner</a>(object_addr, <a href="object.md#0x1_object_BURN_ADDRESS">BURN_ADDRESS</a>);
+<pre><code><b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(_owner: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>, _object: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;) {
+    <b>abort</b> <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_EBURN_NOT_ALLOWED">EBURN_NOT_ALLOWED</a>)
 }
 </code></pre>
 
@@ -3245,17 +3254,14 @@ to determine the identity of the starting point of ownership.
 ### Function `burn`
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(owner: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
+<pre><code>#[deprecated]
+<b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(_owner: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>, _object: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
 </code></pre>
 
 
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
-<b>let</b> object_address = <a href="object.md#0x1_object">object</a>.inner;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(object_address);
-<b>aborts_if</b> <a href="object.md#0x1_object_owner">owner</a>(<a href="object.md#0x1_object">object</a>) != <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
-<b>aborts_if</b> <a href="object.md#0x1_object_is_burnt">is_burnt</a>(<a href="object.md#0x1_object">object</a>);
+<pre><code><b>aborts_if</b> <b>true</b>;
 </code></pre>
 
 

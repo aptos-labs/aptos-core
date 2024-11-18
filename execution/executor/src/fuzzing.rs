@@ -2,21 +2,16 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    block_executor::{BlockExecutor, TransactionBlockExecutor},
-    workflow::do_get_execution_output::DoGetExecutionOutput,
-};
+use crate::block_executor::BlockExecutor;
 use anyhow::Result;
+use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
-use aptos_executor_types::{execution_output::ExecutionOutput, BlockExecutorTrait};
-use aptos_storage_interface::{
-    cached_state_view::CachedStateView, chunk_to_commit::ChunkToCommit, DbReader, DbReaderWriter,
-    DbWriter,
-};
+use aptos_executor_types::BlockExecutorTrait;
+use aptos_storage_interface::{chunk_to_commit::ChunkToCommit, DbReader, DbReaderWriter, DbWriter};
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorConfigFromOnchain,
-        partitioner::{ExecutableTransactions, PartitionedTransactions},
+        config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
+        partitioner::PartitionedTransactions,
     },
     ledger_info::LedgerInfoWithSignatures,
     state_store::StateView,
@@ -31,7 +26,7 @@ use aptos_types::{
 };
 use aptos_vm::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
-    VMExecutor,
+    VMBlockExecutor,
 };
 use std::sync::Arc;
 
@@ -64,26 +59,14 @@ pub fn fuzz_execute_and_commit_blocks(
     let _res = executor.commit_blocks(block_ids, ledger_info_with_sigs);
 }
 
-/// A fake VM implementing VMExecutor
+/// A fake VM implementing VMBlockExecutor
 pub struct FakeVM;
 
-impl TransactionBlockExecutor for FakeVM {
-    fn execute_transaction_block(
-        transactions: ExecutableTransactions,
-        state_view: CachedStateView,
-        onchain_config: BlockExecutorConfigFromOnchain,
-        append_state_checkpoint_to_block: Option<HashValue>,
-    ) -> Result<ExecutionOutput> {
-        DoGetExecutionOutput::by_transaction_execution::<FakeVM>(
-            transactions,
-            state_view,
-            onchain_config,
-            append_state_checkpoint_to_block,
-        )
+impl VMBlockExecutor for FakeVM {
+    fn new() -> Self {
+        Self
     }
-}
 
-impl VMExecutor for FakeVM {
     fn execute_block_sharded<S: StateView + Send + Sync, E: ExecutorClient<S>>(
         _sharded_block_executor: &ShardedBlockExecutor<S, E>,
         _transactions: PartitionedTransactions,
@@ -94,9 +77,11 @@ impl VMExecutor for FakeVM {
     }
 
     fn execute_block(
-        _transactions: &[SignatureVerifiedTransaction],
+        &self,
+        _txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
         _state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
+        _transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         Ok(BlockOutput::new(vec![], None))
     }

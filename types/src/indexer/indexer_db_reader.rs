@@ -60,6 +60,7 @@ pub trait IndexerReader: Send + Sync {
     ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>>;
 
     fn get_latest_internal_indexer_ledger_version(&self) -> Result<Option<Version>>;
+    fn get_latest_table_info_ledger_version(&self) -> Result<Option<Version>>;
 
     #[cfg(any(test, feature = "fuzzing"))]
     fn wait_for_internal_indexer(&self, version: Version) -> Result<()> {

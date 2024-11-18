@@ -1139,11 +1139,12 @@ Emit the collection uri mutation event
                 new_uri,
             }
         );
+    } <b>else</b> {
+        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_event_store.md#0x3_token_event_store_CollectionUriMutateEvent">CollectionUriMutateEvent</a>&gt;(
+            &<b>mut</b> <a href="token_event_store.md#0x3_token_event_store">token_event_store</a>.collection_uri_mutate_events,
+            <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event">event</a>,
+        );
     };
-    <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_event_store.md#0x3_token_event_store_CollectionUriMutateEvent">CollectionUriMutateEvent</a>&gt;(
-        &<b>mut</b> <a href="token_event_store.md#0x3_token_event_store">token_event_store</a>.collection_uri_mutate_events,
-        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event">event</a>,
-    );
 }
 </code></pre>
 
@@ -1185,11 +1186,12 @@ Emit the collection description mutation event
                 new_description,
             }
         );
-    };
-    <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_event_store.md#0x3_token_event_store_CollectionDescriptionMutateEvent">CollectionDescriptionMutateEvent</a>&gt;(
-        &<b>mut</b> <a href="token_event_store.md#0x3_token_event_store">token_event_store</a>.collection_description_mutate_events,
-        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event">event</a>,
-    );
+    } <b>else</b> {
+        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_event_store.md#0x3_token_event_store_CollectionDescriptionMutateEvent">CollectionDescriptionMutateEvent</a>&gt;(
+            &<b>mut</b> <a href="token_event_store.md#0x3_token_event_store">token_event_store</a>.collection_description_mutate_events,
+            <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event">event</a>,
+        );
+    }
 }
 </code></pre>
 
@@ -1231,11 +1233,12 @@ Emit the collection maximum mutation event
                 new_maximum,
             }
         );
+    } <b>else</b> {
+        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_event_store.md#0x3_token_event_store_CollectionMaxiumMutateEvent">CollectionMaxiumMutateEvent</a>&gt;(
+            &<b>mut</b> <a href="token_event_store.md#0x3_token_event_store">token_event_store</a>.collection_maximum_mutate_events,
+            <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event">event</a>,
+        );
     };
-    <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_event_store.md#0x3_token_event_store_CollectionMaxiumMutateEvent">CollectionMaxiumMutateEvent</a>&gt;(
-        &<b>mut</b> <a href="token_event_store.md#0x3_token_event_store">token_event_store</a>.collection_maximum_mutate_events,
-        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event">event</a>,
-    );
 }
 </code></pre>
 
@@ -1271,11 +1274,12 @@ Emit the direct opt-in event
                 account_address: <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="../../../aptos-framework/tests/compiler-v2-doc/account.md#0x1_account">account</a>),
                 opt_in,
             });
-    };
-    <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_event_store.md#0x3_token_event_store_OptInTransferEvent">OptInTransferEvent</a>&gt;(
-        &<b>mut</b> <a href="token_event_store.md#0x3_token_event_store">token_event_store</a>.opt_in_events,
-        opt_in_event,
-    );
+    } <b>else</b> {
+        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_event_store.md#0x3_token_event_store_OptInTransferEvent">OptInTransferEvent</a>&gt;(
+            &<b>mut</b> <a href="token_event_store.md#0x3_token_event_store">token_event_store</a>.opt_in_events,
+            opt_in_event,
+        );
+    }
 }
 </code></pre>
 
@@ -1327,11 +1331,12 @@ Emit URI mutation event
                 old_uri,
                 new_uri,
             });
+    } <b>else</b> {
+        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_event_store.md#0x3_token_event_store_UriMutationEvent">UriMutationEvent</a>&gt;(
+            &<b>mut</b> <a href="token_event_store.md#0x3_token_event_store">token_event_store</a>.uri_mutate_events,
+            <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event">event</a>,
+        );
     };
-    <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_event_store.md#0x3_token_event_store_UriMutationEvent">UriMutationEvent</a>&gt;(
-        &<b>mut</b> <a href="token_event_store.md#0x3_token_event_store">token_event_store</a>.uri_mutate_events,
-        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event">event</a>,
-    );
 }
 </code></pre>
 
@@ -1386,11 +1391,12 @@ Emit tokendata property map mutation event
                 old_values,
                 new_values,
             });
+    } <b>else</b> {
+        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_event_store.md#0x3_token_event_store_DefaultPropertyMutateEvent">DefaultPropertyMutateEvent</a>&gt;(
+            &<b>mut</b> <a href="token_event_store.md#0x3_token_event_store">token_event_store</a>.default_property_mutate_events,
+            <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event">event</a>,
+        );
     };
-    <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_event_store.md#0x3_token_event_store_DefaultPropertyMutateEvent">DefaultPropertyMutateEvent</a>&gt;(
-        &<b>mut</b> <a href="token_event_store.md#0x3_token_event_store">token_event_store</a>.default_property_mutate_events,
-        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event">event</a>,
-    );
 }
 </code></pre>
 
@@ -1442,11 +1448,12 @@ Emit description mutation event
                 old_description,
                 new_description,
             });
+    } <b>else</b> {
+        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_event_store.md#0x3_token_event_store_DescriptionMutateEvent">DescriptionMutateEvent</a>&gt;(
+            &<b>mut</b> <a href="token_event_store.md#0x3_token_event_store">token_event_store</a>.description_mutate_events,
+            <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event">event</a>,
+        );
     };
-    <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_event_store.md#0x3_token_event_store_DescriptionMutateEvent">DescriptionMutateEvent</a>&gt;(
-        &<b>mut</b> <a href="token_event_store.md#0x3_token_event_store">token_event_store</a>.description_mutate_events,
-        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event">event</a>,
-    );
 }
 </code></pre>
 
@@ -1509,11 +1516,12 @@ Emit royalty mutation event
                 new_royalty_denominator,
                 new_royalty_payee_addr,
             });
+    } <b>else</b> {
+        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_event_store.md#0x3_token_event_store_RoyaltyMutateEvent">RoyaltyMutateEvent</a>&gt;(
+            &<b>mut</b> <a href="token_event_store.md#0x3_token_event_store">token_event_store</a>.royalty_mutate_events,
+            <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event">event</a>,
+        );
     };
-    <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_event_store.md#0x3_token_event_store_RoyaltyMutateEvent">RoyaltyMutateEvent</a>&gt;(
-        &<b>mut</b> <a href="token_event_store.md#0x3_token_event_store">token_event_store</a>.royalty_mutate_events,
-        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event">event</a>,
-    );
 }
 </code></pre>
 
@@ -1565,11 +1573,12 @@ Emit maximum mutation event
                 old_maximum,
                 new_maximum,
             });
+    } <b>else</b> {
+        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_event_store.md#0x3_token_event_store_MaxiumMutateEvent">MaxiumMutateEvent</a>&gt;(
+            &<b>mut</b> <a href="token_event_store.md#0x3_token_event_store">token_event_store</a>.maximum_mutate_events,
+            <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event">event</a>,
+        );
     };
-    <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token_event_store.md#0x3_token_event_store_MaxiumMutateEvent">MaxiumMutateEvent</a>&gt;(
-        &<b>mut</b> <a href="token_event_store.md#0x3_token_event_store">token_event_store</a>.maximum_mutate_events,
-        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event">event</a>,
-    );
 }
 </code></pre>
 

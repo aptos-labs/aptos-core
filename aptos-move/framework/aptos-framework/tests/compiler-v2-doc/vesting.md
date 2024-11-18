@@ -2223,19 +2223,20 @@ Create a vesting contract with a given configurations.
                 commission_percentage,
             },
         );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> admin_store.create_events,
+            <a href="vesting.md#0x1_vesting_CreateVestingContractEvent">CreateVestingContractEvent</a> {
+                operator,
+                voter,
+                withdrawal_address,
+                grant_amount,
+                vesting_contract_address: contract_address,
+                staking_pool_address: pool_address,
+                commission_percentage,
+            },
+        );
     };
-    emit_event(
-        &<b>mut</b> admin_store.create_events,
-        <a href="vesting.md#0x1_vesting_CreateVestingContractEvent">CreateVestingContractEvent</a> {
-            operator,
-            voter,
-            withdrawal_address,
-            grant_amount,
-            vesting_contract_address: contract_address,
-            staking_pool_address: pool_address,
-            commission_percentage,
-        },
-    );
 
     <b>move_to</b>(&contract_signer, <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a> {
         state: <a href="vesting.md#0x1_vesting_VESTING_POOL_ACTIVE">VESTING_POOL_ACTIVE</a>,
@@ -2392,17 +2393,18 @@ Unlock any vested portion of the grant.
                 amount: vested_amount,
             },
         );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> vesting_contract.vest_events,
+            <a href="vesting.md#0x1_vesting_VestEvent">VestEvent</a> {
+                admin: vesting_contract.admin,
+                vesting_contract_address: contract_address,
+                staking_pool_address: vesting_contract.staking.pool_address,
+                period_vested: next_period_to_vest,
+                amount: vested_amount,
+            },
+        );
     };
-    emit_event(
-        &<b>mut</b> vesting_contract.vest_events,
-        <a href="vesting.md#0x1_vesting_VestEvent">VestEvent</a> {
-            admin: vesting_contract.admin,
-            vesting_contract_address: contract_address,
-            staking_pool_address: vesting_contract.staking.pool_address,
-            period_vested: next_period_to_vest,
-            amount: vested_amount,
-        },
-    );
 }
 </code></pre>
 
@@ -2496,15 +2498,16 @@ Distribute any withdrawable stake from the stake pool.
                 amount: total_distribution_amount,
             },
         );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> vesting_contract.distribute_events,
+            <a href="vesting.md#0x1_vesting_DistributeEvent">DistributeEvent</a> {
+                admin: vesting_contract.admin,
+                vesting_contract_address: contract_address,
+                amount: total_distribution_amount,
+            },
+        );
     };
-    emit_event(
-        &<b>mut</b> vesting_contract.distribute_events,
-        <a href="vesting.md#0x1_vesting_DistributeEvent">DistributeEvent</a> {
-            admin: vesting_contract.admin,
-            vesting_contract_address: contract_address,
-            amount: total_distribution_amount,
-        },
-    );
 }
 </code></pre>
 
@@ -2583,14 +2586,15 @@ Terminate the vesting contract and send all funds back to the withdrawal address
                 vesting_contract_address: contract_address,
             },
         );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> vesting_contract.terminate_events,
+            <a href="vesting.md#0x1_vesting_TerminateEvent">TerminateEvent</a> {
+                admin: vesting_contract.admin,
+                vesting_contract_address: contract_address,
+            },
+        );
     };
-    emit_event(
-        &<b>mut</b> vesting_contract.terminate_events,
-        <a href="vesting.md#0x1_vesting_TerminateEvent">TerminateEvent</a> {
-            admin: vesting_contract.admin,
-            vesting_contract_address: contract_address,
-        },
-    );
 }
 </code></pre>
 
@@ -2640,15 +2644,16 @@ has already been terminated.
                 amount,
             },
         );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> vesting_contract.admin_withdraw_events,
+            <a href="vesting.md#0x1_vesting_AdminWithdrawEvent">AdminWithdrawEvent</a> {
+                admin: vesting_contract.admin,
+                vesting_contract_address: contract_address,
+                amount,
+            },
+        );
     };
-    emit_event(
-        &<b>mut</b> vesting_contract.admin_withdraw_events,
-        <a href="vesting.md#0x1_vesting_AdminWithdrawEvent">AdminWithdrawEvent</a> {
-            admin: vesting_contract.admin,
-            vesting_contract_address: contract_address,
-            amount,
-        },
-    );
 }
 </code></pre>
 
@@ -2696,18 +2701,19 @@ has already been terminated.
                 commission_percentage,
             },
         );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> vesting_contract.update_operator_events,
+            <a href="vesting.md#0x1_vesting_UpdateOperatorEvent">UpdateOperatorEvent</a> {
+                admin: vesting_contract.admin,
+                vesting_contract_address: contract_address,
+                staking_pool_address: vesting_contract.staking.pool_address,
+                old_operator,
+                new_operator,
+                commission_percentage,
+            },
+        );
     };
-    emit_event(
-        &<b>mut</b> vesting_contract.update_operator_events,
-        <a href="vesting.md#0x1_vesting_UpdateOperatorEvent">UpdateOperatorEvent</a> {
-            admin: vesting_contract.admin,
-            vesting_contract_address: contract_address,
-            staking_pool_address: vesting_contract.staking.pool_address,
-            old_operator,
-            new_operator,
-            commission_percentage,
-        },
-    );
 }
 </code></pre>
 
@@ -2816,17 +2822,18 @@ has already been terminated.
                 new_voter,
             },
         );
-    };
-    emit_event(
-        &<b>mut</b> vesting_contract.update_voter_events,
-        <a href="vesting.md#0x1_vesting_UpdateVoterEvent">UpdateVoterEvent</a> {
-            admin: vesting_contract.admin,
-            vesting_contract_address: contract_address,
-            staking_pool_address: vesting_contract.staking.pool_address,
-            old_voter,
-            new_voter,
-        },
-    );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> vesting_contract.update_voter_events,
+            <a href="vesting.md#0x1_vesting_UpdateVoterEvent">UpdateVoterEvent</a> {
+                admin: vesting_contract.admin,
+                vesting_contract_address: contract_address,
+                staking_pool_address: vesting_contract.staking.pool_address,
+                old_voter,
+                new_voter,
+            },
+        );
+    }
 }
 </code></pre>
 
@@ -2867,16 +2874,17 @@ has already been terminated.
                 new_lockup_expiration_secs: <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(vesting_contract.staking.pool_address),
             },
         );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> vesting_contract.reset_lockup_events,
+            <a href="vesting.md#0x1_vesting_ResetLockupEvent">ResetLockupEvent</a> {
+                admin: vesting_contract.admin,
+                vesting_contract_address: contract_address,
+                staking_pool_address: vesting_contract.staking.pool_address,
+                new_lockup_expiration_secs: <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(vesting_contract.staking.pool_address),
+            },
+        );
     };
-    emit_event(
-        &<b>mut</b> vesting_contract.reset_lockup_events,
-        <a href="vesting.md#0x1_vesting_ResetLockupEvent">ResetLockupEvent</a> {
-            admin: vesting_contract.admin,
-            vesting_contract_address: contract_address,
-            staking_pool_address: vesting_contract.staking.pool_address,
-            new_lockup_expiration_secs: <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(vesting_contract.staking.pool_address),
-        },
-    );
 }
 </code></pre>
 
@@ -2931,17 +2939,18 @@ has already been terminated.
                 new_beneficiary,
             },
         );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> vesting_contract.set_beneficiary_events,
+            <a href="vesting.md#0x1_vesting_SetBeneficiaryEvent">SetBeneficiaryEvent</a> {
+                admin: vesting_contract.admin,
+                vesting_contract_address: contract_address,
+                shareholder,
+                old_beneficiary,
+                new_beneficiary,
+            },
+        );
     };
-    emit_event(
-        &<b>mut</b> vesting_contract.set_beneficiary_events,
-        <a href="vesting.md#0x1_vesting_SetBeneficiaryEvent">SetBeneficiaryEvent</a> {
-            admin: vesting_contract.admin,
-            vesting_contract_address: contract_address,
-            shareholder,
-            old_beneficiary,
-            new_beneficiary,
-        },
-    );
 }
 </code></pre>
 
@@ -3011,7 +3020,7 @@ account.
     role: String,
     role_holder: <b>address</b>,
 ) <b>acquires</b> <a href="vesting.md#0x1_vesting_VestingAccountManagement">VestingAccountManagement</a>, <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a> {
-    <b>let</b> vesting_contract = <b>borrow_global_mut</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
+    <b>let</b> vesting_contract = <b>borrow_global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
     <a href="vesting.md#0x1_vesting_verify_admin">verify_admin</a>(admin, vesting_contract);
 
     <b>if</b> (!<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingAccountManagement">VestingAccountManagement</a>&gt;(contract_address)) {
@@ -3135,7 +3144,7 @@ staking_contract and stake modules.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_get_vesting_account_signer">get_vesting_account_signer</a>(admin: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>, contract_address: <b>address</b>): <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a> {
-    <b>let</b> vesting_contract = <b>borrow_global_mut</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
+    <b>let</b> vesting_contract = <b>borrow_global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
     <a href="vesting.md#0x1_vesting_verify_admin">verify_admin</a>(admin, vesting_contract);
     <a href="vesting.md#0x1_vesting_get_vesting_account_signer_internal">get_vesting_account_signer_internal</a>(vesting_contract)
 }

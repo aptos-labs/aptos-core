@@ -7,8 +7,9 @@
 use crate::{
     logging::{LogEntry, LogSchema},
     metrics::{
-        COMMIT_BLOCKS, CONCURRENCY_GAUGE, EXECUTE_BLOCK, OTHER_TIMERS, SAVE_TRANSACTIONS,
-        TRANSACTIONS_SAVED, UPDATE_LEDGER, VM_EXECUTE_BLOCK,
+        BLOCK_EXECUTION_WORKFLOW_WHOLE, COMMIT_BLOCKS, CONCURRENCY_GAUGE,
+        GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING, OTHER_TIMERS, SAVE_TRANSACTIONS,
+        TRANSACTIONS_SAVED, UPDATE_LEDGER,
     },
     types::partial_state_compute_result::PartialStateComputeResult,
     workflow::{
@@ -19,8 +20,7 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
-    execution_output::ExecutionOutput, state_compute_result::StateComputeResult,
-    BlockExecutorTrait, ExecutorError, ExecutorResult,
+    state_compute_result::StateComputeResult, BlockExecutorTrait, ExecutorError, ExecutorResult,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::RwLock;
@@ -31,43 +31,18 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorConfigFromOnchain,
-        partitioner::{ExecutableBlock, ExecutableTransactions},
+        config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
+        partitioner::ExecutableBlock,
     },
     ledger_info::LedgerInfoWithSignatures,
     state_store::StateViewId,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::VMBlockExecutor;
 use block_tree::BlockTree;
 use fail::fail_point;
-use std::{marker::PhantomData, sync::Arc};
+use std::sync::Arc;
 
 pub mod block_tree;
-
-pub trait TransactionBlockExecutor: Send + Sync {
-    fn execute_transaction_block(
-        transactions: ExecutableTransactions,
-        state_view: CachedStateView,
-        onchain_config: BlockExecutorConfigFromOnchain,
-        append_state_checkpoint_to_block: Option<HashValue>,
-    ) -> Result<ExecutionOutput>;
-}
-
-impl TransactionBlockExecutor for AptosVM {
-    fn execute_transaction_block(
-        transactions: ExecutableTransactions,
-        state_view: CachedStateView,
-        onchain_config: BlockExecutorConfigFromOnchain,
-        append_state_checkpoint_to_block: Option<HashValue>,
-    ) -> Result<ExecutionOutput> {
-        DoGetExecutionOutput::by_transaction_execution::<AptosVM>(
-            transactions,
-            state_view,
-            onchain_config,
-            append_state_checkpoint_to_block,
-        )
-    }
-}
 
 pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,
@@ -76,7 +51,7 @@ pub struct BlockExecutor<V> {
 
 impl<V> BlockExecutor<V>
 where
-    V: TransactionBlockExecutor,
+    V: VMBlockExecutor,
 {
     pub fn new(db: DbReaderWriter) -> Self {
         Self {
@@ -95,7 +70,7 @@ where
 
 impl<V> BlockExecutorTrait for BlockExecutor<V>
 where
-    V: TransactionBlockExecutor,
+    V: VMBlockExecutor,
 {
     fn committed_block_id(&self) -> HashValue {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "committed_block_id"]);
@@ -176,26 +151,26 @@ where
 struct BlockExecutorInner<V> {
     db: DbReaderWriter,
     block_tree: BlockTree,
-    phantom: PhantomData<V>,
+    block_executor: V,
 }
 
 impl<V> BlockExecutorInner<V>
 where
-    V: TransactionBlockExecutor,
+    V: VMBlockExecutor,
 {
     pub fn new(db: DbReaderWriter) -> Result<Self> {
         let block_tree = BlockTree::new(&db.reader)?;
         Ok(Self {
             db,
             block_tree,
-            phantom: PhantomData,
+            block_executor: V::new(),
         })
     }
 }
 
 impl<V> BlockExecutorInner<V>
 where
-    V: TransactionBlockExecutor,
+    V: VMBlockExecutor,
 {
     fn committed_block_id(&self) -> HashValue {
         self.block_tree.root_block().id
@@ -207,7 +182,7 @@ where
         parent_block_id: HashValue,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<()> {
-        let _timer = EXECUTE_BLOCK.start_timer();
+        let _timer = BLOCK_EXECUTION_WORKFLOW_WHOLE.start_timer();
         let ExecutableBlock {
             block_id,
             transactions,
@@ -253,17 +228,19 @@ where
                 };
 
                 let execution_output = {
-                    let _timer = VM_EXECUTE_BLOCK.start_timer();
-                    fail_point!("executor::vm_execute_block", |_| {
+                    let _timer = GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.start_timer();
+                    fail_point!("executor::block_executor_execute_block", |_| {
                         Err(ExecutorError::from(anyhow::anyhow!(
-                            "Injected error in vm_execute_block"
+                            "Injected error in block_executor_execute_block"
                         )))
                     });
-                    V::execute_transaction_block(
+
+                    DoGetExecutionOutput::by_transaction_execution(
+                        &self.block_executor,
                         transactions,
                         state_view,
                         onchain_config.clone(),
-                        Some(block_id),
+                        TransactionSliceMetadata::block(parent_block_id, block_id),
                     )?
                 };
 

@@ -6,7 +6,9 @@
 
 use crate::{
     account_address::{self, AccountAddress},
-    account_config::{AccountResource, CoinStoreResource},
+    account_config::{
+        AccountResource, CoinStoreResource, NewEpochEvent, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
+    },
     aggregate_signature::PartialSignatures,
     block_info::{BlockInfo, Round},
     block_metadata::BlockMetadata,
@@ -1163,6 +1165,11 @@ impl BlockGen {
         self,
         universe: &mut AccountInfoUniverse,
     ) -> (Vec<TransactionToCommit>, LedgerInfo) {
+        let num_txns = self.txn_gens.len() + 1;
+
+        // materialize ledger info
+        let ledger_info = self.ledger_info_gen.materialize(universe, num_txns);
+
         let mut txns_to_commit = Vec::new();
 
         // materialize user transactions
@@ -1179,15 +1186,17 @@ impl BlockGen {
             ),
             arr![HashMap::new(); 16],
             WriteSet::default(),
-            Vec::new(),
-            false,
+            if ledger_info.ends_epoch() {
+                vec![ContractEvent::new_v2(
+                    NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(),
+                    bcs::to_bytes(&NewEpochEvent::dummy()).unwrap(),
+                )]
+            } else {
+                vec![]
+            },
+            ledger_info.ends_epoch(),
             TransactionAuxiliaryData::default(),
         ));
-
-        // materialize ledger info
-        let ledger_info = self
-            .ledger_info_gen
-            .materialize(universe, txns_to_commit.len());
 
         (txns_to_commit, ledger_info)
     }

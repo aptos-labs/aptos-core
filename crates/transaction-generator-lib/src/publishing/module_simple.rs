@@ -126,6 +126,8 @@ pub enum AutomaticArgs {
 // More info in the Simple.move
 #[derive(Debug, Copy, Clone)]
 pub enum EntryPoints {
+    /// Republish the module
+    Republish,
     /// Empty (NoOp) function
     Nop,
     /// Empty (NoOp) function, signed by publisher as fee-payer
@@ -277,7 +279,8 @@ pub enum EntryPoints {
 impl EntryPoints {
     pub fn package_name(&self) -> &'static str {
         match self {
-            EntryPoints::Nop
+            EntryPoints::Republish
+            | EntryPoints::Nop
             | EntryPoints::NopFeePayer
             | EntryPoints::Nop2Signers
             | EntryPoints::Nop5Signers
@@ -334,7 +337,8 @@ impl EntryPoints {
 
     pub fn module_name(&self) -> &'static str {
         match self {
-            EntryPoints::Nop
+            EntryPoints::Republish
+            | EntryPoints::Nop
             | EntryPoints::NopFeePayer
             | EntryPoints::Nop2Signers
             | EntryPoints::Nop5Signers
@@ -394,11 +398,20 @@ impl EntryPoints {
 
     pub fn create_payload(
         &self,
-        module_id: ModuleId,
+        package: &Package,
+        module_name: &str,
         rng: Option<&mut StdRng>,
         other: Option<&AccountAddress>,
     ) -> TransactionPayload {
+        let module_id = package.get_module_id(module_name);
         match self {
+            EntryPoints::Republish => {
+                let (metadata_serialized, code) = package.get_publish_args();
+                get_payload(module_id, ident_str!("publish_p").to_owned(), vec![
+                    bcs::to_bytes(&metadata_serialized).unwrap(),
+                    bcs::to_bytes(&code).unwrap(),
+                ])
+            },
             // 0 args
             EntryPoints::Nop | EntryPoints::NopFeePayer => {
                 get_payload_void(module_id, ident_str!("nop").to_owned())
@@ -765,6 +778,7 @@ impl EntryPoints {
 
     pub fn multi_sig_additional_num(&self) -> MultiSigConfig {
         match self {
+            EntryPoints::Republish => MultiSigConfig::Publisher,
             EntryPoints::NopFeePayer => MultiSigConfig::FeePayerPublisher,
             EntryPoints::Nop2Signers => MultiSigConfig::Random(1),
             EntryPoints::Nop5Signers => MultiSigConfig::Random(4),
@@ -784,6 +798,7 @@ impl EntryPoints {
 
     pub fn automatic_args(&self) -> AutomaticArgs {
         match self {
+            EntryPoints::Republish => AutomaticArgs::Signer,
             EntryPoints::Nop
             | EntryPoints::NopFeePayer
             | EntryPoints::Step
@@ -879,18 +894,26 @@ const GEN_ENTRY_POINTS: &[EntryPoints; 12] = &[
     EntryPoints::BytesMakeOrChange { data_length: None },
 ];
 
-pub fn rand_simple_function(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
+pub fn rand_simple_function(
+    package: &Package,
+    module_name: &str,
+    rng: &mut StdRng,
+) -> TransactionPayload {
     SIMPLE_ENTRY_POINTS
         .choose(rng)
         .unwrap()
-        .create_payload(module_id, Some(rng), None)
+        .create_payload(package, module_name, Some(rng), None)
 }
 
-pub fn rand_gen_function(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
+pub fn rand_gen_function(
+    package: &Package,
+    module_name: &str,
+    rng: &mut StdRng,
+) -> TransactionPayload {
     GEN_ENTRY_POINTS
         .choose(rng)
         .unwrap()
-        .create_payload(module_id, Some(rng), None)
+        .create_payload(package, module_name, Some(rng), None)
 }
 
 //

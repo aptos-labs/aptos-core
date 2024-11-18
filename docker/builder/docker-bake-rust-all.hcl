@@ -145,6 +145,7 @@ target "_common" {
     GIT_TAG    = "${GIT_TAG}"
     BUILD_DATE = "${BUILD_DATE}"
   }
+  output     = ["type=image,compression=zstd,force-compression=true"]
 }
 
 target "validator-testing" {

@@ -810,7 +810,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         self.execution_client
             .start_epoch(
-                consensus_key,
+                consensus_key.clone(),
                 epoch_state.clone(),
                 safety_rules_container.clone(),
                 payload_manager.clone(),
@@ -823,7 +823,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 recovery_data.root_block().round(),
             )
             .await;
+        let consensus_sk =
+            consensus_key.expect("consensus key unavailable for ExecutionProxyClient");
 
+        let maybe_pipeline_builder = if self.config.enable_pipeline {
+            let signer = Arc::new(ValidatorSigner::new(self.author, consensus_sk));
+            Some(self.execution_client.pipeline_builder(signer))
+        } else {
+            None
+        };
         info!(epoch = epoch, "Create BlockStore");
         // Read the last vote, before "moving" `recovery_data`
         let last_vote = recovery_data.last_vote();
@@ -837,6 +845,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             payload_manager,
             onchain_consensus_config.order_vote_enabled(),
             self.pending_blocks.clone(),
+            maybe_pipeline_builder,
         ));
 
         let failures_tracker = Arc::new(Mutex::new(ExponentialWindowFailureTracker::new(
@@ -845,6 +854,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         )));
         let opt_qs_payload_param_provider = Arc::new(OptQSPullParamsProvider::new(
             self.config.quorum_store.enable_opt_quorum_store,
+            self.config.quorum_store.opt_qs_minimum_batch_age_usecs,
             failures_tracker.clone(),
         ));
 

@@ -4,6 +4,10 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 
+## [4.5.0] - 2024/11/15
+- Determine network from URL to make explorer links better for legacy users
+- Add support for AIP-80 compliant strings when importing using the CLI arguments or manual input.
+
 ## [4.4.0] - 2024/11/06
 - Fix typos in `aptos move compile` help text.
 - Update the default version of `movefmt` to be installed from 1.0.5 to 1.0.6

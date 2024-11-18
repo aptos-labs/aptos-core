@@ -14,7 +14,10 @@ use crate::{
 };
 use aptos_abstract_gas_usage::CalibrationAlgebra;
 use aptos_bitvec::BitVec;
-use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::{
+    code_cache_global_manager::AptosModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
+    txn_provider::default::DefaultTxnProvider,
+};
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
 use aptos_gas_algebra::DynamicExpression;
@@ -26,8 +29,12 @@ use aptos_types::{
         new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource,
         ConcurrentSupplyResource, NewBlockEvent, ObjectGroupResource, CORE_CODE_ADDRESS,
     },
-    block_executor::config::{
-        BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
+    block_executor::{
+        config::{
+            BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
+            BlockExecutorModuleCacheLocalConfig,
+        },
+        execution_state::TransactionSliceMetadata,
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -619,7 +626,7 @@ impl FakeExecutor {
 
     fn execute_transaction_block_impl_with_state_view(
         &self,
-        txn_block: &[SignatureVerifiedTransaction],
+        txn_block: Vec<SignatureVerifiedTransaction>,
         onchain_config: BlockExecutorConfigFromOnchain,
         sequential: bool,
         state_view: &(impl StateView + Sync),
@@ -633,17 +640,23 @@ impl FakeExecutor {
                 },
                 allow_fallback: self.allow_block_executor_fallback,
                 discard_failed_blocks: false,
+                module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
             },
             onchain: onchain_config,
         };
-        BlockAptosVM::execute_block_on_thread_pool_without_global_module_cache::<
+        let txn_provider = DefaultTxnProvider::new(txn_block);
+        BlockAptosVM::execute_block_on_thread_pool::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+            _,
         >(
             self.executor_thread_pool.clone(),
-            txn_block,
+            &txn_provider,
             &state_view,
+            // Do not use shared module caches in tests.
+            &AptosModuleCacheManager::new(),
             config,
+            TransactionSliceMetadata::unknown(),
             None,
         )
         .map(BlockOutput::into_transaction_outputs_forced)
@@ -682,7 +695,7 @@ impl FakeExecutor {
 
         let sequential_output = if mode != ExecutorMode::ParallelOnly {
             Some(self.execute_transaction_block_impl_with_state_view(
-                &sig_verified_block,
+                sig_verified_block.clone(),
                 onchain_config.clone(),
                 true,
                 state_view,
@@ -693,7 +706,7 @@ impl FakeExecutor {
 
         let parallel_output = if mode != ExecutorMode::SequentialOnly {
             Some(self.execute_transaction_block_impl_with_state_view(
-                &sig_verified_block,
+                sig_verified_block,
                 onchain_config,
                 false,
                 state_view,
