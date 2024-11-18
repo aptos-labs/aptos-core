@@ -2,7 +2,7 @@
 FROM debian-base AS tools
 
 # TODO upgrade to bookworm
-RUN echo "deb https://cloudfront.debian.net/debian/ bullseye main" > /etc/apt/sources.list.d/bullseye.list && \
+RUN echo "deb https://cloudfront.debian.net/debian/ bullseye main contrib" > /etc/apt/sources.list.d/bullseye.list && \
     echo "Package: *\nPin: release n=bullseye\nPin-Priority: 50" > /etc/apt/preferences.d/bullseye
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \

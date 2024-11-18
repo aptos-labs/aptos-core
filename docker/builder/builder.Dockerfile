@@ -3,9 +3,9 @@
 FROM rust as rust-base
 WORKDIR /aptos
 
-# Current debian base is bookworm, pin to prevent unexpected changes
-RUN echo "deb https://cloudfront.debian.net/debian/ bookworm main" > /etc/apt/sources.list.d/bookworm.list && \
-    echo "Package: *\nPin: release n=bookworm\nPin-Priority: 50" > /etc/apt/preferences.d/bookworm
+# Current debian base used in build is bullseye, pin to prevent unexpected changes
+RUN echo "deb https://cloudfront.debian.net/debian/ bullseye main contrib" > /etc/apt/sources.list.d/bullseye.list && \
+    echo "Package: *\nPin: release n=bullseye\nPin-Priority: 50" > /etc/apt/preferences.d/bullseye
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
