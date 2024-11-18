@@ -6,22 +6,14 @@ FROM tools-builder
 
 FROM debian-base AS validator
 
-# Current debian base used in build is bullseye, pin to prevent unexpected changes
-
-
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install --no-install-recommends -y \
-        libssl1.1 \
-        ca-certificates \
         # Needed to run debugging tools like perf
         linux-perf \
         sudo \
         procps \
-        gdb \
-        curl \
-        # postgres client lib required for indexer
-        libpq-dev
+        gdb
 
 ### Because build machine perf might not match run machine perf, we have to symlink
 ### Even if version slightly off, still mostly works
