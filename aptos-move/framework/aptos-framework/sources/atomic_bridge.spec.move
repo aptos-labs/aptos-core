@@ -43,6 +43,7 @@ spec aptos_framework::atomic_bridge_store {
 
         aborts_if len(bridge_transfer_id) != 32;
         aborts_if smart_table::spec_contains(table, bridge_transfer_id);
+        aborts_if !features::spec_is_enabled(features::ATOMIC_BRIDGE);
     }
 
     spec add<Initiator: store, Recipient: store>(bridge_transfer_id: vector<u8>, details: BridgeTransferDetails<Initiator, Recipient>) {
@@ -80,6 +81,7 @@ spec aptos_framework::atomic_bridge_store {
 
     spec complete_transfer<Initiator: store, Recipient: copy + store>(bridge_transfer_id: vector<u8>, hash_lock: vector<u8>) : (Recipient, u64) {
         let table = global<SmartTableWrapper<vector<u8>, BridgeTransferDetails<Initiator, Recipient>>>(@aptos_framework).inner;
+        aborts_if !features::spec_is_enabled(features::ATOMIC_BRIDGE);
         aborts_if !exists<SmartTableWrapper<vector<u8>, BridgeTransferDetails<Initiator, Recipient>>>(@aptos_framework);
         aborts_if !smart_table::spec_contains(table, bridge_transfer_id);
         let details = smart_table::spec_get(table, bridge_transfer_id);
