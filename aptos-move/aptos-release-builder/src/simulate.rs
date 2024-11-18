@@ -26,6 +26,7 @@ use aptos::{
     common::types::PromptOptions, governance::compile_in_temp_dir, move_tool::FrameworkPackageArgs,
 };
 use aptos_crypto::HashValue;
+use aptos_gas_profiling::GasProfiler;
 use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_language_e2e_tests::account::AccountData;
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
@@ -510,6 +511,7 @@ pub async fn simulate_multistep_proposal(
     remote_url: Url,
     proposal_dir: &Path,
     proposal_scripts: &[PathBuf],
+    profile_gas: bool,
 ) -> Result<()> {
     println!("Simulating proposal at {}", proposal_dir.display());
 
@@ -626,28 +628,51 @@ pub async fn simulate_multistep_proposal(
         let resolver = state_view.as_move_resolver();
         let code_storage = state_view.as_aptos_code_storage(env);
 
-        let (_vm_status, vm_output) = vm.execute_user_transaction(
-            &resolver,
-            &code_storage,
-            &account
-                .account()
-                .transaction()
-                .script(Script::new(script_blob, vec![], vec![
-                    TransactionArgument::U64(DUMMY_PROPOSAL_ID), // dummy proposal id, ignored by the patched function
-                ]))
-                .chain_id(chain_id.chain_id())
-                .sequence_number(script_idx as u64)
-                .gas_unit_price(gas_params.vm.txn.min_price_per_gas_unit.into())
-                .max_gas_amount(100000)
-                .ttl(u64::MAX)
-                .sign(),
-            &log_context,
-        );
+        let txn = account
+            .account()
+            .transaction()
+            .script(Script::new(script_blob, vec![], vec![
+                TransactionArgument::U64(DUMMY_PROPOSAL_ID), // dummy proposal id, ignored by the patched function
+            ]))
+            .chain_id(chain_id.chain_id())
+            .sequence_number(script_idx as u64)
+            .gas_unit_price(gas_params.vm.txn.min_price_per_gas_unit.into())
+            .max_gas_amount(100000)
+            .ttl(u64::MAX)
+            .sign();
+
+        let vm_output = if !profile_gas {
+            let (_vm_status, vm_output) =
+                vm.execute_user_transaction(&resolver, &code_storage, &txn, &log_context);
+            vm_output
+        } else {
+            let (_vm_status, vm_output, gas_profiler) = vm
+                .execute_user_transaction_with_modified_gas_meter(
+                    &resolver,
+                    &code_storage,
+                    &txn,
+                    &log_context,
+                    GasProfiler::new_script,
+                )?;
+
+            let gas_log = gas_profiler.finish();
+            let report_path = proposal_dir
+                .join("gas-profiling")
+                .join(script_path.file_stem().unwrap());
+            gas_log.generate_html_report(&report_path, format!("Gas Report - {}", script_name))?;
+
+            println!("        Gas report saved to {}", report_path.display());
+
+            vm_output
+        };
         // TODO: ensure all scripts trigger reconfiguration.
 
         let txn_output = vm_output
             .try_materialize_into_transaction_output(&resolver)
             .context("failed to materialize transaction output")?;
+
+        println!("        Gas used: {}", txn_output.gas_used());
+
         let txn_status = txn_output.status();
         match txn_status {
             TransactionStatus::Keep(ExecutionStatus::Success) => {
@@ -710,7 +735,11 @@ pub fn collect_proposals(root_dir: &Path) -> Result<Vec<(PathBuf, Vec<PathBuf>)>
     Ok(result)
 }
 
-pub async fn simulate_all_proposals(remote_url: Url, output_dir: &Path) -> Result<()> {
+pub async fn simulate_all_proposals(
+    remote_url: Url,
+    output_dir: &Path,
+    profile_gas: bool,
+) -> Result<()> {
     let proposals =
         collect_proposals(output_dir).context("failed to collect proposals for simulation")?;
 
@@ -735,11 +764,14 @@ pub async fn simulate_all_proposals(remote_url: Url, output_dir: &Path) -> Resul
     }
 
     for (proposal_dir, proposal_scripts) in &proposals {
-        simulate_multistep_proposal(remote_url.clone(), proposal_dir, proposal_scripts)
-            .await
-            .with_context(|| {
-                format!("failed to simulate proposal at {}", proposal_dir.display())
-            })?;
+        simulate_multistep_proposal(
+            remote_url.clone(),
+            proposal_dir,
+            proposal_scripts,
+            profile_gas,
+        )
+        .await
+        .with_context(|| format!("failed to simulate proposal at {}", proposal_dir.display()))?;
     }
 
     println!("All proposals succeeded!");
