@@ -199,8 +199,13 @@ impl LocalAccount {
             let exp_timestamp_secs = now_secs + 7 * 86400; // + 7 days
             let exp_horizon_secs = 100 * 86400; // 100 days
             let blinder = vec![0x01; 31];
-            let eph_key_pair =
-                EphemeralKeyPair::new(&config, esk, exp_timestamp_secs, blinder).unwrap();
+            let eph_key_pair = EphemeralKeyPair::new_with_keyless_config(
+                &config,
+                esk,
+                exp_timestamp_secs,
+                blinder,
+            )
+            .unwrap();
 
             // Simulation of OIDC provider processing.
             let iss = keyless::test_utils::get_sample_iss();
@@ -648,6 +653,19 @@ pub struct EphemeralKeyPair {
 
 impl EphemeralKeyPair {
     pub fn new(
+        private_key: EphemeralPrivateKey,
+        expiry_date_secs: u64,
+        blinder: Vec<u8>,
+    ) -> Result<Self> {
+        Self::new_with_keyless_config(
+            &Configuration::new_for_devnet(),
+            private_key,
+            expiry_date_secs,
+            blinder,
+        )
+    }
+
+    pub fn new_with_keyless_config(
         config: &Configuration,
         private_key: EphemeralPrivateKey,
         expiry_date_secs: u64,
@@ -666,7 +684,6 @@ impl EphemeralKeyPair {
     }
 
     pub fn new_ed25519(
-        config: &keyless::Configuration,
         private_key: Ed25519PrivateKey,
         expiry_date_secs: u64,
         blinder: Vec<u8>,
@@ -674,7 +691,7 @@ impl EphemeralKeyPair {
         let esk = EphemeralPrivateKey::Ed25519 {
             inner_private_key: private_key,
         };
-        Self::new(config, esk, expiry_date_secs, blinder)
+        Self::new(esk, expiry_date_secs, blinder)
     }
 }
 
@@ -1066,7 +1083,6 @@ mod tests {
     #[ignore]
     #[tokio::test]
     async fn test_derive_keyless_account() {
-        let config = Configuration::new_for_testing();
         let aptos_rest_client = Client::builder(AptosBaseUrl::Devnet).build();
         // This JWT is taken from https://github.com/aptos-labs/aptos-ts-sdk/blob/f644e61beb70e69dfd489e75287c67b527385135/tests/e2e/api/keyless.test.ts#L11
         // As is the ephemeralKeyPair
@@ -1077,7 +1093,7 @@ mod tests {
                 .unwrap();
         let esk = Ed25519PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
         let ephemeral_key_pair =
-            EphemeralKeyPair::new_ed25519(&config, esk, 1735475012, vec![0; 31]).unwrap();
+            EphemeralKeyPair::new_ed25519(esk, 1735475012, vec![0; 31]).unwrap();
         let mut account = derive_keyless_account(&aptos_rest_client, jwt, ephemeral_key_pair, None)
             .await
             .unwrap();

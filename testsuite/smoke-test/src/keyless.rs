@@ -326,7 +326,7 @@ script {{
     };
     let rest_cli = swarm.validators().next().unwrap().rest_client();
     let config = get_on_chain_resource(&rest_cli).await;
-    let ephemeral_key_pair = EphemeralKeyPair::new(
+    let ephemeral_key_pair = EphemeralKeyPair::new_with_keyless_config(
         &config,
         esk,
         get_sample_exp_date(),
@@ -443,7 +443,7 @@ async fn test_keyless_groth16_verifies_using_rust_sdk() {
     let esk = EphemeralPrivateKey::Ed25519 {
         inner_private_key: get_sample_esk(),
     };
-    let ephemeral_key_pair = EphemeralKeyPair::new(
+    let ephemeral_key_pair = EphemeralKeyPair::new_with_keyless_config(
         &config,
         esk,
         get_sample_exp_date(),
@@ -511,7 +511,7 @@ async fn test_keyless_groth16_verifies_using_rust_sdk_from_jwt() {
         inner_private_key: get_sample_esk(),
     };
 
-    let ephemeral_key_pair = EphemeralKeyPair::new(
+    let ephemeral_key_pair = EphemeralKeyPair::new_with_keyless_config(
         &config,
         esk,
         get_sample_exp_date(),
