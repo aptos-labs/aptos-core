@@ -13,6 +13,7 @@
 -  [Function `to_eip55_checksumed_address`](#0x1_ethereum_to_eip55_checksumed_address)
 -  [Function `get_inner`](#0x1_ethereum_get_inner)
 -  [Function `assert_eip55`](#0x1_ethereum_assert_eip55)
+-  [Function `assert_40_char_hex`](#0x1_ethereum_assert_40_char_hex)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_aptos_hash">0x1::aptos_hash</a>;
@@ -142,6 +143,7 @@ Returns a new <code><a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">Ethe
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="atomic_bridge.md#0x1_ethereum_ethereum_address_no_eip55">ethereum_address_no_eip55</a>(ethereum_address: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">EthereumAddress</a> {
+    <a href="atomic_bridge.md#0x1_ethereum_assert_40_char_hex">assert_40_char_hex</a>(&ethereum_address);
     <a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">EthereumAddress</a> { inner: ethereum_address }
 }
 </code></pre>
@@ -286,6 +288,59 @@ Checks if an Ethereum address conforms to the EIP-55 checksum standard.
     for (index in 0..len) {
         <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&eip55, index) == <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(ethereum_address, index), 0);
     };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_ethereum_assert_40_char_hex"></a>
+
+## Function `assert_40_char_hex`
+
+Checks if an Ethereum address is a nonzero 40-character hexadecimal string.
+
+@param ethereum_address A reference to a vector of bytes representing the Ethereum address as characters.
+@abort If the address is not 40 characters long, contains invalid characters, or is all zeros.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="atomic_bridge.md#0x1_ethereum_assert_40_char_hex">assert_40_char_hex</a>(ethereum_address: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="atomic_bridge.md#0x1_ethereum_assert_40_char_hex">assert_40_char_hex</a>(ethereum_address: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
+    <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(ethereum_address);
+
+    // Ensure the <b>address</b> is exactly 40 characters long
+    <b>assert</b>!(len == 40, 1);
+
+    // Ensure the <b>address</b> contains only valid hexadecimal characters
+    <b>let</b> is_zero = <b>true</b>;
+    for (index in 0..len) {
+        <b>let</b> char = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(ethereum_address, index);
+
+        // Check <b>if</b> the character is a valid hexadecimal character (0-9, a-f, A-F)
+        <b>assert</b>!(
+            (char &gt;= 0x30 && char &lt;= 0x39) || // '0' <b>to</b> '9'
+            (char &gt;= 0x41 && char &lt;= 0x46) || // 'A' <b>to</b> 'F'
+            (char &gt;= 0x61 && char &lt;= 0x66),  // 'a' <b>to</b> 'f'
+            2
+        );
+
+        // Check <b>if</b> the <b>address</b> is nonzero
+        <b>if</b> (char != 0x30) { // '0'
+            is_zero = <b>false</b>;
+        };
+    };
+
+    // Abort <b>if</b> the <b>address</b> is all zeros
+    <b>assert</b>!(!is_zero, 3);
 }
 </code></pre>
 
@@ -1467,6 +1522,7 @@ If the sum of <code><a href="atomic_bridge.md#0x1_atomic_bridge_store_now">now</
     <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>: SmartTable&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, T&gt;;
     <b>aborts_if</b> len(bridge_transfer_id) != 32;
     <b>aborts_if</b> <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_spec_contains">smart_table::spec_contains</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>, bridge_transfer_id);
+    <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_ATOMIC_BRIDGE">features::ATOMIC_BRIDGE</a>);
 }
 </code></pre>
 
@@ -1601,6 +1657,7 @@ If the sum of <code><a href="atomic_bridge.md#0x1_atomic_bridge_store_now">now</
 
 
 <pre><code><b>let</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a> = <b>global</b>&lt;<a href="atomic_bridge.md#0x1_atomic_bridge_store_SmartTableWrapper">SmartTableWrapper</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="atomic_bridge.md#0x1_atomic_bridge_store_BridgeTransferDetails">BridgeTransferDetails</a>&lt;Initiator, Recipient&gt;&gt;&gt;(@aptos_framework).inner;
+<b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_ATOMIC_BRIDGE">features::ATOMIC_BRIDGE</a>);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="atomic_bridge.md#0x1_atomic_bridge_store_SmartTableWrapper">SmartTableWrapper</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="atomic_bridge.md#0x1_atomic_bridge_store_BridgeTransferDetails">BridgeTransferDetails</a>&lt;Initiator, Recipient&gt;&gt;&gt;(@aptos_framework);
 <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_spec_contains">smart_table::spec_contains</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>, bridge_transfer_id);
 <b>let</b> details = <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_spec_get">smart_table::spec_get</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>, bridge_transfer_id);
@@ -3055,7 +3112,7 @@ The amount is burnt from the initiator
     hash_lock: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     amount: u64
 ) <b>acquires</b> <a href="atomic_bridge.md#0x1_atomic_bridge_initiator_BridgeInitiatorEvents">BridgeInitiatorEvents</a> {
-    <b>let</b> ethereum_address = <a href="atomic_bridge.md#0x1_ethereum_ethereum_address">ethereum::ethereum_address</a>(recipient);
+    <b>let</b> ethereum_address = <a href="atomic_bridge.md#0x1_ethereum_ethereum_address_no_eip55">ethereum::ethereum_address_no_eip55</a>(recipient);
     <b>let</b> initiator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(initiator);
     <b>let</b> time_lock = <a href="atomic_bridge.md#0x1_atomic_bridge_configuration_initiator_timelock_duration">atomic_bridge_configuration::initiator_timelock_duration</a>();
 

@@ -30,6 +30,7 @@ module aptos_framework::ethereum {
     /// @return A validated `EthereumAddress` struct.
     /// @abort If the address does not conform to EIP-55 standards.
     public fun ethereum_address_no_eip55(ethereum_address: vector<u8>): EthereumAddress {
+        assert_40_char_hex(&ethereum_address);
         EthereumAddress { inner: ethereum_address }
     }
 
@@ -101,6 +102,39 @@ module aptos_framework::ethereum {
         for (index in 0..len) {
             assert!(vector::borrow(&eip55, index) == vector::borrow(ethereum_address, index), 0);
         };
+    }
+
+    /// Checks if an Ethereum address is a nonzero 40-character hexadecimal string.
+    ///
+    /// @param ethereum_address A reference to a vector of bytes representing the Ethereum address as characters.
+    /// @abort If the address is not 40 characters long, contains invalid characters, or is all zeros.
+    public fun assert_40_char_hex(ethereum_address: &vector<u8>) {
+        let len = vector::length(ethereum_address);
+
+        // Ensure the address is exactly 40 characters long
+        assert!(len == 40, 1);
+
+        // Ensure the address contains only valid hexadecimal characters
+        let is_zero = true;
+        for (index in 0..len) {
+            let char = *vector::borrow(ethereum_address, index);
+
+            // Check if the character is a valid hexadecimal character (0-9, a-f, A-F)
+            assert!(
+                (char >= 0x30 && char <= 0x39) || // '0' to '9'
+                (char >= 0x41 && char <= 0x46) || // 'A' to 'F'
+                (char >= 0x61 && char <= 0x66),  // 'a' to 'f'
+                2
+            );
+
+            // Check if the address is nonzero
+            if (char != 0x30) { // '0'
+                is_zero = false;
+            };
+        };
+
+        // Abort if the address is all zeros
+        assert!(!is_zero, 3);
     }
 
     #[test_only]
