@@ -23,7 +23,7 @@ pub trait AptosMoveResolver:
     + ModuleResolver
     + ResourceResolver
     + ResourceGroupResolver
-    + StateStorageView
+    + StateStorageView<Key = StateKey>
     + TableResolver
     + AsExecutorView
     + AsResourceGroupView

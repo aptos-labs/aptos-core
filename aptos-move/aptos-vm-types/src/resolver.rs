@@ -176,7 +176,12 @@ pub trait TModuleView {
 
 /// Allows to query state information, e.g. its usage.
 pub trait StateStorageView {
+    type Key;
+
     fn id(&self) -> StateViewId;
+
+    /// Reads the state value from the DB. Used to enforce read-before-write for module writes.
+    fn read_state_value(&self, state_key: &Self::Key) -> Result<(), StateviewError>;
 
     fn get_usage(&self) -> Result<StateStorageUsage, StateviewError>;
 }
@@ -203,7 +208,7 @@ pub trait TExecutorView<K, T, L, I, V>:
     + TModuleView<Key = K>
     + TAggregatorV1View<Identifier = K>
     + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
-    + StateStorageView
+    + StateStorageView<Key = K>
 {
 }
 
@@ -212,7 +217,7 @@ impl<A, K, T, L, I, V> TExecutorView<K, T, L, I, V> for A where
         + TModuleView<Key = K>
         + TAggregatorV1View<Identifier = K>
         + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
-        + StateStorageView
+        + StateStorageView<Key = K>
 {
 }
 
@@ -278,8 +283,15 @@ impl<S> StateStorageView for S
 where
     S: StateView,
 {
+    type Key = StateKey;
+
     fn id(&self) -> StateViewId {
         self.id()
+    }
+
+    fn read_state_value(&self, state_key: &Self::Key) -> Result<(), StateviewError> {
+        self.get_state_value(state_key)?;
+        Ok(())
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {

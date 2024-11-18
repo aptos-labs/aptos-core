@@ -944,6 +944,19 @@ mod tests {
     }
 
     #[test]
+    fn test_publish_transaction() {
+        AptosVM::set_num_shards_once(1);
+        AptosVM::set_concurrency_level_once(4);
+        AptosVM::set_processed_transactions_detailed_counters();
+        for _ in 0..10 {
+            test_generic_benchmark::<AptosVMBlockExecutor>(
+                Some(TransactionTypeArg::RepublishAndCall),
+                true,
+            );
+        }
+    }
+
+    #[test]
     fn test_benchmark_transaction() {
         AptosVM::set_num_shards_once(1);
         AptosVM::set_concurrency_level_once(4);
