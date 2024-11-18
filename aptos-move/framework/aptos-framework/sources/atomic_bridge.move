@@ -228,7 +228,7 @@ module aptos_framework::atomic_bridge_initiator {
 
     /// Increment and get the current nonce  
     fun increment_and_get_nonce(signer: address): u64 acquires Nonce {  
-        let nonce_ref = borrow_global_mut<Nonce>(signer);  
+        let nonce_ref = borrow_global_mut<Nonce>(@aptos_framework);  
         nonce_ref.value = nonce_ref.value + 1;  
         nonce_ref.value  
     }  
@@ -311,7 +311,7 @@ module aptos_framework::atomic_bridge_initiator {
         initiator: &signer,  
         recipient: vector<u8>,  
         amount: u64  
-    ) acquires Nonce {  
+    ) acquires BridgeInitiatorEvents, Nonce {  
         let initiator_address = signer::address_of(initiator);  
         let ethereum_address = ethereum::ethereum_address(recipient);  
     
@@ -335,8 +335,11 @@ module aptos_framework::atomic_bridge_initiator {
         // Burn the amount from the initiator  
         atomic_bridge::burn(initiator_address, amount);  
     
+        let bridge_initiator_events = borrow_global_mut<BridgeInitiatorEvents>(@aptos_framework);
+
         // Emit an event with nonce  
-        event::emit(  
+        event::emit_event(  
+             &mut bridge_initiator_events.bridge_transfer_initiated_simplified_events,
             BridgeTransferInitiatedSimplifiedEvent {  
                 bridge_transfer_id,  
                 initiator: initiator_address,  
@@ -425,6 +428,47 @@ module aptos_framework::atomic_bridge_initiator {
         assert!(bridge_transfer_initiated_event.initiator == sender_address, 0);
         assert!(bridge_transfer_initiated_event.hash_lock == hash_lock, 0);
         assert!(bridge_transfer_initiated_event.time_lock == time_lock, 0);
+    }
+
+    #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
+    fun test_initiate_bridge_transfer_simplified(
+        sender: &signer,
+        aptos_framework: &signer,
+    ) acquires BridgeInitiatorEvents, Nonce {
+        let sender_address = signer::address_of(sender);
+        // Create an account for our recipient
+        atomic_bridge::initialize_for_test(aptos_framework);
+        aptos_account::create_account(sender_address);
+        initialize(aptos_framework);
+
+        let recipient = valid_eip55();
+        let hash_lock = valid_hash_lock();
+        let time_lock = atomic_bridge_configuration::initiator_timelock_duration();
+        let amount = 1000;
+
+        // Mint some coins
+        atomic_bridge::mint(sender_address, amount + 1);
+
+        assert!(coin::balance<AptosCoin>(sender_address) == amount + 1, 0);
+
+        initiate_bridge_transfer_simplified(
+            sender,
+            recipient,
+            amount,
+        );
+
+        assert!(coin::balance<AptosCoin>(sender_address) == 1, 0);
+
+        let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(@aptos_framework);
+        let bridge_transfer_initiated_simplified_events = event::emitted_events_by_handle(
+            &bridge_initiator_events.bridge_transfer_initiated_simplified_events
+        );   
+        let bridge_transfer_initiated_simplified_event = vector::borrow(&bridge_transfer_initiated_simplified_events, 0);
+
+        assert_valid_bridge_transfer_id(&bridge_transfer_initiated_simplified_event.bridge_transfer_id);
+        assert!(bridge_transfer_initiated_simplified_event.initiator == sender_address, 0);
+        assert!(bridge_transfer_initiated_simplified_event.recipient == recipient, 0);
+        assert!(bridge_transfer_initiated_simplified_event.amount == amount, 0);
     }
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
@@ -796,11 +840,23 @@ module aptos_framework::atomic_bridge_store {
 
         move_to(aptos_framework, initiators);
 
+        let initiators_simplified = SmartTableWrapper<vector<u8>, BridgeTransferSimplifiedDetails<address, EthereumAddress>> {
+            inner: smart_table::new(),
+        };
+
+        move_to(aptos_framework, initiators_simplified);
+
         let counterparties = SmartTableWrapper<vector<u8>, BridgeTransferDetails<EthereumAddress, address>> {
             inner: smart_table::new(),
         };
 
         move_to(aptos_framework, counterparties);
+
+        let counterparties_simplified = SmartTableWrapper<vector<u8>, BridgeTransferSimplifiedDetails<EthereumAddress, address>> {
+            inner: smart_table::new(),
+        };
+
+        move_to(aptos_framework, counterparties_simplified);
     }
 
     /// Returns the current time in seconds.
