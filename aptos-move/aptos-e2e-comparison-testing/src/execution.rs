@@ -240,30 +240,36 @@ impl Execution {
                 let res_1: Arc<Mutex<Vec<(u64, std::result::Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>)>>> = Arc::new(Mutex::new(vec![]));
                 let res_1_copy: Arc<Mutex<Vec<(u64, std::result::Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>)>>> = res_1.clone();
 
-                let handle_v1 = std::thread::spawn(move || {
-                    for (v, txn_index, state) in data_state_c.iter() {
-                        let res = Self::execute_one_txn_with_result_alternative(*v, state, txn_index, &cache_copy_v1);
-                        res_1_copy.lock().unwrap().push((*v, res));
-                    }
-                });
+                // let handle_v1 = std::thread::spawn(move || {
+                //     for (v, txn_index, state) in data_state_c.iter() {
+                //         let res = Self::execute_one_txn_with_result_alternative(*v, state, txn_index, &cache_copy_v1);
+                //         res_1_copy.lock().unwrap().push((*v, res));
+                //     }
+                // });
 
-                let res_2: Arc<Mutex<Vec<(u64, std::result::Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>)>>> = Arc::new(Mutex::new(vec![]));
-                let res_2_copy: Arc<Mutex<Vec<(u64, std::result::Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>)>>> = res_2.clone();
-                let handle_v2 = std::thread::spawn(move || {
-                    for (v, txn_index, state) in data_state_copy.iter() {
-                        let res = Self::execute_one_txn_with_result_alternative(*v, state, txn_index, &cache_copy_v2);
-                        res_2_copy.lock().unwrap().push((*v, res));
-                    }
-                });
-                handle_v1.join().unwrap();
-                handle_v2.join().unwrap();
-                for ((v_1, r_1), (v_2, r_2)) in res_1.lock().unwrap().iter().zip(res_2.lock().unwrap().iter()) {
-                    if v_1 == v_2 {
-                        self.print_mismatches(*v_1, r_1, r_2, None);
-                    } else {
-                        eprint!("v1:{}, v2:{}", v_1, v_2);
-                    }
+                for (v, txn_index, state) in data_state_c.iter() {
+                    let res = Self::execute_one_txn_with_result_alternative(*v, state, txn_index, &cache_copy_v1);
+                    println!("res:{:?} at version:{}", res, v);
+                    res_1_copy.lock().unwrap().push((*v, res));
                 }
+
+                // let res_2: Arc<Mutex<Vec<(u64, std::result::Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>)>>> = Arc::new(Mutex::new(vec![]));
+                // let res_2_copy: Arc<Mutex<Vec<(u64, std::result::Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>)>>> = res_2.clone();
+                // let handle_v2 = std::thread::spawn(move || {
+                //     for (v, txn_index, state) in data_state_copy.iter() {
+                //         //let res = Self::execute_one_txn_with_result_alternative(*v, state, txn_index, &cache_copy_v2);
+                //         //res_2_copy.lock().unwrap().push((*v, res));
+                //     }
+                // });
+                // handle_v1.join().unwrap();
+                // handle_v2.join().unwrap();
+                // for ((v_1, r_1), (v_2, r_2)) in res_1.lock().unwrap().iter().zip(res_2.lock().unwrap().iter()) {
+                //     if v_1 == v_2 {
+                //         self.print_mismatches(*v_1, r_1, r_2, None);
+                //     } else {
+                //         eprint!("v1:{}, v2:{}", v_1, v_2);
+                //     }
+                // }
                 data_state = vec![];
                 versions = vec![];
                 if finish_early {
@@ -718,7 +724,7 @@ impl Execution {
         // Update features if needed to the correct binary format used by V2 compiler.
         let mut features = Features::fetch_config(&state).unwrap_or_default();
         features.enable(FeatureFlag::VM_BINARY_FORMAT_V7);
-        features.enable(FeatureFlag::ENABLE_LOADER_V2);
+        // features.enable(FeatureFlag::ENABLE_LOADER_V2);
         // if v2_flag {
         //     features.enable(FeatureFlag::FAKE_FEATURE_FOR_COMPARISON_TESTING);
         // }
