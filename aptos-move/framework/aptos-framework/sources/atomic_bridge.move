@@ -327,6 +327,7 @@ module aptos_framework::atomic_bridge_initiator {
         );  
     
         // Generate a unique bridge transfer ID  
+        // Todo: pass the nonce in here and modify the function to take a nonce. Or only use the nonce in atomic_bridge_store
         let bridge_transfer_id = atomic_bridge_store::bridge_transfer_id_simplified(&details);  
     
         // Add the transfer details to storage  
@@ -1124,6 +1125,7 @@ module aptos_framework::atomic_bridge_store {
         let combined_bytes = vector::empty<u8>();
         vector::append(&mut combined_bytes, bcs::to_bytes(&details.addresses.initiator));
         vector::append(&mut combined_bytes, bcs::to_bytes(&details.addresses.recipient));
+        vector::append(&mut combined_bytes, bcs::to_bytes(&details.amount));
         vector::append(&mut combined_bytes, bcs::to_bytes(&details.nonce));
         keccak256(combined_bytes)
     }
@@ -1627,6 +1629,9 @@ module aptos_framework::atomic_bridge_counterparty {
     use aptos_framework::signer;
     #[test_only]
     use aptos_framework::timestamp;
+    use aptos_std::aptos_hash::keccak256;
+    use std::bcs;
+    use std::vector;
 
     #[event]
     /// An event triggered upon locking assets for a bridge transfer
@@ -1774,10 +1779,30 @@ module aptos_framework::atomic_bridge_counterparty {
         atomic_bridge_configuration::assert_is_caller_operator(caller);  
         let ethereum_address = ethereum::ethereum_address_no_eip55(initiator);
 
-        // Todo: asserts that parameters are correct  
+        // Create bridge transfer details to check the parameters  
+        let details = atomic_bridge_store::create_details_simplified(  
+            recipient,  
+            initiator, 
+            amount,  
+            nonce  
+        );  
+
+        // Create a bridge transfer ID algorithmically
+        let bridge_transfer_id = atomic_bridge_store::bridge_transfer_id_simplified(&details);
+
+        let combined_bytes = vector::empty<u8>();
+        vector::append(&mut combined_bytes, bcs::to_bytes(&initiator));
+        vector::append(&mut combined_bytes, bcs::to_bytes(&recipient));
+        vector::append(&mut combined_bytes, bcs::to_bytes(&amount));
+        vector::append(&mut combined_bytes, bcs::to_bytes(&nonce));
+        assert!(keccak256(combined_bytes) == bridge_transfer_id, 0);
  
         // Mint to recipient  
         atomic_bridge::mint(recipient, amount);  
+
+        // Consume the details variable
+        atomic_bridge_store::add_simplified(bridge_transfer_id, details);
+
 
         let bridge_counterparty_events = borrow_global_mut<BridgeCounterpartyEvents>(@aptos_framework);
         event::emit_event(  
@@ -1932,11 +1957,20 @@ module aptos_framework::atomic_bridge_counterparty {
         initialize_for_test(aptos_framework);
         initialize(aptos_framework);
         let initiator = valid_eip55();
-        let bridge_transfer_id = valid_bridge_transfer_id();
-        let hash_lock = valid_hash_lock();
         let recipient = @0xcafe;
         let amount = 1;
         let nonce = 5;
+
+        // Create bridge transfer details to check the parameters  
+        let details = atomic_bridge_store::create_details_simplified(  
+            recipient,  
+            initiator, 
+            amount,  
+            nonce  
+        );  
+
+        // Create a bridge transfer ID algorithmically
+        let bridge_transfer_id = atomic_bridge_store::bridge_transfer_id_simplified(&details);
 
         // Create an account for our recipient
         aptos_account::create_account(recipient);
@@ -1961,7 +1995,10 @@ module aptos_framework::atomic_bridge_counterparty {
             amount,
             nonce,
         };
+
         assert!(std::vector::contains(&complete_events, &expected_event), 0);
+        atomic_bridge_store::add_simplified(bridge_transfer_id, details);
+
 
     }
 }
