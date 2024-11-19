@@ -73,26 +73,18 @@ fn test_publish_module_with_nested_loops() {
         let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
         let vm = MoveVM::new_with_runtime_environment(&runtime_environment);
 
-        let mut sess = vm.new_session(&storage);
         let module_storage = storage.as_unsync_code_storage(runtime_environment);
-        if vm.vm_config().use_loader_v2 {
-            let new_module_storage =
-                StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob
-                    .clone()
-                    .into()])
+        let new_module_storage =
+            StagingModuleStorage::create(&TEST_ADDR, &module_storage, vec![m_blob.clone().into()])
                 .expect("Module should be publishable");
-            load_and_run_functions(
-                &mut sess,
-                &new_module_storage,
-                &traversal_storage,
-                &m.self_id(),
-            );
-        } else {
-            #[allow(deprecated)]
-            sess.publish_module(m_blob.clone(), TEST_ADDR, &mut UnmeteredGasMeter)
-                .unwrap();
-            load_and_run_functions(&mut sess, &module_storage, &traversal_storage, &m.self_id());
-        };
+
+        let mut sess = vm.new_session(&storage);
+        load_and_run_functions(
+            &mut sess,
+            &new_module_storage,
+            &traversal_storage,
+            &m.self_id(),
+        );
     }
 }
 

@@ -684,25 +684,21 @@ fn test_storage_returns_bogus_error_when_loading_module() {
             )
             .unwrap_err();
 
-        if !vm.vm_config().use_loader_v2 {
-            assert_eq!(err.major_status(), *error_code);
+        // TODO(loader_v2):
+        //   Loader V2 remaps all deserialization and verification errors. Loader V1 does not
+        //   remap them when module resolver is accessed, and only on verification steps.
+        //   Strictly speaking, the storage would never return such an error so V2 behaviour is
+        //   ok. Moreover, the fact that V1 still returns UNKNOWN_BINARY_ERROR and does not
+        //   remap it is weird.
+        if *error_code == StatusCode::UNKNOWN_VERIFICATION_ERROR {
+            assert_eq!(err.major_status(), StatusCode::UNEXPECTED_VERIFIER_ERROR);
+        } else if *error_code == StatusCode::UNKNOWN_BINARY_ERROR {
+            assert_eq!(
+                err.major_status(),
+                StatusCode::UNEXPECTED_DESERIALIZATION_ERROR
+            );
         } else {
-            // TODO(loader_v2):
-            //   Loader V2 remaps all deserialization and verification errors. Loader V1 does not
-            //   remap them when module resolver is accessed, and only on verification steps.
-            //   Strictly speaking, the storage would never return such an error so V2 behaviour is
-            //   ok. Moreover, the fact that V1 still returns UNKNOWN_BINARY_ERROR and does not
-            //   remap it is weird.
-            if *error_code == StatusCode::UNKNOWN_VERIFICATION_ERROR {
-                assert_eq!(err.major_status(), StatusCode::UNEXPECTED_VERIFIER_ERROR);
-            } else if *error_code == StatusCode::UNKNOWN_BINARY_ERROR {
-                assert_eq!(
-                    err.major_status(),
-                    StatusCode::UNEXPECTED_DESERIALIZATION_ERROR
-                );
-            } else {
-                assert_eq!(err.major_status(), *error_code);
-            }
+            assert_eq!(err.major_status(), *error_code);
         }
     }
 }
