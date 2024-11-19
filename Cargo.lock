@@ -3567,6 +3567,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-replay-benchmark"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-block-executor",
+ "aptos-logger",
+ "aptos-move-debugger",
+ "aptos-push-metrics",
+ "aptos-rest-client",
+ "aptos-types",
+ "aptos-validator-interface",
+ "aptos-vm",
+ "bcs 0.1.4",
+ "clap 4.5.21",
+ "serde",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "aptos-resource-viewer"
 version = "0.1.0"
 dependencies = [

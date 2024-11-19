@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use serde::{Deserialize, Serialize};
-use std::{fmt, str::FromStr};
+use std::fmt;
+use strum_macros::{EnumString, FromRepr};
 
 /// Associated metadata with every log to identify what kind of log and where it came from
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -60,68 +61,60 @@ impl Metadata {
     }
 }
 
-static LOG_LEVEL_NAMES: &[&str] = &["ERROR", "WARN", "INFO", "DEBUG", "TRACE"];
-
 /// Logging levels, used for stratifying logs, and disabling less important ones for performance reasons
 #[repr(usize)]
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Serialize, Deserialize)]
+#[derive(
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Debug,
+    Hash,
+    Serialize,
+    Deserialize,
+    FromRepr,
+    EnumString,
+)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum Level {
     /// The "error" level.
     ///
     /// Designates very serious errors.
+    #[strum(ascii_case_insensitive)]
     Error = 0,
     /// The "warn" level.
     ///
     /// Designates hazardous situations.
-    Warn,
+    #[strum(ascii_case_insensitive)]
+    Warn = 1,
     /// The "info" level.
     ///
     /// Designates useful information.
-    Info,
+    #[strum(ascii_case_insensitive)]
+    Info = 2,
     /// The "debug" level.
     ///
     /// Designates lower priority information.
-    Debug,
+    #[strum(ascii_case_insensitive)]
+    Debug = 3,
     /// The "trace" level.
     ///
     /// Designates very low priority, often extremely verbose, information.
-    Trace,
-}
-
-impl Level {
-    fn from_usize(idx: usize) -> Option<Self> {
-        let lvl = match idx {
-            0 => Level::Error,
-            1 => Level::Warn,
-            2 => Level::Info,
-            3 => Level::Debug,
-            4 => Level::Trace,
-            _ => return None,
-        };
-
-        Some(lvl)
-    }
-}
-
-/// An error given when no `Level` matches the inputted string
-#[derive(Debug)]
-pub struct LevelParseError;
-
-impl FromStr for Level {
-    type Err = LevelParseError;
-
-    fn from_str(level: &str) -> Result<Level, Self::Err> {
-        LOG_LEVEL_NAMES
-            .iter()
-            .position(|name| name.eq_ignore_ascii_case(level))
-            .map(|idx| Level::from_usize(idx).unwrap())
-            .ok_or(LevelParseError)
-    }
+    #[strum(ascii_case_insensitive)]
+    Trace = 4,
 }
 
 impl fmt::Display for Level {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.pad(LOG_LEVEL_NAMES[*self as usize])
+        let level_str = match self {
+            Level::Error => "ERROR",
+            Level::Warn => "WARN",
+            Level::Info => "INFO",
+            Level::Debug => "DEBUG",
+            Level::Trace => "TRACE",
+        };
+        fmt.pad(level_str)
     }
 }

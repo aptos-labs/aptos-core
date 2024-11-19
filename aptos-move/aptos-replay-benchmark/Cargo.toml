@@ -1,0 +1,29 @@
+[package]
+name = "aptos-replay-benchmark"
+version = "0.1.0"
+description = "A tool to replay and locally benchmark on-chain transactions."
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-block-executor = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-move-debugger = { workspace = true }
+aptos-push-metrics = { workspace = true }
+aptos-rest-client = { workspace = true }
+aptos-types = { workspace = true }
+aptos-validator-interface = { workspace = true }
+aptos-vm = { workspace = true }
+bcs = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+url = { workspace = true }
