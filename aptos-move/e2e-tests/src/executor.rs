@@ -89,7 +89,7 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
     sync::{Arc, Mutex},
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
@@ -145,10 +145,36 @@ pub enum GasMeterType {
 }
 
 #[derive(Clone)]
-pub struct TimeAndGas {
-    pub elapsed_micros: u128,
-    pub execution_gas: u64,
-    pub io_gas: u64,
+pub struct Measurement {
+    elapsed: Duration,
+    /// In internal gas units
+    execution_gas: u64,
+    /// In internal gas units
+    io_gas: u64,
+}
+
+const GAS_SCALING_FACTOR: f64 = 1_000_000.0;
+
+impl Measurement {
+    pub fn elapsed_micros(&self) -> u128 {
+        self.elapsed.as_micros()
+    }
+
+    pub fn elapsed_secs_f64(&self) -> f64 {
+        self.elapsed.as_secs_f64()
+    }
+
+    pub fn elapsed_micros_f64(&self) -> f64 {
+        self.elapsed.as_secs_f64() * 1_000_000.0
+    }
+
+    pub fn execution_gas_units(&self) -> f64 {
+        self.execution_gas as f64 / GAS_SCALING_FACTOR
+    }
+
+    pub fn io_gas_units(&self) -> f64 {
+        self.io_gas as f64 / GAS_SCALING_FACTOR
+    }
 }
 
 pub enum ExecFuncTimerDynamicArgs {
@@ -980,7 +1006,7 @@ impl FakeExecutor {
         iterations: u64,
         dynamic_args: ExecFuncTimerDynamicArgs,
         gas_meter_type: GasMeterType,
-    ) -> TimeAndGas {
+    ) -> Measurement {
         let mut extra_accounts = match &dynamic_args {
             ExecFuncTimerDynamicArgs::DistinctSigners
             | ExecFuncTimerDynamicArgs::DistinctSignersAndFixed(_) => (0..iterations)
@@ -1000,7 +1026,7 @@ impl FakeExecutor {
 
         // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
         let mut i = 0;
-        let mut times = Vec::new();
+        let mut measurements = Vec::new();
         while i < iterations {
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
@@ -1075,8 +1101,8 @@ impl FakeExecutor {
                     );
                 }
             }
-            times.push(TimeAndGas {
-                elapsed_micros: elapsed.as_micros(),
+            measurements.push(Measurement {
+                elapsed,
                 execution_gas: regular
                     .as_ref()
                     .map_or(0, |gas| gas.algebra().execution_gas_used().into()),
@@ -1088,20 +1114,22 @@ impl FakeExecutor {
         }
 
         // take median of all running time iterations as a more robust measurement
-        times.sort_by_key(|v| v.elapsed_micros);
-        let length = times.len();
+        measurements.sort_by_key(|v| v.elapsed);
+        let length = measurements.len();
         let mid = length / 2;
-        let mut running_time = times[mid].clone();
+        let mut measurement = measurements[mid].clone();
 
         if length % 2 == 0 {
-            running_time = TimeAndGas {
-                elapsed_micros: (times[mid - 1].elapsed_micros + times[mid].elapsed_micros) / 2,
-                execution_gas: (times[mid - 1].execution_gas + times[mid].execution_gas) / 2,
-                io_gas: (times[mid - 1].io_gas + times[mid].io_gas) / 2,
+            measurement = Measurement {
+                elapsed: (measurements[mid - 1].elapsed + measurements[mid].elapsed) / 2,
+                execution_gas: (measurements[mid - 1].execution_gas
+                    + measurements[mid].execution_gas)
+                    / 2,
+                io_gas: (measurements[mid - 1].io_gas + measurements[mid].io_gas) / 2,
             };
         }
 
-        running_time
+        measurement
     }
 
     /// record abstract usage using a modified gas meter

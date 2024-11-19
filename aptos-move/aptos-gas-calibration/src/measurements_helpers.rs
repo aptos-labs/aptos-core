@@ -104,7 +104,7 @@ pub fn execute_user_txn(
             ExecFuncTimerDynamicArgs::NoArgs,
             GasMeterType::UnmeteredGasMeter,
         )
-        .elapsed_micros;
+        .elapsed_micros();
     println!("running time (microseconds): {}", elapsed);
     elapsed
 }

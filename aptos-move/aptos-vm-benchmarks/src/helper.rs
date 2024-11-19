@@ -74,7 +74,7 @@ pub fn execute_user_txn(executor: &mut FakeExecutor, module_name: &ModuleId, fun
             ExecFuncTimerDynamicArgs::NoArgs,
             GasMeterType::UnmeteredGasMeter,
         )
-        .elapsed_micros;
+        .elapsed_micros();
     println!("running time (microseconds): {}", elapsed);
 }
 

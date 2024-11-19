@@ -172,7 +172,7 @@ fn compile_and_run_samples_ir(
                                 ExecFuncTimerDynamicArgs::NoArgs,
                                 GasMeterType::UnmeteredGasMeter,
                             )
-                            .elapsed_micros;
+                            .elapsed_micros();
                         gas_measurement.regular_meter.push(elapsed);
 
                         // record with abstract gas meter
