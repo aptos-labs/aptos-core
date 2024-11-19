@@ -6,13 +6,13 @@ error: cannot adapt `integer` to annotated type `bool`
 4 │         ({ let x = 0; x } : bool);
   │                       ^
 
-error: cannot adapt `&_` to annotated type `u64`
+error: cannot adapt `&_6` to annotated type `u64`
   ┌─ tests/checking/typing/block_with_statements_invalid2.move:5:23
   │
 5 │         ({ let x = 0; &x } : u64);
   │                       ^^
 
-error: cannot adapt `&mut _` to annotated type `()`
+error: cannot adapt `&mut _10` to annotated type `()`
   ┌─ tests/checking/typing/block_with_statements_invalid2.move:6:23
   │
 6 │         ({ let y = 0; &mut (y + 1) } : ());

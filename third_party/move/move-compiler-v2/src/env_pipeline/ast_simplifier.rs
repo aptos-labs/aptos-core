@@ -975,9 +975,11 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
                 let node_id = binding.node_id();
                 let opt_type = self.env().get_node_type_opt(node_id);
                 if let Some(ty) = opt_type {
-                    let ability_set = self
-                        .env()
-                        .type_abilities(&ty, self.func_env.get_type_parameters_ref());
+                    let ability_set = self.env().type_abilities(
+                        &ty,
+                        self.func_env.get_type_parameters_ref(),
+                        None,
+                    );
                     // Don't drop a function-valued expression so we don't lose errors.
                     !ty.has_function() && ability_set.has_ability(Ability::Drop)
                 } else {

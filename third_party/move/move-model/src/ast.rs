@@ -3292,7 +3292,7 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                         .map(|a| a.to_string())
                         .reduce(|l, r| format!("{}, {}", l, r))
                         .unwrap_or_default();
-                    write!(f, " has {}", abilities_as_str)
+                    write!(f, " with {}", abilities_as_str)
                 } else {
                     Ok(())
                 }
@@ -3572,8 +3572,9 @@ impl<'a> fmt::Display for OperationDisplay<'a> {
                     f,
                     "{}",
                     self.env
-                        .get_function(mid.qualified(*fid))
-                        .get_full_name_str()
+                        .get_function_opt(mid.qualified(*fid))
+                        .map(|fun| fun.get_full_name_str())
+                        .unwrap_or_else(|| "<?unknown function?>".to_string())
                 )
             },
             Bind(mask) => {

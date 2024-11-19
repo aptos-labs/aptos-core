@@ -120,25 +120,41 @@ error: type `|u64|u64` is missing required ability `store`
 67 │             g
    │             ^
 
-error: expected `|integer|_` but found a value of type `u64`
+error: expected `|integer|_48` but found a value of type `u64`
    ┌─ tests/lambda/storable/return_func.move:85:37
    │
 85 │         vector::push_back(&mut sum, f(5));
    │                                     ^^^^
 
-error: expected `|integer|_` but found a value of type `u64`
+error: expected `|integer|_55` but found a value of type `u64`
    ┌─ tests/lambda/storable/return_func.move:86:37
    │
 86 │         vector::push_back(&mut sum, g(7));
    │                                     ^^^^
 
-error: expected `|integer|_` but found a value of type `u64`
+error: expected `|integer|_62` but found a value of type `u64`
    ┌─ tests/lambda/storable/return_func.move:87:37
    │
 87 │         vector::push_back(&mut sum, h(6));
    │                                     ^^^^
 
-error: function type `|integer|_` is not allowed as a type argument (type was inferred)
+error: function type `|integer|_100` is not allowed as a type argument (type was inferred)
+   ┌─ tests/lambda/storable/return_func.move:89:21
+   │
+89 │         let funcs = vector[choose_function(0), choose_function(1), choose_function(2)];
+   │                     ^^^^^^
+   │
+   = required by instantiating vector type parameter
+
+error: function type `|integer|_80` is not allowed as a type argument (type was inferred)
+   ┌─ tests/lambda/storable/return_func.move:89:21
+   │
+89 │         let funcs = vector[choose_function(0), choose_function(1), choose_function(2)];
+   │                     ^^^^^^
+   │
+   = required by instantiating vector type parameter
+
+error: function type `|integer|_90` is not allowed as a type argument (type was inferred)
    ┌─ tests/lambda/storable/return_func.move:89:21
    │
 89 │         let funcs = vector[choose_function(0), choose_function(1), choose_function(2)];

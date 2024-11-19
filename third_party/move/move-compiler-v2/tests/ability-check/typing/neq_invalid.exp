@@ -40,7 +40,7 @@ error: reference type `&mut S` is not allowed as a type argument (type was infer
    │
    = required by instantiating type parameter `T` of function `!=`
 
-error: unable to infer instantiation of type `G0<_>` (consider providing type arguments or annotating the type)
+error: unable to infer instantiation of type `G0<_4>` (consider providing type arguments or annotating the type)
    ┌─ tests/ability-check/typing/neq_invalid.move:26:9
    │
 26 │         G0{} != G0{};
@@ -52,7 +52,7 @@ error: unable to infer instantiation of type `G1<key>` (consider providing type 
 27 │         G1{} != G1{};
    │         ^^^^
 
-error: unable to infer instantiation of type `G2<_>` (consider providing type arguments or annotating the type)
+error: unable to infer instantiation of type `G2<_18>` (consider providing type arguments or annotating the type)
    ┌─ tests/ability-check/typing/neq_invalid.move:28:9
    │
 28 │         G2{} != G2{};

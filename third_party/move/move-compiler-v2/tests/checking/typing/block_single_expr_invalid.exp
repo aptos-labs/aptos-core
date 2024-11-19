@@ -6,13 +6,13 @@ error: cannot adapt `integer` to annotated type `bool`
 4 │         ({ 0 } : bool);
   │            ^
 
-error: cannot adapt `&_` to annotated type `u64`
+error: cannot adapt `&_3` to annotated type `u64`
   ┌─ tests/checking/typing/block_single_expr_invalid.move:5:12
   │
 5 │         ({ &0 } : u64);
   │            ^^
 
-error: cannot adapt `&mut _` to annotated type `()`
+error: cannot adapt `&mut _6` to annotated type `()`
   ┌─ tests/checking/typing/block_single_expr_invalid.move:6:12
   │
 6 │         ({ &mut 0 } : ());

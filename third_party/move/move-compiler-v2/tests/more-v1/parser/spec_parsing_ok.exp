@@ -60,19 +60,19 @@ error: undeclared `RET`
 84 │         ensures RET = x[1] && x[0..3];
    │                 ^^^
 
-error: expected `vector<_>` but found a value of type `u64`
+error: expected `vector<_2>` but found a value of type `u64`
    ┌─ tests/more-v1/parser/spec_parsing_ok.move:84:23
    │
 84 │         ensures RET = x[1] && x[0..3];
    │                       ^
 
-error: expected `vector<_>` but found a value of type `u64`
+error: expected `vector<_5>` but found a value of type `u64`
    ┌─ tests/more-v1/parser/spec_parsing_ok.move:84:31
    │
 84 │         ensures RET = x[1] && x[0..3];
    │                               ^
 
-error: cannot use `vector<_>` with an operator which expects a value of type `bool`
+error: cannot use `vector<_5>` with an operator which expects a value of type `bool`
    ┌─ tests/more-v1/parser/spec_parsing_ok.move:84:31
    │
 84 │         ensures RET = x[1] && x[0..3];

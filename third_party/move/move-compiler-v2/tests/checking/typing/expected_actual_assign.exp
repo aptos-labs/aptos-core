@@ -6,7 +6,7 @@ error: cannot assign `u8` to left-hand side of type `u64`
 13 │         x = 1u8;
    │         ^
 
-error: cannot assign `vector<_>` to left-hand side of type `integer`
+error: cannot assign `vector<_4>` to left-hand side of type `integer`
    ┌─ tests/checking/typing/expected_actual_assign.move:18:9
    │
 18 │         x = vector[];

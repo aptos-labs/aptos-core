@@ -40,7 +40,7 @@ error: reference type `&mut S` is not allowed as a type argument (type was infer
    │
    = required by instantiating type parameter `T` of function `==`
 
-error: unable to infer instantiation of type `G2<_>` (consider providing type arguments or annotating the type)
+error: unable to infer instantiation of type `G2<_9>` (consider providing type arguments or annotating the type)
    ┌─ tests/ability-check/typing/eq_invalid.move:28:9
    │
 28 │         G2{} == G2{};

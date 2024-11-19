@@ -44,7 +44,7 @@ use codespan_reporting::{
 };
 use itertools::Itertools;
 #[allow(unused_imports)]
-use log::{info, warn};
+use log::{debug, info, warn};
 pub use move_binary_format::file_format::{AbilitySet, Visibility};
 #[allow(deprecated)]
 use move_binary_format::normalized::Type as MType;
@@ -84,6 +84,8 @@ use std::{
     fmt::{self, Formatter, Write},
     rc::Rc,
 };
+
+static DEBUG_TRACE: bool = true;
 
 // =================================================================================================
 /// # Constants
@@ -892,11 +894,15 @@ impl GlobalEnv {
         });
         if *DUMP_BACKTRACE {
             let bt = Backtrace::capture();
-            if BacktraceStatus::Captured == bt.status() {
+            let msg_out = if BacktraceStatus::Captured == bt.status() {
                 format!("{}\nBacktrace: {:#?}", msg, bt)
             } else {
                 msg.to_owned()
+            };
+            if DEBUG_TRACE {
+                debug!("{}", msg_out);
             }
+            msg_out
         } else {
             msg.to_owned()
         }
@@ -1511,8 +1517,15 @@ impl GlobalEnv {
     }
 
     /// Computes the abilities associated with the given type.
-    pub fn type_abilities(&self, ty: &Type, ty_params: &[TypeParameter]) -> AbilitySet {
-        AbilityInferer::new(self, ty_params).infer_abilities(ty).1
+    pub fn type_abilities(
+        &self,
+        ty: &Type,
+        ty_params: &[TypeParameter],
+        display_context: Option<TypeDisplayContext<'_>>,
+    ) -> AbilitySet {
+        AbilityInferer::new(self, ty_params)
+            .infer_abilities(ty, display_context)
+            .1
     }
 
     /// Returns associated intrinsics.

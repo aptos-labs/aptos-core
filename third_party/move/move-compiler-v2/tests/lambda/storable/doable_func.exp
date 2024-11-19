@@ -48,7 +48,7 @@ error: undeclared `_`
 69 │                 let h = mod3::multiply(_, 12);
    │                                        ^
 
-error: expected `|_|_` but found a value of type `u64`
+error: expected `|_88|_87` but found a value of type `u64`
    ┌─ tests/lambda/storable/doable_func.move:70:28
    │
 70 │                 move |x| { h(x) } with copy + drop
@@ -60,7 +60,7 @@ error: undeclared `_`
 72 │                 let i = multiply3(2, _, 2);
    │                                      ^
 
-error: expected `|_|_` but found a value of type `u64`
+error: expected `|_99|_98` but found a value of type `u64`
    ┌─ tests/lambda/storable/doable_func.move:73:26
    │
 73 │                 move |z| i(z)
@@ -72,7 +72,7 @@ error: undeclared `_`
 76 │                 i(_, 15)
    │                   ^
 
-error: expected `u64` but found a value of type `|_|_`
+error: expected `u64` but found a value of type `|_99|_98`
    ┌─ tests/lambda/storable/doable_func.move:71:20
    │
 71 │               } else if (key == 14) {
@@ -85,7 +85,7 @@ error: expected `u64` but found a value of type `|_|_`
 77 │ │             };
    │ ╰─────────────^
 
-error: expected `|_|_:copy+drop` but found a value of type `u64`
+error: expected `|_88|_87:copy+drop` but found a value of type `u64`
    ┌─ tests/lambda/storable/doable_func.move:65:20
    │
 65 │               } else if (key == 11) {

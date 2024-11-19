@@ -21,21 +21,23 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{
-        AbilityContext, Constraint, ConstraintContext, ErrorMessageContext, PrimitiveType,
-        ReceiverFunctionInstance, ReferenceKind, Substitution, Type, TypeDisplayContext,
-        TypeUnificationError, UnificationContext, Variance, WideningOrder, BOOL_TYPE,
+        AbilityContext, AbilityInference, Constraint, ConstraintContext, ErrorMessageContext,
+        PrimitiveType, ReceiverFunctionInstance, ReferenceKind, SubsAbilityInferer, Substitution,
+        Type, TypeDisplayContext, TypeUnificationError, UnificationContext, Variance,
+        WideningOrder, BOOL_TYPE,
     },
     FunId,
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use move_binary_format::file_format::{self, Ability, AbilitySet};
+use log::debug;
+use move_binary_format::file_format::{self, Ability, AbilitySet, Visibility};
 use move_compiler::{
     expansion::ast::{self as EA, Exp_},
     hlir::ast as HA,
     naming::ast as NA,
     parser::ast::{self as PA, CallKind, Field},
-    shared::{unique_map::UniqueMap, Identifier, Name},
+    shared::{ast_debug, unique_map::UniqueMap, Identifier, Name},
 };
 use move_core_types::{account_address::AccountAddress, value::MoveValue};
 use move_ir_types::{
@@ -44,10 +46,13 @@ use move_ir_types::{
 };
 use num::{BigInt, FromPrimitive, Zero};
 use std::{
+    backtrace::{Backtrace, BacktraceStatus},
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, LinkedList},
     fmt, mem,
 };
+
+static DEBUG_TRACE: bool = true;
 
 #[derive(Debug)]
 pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
@@ -505,6 +510,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     /// Constructs a type display context used to visualize types in error messages.
     pub fn type_display_context(&self) -> TypeDisplayContext<'_> {
         let mut ctx = self.parent.parent.type_display_context();
+        if DEBUG_TRACE {
+            ctx = ctx.with_type_vars();
+        }
         ctx.type_param_names = Some(self.type_params.iter().map(|(s, ..)| *s).collect());
         ctx.subs_opt = Some(&self.subs);
         ctx.module_name = Some(self.parent.module_name.clone());
@@ -905,6 +913,14 @@ impl<'env, 'builder, 'module_builder> AbilityContext
                 struct_env.get_abilities(),
             )
         }
+    }
+
+    fn var_type(&self, vid: u32) -> Option<Type> {
+        self.subs.get_substitution(vid, false)
+    }
+
+    fn var_constraints(&self, _vid: u32) -> Option<&Vec<(Loc, WideningOrder, Constraint)>> {
+        None
     }
 }
 
@@ -1468,13 +1484,20 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         expected_type: &Type,
         context: &ErrorMessageContext,
     ) -> ExpData {
+        if DEBUG_TRACE {
+            debug!(
+                "translate_exp_in_context expected_type={}, exp={}",
+                expected_type.display(&self.type_display_context()),
+                ast_debug::display_verbose(exp)
+            );
+        };
         let loc = self.to_loc(&exp.loc);
         let make_value = |et: &mut ExpTranslator, val: Value, ty: Type| {
             let _rty = et.check_type(&loc, &ty, expected_type, context);
             let id = et.new_node_id_with_type_loc(&ty, &loc);
             ExpData::Value(id, val)
         };
-        match &exp.value {
+        let res = match &exp.value {
             EA::Exp_::Value(v) => {
                 if let Some((v, ty)) = self.translate_value(v, expected_type, context) {
                     make_value(self, v, ty)
@@ -2003,7 +2026,18 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 // Error reported
                 self.new_error_exp()
             },
+        };
+        if DEBUG_TRACE {
+            let tcx = self.type_display_context();
+            debug!(
+                "translate_exp_in_context expected_type={}, exp={}, res={}, res_type={}",
+                expected_type.display(&tcx),
+                ast_debug::display_verbose(exp),
+                res.display(self.env()),
+                self.env().get_node_type(res.node_id()).display(&tcx),
+            );
         }
+        res
     }
 
     fn find_loop_nest(&self, label: &Option<PA::Label>) -> usize {
@@ -3170,6 +3204,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 | ModelCallKind::UnaryOp
         ));
 
+        if DEBUG_TRACE {
+            let tcx = self.type_display_context();
+            debug!("translate_fun_call:");
+            debug!("expected_type is {}", expected_type.display(&tcx));
+        }
+
         // Handle some special cases.
         if let Some(value) = self.translate_fun_call_special_cases(
             expected_type,
@@ -3219,6 +3259,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             context,
         );
 
+        if DEBUG_TRACE {
+            let tcx = self.type_display_context();
+            debug!("finishing translate_fun_call:");
+            debug!("expected_type is {}", expected_type.display(&tcx));
+            let t = self.env().get_node_type(result.node_id());
+            debug!("found type {}", t.display(&tcx));
+        }
         if is_old && self.old_status == OldExpStatus::InsideOld {
             self.old_status = OldExpStatus::OutsideOld;
         }
@@ -3678,6 +3725,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         if let Some(entry) = self.parent.parent.fun_table.get(&global_var_sym) {
             let module_id = entry.module_id;
             let fun_id = entry.fun_id;
+            let fun_abilities = if entry.visibility.is_public() {
+                AbilitySet::PUBLIC_FUNCTIONS
+            } else {
+                AbilitySet::PRIVATE_FUNCTIONS
+            };
             let result_type = entry.result_type.clone();
             let type_params = entry.type_params.clone();
             let param_types = entry
@@ -3697,7 +3749,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             let fun_type = Type::Fun(
                 Box::new(Type::tuple(param_types)),
                 Box::new(result_type),
-                AbilitySet::DEFINED_FUNCTIONS,
+                fun_abilities,
             );
             let fun_type = fun_type.instantiate(&instantiation);
             let fun_type = self.check_type(loc, &fun_type, expected_type, context);
@@ -4295,15 +4347,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         name: Symbol,
         generics: &Option<Vec<EA::Type>>,
         args: &[&EA::Exp],
-        expected_type: &Type,
+        expected_type: &Type, // expected result type from context
         context: &ErrorMessageContext,
     ) -> ExpData {
-        // Translate arguments.
-
-        // Also do First part of curry check; arg_types is needed to do candidate matching.
-        // Mask is set to Some(mask) if some parameters were `_`, indicating that building
-        // a closure is desired.
-        // eprintln!("kind is {:?}", kind);
+        // Translate arguments: arg_types is needed to do candidate matching.
+        //
+        // Also do First part of curry check for Regular calls: `mask` is set to `Some(mask)` if some
+        // parameters were `_`, indicating that building a closure is desired.
         let (mut arg_types, mut translated_args, mask) =
             self.translate_possible_curry_exp_list(args, matches!(kind, ModelCallKind::Regular));
 
@@ -4554,10 +4604,18 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     .iter()
                     .map(|param| param.get_type().instantiate(&instantiation))
                     .collect_vec();
+
+                let abilities = match cand {
+                    AnyFunEntry::SpecOrBuiltin(_) => AbilitySet::PUBLIC_FUNCTIONS,
+                    AnyFunEntry::UserFun(e) => match e.visibility {
+                        Visibility::Public => AbilitySet::PUBLIC_FUNCTIONS,
+                        _ => AbilitySet::PRIVATE_FUNCTIONS,
+                    },
+                };
                 let ftype = Type::Fun(
                     Box::new(Type::tuple(param_types.clone())),
                     Box::new(result_type.clone()),
-                    AbilitySet::DEFINED_FUNCTIONS,
+                    abilities,
                 );
 
                 // Commit the candidate substitution to this expression translator.
@@ -4565,7 +4623,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
                 // Recall from above that mask is non-0 if some arguments were
                 // the placeholder `_`, leading to construction of a closure.
-                if !mask.is_none() && !matches!(cand, AnyFunEntry::UserFun(_)) {
+                if mask.is_some() && !matches!(cand, AnyFunEntry::UserFun(_)) {
                     // We only allow closures for user functions, not other operations.
                     // Generate an error for the use of `_` in a non-call expression..
                     let labels = args
@@ -4609,6 +4667,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 // as the type will be a variable, not a reference, so it will be left alone.
                 let translated_args = self.add_conversions(cand, &instantiation, translated_args);
                 let specialized_expected_type = self.subs.specialize(expected_type);
+                let specialized_expected_type =
+                    self.check_type(loc, &specialized_expected_type, expected_type, context);
 
                 let oper_is_move_function = !matches!(&oper, Operation::MoveFunction(..));
                 self.translate_curry_or_call(
@@ -4746,11 +4806,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 
     /// Translates a call that might be a curry expression.
-    // If `mask` is not `None`, then a normal call is turned into a closure.
+    // If `mask` is not `None`, and `!call_only`, then a normal call is turned into a closure.
     fn translate_curry_or_call(
         &mut self,
         expected_type: &Type,
-        ftype: Type,
+        ftype: Type, // found type of `fun_exp_or_oper`
         fun_exp_or_oper: FunExpOrOper,
         arg_types: Vec<Type>,
         translated_args: Vec<Exp>,
@@ -4788,13 +4848,48 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 (None, expected_type.clone())
             };
 
+            if DEBUG_TRACE {
+                let tcx = self.type_display_context();
+                debug!("expected_type is {}", expected_type.display(&tcx));
+                debug!("ftype is {}", ftype.display(&tcx));
+                debug!("fun_exp_or_oper is {:#?}", &fun_exp_or_oper);
+                debug!(
+                    "arg_types is ({})",
+                    arg_types
+                        .iter()
+                        .map(|t| t.display(&tcx).to_string())
+                        .join(",")
+                );
+                debug!(
+                    "translated_args is ({})",
+                    translated_args
+                        .iter()
+                        .map(|x| x.display(self.env()))
+                        .join(",")
+                );
+                if let Some(mask) = mask {
+                    debug!("mask is Some({:b})", mask)
+                } else {
+                    debug!("mask is None");
+                }
+                debug!("loc is {:?}", loc);
+                let bt = Backtrace::capture();
+                debug!("Stack is {:#?}", bt);
+            }
+
             let fun_t = Type::Fun(
                 Box::new(Type::tuple(arg_types)),
                 Box::new(ty.clone()),
+                // Be generous with abilities; this will be intersected with actual abilities of
+                // ftype, below:
                 AbilitySet::FUNCTIONS,
             );
 
-            // eprintln!("fun_exp_or_oper is {:#?}", &fun_exp_or_oper);
+            if DEBUG_TRACE {
+                let tcx = self.type_display_context();
+                debug!("fun_t is {}", fun_t.display(&tcx));
+            };
+
             self.unify_types_with_context(
                 loc,
                 self.type_variance(),
@@ -4832,47 +4927,148 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             // eprintln!("mask is {:b}", mask);
 
             // We are building a bitmapped closure
-            let (lambda_arg_types, f_arg_types) =
+            let (lambda_arg_types, free_var_types, f_arg_types) =
                 self.translate_curry_parameter_types(&arg_types, mask);
             let lambda_result_t = self.fresh_type_var();
+            if DEBUG_TRACE {
+                let tcx = self.type_display_context();
+                debug!(
+                    "lambda_arg_types is ({})",
+                    lambda_arg_types
+                        .iter()
+                        .map(|t| t.display(&tcx).to_string())
+                        .join(",")
+                );
+                debug!(
+                    "free_var_types is ({})",
+                    free_var_types
+                        .iter()
+                        .map(|t| t.display(&tcx).to_string())
+                        .join(",")
+                );
+                debug!(
+                    "f_arg_types is ({})",
+                    f_arg_types
+                        .iter()
+                        .map(|t| t.display(&tcx).to_string())
+                        .join(",")
+                );
+                debug!("lambda_result_t is {}", lambda_result_t.display(&tcx));
+            }
 
-            // Lambda abilities depend on captured free variables
-            let fun_arg_type = Type::tuple(f_arg_types);
+            // Lambda abilities depend on the function expr.
+            let (fexp, fexp_abilities) = match fun_exp_or_oper {
+                FunExpOrOper::FunExp(fexp) => {
+                    let fexp_type = self.env().get_node_type(fexp.node_id());
+                    self.check_type(loc, &fexp_type, &ftype, context);
+                    let abilities = if let Type::Fun(_, _, abilities) = fexp_type {
+                        if DEBUG_TRACE {
+                            debug!("case 1");
+                        };
+                        abilities
+                    } else {
+                        if DEBUG_TRACE {
+                            debug!("case 2");
+                        }
+                        // We have limited information about abilities, assume minimal.
+                        AbilitySet::FUNCTIONS
+                    };
+                    (fexp, abilities)
+                },
+                FunExpOrOper::Oper(oper) => {
+                    if let Operation::MoveFunction(mid, fid) = oper {
+                        let (fun_t, fun_abilities) = if let Some(fun_env) =
+                            self.env().get_function_opt(mid.qualified(fid))
+                        {
+                            let fun_abilities = if fun_env.visibility().is_public() {
+                                if DEBUG_TRACE {
+                                    debug!("case 3");
+                                };
+                                AbilitySet::PUBLIC_FUNCTIONS
+                            } else {
+                                if DEBUG_TRACE {
+                                    debug!("case 4");
+                                };
+                                AbilitySet::PRIVATE_FUNCTIONS
+                            };
+                            // function type based on current expression
+                            let fun_t = Type::Fun(
+                                Box::new(Type::Tuple(arg_types)),
+                                Box::new(lambda_result_t.clone()),
+                                fun_abilities,
+                            );
+                            if DEBUG_TRACE {
+                                let tcx = self.type_display_context();
+                                debug!("fun_t is {}", fun_t.display(&tcx));
+                                debug!("ftype is {}", ftype.display(&tcx));
+                            }
+                            self.check_type(loc, &fun_t, &ftype, context);
+                            if DEBUG_TRACE {
+                                let tcx = self.type_display_context();
+                                debug!("now fun_t is {}", fun_t.display(&tcx));
+                                debug!("now ftype is {}", ftype.display(&tcx));
+                            }
+                            (fun_t, fun_abilities)
+                        } else {
+                            if DEBUG_TRACE {
+                                debug!("case 5");
+                            };
+                            // We don't have information yet about the function.
+                            // Speculate that it is public, and let it be checked
+                            // by later type checking.
+                            (self.fresh_type_var(), AbilitySet::PUBLIC_FUNCTIONS)
+                        };
+                        let fun_id = self.new_node_id_with_type_loc(&fun_t, loc);
+                        if let Some(instantiation) = instantiation {
+                            self.set_node_instantiation(fun_id, instantiation.clone());
+                        };
+                        (
+                            ExpData::Value(fun_id, Value::Function(mid, fid)),
+                            fun_abilities,
+                        )
+                    } else {
+                        if DEBUG_TRACE {
+                            debug!("case 6");
+                        };
+                        panic!("Only MoveFunction operations should be possible here")
+                    }
+                },
+            };
+
+            // Lambda abilities also depend on captured free variables
+            let free_var_type = Type::tuple(free_var_types);
             let type_params = self.get_type_params();
-            let fun_abilities = self.env().type_abilities(&fun_arg_type, &type_params);
+            // let specialized_free_var_type = self.subs.specialize_with_defaults(&free_var_type);
+            let ability_inferer = SubsAbilityInferer::new(self.env(), &type_params, &self.subs);
+            let free_var_abilities = ability_inferer
+                .infer_abilities(&free_var_type, Some(self.type_display_context()))
+                .1;
+            if DEBUG_TRACE {
+                let tcx = self.type_display_context();
+                debug!("free_var_type is {}", free_var_type.display(&tcx));
+                debug!("free_var_abilities is {}", free_var_abilities);
+            }
 
             // function type of lambda being generated
             let lambda_t = Type::Fun(
                 Box::new(Type::tuple(lambda_arg_types)),
                 Box::new(lambda_result_t.clone()),
-                AbilitySet::FUNCTIONS.union(fun_abilities),
+                fexp_abilities.intersect(free_var_abilities),
             );
-            // function type based on current expression
-            let fun_t = Type::Fun(
-                Box::new(fun_arg_type),
-                Box::new(lambda_result_t),
-                AbilitySet::FUNCTIONS,
-            );
-            self.check_type(loc, &ftype, &fun_t, context);
+            if DEBUG_TRACE {
+                let tcx = self.type_display_context();
+                debug!("lambda_t is {}", lambda_t.display(&tcx));
+                debug!("expected_type is {}", expected_type.display(&tcx));
+            }
             let lambda_t = self.check_type(loc, &lambda_t, expected_type, context);
+            if DEBUG_TRACE {
+                let tcx = self.type_display_context();
+                debug!("now lambda_t is {}", lambda_t.display(&tcx));
+            }
             let id = self.new_node_id_with_type_loc(&lambda_t, loc);
             if let Some(instantiation) = instantiation {
                 self.set_node_instantiation(id, instantiation.clone());
             }
-            let fexp = match fun_exp_or_oper {
-                FunExpOrOper::FunExp(fexp) => fexp,
-                FunExpOrOper::Oper(oper) => {
-                    if let Operation::MoveFunction(mid, fid) = oper {
-                        let fun_id = self.new_node_id_with_type_loc(&ftype, loc);
-                        if let Some(instantiation) = instantiation {
-                            self.set_node_instantiation(fun_id, instantiation.clone());
-                        };
-                        ExpData::Value(fun_id, Value::Function(mid, fid))
-                    } else {
-                        panic!("Only MoveFunction operations should be possible here")
-                    }
-                },
-            };
             // Keep only early-bound arguments, those with a 1 bit set in mask
             let mut translated_args: Vec<_> = translated_args
                 .into_iter()
@@ -4943,29 +5139,31 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     /// Given a list of n parameter types to a function, and a non-empty bit-mask
     /// with k bits set, returns:
     /// (1) a list of n-k new type variables (lambda param types)
-    /// (2) the input list of k curry parameter types, with each element corresponding
-    ///     to a set bit in the mask replaced by the corresponding type variable.
+    /// (2) a list of the k arg_types corresponding to set bits (in order)
+    /// (2) the complete input list of n arg_types, with each element corresponding
+    ///     to a set bit in the mask replaced by the corresponding new type variable.
     /// #1 can be used as the parameter types for a corresponding lambda function type,
-    /// while #2 is the parameter types for the function passed to curry.
+    /// #2 is the bound free variable types, also argument types for curry,
+    /// while #3 is the parameter types for the function passed to curry.
     fn translate_curry_parameter_types(
         &mut self,
         arg_types: &[Type],
         mask: u64,
-    ) -> (Vec<Type>, Vec<Type>) {
+    ) -> (Vec<Type>, Vec<Type>, Vec<Type>) {
         let mut lambda_arg_types = vec![];
-        let mut arg_result = vec![];
+        let mut bound_var_types = vec![];
+        let mut all_arg_types = vec![];
         let mut mask_cursor = 1u64; // tracks 1<<idx in loop
         for elt in arg_types.iter() {
+            all_arg_types.push(elt.clone());
             if mask_cursor & mask == 0 {
-                let lambda_arg_type = self.fresh_type_var();
-                lambda_arg_types.push(lambda_arg_type.clone());
-                arg_result.push(lambda_arg_type);
+                lambda_arg_types.push(elt.clone());
             } else {
-                arg_result.push(elt.clone())
+                bound_var_types.push(elt.clone());
             }
             mask_cursor <<= 1;
         }
-        (lambda_arg_types, arg_result)
+        (lambda_arg_types, bound_var_types, all_arg_types)
     }
 
     /// Translate a list of expressions and deliver them together with their types.

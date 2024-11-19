@@ -2130,7 +2130,7 @@ impl<'env> Generator<'env> {
     fn ty_requires_binding(&self, ty: &Type) -> bool {
         !self
             .env()
-            .type_abilities(ty, &[])
+            .type_abilities(ty, &[], None)
             .has_ability(Ability::Drop)
     }
 }

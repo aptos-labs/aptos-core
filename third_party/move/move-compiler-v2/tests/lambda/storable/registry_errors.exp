@@ -1,7 +1,7 @@
 
 Diagnostics:
 error: unexpected token
-   ┌─ tests/lambda/storable/registry.move:34:12
+   ┌─ tests/lambda/storable/registry_errors.move:34:12
    │
 34 │         if !done {
    │            ^

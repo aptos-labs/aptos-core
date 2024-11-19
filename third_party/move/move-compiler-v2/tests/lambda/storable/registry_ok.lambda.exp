@@ -1,0 +1,63 @@
+
+Diagnostics:
+error: unexpected token
+   ┌─ tests/lambda/storable/registry_ok.move:34:12
+   │
+34 │         if !done {
+   │            ^
+   │            │
+   │            Unexpected '!'
+Backtrace: Backtrace [
+    { fn: "std::backtrace_rs::backtrace::libunwind::trace", file: "/rustc/9b00956e56009bab2aa15d7bff10916599e3d6d6/library/std/src/../../backtrace/src/backtrace/libunwind.rs", line: 105 },
+    { fn: "std::backtrace_rs::backtrace::trace_unsynchronized", file: "/rustc/9b00956e56009bab2aa15d7bff10916599e3d6d6/library/std/src/../../backtrace/src/backtrace/mod.rs", line: 66 },
+    { fn: "std::backtrace::Backtrace::create", file: "/rustc/9b00956e56009bab2aa15d7bff10916599e3d6d6/library/std/src/backtrace.rs", line: 331 },
+    { fn: "add_backtrace", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler/src/diagnostics/mod.rs", line: 310 },
+    { fn: "new<move_compiler::diagnostics::codes::Syntax, alloc::string::String, alloc::string::String, alloc::vec::Vec<(move_ir_types::location::Loc, alloc::string::String), alloc::alloc::Global>, alloc::string::String, core::iter::sources::empty::Empty<alloc::string::String>>", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler/src/diagnostics/mod.rs", line: 287 },
+    { fn: "unexpected_token_error_", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler/src/parser/syntax.rs", line: 67 },
+    { fn: "consume_token_", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler/src/parser/syntax.rs", line: 182 },
+    { fn: "consume_token", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler/src/parser/syntax.rs", line: 168 },
+    { fn: "parse_control_exp", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler/src/parser/syntax.rs", line: 1412 },
+    { fn: "parse_term", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler/src/parser/syntax.rs", line: 1141 },
+    { fn: "parse_dot_or_index_chain", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler/src/parser/syntax.rs", line: 2216 },
+    { fn: "parse_exp", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler/src/parser/syntax.rs", line: 1971 },
+    { fn: "parse_sequence_item", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler/src/parser/syntax.rs", line: 1055 },
+    { fn: "parse_sequence", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler/src/parser/syntax.rs", line: 1082 },
+    { fn: "parse_function_decl", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler/src/parser/syntax.rs", line: 2825 },
+    { fn: "parse_module", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler/src/parser/syntax.rs", line: 3522 },
+    { fn: "parse_file", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler/src/parser/syntax.rs", line: 4346 },
+    { fn: "parse_file_string", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler/src/parser/syntax.rs", line: 4367 },
+    { fn: "parse_file", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler/src/parser/mod.rs", line: 202 },
+    { fn: "parse_program", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler/src/parser/mod.rs", line: 83 },
+    { fn: "run<1>", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler/src/command_line/compiler.rs", line: 225 },
+    { fn: "run_model_builder_with_options_and_compilation_flags<alloc::string::String, alloc::string::String>", file: "/Users/brm/code/aptos-core/third_party/move/move-model/src/lib.rs", line: 194 },
+    { fn: "run_model_builder_in_compiler_mode", file: "/Users/brm/code/aptos-core/third_party/move/move-model/src/lib.rs", line: 112 },
+    { fn: "run_checker", file: "./src/lib.rs", line: 178 },
+    { fn: "run_test", file: "./tests/testsuite.rs", line: 769 },
+    { fn: "{closure#4}", file: "./tests/testsuite.rs", line: 166 },
+    { fn: "call_once<testsuite::TEST_CONFIGS::{closure#0}::{closure_env#4}, (&std::path::Path)>", file: "/rustc/9b00956e56009bab2aa15d7bff10916599e3d6d6/library/core/src/ops/function.rs", line: 250 },
+    { fn: "core::ops::function::FnOnce::call_once{{vtable.shim}}" },
+    { fn: "call_once<(bool), (dyn core::ops::function::FnOnce<(bool), Output=libtest_mimic::Outcome> + core::marker::Send), alloc::alloc::Global>", file: "/rustc/9b00956e56009bab2aa15d7bff10916599e3d6d6/library/alloc/src/boxed.rs", line: 2020 },
+    { fn: "{closure#0}", file: "/Users/brm/.cargo/registry/src/index.crates.io-6f17d22bba15001f/libtest-mimic-0.5.2/src/lib.rs", line: 500 },
+    { fn: "call_once<libtest_mimic::Outcome, libtest_mimic::run_single::{closure_env#0}>", file: "/rustc/9b00956e56009bab2aa15d7bff10916599e3d6d6/library/core/src/panic/unwind_safe.rs", line: 272 },
+    { fn: "do_call<core::panic::unwind_safe::AssertUnwindSafe<libtest_mimic::run_single::{closure_env#0}>, libtest_mimic::Outcome>", file: "/rustc/9b00956e56009bab2aa15d7bff10916599e3d6d6/library/std/src/panicking.rs", line: 552 },
+    { fn: "try<libtest_mimic::Outcome, core::panic::unwind_safe::AssertUnwindSafe<libtest_mimic::run_single::{closure_env#0}>>", file: "/rustc/9b00956e56009bab2aa15d7bff10916599e3d6d6/library/std/src/panicking.rs", line: 516 },
+    { fn: "catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<libtest_mimic::run_single::{closure_env#0}>, libtest_mimic::Outcome>", file: "/rustc/9b00956e56009bab2aa15d7bff10916599e3d6d6/library/std/src/panic.rs", line: 146 },
+    { fn: "run_single", file: "/Users/brm/.cargo/registry/src/index.crates.io-6f17d22bba15001f/libtest-mimic-0.5.2/src/lib.rs", line: 500 },
+    { fn: "run", file: "/Users/brm/.cargo/registry/src/index.crates.io-6f17d22bba15001f/libtest-mimic-0.5.2/src/lib.rs", line: 452 },
+    { fn: "runner", file: "/Users/brm/.cargo/registry/src/index.crates.io-6f17d22bba15001f/datatest-stable-0.1.3/src/runner.rs", line: 17 },
+    { fn: "main", file: "./tests/testsuite.rs", line: 998 },
+    { fn: "call_once<fn(), ()>", file: "/rustc/9b00956e56009bab2aa15d7bff10916599e3d6d6/library/core/src/ops/function.rs", line: 250 },
+    { fn: "__rust_begin_short_backtrace<fn(), ()>", file: "/rustc/9b00956e56009bab2aa15d7bff10916599e3d6d6/library/std/src/sys_common/backtrace.rs", line: 155 },
+    { fn: "std::rt::lang_start::{{closure}}" },
+    { fn: "core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once", file: "/rustc/9b00956e56009bab2aa15d7bff10916599e3d6d6/library/core/src/ops/function.rs", line: 284 },
+    { fn: "std::panicking::try::do_call", file: "/rustc/9b00956e56009bab2aa15d7bff10916599e3d6d6/library/std/src/panicking.rs", line: 552 },
+    { fn: "std::panicking::try", file: "/rustc/9b00956e56009bab2aa15d7bff10916599e3d6d6/library/std/src/panicking.rs", line: 516 },
+    { fn: "std::panic::catch_unwind", file: "/rustc/9b00956e56009bab2aa15d7bff10916599e3d6d6/library/std/src/panic.rs", line: 146 },
+    { fn: "std::rt::lang_start_internal::{{closure}}", file: "/rustc/9b00956e56009bab2aa15d7bff10916599e3d6d6/library/std/src/rt.rs", line: 148 },
+    { fn: "std::panicking::try::do_call", file: "/rustc/9b00956e56009bab2aa15d7bff10916599e3d6d6/library/std/src/panicking.rs", line: 552 },
+    { fn: "std::panicking::try", file: "/rustc/9b00956e56009bab2aa15d7bff10916599e3d6d6/library/std/src/panicking.rs", line: 516 },
+    { fn: "std::panic::catch_unwind", file: "/rustc/9b00956e56009bab2aa15d7bff10916599e3d6d6/library/std/src/panic.rs", line: 146 },
+    { fn: "std::rt::lang_start_internal", file: "/rustc/9b00956e56009bab2aa15d7bff10916599e3d6d6/library/std/src/rt.rs", line: 148 },
+    { fn: "_main" },
+]
+   │            Expected '('

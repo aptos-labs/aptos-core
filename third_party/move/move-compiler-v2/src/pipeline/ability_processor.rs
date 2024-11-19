@@ -552,7 +552,7 @@ impl<'a> Transformer<'a> {
         let target = self.builder.get_target();
         let ty_params = target.get_type_parameters();
         self.env()
-            .type_abilities(ty, &ty_params)
+            .type_abilities(ty, &ty_params, None)
             .has_ability(ability)
     }
 

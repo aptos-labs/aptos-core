@@ -5,7 +5,7 @@ comparison between v1 and v2 failed:
 - Error: error[E01013]: unsupported language construct
 -    ┌─ TEMPFILE:17:30
 + Error: compilation errors:
-+  error: a reference is expected but `_` was provided
++  error: a reference is expected but `_14` was provided
 +    ┌─ TEMPFILE:24:82
 =    │
 - 17 │         for_each_ref_mut(v, |elem: &mut Elem<K, V>| {
@@ -15,7 +15,7 @@ comparison between v1 and v2 failed:
 = 
 - error[E01013]: unsupported language construct
 -    ┌─ TEMPFILE:24:65
-+ error: a reference is expected but `_` was provided
++ error: a reference is expected but `_16` was provided
 +    ┌─ TEMPFILE:24:87
 =    │
 = 24 │         assert!(elem_for_each_ref(&mut vector[Elem{k:1, v:2}], |x: u64, y: u64| *x + *y) == 3, 0)
