@@ -1,0 +1,111 @@
+
+Diagnostics:
+error: function type `|u64|u64:drop+store` is not allowed as a field type
+  ┌─ tests/lambda/storable/registry_errors.move:9:12
+  │
+9 │         f: |u64| u64 with store,
+  │            ^^^^^^^^^^^^^^^^^^^^
+  │
+  = required by declaration of field `f`
+
+error: function type `|u64|u64:drop+store` is not allowed as a type argument (type was inferred)
+   ┌─ tests/lambda/storable/registry_errors.move:22:21
+   │
+13 │     enum Option<T> {
+   │                 - declaration of type parameter `T`
+   ·
+22 │                 x = Option::Some(f.f)
+   │                     ^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `Option`
+
+error: expected `&mut Function` but found a value of type `|u64|u64:drop+store`
+   ┌─ tests/lambda/storable/registry_errors.move:32:17
+   │
+32 │                 f.f = f;
+   │                 ^^^
+
+error: undeclared receiver function `append` for type `vector<Function>`
+   ┌─ tests/lambda/storable/registry_errors.move:38:13
+   │
+38 │             v.append(new_record);
+   │             ^^^^^^^^^^^^^^^^^^^^
+
+error: cannot return nothing from a function with result type `Option<Function>`
+   ┌─ tests/lambda/storable/registry_errors.move:38:33
+   │
+38 │             v.append(new_record);
+   │                                 ^
+
+error: cannot return nothing from a function with result type `Option<Function>`
+   ┌─ tests/lambda/storable/registry_errors.move:36:9
+   │
+36 │ ╭         if (!done) {
+37 │ │             let new_record = Function { f: f, key: k };
+38 │ │             v.append(new_record);
+39 │ │         }
+   │ ╰─────────^
+
+error: expected a struct with field `address` but found `signer`
+   ┌─ tests/lambda/storable/registry_errors.move:43:20
+   │
+43 │         let addr = owner.address;
+   │                    ^^^^^
+
+error: type `Registry` is missing required ability `key`
+   ┌─ tests/lambda/storable/registry_errors.move:48:21
+   │
+48 │             move_to<Registry>(owner, registry);
+   │                     ^^^^^^^^
+   │
+   = required by instantiating type parameter `T:key` of function `move_to`
+
+error: undeclared `registry`
+   ┌─ tests/lambda/storable/registry_errors.move:48:38
+   │
+48 │             move_to<Registry>(owner, registry);
+   │                                      ^^^^^^^^
+
+error: type `Registry` is missing required ability `key`
+   ┌─ tests/lambda/storable/registry_errors.move:55:21
+   │
+55 │         if (!exists<Registry>(addr)) {
+   │                     ^^^^^^^^
+   │
+   = required by instantiating type parameter `T:key` of function `exists`
+
+error: cannot pass `vector<Function>` to a function which expects argument of type `&vector<Function>`
+   ┌─ tests/lambda/storable/registry_errors.move:68:29
+   │
+68 │         match (get_function(registry.functions, k)) {
+   │                             ^^^^^^^^^^^^^^^^^^
+
+error: undeclared struct `test::Some`
+   ┌─ tests/lambda/storable/registry_errors.move:69:13
+   │
+69 │             Some(func) => {
+   │             ^^^^
+
+error: undeclared `func`
+   ┌─ tests/lambda/storable/registry_errors.move:70:52
+   │
+70 │                 let Function { f: f, key: key } = &func;
+   │                                                    ^^^^
+
+error: expected `|u64|u64` but found a value of type `&|u64|u64:drop+store`
+   ┌─ tests/lambda/storable/registry_errors.move:71:22
+   │
+71 │                 Some(f(x))
+   │                      ^^^^
+
+error: type `|u64|u64` is missing required ability `store`
+   ┌─ tests/lambda/storable/registry_errors.move:92:9
+   │
+92 │         |y| multiply(x, y)
+   │         ^^^^^^^^^^^^^^^^^^
+
+error: type `|u64|u64` is missing required ability `store`
+   ┌─ tests/lambda/storable/registry_errors.move:96:9
+   │
+96 │         move |y| multiply(x, y)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^

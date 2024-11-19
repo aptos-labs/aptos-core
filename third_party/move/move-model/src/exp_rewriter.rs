@@ -493,15 +493,12 @@ pub trait ExpRewriterFunctions {
                     {
                         (true, new_exp)
                     } else {
-                        (
-                            false,
-                            MatchArm {
-                                loc: arm.loc.clone(),
-                                pattern: newer_pat,
-                                condition: new_cond,
-                                body: new_body,
-                            },
-                        )
+                        (false, MatchArm {
+                            loc: arm.loc.clone(),
+                            pattern: newer_pat,
+                            condition: new_cond,
+                            body: new_body,
+                        })
                     };
                     new_arms.push(new_arm);
                     arms_changed =
@@ -640,24 +637,18 @@ pub trait ExpRewriterFunctions {
         let new_exp = self.rewrite_exp(condition.exp.clone());
         let maybe_new_additional_exps = self.internal_rewrite_vec(&condition.additional_exps);
         if let Some(new_additional_exps) = maybe_new_additional_exps {
-            (
-                true,
-                Condition {
-                    exp: new_exp,
-                    additional_exps: new_additional_exps,
-                    ..condition
-                },
-            )
+            (true, Condition {
+                exp: new_exp,
+                additional_exps: new_additional_exps,
+                ..condition
+            })
         } else {
             let changed = !ExpData::ptr_eq(&condition.exp, &new_exp);
             if changed {
-                (
-                    true,
-                    Condition {
-                        exp: new_exp,
-                        ..condition
-                    },
-                )
+                (true, Condition {
+                    exp: new_exp,
+                    ..condition
+                })
             } else {
                 (false, condition)
             }

@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+   ┌─ tests/lambda/storable/registry_ok.move:54:31
+   │
+54 │             return Option<u64>::None
+   │                               ^^
+   │                               │
+   │                               Unexpected '::'
+   │                               Expected ';'

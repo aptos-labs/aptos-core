@@ -4,10 +4,10 @@ error: expected `|()|_` but found a value of type `integer`
   ┌─ tests/more-v1/parser/invalid_call_lhs_value2.move:3:9
   │
 3 │         5();
-  │         ^^^
+  │         ^
 
 error: expected `|(integer, integer)|_` but found a value of type `integer`
   ┌─ tests/more-v1/parser/invalid_call_lhs_value2.move:4:9
   │
 4 │         5(0, 1);
-  │         ^^^^^^^
+  │         ^

@@ -44,7 +44,7 @@ use codespan_reporting::{
 };
 use itertools::Itertools;
 #[allow(unused_imports)]
-use log::{info, warn};
+use log::{debug, info, warn};
 pub use move_binary_format::file_format::{AbilitySet, Visibility};
 #[allow(deprecated)]
 use move_binary_format::normalized::Type as MType;
@@ -84,6 +84,8 @@ use std::{
     fmt::{self, Formatter, Write},
     rc::Rc,
 };
+
+static DEBUG_TRACE: bool = true;
 
 // =================================================================================================
 /// # Constants
@@ -892,11 +894,15 @@ impl GlobalEnv {
         });
         if *DUMP_BACKTRACE {
             let bt = Backtrace::capture();
-            if BacktraceStatus::Captured == bt.status() {
+            let msg_out = if BacktraceStatus::Captured == bt.status() {
                 format!("{}\nBacktrace: {:#?}", msg, bt)
             } else {
                 msg.to_owned()
+            };
+            if DEBUG_TRACE {
+                debug!("{}", msg_out);
             }
+            msg_out
         } else {
             msg.to_owned()
         }
@@ -1764,16 +1770,13 @@ impl GlobalEnv {
         let field_name = self.symbol_pool.make("v");
         let mut field_data = BTreeMap::new();
         let field_id = FieldId::new(field_name);
-        field_data.insert(
-            field_id,
-            FieldData {
-                name: field_name,
-                loc: loc.clone(),
-                offset: 0,
-                variant: None,
-                ty,
-            },
-        );
+        field_data.insert(field_id, FieldData {
+            name: field_name,
+            loc: loc.clone(),
+            offset: 0,
+            variant: None,
+            ty,
+        });
         StructData {
             name: self.ghost_memory_name(var_name),
             loc,
@@ -3384,16 +3387,13 @@ impl<'env> ModuleEnv<'env> {
     pub fn disassemble(&self) -> Option<String> {
         let view = BinaryIndexedView::Module(self.get_verified_module()?);
         let smap = self.data.source_map.as_ref().expect("source map").clone();
-        let disas = Disassembler::new(
-            SourceMapping::new(smap, view),
-            DisassemblerOptions {
-                only_externally_visible: false,
-                print_code: true,
-                print_basic_blocks: true,
-                print_locals: true,
-                print_bytecode_stats: false,
-            },
-        );
+        let disas = Disassembler::new(SourceMapping::new(smap, view), DisassemblerOptions {
+            only_externally_visible: false,
+            print_code: true,
+            print_basic_blocks: true,
+            print_locals: true,
+            print_bytecode_stats: false,
+        });
         Some(
             disas
                 .disassemble()

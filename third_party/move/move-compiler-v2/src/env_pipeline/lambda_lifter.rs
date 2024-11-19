@@ -43,7 +43,7 @@
 //! ```
 
 use itertools::Itertools;
-use move_binary_format::file_format::{Ability, AbilitySet, Visibility};
+use move_binary_format::file_format::{AbilitySet, Visibility};
 use move_model::{
     ast::{self, Exp, ExpData, LambdaCaptureKind, Operation, Pattern, TempIndex},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
@@ -348,22 +348,19 @@ impl<'a> LambdaLifter<'a> {
     fn get_move_fn_type(&mut self, expr_id: NodeId, module_id: ModuleId, fun_id: FunId) -> Type {
         let env = self.fun_env.module_env.env;
         let fn_env = env.get_function(module_id.qualified(fun_id));
+        let fun_abilities = if fn_env.visibility().is_public() {
+            AbilitySet::PUBLIC_FUNCTIONS
+        } else {
+            AbilitySet::PRIVATE_FUNCTIONS
+        };
         let params = fn_env.get_parameters_ref();
         let param_types = params.iter().map(|param| param.get_type()).collect();
         let node_instantiation = env.get_node_instantiation(expr_id);
         let result_type = fn_env.get_result_type();
-        let visibility = fn_env.visibility();
-        let abilities = AbilitySet::FUNCTIONS
-            | match visibility {
-                Visibility::Public => {
-                    AbilitySet::singleton(Ability::Store) | AbilitySet::singleton(Ability::Copy)
-                },
-                Visibility::Private | Visibility::Friend => AbilitySet::singleton(Ability::Copy),
-            };
         Type::Fun(
             Box::new(Type::Tuple(param_types)),
             Box::new(result_type),
-            abilities,
+            fun_abilities,
         )
         .instantiate(&node_instantiation)
     }
@@ -378,7 +375,8 @@ impl<'a> LambdaLifter<'a> {
             Call(id, oper, args) => {
                 match oper {
                     Operation::Bind(_mask) => {
-                        // TODO(LAMBDA): We may be able to do something with this.
+                        // TODO(LAMBDA): We may be able to do something with this,
+                        // but skip for now because it will be complicated.
                         None
                     },
                     Operation::MoveFunction(mid, fid) => {
@@ -472,10 +470,16 @@ impl<'a> LambdaLifter<'a> {
             }
             if !has_mismatch {
                 match fn_exp.as_ref() {
-                    ExpData::Value(_, ast::Value::Function(..)) => {
+                    ExpData::Value(value_id, ast::Value::Function(module_id, fun_id)) => {
                         let env = self.fun_env.module_env.env;
                         let bind_id = env.clone_node(id);
-                        new_args.insert(0, fn_exp);
+                        let fn_env = env.get_function(module_id.qualified(*fun_id));
+                        let fun_abilities = if fn_env.visibility().is_public() {
+                            AbilitySet::PUBLIC_FUNCTIONS
+                        } else {
+                            AbilitySet::PRIVATE_FUNCTIONS
+                        };
+                        new_args.insert(0, fn_exp.clone());
                         let ty_params = self.fun_env.get_type_parameters_ref();
                         let ability_inferer = AbilityInferer::new(env, ty_params);
                         let bound_value_abilities: Vec<_> = new_args
@@ -487,7 +491,7 @@ impl<'a> LambdaLifter<'a> {
                                 (env.get_node_loc(node), node_abilities)
                             })
                             .collect();
-                        let bound_value_missing_abilities: Vec<_> = bound_value_abilities
+                        let mut bound_value_missing_abilities: Vec<_> = bound_value_abilities
                             .iter()
                             .filter_map(|(loc, node_abilities)| {
                                 if !abilities.is_subset(*node_abilities) {
@@ -504,11 +508,21 @@ impl<'a> LambdaLifter<'a> {
                                 }
                             })
                             .collect();
-                        let closure_abilities = bound_value_abilities.iter()
+                        if !abilities.is_subset(fun_abilities) {
+                            let missing = abilities.setminus(fun_abilities);
+                            bound_value_missing_abilities.push((
+                                env.get_node_loc(*value_id),
+                                format!(
+                                    "Base function of closure is missing abilities: {}",
+                                    missing
+                                ),
+                            ));
+                        }
+                        let closure_abilities = bound_value_abilities
+                            .iter()
                             .map(|(_loc, node_abilities)| *node_abilities)
                             .reduce(|abs1, abs2| abs1.intersect(abs2))
-                            .unwrap_or(AbilitySet::PRIMITIVES)  // no bound vars, can assume anything.
-                            | AbilitySet::FUNCTIONS;
+                            .unwrap_or(fun_abilities);
                         if !bound_value_missing_abilities.is_empty() {
                             let missing_abilities = abilities.setminus(closure_abilities);
                             let loc = env.get_node_loc(id);
@@ -525,9 +539,9 @@ impl<'a> LambdaLifter<'a> {
                     },
                     ExpData::Call(_id2, Operation::Bind(_mask2), _bind_args) => {
                         // TODO: LAMBDA
-                        // We can convert this into a single bind, but we need to build a let
-                        // expression to be sure to evaluate args in the right order.  Skip it for
-                        // now.
+                        // We can convert 2 nested binds into a single bind, but it's complicated
+                        // to juggle all the parameters and make sure evluation order is right.
+                        // Skip it for now.
                     },
                     _ => {},
                 }
@@ -602,13 +616,10 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
 
     fn rewrite_assign(&mut self, _node_id: NodeId, lhs: &Pattern, _rhs: &Exp) -> Option<Exp> {
         for (node_id, name) in lhs.vars() {
-            self.free_locals.insert(
-                name,
-                VarInfo {
-                    node_id,
-                    modified: true,
-                },
-            );
+            self.free_locals.insert(name, VarInfo {
+                node_id,
+                modified: true,
+            });
         }
         None
     }
@@ -617,22 +628,16 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         if matches!(oper, Operation::Borrow(ReferenceKind::Mutable)) {
             match args[0].as_ref() {
                 ExpData::LocalVar(node_id, name) => {
-                    self.free_locals.insert(
-                        *name,
-                        VarInfo {
-                            node_id: *node_id,
-                            modified: true,
-                        },
-                    );
+                    self.free_locals.insert(*name, VarInfo {
+                        node_id: *node_id,
+                        modified: true,
+                    });
                 },
                 ExpData::Temporary(node_id, param) => {
-                    self.free_params.insert(
-                        *param,
-                        VarInfo {
-                            node_id: *node_id,
-                            modified: true,
-                        },
-                    );
+                    self.free_params.insert(*param, VarInfo {
+                        node_id: *node_id,
+                        modified: true,
+                    });
                 },
                 _ => {},
             }
@@ -658,7 +663,7 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
             LambdaCaptureKind::Move => {
                 // OK.
             },
-            LambdaCaptureKind::Default | LambdaCaptureKind::Copy | LambdaCaptureKind::Borrow => {
+            LambdaCaptureKind::Default | LambdaCaptureKind::Copy => {
                 let loc = env.get_node_loc(id);
                 env.error(
                     &loc,

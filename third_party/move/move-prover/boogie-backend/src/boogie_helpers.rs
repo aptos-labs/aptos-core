@@ -707,14 +707,10 @@ impl TypeIdentToken {
         fn get_char_array(tokens: &[TypeIdentToken], start: usize, end: usize) -> String {
             let elements = (start..end)
                 .map(|k| {
-                    format!(
-                        "[{} := {}]",
-                        k - start,
-                        match &tokens[k] {
-                            TypeIdentToken::Char(c) => *c,
-                            TypeIdentToken::Variable(_) => unreachable!(),
-                        }
-                    )
+                    format!("[{} := {}]", k - start, match &tokens[k] {
+                        TypeIdentToken::Char(c) => *c,
+                        TypeIdentToken::Variable(_) => unreachable!(),
+                    })
                 })
                 .join("");
             format!("Vec(DefaultVecMap(){}, {})", elements, end - start)

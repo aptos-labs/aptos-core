@@ -1,12 +1,12 @@
 
 Diagnostics:
-error: expected `|(&T, u64)|` but found a value of type `|&T|`
+error: expected `|(&T, u64)|_` but found a value of type `|&T|`
    ┌─ tests/checking/typing/lambda_typed.move:40:13
    │
 40 │             action(XVector::borrow(v, i), i); // expected to have wrong argument count
    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: expected `|u64|` but found a value of type `|&T|`
+error: expected `|u64|_` but found a value of type `|&T|`
    ┌─ tests/checking/typing/lambda_typed.move:48:13
    │
 48 │             action(i); // expected to have wrong argument type

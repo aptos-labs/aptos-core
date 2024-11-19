@@ -31,7 +31,7 @@ module 0x42::test {
                 done = true;
             }
         });
-        if !done {
+        if (!done) {
             let new_record = Function { f: f, key: k };
             v.append(new_record);
         }
@@ -39,20 +39,20 @@ module 0x42::test {
 
     fun register(owner: &signer, f: |u64| u64 with store, k: u64) acquires Registry {
         let addr = owner.address;
-        if !exists<Registry>(addr) {
+        if (!exists<Registry>(addr)) {
             let new_registry = Registry {
                 functions: vector[]
             };
             move_to<Registry>(owner, registry);
-        }
+        };
         let registry = borrow_global_mut<Registry>(addr);
         replace_or_add_function(&mut registry.functions, k, f);
     }
 
     fun invoke(addr: address, k: u64, x: u64): Option<u64> acquires Registry {
-        if !exists<Registry>(addr) {
+        if (!exists<Registry>(addr)) {
             return Option<u64>::None
-        }
+        };
         let registry = borrow_global<Registry>(addr);
         match get_function(registry.functions, k) {
             Some(func) => {

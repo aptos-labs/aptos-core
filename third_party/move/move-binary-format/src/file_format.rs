@@ -849,14 +849,17 @@ impl AbilitySet {
             | (Ability::Store as u8)
             | (Ability::Key as u8),
     );
-    /// Abilities for user-defined/"primitive" functions (not closures)
-    pub const DEFINED_FUNCTIONS: AbilitySet = Self((Ability::Copy as u8) | (Ability::Drop as u8));
-    /// The empty ability set
     pub const EMPTY: Self = Self(0);
-    /// Abilities for `Functions`
+    /// Base abilities for all `Functions`
     pub const FUNCTIONS: AbilitySet = Self(Ability::Drop as u8);
     /// Abilities for `Bool`, `U8`, `U64`, `U128`, and `Address`
     pub const PRIMITIVES: AbilitySet =
+        Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));
+    /// Abilities for `private` user-defined/"primitive" functions (not closures).
+    /// These can be be changed in module upgrades, so should not be stored
+    pub const PRIVATE_FUNCTIONS: AbilitySet = Self((Ability::Copy as u8) | (Ability::Drop as u8));
+    /// Abilities for `public` user-defined/"primitive" functions (not closures)
+    pub const PUBLIC_FUNCTIONS: AbilitySet =
         Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));
     /// Abilities for `Reference` and `MutableReference`
     pub const REFERENCES: AbilitySet = Self((Ability::Copy as u8) | (Ability::Drop as u8));
@@ -865,6 +868,8 @@ impl AbilitySet {
     /// Abilities for `Vector`, note they are predicated on the type argument
     pub const VECTOR: AbilitySet =
         Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));
+
+    /// The empty ability set
 
     pub fn singleton(ability: Ability) -> Self {
         Self(ability as u8)

@@ -40,21 +40,21 @@ module 0x42::test {
             } else if (key == 1) {
                 mod1::triple
             } else if (key == 2) {
-                mod3::multiply(4, _)
+                move |x| mod3::multiply(4, x)
             } else if (key == 3) {
                 let x = 5;
-                alt_multiply(x, _)
+                move |y| alt_multiply(x, y)
             } else if (key == 4) {
                 let x = 6;
-                mod3::multiply(_, x)
+                move |y| mod3::multiply(y, x)
             } else if (key == 5) {
-                multiply3(_, 3, 2)
+                move |x| multiply3(x, 3, 2)
             } else if (key == 6) {
                 move |x| mod3::multiply(x, 7)
             } else if (key == 7) {
-                multiply3(4, _, 2)
+                move |x| multiply3(4, x, 2)
             } else if (key == 8) {
-                multiply3(3, 3, _)
+                move |x| multiply3(3, 3, x)
             } else if (key == 9) {
                 let x = 2;
                 let y = 5;
@@ -64,16 +64,16 @@ module 0x42::test {
                 move |x| alt_multiply(x, z) with copy
             } else if (key == 11) {
                 let g = move |x, y| mod3::multiply(x, y) with copy+drop;
-                g(_, 11)
+                move |x| g(x, 11)
             } else if (key == 12) {
-                let h = mod3::multiply(_, 12);
+                let h = move |x| mod3::multiply(x, 12);
                 move |x| { h(x) } with copy + drop
             } else if (key == 14) {
-                let i = multiply3(2, _, 2);
+                let i = move |x| multiply3(2, x, 2);
                 move |z| i(z)
             } else {
                 let i = move |x, y| { let q = y - 1; 0x42::mod3::multiply(x, q + 1)  };
-                i(_, 15)
+                move |x| i(x, 15)
             };
         f(x)
     }

@@ -1,13 +1,19 @@
 
 Diagnostics:
 error: expected `|()|_` but found a value of type `integer`
-  ┌─ tests/more-v1/parser/invalid_call_lhs_complex_expression2.move:3:9
+  ┌─ tests/more-v1/parser/invalid_call_lhs_complex_expression2.move:3:20
   │
 3 │         (if (true) 5 else 0)();
-  │         ^^^^^^^^^^^^^^^^^^^^^^
+  │                    ^
+
+error: expected `|()|_` but found a value of type `integer`
+  ┌─ tests/more-v1/parser/invalid_call_lhs_complex_expression2.move:3:27
+  │
+3 │         (if (true) 5 else 0)();
+  │                           ^
 
 error: expected `|(integer, integer)|_` but found a value of type `()`
   ┌─ tests/more-v1/parser/invalid_call_lhs_complex_expression2.move:4:9
   │
 4 │         (while (false) {})(0, 1);
-  │         ^^^^^^^^^^^^^^^^^^^^^^^^
+  │         ^^^^^^^^^^^^^^^^^^

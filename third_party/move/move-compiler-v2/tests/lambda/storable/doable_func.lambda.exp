@@ -36,31 +36,31 @@ module 0x42::test {
               mod1::triple
             } else {
               if Eq<u64>(key, 2) {
-                bind(1)(mod3::multiply, 4)
+                 move|x: u64| mod3::multiply(4, x)
               } else {
                 if Eq<u64>(key, 3) {
                   {
                     let x: u64 = 5;
-                    bind(1)(mod4::alt_multiply, x)
+                     move|y: u64| mod4::alt_multiply(x, y)
                   }
                 } else {
                   if Eq<u64>(key, 4) {
                     {
                       let x: u64 = 6;
-                      bind(10)(mod3::multiply, x)
+                       move|y: u64| mod3::multiply(y, x)
                     }
                   } else {
                     if Eq<u64>(key, 5) {
-                      bind(110)(test::multiply3, 3, 2)
+                       move|x: u64| test::multiply3(x, 3, 2)
                     } else {
                       if Eq<u64>(key, 6) {
                          move|x: u64| mod3::multiply(x, 7)
                       } else {
                         if Eq<u64>(key, 7) {
-                          bind(101)(test::multiply3, 4, 2)
+                           move|x: u64| test::multiply3(4, x, 2)
                         } else {
                           if Eq<u64>(key, 8) {
-                            bind(11)(test::multiply3, 3, 3)
+                             move|x: u64| test::multiply3(3, 3, x)
                           } else {
                             if Eq<u64>(key, 9) {
                               {
@@ -74,24 +74,24 @@ module 0x42::test {
                               if Eq<u64>(key, 10) {
                                 {
                                   let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(x, z) has copy, drop
+                                   move|x: u64| mod4::alt_multiply(x, z) with copy, drop
                                 }
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) has copy, drop;
-                                    bind(10)(g, 11)
+                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                     move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 = bind(10)(mod3::multiply, 12);
-                                       move|x: u64| (h)(x) has copy, drop
+                                      let h: |u64|u64 =  move|x: u64| mod3::multiply(x, 12);
+                                       move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 = bind(101)(test::multiply3, 2, 2);
+                                        let i: |u64|u64 =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
@@ -100,7 +100,7 @@ module 0x42::test {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };
-                                        bind(10)(i, 15)
+                                         move|x: u64| (i)(x, 15)
                                       }
                                     }
                                   }
@@ -203,31 +203,31 @@ module 0x42::test {
               mod1::triple
             } else {
               if Eq<u64>(key, 2) {
-                bind(1)(mod3::multiply, 4)
+                 move|x: u64| mod3::multiply(4, x)
               } else {
                 if Eq<u64>(key, 3) {
                   {
                     let x: u64 = 5;
-                    bind(1)(mod4::alt_multiply, x)
+                     move|y: u64| mod4::alt_multiply(x, y)
                   }
                 } else {
                   if Eq<u64>(key, 4) {
                     {
                       let x: u64 = 6;
-                      bind(10)(mod3::multiply, x)
+                       move|y: u64| mod3::multiply(y, x)
                     }
                   } else {
                     if Eq<u64>(key, 5) {
-                      bind(110)(test::multiply3, 3, 2)
+                       move|x: u64| test::multiply3(x, 3, 2)
                     } else {
                       if Eq<u64>(key, 6) {
                          move|x: u64| mod3::multiply(x, 7)
                       } else {
                         if Eq<u64>(key, 7) {
-                          bind(101)(test::multiply3, 4, 2)
+                           move|x: u64| test::multiply3(4, x, 2)
                         } else {
                           if Eq<u64>(key, 8) {
-                            bind(11)(test::multiply3, 3, 3)
+                             move|x: u64| test::multiply3(3, 3, x)
                           } else {
                             if Eq<u64>(key, 9) {
                               {
@@ -241,24 +241,24 @@ module 0x42::test {
                               if Eq<u64>(key, 10) {
                                 {
                                   let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(x, z) has copy, drop
+                                   move|x: u64| mod4::alt_multiply(x, z) with copy, drop
                                 }
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) has copy, drop;
-                                    bind(10)(g, 11)
+                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                     move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 = bind(10)(mod3::multiply, 12);
-                                       move|x: u64| (h)(x) has copy, drop
+                                      let h: |u64|u64 =  move|x: u64| mod3::multiply(x, 12);
+                                       move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 = bind(101)(test::multiply3, 2, 2);
+                                        let i: |u64|u64 =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
@@ -267,7 +267,7 @@ module 0x42::test {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };
-                                        bind(10)(i, 15)
+                                         move|x: u64| (i)(x, 15)
                                       }
                                     }
                                   }
@@ -370,31 +370,31 @@ module 0x42::test {
               mod1::triple
             } else {
               if Eq<u64>(key, 2) {
-                bind(1)(mod3::multiply, 4)
+                 move|x: u64| mod3::multiply(4, x)
               } else {
                 if Eq<u64>(key, 3) {
                   {
                     let x: u64 = 5;
-                    bind(1)(mod4::alt_multiply, x)
+                     move|y: u64| mod4::alt_multiply(x, y)
                   }
                 } else {
                   if Eq<u64>(key, 4) {
                     {
                       let x: u64 = 6;
-                      bind(10)(mod3::multiply, x)
+                       move|y: u64| mod3::multiply(y, x)
                     }
                   } else {
                     if Eq<u64>(key, 5) {
-                      bind(110)(test::multiply3, 3, 2)
+                       move|x: u64| test::multiply3(x, 3, 2)
                     } else {
                       if Eq<u64>(key, 6) {
                          move|x: u64| mod3::multiply(x, 7)
                       } else {
                         if Eq<u64>(key, 7) {
-                          bind(101)(test::multiply3, 4, 2)
+                           move|x: u64| test::multiply3(4, x, 2)
                         } else {
                           if Eq<u64>(key, 8) {
-                            bind(11)(test::multiply3, 3, 3)
+                             move|x: u64| test::multiply3(3, 3, x)
                           } else {
                             if Eq<u64>(key, 9) {
                               {
@@ -408,24 +408,24 @@ module 0x42::test {
                               if Eq<u64>(key, 10) {
                                 {
                                   let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(x, z) has copy, drop
+                                   move|x: u64| mod4::alt_multiply(x, z) with copy, drop
                                 }
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) has copy, drop;
-                                    bind(10)(g, 11)
+                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                     move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 = bind(10)(mod3::multiply, 12);
-                                       move|x: u64| (h)(x) has copy, drop
+                                      let h: |u64|u64 =  move|x: u64| mod3::multiply(x, 12);
+                                       move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 = bind(101)(test::multiply3, 2, 2);
+                                        let i: |u64|u64 =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
@@ -434,7 +434,7 @@ module 0x42::test {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };
-                                        bind(10)(i, 15)
+                                         move|x: u64| (i)(x, 15)
                                       }
                                     }
                                   }
@@ -537,31 +537,31 @@ module 0x42::test {
               mod1::triple
             } else {
               if Eq<u64>(key, 2) {
-                bind(1)(mod3::multiply, 4)
+                 move|x: u64| mod3::multiply(4, x)
               } else {
                 if Eq<u64>(key, 3) {
                   {
                     let x: u64 = 5;
-                    bind(1)(mod4::alt_multiply, x)
+                     move|y: u64| mod4::alt_multiply(x, y)
                   }
                 } else {
                   if Eq<u64>(key, 4) {
                     {
                       let x: u64 = 6;
-                      bind(10)(mod3::multiply, x)
+                       move|y: u64| mod3::multiply(y, x)
                     }
                   } else {
                     if Eq<u64>(key, 5) {
-                      bind(110)(test::multiply3, 3, 2)
+                       move|x: u64| test::multiply3(x, 3, 2)
                     } else {
                       if Eq<u64>(key, 6) {
                          move|x: u64| mod3::multiply(x, 7)
                       } else {
                         if Eq<u64>(key, 7) {
-                          bind(101)(test::multiply3, 4, 2)
+                           move|x: u64| test::multiply3(4, x, 2)
                         } else {
                           if Eq<u64>(key, 8) {
-                            bind(11)(test::multiply3, 3, 3)
+                             move|x: u64| test::multiply3(3, 3, x)
                           } else {
                             if Eq<u64>(key, 9) {
                               {
@@ -575,24 +575,24 @@ module 0x42::test {
                               if Eq<u64>(key, 10) {
                                 {
                                   let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(x, z) has copy, drop
+                                   move|x: u64| mod4::alt_multiply(x, z) with copy, drop
                                 }
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) has copy, drop;
-                                    bind(10)(g, 11)
+                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                     move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 = bind(10)(mod3::multiply, 12);
-                                       move|x: u64| (h)(x) has copy, drop
+                                      let h: |u64|u64 =  move|x: u64| mod3::multiply(x, 12);
+                                       move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 = bind(101)(test::multiply3, 2, 2);
+                                        let i: |u64|u64 =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
@@ -601,7 +601,7 @@ module 0x42::test {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };
-                                        bind(10)(i, 15)
+                                         move|x: u64| (i)(x, 15)
                                       }
                                     }
                                   }
@@ -704,31 +704,31 @@ module 0x42::test {
               mod1::triple
             } else {
               if Eq<u64>(key, 2) {
-                bind(1)(mod3::multiply, 4)
+                 move|x: u64| mod3::multiply(4, x)
               } else {
                 if Eq<u64>(key, 3) {
                   {
                     let x: u64 = 5;
-                    bind(1)(mod4::alt_multiply, x)
+                     move|y: u64| mod4::alt_multiply(x, y)
                   }
                 } else {
                   if Eq<u64>(key, 4) {
                     {
                       let x: u64 = 6;
-                      bind(10)(mod3::multiply, x)
+                       move|y: u64| mod3::multiply(y, x)
                     }
                   } else {
                     if Eq<u64>(key, 5) {
-                      bind(110)(test::multiply3, 3, 2)
+                       move|x: u64| test::multiply3(x, 3, 2)
                     } else {
                       if Eq<u64>(key, 6) {
                          move|x: u64| mod3::multiply(x, 7)
                       } else {
                         if Eq<u64>(key, 7) {
-                          bind(101)(test::multiply3, 4, 2)
+                           move|x: u64| test::multiply3(4, x, 2)
                         } else {
                           if Eq<u64>(key, 8) {
-                            bind(11)(test::multiply3, 3, 3)
+                             move|x: u64| test::multiply3(3, 3, x)
                           } else {
                             if Eq<u64>(key, 9) {
                               {
@@ -742,24 +742,24 @@ module 0x42::test {
                               if Eq<u64>(key, 10) {
                                 {
                                   let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(x, z) has copy, drop
+                                   move|x: u64| mod4::alt_multiply(x, z) with copy, drop
                                 }
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) has copy, drop;
-                                    bind(10)(g, 11)
+                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                     move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 = bind(10)(mod3::multiply, 12);
-                                       move|x: u64| (h)(x) has copy, drop
+                                      let h: |u64|u64 =  move|x: u64| mod3::multiply(x, 12);
+                                       move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 = bind(101)(test::multiply3, 2, 2);
+                                        let i: |u64|u64 =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
@@ -768,7 +768,7 @@ module 0x42::test {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };
-                                        bind(10)(i, 15)
+                                         move|x: u64| (i)(x, 15)
                                       }
                                     }
                                   }
@@ -871,31 +871,31 @@ module 0x42::test {
               mod1::triple
             } else {
               if Eq<u64>(key, 2) {
-                bind(1)(mod3::multiply, 4)
+                 move|x: u64| mod3::multiply(4, x)
               } else {
                 if Eq<u64>(key, 3) {
                   {
                     let x: u64 = 5;
-                    bind(1)(mod4::alt_multiply, x)
+                     move|y: u64| mod4::alt_multiply(x, y)
                   }
                 } else {
                   if Eq<u64>(key, 4) {
                     {
                       let x: u64 = 6;
-                      bind(10)(mod3::multiply, x)
+                       move|y: u64| mod3::multiply(y, x)
                     }
                   } else {
                     if Eq<u64>(key, 5) {
-                      bind(110)(test::multiply3, 3, 2)
+                       move|x: u64| test::multiply3(x, 3, 2)
                     } else {
                       if Eq<u64>(key, 6) {
                          move|x: u64| mod3::multiply(x, 7)
                       } else {
                         if Eq<u64>(key, 7) {
-                          bind(101)(test::multiply3, 4, 2)
+                           move|x: u64| test::multiply3(4, x, 2)
                         } else {
                           if Eq<u64>(key, 8) {
-                            bind(11)(test::multiply3, 3, 3)
+                             move|x: u64| test::multiply3(3, 3, x)
                           } else {
                             if Eq<u64>(key, 9) {
                               {
@@ -909,24 +909,24 @@ module 0x42::test {
                               if Eq<u64>(key, 10) {
                                 {
                                   let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(x, z) has copy, drop
+                                   move|x: u64| mod4::alt_multiply(x, z) with copy, drop
                                 }
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) has copy, drop;
-                                    bind(10)(g, 11)
+                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                     move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 = bind(10)(mod3::multiply, 12);
-                                       move|x: u64| (h)(x) has copy, drop
+                                      let h: |u64|u64 =  move|x: u64| mod3::multiply(x, 12);
+                                       move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 = bind(101)(test::multiply3, 2, 2);
+                                        let i: |u64|u64 =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
@@ -935,7 +935,7 @@ module 0x42::test {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };
-                                        bind(10)(i, 15)
+                                         move|x: u64| (i)(x, 15)
                                       }
                                     }
                                   }
@@ -1038,31 +1038,31 @@ module 0x42::test {
               mod1::triple
             } else {
               if Eq<u64>(key, 2) {
-                bind(1)(mod3::multiply, 4)
+                 move|x: u64| mod3::multiply(4, x)
               } else {
                 if Eq<u64>(key, 3) {
                   {
                     let x: u64 = 5;
-                    bind(1)(mod4::alt_multiply, x)
+                     move|y: u64| mod4::alt_multiply(x, y)
                   }
                 } else {
                   if Eq<u64>(key, 4) {
                     {
                       let x: u64 = 6;
-                      bind(10)(mod3::multiply, x)
+                       move|y: u64| mod3::multiply(y, x)
                     }
                   } else {
                     if Eq<u64>(key, 5) {
-                      bind(110)(test::multiply3, 3, 2)
+                       move|x: u64| test::multiply3(x, 3, 2)
                     } else {
                       if Eq<u64>(key, 6) {
                          move|x: u64| mod3::multiply(x, 7)
                       } else {
                         if Eq<u64>(key, 7) {
-                          bind(101)(test::multiply3, 4, 2)
+                           move|x: u64| test::multiply3(4, x, 2)
                         } else {
                           if Eq<u64>(key, 8) {
-                            bind(11)(test::multiply3, 3, 3)
+                             move|x: u64| test::multiply3(3, 3, x)
                           } else {
                             if Eq<u64>(key, 9) {
                               {
@@ -1076,24 +1076,24 @@ module 0x42::test {
                               if Eq<u64>(key, 10) {
                                 {
                                   let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(x, z) has copy, drop
+                                   move|x: u64| mod4::alt_multiply(x, z) with copy, drop
                                 }
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) has copy, drop;
-                                    bind(10)(g, 11)
+                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                     move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 = bind(10)(mod3::multiply, 12);
-                                       move|x: u64| (h)(x) has copy, drop
+                                      let h: |u64|u64 =  move|x: u64| mod3::multiply(x, 12);
+                                       move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 = bind(101)(test::multiply3, 2, 2);
+                                        let i: |u64|u64 =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
@@ -1102,7 +1102,7 @@ module 0x42::test {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };
-                                        bind(10)(i, 15)
+                                         move|x: u64| (i)(x, 15)
                                       }
                                     }
                                   }
@@ -1205,31 +1205,31 @@ module 0x42::test {
               mod1::triple
             } else {
               if Eq<u64>(key, 2) {
-                bind(1)(mod3::multiply, 4)
+                 move|x: u64| mod3::multiply(4, x)
               } else {
                 if Eq<u64>(key, 3) {
                   {
                     let x: u64 = 5;
-                    bind(1)(mod4::alt_multiply, x)
+                     move|y: u64| mod4::alt_multiply(x, y)
                   }
                 } else {
                   if Eq<u64>(key, 4) {
                     {
                       let x: u64 = 6;
-                      bind(10)(mod3::multiply, x)
+                       move|y: u64| mod3::multiply(y, x)
                     }
                   } else {
                     if Eq<u64>(key, 5) {
-                      bind(110)(test::multiply3, 3, 2)
+                       move|x: u64| test::multiply3(x, 3, 2)
                     } else {
                       if Eq<u64>(key, 6) {
                          move|x: u64| mod3::multiply(x, 7)
                       } else {
                         if Eq<u64>(key, 7) {
-                          bind(101)(test::multiply3, 4, 2)
+                           move|x: u64| test::multiply3(4, x, 2)
                         } else {
                           if Eq<u64>(key, 8) {
-                            bind(11)(test::multiply3, 3, 3)
+                             move|x: u64| test::multiply3(3, 3, x)
                           } else {
                             if Eq<u64>(key, 9) {
                               {
@@ -1243,24 +1243,24 @@ module 0x42::test {
                               if Eq<u64>(key, 10) {
                                 {
                                   let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(x, z) has copy, drop
+                                   move|x: u64| mod4::alt_multiply(x, z) with copy, drop
                                 }
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) has copy, drop;
-                                    bind(10)(g, 11)
+                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                     move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 = bind(10)(mod3::multiply, 12);
-                                       move|x: u64| (h)(x) has copy, drop
+                                      let h: |u64|u64 =  move|x: u64| mod3::multiply(x, 12);
+                                       move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 = bind(101)(test::multiply3, 2, 2);
+                                        let i: |u64|u64 =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
@@ -1269,7 +1269,7 @@ module 0x42::test {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };
-                                        bind(10)(i, 15)
+                                         move|x: u64| (i)(x, 15)
                                       }
                                     }
                                   }
@@ -1372,31 +1372,31 @@ module 0x42::test {
               mod1::triple
             } else {
               if Eq<u64>(key, 2) {
-                bind(1)(mod3::multiply, 4)
+                 move|x: u64| mod3::multiply(4, x)
               } else {
                 if Eq<u64>(key, 3) {
                   {
                     let x: u64 = 5;
-                    bind(1)(mod4::alt_multiply, x)
+                     move|y: u64| mod4::alt_multiply(x, y)
                   }
                 } else {
                   if Eq<u64>(key, 4) {
                     {
                       let x: u64 = 6;
-                      bind(10)(mod3::multiply, x)
+                       move|y: u64| mod3::multiply(y, x)
                     }
                   } else {
                     if Eq<u64>(key, 5) {
-                      bind(110)(test::multiply3, 3, 2)
+                       move|x: u64| test::multiply3(x, 3, 2)
                     } else {
                       if Eq<u64>(key, 6) {
                          move|x: u64| mod3::multiply(x, 7)
                       } else {
                         if Eq<u64>(key, 7) {
-                          bind(101)(test::multiply3, 4, 2)
+                           move|x: u64| test::multiply3(4, x, 2)
                         } else {
                           if Eq<u64>(key, 8) {
-                            bind(11)(test::multiply3, 3, 3)
+                             move|x: u64| test::multiply3(3, 3, x)
                           } else {
                             if Eq<u64>(key, 9) {
                               {
@@ -1410,24 +1410,24 @@ module 0x42::test {
                               if Eq<u64>(key, 10) {
                                 {
                                   let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(x, z) has copy, drop
+                                   move|x: u64| mod4::alt_multiply(x, z) with copy, drop
                                 }
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) has copy, drop;
-                                    bind(10)(g, 11)
+                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                     move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 = bind(10)(mod3::multiply, 12);
-                                       move|x: u64| (h)(x) has copy, drop
+                                      let h: |u64|u64 =  move|x: u64| mod3::multiply(x, 12);
+                                       move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 = bind(101)(test::multiply3, 2, 2);
+                                        let i: |u64|u64 =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
@@ -1436,7 +1436,7 @@ module 0x42::test {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };
-                                        bind(10)(i, 15)
+                                         move|x: u64| (i)(x, 15)
                                       }
                                     }
                                   }
@@ -1539,31 +1539,31 @@ module 0x42::test {
               mod1::triple
             } else {
               if Eq<u64>(key, 2) {
-                bind(1)(mod3::multiply, 4)
+                 move|x: u64| mod3::multiply(4, x)
               } else {
                 if Eq<u64>(key, 3) {
                   {
                     let x: u64 = 5;
-                    bind(1)(mod4::alt_multiply, x)
+                     move|y: u64| mod4::alt_multiply(x, y)
                   }
                 } else {
                   if Eq<u64>(key, 4) {
                     {
                       let x: u64 = 6;
-                      bind(10)(mod3::multiply, x)
+                       move|y: u64| mod3::multiply(y, x)
                     }
                   } else {
                     if Eq<u64>(key, 5) {
-                      bind(110)(test::multiply3, 3, 2)
+                       move|x: u64| test::multiply3(x, 3, 2)
                     } else {
                       if Eq<u64>(key, 6) {
                          move|x: u64| mod3::multiply(x, 7)
                       } else {
                         if Eq<u64>(key, 7) {
-                          bind(101)(test::multiply3, 4, 2)
+                           move|x: u64| test::multiply3(4, x, 2)
                         } else {
                           if Eq<u64>(key, 8) {
-                            bind(11)(test::multiply3, 3, 3)
+                             move|x: u64| test::multiply3(3, 3, x)
                           } else {
                             if Eq<u64>(key, 9) {
                               {
@@ -1577,24 +1577,24 @@ module 0x42::test {
                               if Eq<u64>(key, 10) {
                                 {
                                   let z: u64 = 11;
-                                   move|x: u64| mod4::alt_multiply(x, z) has copy, drop
+                                   move|x: u64| mod4::alt_multiply(x, z) with copy, drop
                                 }
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) has copy, drop;
-                                    bind(10)(g, 11)
+                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                     move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 = bind(10)(mod3::multiply, 12);
-                                       move|x: u64| (h)(x) has copy, drop
+                                      let h: |u64|u64 =  move|x: u64| mod3::multiply(x, 12);
+                                       move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 = bind(101)(test::multiply3, 2, 2);
+                                        let i: |u64|u64 =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
@@ -1603,7 +1603,7 @@ module 0x42::test {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };
-                                        bind(10)(i, 15)
+                                         move|x: u64| (i)(x, 15)
                                       }
                                     }
                                   }
@@ -1706,47 +1706,47 @@ module 0x42::test {
               mod1::triple
             } else {
               if Eq<u64>(key, 2) {
-                bind(1)(mod3::multiply, 4)
+                 move|x: u64| mod3::multiply(4, x)
               } else {
                 if Eq<u64>(key, 3) {
-                  bind(1)(mod4::alt_multiply, 5)
+                   move|y: u64| mod4::alt_multiply(5, y)
                 } else {
                   if Eq<u64>(key, 4) {
-                    bind(10)(mod3::multiply, 6)
+                     move|y: u64| mod3::multiply(y, 6)
                   } else {
                     if Eq<u64>(key, 5) {
-                      bind(110)(test::multiply3, 3, 2)
+                       move|x: u64| test::multiply3(x, 3, 2)
                     } else {
                       if Eq<u64>(key, 6) {
                          move|x: u64| mod3::multiply(x, 7)
                       } else {
                         if Eq<u64>(key, 7) {
-                          bind(101)(test::multiply3, 4, 2)
+                           move|x: u64| test::multiply3(4, x, 2)
                         } else {
                           if Eq<u64>(key, 8) {
-                            bind(11)(test::multiply3, 3, 3)
+                             move|x: u64| test::multiply3(3, 3, x)
                           } else {
                             if Eq<u64>(key, 9) {
                                move|z: u64| test::multiply3(2, 5, z)
                             } else {
                               if Eq<u64>(key, 10) {
-                                 move|x: u64| mod4::alt_multiply(x, 11) has copy, drop
+                                 move|x: u64| mod4::alt_multiply(x, 11) with copy, drop
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) has copy, drop;
-                                    bind(10)(g, 11)
+                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                     move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 = bind(10)(mod3::multiply, 12);
-                                       move|x: u64| (h)(x) has copy, drop
+                                      let h: |u64|u64 =  move|x: u64| mod3::multiply(x, 12);
+                                       move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 = bind(101)(test::multiply3, 2, 2);
+                                        let i: |u64|u64 =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
@@ -1755,7 +1755,7 @@ module 0x42::test {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };
-                                        bind(10)(i, 15)
+                                         move|x: u64| (i)(x, 15)
                                       }
                                     }
                                   }
@@ -1881,24 +1881,24 @@ module 0x42::test {
                                 if Eq<u64>(key, 11) {
                                   {
                                     let g: |(u64, u64)|u64:copy+drop = bind(0)(mod3::multiply);
-                                    bind(10)(g, 11)
+                                    bind(1)(test::choose_function1$lambda$1, g)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
                                       let h: |u64|u64 = bind(10)(mod3::multiply, 12);
-                                      bind(1)(test::choose_function1$lambda$1, h)
+                                      bind(1)(test::choose_function1$lambda$2, h)
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
                                         let i: |u64|u64 = bind(101)(test::multiply3, 2, 2);
-                                        bind(1)(test::choose_function1$lambda$2, i)
+                                        bind(1)(test::choose_function1$lambda$3, i)
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 = test::choose_function1$lambda$3;
-                                        bind(10)(i, 15)
+                                        let i: |(u64, u64)|u64 = test::choose_function1$lambda$4;
+                                        bind(1)(test::choose_function1$lambda$5, i)
                                       }
                                     }
                                   }
@@ -1954,17 +1954,23 @@ module 0x42::test {
           }
         }
     }
-    private fun choose_function1$lambda$1(h: |u64|u64): u64 {
+    private fun choose_function1$lambda$1(g: |(u64, u64)|u64): u64 {
+        (g)(x, 11)
+    }
+    private fun choose_function1$lambda$2(h: |u64|u64): u64 {
         (h)(x)
     }
-    private fun choose_function1$lambda$2(i: |u64|u64): u64 {
+    private fun choose_function1$lambda$3(i: |u64|u64): u64 {
         (i)(z)
     }
-    private fun choose_function1$lambda$3(): u64 {
+    private fun choose_function1$lambda$4(): u64 {
         {
           let q: u64 = Sub<u64>(y, 1);
           mod3::multiply(x, Add<u64>(q, 1))
         }
+    }
+    private fun choose_function1$lambda$5(i: |(u64, u64)|u64): u64 {
+        (i)(x, 15)
     }
 } // end 0x42::test
 
@@ -2036,24 +2042,24 @@ module 0x42::test {
                                 if Eq<u64>(key, 11) {
                                   {
                                     let g: |(u64, u64)|u64:copy+drop = bind(0)(mod3::multiply);
-                                    bind(10)(g, 11)
+                                    bind(1)(test::choose_function1$lambda$1, g)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
                                       let h: |u64|u64 = bind(10)(mod3::multiply, 12);
-                                      bind(1)(test::choose_function1$lambda$1, h)
+                                      bind(1)(test::choose_function1$lambda$2, h)
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
                                         let i: |u64|u64 = bind(101)(test::multiply3, 2, 2);
-                                        bind(1)(test::choose_function1$lambda$2, i)
+                                        bind(1)(test::choose_function1$lambda$3, i)
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 = test::choose_function1$lambda$3;
-                                        bind(10)(i, 15)
+                                        let i: |(u64, u64)|u64 = test::choose_function1$lambda$4;
+                                        bind(1)(test::choose_function1$lambda$5, i)
                                       }
                                     }
                                   }
@@ -2109,17 +2115,23 @@ module 0x42::test {
           }
         }
     }
-    private fun choose_function1$lambda$1(h: |u64|u64): u64 {
+    private fun choose_function1$lambda$1(g: |(u64, u64)|u64): u64 {
+        (g)(x, 11)
+    }
+    private fun choose_function1$lambda$2(h: |u64|u64): u64 {
         (h)(x)
     }
-    private fun choose_function1$lambda$2(i: |u64|u64): u64 {
+    private fun choose_function1$lambda$3(i: |u64|u64): u64 {
         (i)(z)
     }
-    private fun choose_function1$lambda$3(): u64 {
+    private fun choose_function1$lambda$4(): u64 {
         {
           let q: u64 = Sub<u64>(y, 1);
           mod3::multiply(x, Add<u64>(q, 1))
         }
+    }
+    private fun choose_function1$lambda$5(i: |(u64, u64)|u64): u64 {
+        (i)(x, 15)
     }
 } // end 0x42::test
 
@@ -2191,24 +2203,24 @@ module 0x42::test {
                                 if Eq<u64>(key, 11) {
                                   {
                                     let g: |(u64, u64)|u64:copy+drop = bind(0)(mod3::multiply);
-                                    bind(10)(g, 11)
+                                    bind(1)(test::choose_function1$lambda$1, g)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
                                       let h: |u64|u64 = bind(10)(mod3::multiply, 12);
-                                      bind(1)(test::choose_function1$lambda$1, h)
+                                      bind(1)(test::choose_function1$lambda$2, h)
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
                                         let i: |u64|u64 = bind(101)(test::multiply3, 2, 2);
-                                        bind(1)(test::choose_function1$lambda$2, i)
+                                        bind(1)(test::choose_function1$lambda$3, i)
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 = test::choose_function1$lambda$3;
-                                        bind(10)(i, 15)
+                                        let i: |(u64, u64)|u64 = test::choose_function1$lambda$4;
+                                        bind(1)(test::choose_function1$lambda$5, i)
                                       }
                                     }
                                   }
@@ -2264,17 +2276,23 @@ module 0x42::test {
           }
         }
     }
-    private fun choose_function1$lambda$1(h: |u64|u64): u64 {
+    private fun choose_function1$lambda$1(g: |(u64, u64)|u64): u64 {
+        (g)(x, 11)
+    }
+    private fun choose_function1$lambda$2(h: |u64|u64): u64 {
         (h)(x)
     }
-    private fun choose_function1$lambda$2(i: |u64|u64): u64 {
+    private fun choose_function1$lambda$3(i: |u64|u64): u64 {
         (i)(z)
     }
-    private fun choose_function1$lambda$3(): u64 {
+    private fun choose_function1$lambda$4(): u64 {
         {
           let q: u64 = Sub<u64>(y, 1);
           mod3::multiply(x, Add<u64>(q, 1))
         }
+    }
+    private fun choose_function1$lambda$5(i: |(u64, u64)|u64): u64 {
+        (i)(x, 15)
     }
 } // end 0x42::test
 
@@ -2296,26 +2314,26 @@ error: Function-typed values not yet supported except as parameters to calls to 
 error: Function-typed values not yet supported except as parameters to calls to inline functions
    ┌─ tests/lambda/storable/doable_func.move:43:17
    │
-43 │                 mod3::multiply(4, _)
-   │                 ^^^^^^^^^^^^^^^^^^^^
+43 │                 move |x| mod3::multiply(4, x)
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: Function-typed values not yet supported except as parameters to calls to inline functions
    ┌─ tests/lambda/storable/doable_func.move:46:17
    │
-46 │                 alt_multiply(x, _)
-   │                 ^^^^^^^^^^^^^^^^^^
+46 │                 move |y| alt_multiply(x, y)
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: Function-typed values not yet supported except as parameters to calls to inline functions
    ┌─ tests/lambda/storable/doable_func.move:49:17
    │
-49 │                 mod3::multiply(_, x)
-   │                 ^^^^^^^^^^^^^^^^^^^^
+49 │                 move |y| mod3::multiply(y, x)
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: Function-typed values not yet supported except as parameters to calls to inline functions
    ┌─ tests/lambda/storable/doable_func.move:51:17
    │
-51 │                 multiply3(_, 3, 2)
-   │                 ^^^^^^^^^^^^^^^^^^
+51 │                 move |x| multiply3(x, 3, 2)
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: Function-typed values not yet supported except as parameters to calls to inline functions
    ┌─ tests/lambda/storable/doable_func.move:53:17
@@ -2326,14 +2344,14 @@ error: Function-typed values not yet supported except as parameters to calls to 
 error: Function-typed values not yet supported except as parameters to calls to inline functions
    ┌─ tests/lambda/storable/doable_func.move:55:17
    │
-55 │                 multiply3(4, _, 2)
-   │                 ^^^^^^^^^^^^^^^^^^
+55 │                 move |x| multiply3(4, x, 2)
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: Function-typed values not yet supported except as parameters to calls to inline functions
    ┌─ tests/lambda/storable/doable_func.move:57:17
    │
-57 │                 multiply3(3, 3, _)
-   │                 ^^^^^^^^^^^^^^^^^^
+57 │                 move |x| multiply3(3, 3, x)
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: Function-typed values not yet supported except as parameters to calls to inline functions
    ┌─ tests/lambda/storable/doable_func.move:61:17
@@ -2353,17 +2371,23 @@ error: Function-typed values not yet supported except as parameters to calls to 
 66 │                 let g = move |x, y| mod3::multiply(x, y) with copy+drop;
    │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+error: Calls to function values other than inline function parameters not yet supported
+   ┌─ tests/lambda/storable/doable_func.move:67:26
+   │
+67 │                 move |x| g(x, 11)
+   │                          ^^^^^^^^
+
 error: Function-typed values not yet supported except as parameters to calls to inline functions
    ┌─ tests/lambda/storable/doable_func.move:67:17
    │
-67 │                 g(_, 11)
-   │                 ^^^^^^^^
+67 │                 move |x| g(x, 11)
+   │                 ^^^^^^^^^^^^^^^^^
 
 error: Function-typed values not yet supported except as parameters to calls to inline functions
    ┌─ tests/lambda/storable/doable_func.move:69:25
    │
-69 │                 let h = mod3::multiply(_, 12);
-   │                         ^^^^^^^^^^^^^^^^^^^^^
+69 │                 let h = move |x| mod3::multiply(x, 12);
+   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: Calls to function values other than inline function parameters not yet supported
    ┌─ tests/lambda/storable/doable_func.move:70:28
@@ -2380,8 +2404,8 @@ error: Function-typed values not yet supported except as parameters to calls to 
 error: Function-typed values not yet supported except as parameters to calls to inline functions
    ┌─ tests/lambda/storable/doable_func.move:72:25
    │
-72 │                 let i = multiply3(2, _, 2);
-   │                         ^^^^^^^^^^^^^^^^^^
+72 │                 let i = move |x| multiply3(2, x, 2);
+   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: Calls to function values other than inline function parameters not yet supported
    ┌─ tests/lambda/storable/doable_func.move:73:26
@@ -2413,11 +2437,17 @@ error: Function-typed values not yet supported except as parameters to calls to 
 75 │                 let i = move |x, y| { let q = y - 1; 0x42::mod3::multiply(x, q + 1)  };
    │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+error: Calls to function values other than inline function parameters not yet supported
+   ┌─ tests/lambda/storable/doable_func.move:76:26
+   │
+76 │                 move |x| i(x, 15)
+   │                          ^^^^^^^^
+
 error: Function-typed values not yet supported except as parameters to calls to inline functions
    ┌─ tests/lambda/storable/doable_func.move:76:17
    │
-76 │                 i(_, 15)
-   │                 ^^^^^^^^
+76 │                 move |x| i(x, 15)
+   │                 ^^^^^^^^^^^^^^^^^
 
 error: Calls to function values other than inline function parameters not yet supported
    ┌─ tests/lambda/storable/doable_func.move:78:9

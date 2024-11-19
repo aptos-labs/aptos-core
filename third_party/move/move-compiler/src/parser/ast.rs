@@ -487,7 +487,7 @@ pub enum Type_ {
     // &t
     // &mut t
     Ref(bool, Box<Type>),
-    // |t1,...,tn|t has store+copy
+    // |t1,...,tn|t with store+copy
     Fun(Vec<Type>, Box<Type>, Vec<Ability>),
     // ()
     Unit,
@@ -654,8 +654,6 @@ pub enum LambdaCaptureKind {
     Copy,
     /// Move
     Move,
-    /// Borrow (`&`)
-    Borrow,
 }
 
 impl fmt::Display for LambdaCaptureKind {
@@ -668,7 +666,6 @@ impl fmt::Display for LambdaCaptureKind {
                 write!(f, "copy")
             },
             LambdaCaptureKind::Move => write!(f, "move"),
-            LambdaCaptureKind::Borrow => write!(f, "&"),
         }
     }
 }
@@ -1085,32 +1082,24 @@ impl fmt::Display for BinOp_ {
 
 impl fmt::Display for Visibility {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match &self {
-                Visibility::Public(_) => Visibility::PUBLIC,
-                Visibility::Script(_) => Visibility::SCRIPT,
-                Visibility::Friend(_) => Visibility::FRIEND,
-                Visibility::Package(_) => Visibility::PACKAGE,
-                Visibility::Internal => Visibility::INTERNAL,
-            }
-        )
+        write!(f, "{}", match &self {
+            Visibility::Public(_) => Visibility::PUBLIC,
+            Visibility::Script(_) => Visibility::SCRIPT,
+            Visibility::Friend(_) => Visibility::FRIEND,
+            Visibility::Package(_) => Visibility::PACKAGE,
+            Visibility::Internal => Visibility::INTERNAL,
+        })
     }
 }
 
 impl fmt::Display for Ability_ {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match &self {
-                Ability_::Copy => Ability_::COPY,
-                Ability_::Drop => Ability_::DROP,
-                Ability_::Store => Ability_::STORE,
-                Ability_::Key => Ability_::KEY,
-            }
-        )
+        write!(f, "{}", match &self {
+            Ability_::Copy => Ability_::COPY,
+            Ability_::Drop => Ability_::DROP,
+            Ability_::Store => Ability_::STORE,
+            Ability_::Key => Ability_::KEY,
+        })
     }
 }
 
@@ -1955,7 +1944,7 @@ impl AstDebug for Exp_ {
                 w.write("|");
                 e.ast_debug(w);
                 if !abilities.is_empty() {
-                    w.write(" has ");
+                    w.write(" with ");
                     w.list(abilities, ", ", |w, ab_mod| {
                         ab_mod.ast_debug(w);
                         false
