@@ -59,6 +59,7 @@ pub(crate) fn build_package_with_compiler_version(
     compiler_version: CompilerVersion,
 ) -> anyhow::Result<BuiltPackage> {
     let mut options = options;
+    options.language_version = Some(compiler_version.infer_stable_language_version());
     options.compiler_version = Some(compiler_version);
     BuiltPackage::build(package_path.to_owned(), options)
 }
