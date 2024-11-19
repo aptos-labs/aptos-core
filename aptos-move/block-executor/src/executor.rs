@@ -6,9 +6,9 @@ use crate::{
     code_cache_global::GlobalModuleCache,
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     counters::{
-        self, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK, GLOBAL_MODULE_CACHE_NUM_MISSES_PER_BLOCK,
-        PARALLEL_EXECUTION_SECONDS, RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS,
-        TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
+        self, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK, PARALLEL_EXECUTION_SECONDS,
+        RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS, VM_INIT_SECONDS,
+        WORK_WITH_TASK_SECONDS,
     },
     errors::*,
     executor_utilities::*,
@@ -1710,7 +1710,6 @@ where
         base_view: &S,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
     ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
-        GLOBAL_MODULE_CACHE_NUM_MISSES_PER_BLOCK.reset();
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
         if self.config.local.concurrency_level > 1 {

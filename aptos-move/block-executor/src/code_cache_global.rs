@@ -82,7 +82,7 @@ where
     }
 
     /// Returns true if the key exists in cache and the corresponding module is not overridden.
-    pub fn is_not_overridden(&self, key: &K) -> bool {
+    pub fn contains_not_overridden(&self, key: &K) -> bool {
         self.module_cache
             .get(key)
             .is_some_and(|entry| entry.is_not_overridden())
@@ -214,9 +214,9 @@ mod test {
 
         assert_eq!(cache.num_modules(), 2);
 
-        assert!(cache.is_not_overridden(&0));
-        assert!(!cache.is_not_overridden(&1));
-        assert!(!cache.is_not_overridden(&3));
+        assert!(cache.contains_not_overridden(&0));
+        assert!(!cache.contains_not_overridden(&1));
+        assert!(!cache.contains_not_overridden(&3));
 
         assert!(cache.get(&0).is_some());
         assert!(cache.get(&1).is_none());

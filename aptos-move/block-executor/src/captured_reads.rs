@@ -661,7 +661,7 @@ where
         }
 
         self.module_reads.iter().all(|(key, read)| match read {
-            ModuleRead::GlobalCache(_) => global_module_cache.is_not_overridden(key),
+            ModuleRead::GlobalCache(_) => global_module_cache.contains_not_overridden(key),
             ModuleRead::PerBlockCache(previous) => {
                 let current_version = per_block_module_cache.get_module_version(key);
                 let previous_version = previous.as_ref().map(|(_, version)| *version);
@@ -1713,6 +1713,6 @@ mod test {
         // Assume we re-read the new correct version. Then validation should pass again.
         captured_reads.capture_per_block_cache_read(0, Some((a, Some(10))));
         assert!(captured_reads.validate_module_reads(&global_module_cache, &per_block_module_cache));
-        assert!(!global_module_cache.is_not_overridden(&0));
+        assert!(!global_module_cache.contains_not_overridden(&0));
     }
 }
