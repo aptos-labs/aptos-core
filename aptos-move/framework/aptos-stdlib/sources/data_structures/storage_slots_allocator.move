@@ -212,7 +212,8 @@ module aptos_std::storage_slots_allocator {
 
     fun maybe_push_to_reuse_queue<T: store>(self: &mut StorageSlotsAllocator<T>, slot_index: u64) {
         if (self.should_reuse) {
-            self.add_link(slot_index, Link::Vacant { next: self.reuse_head_index });
+            let link = Link::Vacant { next: self.reuse_head_index };
+            self.add_link(slot_index, link);
             self.reuse_head_index = slot_index;
             self.reuse_spare_count = self.reuse_spare_count + 1;
         };

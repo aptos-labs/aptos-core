@@ -815,7 +815,8 @@ Remove storage slot, but reserve it for later.
 
 <pre><code><b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_maybe_push_to_reuse_queue">maybe_push_to_reuse_queue</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt;, slot_index: u64) {
     <b>if</b> (self.should_reuse) {
-        self.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_add_link">add_link</a>(slot_index, Link::Vacant { next: self.reuse_head_index });
+        <b>let</b> link = Link::Vacant { next: self.reuse_head_index };
+        self.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_add_link">add_link</a>(slot_index, link);
         self.reuse_head_index = slot_index;
         self.reuse_spare_count = self.reuse_spare_count + 1;
     };
