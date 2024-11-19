@@ -14,6 +14,12 @@
 ///   operation touch only few resources
 /// * it allows for parallelism for keys that are not close to each other,
 ///   once it contains enough keys
+///
+///
+/// TODO: all iterator functions are public(friend) for now, so that they can be modified in a
+/// backward incompatible way.
+/// They are waiting for Move improvement that will allow references to be part of the struct
+/// Allowing cleaner iterator APIs
 module aptos_std::big_ordered_map {
     use std::error;
     use std::vector;
@@ -218,7 +224,7 @@ module aptos_std::big_ordered_map {
 
     /// Returns an iterator pointing to the first element that is greater or equal to the provided
     /// key, or an end iterator if such element doesn't exist.
-    public fun lower_bound<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): Iterator<K> {
+    public(friend) fun lower_bound<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): Iterator<K> {
         let leaf = self.find_leaf(key);
         if (leaf == NULL_INDEX) {
             return self.new_end_iter()
@@ -238,7 +244,7 @@ module aptos_std::big_ordered_map {
 
     /// Returns an iterator pointing to the element that equals to the provided key, or an end
     /// iterator if the key is not found.
-    public fun find<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): Iterator<K> {
+    public(friend) fun find<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): Iterator<K> {
         let lower_bound = self.lower_bound(key);
         if (lower_bound.iter_is_end(self)) {
             lower_bound
@@ -283,7 +289,7 @@ module aptos_std::big_ordered_map {
     // ========================= Iterator functions ===========================
 
     /// Return the begin iterator.
-    public fun new_begin_iter<K: copy + store, V: store>(self: &BigOrderedMap<K, V>): Iterator<K> {
+    public(friend) fun new_begin_iter<K: copy + store, V: store>(self: &BigOrderedMap<K, V>): Iterator<K> {
         if (self.is_empty()) {
             return Iterator::End;
         };
@@ -296,12 +302,12 @@ module aptos_std::big_ordered_map {
     }
 
     /// Return the end iterator.
-    public fun new_end_iter<K: copy + store, V: store>(self: &BigOrderedMap<K, V>): Iterator<K> {
+    public(friend) fun new_end_iter<K: copy + store, V: store>(self: &BigOrderedMap<K, V>): Iterator<K> {
         Iterator::End
     }
 
     // Returns true iff the iterator is a begin iterator.
-    public fun iter_is_begin<K: store, V: store>(self: &Iterator<K>, map: &BigOrderedMap<K, V>): bool {
+    public(friend) fun iter_is_begin<K: store, V: store>(self: &Iterator<K>, map: &BigOrderedMap<K, V>): bool {
         if (self is Iterator::End<K>) {
             map.is_empty()
         } else {
@@ -310,19 +316,19 @@ module aptos_std::big_ordered_map {
     }
 
     // Returns true iff the iterator is an end iterator.
-    public fun iter_is_end<K: store, V: store>(self: &Iterator<K>, _map: &BigOrderedMap<K, V>): bool {
+    public(friend) fun iter_is_end<K: store, V: store>(self: &Iterator<K>, _map: &BigOrderedMap<K, V>): bool {
         self is Iterator::End<K>
     }
 
     /// Returns the key of the given iterator.
-    public fun iter_get_key<K>(self: &Iterator<K>): &K {
+    public(friend) fun iter_get_key<K>(self: &Iterator<K>): &K {
         assert!(!(self is Iterator::End<K>), error::invalid_argument(EITER_OUT_OF_BOUNDS));
         &self.key
     }
 
     /// Returns the next iterator, or none if already at the end iterator.
     /// Requires the map is not changed after the input iterator is generated.
-    public fun iter_next<K: drop + copy + store, V: store>(self: Iterator<K>, map: &BigOrderedMap<K, V>): Iterator<K> {
+    public(friend) fun iter_next<K: drop + copy + store, V: store>(self: Iterator<K>, map: &BigOrderedMap<K, V>): Iterator<K> {
         assert!(!(self is Iterator::End<K>), error::invalid_argument(EITER_OUT_OF_BOUNDS));
 
         let node_index = self.node_index;
@@ -351,7 +357,7 @@ module aptos_std::big_ordered_map {
 
     /// Returns the previous iterator, or none if already at the begin iterator.
     /// Requires the map is not changed after the input iterator is generated.
-    public fun iter_prev<K: drop + copy + store, V: store>(self: Iterator<K>, map: &BigOrderedMap<K, V>): Iterator<K> {
+    public(friend) fun iter_prev<K: drop + copy + store, V: store>(self: Iterator<K>, map: &BigOrderedMap<K, V>): Iterator<K> {
         let prev_index = if (self is Iterator::End<K>) {
             map.max_leaf_index
         } else {

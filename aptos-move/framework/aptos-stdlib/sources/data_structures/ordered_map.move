@@ -177,7 +177,7 @@ module aptos_std::ordered_map {
 
     /// Add multiple key/value pairs to the map, overwrites values if they exist already,
     /// or if duplicate keys are passed in.s
-    public fun upsert_all<K, V>(self: &mut OrderedMap<K, V>, keys: vector<K>, values: vector<V>) {
+    public fun upsert_all<K: drop, V: drop>(self: &mut OrderedMap<K, V>, keys: vector<K>, values: vector<V>) {
         // TODO: Can be optimized, by sorting keys and values, and then creating map.
         vector::zip(keys, values, |key, value| {
             upsert(self, key, value);
@@ -235,6 +235,7 @@ module aptos_std::ordered_map {
             };
         };
 
+        other_entries.destroy_empty();
         self.entries.reverse_append(reverse_result);
     }
 

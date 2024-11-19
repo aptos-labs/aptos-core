@@ -21,6 +21,12 @@ operation touch only few resources
 once it contains enough keys
 
 
+TODO: all iterator functions are public(friend) for now, so that they can be modified in a
+backward incompatible way.
+They are waiting for Move improvement that will allow references to be part of the struct
+Allowing cleaner iterator APIs
+
+
 -  [Struct `Node`](#0x1_big_ordered_map_Node)
 -  [Enum `Child`](#0x1_big_ordered_map_Child)
 -  [Enum `Iterator`](#0x1_big_ordered_map_Iterator)
@@ -345,25 +351,6 @@ The BigOrderedMap data structure.
 ## Constants
 
 
-<a id="0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN"></a>
-
-Internal errors.
-
-
-<pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>: u64 = 20;
-</code></pre>
-
-
-
-<a id="0x1_big_ordered_map_NULL_INDEX"></a>
-
-
-
-<pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>: u64 = 0;
-</code></pre>
-
-
-
 <a id="0x1_big_ordered_map_EITER_OUT_OF_BOUNDS"></a>
 
 Trying to do an operation on an Iterator that would go out of bounds
@@ -390,6 +377,25 @@ Map key is not found
 
 
 <pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_EKEY_NOT_FOUND">EKEY_NOT_FOUND</a>: u64 = 2;
+</code></pre>
+
+
+
+<a id="0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN"></a>
+
+Internal errors.
+
+
+<pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>: u64 = 20;
+</code></pre>
+
+
+
+<a id="0x1_big_ordered_map_NULL_INDEX"></a>
+
+
+
+<pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>: u64 = 0;
 </code></pre>
 
 
@@ -700,7 +706,7 @@ Returns an iterator pointing to the first element that is greater or equal to th
 key, or an end iterator if such element doesn't exist.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_lower_bound">lower_bound</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_lower_bound">lower_bound</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;
 </code></pre>
 
 
@@ -709,7 +715,7 @@ key, or an end iterator if such element doesn't exist.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_lower_bound">lower_bound</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, key: &K): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt; {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_lower_bound">lower_bound</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, key: &K): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt; {
     <b>let</b> leaf = self.<a href="big_ordered_map.md#0x1_big_ordered_map_find_leaf">find_leaf</a>(key);
     <b>if</b> (leaf == <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>) {
         <b>return</b> self.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>()
@@ -740,7 +746,7 @@ Returns an iterator pointing to the element that equals to the provided key, or 
 iterator if the key is not found.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_find">find</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_find">find</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;
 </code></pre>
 
 
@@ -749,7 +755,7 @@ iterator if the key is not found.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_find">find</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, key: &K): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt; {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_find">find</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, key: &K): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt; {
     <b>let</b> lower_bound = self.<a href="big_ordered_map.md#0x1_big_ordered_map_lower_bound">lower_bound</a>(key);
     <b>if</b> (lower_bound.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(self)) {
         lower_bound
@@ -863,7 +869,7 @@ Returns a mutable reference to the element with its key at the given index, abor
 Return the begin iterator.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_begin_iter">new_begin_iter</a>&lt;K: <b>copy</b>, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_begin_iter">new_begin_iter</a>&lt;K: <b>copy</b>, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;
 </code></pre>
 
 
@@ -872,7 +878,7 @@ Return the begin iterator.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_begin_iter">new_begin_iter</a>&lt;K: <b>copy</b> + store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt; {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_begin_iter">new_begin_iter</a>&lt;K: <b>copy</b> + store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt; {
     <b>if</b> (self.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>()) {
         <b>return</b> Iterator::End;
     };
@@ -896,7 +902,7 @@ Return the begin iterator.
 Return the end iterator.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>&lt;K: <b>copy</b>, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>&lt;K: <b>copy</b>, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;
 </code></pre>
 
 
@@ -905,7 +911,7 @@ Return the end iterator.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>&lt;K: <b>copy</b> + store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt; {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>&lt;K: <b>copy</b> + store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt; {
     Iterator::End
 }
 </code></pre>
@@ -920,7 +926,7 @@ Return the end iterator.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_begin">iter_is_begin</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;, map: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_begin">iter_is_begin</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;, map: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): bool
 </code></pre>
 
 
@@ -929,7 +935,7 @@ Return the end iterator.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_begin">iter_is_begin</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt;, map: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;): bool {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_begin">iter_is_begin</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt;, map: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;): bool {
     <b>if</b> (self is Iterator::End&lt;K&gt;) {
         map.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>()
     } <b>else</b> {
@@ -948,7 +954,7 @@ Return the end iterator.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;, _map: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;, _map: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): bool
 </code></pre>
 
 
@@ -957,7 +963,7 @@ Return the end iterator.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt;, _map: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;): bool {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt;, _map: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;): bool {
     self is Iterator::End&lt;K&gt;
 }
 </code></pre>
@@ -973,7 +979,7 @@ Return the end iterator.
 Returns the key of the given iterator.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_get_key">iter_get_key</a>&lt;K&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;): &K
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_get_key">iter_get_key</a>&lt;K&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;): &K
 </code></pre>
 
 
@@ -982,7 +988,7 @@ Returns the key of the given iterator.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_get_key">iter_get_key</a>&lt;K&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt;): &K {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_get_key">iter_get_key</a>&lt;K&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt;): &K {
     <b>assert</b>!(!(self is Iterator::End&lt;K&gt;), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EITER_OUT_OF_BOUNDS">EITER_OUT_OF_BOUNDS</a>));
     &self.key
 }
@@ -1000,7 +1006,7 @@ Returns the next iterator, or none if already at the end iterator.
 Requires the map is not changed after the input iterator is generated.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_next">iter_next</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;, map: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_next">iter_next</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;, map: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;
 </code></pre>
 
 
@@ -1009,7 +1015,7 @@ Requires the map is not changed after the input iterator is generated.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_next">iter_next</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt;, map: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt; {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_next">iter_next</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt;, map: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt; {
     <b>assert</b>!(!(self is Iterator::End&lt;K&gt;), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EITER_OUT_OF_BOUNDS">EITER_OUT_OF_BOUNDS</a>));
 
     <b>let</b> node_index = self.node_index;
@@ -1049,7 +1055,7 @@ Returns the previous iterator, or none if already at the begin iterator.
 Requires the map is not changed after the input iterator is generated.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;, map: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;, map: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">big_ordered_map::Iterator</a>&lt;K&gt;
 </code></pre>
 
 
@@ -1058,7 +1064,7 @@ Requires the map is not changed after the input iterator is generated.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt;, map: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt; {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt;, map: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_Iterator">Iterator</a>&lt;K&gt; {
     <b>let</b> prev_index = <b>if</b> (self is Iterator::End&lt;K&gt;) {
         map.max_leaf_index
     } <b>else</b> {
