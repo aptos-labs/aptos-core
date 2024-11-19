@@ -235,9 +235,17 @@ module aptos_std::ordered_map {
         }
     }
 
+    /// TODO: all iterator functions are public(friend) for now, so that they can be modified in a
+    /// backward incompatible way.
+    /// They are waiting for Move improvement that will allow references to be part of the struct
+    /// Allowing cleaner iterator APIs
+
+    // TODO: see if it is more understandable if iterator points between elements,
+    // and there is iter_borrow_next and iter_borrow_prev, and provide iter_insert.
+
     /// Returns an iterator pointing to the first element that is greater or equal to the provided
     /// key, or an end iterator if such element doesn't exist.
-    public fun lower_bound<K, V>(self: &OrderedMap<K, V>, key: &K): Iterator {
+    public(friend) fun lower_bound<K, V>(self: &OrderedMap<K, V>, key: &K): Iterator {
         let entries = &self.entries;
         let len = entries.length();
 
@@ -251,7 +259,7 @@ module aptos_std::ordered_map {
 
     /// Returns an iterator pointing to the element that equals to the provided key, or an end
     /// iterator if the key is not found.
-    public fun find<K, V>(self: &OrderedMap<K, V>, key: &K): Iterator {
+    public(friend) fun find<K, V>(self: &OrderedMap<K, V>, key: &K): Iterator {
         let lower_bound = self.lower_bound(key);
         if (lower_bound.iter_is_end(self)) {
             lower_bound
@@ -263,7 +271,7 @@ module aptos_std::ordered_map {
     }
 
     /// Returns the begin iterator.
-    public fun new_begin_iter<K, V>(self: &OrderedMap<K, V>): Iterator {
+    public(friend) fun new_begin_iter<K, V>(self: &OrderedMap<K, V>): Iterator {
         if (self.is_empty()) {
             return Iterator::End;
         };
@@ -272,7 +280,7 @@ module aptos_std::ordered_map {
     }
 
     /// Returns the end iterator.
-    public fun new_end_iter<K, V>(self: &OrderedMap<K, V>): Iterator {
+    public(friend) fun new_end_iter<K, V>(self: &OrderedMap<K, V>): Iterator {
         Iterator::End
     }
 
@@ -280,12 +288,9 @@ module aptos_std::ordered_map {
     // Note: After any modifications to the map, do not use any of the iterators obtained beforehand.
     // Operations on iterators after map is modified are unexpected/incorrect.
 
-    // TODO: see if it is more understandable if iterator points between elements,
-    // and there is iter_borrow_next and iter_borrow_prev, and provide iter_insert.
-
     /// Returns the next iterator, or none if already at the end iterator.
     /// Note: Requires that the map is not changed after the input iterator is generated.
-    public fun iter_next<K, V>(self: Iterator, map: &OrderedMap<K, V>): Iterator {
+    public(friend) fun iter_next<K, V>(self: Iterator, map: &OrderedMap<K, V>): Iterator {
         assert!(!self.iter_is_end(map), error::invalid_argument(EITER_OUT_OF_BOUNDS));
 
         let index = self.index + 1;
@@ -298,7 +303,7 @@ module aptos_std::ordered_map {
 
     /// Returns the previous iterator, or none if already at the begin iterator.
     /// Note: Requires that the map is not changed after the input iterator is generated.
-    public fun iter_prev<K, V>(self: Iterator, map: &OrderedMap<K, V>): Iterator {
+    public(friend) fun iter_prev<K, V>(self: Iterator, map: &OrderedMap<K, V>): Iterator {
         assert!(!self.iter_is_begin(map), error::invalid_argument(EITER_OUT_OF_BOUNDS));
 
         let index = if (self is Iterator::End) {
@@ -331,13 +336,13 @@ module aptos_std::ordered_map {
     }
 
     /// Returns whether the iterator is an end iterator.
-    public fun iter_is_end<K, V>(self: &Iterator, _map: &OrderedMap<K, V>): bool {
+    public(friend) fun iter_is_end<K, V>(self: &Iterator, _map: &OrderedMap<K, V>): bool {
         self is Iterator::End
     }
 
     /// Borrows the key given iterator points to.
     /// Note: Requires that the map is not changed after the input iterator is generated.
-    public fun iter_borrow_key<K, V>(self: &Iterator, map: &OrderedMap<K, V>): &K {
+    public(friend) fun iter_borrow_key<K, V>(self: &Iterator, map: &OrderedMap<K, V>): &K {
         assert!(!(self is Iterator::End), error::invalid_argument(EITER_OUT_OF_BOUNDS));
 
         &map.entries.borrow(self.index).key
@@ -345,14 +350,14 @@ module aptos_std::ordered_map {
 
     /// Borrows the value given iterator points to.
     /// Note: Requires that the map is not changed after the input iterator is generated.
-    public fun iter_borrow<K, V>(self: Iterator, map: &OrderedMap<K, V>): &V {
+    public(friend) fun iter_borrow<K, V>(self: Iterator, map: &OrderedMap<K, V>): &V {
         assert!(!(self is Iterator::End), error::invalid_argument(EITER_OUT_OF_BOUNDS));
         &map.entries.borrow(self.index).value
     }
 
     /// Mutably borrows the value iterator points to.
     /// Note: Requires that the map is not changed after the input iterator is generated.
-    public fun iter_borrow_mut<K, V>(self: Iterator, map: &mut OrderedMap<K, V>): &mut V {
+    public(friend) fun iter_borrow_mut<K, V>(self: Iterator, map: &mut OrderedMap<K, V>): &mut V {
         assert!(!(self is Iterator::End), error::invalid_argument(EITER_OUT_OF_BOUNDS));
         &mut map.entries.borrow_mut(self.index).value
     }
@@ -360,7 +365,7 @@ module aptos_std::ordered_map {
     /// Removes (key, value) pair iterator points to, returning the previous value.
     /// Aborts with EKEY_NOT_FOUND if iterator is pointing to the end.
     /// Note: Requires that the map is not changed after the input iterator is generated.
-    public fun iter_remove<K: drop, V>(self: Iterator, map: &mut OrderedMap<K, V>): V {
+    public(friend) fun iter_remove<K: drop, V>(self: Iterator, map: &mut OrderedMap<K, V>): V {
         assert!(!(self is Iterator::End), error::invalid_argument(EKEY_NOT_FOUND));
 
         let Entry { key: _, value } = map.entries.remove(self.index);
@@ -370,7 +375,7 @@ module aptos_std::ordered_map {
     /// Replaces the value iterator is pointing to, returning the previous value.
     /// Aborts with EKEY_NOT_FOUND if iterator is pointing to the end.
     /// Note: Requires that the map is not changed after the input iterator is generated.
-    public fun iter_replace<K, V>(self: Iterator, map: &mut OrderedMap<K, V>, value: V): V {
+    public(friend) fun iter_replace<K, V>(self: Iterator, map: &mut OrderedMap<K, V>, value: V): V {
         assert!(!(self is Iterator::End), error::invalid_argument(EKEY_NOT_FOUND));
 
         let entry = map.entries.borrow_mut(self.index);
