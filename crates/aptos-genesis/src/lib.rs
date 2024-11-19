@@ -23,6 +23,8 @@ use aptos_storage_interface::DbReaderWriter;
 use aptos_temppath::TempPath;
 use aptos_types::{
     chain_id::ChainId,
+    jwks::patch::IssuerJWK,
+    keyless::Groth16VerificationKey,
     on_chain_config::{
         Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
         OnChainJWKConsensusConfig, OnChainRandomnessConfig,
@@ -76,6 +78,8 @@ pub struct GenesisInfo {
     pub initial_features_override: Option<Features>,
     pub randomness_config_override: Option<OnChainRandomnessConfig>,
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
+    pub initial_jwks: Vec<IssuerJWK>,
+    pub keyless_groth16_vk_override: Option<Groth16VerificationKey>,
 }
 
 impl GenesisInfo {
@@ -115,6 +119,8 @@ impl GenesisInfo {
             initial_features_override: genesis_config.initial_features_override.clone(),
             randomness_config_override: genesis_config.randomness_config_override.clone(),
             jwk_consensus_config_override: genesis_config.jwk_consensus_config_override.clone(),
+            initial_jwks: genesis_config.initial_jwks.clone(),
+            keyless_groth16_vk_override: genesis_config.keyless_groth16_vk_override.clone(),
         })
     }
 
@@ -150,6 +156,8 @@ impl GenesisInfo {
                 initial_features_override: self.initial_features_override.clone(),
                 randomness_config_override: self.randomness_config_override.clone(),
                 jwk_consensus_config_override: self.jwk_consensus_config_override.clone(),
+                initial_jwks: self.initial_jwks.clone(),
+                keyless_groth16_vk_override: self.keyless_groth16_vk_override.clone(),
             },
             &self.consensus_config,
             &self.execution_config,
