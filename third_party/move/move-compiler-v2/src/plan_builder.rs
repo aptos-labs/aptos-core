@@ -503,10 +503,10 @@ fn get_assigned_attribute(
 fn convert_location(env: &GlobalEnv, attr: Attribute) -> Option<ModuleId> {
     let (loc, value) = get_assigned_attribute(env, TestingAttribute::ERROR_LOCATION, attr)?;
     match value {
-        AttributeValue::Name(id, opt_module_name, _sym) => {
+        AttributeValue::Name(id, opt_module_name, sym) => {
             let vloc = env.get_node_loc(id);
             let module_id_opt = convert_module_id(env, vloc.clone(), opt_module_name);
-            if !_sym.display(env.symbol_pool()).to_string().is_empty() || module_id_opt.is_none() {
+            if !sym.display(env.symbol_pool()).to_string().is_empty() || module_id_opt.is_none() {
                 env.error_with_labels(&loc, "invalid attribute value", vec![(
                     vloc,
                     "Expected a module identifier, e.g. 'std::vector'".to_string(),
@@ -515,7 +515,7 @@ fn convert_location(env: &GlobalEnv, attr: Attribute) -> Option<ModuleId> {
             module_id_opt
         },
         AttributeValue::Value(id, _val) => {
-            let vloc: Loc = env.get_node_loc(id);
+            let vloc = env.get_node_loc(id);
             env.error_with_labels(&loc, "invalid attribute value", vec![(
                 vloc,
                 "Expected a module identifier, e.g. 'std::vector'".to_string(),

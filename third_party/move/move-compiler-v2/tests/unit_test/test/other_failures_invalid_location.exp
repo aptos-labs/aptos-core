@@ -47,17 +47,17 @@ error: invalid attribute value
    │                                             Expected a module identifier, e.g. 'std::vector'
 
 error: invalid attribute value
-   ┌─ tests/unit_test/test/other_failures_invalid_location.move:34:43
+   ┌─ tests/unit_test/test/other_failures_invalid_location.move:38:43
    │
-34 │     #[expected_failure(major_status=4004, location=self)]
+38 │     #[expected_failure(major_status=4004, location=self)]
    │                                           ^^^^^^^^^^^^^
    │                                                    │
    │                                                    Expected a module identifier, e.g. 'std::vector'
 
 error: invalid attribute value
-   ┌─ tests/unit_test/test/other_failures_invalid_location.move:38:59
+   ┌─ tests/unit_test/test/other_failures_invalid_location.move:42:59
    │
-38 │     #[expected_failure(major_status=4016, minor_status=0, location=0)]
+42 │     #[expected_failure(major_status=4016, minor_status=0, location=0)]
    │                                                           ^^^^^^^^^^
    │                                                                    │
    │                                                                    Expected a module identifier, e.g. 'std::vector'
