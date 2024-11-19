@@ -295,12 +295,40 @@ pub enum EntryFunctionCall {
         pre_image: Vec<u8>,
     },
 
+    /// Completes a bridge transfer by the initiator.  
+
+    /// @param caller The signer representing the bridge operator.  
+    /// @param initiator The initiator's Ethereum address as a vector of bytes.  
+    /// @param bridge_transfer_id The unique identifier for the bridge transfer.  
+    /// @param recipient The address of the recipient on the Aptos blockchain.  
+    /// @param amount The amount of assets to be locked.  
+    /// @param nonce The unique nonce for the transfer.    
+    /// @abort If the caller is not the bridge operator.
+    AtomicBridgeCounterpartyCompleteBridgeTransferSimplified {
+        bridge_transfer_id: Vec<u8>,
+        initiator: Vec<u8>,
+        recipient: AccountAddress,
+        amount: u64,
+        nonce: u64,
+    },
+
     /// Initiate a bridge transfer of ETH from Movement to the base layer
     /// Anyone can initiate a bridge transfer from the source chain
     /// The amount is burnt from the initiator
     AtomicBridgeInitiatorInitiateBridgeTransfer {
         recipient: Vec<u8>,
         hash_lock: Vec<u8>,
+        amount: u64,
+    },
+
+    /// Initiate a bridge transfer of MOVE from Movement to the base layer  
+    /// Anyone can initiate a bridge transfer from the source chain  
+    /// The amount is burnt from the initiator and the module-level nonce is incremented  
+    /// @param initiator The initiator's Ethereum address as a vector of bytes.  
+    /// @param recipient The address of the recipient on the Aptos blockchain.  
+    /// @param amount The amount of assets to be locked.
+    AtomicBridgeInitiatorInitiateBridgeTransferSimplified {
+        recipient: Vec<u8>,
         amount: u64,
     },
 
@@ -1220,11 +1248,27 @@ impl EntryFunctionCall {
                 bridge_transfer_id,
                 pre_image,
             } => atomic_bridge_initiator_complete_bridge_transfer(bridge_transfer_id, pre_image),
+            AtomicBridgeCounterpartyCompleteBridgeTransferSimplified {
+                bridge_transfer_id,
+                initiator,
+                recipient,
+                amount,
+                nonce,
+            } => atomic_bridge_counterparty_complete_bridge_transfer_simplified(
+                bridge_transfer_id,
+                initiator,
+                recipient,
+                amount,
+                nonce,
+            ),
             AtomicBridgeInitiatorInitiateBridgeTransfer {
                 recipient,
                 hash_lock,
                 amount,
             } => atomic_bridge_initiator_initiate_bridge_transfer(recipient, hash_lock, amount),
+            AtomicBridgeInitiatorInitiateBridgeTransferSimplified { recipient, amount } => {
+                atomic_bridge_initiator_initiate_bridge_transfer_simplified(recipient, amount)
+            },
             AtomicBridgeCounterpartyLockBridgeTransferAssets {
                 initiator,
                 bridge_transfer_id,
@@ -2419,6 +2463,42 @@ pub fn atomic_bridge_initiator_complete_bridge_transfer(
     ))
 }
 
+/// Completes a bridge transfer by the initiator.  
+///
+/// @param caller The signer representing the bridge operator.  
+/// @param initiator The initiator's Ethereum address as a vector of bytes.  
+/// @param bridge_transfer_id The unique identifier for the bridge transfer.  
+/// @param recipient The address of the recipient on the Aptos blockchain.  
+/// @param amount The amount of assets to be locked.  
+/// @param nonce The unique nonce for the transfer.    
+/// @abort If the caller is not the bridge operator.
+pub fn atomic_bridge_counterparty_complete_bridge_transfer_simplified(
+    bridge_transfer_id: Vec<u8>,
+    initiator: Vec<u8>,
+    recipient: AccountAddress,
+    amount: u64,
+    nonce: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("atomic_bridge_counterparty").to_owned(),
+        ),
+        ident_str!("complete_bridge_transfer_simplified").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&bridge_transfer_id).unwrap(),
+            bcs::to_bytes(&initiator).unwrap(),
+            bcs::to_bytes(&recipient).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+            bcs::to_bytes(&nonce).unwrap(),
+        ],
+    ))
+}
+
 /// Initiate a bridge transfer of ETH from Movement to the base layer
 /// Anyone can initiate a bridge transfer from the source chain
 /// The amount is burnt from the initiator
@@ -2440,6 +2520,33 @@ pub fn atomic_bridge_initiator_initiate_bridge_transfer(
         vec![
             bcs::to_bytes(&recipient).unwrap(),
             bcs::to_bytes(&hash_lock).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
+/// Initiate a bridge transfer of MOVE from Movement to the base layer  
+/// Anyone can initiate a bridge transfer from the source chain  
+/// The amount is burnt from the initiator and the module-level nonce is incremented  
+/// @param initiator The initiator's Ethereum address as a vector of bytes.  
+/// @param recipient The address of the recipient on the Aptos blockchain.  
+/// @param amount The amount of assets to be locked.
+pub fn atomic_bridge_initiator_initiate_bridge_transfer_simplified(
+    recipient: Vec<u8>,
+    amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("atomic_bridge_initiator").to_owned(),
+        ),
+        ident_str!("initiate_bridge_transfer_simplified").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&recipient).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
         ],
     ))
@@ -5206,6 +5313,24 @@ mod decoder {
         }
     }
 
+    pub fn atomic_bridge_counterparty_complete_bridge_transfer_simplified(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AtomicBridgeCounterpartyCompleteBridgeTransferSimplified {
+                    bridge_transfer_id: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    initiator: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    recipient: bcs::from_bytes(script.args().get(2)?).ok()?,
+                    amount: bcs::from_bytes(script.args().get(3)?).ok()?,
+                    nonce: bcs::from_bytes(script.args().get(4)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn atomic_bridge_initiator_initiate_bridge_transfer(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -5215,6 +5340,21 @@ mod decoder {
                     recipient: bcs::from_bytes(script.args().get(0)?).ok()?,
                     hash_lock: bcs::from_bytes(script.args().get(1)?).ok()?,
                     amount: bcs::from_bytes(script.args().get(2)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn atomic_bridge_initiator_initiate_bridge_transfer_simplified(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AtomicBridgeInitiatorInitiateBridgeTransferSimplified {
+                    recipient: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    amount: bcs::from_bytes(script.args().get(1)?).ok()?,
                 },
             )
         } else {
@@ -6763,8 +6903,16 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::atomic_bridge_initiator_complete_bridge_transfer),
         );
         map.insert(
+            "atomic_bridge_counterparty_complete_bridge_transfer_simplified".to_string(),
+            Box::new(decoder::atomic_bridge_counterparty_complete_bridge_transfer_simplified),
+        );
+        map.insert(
             "atomic_bridge_initiator_initiate_bridge_transfer".to_string(),
             Box::new(decoder::atomic_bridge_initiator_initiate_bridge_transfer),
+        );
+        map.insert(
+            "atomic_bridge_initiator_initiate_bridge_transfer_simplified".to_string(),
+            Box::new(decoder::atomic_bridge_initiator_initiate_bridge_transfer_simplified),
         );
         map.insert(
             "atomic_bridge_counterparty_lock_bridge_transfer_assets".to_string(),
