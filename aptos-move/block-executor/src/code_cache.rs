@@ -3,7 +3,7 @@
 
 use crate::{
     captured_reads::CacheRead,
-    counters::GLOBAL_MODULE_CACHE_NUM_MISSES_PER_BLOCK,
+    counters::GLOBAL_MODULE_CACHE_MISS_SECONDS,
     view::{LatestView, ViewState},
 };
 use ambassador::delegate_to_methods;
@@ -153,9 +153,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCache
                     return Ok(Some((module, Self::Version::default())));
                 }
 
-                GLOBAL_MODULE_CACHE_NUM_MISSES_PER_BLOCK.inc();
-
                 // If not global cache, check per-block cache.
+                let _timer = GLOBAL_MODULE_CACHE_MISS_SECONDS.start_timer();
                 let read = state
                     .versioned_map
                     .module_cache()
@@ -172,8 +171,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCache
                     return Ok(Some((module, Self::Version::default())));
                 }
 
-                GLOBAL_MODULE_CACHE_NUM_MISSES_PER_BLOCK.inc();
-
+                let _timer = GLOBAL_MODULE_CACHE_MISS_SECONDS.start_timer();
                 let read = state
                     .unsync_map
                     .module_cache()

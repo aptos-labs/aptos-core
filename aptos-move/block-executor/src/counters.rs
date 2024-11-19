@@ -198,7 +198,7 @@ pub static EFFECTIVE_BLOCK_GAS: Lazy<HistogramVec> = Lazy::new(|| {
 pub static APPROX_BLOCK_OUTPUT_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_execution_approx_block_output_size",
-        "Historgram for different approx block output sizes - used for evaluting block ouptut limit.",
+        "Histogram for different approx block output sizes - used for evaluating block output limit.",
         &["mode"],
         output_buckets(),
     )
@@ -350,11 +350,13 @@ pub static GLOBAL_MODULE_CACHE_NUM_MODULES: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Count of global module cache misses per-block.
-pub static GLOBAL_MODULE_CACHE_NUM_MISSES_PER_BLOCK: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "global_module_cache_num_misses_per_block",
-        "Number of global module cache misses in parallel execution (per-block)"
+pub static GLOBAL_MODULE_CACHE_MISS_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "global_module_cache_miss_seconds",
+        // metric description
+        "The time spent in seconds after global module cache miss to access per-block module cache",
+        time_buckets(),
     )
     .unwrap()
 });

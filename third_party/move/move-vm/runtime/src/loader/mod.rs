@@ -258,6 +258,7 @@ impl Loader {
         I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
         I::IntoIter: DoubleEndedIterator,
     {
+        let _timer = VM_TIMER.timer_with_label("Loader::check_dependencies_and_charge_gas");
         match self {
             Self::V1(loader) => loader.check_dependencies_and_charge_gas(
                 module_store,
@@ -526,7 +527,7 @@ impl LoaderV1 {
         data_store: &mut TransactionDataCache,
         module_store: &LegacyModuleStorageAdapter,
     ) -> VMResult<Arc<CompiledScript>> {
-        let _timer = VM_TIMER.timer_with_label("Loader::deserialize_and_verify_script");
+        let _timer = VM_TIMER.timer_with_label("LoaderV1::deserialize_and_verify_script");
 
         let script = data_store.load_compiled_script_to_cache(script, hash_value)?;
 
@@ -847,8 +848,6 @@ impl LoaderV1 {
         I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
         I::IntoIter: DoubleEndedIterator,
     {
-        let _timer = VM_TIMER.timer_with_label("Loader::check_dependencies_and_charge_gas");
-
         // Initialize the work list (stack) and the map of visited modules.
         //
         // TODO: Determine the reserved capacity based on the max number of dependencies allowed.
@@ -918,7 +917,7 @@ impl LoaderV1 {
             return Ok(cached);
         }
 
-        let _timer = VM_TIMER.timer_with_label("Loader::load_module [cache miss]");
+        let _timer = VM_TIMER.timer_with_label("LoaderV1::load_module [cache miss]");
 
         // otherwise, load the transitive closure of the target module
         let module_ref = self.load_and_verify_module_and_dependencies_and_friends(
@@ -962,7 +961,7 @@ impl LoaderV1 {
         // Verify the module if it hasn't been verified before.
         if VERIFIED_MODULES.lock().get(&hash_value).is_none() {
             let _timer = VM_TIMER
-                .timer_with_label("Loader::load_and_verify_module [verification cache miss]");
+                .timer_with_label("LoaderV1::load_and_verify_module [verification cache miss]");
 
             move_bytecode_verifier::verify_module_with_config(
                 &self.vm_config.verifier_config,
