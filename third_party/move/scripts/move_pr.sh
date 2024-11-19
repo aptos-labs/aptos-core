@@ -197,10 +197,10 @@ if [ ! -z "$COMPILER_V2_TEST" ]; then
   echo "*************** [move-pr] Running integration tests with compiler v2"
   (
     cd $BASE
-    MVC_DOCGEN_OUTPUT_DIR=tests/compiler-v2-doc MOVE_COMPILER_V2=true cargo build $CARGO_OP_PARAMS \
+    MVC_DOCGEN_OUTPUT_DIR=tests/compiler-v2-doc MOVE_COMPILER_V2=true MOVE_LANGUAGE_V2=true cargo build $CARGO_OP_PARAMS \
        $MOVE_CRATES_V2_ENV_DEPENDENT
     MVC_DOCGEN_OUTPUT_DIR=tests/compiler-v2-doc \
-       MOVE_COMPILER_V2=true cargo nextest run $CARGO_NEXTEST_PARAMS \
+       MOVE_COMPILER_V2=true MOVE_LANGUAGE_V2=true cargo nextest run $CARGO_NEXTEST_PARAMS \
        $MOVE_CRATES_V2_ENV_DEPENDENT
   )
 fi

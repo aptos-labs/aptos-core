@@ -21,7 +21,7 @@ use aptos_block_executor::{
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
 use aptos_gas_algebra::DynamicExpression;
-use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
+use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_keygen::KeyGen;
 use aptos_types::{
@@ -89,7 +89,7 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
     sync::{Arc, Mutex},
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
@@ -142,6 +142,39 @@ pub struct FakeExecutor {
 pub enum GasMeterType {
     RegularGasMeter,
     UnmeteredGasMeter,
+}
+
+#[derive(Clone)]
+pub struct Measurement {
+    elapsed: Duration,
+    /// In internal gas units
+    execution_gas: u64,
+    /// In internal gas units
+    io_gas: u64,
+}
+
+const GAS_SCALING_FACTOR: f64 = 1_000_000.0;
+
+impl Measurement {
+    pub fn elapsed_micros(&self) -> u128 {
+        self.elapsed.as_micros()
+    }
+
+    pub fn elapsed_secs_f64(&self) -> f64 {
+        self.elapsed.as_secs_f64()
+    }
+
+    pub fn elapsed_micros_f64(&self) -> f64 {
+        self.elapsed.as_secs_f64() * 1_000_000.0
+    }
+
+    pub fn execution_gas_units(&self) -> f64 {
+        self.execution_gas as f64 / GAS_SCALING_FACTOR
+    }
+
+    pub fn io_gas_units(&self) -> f64 {
+        self.io_gas as f64 / GAS_SCALING_FACTOR
+    }
 }
 
 pub enum ExecFuncTimerDynamicArgs {
@@ -973,7 +1006,7 @@ impl FakeExecutor {
         iterations: u64,
         dynamic_args: ExecFuncTimerDynamicArgs,
         gas_meter_type: GasMeterType,
-    ) -> u128 {
+    ) -> Measurement {
         let mut extra_accounts = match &dynamic_args {
             ExecFuncTimerDynamicArgs::DistinctSigners
             | ExecFuncTimerDynamicArgs::DistinctSignersAndFixed(_) => (0..iterations)
@@ -993,7 +1026,7 @@ impl FakeExecutor {
 
         // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
         let mut i = 0;
-        let mut times = Vec::new();
+        let mut measurements = Vec::new();
         while i < iterations {
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
@@ -1062,24 +1095,41 @@ impl FakeExecutor {
             let elapsed = start.elapsed();
             if let Err(err) = result {
                 if !should_error {
-                    println!("Shouldn't error, but ignoring for now... {}", err);
+                    println!(
+                        "Entry function under measurement failed with an error. Continuing, but measurements are probably not what is expected. Error: {}",
+                        err
+                    );
                 }
             }
-            times.push(elapsed.as_micros());
+            measurements.push(Measurement {
+                elapsed,
+                execution_gas: regular
+                    .as_ref()
+                    .map_or(0, |gas| gas.algebra().execution_gas_used().into()),
+                io_gas: regular
+                    .as_ref()
+                    .map_or(0, |gas| gas.algebra().io_gas_used().into()),
+            });
             i += 1;
         }
 
         // take median of all running time iterations as a more robust measurement
-        times.sort();
-        let length = times.len();
+        measurements.sort_by_key(|v| v.elapsed);
+        let length = measurements.len();
         let mid = length / 2;
-        let mut running_time = times[mid];
+        let mut measurement = measurements[mid].clone();
 
         if length % 2 == 0 {
-            running_time = (times[mid - 1] + times[mid]) / 2;
+            measurement = Measurement {
+                elapsed: (measurements[mid - 1].elapsed + measurements[mid].elapsed) / 2,
+                execution_gas: (measurements[mid - 1].execution_gas
+                    + measurements[mid].execution_gas)
+                    / 2,
+                io_gas: (measurements[mid - 1].io_gas + measurements[mid].io_gas) / 2,
+            };
         }
 
-        running_time
+        measurement
     }
 
     /// record abstract usage using a modified gas meter

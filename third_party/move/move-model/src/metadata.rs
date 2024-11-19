@@ -171,6 +171,15 @@ impl CompilerVersion {
             _ => Ok(()),
         }
     }
+
+    /// Infer the latest stable language version based on the compiler version
+    pub fn infer_stable_language_version(&self) -> LanguageVersion {
+        if *self == CompilerVersion::V1 {
+            LanguageVersion::V1
+        } else {
+            LanguageVersion::latest_stable()
+        }
+    }
 }
 
 // ================================================================================'
