@@ -356,9 +356,9 @@ impl TransactionTypeArg {
                     publish_packages: true,
                 },
                 // progress_type: WorkflowProgress::MoveByPhases,
-progress_type: WorkflowProgress::WhenDone {
-                   delay_between_stages_s: 60,
-               },
+                progress_type: WorkflowProgress::WhenDone {
+                                delay_between_stages_s: 60,
+                            },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -370,10 +370,10 @@ progress_type: WorkflowProgress::WhenDone {
                     reuse_accounts_for_orders: false,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::MoveByPhases,
-// progress_type: WorkflowProgress::WhenDone {
-//                    delay_between_stages_s: 60,
-//                },
+                // progress_type: WorkflowProgress::MoveByPhases,
+progress_type: WorkflowProgress::WhenDone {
+                   delay_between_stages_s: 60,
+               },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -385,10 +385,10 @@ progress_type: WorkflowProgress::WhenDone {
                     reuse_accounts_for_orders: false,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::MoveByPhases,
-// progress_type: WorkflowProgress::WhenDone {
-//                    delay_between_stages_s: 60,
-//                },
+                // progress_type: WorkflowProgress::MoveByPhases,
+progress_type: WorkflowProgress::WhenDone {
+                   delay_between_stages_s: 60,
+               },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -400,10 +400,10 @@ progress_type: WorkflowProgress::WhenDone {
                     reuse_accounts_for_orders: false,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::MoveByPhases,
-// progress_type: WorkflowProgress::WhenDone {
-//                    delay_between_stages_s: 60,
-//                },
+                // progress_type: WorkflowProgress::MoveByPhases,
+progress_type: WorkflowProgress::WhenDone {
+                   delay_between_stages_s: 60,
+               },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -415,10 +415,10 @@ progress_type: WorkflowProgress::WhenDone {
                     reuse_accounts_for_orders: false,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::MoveByPhases,
-// progress_type: WorkflowProgress::WhenDone {
-//                    delay_between_stages_s: 60,
-//                },
+                // progress_type: WorkflowProgress::MoveByPhases,
+progress_type: WorkflowProgress::WhenDone {
+                   delay_between_stages_s: 60,
+               },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -430,10 +430,10 @@ progress_type: WorkflowProgress::WhenDone {
                     reuse_accounts_for_orders: false,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::MoveByPhases,
-// progress_type: WorkflowProgress::WhenDone {
-//                    delay_between_stages_s: 60,
-//                },
+                // progress_type: WorkflowProgress::MoveByPhases,
+progress_type: WorkflowProgress::WhenDone {
+                   delay_between_stages_s: 60,
+               },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -445,10 +445,10 @@ progress_type: WorkflowProgress::WhenDone {
                     reuse_accounts_for_orders: false,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::MoveByPhases,
-// progress_type: WorkflowProgress::WhenDone {
-//                    delay_between_stages_s: 60,
-//                },
+                // progress_type: WorkflowProgress::MoveByPhases,
+progress_type: WorkflowProgress::WhenDone {
+                   delay_between_stages_s: 60,
+               },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -460,10 +460,10 @@ progress_type: WorkflowProgress::WhenDone {
                     reuse_accounts_for_orders: false,
                     publish_packages: false,
                 },
-                progress_type: WorkflowProgress::MoveByPhases,
-// progress_type: WorkflowProgress::WhenDone {
-//                    delay_between_stages_s: 60,
-//                },
+                // progress_type: WorkflowProgress::MoveByPhases,
+progress_type: WorkflowProgress::WhenDone {
+                   delay_between_stages_s: 60,
+               },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -475,10 +475,10 @@ progress_type: WorkflowProgress::WhenDone {
                     reuse_accounts_for_orders: false,
                     publish_packages: false,
                 },
-                progress_type: WorkflowProgress::MoveByPhases,
-// progress_type: WorkflowProgress::WhenDone {
-//                    delay_between_stages_s: 60,
-//                },
+                // progress_type: WorkflowProgress::MoveByPhases,
+progress_type: WorkflowProgress::WhenDone {
+                   delay_between_stages_s: 60,
+               },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -490,10 +490,10 @@ progress_type: WorkflowProgress::WhenDone {
                     reuse_accounts_for_orders: false,
                     publish_packages: false,
                 },
-                progress_type: WorkflowProgress::MoveByPhases,
-// progress_type: WorkflowProgress::WhenDone {
-//                    delay_between_stages_s: 60,
-//                },
+                // progress_type: WorkflowProgress::MoveByPhases,
+progress_type: WorkflowProgress::WhenDone {
+                   delay_between_stages_s: 60,
+               },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -505,10 +505,10 @@ progress_type: WorkflowProgress::WhenDone {
                     reuse_accounts_for_orders: false,
                     publish_packages: false,
                 },
-                progress_type: WorkflowProgress::MoveByPhases,
-// progress_type: WorkflowProgress::WhenDone {
-//                    delay_between_stages_s: 60,
-//                },
+                // progress_type: WorkflowProgress::MoveByPhases,
+progress_type: WorkflowProgress::WhenDone {
+                   delay_between_stages_s: 60,
+               },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -520,10 +520,10 @@ progress_type: WorkflowProgress::WhenDone {
                     reuse_accounts_for_orders: true,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::MoveByPhases,
-// progress_type: WorkflowProgress::WhenDone {
-//                    delay_between_stages_s: 60,
-//                },
+                // progress_type: WorkflowProgress::MoveByPhases,
+progress_type: WorkflowProgress::WhenDone {
+                   delay_between_stages_s: 60,
+               },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -535,10 +535,10 @@ progress_type: WorkflowProgress::WhenDone {
                     reuse_accounts_for_orders: true,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::MoveByPhases,
-// progress_type: WorkflowProgress::WhenDone {
-//                    delay_between_stages_s: 60,
-//                },
+                // progress_type: WorkflowProgress::MoveByPhases,
+progress_type: WorkflowProgress::WhenDone {
+                   delay_between_stages_s: 60,
+               },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -550,10 +550,10 @@ progress_type: WorkflowProgress::WhenDone {
                     reuse_accounts_for_orders: true,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::MoveByPhases,
-// progress_type: WorkflowProgress::WhenDone {
-//                    delay_between_stages_s: 60,
-//                },
+                // progress_type: WorkflowProgress::MoveByPhases,
+progress_type: WorkflowProgress::WhenDone {
+                   delay_between_stages_s: 60,
+               },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -565,10 +565,10 @@ progress_type: WorkflowProgress::WhenDone {
                     reuse_accounts_for_orders: true,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::MoveByPhases,
-// progress_type: WorkflowProgress::WhenDone {
-//                    delay_between_stages_s: 60,
-//                },
+                // progress_type: WorkflowProgress::MoveByPhases,
+progress_type: WorkflowProgress::WhenDone {
+                   delay_between_stages_s: 60,
+               },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -580,10 +580,10 @@ progress_type: WorkflowProgress::WhenDone {
                     reuse_accounts_for_orders: true,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::MoveByPhases,
-// progress_type: WorkflowProgress::WhenDone {
-//                    delay_between_stages_s: 60,
-//                },
+                // progress_type: WorkflowProgress::MoveByPhases,
+progress_type: WorkflowProgress::WhenDone {
+                   delay_between_stages_s: 60,
+               },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -595,10 +595,10 @@ progress_type: WorkflowProgress::WhenDone {
                     reuse_accounts_for_orders: true,
                     publish_packages: false,
                 },
-                progress_type: WorkflowProgress::MoveByPhases,
-// progress_type: WorkflowProgress::WhenDone {
-//                    delay_between_stages_s: 60,
-//                },
+                // progress_type: WorkflowProgress::MoveByPhases,
+progress_type: WorkflowProgress::WhenDone {
+                   delay_between_stages_s: 60,
+               },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -610,10 +610,10 @@ progress_type: WorkflowProgress::WhenDone {
                     reuse_accounts_for_orders: true,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::MoveByPhases,
-// progress_type: WorkflowProgress::WhenDone {
-//                    delay_between_stages_s: 60,
-//                },
+                // progress_type: WorkflowProgress::MoveByPhases,
+progress_type: WorkflowProgress::WhenDone {
+                   delay_between_stages_s: 60,
+               },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -625,10 +625,10 @@ progress_type: WorkflowProgress::WhenDone {
                     reuse_accounts_for_orders: true,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::MoveByPhases,
-// progress_type: WorkflowProgress::WhenDone {
-//                    delay_between_stages_s: 60,
-//                },
+                // progress_type: WorkflowProgress::MoveByPhases,
+progress_type: WorkflowProgress::WhenDone {
+                   delay_between_stages_s: 60,
+               },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -640,10 +640,10 @@ progress_type: WorkflowProgress::WhenDone {
                     reuse_accounts_for_orders: true,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::MoveByPhases,
-// progress_type: WorkflowProgress::WhenDone {
-//                    delay_between_stages_s: 60,
-//                },
+                // progress_type: WorkflowProgress::MoveByPhases,
+progress_type: WorkflowProgress::WhenDone {
+                   delay_between_stages_s: 60,
+               },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
