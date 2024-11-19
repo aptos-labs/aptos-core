@@ -132,14 +132,17 @@ impl Package {
     }
 
     pub fn script(publisher: AccountAddress) -> TransactionPayload {
+        assert_ne!(publisher, AccountAddress::MAX_ADDRESS);
+
         let code = &*raw_module_data::SCRIPT_SIMPLE;
         let mut script = CompiledScript::deserialize(code).expect("Script must deserialize");
 
-        // Change the constant to the sender's address to change script's hash.
-        for constant in &mut script.constant_pool {
-            if constant.type_ == SignatureToken::Address {
-                constant.data = bcs::to_bytes(&publisher).expect("Address must serialize");
-                break;
+        // Make sure dependencies link to published modules. Compiler V2 adds 0xf..ff so we need to
+        // skip it.
+        assert_eq!(script.address_identifiers.len(), 2);
+        for address in &mut script.address_identifiers {
+            if address != &AccountAddress::MAX_ADDRESS {
+                *address = publisher;
             }
         }
 
