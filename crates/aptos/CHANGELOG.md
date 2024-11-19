@@ -4,6 +4,9 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 - Add option `--print-metadata-only` to `aptos move decompile` and `aptos move disassemble` to print out the metadata attached to the bytecode.
+- Add `--existing-hasura-url` flag to localnet to tell it to use an existing Hasura instance instead of run Hasura itself. See https://github.com/aptos-labs/aptos-core/pull/15313.
+- Add `--skip-metadata-apply` flag to localnet, in which case we won't try to apply the Hasura metadata.
+- Upgrade Hasura image we use from 2.40.2 to 2.44.0.
 
 ## [4.5.0] - 2024/11/15
 - Determine network from URL to make explorer links better for legacy users
