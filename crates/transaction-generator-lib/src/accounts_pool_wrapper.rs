@@ -1,16 +1,98 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{ObjectPool, TransactionGenerator, TransactionGeneratorCreator};
-use aptos_sdk::types::{
-    transaction::{SignedTransaction, TransactionPayload},
-    LocalAccount,
+use crate::{ObjectPool, BucketedAccountPool, TransactionGenerator, TransactionGeneratorCreator};
+use aptos_sdk::{
+    types::{
+        transaction::{SignedTransaction, TransactionPayload},
+        LocalAccount,
+    },
+    move_types::account_address::AccountAddress,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{
     collections::HashMap,
     sync::{atomic::AtomicU64, Arc},
 };
+
+pub struct BucketedAccountsPoolWrapperGenerator {
+    rng: StdRng,
+    generator: Box<dyn TransactionGenerator>,
+    source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+    destination_accounts_pool: Option<Arc<BucketedAccountPool<AccountAddress>>>,
+}
+
+impl BucketedAccountsPoolWrapperGenerator {
+    pub fn new(
+        rng: StdRng,
+        generator: Box<dyn TransactionGenerator>,
+        source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+        destination_accounts_pool: Option<Arc<BucketedAccountPool<AccountAddress>>>,
+    ) -> Self {
+        Self {
+            rng,
+            generator,
+            source_accounts_pool,
+            destination_accounts_pool,
+        }
+    }
+}
+
+impl TransactionGenerator for BucketedAccountsPoolWrapperGenerator {
+    fn generate_transactions(
+        &mut self,
+        _account: &LocalAccount,
+        num_to_create: usize,
+        history: &[String],
+        market_maker: bool,
+    ) -> Vec<SignedTransaction> {
+        let accounts_to_use =
+            self.source_accounts_pool
+                .take_from_pool(num_to_create, true, &mut self.rng);
+        if accounts_to_use.is_empty() {
+            return Vec::new();
+        }
+        let txns = accounts_to_use
+            .iter()
+            .flat_map(|account| self.generator.generate_transactions(account, num_to_create, history, market_maker))
+            .collect();
+        if let Some(destination_accounts_pool) = &self.destination_accounts_pool {
+            destination_accounts_pool.add_to_pool(accounts_to_use);
+        }
+        txns
+    }
+}
+
+pub struct BucketedAccountsPoolWrapperCreator {
+    creator: Box<dyn TransactionGeneratorCreator>,
+    source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+    destination_accounts_pool: Option<Arc<BucketedAccountPool<AccountAddress>>>,
+}
+
+impl BucketedAccountsPoolWrapperCreator {
+    pub fn new(
+        creator: Box<dyn TransactionGeneratorCreator>,
+        source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+        destination_accounts_pool: Option<Arc<BucketedAccountPool<AccountAddress>>>,
+    ) -> Self {
+        Self {
+            creator,
+            source_accounts_pool,
+            destination_accounts_pool,
+        }
+    }
+}
+
+impl TransactionGeneratorCreator for BucketedAccountsPoolWrapperCreator {
+    fn create_transaction_generator(&self, txn_counter: Arc<AtomicU64>) -> Box<dyn TransactionGenerator> {
+        Box::new(BucketedAccountsPoolWrapperGenerator::new(
+            StdRng::from_entropy(),
+            self.creator.create_transaction_generator(txn_counter),
+            self.source_accounts_pool.clone(),
+            self.destination_accounts_pool.clone(),
+        ))
+    }
+}
 
 /// Wrapper that allows inner transaction generator to have unique accounts
 /// for all transactions (instead of having 5-20 transactions per account, as default)

@@ -514,7 +514,7 @@ progress_type: WorkflowProgress::WhenDone {
             },
             TransactionTypeArg::EconiaBasic1MarketReuseAccounts => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
-                    num_users: 20000,
+                    num_users: 600000,
                     flow_type: crate::EconiaFlowType::Basic,
                     num_markets: 1,
                     reuse_accounts_for_orders: true,
@@ -529,7 +529,7 @@ progress_type: WorkflowProgress::WhenDone {
             },
             TransactionTypeArg::EconiaMixed1MarketReuseAccounts => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
-                    num_users: 20000,
+                    num_users: 600000,
                     flow_type: crate::EconiaFlowType::Mixed,
                     num_markets: 1,
                     reuse_accounts_for_orders: true,
@@ -544,7 +544,7 @@ progress_type: WorkflowProgress::WhenDone {
             },
             TransactionTypeArg::EconiaMixed10MarketReuseAccounts => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
-                    num_users: 20000,
+                    num_users: 600000,
                     flow_type: crate::EconiaFlowType::Mixed,
                     num_markets: 10,
                     reuse_accounts_for_orders: true,
@@ -559,7 +559,7 @@ progress_type: WorkflowProgress::WhenDone {
             },
             TransactionTypeArg::EconiaMixed100MarketReuseAccounts => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
-                    num_users: 20000,
+                    num_users: 600000,
                     flow_type: crate::EconiaFlowType::Mixed,
                     num_markets: 100,
                     reuse_accounts_for_orders: true,
@@ -574,7 +574,7 @@ progress_type: WorkflowProgress::WhenDone {
             },
             TransactionTypeArg::EconiaReal => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
-                    num_users: 20000,
+                    num_users: 600000,
                     flow_type: crate::EconiaFlowType::Real,
                     num_markets: 2,
                     reuse_accounts_for_orders: true,
@@ -589,7 +589,7 @@ progress_type: WorkflowProgress::WhenDone {
             },
             TransactionTypeArg::EconiaRealNoPublish => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
-                    num_users: 20000,
+                    num_users: 600000,
                     flow_type: crate::EconiaFlowType::Real,
                     num_markets: 2,
                     reuse_accounts_for_orders: true,
@@ -604,7 +604,7 @@ progress_type: WorkflowProgress::WhenDone {
             },
             TransactionTypeArg::EconiaMarket1MarketReuseAccounts => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
-                    num_users: 20000,
+                    num_users: 600000,
                     flow_type: crate::EconiaFlowType::Market,
                     num_markets: 1,
                     reuse_accounts_for_orders: true,
@@ -619,7 +619,7 @@ progress_type: WorkflowProgress::WhenDone {
             },
             TransactionTypeArg::EconiaMarket10MarketReuseAccounts => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
-                    num_users: 200000,
+                    num_users: 600000,
                     flow_type: crate::EconiaFlowType::Market,
                     num_markets: 10,
                     reuse_accounts_for_orders: true,
@@ -634,7 +634,7 @@ progress_type: WorkflowProgress::WhenDone {
             },
             TransactionTypeArg::EconiaMarket100MarketReuseAccounts => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
-                    num_users: 2000000,
+                    num_users: 600000,
                     flow_type: crate::EconiaFlowType::Market,
                     num_markets: 100,
                     reuse_accounts_for_orders: true,
@@ -650,7 +650,7 @@ progress_type: WorkflowProgress::WhenDone {
             TransactionTypeArg::EconiaMarket1MarketReuseAccountsNoPublish => {
                 TransactionType::Workflow {
                     workflow_kind: WorkflowKind::Econia {
-                        num_users: 20000,
+                        num_users: 600000,
                         flow_type: crate::EconiaFlowType::Market,
                         num_markets: 1,
                         reuse_accounts_for_orders: true,
