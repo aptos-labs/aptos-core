@@ -31,6 +31,30 @@ error: Expected `location` following `major_status`
    │                        ^^^^^^^^^^^^^^^^^
 
 error: invalid attribute value
+   ┌─ tests/unit_test/test/other_failures_invalid_location.move:26:38
+   │
+26 │     #[expected_failure(vector_error, location=x)]
+   │                                      ^^^^^^^^^^
+   │                                               │
+   │                                               Expected a module identifier, e.g. 'std::vector'
+
+error: invalid attribute value
+   ┌─ tests/unit_test/test/other_failures_invalid_location.move:30:36
+   │
+30 │     #[expected_failure(out_of_gas, location=0x1::m::t0)]
+   │                                    ^^^^^^^^^^^^^^^^^^^
+   │                                             │
+   │                                             Expected a module identifier, e.g. 'std::vector'
+
+error: invalid attribute value
+   ┌─ tests/unit_test/test/other_failures_invalid_location.move:34:43
+   │
+34 │     #[expected_failure(major_status=4004, location=self)]
+   │                                           ^^^^^^^^^^^^^
+   │                                                    │
+   │                                                    Expected a module identifier, e.g. 'std::vector'
+
+error: invalid attribute value
    ┌─ tests/unit_test/test/other_failures_invalid_location.move:38:59
    │
 38 │     #[expected_failure(major_status=4016, minor_status=0, location=0)]

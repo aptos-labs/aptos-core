@@ -505,10 +505,17 @@ fn convert_location(env: &GlobalEnv, attr: Attribute) -> Option<ModuleId> {
     match value {
         AttributeValue::Name(id, opt_module_name, _sym) => {
             let vloc = env.get_node_loc(id);
-            convert_module_id(env, vloc, opt_module_name)
+            let module_id_opt = convert_module_id(env, vloc.clone(), opt_module_name);
+            if !_sym.display(env.symbol_pool()).to_string().is_empty() || module_id_opt.is_none() {
+                env.error_with_labels(&loc, "invalid attribute value", vec![(
+                    vloc,
+                    "Expected a module identifier, e.g. 'std::vector'".to_string(),
+                )]);
+            }
+            module_id_opt
         },
         AttributeValue::Value(id, _val) => {
-            let vloc = env.get_node_loc(id);
+            let vloc: Loc = env.get_node_loc(id);
             env.error_with_labels(&loc, "invalid attribute value", vec![(
                 vloc,
                 "Expected a module identifier, e.g. 'std::vector'".to_string(),
