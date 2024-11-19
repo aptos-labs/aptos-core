@@ -46,7 +46,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::{select, sync::oneshot, task::AbortHandle};
+use tokio::{join, select, sync::oneshot, task::AbortHandle};
 
 /// The pipeline builder is responsible for constructing the pipeline structure for a block.
 /// Each phase is represented as a shared future, takes in other futures as pre-condition.
@@ -96,7 +96,7 @@ fn spawn_ready_fut<T: Send + Clone + 'static>(f: T) -> TaskFuture<T> {
 
 async fn wait_and_log_error<T, F: Future<Output = TaskResult<T>>>(f: F, msg: String) {
     if let Err(TaskError::InternalError(e)) = f.await {
-        warn!("{} failed: {}", msg, e);
+        warn!("[Pipeline] error {} failed: {}", msg, e);
     }
 }
 
@@ -766,7 +766,7 @@ impl PipelineBuilder {
             post_ledger_update_fut: _,
             commit_vote_fut: _,
             pre_commit_fut,
-            post_pre_commit_fut: _,
+            post_pre_commit_fut,
             commit_ledger_fut,
             post_commit_fut: _,
         } = all_futs;
@@ -780,6 +780,11 @@ impl PipelineBuilder {
         wait_and_log_error(
             pre_commit_fut,
             format!("{epoch} {round} {block_id} pre commit"),
+        )
+        .await;
+        wait_and_log_error(
+            post_pre_commit_fut,
+            format!("{epoch} {round} {block_id} post pre commit"),
         )
         .await;
         wait_and_log_error(
