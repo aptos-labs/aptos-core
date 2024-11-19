@@ -142,7 +142,8 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     execution_client: Arc<dyn TExecutionClient>,
     dummy_client: Arc<dyn TExecutionClient>,
     storage: Arc<dyn PersistentLivenessStorage>,
-    safety_rules_manager: SafetyRulesManager,
+    safety_rules_manager_0: SafetyRulesManager,
+    safety_rules_manager_1: SafetyRulesManager,
     vtxn_pool: VTxnPoolState,
     reconfig_events: ReconfigNotificationListener<P>,
     // channels to rand manager
@@ -209,7 +210,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let execution_config = node_config.execution.clone();
         let dag_config = node_config.dag_consensus.clone();
         let sr_config = &node_config.consensus.safety_rules;
-        let safety_rules_manager = SafetyRulesManager::new(sr_config);
+        let safety_rules_manager_0 = SafetyRulesManager::new(sr_config);
+        let safety_rules_manager_1 = SafetyRulesManager::new(sr_config);
         let key_storage = safety_rules_manager::storage(sr_config);
         Self {
             author,
@@ -225,7 +227,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             quorum_store_to_mempool_sender,
             execution_client,
             storage,
-            safety_rules_manager,
+            safety_rules_manager_0,
+            safety_rules_manager_1,
             vtxn_pool,
             reconfig_events,
             rand_manager_msg_tx: None,
@@ -814,8 +817,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         info!(epoch = epoch, round_manager_id = id, "Update SafetyRules");
 
-        let mut safety_rules =
-            MetricsSafetyRules::new(self.safety_rules_manager.client(), self.storage.clone());
+
+        let mut safety_rules = match id {
+            0 => MetricsSafetyRules::new(self.safety_rules_manager_0.client(), self.storage.clone()),
+            1 => MetricsSafetyRules::new(self.safety_rules_manager_1.client(), self.storage.clone()),
+            _ => unreachable!(),
+        };
+
         match safety_rules.perform_initialize() {
             Err(e) if matches!(e, Error::ValidatorNotInSet(_)) => {
                 warn!(
