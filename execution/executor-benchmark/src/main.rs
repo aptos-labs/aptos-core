@@ -14,8 +14,8 @@ use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };
 use aptos_executor_benchmark::{
-    native::native_config::NativeConfig, native_executor::NativeExecutor, pipeline::PipelineConfig,
-    BenchmarkWorkload,
+    default_benchmark_features, native::native_config::NativeConfig,
+    native_executor::NativeExecutor, pipeline::PipelineConfig, BenchmarkWorkload,
 };
 use aptos_executor_service::remote_executor_client;
 use aptos_experimental_ptx_executor::PtxBlockExecutor;
@@ -413,7 +413,7 @@ fn get_init_features(
         "Enable and disable feature flags cannot overlap."
     );
 
-    let mut init_features = Features::default();
+    let mut init_features = default_benchmark_features();
     for feature in enable_feature.iter() {
         init_features.enable(*feature);
     }
