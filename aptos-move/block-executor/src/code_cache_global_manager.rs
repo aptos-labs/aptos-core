@@ -173,7 +173,6 @@ impl AptosModuleCacheManager {
                 AptosModuleCacheManagerGuard::Guard { guard }
             },
             None => {
-                // TODO(loader_v2): Should we return an error here instead?
                 alert_or_println!("Locking module cache manager failed, fallback to empty caches");
 
                 // If this is true, we failed to acquire a lock, and so default storage environment
