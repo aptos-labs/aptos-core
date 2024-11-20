@@ -1373,6 +1373,7 @@ dependencies = [
  "aptos-metrics-core",
  "derive_more",
  "once_cell",
+ "rayon",
  "threadpool",
 ]
 
