@@ -162,8 +162,6 @@ module aptos_framework::native_bridge {
         vector::append(&mut combined_bytes, bcs::to_bytes(&nonce));
         assert!(keccak256(combined_bytes) == bridge_transfer_id, EINVALID_BRIDGE_TRANSFER_ID);
         // todo: expect it to be empty
-        let retrieved_bridge_transfer_id = native_bridge_store::get_bridge_transfer_id_from_nonce(nonce);
-        //native_bridge_store::set_nonce_to_bridge_transfer_id(nonce, bridge_transfer_id);
  
         // Mint to recipient  
         native_bridge_core::mint(recipient, amount);
@@ -370,6 +368,12 @@ module aptos_framework::native_bridge_store {
         move_to(aptos_framework, Nonce {
             inner: 0,
         });
+
+        let initiators = SmartTableWrapper<vector<u8>, OutboundBridgeTransfer<address, EthereumAddress>> {
+            inner: smart_table::new(),
+        };
+
+        move_to(aptos_framework, initiators);    
 
         let nonces_to_bridge_transfer_ids = SmartTableWrapper<u64, vector<u8>> {
             inner: smart_table::new(),
