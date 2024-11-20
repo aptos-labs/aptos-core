@@ -95,6 +95,8 @@ module groth16_example::groth16 {
     // where X is bn254_algebra for BN254 and bls12381_algebra for BLS12_381
     // The names are preserved from the snarkjs proof and verifier key JSON file format, with the
     // exception of "IC", which has been renamed to `vk_gamma_abc`
+    // The JSON files output by snarkjs used for this example can be found in "groth16_example/example_snarkjs_proof.json"
+    // and "groth16_example/example_snarkjs_vk.json"
     #[test(fx = @std)]
     fun test_verify_circom_proof(fx: signer) {
         enable_cryptography_algebra_natives(&fx);
