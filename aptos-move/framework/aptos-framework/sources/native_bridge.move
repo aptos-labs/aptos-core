@@ -28,6 +28,7 @@ module aptos_framework::native_bridge {
     const ETRANSFER_ALREADY_PROCESSED: u64 = 1;
     const EINVALID_BRIDGE_TRANSFER_ID: u64 = 2;
     const EEVENT_NOT_FOUND : u64 = 3;
+    const EINVALID_NONCE : u64 = 4;
 
     #[event]
     /// An event triggered upon initiating a bridge transfer
@@ -163,7 +164,7 @@ module aptos_framework::native_bridge {
         // Check if the bridge transfer ID is already associated with an incoming nonce
         let incoming_nonce_exists = native_bridge_store::is_incoming_nonce_set(bridge_transfer_id);
         assert!(!incoming_nonce_exists, ETRANSFER_ALREADY_PROCESSED); // Abort if the transfer is already processed
-
+        assert!(nonce > 0, EINVALID_NONCE); 
         let ethereum_address = ethereum::ethereum_address_no_eip55(initiator);
 
         // Validate the bridge_transfer_id by reconstructing the hash
@@ -677,6 +678,7 @@ module aptos_framework::native_bridge_configuration {
 }
 
 module aptos_framework::native_bridge_core {
+    use std::signer;
     use std::features;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::native_bridge_configuration;
