@@ -714,15 +714,15 @@ pub enum EntryFunctionCall {
         approved: bool,
     },
 
-    /// Completes a bridge transfer by the initiator.  
+    /// Completes a bridge transfer by the initiator.
 
-    /// @param caller The signer representing the bridge operator.  
+    /// @param caller The signer representing the bridge relayer.  
     /// @param initiator The initiator's Ethereum address as a vector of bytes.  
     /// @param bridge_transfer_id The unique identifier for the bridge transfer.  
     /// @param recipient The address of the recipient on the Aptos blockchain.  
     /// @param amount The amount of assets to be locked.  
     /// @param nonce The unique nonce for the transfer.    
-    /// @abort If the caller is not the bridge operator.
+    /// @abort If the caller is not the bridge relayer or the transfer has already been processed.
     NativeBridgeCompleteBridgeTransfer {
         bridge_transfer_id: Vec<u8>,
         initiator: Vec<u8>,
@@ -3698,15 +3698,15 @@ pub fn multisig_account_vote_transanction(
     ))
 }
 
-/// Completes a bridge transfer by the initiator.  
+/// Completes a bridge transfer by the initiator.
 ///
-/// @param caller The signer representing the bridge operator.  
+/// @param caller The signer representing the bridge relayer.  
 /// @param initiator The initiator's Ethereum address as a vector of bytes.  
 /// @param bridge_transfer_id The unique identifier for the bridge transfer.  
 /// @param recipient The address of the recipient on the Aptos blockchain.  
 /// @param amount The amount of assets to be locked.  
 /// @param nonce The unique nonce for the transfer.    
-/// @abort If the caller is not the bridge operator.
+/// @abort If the caller is not the bridge relayer or the transfer has already been processed.
 pub fn native_bridge_complete_bridge_transfer(
     bridge_transfer_id: Vec<u8>,
     initiator: Vec<u8>,

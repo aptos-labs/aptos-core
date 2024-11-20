@@ -3,7 +3,7 @@ module aptos_framework::native_bridge {
     use aptos_framework::account;
     use aptos_framework::native_bridge_core;
     use aptos_framework::native_bridge_configuration;
-    use aptos_framework::native_bridge_configuration::assert_is_caller_operator;
+    use aptos_framework::native_bridge_configuration::assert_is_caller_relayer;
     use aptos_framework::native_bridge_store;
     use aptos_std::smart_table;
     use aptos_framework::ethereum;
@@ -142,13 +142,13 @@ module aptos_framework::native_bridge {
 
     /// Completes a bridge transfer by the initiator.
     ///  
-    /// @param caller The signer representing the bridge operator.  
+    /// @param caller The signer representing the bridge relayer.  
     /// @param initiator The initiator's Ethereum address as a vector of bytes.  
     /// @param bridge_transfer_id The unique identifier for the bridge transfer.  
     /// @param recipient The address of the recipient on the Aptos blockchain.  
     /// @param amount The amount of assets to be locked.  
     /// @param nonce The unique nonce for the transfer.    
-    /// @abort If the caller is not the bridge operator or the transfer has already been processed.  
+    /// @abort If the caller is not the bridge relayer or the transfer has already been processed.  
     public entry fun complete_bridge_transfer(  
         caller: &signer,  
         bridge_transfer_id: vector<u8>,
@@ -157,8 +157,8 @@ module aptos_framework::native_bridge {
         amount: u64,  
         nonce: u64  
     ) acquires BridgeEvents {  
-        // Ensure the caller is the bridge operator
-        native_bridge_configuration::assert_is_caller_operator(caller);  
+        // Ensure the caller is the bridge relayer
+        native_bridge_configuration::assert_is_caller_relayer(caller);  
 
         // Check if the bridge transfer ID is already associated with an incoming nonce
         let incoming_nonce_exists = native_bridge_store::is_incoming_nonce_set(bridge_transfer_id);
@@ -293,7 +293,7 @@ module aptos_framework::native_bridge {
     }
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
-    // #[expected_failure(abort_code = 0x1, location = 0x1::native_bridge_configuration)] // EINVALID_BRIDGE_OPERATOR
+    // #[expected_failure(abort_code = 0x1, location = 0x1::native_bridge_configuration)] // EINVALID_BRIDGE_relayer
     fun test_complete_bridge_transfer_by_sender(
         sender: &signer,
         aptos_framework: &signer
@@ -331,7 +331,7 @@ module aptos_framework::native_bridge {
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
     #[expected_failure(abort_code = EINVALID_BRIDGE_TRANSFER_ID, location = Self)] // ENOT_FOUND
-    fun test_complete_bridge_with_erroneous_bridge_id_by_operator(
+    fun test_complete_bridge_with_erroneous_bridge_id_by_relayer(
         sender: &signer,
         aptos_framework: &signer
     ) acquires BridgeEvents {
@@ -342,7 +342,7 @@ module aptos_framework::native_bridge {
 
         let bridge_transfer_id = b"guessing the id";
 
-        // As operator I send a complete request and it should fail
+        // As relayer I send a complete request and it should fail
         complete_bridge_transfer(
             aptos_framework,
             bridge_transfer_id,
@@ -700,8 +700,8 @@ module aptos_framework::native_bridge_configuration {
 
     friend aptos_framework::native_bridge;
 
-    /// Error code for invalid bridge operator
-    const EINVALID_BRIDGE_OPERATOR: u64 = 0x1;
+    /// Error code for invalid bridge relayer
+    const EINVALID_BRIDGE_RELAYER: u64 = 0x1;
 
     /// Counterparty time lock duration is 24 hours in seconds
     const COUNTERPARTY_TIME_LOCK_DUARTION: u64 = 24 * 60 * 60;
@@ -709,16 +709,16 @@ module aptos_framework::native_bridge_configuration {
     const INITIATOR_TIME_LOCK_DUARTION: u64 = 48 * 60 * 60;
 
     struct BridgeConfig has key {
-        bridge_operator: address,
+        bridge_relayer: address,
         initiator_time_lock: u64,
         counterparty_time_lock: u64,
     }
 
     #[event]
-    /// Event emitted when the bridge operator is updated.
-    struct BridgeConfigOperatorUpdated has store, drop {
-        old_operator: address,
-        new_operator: address,
+    /// Event emitted when the bridge relayer is updated.
+    struct BridgeConfigRelayerUpdated has store, drop {
+        old_relayer: address,
+        new_relayer: address,
     }
 
     #[event]
@@ -733,56 +733,56 @@ module aptos_framework::native_bridge_configuration {
         time_lock: u64,
     }
 
-    /// Initializes the bridge configuration with Aptos framework as the bridge operator.
+    /// Initializes the bridge configuration with Aptos framework as the bridge relayer.
     ///
     /// @param aptos_framework The signer representing the Aptos framework.
     public fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         let bridge_config = BridgeConfig {
-            bridge_operator: signer::address_of(aptos_framework),
+            bridge_relayer: signer::address_of(aptos_framework),
             initiator_time_lock: INITIATOR_TIME_LOCK_DUARTION,
             counterparty_time_lock: COUNTERPARTY_TIME_LOCK_DUARTION,
         };
         move_to(aptos_framework, bridge_config);
     }
 
-    /// Updates the bridge operator, requiring governance validation.
+    /// Updates the bridge relayer, requiring governance validation.
     ///
     /// @param aptos_framework The signer representing the Aptos framework.
-    /// @param new_operator The new address to be set as the bridge operator.
-    /// @abort If the current operator is the same as the new operator.
-    public fun update_bridge_operator(aptos_framework: &signer, new_operator: address
+    /// @param new_relayer The new address to be set as the bridge relayer.
+    /// @abort If the current relayer is the same as the new relayer.
+    public fun update_bridge_relayer(aptos_framework: &signer, new_relayer: address
     )   acquires BridgeConfig {
         system_addresses::assert_aptos_framework(aptos_framework);
         let bridge_config = borrow_global_mut<BridgeConfig>(@aptos_framework);
-        let old_operator = bridge_config.bridge_operator;
-        assert!(old_operator != new_operator, EINVALID_BRIDGE_OPERATOR);
+        let old_relayer = bridge_config.bridge_relayer;
+        assert!(old_relayer != new_relayer, EINVALID_BRIDGE_RELAYER);
 
-        bridge_config.bridge_operator = new_operator;
+        bridge_config.bridge_relayer = new_relayer;
 
         event::emit(
-            BridgeConfigOperatorUpdated {
-                old_operator,
-                new_operator,
+            BridgeConfigRelayerUpdated {
+                old_relayer,
+                new_relayer,
             },
         );
     }
 
     #[view]
-    /// Retrieves the address of the current bridge operator.
+    /// Retrieves the address of the current bridge relayer.
     ///
-    /// @return The address of the current bridge operator.
-    public fun bridge_operator(): address acquires BridgeConfig {
-        borrow_global_mut<BridgeConfig>(@aptos_framework).bridge_operator
+    /// @return The address of the current bridge relayer.
+    public fun bridge_relayer(): address acquires BridgeConfig {
+        borrow_global_mut<BridgeConfig>(@aptos_framework).bridge_relayer
     }
 
-    /// Asserts that the caller is the current bridge operator.
+    /// Asserts that the caller is the current bridge relayer.
     ///
     /// @param caller The signer whose authority is being checked.
-    /// @abort If the caller is not the current bridge operator.
-    public(friend) fun assert_is_caller_operator(caller: &signer
+    /// @abort If the caller is not the current bridge relayer.
+    public(friend) fun assert_is_caller_relayer(caller: &signer
     ) acquires BridgeConfig {
-        assert!(borrow_global<BridgeConfig>(@aptos_framework).bridge_operator == signer::address_of(caller), EINVALID_BRIDGE_OPERATOR);
+        assert!(borrow_global<BridgeConfig>(@aptos_framework).bridge_relayer == signer::address_of(caller), EINVALID_BRIDGE_RELAYER);
     }
 
     #[test(aptos_framework = @aptos_framework)]
@@ -792,46 +792,46 @@ module aptos_framework::native_bridge_configuration {
         assert!(exists<BridgeConfig>(@aptos_framework), 0);
     }
 
-    #[test(aptos_framework = @aptos_framework, new_operator = @0xcafe)]
-    /// Tests updating the bridge operator and emitting the corresponding event.
-    fun test_update_bridge_operator(aptos_framework: &signer, new_operator: address
+    #[test(aptos_framework = @aptos_framework, new_relayer = @0xcafe)]
+    /// Tests updating the bridge relayer and emitting the corresponding event.
+    fun test_update_bridge_relayer(aptos_framework: &signer, new_relayer: address
     ) acquires BridgeConfig {
         initialize(aptos_framework);
-        update_bridge_operator(aptos_framework, new_operator);
+        update_bridge_relayer(aptos_framework, new_relayer);
 
         assert!(
-            event::was_event_emitted<BridgeConfigOperatorUpdated>(
-                &BridgeConfigOperatorUpdated {
-                    old_operator: @aptos_framework,
-                    new_operator,
+            event::was_event_emitted<BridgeConfigRelayerUpdated>(
+                &BridgeConfigRelayerUpdated {
+                    old_relayer: @aptos_framework,
+                    new_relayer,
                 }
             ), 0);
 
-        assert!(bridge_operator() == new_operator, 0);
+        assert!(bridge_relayer() == new_relayer, 0);
     }
 
-    #[test(aptos_framework = @aptos_framework, bad = @0xbad, new_operator = @0xcafe)]
+    #[test(aptos_framework = @aptos_framework, bad = @0xbad, new_relayer = @0xcafe)]
     #[expected_failure(abort_code = 0x50003, location = 0x1::system_addresses)]
-    /// Tests that updating the bridge operator with an invalid signer fails.
-    fun test_failing_update_bridge_operator(aptos_framework: &signer, bad: &signer, new_operator: address
+    /// Tests that updating the bridge relayer with an invalid signer fails.
+    fun test_failing_update_bridge_relayer(aptos_framework: &signer, bad: &signer, new_relayer: address
     ) acquires BridgeConfig {
         initialize(aptos_framework);
-        update_bridge_operator(bad, new_operator);
+        update_bridge_relayer(bad, new_relayer);
     }
 
     #[test(aptos_framework = @aptos_framework)]
-    /// Tests that the correct operator is validated successfully.
-    fun test_is_valid_operator(aptos_framework: &signer) acquires BridgeConfig {
+    /// Tests that the correct relayer is validated successfully.
+    fun test_is_valid_relayer(aptos_framework: &signer) acquires BridgeConfig {
         initialize(aptos_framework);
-        assert_is_caller_operator(aptos_framework);
+        assert_is_caller_relayer(aptos_framework);
     }
 
     #[test(aptos_framework = @aptos_framework, bad = @0xbad)]
     #[expected_failure(abort_code = 0x1, location = 0x1::native_bridge_configuration)]
-    /// Tests that an incorrect operator is not validated and results in an abort.
-    fun test_is_not_valid_operator(aptos_framework: &signer, bad: &signer) acquires BridgeConfig {
+    /// Tests that an incorrect relayer is not validated and results in an abort.
+    fun test_is_not_valid_relayer(aptos_framework: &signer, bad: &signer) acquires BridgeConfig {
         initialize(aptos_framework);
-        assert_is_caller_operator(bad);
+        assert_is_caller_relayer(bad);
     }
 
 }

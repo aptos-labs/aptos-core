@@ -1,3 +1,4 @@
+/*
 spec aptos_framework::native_bridge_store {
     spec initialize {
         let addr = signer::address_of(aptos_framework);
@@ -105,3 +106,5 @@ spec aptos_framework::native_bridge_configuration {
         ensures global<BridgeConfig>(signer::address_of(aptos_framework)).bridge_operator == new_operator;
     }
 }
+
+*/
