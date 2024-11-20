@@ -21,8 +21,6 @@ module aptos_framework::native_bridge {
     use aptos_framework::coin;
     #[test_only]
     use aptos_framework::ethereum::valid_eip55;
-    #[test_only]
-    use aptos_framework::timestamp;
     use std::bcs;
     use std::vector;
     use aptos_std::aptos_hash::keccak256;
@@ -79,7 +77,9 @@ module aptos_framework::native_bridge {
         );
 
         // Create the Nonce resource with an initial value of 1
-        move_to<Nonce>(aptos_framework, Nonce { value: 0 });
+        move_to<Nonce>(aptos_framework, Nonce { 
+            value: 1 
+        });
 
         move_to(aptos_framework, BridgeEvents {
             bridge_transfer_initiated_events: account::new_event_handle<BridgeTransferInitiatedEvent>(aptos_framework),
@@ -113,7 +113,6 @@ module aptos_framework::native_bridge {
         );  
     
         // Generate a unique bridge transfer ID  
-        // Todo: pass the nonce in here and modify the function to take a nonce. Or only use the nonce in native_bridge_store
         let bridge_transfer_id = native_bridge_store::bridge_transfer_id(&details);  
     
         // Add the transfer details to storage  
@@ -360,9 +359,7 @@ module aptos_framework::native_bridge_store {
     use aptos_std::smart_table::SmartTable;
     use aptos_framework::ethereum::EthereumAddress;
     use aptos_framework::system_addresses;
-    use aptos_framework::timestamp;
     use std::signer;
-    use aptos_framework::timestamp::CurrentTimeMicroseconds;
 
     friend aptos_framework::native_bridge;
 
@@ -401,13 +398,6 @@ module aptos_framework::native_bridge_store {
         nonce: u64
     }
 
-    /// Details on the inbound transfer
-    struct InboundBridgeTransfer<Initiator: store, Recipient: store> has store, copy {
-        addresses: AddressPair<Initiator, Recipient>,
-        amount: u64,
-        nonce: u64
-    }
-
     /// Checks if a bridge transfer ID is associated with an incoming nonce.
     /// @param bridge_transfer_id The bridge transfer ID.
     /// @return `true` if the ID is associated with an existing incoming nonce, `false` otherwise.
@@ -433,13 +423,6 @@ module aptos_framework::native_bridge_store {
         };
 
         move_to(aptos_framework, ids_to_incoming_nonces);
-    }
-
-    /// Returns the current time in seconds.
-    ///
-    /// @return Current timestamp in seconds.
-    fun now() : u64 {
-        timestamp::now_seconds()
     }
 
     /// Creates bridge transfer details with validation.
@@ -710,8 +693,6 @@ module aptos_framework::native_bridge_core {
     use aptos_framework::account;
     #[test_only]
     use aptos_framework::aptos_coin;
-    #[test_only]
-    use aptos_framework::timestamp;
 
     friend aptos_framework::native_bridge;
     friend aptos_framework::genesis;
@@ -743,11 +724,10 @@ module aptos_framework::native_bridge_core {
     }
 
     #[test_only]
-    /// Initializes the atomic bridge for testing purposes, including setting up accounts and timestamps.
+    /// Initializes the native bridge for testing purposes
     ///
     /// @param aptos_framework The signer representing the Aptos framework.
     public fun initialize_for_test(aptos_framework: &signer) {
-        timestamp::set_time_has_started_for_testing(aptos_framework);
         account::create_account_for_test(@aptos_framework);
         features::change_feature_flags_for_testing(
             aptos_framework,
