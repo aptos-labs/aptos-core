@@ -584,6 +584,16 @@ module std::features {
 
     /// Whether the Atomic bridge is available
     /// Lifetime: transient
+    const NATIVE_BRIDGE: u64 = 72;
+
+    public fun get_native_bridge_feature(): u64 { NATIVE_BRIDGE }
+
+    public fun abort_native_bridge_enabled(): bool acquires Features {
+        is_enabled(NATIVE_BRIDGE)
+    }
+
+    /// Whether the Atomic bridge is available
+    /// Lifetime: transient
     const ATOMIC_BRIDGE: u64 = 71;
 
     public fun get_atomic_bridge_feature(): u64 { ATOMIC_BRIDGE }
