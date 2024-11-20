@@ -176,7 +176,6 @@ module aptos_framework::atomic_bridge_initiator {
     use aptos_framework::ethereum::EthereumAddress;
     use aptos_framework::event::{Self, EventHandle}; 
     use aptos_framework::signer;
-    use aptos_framework::system_addresses;
     #[test_only]
     use std::vector;
     #[test_only]
@@ -203,15 +202,6 @@ module aptos_framework::atomic_bridge_initiator {
     }
 
     #[event]
-    struct BridgeTransferInitiatedSimplifiedEvent has store, drop {
-        bridge_transfer_id: vector<u8>,
-        initiator: address,
-        recipient: vector<u8>,
-        amount: u64,
-        nonce: u64,
-    }
-
-    #[event]
     struct BridgeTransferCompletedEvent has store, drop {
         bridge_transfer_id: vector<u8>,
         pre_image: vector<u8>,
@@ -222,41 +212,17 @@ module aptos_framework::atomic_bridge_initiator {
         bridge_transfer_id: vector<u8>,
     }
 
-    struct Nonce has key {
-        value: u64
-    }
-
-    /// Increment and get the current nonce  
-    fun increment_and_get_nonce(signer: address): u64 acquires Nonce {  
-        let nonce_ref = borrow_global_mut<Nonce>(@aptos_framework);  
-        nonce_ref.value = nonce_ref.value + 1;  
-        nonce_ref.value  
-    }  
-
     /// This struct will store the event handles for bridge events.
     struct BridgeInitiatorEvents has key, store {
         bridge_transfer_initiated_events: EventHandle<BridgeTransferInitiatedEvent>,
-        bridge_transfer_initiated_simplified_events: EventHandle<BridgeTransferInitiatedSimplifiedEvent>,
         bridge_transfer_completed_events: EventHandle<BridgeTransferCompletedEvent>,
         bridge_transfer_refunded_events: EventHandle<BridgeTransferRefundedEvent>,
     }
 
     /// Initializes the module and stores the `EventHandle`s in the resource.
     public fun initialize(aptos_framework: &signer) {
-        system_addresses::assert_aptos_framework(aptos_framework);
-
-        // Ensure the nonce is not already initialized
-        assert!(
-            !exists<Nonce>(signer::address_of(aptos_framework)),
-            2
-        );
-
-        // Create the Nonce resource with an initial value of 1
-        move_to<Nonce>(aptos_framework, Nonce { value: 1 });
-
         move_to(aptos_framework, BridgeInitiatorEvents {
             bridge_transfer_initiated_events: account::new_event_handle<BridgeTransferInitiatedEvent>(aptos_framework),
-            bridge_transfer_initiated_simplified_events: account::new_event_handle<BridgeTransferInitiatedSimplifiedEvent>(aptos_framework),
             bridge_transfer_completed_events: account::new_event_handle<BridgeTransferCompletedEvent>(aptos_framework),
             bridge_transfer_refunded_events: account::new_event_handle<BridgeTransferRefundedEvent>(aptos_framework),
         });
@@ -300,56 +266,6 @@ module aptos_framework::atomic_bridge_initiator {
             },
         );
     }
-
-    /// Initiate a bridge transfer of MOVE from Movement to the base layer  
-    /// Anyone can initiate a bridge transfer from the source chain  
-    /// The amount is burnt from the initiator and the module-level nonce is incremented  
-    /// @param initiator The initiator's Ethereum address as a vector of bytes.  
-    /// @param recipient The address of the recipient on the Aptos blockchain.  
-    /// @param amount The amount of assets to be locked.  
-    public entry fun initiate_bridge_transfer_simplified(  
-        initiator: &signer,  
-        recipient: vector<u8>,  
-        amount: u64  
-    ) acquires BridgeInitiatorEvents, Nonce {  
-        let initiator_address = signer::address_of(initiator);  
-        let ethereum_address = ethereum::ethereum_address(recipient);  
-    
-        // Increment and retrieve the nonce  
-        let nonce = increment_and_get_nonce(initiator_address);  
-    
-        // Create bridge transfer details  
-        let details = atomic_bridge_store::create_details_simplified(  
-            initiator_address,  
-            ethereum_address, 
-            amount,  
-            nonce  
-        );  
-    
-        // Generate a unique bridge transfer ID  
-        // Todo: pass the nonce in here and modify the function to take a nonce. Or only use the nonce in atomic_bridge_store
-        let bridge_transfer_id = atomic_bridge_store::bridge_transfer_id_simplified(&details);  
-    
-        // Add the transfer details to storage  
-        atomic_bridge_store::add_simplified(bridge_transfer_id, details);  
-    
-        // Burn the amount from the initiator  
-        atomic_bridge::burn(initiator_address, amount);  
-    
-        let bridge_initiator_events = borrow_global_mut<BridgeInitiatorEvents>(@aptos_framework);
-
-        // Emit an event with nonce  
-        event::emit_event(  
-             &mut bridge_initiator_events.bridge_transfer_initiated_simplified_events,
-            BridgeTransferInitiatedSimplifiedEvent {  
-                bridge_transfer_id,  
-                initiator: initiator_address,  
-                recipient,  
-                amount,  
-                nonce,  
-            }  
-        );  
-    } 
 
     /// Bridge operator can complete the transfer
     public entry fun complete_bridge_transfer (
@@ -429,47 +345,6 @@ module aptos_framework::atomic_bridge_initiator {
         assert!(bridge_transfer_initiated_event.initiator == sender_address, 0);
         assert!(bridge_transfer_initiated_event.hash_lock == hash_lock, 0);
         assert!(bridge_transfer_initiated_event.time_lock == time_lock, 0);
-    }
-
-    #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
-    fun test_initiate_bridge_transfer_simplified(
-        sender: &signer,
-        aptos_framework: &signer,
-    ) acquires BridgeInitiatorEvents, Nonce {
-        let sender_address = signer::address_of(sender);
-        // Create an account for our recipient
-        atomic_bridge::initialize_for_test(aptos_framework);
-        aptos_account::create_account(sender_address);
-        initialize(aptos_framework);
-
-        let recipient = valid_eip55();
-        let hash_lock = valid_hash_lock();
-        let time_lock = atomic_bridge_configuration::initiator_timelock_duration();
-        let amount = 1000;
-
-        // Mint some coins
-        atomic_bridge::mint(sender_address, amount + 1);
-
-        assert!(coin::balance<AptosCoin>(sender_address) == amount + 1, 0);
-
-        initiate_bridge_transfer_simplified(
-            sender,
-            recipient,
-            amount,
-        );
-
-        assert!(coin::balance<AptosCoin>(sender_address) == 1, 0);
-
-        let bridge_initiator_events = borrow_global<BridgeInitiatorEvents>(@aptos_framework);
-        let bridge_transfer_initiated_simplified_events = event::emitted_events_by_handle(
-            &bridge_initiator_events.bridge_transfer_initiated_simplified_events
-        );   
-        let bridge_transfer_initiated_simplified_event = vector::borrow(&bridge_transfer_initiated_simplified_events, 0);
-
-        assert_valid_bridge_transfer_id(&bridge_transfer_initiated_simplified_event.bridge_transfer_id);
-        assert!(bridge_transfer_initiated_simplified_event.initiator == sender_address, 0);
-        assert!(bridge_transfer_initiated_simplified_event.recipient == recipient, 0);
-        assert!(bridge_transfer_initiated_simplified_event.amount == amount, 0);
     }
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
@@ -806,11 +681,6 @@ module aptos_framework::atomic_bridge_store {
         inner: SmartTable<K, V>,
     }
 
-    // Unique bridge store nonce
-    struct Nonce has key {
-        inner: u64
-    }
-
     /// Details on the transfer
     struct BridgeTransferDetails<Initiator: store, Recipient: store> has store, copy {
         addresses: AddressPair<Initiator, Recipient>,
@@ -820,11 +690,8 @@ module aptos_framework::atomic_bridge_store {
         state: u8,
     }
 
-    /// Details on the simplified transfer
-    struct BridgeTransferSimplifiedDetails<Initiator: store, Recipient: store> has store, copy {
-        addresses: AddressPair<Initiator, Recipient>,
-        amount: u64,
-        nonce: u64
+    struct Nonce has key {
+        inner: u64
     }
 
     /// Initializes the initiators and counterparties tables and nonce.
@@ -835,29 +702,18 @@ module aptos_framework::atomic_bridge_store {
         move_to(aptos_framework, Nonce {
             inner: 0,
         });
+
         let initiators = SmartTableWrapper<vector<u8>, BridgeTransferDetails<address, EthereumAddress>> {
             inner: smart_table::new(),
         };
 
         move_to(aptos_framework, initiators);
 
-        let initiators_simplified = SmartTableWrapper<vector<u8>, BridgeTransferSimplifiedDetails<address, EthereumAddress>> {
-            inner: smart_table::new(),
-        };
-
-        move_to(aptos_framework, initiators_simplified);
-
         let counterparties = SmartTableWrapper<vector<u8>, BridgeTransferDetails<EthereumAddress, address>> {
             inner: smart_table::new(),
         };
 
         move_to(aptos_framework, counterparties);
-
-        let counterparties_simplified = SmartTableWrapper<vector<u8>, BridgeTransferSimplifiedDetails<EthereumAddress, address>> {
-            inner: smart_table::new(),
-        };
-
-        move_to(aptos_framework, counterparties_simplified);
     }
 
     /// Returns the current time in seconds.
@@ -904,28 +760,6 @@ module aptos_framework::atomic_bridge_store {
         }
     }
 
-    /// Creates bridge transfer details with validation.
-    ///
-    /// @param initiator The initiating party of the transfer.
-    /// @param recipient The receiving party of the transfer.
-    /// @param amount The amount to be transferred.
-    /// @param nonce The unique nonce for the transfer.
-    /// @return A `BridgeTransferSimplifiedDetails` object.
-    /// @abort If the amount is zero or locks are invalid.
-    public(friend) fun create_details_simplified<Initiator: store, Recipient: store>(initiator: Initiator, recipient: Recipient, amount: u64, nonce: u64)
-        : BridgeTransferSimplifiedDetails<Initiator, Recipient> {
-        assert!(amount > 0, EZERO_AMOUNT);
-
-        BridgeTransferSimplifiedDetails {
-            addresses: AddressPair {
-                initiator,
-                recipient
-            },
-            amount,
-            nonce,
-        }
-    }
-
     /// Record details of a transfer
     ///
     /// @param bridge_transfer_id Bridge transfer ID.
@@ -935,18 +769,6 @@ module aptos_framework::atomic_bridge_store {
 
         assert_valid_bridge_transfer_id(&bridge_transfer_id);
         let table = borrow_global_mut<SmartTableWrapper<vector<u8>, BridgeTransferDetails<Initiator, Recipient>>>(@aptos_framework);
-        smart_table::add(&mut table.inner, bridge_transfer_id, details);
-    }
-
-    /// Record details of a transfer
-    ///
-    /// @param bridge_transfer_id Bridge transfer ID.
-    /// @param details The bridge transfer details
-    public(friend) fun add_simplified<Initiator: store, Recipient: store>(bridge_transfer_id: vector<u8>, details: BridgeTransferSimplifiedDetails<Initiator, Recipient>) acquires SmartTableWrapper {
-        assert!(features::abort_atomic_bridge_enabled(), EATOMIC_BRIDGE_NOT_ENABLED);
-
-        assert_valid_bridge_transfer_id(&bridge_transfer_id);
-        let table = borrow_global_mut<SmartTableWrapper<vector<u8>, BridgeTransferSimplifiedDetails<Initiator, Recipient>>>(@aptos_framework);
         smart_table::add(&mut table.inner, bridge_transfer_id, details);
     }
 
@@ -1113,20 +935,6 @@ module aptos_framework::atomic_bridge_store {
         };
         vector::append(&mut combined_bytes, bcs::to_bytes(&nonce.inner));
 
-        keccak256(combined_bytes)
-    }
-
-    /// Generates a unique bridge transfer ID based on transfer details and nonce.
-    ///
-    /// @param details The bridge transfer details.
-    /// @return The generated bridge transfer ID.
-    public(friend) fun bridge_transfer_id_simplified<Initiator: store, Recipient: store>(details: &BridgeTransferSimplifiedDetails<Initiator, Recipient>) : vector<u8> acquires Nonce {
-        let nonce = borrow_global_mut<Nonce>(@aptos_framework);
-        let combined_bytes = vector::empty<u8>();
-        vector::append(&mut combined_bytes, bcs::to_bytes(&details.addresses.initiator));
-        vector::append(&mut combined_bytes, bcs::to_bytes(&details.addresses.recipient));
-        vector::append(&mut combined_bytes, bcs::to_bytes(&details.amount));
-        vector::append(&mut combined_bytes, bcs::to_bytes(&details.nonce));
         keccak256(combined_bytes)
     }
 
@@ -1629,9 +1437,6 @@ module aptos_framework::atomic_bridge_counterparty {
     use aptos_framework::signer;
     #[test_only]
     use aptos_framework::timestamp;
-    use aptos_std::aptos_hash::keccak256;
-    use std::bcs;
-    use std::vector;
 
     #[event]
     /// An event triggered upon locking assets for a bridge transfer
@@ -1652,16 +1457,6 @@ module aptos_framework::atomic_bridge_counterparty {
     }
 
     #[event]
-    /// An event triggered upon completing a bridge transfer
-    struct BridgeTransferCompletedSimplifiedEvent has store, drop {
-        bridge_transfer_id: vector<u8>,
-        initiator: vector<u8>,
-        recipient: address,
-        amount: u64,
-        nonce: u64,
-    }
-
-    #[event]
     /// An event triggered upon cancelling a bridge transfer
     struct BridgeTransferCancelledEvent has store, drop {
         bridge_transfer_id: vector<u8>,
@@ -1671,7 +1466,6 @@ module aptos_framework::atomic_bridge_counterparty {
     struct BridgeCounterpartyEvents has key, store {
         bridge_transfer_locked_events: EventHandle<BridgeTransferLockedEvent>,
         bridge_transfer_completed_events: EventHandle<BridgeTransferCompletedEvent>,
-        bridge_transfer_completed_simplified_events: EventHandle<BridgeTransferCompletedSimplifiedEvent>,
         bridge_transfer_cancelled_events: EventHandle<BridgeTransferCancelledEvent>,
     }
 
@@ -1680,7 +1474,6 @@ module aptos_framework::atomic_bridge_counterparty {
         move_to(aptos_framework, BridgeCounterpartyEvents {
             bridge_transfer_locked_events: account::new_event_handle<BridgeTransferLockedEvent>(aptos_framework),
             bridge_transfer_completed_events: account::new_event_handle<BridgeTransferCompletedEvent>(aptos_framework),
-            bridge_transfer_completed_simplified_events: account::new_event_handle<BridgeTransferCompletedSimplifiedEvent>(aptos_framework),
             bridge_transfer_cancelled_events: account::new_event_handle<BridgeTransferCancelledEvent>(aptos_framework),
         });
     }
@@ -1758,49 +1551,6 @@ module aptos_framework::atomic_bridge_counterparty {
             },
         );
     }
-
-    /// Completes a bridge transfer by the initiator.  
-    ///  
-    /// @param caller The signer representing the bridge operator.  
-    /// @param initiator The initiator's Ethereum address as a vector of bytes.  
-    /// @param bridge_transfer_id The unique identifier for the bridge transfer.  
-    /// @param recipient The address of the recipient on the Aptos blockchain.  
-    /// @param amount The amount of assets to be locked.  
-    /// @param nonce The unique nonce for the transfer.    
-    /// @abort If the caller is not the bridge operator.  
-    public entry fun complete_bridge_transfer_simplified(  
-        caller: &signer,  
-        bridge_transfer_id: vector<u8>,
-        initiator: vector<u8>,  
-        recipient: address,  
-        amount: u64,  
-        nonce: u64  
-    ) acquires BridgeCounterpartyEvents {  
-        atomic_bridge_configuration::assert_is_caller_operator(caller);  
-        let ethereum_address = ethereum::ethereum_address_no_eip55(initiator);
-
-        let combined_bytes = vector::empty<u8>();
-        vector::append(&mut combined_bytes, bcs::to_bytes(&initiator));
-        vector::append(&mut combined_bytes, bcs::to_bytes(&recipient));
-        vector::append(&mut combined_bytes, bcs::to_bytes(&amount));
-        vector::append(&mut combined_bytes, bcs::to_bytes(&nonce));
-        assert!(keccak256(combined_bytes) == bridge_transfer_id, 0);
- 
-        // Mint to recipient  
-        atomic_bridge::mint(recipient, amount);
-
-        let bridge_counterparty_events = borrow_global_mut<BridgeCounterpartyEvents>(@aptos_framework);
-        event::emit_event(  
-            &mut bridge_counterparty_events.bridge_transfer_completed_simplified_events,
-            BridgeTransferCompletedSimplifiedEvent {  
-                bridge_transfer_id,  
-                initiator,  
-                recipient,  
-                amount,  
-                nonce,  
-            },  
-        );  
-    }  
 
     /// Aborts a bridge transfer if the time lock has expired.
     ///
@@ -1936,49 +1686,4 @@ module aptos_framework::atomic_bridge_counterparty {
 
         complete_bridge_transfer(bridge_transfer_id, b"not the secret");
     }
-
-    #[test(aptos_framework = @aptos_framework)]
-    fun test_complete_bridge_transfer_simplified(aptos_framework: &signer) acquires BridgeCounterpartyEvents {
-        initialize_for_test(aptos_framework);
-        initialize(aptos_framework);
-        let initiator = valid_eip55();
-        let recipient = @0xcafe;
-        let amount = 1;
-        let nonce = 5;
-
-        // Create a bridge transfer ID algorithmically
-        let combined_bytes = vector::empty<u8>();
-        vector::append(&mut combined_bytes, bcs::to_bytes(&initiator));
-        vector::append(&mut combined_bytes, bcs::to_bytes(&recipient));
-        vector::append(&mut combined_bytes, bcs::to_bytes(&amount));
-        vector::append(&mut combined_bytes, bcs::to_bytes(&nonce));
-        let bridge_transfer_id = keccak256(combined_bytes);
-
-        // Create an account for our recipient
-        aptos_account::create_account(recipient);
-
-        complete_bridge_transfer_simplified(
-            aptos_framework,
-            bridge_transfer_id,
-            initiator,
-            recipient,
-            amount,
-            nonce
-        );
-
-        let bridge_counterparty_events = borrow_global<BridgeCounterpartyEvents>(signer::address_of(aptos_framework));
-        let complete_events = event::emitted_events_by_handle(&bridge_counterparty_events.bridge_transfer_completed_simplified_events);
-
-        // Assert that the event was emitted
-        let expected_event = BridgeTransferCompletedSimplifiedEvent {
-            bridge_transfer_id,
-            initiator,
-            recipient,
-            amount,
-            nonce,
-        };
-
-        assert!(std::vector::contains(&complete_events, &expected_event), 0);
-    }
 }
-
