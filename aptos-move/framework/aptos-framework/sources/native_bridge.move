@@ -97,34 +97,37 @@ module aptos_framework::native_bridge {
         initiator: &signer,  
         recipient: vector<u8>,  
         amount: u64  
-    ) acquires BridgeEvents, Nonce {  
+    ) acquires BridgeConfig, BridgeEvents, Nonce {
         let initiator_address = signer::address_of(initiator);  
         let ethereum_address = ethereum::ethereum_address_no_eip55(recipient);  
-    
+
+        // Ensure the amount is enough for the bridge fee
+        let amount = charge_bridge_fee(initiator_address, amount);
+
         // Increment and retrieve the nonce  
         let nonce = increment_and_get_nonce();  
-    
+
         // Create bridge transfer details  
         let details = native_bridge_store::create_details(  
             initiator_address,  
             ethereum_address, 
             amount,  
             nonce  
-        );  
-    
+        );
+
         // Generate a unique bridge transfer ID  
         // Todo: pass the nonce in here and modify the function to take a nonce. Or only use the nonce in native_bridge_store
         let bridge_transfer_id = native_bridge_store::bridge_transfer_id(&details);  
-    
+
         // Add the transfer details to storage  
         native_bridge_store::add(bridge_transfer_id, details);
-    
+
         // Push details to be able to lookup by nonce
         native_bridge_store::set_nonce_to_bridge_transfer_id(nonce, bridge_transfer_id);
 
         // Burn the amount from the initiator  
         native_bridge_core::burn(initiator_address, amount);  
-    
+
         let bridge_events = borrow_global_mut<BridgeEvents>(@aptos_framework);
 
         // Emit an event with nonce  
@@ -326,7 +329,7 @@ module aptos_framework::native_bridge {
         let bridge_transfer_initiated_event = vector::borrow(&bridge_transfer_initiated_events, 0);
 
         let bridge_transfer_id = bridge_transfer_initiated_event.bridge_transfer_id;
-        
+
     }
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
@@ -553,7 +556,7 @@ module aptos_framework::native_bridge_store {
 
         *details_ref
     }
-    
+
     #[view]
     /// Gets `bridge_transfer_id` from `nonce`.
     /// @param nonce The nonce of the bridge transfer.
@@ -561,7 +564,7 @@ module aptos_framework::native_bridge_store {
     /// @abort If the nonce is not found in the smart table.
     public fun get_bridge_transfer_id_from_nonce(nonce: u64): vector<u8> acquires SmartTableWrapper {
         let table = borrow_global<SmartTableWrapper<u64, vector<u8>>>(@aptos_framework);
-        
+
         // Check if the nonce exists in the table
         assert!(smart_table::contains(&table.inner, nonce), ENONCE_NOT_FOUND);
 
@@ -703,15 +706,9 @@ module aptos_framework::native_bridge_configuration {
     /// Error code for invalid bridge operator
     const EINVALID_BRIDGE_OPERATOR: u64 = 0x1;
 
-    /// Counterparty time lock duration is 24 hours in seconds
-    const COUNTERPARTY_TIME_LOCK_DUARTION: u64 = 24 * 60 * 60;
-    /// Initiator time lock duration is 48 hours in seconds
-    const INITIATOR_TIME_LOCK_DUARTION: u64 = 48 * 60 * 60;
-
     struct BridgeConfig has key {
         bridge_operator: address,
-        initiator_time_lock: u64,
-        counterparty_time_lock: u64,
+        bridge_fee: u64
     }
 
     #[event]
@@ -722,15 +719,10 @@ module aptos_framework::native_bridge_configuration {
     }
 
     #[event]
-    /// Event emitted when the initiator time lock has been updated.
-    struct InitiatorTimeLockUpdated has store, drop {
-        time_lock: u64,
-    }
-
-    #[event]
-    /// Event emitted when the initiator time lock has been updated.
-    struct CounterpartyTimeLockUpdated has store, drop {
-        time_lock: u64,
+    /// An event triggered upon change of bridgefee
+    struct BridgeFeeChangedEvent has store, drop {
+        old_bridge_fee: u64,
+        new_bridge_fee: u64,
     }
 
     /// Initializes the bridge configuration with Aptos framework as the bridge operator.
@@ -740,8 +732,7 @@ module aptos_framework::native_bridge_configuration {
         system_addresses::assert_aptos_framework(aptos_framework);
         let bridge_config = BridgeConfig {
             bridge_operator: signer::address_of(aptos_framework),
-            initiator_time_lock: INITIATOR_TIME_LOCK_DUARTION,
-            counterparty_time_lock: COUNTERPARTY_TIME_LOCK_DUARTION,
+            bridge_fee: 20_000_000_000,
         };
         move_to(aptos_framework, bridge_config);
     }
@@ -768,6 +759,27 @@ module aptos_framework::native_bridge_configuration {
         );
     }
 
+    /// Updates the bridge fee, requiring relayer validation.
+    /// 
+    /// @param relayer The signer representing the Relayer.
+    /// @param new_bridge_fee The new bridge fee to be set.
+    /// @abort If the new bridge fee is the same as the old bridge fee.
+    public fun update_bridge_fee(relayer: &signer, new_bridge_fee: u64
+    ) acquires BridgeConfig {
+        system_addresses::assert_is_caller_operator(relayer);
+        let bridge_config = borrow_global_mut<BridgeConfig>(@aptos_framework);
+        let old_bridge_fee = bridge_config.bridge_fee;
+        assert!(old_bridge_fee != new_bridge_fee, EINVALID_VALUE);
+        bridge_config.bridge_fee = new_bridge_fee;
+
+        event::emit(
+            BridgeFeeChangedEvent {
+                old_bridge_fee,
+                new_bridge_fee,
+            },
+        );
+    }
+
     #[view]
     /// Retrieves the address of the current bridge operator.
     ///
@@ -783,6 +795,22 @@ module aptos_framework::native_bridge_configuration {
     public(friend) fun assert_is_caller_operator(caller: &signer
     ) acquires BridgeConfig {
         assert!(borrow_global<BridgeConfig>(@aptos_framework).bridge_operator == signer::address_of(caller), EINVALID_BRIDGE_OPERATOR);
+    }
+
+    /// Charge bridge fee to the initiate bridge transfer.
+    /// 
+    /// @param initiator The signer representing the initiator.
+    /// @param amount The amount to be charged.
+    /// @return The new amount after deducting the bridge fee.
+    public(friend) fun charge_bridge_fee(initiator: &signer, amount: u64
+    ) acquires BridgeConfig : u64 {
+        let bridge_config = borrow_global<BridgeConfig>(@aptos_framework);
+        let bridge_fee = bridge_config.bridge_fee;
+        let new_amount = amount - bridge_fee;
+        assert!(new_amount > 0, EINVALID_VALUE);
+        let bridge_fee_receiver = borrow_global<BridgeConfig>(@aptos_framework).bridge_operator;
+        coin::transfer_from_sender_to_receiver(initiator_address, bridge_fee_receiver, bridge_fee);
+        new_amount
     }
 
     #[test(aptos_framework = @aptos_framework)]
