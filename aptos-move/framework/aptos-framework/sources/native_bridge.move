@@ -117,6 +117,9 @@ module aptos_framework::native_bridge {
         // Add the transfer details to storage  
         native_bridge_store::add(bridge_transfer_id, details);
     
+        // Push details to be able to lookup by nonce
+        native_bridge_store::set_nonce_to_bridge_transfer_id(nonce, bridge_transfer_id);
+
         // Burn the amount from the initiator  
         native_bridge_core::burn(initiator_address, amount);  
     
@@ -427,7 +430,7 @@ module aptos_framework::native_bridge_store {
     ///
     /// @param bridge_transfer_id Bridge transfer ID.
     /// @param details The bridge transfer details
-    public(friend) fun set_nonce_to_bridge_transfer_id<Initiator: store, Recipient: store>(nonce: u64, bridge_transfer_id: vector<u8>) acquires SmartTableWrapper {
+    public(friend) fun set_nonce_to_bridge_transfer_id(nonce: u64, bridge_transfer_id: vector<u8>) acquires SmartTableWrapper {
         assert!(features::abort_native_bridge_enabled(), ENATIVE_BRIDGE_NOT_ENABLED);
 
         assert_valid_bridge_transfer_id(&bridge_transfer_id);
@@ -680,18 +683,6 @@ module aptos_framework::native_bridge_configuration {
         );
     }
 
-    public fun set_initiator_time_lock_duration(aptos_framework: &signer, time_lock: u64
-    ) acquires BridgeConfig {
-        system_addresses::assert_aptos_framework(aptos_framework);
-        borrow_global_mut<BridgeConfig>(@aptos_framework).initiator_time_lock = time_lock;
-
-        event::emit(
-            InitiatorTimeLockUpdated {
-                time_lock
-            },
-        );
-    }
-
     #[view]
     /// Retrieves the address of the current bridge operator.
     ///
@@ -758,13 +749,6 @@ module aptos_framework::native_bridge_configuration {
         assert_is_caller_operator(bad);
     }
 
-    #[test(aptos_framework = @aptos_framework, bad = @0xbad)]
-    #[expected_failure(abort_code = 0x50003, location = 0x1::system_addresses)]
-    /// Tests that an incorrect signer cannot update the initiator time lock
-    fun test_not_able_to_set_initiator_time_lock(aptos_framework: &signer, bad: &signer) acquires BridgeConfig {
-        initialize(aptos_framework);
-        set_initiator_time_lock_duration(bad, 1);
-    }
 }
 
 module aptos_framework::native_bridge_core {
