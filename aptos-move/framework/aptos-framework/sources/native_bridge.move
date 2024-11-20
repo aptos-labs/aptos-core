@@ -117,10 +117,7 @@ module aptos_framework::native_bridge {
         let bridge_transfer_id = native_bridge_store::bridge_transfer_id(&details);  
     
         // Add the transfer details to storage  
-        native_bridge_store::add(bridge_transfer_id, details);
-    
-        // Push details to be able to lookup by nonce
-        native_bridge_store::set_nonce_to_bridge_transfer_id(nonce, bridge_transfer_id);
+        native_bridge_store::add(nonce, details);
 
         // Burn the amount from the initiator  
         native_bridge_core::burn(initiator_address, amount);  
@@ -174,11 +171,11 @@ module aptos_framework::native_bridge {
         vector::append(&mut combined_bytes, bcs::to_bytes(&nonce));
         assert!(keccak256(combined_bytes) == bridge_transfer_id, EINVALID_BRIDGE_TRANSFER_ID);
 
-        // Mint to the recipient
-        native_bridge_core::mint(recipient, amount);
-
         // Record the transfer as completed by associating the bridge_transfer_id with the incoming nonce
         native_bridge_store::set_bridge_transfer_id_to_incoming_nonce(bridge_transfer_id, nonce);
+
+        // Mint to the recipient
+        native_bridge_core::mint(recipient, amount);
 
         // Emit the event
         let bridge_events = borrow_global_mut<BridgeEvents>(@aptos_framework);
@@ -413,7 +410,7 @@ module aptos_framework::native_bridge_store {
 
     /// Checks if a bridge transfer ID is associated with an incoming nonce.
     /// @param bridge_transfer_id The bridge transfer ID.
-    /// @return `true` if the ID is associated with an incoming nonce, `false` otherwise.
+    /// @return `true` if the ID is associated with an existing incoming nonce, `false` otherwise.
     public(friend) fun is_incoming_nonce_set(bridge_transfer_id: vector<u8>): bool acquires SmartTableWrapper {
         let table = borrow_global<SmartTableWrapper<vector<u8>, u64>>(@aptos_framework);
         smart_table::contains(&table.inner, bridge_transfer_id)
@@ -425,17 +422,11 @@ module aptos_framework::native_bridge_store {
     public fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
-        let initiators = SmartTableWrapper<vector<u8>, OutboundTransfer<address, EthereumAddress>> {
+        let nonces_to_details = SmartTableWrapper<u64, OutboundTransfer<address, EthereumAddress>> {
             inner: smart_table::new(),
         };
 
-        move_to(aptos_framework, initiators);    
-
-        let nonces_to_bridge_transfer_ids = SmartTableWrapper<u64, vector<u8>> {
-            inner: smart_table::new(),
-        };
-
-        move_to(aptos_framework, nonces_to_bridge_transfer_ids);
+        move_to(aptos_framework, nonces_to_details);
 
         let ids_to_incoming_nonces = SmartTableWrapper<vector<u8>, u64> {
             inner: smart_table::new(),
@@ -477,24 +468,11 @@ module aptos_framework::native_bridge_store {
     ///
     /// @param bridge_transfer_id Bridge transfer ID.
     /// @param details The bridge transfer details
-    public(friend) fun add<Initiator: store, Recipient: store>(bridge_transfer_id: vector<u8>, details: OutboundTransfer<Initiator, Recipient>) acquires SmartTableWrapper {
+    public(friend) fun add<Initiator: store, Recipient: store>(nonce: u64, details: OutboundTransfer<Initiator, Recipient>) acquires SmartTableWrapper {
         assert!(features::abort_native_bridge_enabled(), ENATIVE_BRIDGE_NOT_ENABLED);
 
-        assert_valid_bridge_transfer_id(&bridge_transfer_id);
-        let table = borrow_global_mut<SmartTableWrapper<vector<u8>, OutboundTransfer<Initiator, Recipient>>>(@aptos_framework);
-        smart_table::add(&mut table.inner, bridge_transfer_id, details);
-    }
-
-    /// Record details of an initiated transfer, mapping nonce to bridge transfer ID
-    ///
-    /// @param bridge_transfer_id Bridge transfer ID.
-    /// @param details The bridge transfer details
-    public(friend) fun set_nonce_to_bridge_transfer_id(nonce: u64, bridge_transfer_id: vector<u8>) acquires SmartTableWrapper {
-        assert!(features::abort_native_bridge_enabled(), ENATIVE_BRIDGE_NOT_ENABLED);
-
-        assert_valid_bridge_transfer_id(&bridge_transfer_id);
-        let table = borrow_global_mut<SmartTableWrapper<u64, vector<u8>>>(@aptos_framework);
-        smart_table::add(&mut table.inner, nonce, bridge_transfer_id);
+        let table = borrow_global_mut<SmartTableWrapper<u64, OutboundTransfer<Initiator, Recipient>>>(@aptos_framework);
+        smart_table::add(&mut table.inner, nonce, details);
     }
 
     /// Record details of a completed transfer, mapping bridge transfer ID to incoming nonce
@@ -528,30 +506,6 @@ module aptos_framework::native_bridge_store {
         vector::append(&mut combined_bytes, bcs::to_bytes(&details.amount));
         vector::append(&mut combined_bytes, bcs::to_bytes(&details.nonce));
         keccak256(combined_bytes)
-    }
-
-    #[view]
-    /// Gets initiator bridge transfer details given a bridge transfer ID
-    ///
-    /// @param bridge_transfer_id A 32-byte vector of unsigned 8-bit integers.
-    /// @return A `OutboundTransfer` struct.
-    /// @abort If there is no transfer in the atomic bridge store.
-    public fun get_bridge_transfer_details(
-        bridge_transfer_id: vector<u8>
-    ): OutboundTransfer<address, EthereumAddress> acquires SmartTableWrapper {
-        get_bridge_transfer_details_inner(bridge_transfer_id)
-    }
-
-    fun get_bridge_transfer_details_inner<Initiator: store + copy, Recipient: store + copy>(bridge_transfer_id: vector<u8>
-    ): OutboundTransfer<Initiator, Recipient> acquires SmartTableWrapper {
-        let table = borrow_global<SmartTableWrapper<vector<u8>, OutboundTransfer<Initiator, Recipient>>>(@aptos_framework);
-
-        let details_ref = smart_table::borrow(
-            &table.inner,
-            bridge_transfer_id
-        );
-
-        *details_ref
     }
     
     #[view]
@@ -597,99 +551,6 @@ module aptos_framework::native_bridge_store {
     #[test_only]
     public fun valid_hash_lock() : vector<u8> {
         keccak256(plain_secret())
-    }
-
-
-    #[test(aptos_framework = @aptos_framework)]
-    public fun test_get_bridge_transfer_details_initiator(aptos_framework: &signer) acquires SmartTableWrapper {
-        timestamp::set_time_has_started_for_testing(aptos_framework);
-        features::change_feature_flags_for_testing(
-            aptos_framework,
-            vector[features::get_native_bridge_feature()],
-            vector[]
-        );
-        native_bridge_configuration::initialize(aptos_framework);
-        initialize(aptos_framework);
-
-        let initiator = signer::address_of(aptos_framework);
-        let recipient = ethereum::ethereum_address(ethereum::valid_eip55());
-        let amount = 1000;
-        let nonce = 5;
-        let bridge_transfer_id = valid_bridge_transfer_id();
-
-        let details = create_details(
-            initiator, 
-            recipient, 
-            amount, 
-            nonce
-        );
-
-        add(bridge_transfer_id, details);
-
-        let retrieved_details = get_bridge_transfer_details(bridge_transfer_id);
-
-        let OutboundTransfer {
-            addresses: AddressPair {
-                initiator: retrieved_initiator,
-                recipient: retrieved_recipient
-            },
-            amount: retrieved_amount,
-            nonce: retrieved_nonce
-        } = retrieved_details;
-
-        assert!(retrieved_initiator == initiator, 0);
-        assert!(retrieved_recipient == recipient, 1);
-        assert!(retrieved_amount == amount, 2);
-        assert!(retrieved_nonce == nonce, 3);
-    }
-
-    #[test(aptos_framework = @aptos_framework)]
-    public fun test_get_bridge_transfer_details_counterparty(aptos_framework: &signer) acquires SmartTableWrapper {
-        timestamp::set_time_has_started_for_testing(aptos_framework);
-        features::change_feature_flags_for_testing(
-            aptos_framework,
-            vector[features::get_native_bridge_feature()],
-            vector[]
-        );
-        initialize(aptos_framework);
-
-        let initiator = signer::address_of(aptos_framework);
-        let recipient = ethereum::ethereum_address(ethereum::valid_eip55());
-        let amount = 500;
-        let nonce = 5;
-
-        // Create a bridge transfer ID algorithmically
-        let combined_bytes = vector::empty<u8>();
-        vector::append(&mut combined_bytes, bcs::to_bytes(&initiator));
-        vector::append(&mut combined_bytes, bcs::to_bytes(&recipient));
-        vector::append(&mut combined_bytes, bcs::to_bytes(&amount));
-        vector::append(&mut combined_bytes, bcs::to_bytes(&nonce));
-        let bridge_transfer_id = keccak256(combined_bytes);
-
-        let details = create_details(
-            initiator, 
-            recipient, 
-            amount, 
-            nonce
-        );
-
-        add(bridge_transfer_id, details);
-
-        let retrieved_details = get_bridge_transfer_details(bridge_transfer_id);
-
-        let OutboundTransfer {
-            addresses: AddressPair {
-                initiator: retrieved_initiator,
-                recipient: retrieved_recipient
-            },
-            amount: retrieved_amount,
-            nonce: retrieved_nonce
-        } = retrieved_details;
-
-        assert!(retrieved_initiator == initiator, 0);
-        assert!(retrieved_recipient == recipient, 1);
-        assert!(retrieved_amount == amount, 2);
-        assert!(retrieved_nonce == 5, EINCORRECT_NONCE);
     }
 }
 
