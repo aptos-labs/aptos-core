@@ -8,11 +8,9 @@
 -  [Struct `AddressPair`](#0x1_native_bridge_store_AddressPair)
 -  [Resource `SmartTableWrapper`](#0x1_native_bridge_store_SmartTableWrapper)
 -  [Struct `OutboundTransfer`](#0x1_native_bridge_store_OutboundTransfer)
--  [Struct `InboundBridgeTransfer`](#0x1_native_bridge_store_InboundBridgeTransfer)
 -  [Constants](#@Constants_0)
 -  [Function `is_incoming_nonce_set`](#0x1_native_bridge_store_is_incoming_nonce_set)
 -  [Function `initialize`](#0x1_native_bridge_store_initialize)
--  [Function `now`](#0x1_native_bridge_store_now)
 -  [Function `create_details`](#0x1_native_bridge_store_create_details)
 -  [Function `add`](#0x1_native_bridge_store_add)
 -  [Function `set_bridge_transfer_id_to_incoming_nonce`](#0x1_native_bridge_store_set_bridge_transfer_id_to_incoming_nonce)
@@ -28,7 +26,6 @@
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table">0x1::smart_table</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
-<b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
 
@@ -102,7 +99,7 @@ A smart table wrapper
 Details on the outbound transfer
 
 
-<pre><code><b>struct</b> <a href="native_bridge.md#0x1_native_bridge_store_OutboundTransfer">OutboundTransfer</a>&lt;Initiator: store, Recipient: store&gt; <b>has</b> <b>copy</b>, store
+<pre><code><b>struct</b> <a href="native_bridge.md#0x1_native_bridge_store_OutboundTransfer">OutboundTransfer</a> <b>has</b> <b>copy</b>, store
 </code></pre>
 
 
@@ -113,59 +110,25 @@ Details on the outbound transfer
 
 <dl>
 <dt>
-<code>addresses: <a href="native_bridge.md#0x1_native_bridge_store_AddressPair">native_bridge_store::AddressPair</a>&lt;Initiator, Recipient&gt;</code>
+<code>bridge_transfer_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>initiator: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>recipient: <a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">ethereum::EthereumAddress</a></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
 <code>amount: u64</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>nonce: u64</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-<a id="0x1_native_bridge_store_InboundBridgeTransfer"></a>
-
-## Struct `InboundBridgeTransfer`
-
-Details on the inbound transfer
-
-
-<pre><code><b>struct</b> <a href="native_bridge.md#0x1_native_bridge_store_InboundBridgeTransfer">InboundBridgeTransfer</a>&lt;Initiator: store, Recipient: store&gt; <b>has</b> <b>copy</b>, store
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>addresses: <a href="native_bridge.md#0x1_native_bridge_store_AddressPair">native_bridge_store::AddressPair</a>&lt;Initiator, Recipient&gt;</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>amount: u64</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>nonce: u64</code>
 </dt>
 <dd>
 
@@ -302,7 +265,7 @@ Initializes the initiators tables and nonce.
 <pre><code><b>public</b> <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
 
-    <b>let</b> nonces_to_details = <a href="native_bridge.md#0x1_native_bridge_store_SmartTableWrapper">SmartTableWrapper</a>&lt;u64, <a href="native_bridge.md#0x1_native_bridge_store_OutboundTransfer">OutboundTransfer</a>&lt;<b>address</b>, EthereumAddress&gt;&gt; {
+    <b>let</b> nonces_to_details = <a href="native_bridge.md#0x1_native_bridge_store_SmartTableWrapper">SmartTableWrapper</a>&lt;u64, <a href="native_bridge.md#0x1_native_bridge_store_OutboundTransfer">OutboundTransfer</a>&gt; {
         inner: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>(),
     };
 
@@ -313,33 +276,6 @@ Initializes the initiators tables and nonce.
     };
 
     <b>move_to</b>(aptos_framework, ids_to_incoming_nonces);
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_native_bridge_store_now"></a>
-
-## Function `now`
-
-Returns the current time in seconds.
-
-@return Current timestamp in seconds.
-
-
-<pre><code><b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_now">now</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_now">now</a>() : u64 {
-    <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>()
 }
 </code></pre>
 
@@ -361,7 +297,7 @@ Creates bridge transfer details with validation.
 @abort If the amount is zero or locks are invalid.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_create_details">create_details</a>&lt;Initiator: store, Recipient: store&gt;(initiator: Initiator, recipient: Recipient, amount: u64, nonce: u64): <a href="native_bridge.md#0x1_native_bridge_store_OutboundTransfer">native_bridge_store::OutboundTransfer</a>&lt;Initiator, Recipient&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_create_details">create_details</a>(initiator: <b>address</b>, recipient: <a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">ethereum::EthereumAddress</a>, amount: u64, nonce: u64): <a href="native_bridge.md#0x1_native_bridge_store_OutboundTransfer">native_bridge_store::OutboundTransfer</a>
 </code></pre>
 
 
@@ -370,17 +306,23 @@ Creates bridge transfer details with validation.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_create_details">create_details</a>&lt;Initiator: store, Recipient: store&gt;(initiator: Initiator, recipient: Recipient, amount: u64, nonce: u64)
-    : <a href="native_bridge.md#0x1_native_bridge_store_OutboundTransfer">OutboundTransfer</a>&lt;Initiator, Recipient&gt; {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_create_details">create_details</a>(initiator: <b>address</b>, recipient: EthereumAddress, amount: u64, nonce: u64)
+    : <a href="native_bridge.md#0x1_native_bridge_store_OutboundTransfer">OutboundTransfer</a> {
     <b>assert</b>!(amount &gt; 0, <a href="native_bridge.md#0x1_native_bridge_store_EZERO_AMOUNT">EZERO_AMOUNT</a>);
 
+    // Create a bridge transfer ID algorithmically
+    <b>let</b> combined_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&initiator));
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&recipient));
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&amount));
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&nonce));
+    <b>let</b> bridge_transfer_id = keccak256(combined_bytes);
+
     <a href="native_bridge.md#0x1_native_bridge_store_OutboundTransfer">OutboundTransfer</a> {
-        addresses: <a href="native_bridge.md#0x1_native_bridge_store_AddressPair">AddressPair</a> {
-            initiator,
-            recipient
-        },
+        bridge_transfer_id,
+        initiator,
+        recipient,
         amount,
-        nonce,
     }
 }
 </code></pre>
@@ -399,7 +341,7 @@ Record details of an initiated transfer for quick lookup of details, mapping bri
 @param details The bridge transfer details
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_add">add</a>&lt;Initiator: store, Recipient: store&gt;(nonce: u64, details: <a href="native_bridge.md#0x1_native_bridge_store_OutboundTransfer">native_bridge_store::OutboundTransfer</a>&lt;Initiator, Recipient&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_add">add</a>(nonce: u64, details: <a href="native_bridge.md#0x1_native_bridge_store_OutboundTransfer">native_bridge_store::OutboundTransfer</a>)
 </code></pre>
 
 
@@ -408,10 +350,10 @@ Record details of an initiated transfer for quick lookup of details, mapping bri
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_add">add</a>&lt;Initiator: store, Recipient: store&gt;(nonce: u64, details: <a href="native_bridge.md#0x1_native_bridge_store_OutboundTransfer">OutboundTransfer</a>&lt;Initiator, Recipient&gt;) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_store_SmartTableWrapper">SmartTableWrapper</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_add">add</a>(nonce: u64, details: <a href="native_bridge.md#0x1_native_bridge_store_OutboundTransfer">OutboundTransfer</a>) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_store_SmartTableWrapper">SmartTableWrapper</a> {
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_abort_native_bridge_enabled">features::abort_native_bridge_enabled</a>(), <a href="native_bridge.md#0x1_native_bridge_store_ENATIVE_BRIDGE_NOT_ENABLED">ENATIVE_BRIDGE_NOT_ENABLED</a>);
 
-    <b>let</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a> = <b>borrow_global_mut</b>&lt;<a href="native_bridge.md#0x1_native_bridge_store_SmartTableWrapper">SmartTableWrapper</a>&lt;u64, <a href="native_bridge.md#0x1_native_bridge_store_OutboundTransfer">OutboundTransfer</a>&lt;Initiator, Recipient&gt;&gt;&gt;(@aptos_framework);
+    <b>let</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a> = <b>borrow_global_mut</b>&lt;<a href="native_bridge.md#0x1_native_bridge_store_SmartTableWrapper">SmartTableWrapper</a>&lt;u64, <a href="native_bridge.md#0x1_native_bridge_store_OutboundTransfer">OutboundTransfer</a>&gt;&gt;(@aptos_framework);
     <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_add">smart_table::add</a>(&<b>mut</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>.inner, nonce, details);
 }
 </code></pre>
@@ -490,7 +432,7 @@ Generates a unique bridge transfer ID based on transfer details and nonce.
 @return The generated bridge transfer ID.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_bridge_transfer_id">bridge_transfer_id</a>&lt;Initiator: store, Recipient: store&gt;(details: &<a href="native_bridge.md#0x1_native_bridge_store_OutboundTransfer">native_bridge_store::OutboundTransfer</a>&lt;Initiator, Recipient&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_bridge_transfer_id">bridge_transfer_id</a>(initiator: <b>address</b>, recipient: <a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">ethereum::EthereumAddress</a>, amount: u64, nonce: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -499,12 +441,12 @@ Generates a unique bridge transfer ID based on transfer details and nonce.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_bridge_transfer_id">bridge_transfer_id</a>&lt;Initiator: store, Recipient: store&gt;(details: &<a href="native_bridge.md#0x1_native_bridge_store_OutboundTransfer">OutboundTransfer</a>&lt;Initiator, Recipient&gt;) : <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_bridge_transfer_id">bridge_transfer_id</a>(initiator: <b>address</b>, recipient: EthereumAddress, amount: u64, nonce: u64) : <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <b>let</b> combined_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&details.addresses.initiator));
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&details.addresses.recipient));
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&details.amount));
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&details.nonce));
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&initiator));
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&recipient));
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&amount));
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&nonce));
     keccak256(combined_bytes)
 }
 </code></pre>
@@ -1507,7 +1449,9 @@ Initializes the module and stores the <code>EventHandle</code>s in the resource.
     );
 
     // Create the <a href="native_bridge.md#0x1_native_bridge_Nonce">Nonce</a> resource <b>with</b> an initial value of 1
-    <b>move_to</b>&lt;<a href="native_bridge.md#0x1_native_bridge_Nonce">Nonce</a>&gt;(aptos_framework, <a href="native_bridge.md#0x1_native_bridge_Nonce">Nonce</a> { value: 0 });
+    <b>move_to</b>&lt;<a href="native_bridge.md#0x1_native_bridge_Nonce">Nonce</a>&gt;(aptos_framework, <a href="native_bridge.md#0x1_native_bridge_Nonce">Nonce</a> {
+        value: 1
+    });
 
     <b>move_to</b>(aptos_framework, <a href="native_bridge.md#0x1_native_bridge_BridgeEvents">BridgeEvents</a> {
         bridge_transfer_initiated_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="native_bridge.md#0x1_native_bridge_BridgeTransferInitiatedEvent">BridgeTransferInitiatedEvent</a>&gt;(aptos_framework),
@@ -1547,7 +1491,7 @@ The amount is burnt from the initiator and the module-level nonce is incremented
     amount: u64
 ) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_BridgeEvents">BridgeEvents</a>, <a href="native_bridge.md#0x1_native_bridge_Nonce">Nonce</a> {
     <b>let</b> initiator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(initiator);
-    <b>let</b> ethereum_address = <a href="atomic_bridge.md#0x1_ethereum_ethereum_address_no_eip55">ethereum::ethereum_address_no_eip55</a>(recipient);
+    <b>let</b> recipient_address = <a href="atomic_bridge.md#0x1_ethereum_ethereum_address_no_eip55">ethereum::ethereum_address_no_eip55</a>(recipient);
 
     // Increment and retrieve the nonce
     <b>let</b> nonce = <a href="native_bridge.md#0x1_native_bridge_increment_and_get_nonce">increment_and_get_nonce</a>();
@@ -1555,14 +1499,17 @@ The amount is burnt from the initiator and the module-level nonce is incremented
     // Create bridge transfer details
     <b>let</b> details = <a href="native_bridge.md#0x1_native_bridge_store_create_details">native_bridge_store::create_details</a>(
         initiator_address,
-        ethereum_address,
+        recipient_address,
         amount,
         nonce
     );
 
-    // Generate a unique bridge transfer ID
-    // Todo: pass the nonce in here and modify the function <b>to</b> take a nonce. Or only <b>use</b> the nonce in <a href="native_bridge.md#0x1_native_bridge_store">native_bridge_store</a>
-    <b>let</b> bridge_transfer_id = <a href="native_bridge.md#0x1_native_bridge_store_bridge_transfer_id">native_bridge_store::bridge_transfer_id</a>(&details);
+    <b>let</b> bridge_transfer_id = <a href="native_bridge.md#0x1_native_bridge_store_bridge_transfer_id">native_bridge_store::bridge_transfer_id</a>(
+        initiator_address,
+        recipient_address,
+        amount,
+        nonce
+    );
 
     // Add the transfer details <b>to</b> storage
     <a href="native_bridge.md#0x1_native_bridge_store_add">native_bridge_store::add</a>(nonce, details);
