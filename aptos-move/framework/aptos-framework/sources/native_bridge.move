@@ -16,7 +16,7 @@ module aptos_framework::native_bridge {
     #[test_only]
     use aptos_framework::aptos_coin::AptosCoin;
     #[test_only]
-    use aptos_framework::native_bridge_store::{valid_hash_lock, assert_valid_bridge_transfer_id, plain_secret};
+    use aptos_framework::native_bridge_store::assert_valid_bridge_transfer_id;
     #[test_only]
     use aptos_framework::coin;
     #[test_only]
@@ -519,21 +519,6 @@ module aptos_framework::native_bridge_store {
 
         // If it exists, return the associated nonce
         *smart_table::borrow(&table.inner, bridge_transfer_id)
-    }
-
-    #[test_only]
-    public fun valid_bridge_transfer_id() : vector<u8> {
-        sha3_256(b"atomic bridge")
-    }
-
-    #[test_only]
-    public fun plain_secret() : vector<u8> {
-        b"too secret!"
-    }
-
-    #[test_only]
-    public fun valid_hash_lock() : vector<u8> {
-        keccak256(plain_secret())
     }
 }
 
