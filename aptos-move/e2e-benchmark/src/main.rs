@@ -17,6 +17,10 @@ use rand::{rngs::StdRng, SeedableRng};
 use serde_json::json;
 use std::{collections::HashMap, process::exit};
 
+// bump after a bigger test or perf change, so you can easily distinguish runs
+// that are on top of this commit
+const CODE_PERF_VERSION: &str = "v1";
+
 pub fn execute_txn(
     executor: &mut FakeExecutor,
     account: &Account,
@@ -82,32 +86,32 @@ const ALLOWED_IMPROVEMENT: f64 = 0.15;
 const ABSOLUTE_BUFFER_US: f64 = 2.0;
 
 const CALIBRATION_VALUES: &str = "
-Loop { loop_count: Some(100000), loop_type: NoOp }	6	0.988	1.039	41212.4
-Loop { loop_count: Some(10000), loop_type: Arithmetic }	6	0.977	1.038	25868.8
-CreateObjects { num_objects: 10, object_payload_size: 0 }	6	0.940	1.026	152.1
-CreateObjects { num_objects: 10, object_payload_size: 10240 }	6	0.934	1.051	9731.3
-CreateObjects { num_objects: 100, object_payload_size: 0 }	6	0.966	1.051	1458.3
-CreateObjects { num_objects: 100, object_payload_size: 10240 }	6	0.969	1.077	11196.4
-InitializeVectorPicture { length: 128 }	6	0.973	1.066	170.3
-VectorPicture { length: 128 }	6	0.955	1.092	46.2
-VectorPictureRead { length: 128 }	6	0.952	1.047	45.1
-InitializeVectorPicture { length: 30720 }	6	0.969	1.071	27295.8
-VectorPicture { length: 30720 }	6	0.957	1.066	6560.2
-VectorPictureRead { length: 30720 }	6	0.948	1.053	6642.8
-SmartTablePicture { length: 30720, num_points_per_txn: 200 }	6	0.972	1.024	42660.4
-SmartTablePicture { length: 1048576, num_points_per_txn: 300 }	6	0.961	1.020	73725.5
-ResourceGroupsSenderWriteTag { string_length: 1024 }	6	0.867	1.001	15.0
-ResourceGroupsSenderMultiChange { string_length: 1024 }	6	0.966	1.069	29.0
-TokenV1MintAndTransferFT	6	0.972	1.045	356.8
-TokenV1MintAndTransferNFTSequential	6	0.991	1.067	543.7
-TokenV2AmbassadorMint { numbered: true }	6	0.987	1.052	474.4
-LiquidityPoolSwap { is_stable: true }	6	0.970	1.042	555.4
-LiquidityPoolSwap { is_stable: false }	6	0.925	1.001	535.3
-CoinInitAndMint	6	0.925	1.001	197.1
-FungibleAssetMint	6	0.925	1.001	231.6
-IncGlobalMilestoneAggV2 { milestone_every: 1 }	6	0.925	1.001	33.3
-IncGlobalMilestoneAggV2 { milestone_every: 2 }	6	0.925	1.001	19.1
-EmitEvents { count: 1000 }	6	0.925	1.001	8493.7
+Loop { loop_count: Some(100000), loop_type: NoOp }	60	0.955	1.074	41893.7
+Loop { loop_count: Some(10000), loop_type: Arithmetic }	60	0.965	1.078	25915.0
+CreateObjects { num_objects: 10, object_payload_size: 0 }	60	0.924	1.082	158.1
+CreateObjects { num_objects: 10, object_payload_size: 10240 }	60	0.951	1.118	9356.2
+CreateObjects { num_objects: 100, object_payload_size: 0 }	60	0.926	1.082	1574.2
+CreateObjects { num_objects: 100, object_payload_size: 10240 }	60	0.952	1.092	11541.9
+InitializeVectorPicture { length: 128 }	10	0.965	1.038	163.3
+VectorPicture { length: 128 }	10	0.938	1.060	48.8
+VectorPictureRead { length: 128 }	10	0.977	1.077	46.4
+InitializeVectorPicture { length: 30720 }	60	0.948	1.123	27893.4
+VectorPicture { length: 30720 }	60	0.931	1.125	6923.1
+VectorPictureRead { length: 30720 }	60	0.934	1.102	6923.1
+SmartTablePicture { length: 30720, num_points_per_txn: 200 }	60	0.952	1.109	43594.7
+SmartTablePicture { length: 1048576, num_points_per_txn: 300 }	60	0.957	1.120	73865.4
+ResourceGroupsSenderWriteTag { string_length: 1024 }	60	0.934	1.134	15.0
+ResourceGroupsSenderMultiChange { string_length: 1024 }	60	0.929	1.122	32.3
+TokenV1MintAndTransferFT	60	0.958	1.093	385.2
+TokenV1MintAndTransferNFTSequential	60	0.973	1.139	588.1
+TokenV2AmbassadorMint { numbered: true }	60	0.960	1.141	512.5
+LiquidityPoolSwap { is_stable: true }	60	0.961	1.103	590.3
+LiquidityPoolSwap { is_stable: false }	60	0.954	1.134	552.2
+CoinInitAndMint	10	0.975	1.043	199.6
+FungibleAssetMint	10	0.954	1.038	236.3
+IncGlobalMilestoneAggV2 { milestone_every: 1 }	10	0.960	1.047	32.9
+IncGlobalMilestoneAggV2 { milestone_every: 2 }	10	0.971	1.066	18.1
+EmitEvents { count: 1000 }	10	0.969	1.052	8615.5
 ";
 
 struct CalibrationInfo {
@@ -276,6 +280,7 @@ fn main() {
             "execution_gas_units": execution_gas_units,
             "io_gas_units": io_gas_units,
             "expected_wall_time_us": expected_time_micros,
+            "code_perf_version": CODE_PERF_VERSION,
             "test_index": index,
         }));
 
