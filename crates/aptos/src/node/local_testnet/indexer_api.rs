@@ -24,7 +24,7 @@ use std::{collections::HashSet, path::PathBuf, time::Duration};
 use tracing::{info, warn};
 
 const INDEXER_API_CONTAINER_NAME: &str = "local-testnet-indexer-api";
-const HASURA_IMAGE: &str = "hasura/graphql-engine:v2.44.0-ce";
+pub const HASURA_IMAGE: &str = "hasura/graphql-engine:v2.44.0-ce";
 
 /// This Hasura metadata originates from the aptos-indexer-processors repo.
 ///
@@ -42,7 +42,7 @@ const HASURA_IMAGE: &str = "hasura/graphql-engine:v2.44.0-ce";
 /// This works fine today since all the key processors you'd need in a localnet
 /// are in the set of processors written in Rust. If this changes, we can explore
 /// alternatives, e.g. running processors in other languages using containers.
-const HASURA_METADATA: &str = include_str!("hasura_metadata.json");
+pub const HASURA_METADATA: &str = include_str!("hasura_metadata.json");
 
 /// Args related to running an indexer API for the localnet.
 #[derive(Debug, Parser)]
@@ -337,7 +337,7 @@ impl ServiceManager for IndexerApiManager {
 }
 
 /// This submits a POST request to apply metadata to a Hasura API.
-async fn post_metadata(url: Url, metadata_content: &str) -> Result<()> {
+pub async fn post_metadata(url: Url, metadata_content: &str) -> Result<()> {
     // Parse the metadata content as JSON.
     let metadata_json: serde_json::Value = serde_json::from_str(metadata_content)?;
 
