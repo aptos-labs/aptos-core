@@ -42,7 +42,7 @@ where
         })
     }
 
-    /// Marks the module as invalid.
+    /// Marks the module as overridden.
     fn mark_overridden(&self) {
         self.overridden.store(true, Ordering::Release)
     }
@@ -98,7 +98,7 @@ where
     }
 
     /// Returns the module stored in cache. If the module has not been cached, or it exists but is
-    /// not valid, [None] is returned.
+    /// overridden, [None] is returned.
     pub fn get(&self, key: &K) -> Option<Arc<ModuleCode<D, V, E>>> {
         self.module_cache.get(key).and_then(|entry| {
             entry
