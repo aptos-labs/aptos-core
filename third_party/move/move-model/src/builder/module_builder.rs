@@ -767,6 +767,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     ) {
         let name = self.symbol_pool().make(&name.0.value);
         let (type_params, params, result_type) = self.decl_ana_signature(signature, false);
+        // Eliminate references in parameters and result type for spec functions
+        // `derive_spec_fun` does the same when generating spec functions from general move functions
+        let params = params
+            .into_iter()
+            .map(|Parameter(sym, ty, loc)| Parameter(sym, ty.skip_reference().clone(), loc))
+            .collect_vec();
+        let result_type = result_type.skip_reference().clone();
 
         // Add the function to the symbol table.
         let fun_id = SpecFunId::new(self.spec_funs.len());
@@ -1532,8 +1539,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 et.define_type_param(loc, *name, Type::new_param(pos), kind.clone(), false);
             }
             et.enter_scope();
+            let is_lang_version_2_1 = et.env().language_version.is_at_least(LanguageVersion::V2_1);
             for (idx, Parameter(n, ty, loc)) in params.iter().enumerate() {
-                et.define_local(loc, *n, ty.clone(), None, Some(idx));
+                let symbol_pool = et.parent.parent.env.symbol_pool();
+                if !is_lang_version_2_1 || symbol_pool.string(*n).as_ref() != "_" {
+                    et.define_local(loc, *n, ty.clone(), None, Some(idx));
+                }
             }
             let access_specifiers = et.translate_access_specifiers(&def.access_specifiers);
             let result = et.translate_seq(&loc, seq, &result_type, &ErrorMessageContext::Return);

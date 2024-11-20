@@ -4,23 +4,15 @@
 use crate::{
     db::AptosDB,
     db_debugger::ShardingConfig,
-    schema::{
-        db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-        epoch_by_version::EpochByVersionSchema,
-        jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-    },
-    state_merkle_db::StateMerkleDb,
+    schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     state_store::StateStore,
     utils::truncation_helper::{
-        find_closest_node_version_at_or_before, get_current_version_in_state_merkle_db,
-        get_state_kv_commit_progress, truncate_state_merkle_db,
+        get_current_version_in_state_merkle_db, get_state_kv_commit_progress,
     },
 };
 use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
-use aptos_jellyfish_merkle::node_type::NodeKey;
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_schemadb::SchemaBatch;
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
-use aptos_types::transaction::Version;
 use claims::assert_le;
 use clap::Parser;
 use std::{fs, path::PathBuf, sync::Arc};
@@ -127,30 +119,7 @@ impl Cmd {
                 .0;
         }
 
-        // TODO(grao): We are using a brute force implementation for now. We might be able to make
-        // it faster, since our data is append only.
-        if target_version < state_merkle_db_version {
-            let state_merkle_target_version = Self::find_tree_root_at_or_before(
-                &ledger_db.metadata_db_arc(),
-                &state_merkle_db,
-                target_version,
-            )?
-            .unwrap_or_else(|| {
-                panic!(
-                    "Could not find a valid root before or at version {}, maybe it was pruned?",
-                    target_version
-                )
-            });
-
-            println!(
-                "Starting state merkle db truncation... target_version: {}",
-                state_merkle_target_version
-            );
-            truncate_state_merkle_db(&state_merkle_db, state_merkle_target_version)?;
-            println!("Done!");
-        }
-
-        println!("Starting ledger db and state kv db truncation...");
+        println!("Starting db truncation...");
         let batch = SchemaBatch::new();
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::OverallCommitProgress,
@@ -161,6 +130,7 @@ impl Cmd {
         StateStore::sync_commit_progress(
             Arc::clone(&ledger_db),
             Arc::clone(&state_kv_db),
+            Arc::clone(&state_merkle_db),
             /*crash_if_difference_is_too_large=*/ false,
         );
         println!("Done!");
@@ -183,40 +153,6 @@ impl Cmd {
 
         Ok(())
     }
-
-    fn find_tree_root_at_or_before(
-        ledger_metadata_db: &DB,
-        state_merkle_db: &StateMerkleDb,
-        version: Version,
-    ) -> Result<Option<Version>> {
-        match find_closest_node_version_at_or_before(state_merkle_db, version)? {
-            Some(closest_version) => {
-                if Self::root_exists_at_version(state_merkle_db, closest_version)? {
-                    return Ok(Some(closest_version));
-                }
-                let mut iter = ledger_metadata_db.iter::<EpochByVersionSchema>()?;
-                iter.seek_for_prev(&version)?;
-                match iter.next().transpose()? {
-                    Some((closest_epoch_version, _)) => {
-                        if Self::root_exists_at_version(state_merkle_db, closest_epoch_version)? {
-                            Ok(Some(closest_epoch_version))
-                        } else {
-                            Ok(None)
-                        }
-                    },
-                    None => Ok(None),
-                }
-            },
-            None => Ok(None),
-        }
-    }
-
-    fn root_exists_at_version(state_merkle_db: &StateMerkleDb, version: Version) -> Result<bool> {
-        Ok(state_merkle_db
-            .metadata_db()
-            .get::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version))?
-            .is_some())
-    }
 }
 
 #[cfg(test)]
@@ -229,7 +165,8 @@ mod test {
             AptosDB,
         },
         schema::{
-            epoch_by_version::EpochByVersionSchema, ledger_info::LedgerInfoSchema,
+            epoch_by_version::EpochByVersionSchema,
+            jellyfish_merkle_node::JellyfishMerkleNodeSchema, ledger_info::LedgerInfoSchema,
             stale_node_index::StaleNodeIndexSchema,
             stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
             stale_state_value_index::StaleStateValueIndexSchema,
@@ -258,7 +195,7 @@ mod test {
             let tmp_dir = TempPath::new();
 
             let db = if input.1 { AptosDB::new_for_test_with_sharding(&tmp_dir, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD) } else { AptosDB::new_for_test(&tmp_dir) };
-            let mut in_memory_state = db.state_store.buffered_state().lock().current_state().clone();
+            let mut in_memory_state = db.state_store.current_state_cloned();
             let _ancestor = in_memory_state.base.clone();
             let mut version = 0;
             for (txns_to_commit, ledger_info_with_sigs) in input.0.iter() {
@@ -269,7 +206,7 @@ mod test {
                     version.checked_sub(1),
                     Some(ledger_info_with_sigs),
                     true,
-                    in_memory_state.clone()
+                    &in_memory_state,
                 )
                     .unwrap();
                 version += txns_to_commit.len() as u64;
@@ -380,16 +317,12 @@ mod test {
                 }
 
                 let mut iter = state_kv_db.metadata_db().iter::<StaleStateValueIndexSchema>().unwrap();
-            iter.seek_to_first();
-            for item in iter {
-                let version = item.unwrap().0.stale_since_version;
-                prop_assert!(version <= target_version);
+                iter.seek_to_first();
+                for item in iter {
+                    let version = item.unwrap().0.stale_since_version;
+                    prop_assert!(version <= target_version);
+                }
             }
-            }
-
-
-
-
 
             let mut iter = state_merkle_db.metadata_db().iter::<StaleNodeIndexSchema>().unwrap();
             iter.seek_to_first();

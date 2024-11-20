@@ -4,10 +4,11 @@
 
 use crate::{
     loader::{
-        access_specifier_loader::load_access_specifier, Loader, Module, ModuleStorageAdapter,
+        access_specifier_loader::load_access_specifier, LegacyModuleStorageAdapter, Loader, Module,
         Resolver, Script,
     },
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
+    ModuleStorage,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -133,8 +134,8 @@ impl LoadedFunction {
             LoadedFunctionOwner::Script(_) => "script::main".into(),
             LoadedFunctionOwner::Module(m) => format!(
                 "0x{}::{}::{}",
-                m.module().self_addr().to_hex(),
-                m.module().self_name().as_str(),
+                m.self_addr().to_hex(),
+                m.self_name().as_str(),
                 self.function.name()
             ),
         }
@@ -143,14 +144,15 @@ impl LoadedFunction {
     pub(crate) fn get_resolver<'a>(
         &self,
         loader: &'a Loader,
-        module_store: &'a ModuleStorageAdapter,
+        module_store: &'a LegacyModuleStorageAdapter,
+        module_storage: &'a impl ModuleStorage,
     ) -> Resolver<'a> {
         match &self.owner {
             LoadedFunctionOwner::Module(module) => {
-                Resolver::for_module(loader, module_store, module.clone())
+                Resolver::for_module(loader, module_store, module_storage, module.clone())
             },
             LoadedFunctionOwner::Script(script) => {
-                Resolver::for_script(loader, module_store, script.clone())
+                Resolver::for_script(loader, module_store, module_storage, script.clone())
             },
         }
     }

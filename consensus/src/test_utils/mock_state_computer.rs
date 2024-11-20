@@ -17,7 +17,9 @@ use aptos_consensus_types::{
     pipelined_block::PipelinedBlock,
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::{ExecutorError, ExecutorResult, StateComputeResult};
+use aptos_executor_types::{
+    state_compute_result::StateComputeResult, ExecutorError, ExecutorResult,
+};
 use aptos_logger::debug;
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,

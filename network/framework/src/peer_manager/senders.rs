@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    peer::DisconnectReason,
     peer_manager::{types::PeerManagerRequest, ConnectionRequest, PeerManagerError},
     protocols::{
         direct_send::Message,
@@ -125,10 +126,16 @@ impl ConnectionRequestSender {
         oneshot_rx.await?
     }
 
-    pub async fn disconnect_peer(&self, peer: PeerId) -> Result<(), PeerManagerError> {
+    pub async fn disconnect_peer(
+        &self,
+        peer: PeerId,
+        disconnect_reason: DisconnectReason,
+    ) -> Result<(), PeerManagerError> {
         let (oneshot_tx, oneshot_rx) = oneshot::channel();
-        self.inner
-            .push(peer, ConnectionRequest::DisconnectPeer(peer, oneshot_tx))?;
+        self.inner.push(
+            peer,
+            ConnectionRequest::DisconnectPeer(peer, disconnect_reason, oneshot_tx),
+        )?;
         oneshot_rx.await?
     }
 }

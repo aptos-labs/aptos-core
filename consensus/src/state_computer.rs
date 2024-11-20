@@ -10,7 +10,7 @@ use crate::{
     execution_pipeline::{ExecutionPipeline, PreCommitHook},
     monitor,
     payload_manager::TPayloadManager,
-    pipeline::pipeline_phase::CountedRequest,
+    pipeline::{pipeline_builder::PipelineBuilder, pipeline_phase::CountedRequest},
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
     transaction_filter::TransactionFilter,
@@ -24,13 +24,16 @@ use aptos_consensus_types::{
     pipelined_block::PipelinedBlock,
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, StateComputeResult};
+use aptos_executor_types::{
+    state_compute_result::StateComputeResult, BlockExecutorTrait, ExecutorResult,
+};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::IntGauge;
 use aptos_types::{
     account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, randomness::Randomness,
+    validator_signer::ValidatorSigner,
 };
 use fail::fail_point;
 use futures::{future::BoxFuture, SinkExt, StreamExt};
@@ -142,7 +145,9 @@ impl ExecutionProxy {
             Box::pin(async move {
                 pre_commit_notifier
                     .send(Box::pin(async move {
-                        let txns = state_compute_result.transactions_to_commit();
+                        let _timer = counters::OP_COUNTERS.timer("pre_commit_notify");
+
+                        let txns = state_compute_result.transactions_to_commit().to_vec();
                         let subscribable_events =
                             state_compute_result.subscribable_events().to_vec();
                         if let Err(e) = monitor!(
@@ -161,6 +166,40 @@ impl ExecutionProxy {
                     .expect("Failed to send pre-commit notification");
             })
         })
+    }
+
+    pub fn pipeline_builder(&self, commit_signer: Arc<ValidatorSigner>) -> PipelineBuilder {
+        let MutableState {
+            validators,
+            payload_manager,
+            transaction_shuffler,
+            block_executor_onchain_config,
+            transaction_deduper,
+            is_randomness_enabled,
+        } = self
+            .state
+            .read()
+            .as_ref()
+            .cloned()
+            .expect("must be set within an epoch");
+
+        let block_preparer = Arc::new(BlockPreparer::new(
+            payload_manager.clone(),
+            self.transaction_filter.clone(),
+            transaction_deduper.clone(),
+            transaction_shuffler.clone(),
+        ));
+        PipelineBuilder::new(
+            block_preparer,
+            self.executor.clone(),
+            validators,
+            block_executor_onchain_config,
+            is_randomness_enabled,
+            commit_signer,
+            self.state_sync_notifier.clone(),
+            payload_manager,
+            self.txn_notifier.clone(),
+        )
     }
 }
 
@@ -462,9 +501,6 @@ async fn test_commit_sync_race() {
     };
     use aptos_config::config::transaction_filter_type::Filter;
     use aptos_consensus_notifications::Error;
-    use aptos_executor_types::{
-        state_checkpoint_output::StateCheckpointOutput, StateComputeResult,
-    };
     use aptos_infallible::Mutex;
     use aptos_types::{
         aggregate_signature::AggregateSignature,
@@ -503,7 +539,7 @@ async fn test_commit_sync_race() {
             _block: ExecutableBlock,
             _parent_block_id: HashValue,
             _onchain_config: BlockExecutorConfigFromOnchain,
-        ) -> ExecutorResult<StateCheckpointOutput> {
+        ) -> ExecutorResult<()> {
             todo!()
         }
 
@@ -511,16 +547,11 @@ async fn test_commit_sync_race() {
             &self,
             _block_id: HashValue,
             _parent_block_id: HashValue,
-            _state_checkpoint_output: StateCheckpointOutput,
         ) -> ExecutorResult<StateComputeResult> {
             todo!()
         }
 
-        fn pre_commit_block(
-            &self,
-            _block_id: HashValue,
-            _parent_block_id: HashValue,
-        ) -> ExecutorResult<()> {
+        fn pre_commit_block(&self, _block_id: HashValue) -> ExecutorResult<()> {
             todo!()
         }
 

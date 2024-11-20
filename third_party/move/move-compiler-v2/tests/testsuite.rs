@@ -106,7 +106,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         // Turn optimization on by default. Some configs below may turn it off.
         .set_experiment(Experiment::OPTIMIZE, true)
         .set_experiment(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, true)
-        .set_language_version(LanguageVersion::V2_1);
+        .set_language_version(LanguageVersion::latest_stable());
     opts.testing = true;
     let configs = vec![
         // --- Tests for checking and ast processing
@@ -160,23 +160,24 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::None,
             dump_bytecode_filter: None,
         },
-        // Tests for lambda lifting
+        // Tests for lambda lifting and lambdas -- with full lambda support
         TestConfig {
-            name: "lambda-lifting",
-            runner: |p| run_test(p, get_config_by_name("lambda-lifting")),
-            include: vec!["/lambda-lifting/"],
+            name: "lambda",
+            runner: |p| run_test(p, get_config_by_name("lambda")),
+            include: vec!["/lambda/", "/lambda-lifting/"],
             exclude: vec![],
-            exp_suffix: None,
+            exp_suffix: Some("lambda.exp"),
             options: opts
                 .clone()
+                // .set_experiment(Experiment::AST_SIMPLIFY, true)
                 .set_experiment(Experiment::LAMBDA_FIELDS, true)
                 .set_experiment(Experiment::LAMBDA_IN_PARAMS, true)
                 .set_experiment(Experiment::LAMBDA_IN_RETURNS, true)
                 .set_experiment(Experiment::LAMBDA_VALUES, true)
                 .set_experiment(Experiment::LAMBDA_LIFTING, true),
-            stop_after: StopAfter::AstPipeline,
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::AllStages,
-            dump_bytecode: DumpLevel::None,
+            dump_bytecode: DumpLevel::EndStage,
             dump_bytecode_filter: None,
         },
         // Tests for simplifier in full mode, with code elimination
@@ -213,7 +214,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         TestConfig {
             name: "inlining-et-al",
             runner: |p| run_test(p, get_config_by_name("inlining-et-al")),
-            include: vec!["/inlining/", "/folding/", "/simplifier/"],
+            include: vec!["/inlining/", "/folding/", "/simplifier/", "/lambda/"],
             exclude: vec!["/more-v1/"],
             exp_suffix: None,
             options: opts.clone().set_experiment(Experiment::AST_SIMPLIFY, true),
@@ -554,7 +555,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             stop_after: StopAfter::BytecodePipeline(Some("uninitialized_use_checker")),
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::AllStages,
-            dump_bytecode_filter: None,
+            dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE, "uninitialized_use_checker"]),
         },
         // -- File Format Generation
         // Test without bytecode optimizations enabled
@@ -670,21 +671,6 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode_filter: None,
         },
         TestConfig {
-            name: "lint-checks",
-            runner: |p| run_test(p, get_config_by_name("lint-checks")),
-            include: vec![
-                "/lints/model_ast_lints/",
-                "/lints/stackless_bytecode_lints/",
-            ],
-            exclude: vec![],
-            exp_suffix: None,
-            options: opts.clone().set_experiment(Experiment::LINT_CHECKS, true),
-            stop_after: StopAfter::FileFormat,
-            dump_ast: DumpLevel::None,
-            dump_bytecode: DumpLevel::None,
-            dump_bytecode_filter: None,
-        },
-        TestConfig {
             name: "control-flow-simplification-on",
             runner: |p| run_test(p, get_config_by_name("control-flow-simplification-on")),
             include: vec!["/control-flow-simplification/"],
@@ -725,6 +711,18 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::EndStage,
             dump_bytecode_filter: None,
         },
+        TestConfig {
+            name: "eager-pushes",
+            runner: |p| run_test(p, get_config_by_name("eager-pushes")),
+            include: vec!["/eager-pushes/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts.clone(),
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::EndStage,
+            dump_bytecode_filter: None,
+        },
     ];
     configs.into_iter().map(|c| (c.name, c)).collect()
 });
@@ -760,7 +758,6 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         "A=0x42".to_string(),
         "B=0x42".to_string(),
         "K=0x19".to_string(),
-        "Async=0x20".to_string(),
     ];
 
     // Putting the generated test baseline into a Refcell to avoid problems with mut borrow

@@ -13,6 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+ahash = { workspace = true }
 anyhow = { workspace = true }
 aptos-indexer-grpc-server-framework = { workspace = true }
 aptos-metrics-core = { workspace = true }
@@ -36,6 +37,7 @@ futures = { workspace = true }
 google-cloud-storage = { workspace = true }
 image = { workspace = true }
 once_cell = { workspace = true }
+rayon = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }

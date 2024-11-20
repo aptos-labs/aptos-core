@@ -28,10 +28,8 @@ spec aptos_framework::reconfiguration_with_dkg {
         use aptos_framework::chain_status;
         use std::signer;
         use std::features;
-        use aptos_framework::stake;
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
-        use aptos_framework::transaction_fee;
         use aptos_framework::staking_config;
         use aptos_framework::config_buffer;
         use aptos_framework::version;
@@ -46,8 +44,6 @@ spec aptos_framework::reconfiguration_with_dkg {
         requires chain_status::is_operating();
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         include staking_config::StakingRewardsConfigRequirement;
-        requires exists<stake::ValidatorFees>(@aptos_framework);
-        include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         requires exists<features::Features>(@std);
         include config_buffer::OnNewEpochRequirement<version::Version>;
         include config_buffer::OnNewEpochRequirement<gas_schedule::GasScheduleV2>;

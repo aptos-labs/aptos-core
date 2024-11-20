@@ -7,6 +7,7 @@ use crate::{
         circuit_constants, circuit_testcases::SAMPLE_EXP_HORIZON_SECS, KEYLESS_ACCOUNT_MODULE_NAME,
     },
     move_utils::as_move_value::AsMoveValue,
+    on_chain_config::OnChainConfig,
 };
 use move_core_types::{
     ident_str,
@@ -91,4 +92,9 @@ impl Configuration {
             Ok(())
         }
     }
+}
+
+impl OnChainConfig for Configuration {
+    const MODULE_IDENTIFIER: &'static str = KEYLESS_ACCOUNT_MODULE_NAME;
+    const TYPE_IDENTIFIER: &'static str = "Configuration";
 }

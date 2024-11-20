@@ -10,6 +10,8 @@ use aptos_types::{
 };
 use aptos_vm_types::{
     abstract_write_op::GroupWrite,
+    module_and_script_storage::module_storage::AptosModuleStorage,
+    module_write_set::ModuleWrite,
     resource_group_adapter::{
         check_size_and_existence_match, decrement_size_for_remove_tag, group_tagged_resource_size,
         increment_size_for_add_tag,
@@ -18,7 +20,9 @@ use aptos_vm_types::{
 use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
-    effects::Op as MoveStorageOp, language_storage::StructTag, value::MoveTypeLayout,
+    effects::{Op as MoveStorageOp, Op},
+    language_storage::{ModuleId, StructTag},
+    value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use std::{collections::BTreeMap, sync::Arc};
@@ -71,6 +75,55 @@ impl<'r> WriteOpConverter<'r> {
             remote,
             new_slot_metadata,
         }
+    }
+
+    pub(crate) fn convert_modules_into_write_ops(
+        &self,
+        module_storage: &impl AptosModuleStorage,
+        verified_module_bundle: impl Iterator<Item = (ModuleId, Bytes)>,
+    ) -> PartialVMResult<BTreeMap<StateKey, ModuleWrite<WriteOp>>> {
+        let mut writes = BTreeMap::new();
+        for (module_id, bytes) in verified_module_bundle {
+            let addr = module_id.address();
+            let name = module_id.name();
+
+            let module_exists = module_storage
+                .check_module_exists(addr, name)
+                .map_err(|e| e.to_partial())?;
+            let op = if module_exists {
+                Op::Modify(bytes)
+            } else {
+                Op::New(bytes)
+            };
+
+            let state_value_metadata = module_storage.fetch_state_value_metadata(addr, name)?;
+            let write_op = self.convert(
+                state_value_metadata,
+                op,
+                // For modules, creation is never a modification.
+                false,
+            )?;
+
+            let state_key = StateKey::module_id(&module_id);
+
+            // Enforce read-before-write:
+            //   Modules can live in global cache, and so the DB may not see a module read even
+            //   when it gets republished. This violates read-before-write property. Here, we on
+            //   purpose enforce this by registering a read to the DB directly.
+            //   Note that we also do it here so that in case of storage errors, only a  single
+            //   transaction fails (e.g., if doing this read before commit in block executor we
+            //   have no way to alter the transaction outputs at that point).
+            self.remote.read_state_value(&state_key).map_err(|err| {
+                let msg = format!(
+                    "Error when enforcing read-before-write for module {}::{}: {:?}",
+                    addr, name, err
+                );
+                PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(msg)
+            })?;
+
+            writes.insert(state_key, ModuleWrite::new(module_id, write_op));
+        }
+        Ok(writes)
     }
 
     pub(crate) fn convert_resource(
@@ -173,7 +226,6 @@ impl<'r> WriteOpConverter<'r> {
         legacy_creation_as_modification: bool,
     ) -> PartialVMResult<WriteOp> {
         use MoveStorageOp::*;
-        use WriteOp::*;
         let write_op = match (state_value_metadata, move_storage_op) {
             (None, Modify(_) | Delete) => {
                 // Possible under speculative execution, returning speculative error waiting for re-execution.
@@ -201,18 +253,12 @@ impl<'r> WriteOpConverter<'r> {
                         WriteOp::legacy_creation(data)
                     }
                 },
-                Some(metadata) => Creation {
-                    data,
-                    metadata: metadata.clone(),
-                },
+                Some(metadata) => WriteOp::creation(data, metadata.clone()),
             },
-            (Some(metadata), Modify(data)) => {
-                // Inherit metadata even if the feature flags is turned off, for compatibility.
-                Modification { data, metadata }
-            },
+            (Some(metadata), Modify(data)) => WriteOp::modification(data, metadata),
             (Some(metadata), Delete) => {
                 // Inherit metadata even if the feature flags is turned off, for compatibility.
-                Deletion { metadata }
+                WriteOp::deletion(metadata)
             },
         };
         Ok(write_op)
@@ -233,13 +279,10 @@ impl<'r> WriteOpConverter<'r> {
                 match &self.new_slot_metadata {
                     // n.b. Aggregator writes historically did not distinguish Create vs Modify.
                     None => WriteOp::legacy_modification(data),
-                    Some(metadata) => WriteOp::Creation {
-                        data,
-                        metadata: metadata.clone(),
-                    },
+                    Some(metadata) => WriteOp::creation(data, metadata.clone()),
                 }
             },
-            Some(metadata) => WriteOp::Modification { data, metadata },
+            Some(metadata) => WriteOp::modification(data, metadata),
         };
 
         Ok(op)
@@ -250,22 +293,28 @@ impl<'r> WriteOpConverter<'r> {
 mod tests {
     use super::*;
     use crate::{
-        data_cache::tests::as_resolver_with_group_size_kind,
+        data_cache::{tests::as_resolver_with_group_size_kind, AsMoveResolver},
         move_vm_ext::resolver::ResourceGroupResolver,
     };
     use aptos_types::{
         account_address::AccountAddress,
-        state_store::{
-            errors::StateviewError, state_storage_usage::StateStorageUsage,
-            state_value::StateValue, TStateView,
-        },
+        state_store::{state_value::StateValue, MockStateView},
+        write_set::TransactionWrite,
     };
-    use aptos_vm_types::resource_group_adapter::{group_size_as_sum, GroupSizeKind};
-    use claims::{assert_none, assert_some_eq};
+    use aptos_vm_environment::environment::AptosEnvironment;
+    use aptos_vm_types::{
+        module_and_script_storage::AsAptosCodeStorage,
+        resource_group_adapter::{group_size_as_sum, GroupSizeKind},
+    };
+    use claims::{assert_none, assert_ok, assert_some, assert_some_eq};
+    use move_binary_format::{
+        file_format::empty_module_with_dependencies_and_friends, CompiledModule,
+    };
     use move_core_types::{
         identifier::Identifier,
         language_storage::{StructTag, TypeTag},
     };
+    use std::collections::HashMap;
 
     fn raw_metadata(v: u64) -> StateValueMetadata {
         StateValueMetadata::legacy(v, &CurrentTimeMicroseconds { microseconds: v })
@@ -299,29 +348,105 @@ mod tests {
         }
     }
 
-    struct MockStateView {
-        data: BTreeMap<StateKey, StateValue>,
+    fn module(name: &str) -> (StateKey, Bytes, CompiledModule) {
+        let module = empty_module_with_dependencies_and_friends(name, vec![], vec![]);
+        let state_key = StateKey::module(module.self_addr(), module.self_name());
+        let mut module_bytes = vec![];
+        assert_ok!(module.serialize(&mut module_bytes));
+        (state_key, module_bytes.into(), module)
     }
 
-    impl MockStateView {
-        fn new(data: BTreeMap<StateKey, StateValue>) -> Self {
-            Self { data }
-        }
-    }
+    #[test]
+    fn test_convert_modules_into_write_ops() {
+        // Create a state value with no metadata.
+        let (a_state_key, a_bytes, a) = module("a");
+        let a_state_value = StateValue::new_legacy(a_bytes.clone());
 
-    impl TStateView for MockStateView {
-        type Key = StateKey;
+        // Create a state value with legacy metadata.
+        let (b_state_key, b_bytes, b) = module("b");
+        let b_state_value = StateValue::new_with_metadata(
+            b_bytes.clone(),
+            StateValueMetadata::legacy(10, &CurrentTimeMicroseconds { microseconds: 100 }),
+        );
 
-        fn get_state_value(
-            &self,
-            state_key: &Self::Key,
-        ) -> Result<Option<StateValue>, StateviewError> {
-            Ok(self.data.get(state_key).cloned())
-        }
+        // Create a state value with non-legacy metadata.
+        let (c_state_key, c_bytes, c) = module("c");
+        let c_state_value = StateValue::new_with_metadata(
+            c_bytes.clone(),
+            StateValueMetadata::new(20, 30, &CurrentTimeMicroseconds { microseconds: 200 }),
+        );
 
-        fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
-            unimplemented!();
-        }
+        // Module that does not yet exist.
+        let (d_state_key, d_bytes, d) = module("d");
+
+        // Create the configuration time resource in the state as well;
+        let current_time = CurrentTimeMicroseconds { microseconds: 300 };
+        let state_key = assert_ok!(StateKey::resource(
+            CurrentTimeMicroseconds::address(),
+            &CurrentTimeMicroseconds::struct_tag()
+        ));
+        let bytes = assert_ok!(bcs::to_bytes(&current_time));
+        let state_value = StateValue::new_legacy(bytes.into());
+
+        // Setting up the state.
+        let state_view = MockStateView::new(HashMap::from([
+            (state_key, state_value),
+            (a_state_key.clone(), a_state_value.clone()),
+            (b_state_key.clone(), b_state_value.clone()),
+            (c_state_key.clone(), c_state_value.clone()),
+        ]));
+        let resolver = state_view.as_move_resolver();
+        let env = AptosEnvironment::new(&state_view);
+        let code_storage = state_view.as_aptos_code_storage(env);
+        // Storage slot metadata is enabled on the mainnet.
+        let woc = WriteOpConverter::new(&resolver, true);
+
+        let modules = vec![
+            (a.self_id(), a_bytes.clone()),
+            (b.self_id(), b_bytes.clone()),
+            (c.self_id(), c_bytes.clone()),
+            (d.self_id(), d_bytes.clone()),
+        ];
+
+        let results =
+            assert_ok!(woc.convert_modules_into_write_ops(&code_storage, modules.into_iter()));
+        assert_eq!(results.len(), 4);
+
+        // For `a`, `b`, and `c`, since they exist, metadata is inherited
+        // the write op is a creation.
+
+        let a_write = assert_some!(results.get(&a_state_key));
+        assert!(a_write.write_op().is_modification());
+        assert_eq!(assert_some!(a_write.write_op().bytes()), &a_bytes);
+        assert_eq!(
+            a_write.write_op().metadata(),
+            &a_state_value.into_metadata()
+        );
+
+        let b_write = assert_some!(results.get(&b_state_key));
+        assert!(b_write.write_op().is_modification());
+        assert_eq!(assert_some!(b_write.write_op().bytes()), &b_bytes);
+        assert_eq!(
+            b_write.write_op().metadata(),
+            &b_state_value.into_metadata()
+        );
+
+        let c_write = assert_some!(results.get(&c_state_key));
+        assert!(c_write.write_op().is_modification());
+        assert_eq!(assert_some!(c_write.write_op().bytes()), &c_bytes);
+        assert_eq!(
+            c_write.write_op().metadata(),
+            &c_state_value.into_metadata()
+        );
+
+        // Since `d` does not exist, its metadata is a placeholder.
+        let d_write = assert_some!(results.get(&d_state_key));
+        assert!(d_write.write_op().is_creation());
+        assert_eq!(assert_some!(d_write.write_op().bytes()), &d_bytes);
+        assert_eq!(
+            d_write.write_op().metadata(),
+            &StateValueMetadata::placeholder(&current_time)
+        )
     }
 
     // TODO[agg_v2](test) make as_resolver_with_group_size_kind support AsSum
@@ -336,7 +461,7 @@ mod tests {
         let metadata = raw_metadata(100);
         let key = StateKey::raw(&[0]);
 
-        let data = BTreeMap::from([(
+        let data = HashMap::from([(
             key.clone(),
             StateValue::new_with_metadata(bcs::to_bytes(&group).unwrap().into(), metadata.clone()),
         )]);
@@ -392,7 +517,7 @@ mod tests {
         let metadata = raw_metadata(100);
         let key = StateKey::raw(&[0]);
 
-        let data = BTreeMap::from([(
+        let data = HashMap::from([(
             key.clone(),
             StateValue::new_with_metadata(bcs::to_bytes(&group).unwrap().into(), metadata.clone()),
         )]);
@@ -426,7 +551,7 @@ mod tests {
     // #[test]
     #[allow(unused)]
     fn size_computation_new_group() {
-        let s = MockStateView::new(BTreeMap::new());
+        let s = MockStateView::empty();
         let resolver = as_resolver_with_group_size_kind(&s, GroupSizeKind::AsSum);
 
         // TODO[agg_v2](test): Layout hardcoded to None. Test with layout = Some(..)
@@ -459,7 +584,7 @@ mod tests {
         let metadata = raw_metadata(100);
         let key = StateKey::raw(&[0]);
 
-        let data = BTreeMap::from([(
+        let data = HashMap::from([(
             key.clone(),
             StateValue::new_with_metadata(bcs::to_bytes(&group).unwrap().into(), metadata.clone()),
         )]);
@@ -477,7 +602,7 @@ mod tests {
 
         // Deletion should still contain the metadata - for storage refunds.
         assert_eq!(group_write.metadata_op().metadata(), &metadata);
-        assert_eq!(group_write.metadata_op(), &WriteOp::Deletion { metadata });
+        assert_eq!(group_write.metadata_op(), &WriteOp::deletion(metadata));
         assert_none!(group_write.metadata_op().bytes());
     }
 }

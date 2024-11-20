@@ -318,8 +318,14 @@ impl<'r> TModuleView for ExecutorViewWithChangeSet<'r> {
 }
 
 impl<'r> StateStorageView for ExecutorViewWithChangeSet<'r> {
+    type Key = StateKey;
+
     fn id(&self) -> StateViewId {
         self.base_executor_view.id()
+    }
+
+    fn read_state_value(&self, state_key: &Self::Key) -> Result<(), StateviewError> {
+        self.base_executor_view.read_state_value(state_key)
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {

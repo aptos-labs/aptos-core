@@ -31,7 +31,7 @@ use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_binary_format::file_format::{self, Ability, AbilitySet};
 use move_compiler::{
-    expansion::ast::{self as EA},
+    expansion::ast::{self as EA, Exp_},
     hlir::ast as HA,
     naming::ast as NA,
     parser::ast::{self as PA, CallKind, Field},
@@ -677,23 +677,31 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         params: &[(PA::Var, EA::Type)],
         for_move_fun: bool,
     ) -> Vec<Parameter> {
+        let is_lang_version_2_1 = self
+            .env()
+            .language_version
+            .is_at_least(LanguageVersion::V2_1);
         params
             .iter()
             .enumerate()
             .map(|(idx, (v, ty))| {
                 let ty = self.translate_type(ty);
-                let sym = self.symbol_pool().make(v.0.value.as_str());
+                let var_str = v.0.value.as_str();
+                let sym = self.symbol_pool().make(var_str);
                 let loc = self.to_loc(&v.loc());
-                self.define_local(
-                    &loc,
-                    sym,
-                    ty.clone(),
-                    None,
-                    // If this is for a proper Move function (not spec function), add the
-                    // index so we can resolve this to a `Temporary` expression instead of
-                    // a `LocalVar`.
-                    if for_move_fun { Some(idx) } else { None },
-                );
+
+                if !is_lang_version_2_1 || var_str != "_" {
+                    self.define_local(
+                        &loc,
+                        sym,
+                        ty.clone(),
+                        None,
+                        // If this is for a proper Move function (not spec function), add the
+                        // index so we can resolve this to a `Temporary` expression instead of
+                        // a `LocalVar`.
+                        if for_move_fun { Some(idx) } else { None },
+                    );
+                }
                 Parameter(sym, ty, loc)
             })
             .collect_vec()
@@ -777,7 +785,8 @@ impl<'env, 'builder, 'module_builder> UnificationContext
             .lookup_receiver_function(ty, name)
             .cloned()
         {
-            let type_inst = self.fresh_type_vars(entry.type_params.len());
+            let type_params = entry.type_params.clone();
+            let type_inst = self.fresh_type_vars(type_params.len());
             let arg_types = entry
                 .params
                 .iter()
@@ -786,6 +795,8 @@ impl<'env, 'builder, 'module_builder> UnificationContext
             let result_type = entry.result_type.instantiate(&type_inst);
             Some(ReceiverFunctionInstance {
                 id: entry.module_id.qualified(entry.fun_id),
+                fun_name: name,
+                type_params,
                 type_inst,
                 arg_types,
                 result_type,
@@ -1576,7 +1587,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 self.pop_loop_label();
                 // See the Move book for below treatment: if the loop has no exit, the type
                 // is arbitrary, otherwise `()`.
-                let loop_type = if body.has_loop_exit() {
+                let loop_type = if body.branches_to(0..usize::MAX) {
                     self.check_type(&loc, &Type::unit(), expected_type, context)
                 } else {
                     expected_type.clone()
@@ -2151,8 +2162,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     &inst.result_type,
                 )
                 .map_err(|_| ok = false);
-            // `type.inst` is now unified with the actual types,
-            // annotate the instance. Since this post processor
+            // `type_inst` is now unified with the actual types,
+            // annotate the instance.  Since this post processor
             // is run after type finalization, we need to finalize
             // it to report any un-inferred type errors. However,
             // to avoid follow-up errors, only do if unification
@@ -2165,6 +2176,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     .iter()
                     .map(|t| self.finalize_type(id, t, &mut BTreeSet::new()))
                     .collect();
+                // Also need to evaluate type constraints on type parameters
+
                 self.env().set_node_instantiation(id, inst)
             }
         }
@@ -3632,32 +3645,21 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
         let type_opt = convert_name_to_type(&resource_ty_exp.loc, resource_ty_exp.clone().value);
         if let Some(ty) = type_opt {
-            let resource_ty = self.translate_type(&ty);
-            let ref_t = Type::Reference(
-                ReferenceKind::from_is_mut(mutable),
-                Box::new(resource_ty.clone()),
-            );
-            let ty = self.check_type(loc, &ref_t, expected_type, context);
-            if ty.is_error() {
-                return self.new_error_exp();
-            }
-            let addr = self.translate_exp_in_context(
-                addr_exp,
-                &Type::Primitive(PrimitiveType::Address),
-                context,
-            );
-            let node = self.new_node_id_with_type_loc(
-                &Type::Reference(
-                    ReferenceKind::from_is_mut(mutable),
-                    Box::new(resource_ty.clone()),
-                ),
+            let name = if mutable {
+                self.symbol_pool().make("borrow_global_mut")
+            } else {
+                self.symbol_pool().make("borrow_global")
+            };
+            self.translate_call(
                 loc,
-            );
-            self.set_node_instantiation(node, vec![resource_ty.clone()]);
-            ExpData::Call(
-                node,
-                Operation::BorrowGlobal(ReferenceKind::from_is_mut(mutable)),
-                vec![addr.into()],
+                &self.to_loc(&resource_ty_exp.loc),
+                CallKind::Regular,
+                &Some(self.parent.parent.builtin_module()),
+                name,
+                &Some(vec![ty]),
+                &[addr_exp],
+                expected_type,
+                context,
             )
         } else {
             self.new_error_exp()
@@ -4123,7 +4125,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         context: &ErrorMessageContext,
     ) -> ExpData {
         // Translate arguments.
-        let (arg_types, translated_args) = self.translate_exp_list(args);
+        let (mut arg_types, mut translated_args) = self.translate_exp_list(args);
 
         // Special handling of receiver call functions
         if kind == CallKind::Receiver {
@@ -4131,6 +4133,50 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 module.is_none(),
                 "unexpected qualified name in receiver call"
             );
+            debug_assert!(
+                !args.is_empty(),
+                "receiver call needs to have at least one parameter"
+            );
+            let receiver_call_opt = self.get_receiver_function(&arg_types[0], name);
+            if let Some(receiver_call) = receiver_call_opt {
+                if let Exp_::ExpDotted(dotted) = &args[0].value {
+                    // we need a special case for the receiver call S[x].f.fun(&mut...)
+                    // when the first argument is a dotted expression with index notation:
+                    // S[x].y because the reference type is by default set immutable ref
+                    if receiver_call.arg_types[0].is_mutable_reference() {
+                        let first_arg = self.translate_dotted(
+                            dotted,
+                            &arg_types[0],
+                            true,
+                            &ErrorMessageContext::General,
+                        );
+                        translated_args[0] = first_arg.into_exp();
+                    }
+                } else if let Exp_::Index(target, index) = &args[0].value {
+                    // special case for the receiver call S[x].fun(&...), S[x].fun(&mut...)
+                    // so that it behaves the same as (&S[x]).fun(&...), (&mut S[x]).fun(&mut...)
+                    if receiver_call.arg_types[0].is_reference() {
+                        let index_mutate = receiver_call.arg_types[0].is_mutable_reference();
+                        if let Some(first_arg) = self.try_resource_or_vector_index(
+                            loc,
+                            target,
+                            index,
+                            &ErrorMessageContext::General,
+                            &Type::Reference(
+                                ReferenceKind::from_is_mut(index_mutate),
+                                Box::new(arg_types[0].clone()),
+                            ),
+                            index_mutate,
+                        ) {
+                            translated_args[0] = first_arg.into_exp();
+                            arg_types[0] = Type::Reference(
+                                ReferenceKind::from_is_mut(index_mutate),
+                                Box::new(arg_types[0].clone()),
+                            );
+                        }
+                    }
+                }
+            }
             return self.translate_receiver_call(
                 loc,
                 name,

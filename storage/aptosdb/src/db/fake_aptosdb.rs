@@ -406,7 +406,7 @@ impl FakeAptosDB {
                     base_state_version,
                     ledger_info_with_sigs,
                     sync_commit,
-                    latest_in_memory_state.clone(),
+                    &latest_in_memory_state,
                 )?;
             }
 
@@ -994,10 +994,7 @@ mod tests {
 
             let mut in_memory_state = db
                 .inner
-                .buffered_state()
-                .lock()
-                .current_state()
-                .clone();
+            .get_latest_executed_trees().state;
 
             let mut cur_ver: Version = 0;
             for (txns_to_commit, ledger_info_with_sigs) in input.iter() {
@@ -1008,7 +1005,7 @@ mod tests {
                     cur_ver.checked_sub(1), /* base_state_version */
                     Some(ledger_info_with_sigs),
                     false, /* sync_commit */
-                    in_memory_state.clone(),
+                    &in_memory_state,
                     None, // ignored
                     Some(&ShardedStateCache::default()) // ignored
                 )

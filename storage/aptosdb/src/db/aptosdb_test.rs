@@ -245,12 +245,7 @@ pub fn test_state_merkle_pruning_impl(
     .unwrap();
 
     // augment DB in blocks
-    let mut in_memory_state = db
-        .state_store
-        .buffered_state()
-        .lock()
-        .current_state()
-        .clone();
+    let mut in_memory_state = db.state_store.current_state_cloned();
     let _ancester = in_memory_state.current.clone();
     let mut next_ver: Version = 0;
     let mut snapshot_versions = vec![];
@@ -262,7 +257,7 @@ pub fn test_state_merkle_pruning_impl(
             next_ver.checked_sub(1), /* base_state_version */
             Some(ledger_info_with_sigs),
             true, /* sync_commit */
-            in_memory_state.clone(),
+            &in_memory_state,
         )
         .unwrap();
 

@@ -266,6 +266,7 @@ class ForgeContext:
     forge_username: str
     forge_blocking: bool
     forge_retain_debug_logs: str
+    forge_junit_xml_path: Optional[str]
 
     github_actions: str
     github_job_url: Optional[str]
@@ -378,16 +379,19 @@ def get_cpu_profile_link(
     start_time: datetime | None = None,
     end_time: datetime | None = None,
 ) -> str:
-    base_url = "https://aptoslabs.grafana.net/a/grafana-pyroscope-app/single"
+    base_url = "https://grafana.aptoslabs.com/a/grafana-pyroscope-app/profiles-explorer"
     start_timestamp = str(int(start_time.timestamp())) if start_time else "now-1h"
     end_timestamp = str(int(end_time.timestamp())) if end_time else "now"
 
-    query_params = {
-        "query": f'process_cpu:cpu:nanoseconds:cpu:nanoseconds{{service_name="ebpf/{forge_namespace}/{container_name.value}"}}',
-        "from": start_timestamp,
-        "until": end_timestamp,
-        "maxNodes": "16384",
-    }
+    query_params = [
+        ("from", start_timestamp),
+        ("until", end_timestamp),
+        ("maxNodes", "16384"),
+        ("explorationType", "flame-graph"),
+        ("var-serviceName", "ebpf/forge"),
+        ("var-filters", f"namespace|=|{forge_namespace}"),
+        ("var-filters", f"pod|=~|.*{container_name.value}.*"),
+    ]
     encoded_params = urlencode(query_params)
 
     return f"{base_url}?{encoded_params}"
@@ -615,9 +619,8 @@ def format_pre_comment(context: ForgeContext) -> str:
         context.forge_namespace,
     )
 
-    return (
-        textwrap.dedent(
-            f"""
+    return textwrap.dedent(
+        f"""
             ### Forge is running suite `{context.forge_test_suite}` on {get_testsuite_images(context)}
             * [Grafana dashboard (auto-refresh)]({dashboard_link})
             * [Humio Logs]({humio_logs_link})
@@ -625,9 +628,7 @@ def format_pre_comment(context: ForgeContext) -> str:
             * [Validator CPU Profile]({validator_cpu_profile_link})
             * [Fullnode CPU Profile]({fullnode_cpu_profile_link})
             """
-        ).lstrip()
-        + format_github_info(context)
-    )
+    ).lstrip() + format_github_info(context)
 
 
 def format_comment(context: ForgeContext, result: ForgeResult) -> str:
@@ -686,6 +687,33 @@ def format_comment(context: ForgeContext, result: ForgeResult) -> str:
         )
         + format_github_info(context)
     )
+
+
+BEGIN_JUNIT = "=== BEGIN JUNIT ==="
+END_JUNIT = "=== END JUNIT ==="
+
+
+def format_junit_xml(_context: ForgeContext, result: ForgeResult) -> str:
+    forge_output = result.output
+    start_index = forge_output.find(BEGIN_JUNIT)
+    if start_index == -1:
+        raise Exception(
+            "=== BEGIN JUNIT === not found in forge output, unable to write junit xml"
+        )
+
+    start_index += len(BEGIN_JUNIT)
+    if start_index > len(forge_output):
+        raise Exception(
+            "=== BEGIN JUNIT === found at end of forge output, unable to write junit xml"
+        )
+
+    end_index = forge_output.find(END_JUNIT)
+    if end_index == -1:
+        raise Exception(
+            "=== END JUNIT === not found in forge output, unable to write junit xml"
+        )
+
+    return forge_output[start_index:end_index].strip().lstrip()
 
 
 class ForgeRunner:
@@ -840,6 +868,7 @@ class K8sForgeRunner(ForgeRunner):
             FORGE_TEST_SUITE=sanitize_k8s_resource_name(context.forge_test_suite),
             FORGE_USERNAME=sanitize_k8s_resource_name(context.forge_username),
             FORGE_RETAIN_DEBUG_LOGS=context.forge_retain_debug_logs,
+            FORGE_JUNIT_XML_PATH=context.forge_junit_xml_path,
             VALIDATOR_NODE_SELECTOR=validator_node_selector,
             KUBECONFIG=MULTIREGION_KUBECONFIG_PATH,
             MULTIREGION_KUBECONFIG_DIR=MULTIREGION_KUBECONFIG_DIR,
@@ -1340,10 +1369,11 @@ def seeded_random_choice(namespace: str, cluster_names: Sequence[str]) -> str:
 @envoption("FORGE_DEPLOYER_PROFILE")
 @envoption("FORGE_ENABLE_FAILPOINTS")
 @envoption("FORGE_ENABLE_PERFORMANCE")
-@envoption("FORGE_TEST_SUITE")
 @envoption("FORGE_RUNNER_DURATION_SECS", "300")
 @envoption("FORGE_IMAGE_TAG")
 @envoption("FORGE_RETAIN_DEBUG_LOGS", "false")
+@envoption("FORGE_JUNIT_XML_PATH")
+@envoption("FORGE_TEST_SUITE")
 @envoption("IMAGE_TAG")
 @envoption("UPGRADE_IMAGE_TAG")
 @envoption("FORGE_NAMESPACE")
@@ -1389,6 +1419,7 @@ def test(
     forge_runner_duration_secs: str,
     forge_image_tag: Optional[str],
     forge_retain_debug_logs: str,
+    forge_junit_xml_path: Optional[str],
     image_tag: Optional[str],
     upgrade_image_tag: Optional[str],
     forge_namespace: Optional[str],
@@ -1639,6 +1670,7 @@ def test(
         forge_test_suite=forge_test_suite,
         forge_username=forge_username,
         forge_retain_debug_logs=forge_retain_debug_logs,
+        forge_junit_xml_path=forge_junit_xml_path,
         forge_blocking=forge_blocking == "true",
         github_actions=github_actions,
         github_job_url=(
@@ -1683,6 +1715,9 @@ def test(
             log.info(format_comment(forge_context, result))
         if github_step_summary:
             outputs.append(ForgeFormatter(github_step_summary, format_comment))
+        if forge_junit_xml_path:
+            outputs.append(ForgeFormatter(forge_junit_xml_path, format_junit_xml))
+
         forge_context.report(result, outputs)
 
         log.info(result.format(forge_context))

@@ -12,13 +12,13 @@ use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
 };
 use aptos_block_executor::{
-    errors::BlockExecutionError, executor::BlockExecutor,
-    task::TransactionOutput as BlockExecutorTransactionOutput,
-    txn_commit_hook::TransactionCommitHook, types::InputOutputKey,
+    code_cache_global_manager::AptosModuleCacheManager, errors::BlockExecutionError,
+    executor::BlockExecutor, task::TransactionOutput as BlockExecutorTransactionOutput,
+    txn_commit_hook::TransactionCommitHook, txn_provider::TxnProvider, types::InputOutputKey,
 };
 use aptos_infallible::Mutex;
 use aptos_types::{
-    block_executor::config::BlockExecutorConfig,
+    block_executor::{config::BlockExecutorConfig, execution_state::TransactionSliceMetadata},
     contract_event::ContractEvent,
     error::PanicError,
     executable::ExecutableTestType,
@@ -32,7 +32,7 @@ use aptos_types::{
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::{
-    abstract_write_op::AbstractResourceWriteOp, environment::Environment, output::VMOutput,
+    abstract_write_op::AbstractResourceWriteOp, module_write_set::ModuleWrite, output::VMOutput,
     resolver::ResourceGroupSize,
 };
 use move_core_types::{
@@ -42,13 +42,12 @@ use move_core_types::{
 };
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::{Lazy, OnceCell};
-use rayon::ThreadPool;
 use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
 };
 
-pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
+static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
         rayon::ThreadPoolBuilder::new()
             .num_threads(num_cpus::get())
@@ -192,7 +191,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn module_write_set(&self) -> BTreeMap<StateKey, WriteOp> {
+    fn module_write_set(&self) -> BTreeMap<StateKey, ModuleWrite<WriteOp>> {
         self.vm_output
             .lock()
             .as_ref()
@@ -392,15 +391,19 @@ impl BlockAptosVM {
     pub fn execute_block_on_thread_pool<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
+        TP: TxnProvider<SignatureVerifiedTransaction> + Sync,
     >(
-        executor_thread_pool: Arc<ThreadPool>,
-        signature_verified_block: &[SignatureVerifiedTransaction],
+        executor_thread_pool: Arc<rayon::ThreadPool>,
+        signature_verified_block: &TP,
         state_view: &S,
+        module_cache_manager: &AptosModuleCacheManager,
         config: BlockExecutorConfig,
+        transaction_slice_metadata: TransactionSliceMetadata,
         transaction_commit_listener: Option<L>,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
-        let num_txns = signature_verified_block.len();
+
+        let num_txns = signature_verified_block.num_txns();
         if state_view.id() != StateViewId::Miscellaneous {
             // Speculation is disabled in Miscellaneous context, which is used by testing and
             // can even lead to concurrent execute_block invocations, leading to errors on flush.
@@ -408,17 +411,27 @@ impl BlockAptosVM {
         }
 
         BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
+
+        let mut module_cache_manager_guard = module_cache_manager.try_lock(
+            &state_view,
+            &config.local.module_cache_config,
+            transaction_slice_metadata,
+        )?;
+
         let executor = BlockExecutor::<
             SignatureVerifiedTransaction,
             AptosExecutorTask,
             S,
             L,
             ExecutableTestType,
+            TP,
         >::new(config, executor_thread_pool, transaction_commit_listener);
 
-        let environment =
-            Arc::new(Environment::new(state_view).try_enable_delayed_field_optimization());
-        let ret = executor.execute_block(environment, signature_verified_block, state_view);
+        let ret = executor.execute_block(
+            signature_verified_block,
+            state_view,
+            &mut module_cache_manager_guard,
+        );
         match ret {
             Ok(block_output) => {
                 let (transaction_outputs, block_end_info) = block_output.into_inner();
@@ -453,17 +466,22 @@ impl BlockAptosVM {
     pub fn execute_block<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
+        TP: TxnProvider<SignatureVerifiedTransaction> + Sync,
     >(
-        signature_verified_block: &[SignatureVerifiedTransaction],
+        signature_verified_block: &TP,
         state_view: &S,
+        module_cache_manager: &AptosModuleCacheManager,
         config: BlockExecutorConfig,
+        transaction_slice_metadata: TransactionSliceMetadata,
         transaction_commit_listener: Option<L>,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
-        Self::execute_block_on_thread_pool::<S, L>(
+        Self::execute_block_on_thread_pool::<S, L, TP>(
             Arc::clone(&RAYON_EXEC_POOL),
             signature_verified_block,
             state_view,
+            module_cache_manager,
             config,
+            transaction_slice_metadata,
             transaction_commit_listener,
         )
     }

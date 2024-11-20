@@ -20,7 +20,7 @@ use crate::{
             fallback_manager::ObserverFallbackManager,
             ordered_blocks::OrderedBlockStore,
             payload_store::BlockPayloadStore,
-            pending_blocks::PendingBlockStore,
+            pending_blocks::{PendingBlockStore, PendingBlockWithMetadata},
             state_sync_manager::{StateSyncManager, StateSyncNotification},
             subscription_manager::SubscriptionManager,
         },
@@ -29,16 +29,20 @@ use crate::{
     dag::DagCommitSigner,
     network::{IncomingCommitRequest, IncomingRandGenRequest},
     network_interface::CommitMessage,
-    pipeline::execution_client::TExecutionClient,
+    pipeline::{execution_client::TExecutionClient, pipeline_builder::PipelineBuilder},
 };
 use aptos_channels::{aptos_channel, aptos_channel::Receiver, message_queues::QueueStyle};
 use aptos_config::{
     config::{ConsensusObserverConfig, NodeConfig},
     network_id::PeerNetworkId,
 };
-use aptos_consensus_types::{pipeline, pipelined_block::PipelinedBlock};
+use aptos_consensus_types::{
+    pipeline,
+    pipelined_block::{PipelineFutures, PipelinedBlock},
+};
 use aptos_crypto::{bls12381, Genesis};
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
+use aptos_executor_types::state_compute_result::StateComputeResult;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, error, info, warn};
 use aptos_network::{
@@ -55,7 +59,10 @@ use aptos_types::{
 use futures::StreamExt;
 use futures_channel::oneshot;
 use move_core_types::account_address::AccountAddress;
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::{sync::mpsc::UnboundedSender, time::interval};
 use tokio_stream::wrappers::IntervalStream;
 
@@ -87,6 +94,9 @@ pub struct ConsensusObserver {
 
     // The consensus observer subscription manager
     subscription_manager: SubscriptionManager,
+
+    // Pipeline builder
+    pipeline_builder: Option<PipelineBuilder>,
 }
 
 impl ConsensusObserver {
@@ -149,6 +159,7 @@ impl ConsensusObserver {
             observer_fallback_manager,
             state_sync_manager,
             subscription_manager,
+            pipeline_builder: None,
         }
     }
 
@@ -261,10 +272,12 @@ impl ConsensusObserver {
         );
 
         // Create the commit callback (to be called after the execution pipeline)
-        let commit_callback = self.active_observer_state.create_commit_callback(
-            self.ordered_block_store.clone(),
-            self.block_payload_store.clone(),
-        );
+        let commit_callback = self
+            .active_observer_state
+            .create_commit_callback_deprecated(
+                self.ordered_block_store.clone(),
+                self.block_payload_store.clone(),
+            );
 
         // Send the ordered block to the execution pipeline
         if let Err(error) = self
@@ -334,25 +347,40 @@ impl ConsensusObserver {
     /// Returns the last ordered block
     fn get_last_ordered_block(&self) -> BlockInfo {
         if let Some(last_ordered_block) = self.ordered_block_store.lock().get_last_ordered_block() {
-            last_ordered_block
+            last_ordered_block.block_info()
         } else {
             // Return the root ledger info
             self.active_observer_state.root().commit_info().clone()
         }
     }
 
+    /// Returns the last block's pipeline futures, should only be called when pipeline is enabled
+    fn get_last_pipeline_futs(&self) -> PipelineFutures {
+        if let Some(last_ordered_block) = self.ordered_block_store.lock().get_last_ordered_block() {
+            last_ordered_block
+                .pipeline_futs()
+                .expect("Pipeline futures should exist when enabled")
+        } else {
+            self.pipeline_builder().build_root(
+                StateComputeResult::new_dummy(),
+                self.active_observer_state.root().clone(),
+            )
+        }
+    }
+
     /// Orders any ready pending blocks for the given epoch and round
     async fn order_ready_pending_block(&mut self, block_epoch: u64, block_round: Round) {
         // Get any ready ordered block
-        let ready_ordered_block = self.pending_block_store.lock().remove_ready_block(
+        let pending_block_with_metadata = self.pending_block_store.lock().remove_ready_block(
             block_epoch,
             block_round,
             self.block_payload_store.clone(),
         );
 
         // Process the ready ordered block (if it exists)
-        if let Some(ready_ordered_block) = ready_ordered_block {
-            self.process_ordered_block(ready_ordered_block).await;
+        if let Some(pending_block_with_metadata) = pending_block_with_metadata {
+            self.process_ordered_block(pending_block_with_metadata)
+                .await;
         }
     }
 
@@ -360,6 +388,7 @@ impl ConsensusObserver {
     async fn process_block_payload_message(
         &mut self,
         peer_network_id: PeerNetworkId,
+        message_received_time: Instant,
         block_payload: BlockPayload,
     ) {
         // Get the epoch and round for the block
@@ -416,6 +445,13 @@ impl ConsensusObserver {
             false // We can't verify the signatures yet
         };
 
+        // Update the latency metrics for block payload processing
+        update_message_processing_latency_metrics(
+            message_received_time,
+            &peer_network_id,
+            metrics::BLOCK_PAYLOAD_LABEL,
+        );
+
         // Update the payload store with the payload
         self.block_payload_store
             .lock()
@@ -434,6 +470,7 @@ impl ConsensusObserver {
     fn process_commit_decision_message(
         &mut self,
         peer_network_id: PeerNetworkId,
+        message_received_time: Instant,
         commit_decision: CommitDecision,
     ) {
         // Get the commit decision epoch and round
@@ -464,6 +501,13 @@ impl ConsensusObserver {
                 );
                 return;
             }
+
+            // Update the latency metrics for commit processing
+            update_message_processing_latency_metrics(
+                message_received_time,
+                &peer_network_id,
+                metrics::COMMIT_DECISION_LABEL,
+            );
 
             // Update the pending blocks with the commit decision
             if self.process_commit_decision_for_pending_block(&commit_decision) {
@@ -553,7 +597,8 @@ impl ConsensusObserver {
 
     /// Processes a network message received by the consensus observer
     async fn process_network_message(&mut self, network_message: ConsensusObserverNetworkMessage) {
-        // Unpack the network message
+        // Unpack the network message and note the received time
+        let message_received_time = Instant::now();
         let (peer_network_id, message) = network_message.into_parts();
 
         // Verify the message is from the peers we've subscribed to
@@ -588,15 +633,27 @@ impl ConsensusObserver {
         // Process the message based on the type
         match message {
             ConsensusObserverDirectSend::OrderedBlock(ordered_block) => {
-                self.process_ordered_block_message(peer_network_id, ordered_block)
-                    .await;
+                self.process_ordered_block_message(
+                    peer_network_id,
+                    message_received_time,
+                    ordered_block,
+                )
+                .await;
             },
             ConsensusObserverDirectSend::CommitDecision(commit_decision) => {
-                self.process_commit_decision_message(peer_network_id, commit_decision);
+                self.process_commit_decision_message(
+                    peer_network_id,
+                    message_received_time,
+                    commit_decision,
+                );
             },
             ConsensusObserverDirectSend::BlockPayload(block_payload) => {
-                self.process_block_payload_message(peer_network_id, block_payload)
-                    .await;
+                self.process_block_payload_message(
+                    peer_network_id,
+                    message_received_time,
+                    block_payload,
+                )
+                .await;
             },
         }
 
@@ -608,6 +665,7 @@ impl ConsensusObserver {
     async fn process_ordered_block_message(
         &mut self,
         peer_network_id: PeerNetworkId,
+        message_received_time: Instant,
         ordered_block: OrderedBlock,
     ) {
         // Verify the ordered blocks before processing
@@ -645,20 +703,32 @@ impl ConsensusObserver {
         // Update the metrics for the received ordered block
         update_metrics_for_ordered_block_message(peer_network_id, &ordered_block);
 
+        // Create a new pending block with metadata
+        let pending_block_with_metadata =
+            PendingBlockWithMetadata::new(peer_network_id, message_received_time, ordered_block);
+
         // If all payloads exist, process the block. Otherwise, store it
         // in the pending block store and wait for the payloads to arrive.
-        if self.all_payloads_exist(ordered_block.blocks()) {
-            self.process_ordered_block(ordered_block).await;
+        if self.all_payloads_exist(pending_block_with_metadata.ordered_block().blocks()) {
+            self.process_ordered_block(pending_block_with_metadata)
+                .await;
         } else {
             self.pending_block_store
                 .lock()
-                .insert_pending_block(ordered_block);
+                .insert_pending_block(pending_block_with_metadata);
         }
     }
 
     /// Processes the ordered block. This assumes the ordered block
     /// has been sanity checked and that all payloads exist.
-    async fn process_ordered_block(&mut self, ordered_block: OrderedBlock) {
+    async fn process_ordered_block(
+        &mut self,
+        pending_block_with_metadata: PendingBlockWithMetadata,
+    ) {
+        // Unpack the pending block
+        let (peer_network_id, message_received_time, ordered_block) =
+            pending_block_with_metadata.into_parts();
+
         // Verify the ordered block proof
         let epoch_state = self.get_epoch_state();
         if ordered_block.proof_block_info().epoch() == epoch_state.epoch {
@@ -702,6 +772,26 @@ impl ConsensusObserver {
         // The block was verified correctly. If the block is a child of our
         // last block, we can insert it into the ordered block store.
         if self.get_last_ordered_block().id() == ordered_block.first_block().parent_id() {
+            // Update the latency metrics for ordered block processing
+            update_message_processing_latency_metrics(
+                message_received_time,
+                &peer_network_id,
+                metrics::ORDERED_BLOCK_LABEL,
+            );
+
+            if self.pipeline_enabled() {
+                for block in ordered_block.blocks() {
+                    let commit_callback = self.active_observer_state.create_commit_callback(
+                        self.ordered_block_store.clone(),
+                        self.block_payload_store.clone(),
+                    );
+                    self.pipeline_builder().build(
+                        block,
+                        self.get_last_pipeline_futs(),
+                        commit_callback,
+                    );
+                }
+            }
             // Insert the ordered block into the pending blocks
             self.ordered_block_store
                 .lock()
@@ -909,7 +999,7 @@ impl ConsensusObserver {
             .start_epoch(
                 Some(sk),
                 epoch_state.clone(),
-                dummy_signer,
+                dummy_signer.clone(),
                 payload_manager,
                 &consensus_config,
                 &execution_config,
@@ -920,6 +1010,9 @@ impl ConsensusObserver {
                 0,
             )
             .await;
+        if self.pipeline_enabled() {
+            self.pipeline_builder = Some(self.execution_client.pipeline_builder(signer))
+        }
     }
 
     /// Starts the consensus observer loop that processes incoming
@@ -965,6 +1058,18 @@ impl ConsensusObserver {
         error!(LogSchema::new(LogEntry::ConsensusObserver)
             .message("The consensus observer loop exited unexpectedly!"));
     }
+
+    /// Returns whether the pipeline is enabled
+    pub fn pipeline_enabled(&self) -> bool {
+        self.active_observer_state.pipeline_enabled()
+    }
+
+    /// Returns the builder, should only be called if pipeline is enabled
+    pub fn pipeline_builder(&self) -> &PipelineBuilder {
+        self.pipeline_builder
+            .as_ref()
+            .expect("Pipeline builder should exist")
+    }
 }
 
 /// Logs the received message using an appropriate log level
@@ -976,6 +1081,24 @@ fn log_received_message(message: String) {
     } else {
         debug!(log_schema);
     }
+}
+
+/// Updates the message processing latency metrics
+fn update_message_processing_latency_metrics(
+    message_received_time: Instant,
+    peer_network_id: &PeerNetworkId,
+    message_label: &str,
+) {
+    // Calculate the message processing duration
+    let processing_duration_secs = message_received_time.elapsed().as_secs_f64();
+
+    // Update the processing latency metrics
+    metrics::observe_value_with_label(
+        &metrics::OBSERVER_MESSAGE_PROCESSING_LATENCIES,
+        message_label,
+        peer_network_id,
+        processing_duration_secs,
+    );
 }
 
 /// Updates the metrics for the received block payload message

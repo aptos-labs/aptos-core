@@ -169,10 +169,10 @@ fn test_runner_for_feature(path: &Path, feature: &Feature) -> datatest_stable::R
 
     let mut error_writer = Buffer::no_color();
     let result = if feature.v2 {
-        options.language_version = Some(LanguageVersion::V2_0);
+        options.language_version = Some(LanguageVersion::latest());
         run_move_prover_v2(&mut error_writer, options)
     } else {
-        options.model_builder.language_version = LanguageVersion::V2_0;
+        options.model_builder.language_version = LanguageVersion::latest();
         run_move_prover(&mut error_writer, options)
     };
     let mut diags = match result {

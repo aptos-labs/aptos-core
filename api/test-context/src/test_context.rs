@@ -47,8 +47,8 @@ use aptos_types::{
         TransactionPayload, TransactionStatus, Version,
     },
 };
-use aptos_vm::AptosVM;
-use aptos_vm_validator::vm_validator::VMValidator;
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
+use aptos_vm_validator::vm_validator::PooledVMValidator;
 use bytes::Bytes;
 use hyper::{HeaderMap, Response};
 use rand::SeedableRng;
@@ -168,11 +168,15 @@ pub fn new_test_context_inner(
         }
         DbReaderWriter::wrap(aptos_db)
     };
-    let ret =
-        db_bootstrapper::maybe_bootstrap::<AptosVM>(&db_rw, &genesis, genesis_waypoint).unwrap();
+    let ret = db_bootstrapper::maybe_bootstrap::<AptosVMBlockExecutor>(
+        &db_rw,
+        &genesis,
+        genesis_waypoint,
+    )
+    .unwrap();
     assert!(ret.is_some());
 
-    let mempool = MockSharedMempool::new_in_runtime(&db_rw, VMValidator::new(db.clone()));
+    let mempool = MockSharedMempool::new_in_runtime(&db_rw, PooledVMValidator::new(db.clone(), 1));
 
     node_config
         .storage
@@ -204,7 +208,7 @@ pub fn new_test_context_inner(
         rng,
         root_key,
         validator_owner,
-        Box::new(BlockExecutor::<AptosVM>::new(db_rw)),
+        Box::new(BlockExecutor::<AptosVMBlockExecutor>::new(db_rw)),
         mempool,
         db,
         test_name,

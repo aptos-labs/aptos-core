@@ -2,14 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, format_err, Result};
-use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::{
+    code_cache_global_manager::AptosModuleCacheManager,
+    txn_commit_hook::NoOpTransactionCommitHook,
+    txn_provider::{default::DefaultTxnProvider, TxnProvider},
+};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
-    block_executor::config::{
-        BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
+    block_executor::{
+        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
+        execution_state::TransactionSliceMetadata,
     },
+    contract_event::ContractEvent,
     state_store::TStateView,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
@@ -26,8 +32,9 @@ use aptos_vm::{
     data_cache::AsMoveResolver,
     AptosVM,
 };
+use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::output::VMOutput;
+use aptos_vm_types::{module_and_script_storage::AsAptosCodeStorage, output::VMOutput};
 use itertools::Itertools;
 use std::{path::Path, sync::Arc, time::Instant};
 
@@ -59,9 +66,10 @@ impl AptosDebugger {
     ) -> Result<Vec<TransactionOutput>> {
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
             txns.into_iter().map(|x| x.into()).collect::<Vec<_>>();
+        let txn_provider = DefaultTxnProvider::new(sig_verified_txns);
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
 
-        print_transaction_stats(&sig_verified_txns, version);
+        print_transaction_stats(txn_provider.get_txns(), version);
 
         let mut result = None;
 
@@ -69,12 +77,12 @@ impl AptosDebugger {
             for i in 0..repeat_execution_times {
                 let start_time = Instant::now();
                 let cur_result =
-                    execute_block_no_limit(&sig_verified_txns, &state_view, *concurrency_level)
+                    execute_block_no_limit(&txn_provider, &state_view, *concurrency_level)
                         .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
 
                 println!(
                     "[{} txns from {}] Finished execution round {}/{} with concurrency_level={} in {}ms",
-                    sig_verified_txns.len(),
+                    txn_provider.num_txns(),
                     version,
                     i + 1,
                     repeat_execution_times,
@@ -98,7 +106,7 @@ impl AptosDebugger {
         }
 
         let result = result.unwrap();
-        assert_eq!(sig_verified_txns.len(), result.len());
+        assert_eq!(txn_provider.num_txns(), result.len());
         Ok(result)
     }
 
@@ -118,11 +126,14 @@ impl AptosDebugger {
             bail!("Module bundle payload has been removed")
         }
 
-        let vm = AptosVM::new(&state_view);
+        let env = AptosEnvironment::new(&state_view);
+        let vm = AptosVM::new(env.clone(), &state_view);
         let resolver = state_view.as_move_resolver();
+        let code_storage = state_view.as_aptos_code_storage(env);
 
         let (status, output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
             &resolver,
+            &code_storage,
             &txn,
             &log_context,
             |gas_meter| {
@@ -412,29 +423,30 @@ fn print_transaction_stats(sig_verified_txns: &[SignatureVerifiedTransaction], v
 }
 
 fn is_reconfiguration(vm_output: &TransactionOutput) -> bool {
-    let new_epoch_event_key = aptos_types::on_chain_config::new_epoch_event_key();
     vm_output
         .events()
         .iter()
-        .any(|event| event.event_key() == Some(&new_epoch_event_key))
+        .any(ContractEvent::is_new_epoch_event)
 }
 
 fn execute_block_no_limit(
-    sig_verified_txns: &[SignatureVerifiedTransaction],
+    txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
     state_view: &DebuggerStateView,
     concurrency_level: usize,
 ) -> Result<Vec<TransactionOutput>, VMStatus> {
-    BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
-        sig_verified_txns,
+    BlockAptosVM::execute_block::<
+        _,
+        NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+        DefaultTxnProvider<SignatureVerifiedTransaction>,
+    >(
+        txn_provider,
         state_view,
+        &AptosModuleCacheManager::new(),
         BlockExecutorConfig {
-            local: BlockExecutorLocalConfig {
-                concurrency_level,
-                allow_fallback: true,
-                discard_failed_blocks: false,
-            },
+            local: BlockExecutorLocalConfig::default_with_concurrency_level(concurrency_level),
             onchain: BlockExecutorConfigFromOnchain::new_no_block_limit(),
         },
+        TransactionSliceMetadata::unknown(),
         None,
     )
     .map(BlockOutput::into_transaction_outputs_forced)

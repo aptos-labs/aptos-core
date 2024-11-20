@@ -122,13 +122,6 @@ impl Vote {
         self.signature.is_verified()
     }
 
-    /// Only the verify method in validator verifier can set the signature status verified.
-    /// This method additionally lets the tests to set the status to verified.
-    #[cfg(any(test, feature = "fuzzing"))]
-    pub fn set_verified(&self) {
-        self.signature.set_verified();
-    }
-
     /// Returns the 2-chain timeout.
     pub fn generate_2chain_timeout(&self, qc: QuorumCert) -> TwoChainTimeout {
         TwoChainTimeout::new(

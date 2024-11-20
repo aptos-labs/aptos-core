@@ -7,7 +7,7 @@ use aptos_consensus_types::{common::Author, order_vote::OrderVote, quorum_cert::
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
 use aptos_types::{
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures, LedgerInfoWithUnverifiedSignatures},
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures, SignatureAggregator},
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
 use std::{collections::HashMap, sync::Arc};
@@ -33,7 +33,7 @@ pub enum OrderVoteReceptionResult {
 #[derive(Debug, PartialEq, Eq)]
 enum OrderVoteStatus {
     EnoughVotes(LedgerInfoWithSignatures),
-    NotEnoughVotes(LedgerInfoWithUnverifiedSignatures),
+    NotEnoughVotes(SignatureAggregator<LedgerInfo>),
 }
 
 /// A PendingVotes structure keep track of order votes for the last few rounds
@@ -75,7 +75,7 @@ impl PendingOrderVotes {
                 verified_quorum_cert.expect(
                     "Quorum Cert is expected when creating a new entry in pending order votes",
                 ),
-                OrderVoteStatus::NotEnoughVotes(LedgerInfoWithUnverifiedSignatures::new(
+                OrderVoteStatus::NotEnoughVotes(SignatureAggregator::new(
                     order_vote.ledger_info().clone(),
                 )),
             )
@@ -89,7 +89,7 @@ impl PendingOrderVotes {
                     li_with_sig.clone(),
                 ))
             },
-            OrderVoteStatus::NotEnoughVotes(li_with_sig) => {
+            OrderVoteStatus::NotEnoughVotes(sig_aggregator) => {
                 // we don't have enough votes for this ledger info yet
                 let validator_voting_power =
                     validator_verifier.get_voting_power(&order_vote.author());
@@ -109,8 +109,9 @@ impl PendingOrderVotes {
                         order_vote.author()
                     );
                 }
-                li_with_sig.add_signature(order_vote.author(), order_vote.signature_with_status());
-                match li_with_sig.check_voting_power(validator_verifier, true) {
+                sig_aggregator
+                    .add_signature(order_vote.author(), order_vote.signature_with_status());
+                match sig_aggregator.check_voting_power(validator_verifier, true) {
                     Ok(aggregated_voting_power) => {
                         assert!(
                             aggregated_voting_power >= validator_verifier.quorum_voting_power(),
@@ -120,7 +121,11 @@ impl PendingOrderVotes {
                             let _timer = counters::VERIFY_MSG
                                 .with_label_values(&["order_vote_aggregate_and_verify"])
                                 .start_timer();
-                            li_with_sig.aggregate_and_verify(validator_verifier)
+                            sig_aggregator.aggregate_and_verify(validator_verifier).map(
+                                |(ledger_info, aggregated_sig)| {
+                                    LedgerInfoWithSignatures::new(ledger_info, aggregated_sig)
+                                },
+                            )
                         };
                         match verification_result {
                             Ok(ledger_info_with_sig) => {
@@ -159,8 +164,8 @@ impl PendingOrderVotes {
                 OrderVoteStatus::EnoughVotes(li_with_sig) => {
                     li_with_sig.ledger_info().round() > highest_ordered_round
                 },
-                OrderVoteStatus::NotEnoughVotes(li_with_sig) => {
-                    li_with_sig.ledger_info().round() > highest_ordered_round
+                OrderVoteStatus::NotEnoughVotes(sig_aggregator) => {
+                    sig_aggregator.data().round() > highest_ordered_round
                 },
             });
     }
@@ -211,7 +216,6 @@ mod tests {
         );
 
         // first time a new order vote is added -> OrderVoteAdded
-        order_vote_1_author_0.set_verified();
         assert_eq!(
             pending_order_votes.insert_order_vote(
                 &order_vote_1_author_0,
@@ -234,7 +238,6 @@ mod tests {
             li2.clone(),
             signers[1].sign(&li2).expect("Unable to sign ledger info"),
         );
-        order_vote_2_author_1.set_verified();
         assert_eq!(
             pending_order_votes.insert_order_vote(
                 &order_vote_2_author_1,
@@ -252,7 +255,6 @@ mod tests {
             li2.clone(),
             signers[2].sign(&li2).expect("Unable to sign ledger info"),
         );
-        order_vote_2_author_2.set_verified();
         match pending_order_votes.insert_order_vote(&order_vote_2_author_2, &verifier, None) {
             OrderVoteReceptionResult::NewLedgerInfoWithSignatures((_qc, li_with_sig)) => {
                 assert!(li_with_sig.check_voting_power(&verifier).is_ok());
@@ -319,7 +321,6 @@ mod tests {
             OrderVoteReceptionResult::VoteAdded(1)
         );
 
-        vote_0.set_verified();
         assert_eq!(
             pending_order_votes.insert_order_vote(&vote_0, &verifier, None),
             OrderVoteReceptionResult::VoteAdded(1)
@@ -341,9 +342,9 @@ mod tests {
             .get(&li_hash)
             .unwrap();
         match order_vote_status {
-            OrderVoteStatus::NotEnoughVotes(li_with_sig) => {
-                assert_eq!(li_with_sig.verified_voters().count(), 2);
-                assert_eq!(li_with_sig.unverified_voters().count(), 0);
+            OrderVoteStatus::NotEnoughVotes(sig_aggregator) => {
+                assert_eq!(sig_aggregator.verified_voters().count(), 2);
+                assert_eq!(sig_aggregator.unverified_voters().count(), 0);
             },
             _ => {
                 panic!("QC should not be formed yet.");

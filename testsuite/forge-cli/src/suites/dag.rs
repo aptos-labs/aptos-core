@@ -1,7 +1,11 @@
 // Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{changing_working_quorum_test_helper, wrap_with_realistic_env, TestCommand};
+use super::{
+    realistic_environment::wrap_with_realistic_env, ungrouped::changing_working_quorum_test_helper,
+};
+use crate::TestCommand;
 use aptos_forge::{
     success_criteria::{LatencyType, StateProgressThreshold, SuccessCriteria},
     EmitJobMode, EmitJobRequest, ForgeConfig,

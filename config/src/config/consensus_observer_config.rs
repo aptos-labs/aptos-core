@@ -20,6 +20,8 @@ pub struct ConsensusObserverConfig {
     pub observer_enabled: bool,
     /// Whether the consensus publisher is enabled
     pub publisher_enabled: bool,
+    /// Whether to use new pipeline
+    pub enable_pipeline: bool,
 
     /// Maximum number of pending network messages
     pub max_network_channel_size: u64,
@@ -49,6 +51,8 @@ pub struct ConsensusObserverConfig {
 
     /// Duration (in milliseconds) to require state sync to synchronize when in fallback mode
     pub observer_fallback_duration_ms: u64,
+    /// Duration (in milliseconds) we'll wait on startup before considering fallback mode
+    pub observer_fallback_startup_period_ms: u64,
     /// Duration (in milliseconds) we'll wait for syncing progress before entering fallback mode
     pub observer_fallback_sync_threshold_ms: u64,
 }
@@ -58,6 +62,7 @@ impl Default for ConsensusObserverConfig {
         Self {
             observer_enabled: false,
             publisher_enabled: false,
+            enable_pipeline: false,
             max_network_channel_size: 1000,
             max_parallel_serialization_tasks: num_cpus::get(), // Default to the number of CPUs
             network_request_timeout_ms: 5_000,                 // 5 seconds
@@ -67,9 +72,10 @@ impl Default for ConsensusObserverConfig {
             max_concurrent_subscriptions: 2,                   // 2 streams should be sufficient
             max_subscription_sync_timeout_ms: 15_000,          // 15 seconds
             max_subscription_timeout_ms: 15_000,               // 15 seconds
-            subscription_peer_change_interval_ms: 60_000,      // 1 minute
-            subscription_refresh_interval_ms: 300_000,         // 5 minutes
+            subscription_peer_change_interval_ms: 180_000,     // 3 minutes
+            subscription_refresh_interval_ms: 600_000,         // 10 minutes
             observer_fallback_duration_ms: 600_000,            // 10 minutes
+            observer_fallback_startup_period_ms: 60_000,       // 60 seconds
             observer_fallback_sync_threshold_ms: 30_000,       // 30 seconds
         }
     }
