@@ -12,7 +12,8 @@ use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
+        config::BlockExecutorConfigFromOnchain,
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     transaction::{Transaction, TransactionOutput, Version},
 };

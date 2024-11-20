@@ -33,7 +33,7 @@ use aptos_types::{
             BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
             BlockExecutorModuleCacheLocalConfig,
         },
-        execution_state::TransactionSliceMetadata,
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,

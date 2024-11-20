@@ -272,12 +272,12 @@ fn fetch_config_and_update_hash<T: OnChainConfig>(
 #[cfg(test)]
 pub mod test {
     use super::*;
-    use aptos_language_e2e_tests::data_store::FakeDataStore;
+    use aptos_types::state_store::MockStateView;
 
     #[test]
     fn test_new_environment() {
         // This creates an empty state.
-        let state_view = FakeDataStore::default();
+        let state_view = MockStateView::empty();
         let env = Environment::new(&state_view, false, None);
 
         // Check default values.

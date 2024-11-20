@@ -22,8 +22,8 @@ use aptos_storage_interface::cached_state_view::{CachedStateView, StateCache};
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain,
-        execution_state::TransactionSliceMetadata,
         partitioner::{ExecutableTransactions, PartitionedTransactions},
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     contract_event::ContractEvent,
     epoch_state::EpochState,
