@@ -1304,8 +1304,7 @@ impl<'a> Resolver<'a> {
                     function_name,
                 )
                 .map_err(|_| {
-                    // TODO(loader_v2):
-                    //   Loader V1 implementation uses this error, but it should be a linker error.
+                    // Note: legacy loader implementation used this error, so we need to remap.
                     PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(
                         format!(
                             "Module or function do not exist for {}::{}::{}",
