@@ -10,6 +10,7 @@ use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
     metadata::Metadata,
 };
+use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, WithBytes, WithHash, WithSize},
     module_cyclic_dependency_error, module_linker_error,
@@ -190,6 +191,8 @@ where
         if module.code().is_verified() {
             return Ok(Some(module.code().verified().clone()));
         }
+
+        let _timer = VM_TIMER.timer_with_label("ModuleStorage::fetch_verified_module [cache miss]");
 
         let mut visited = HashSet::new();
         visited.insert(id.clone());

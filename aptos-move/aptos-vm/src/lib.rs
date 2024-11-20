@@ -129,8 +129,8 @@ use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBloc
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
-        partitioner::PartitionedTransactions,
+        config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     state_store::StateView,
     transaction::{

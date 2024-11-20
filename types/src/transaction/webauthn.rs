@@ -57,7 +57,7 @@ pub enum AssertionSignature {
 /// Custom arbitrary implementation for fuzzing
 /// as the `secp256r1_ecdsa::Signature` type is an external dependency
 /// p256::ecdsa::Signature
-#[cfg(any(test, feature = "fuzzing"))]
+#[cfg(feature = "fuzzing")]
 impl<'a> arbitrary::Arbitrary<'a> for AssertionSignature {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         // Generate a fixed-length byte array for the signature
