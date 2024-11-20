@@ -28,6 +28,7 @@ module aptos_framework::native_bridge {
     use aptos_std::aptos_hash::keccak256;
 
     const EINVALID_BRIDGE_TRANSFER_ID: u64 = 2;
+    const EEVENT_NOT_FOUND : u64 = 3;
 
     #[event]
     /// An event triggered upon initiating a bridge transfer
@@ -183,6 +184,39 @@ module aptos_framework::native_bridge {
     }  
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
+    fun test_initiate_bridge_transfer_happy_path(
+        sender: &signer,
+        aptos_framework: &signer,
+    ) acquires BridgeEvents, Nonce {
+        let sender_address = signer::address_of(sender);
+        native_bridge_core::initialize_for_test(aptos_framework);
+        initialize(aptos_framework);
+        aptos_account::create_account(sender_address);
+        let amount = 1000;
+
+        // Mint coins to the sender to ensure they have sufficient balance
+        let account_balance = amount + 1;
+        // Mint some coins
+        native_bridge_core::mint(sender_address, account_balance);
+
+        // Specify the recipient and transfer amount
+        let recipient = valid_eip55();
+
+        // Perform the bridge transfer
+        initiate_bridge_transfer(
+            sender,
+            recipient,
+            amount
+        );
+
+        let bridge_events = borrow_global<BridgeEvents>(@aptos_framework);
+        let initiated_events = event::emitted_events_by_handle(
+            &bridge_events.bridge_transfer_initiated_events
+        );
+        assert!(vector::length(&initiated_events) == 1, EEVENT_NOT_FOUND);
+    }
+
+    #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
     #[expected_failure(abort_code = 0x10006, location = 0x1::coin)] //EINSUFFICIENT_BALANCE
     fun test_initiate_bridge_transfer_insufficient_balance(
         sender: &signer,
@@ -190,6 +224,7 @@ module aptos_framework::native_bridge {
     ) acquires BridgeEvents, Nonce {
         let sender_address = signer::address_of(sender);
         native_bridge_core::initialize_for_test(aptos_framework);
+        initialize(aptos_framework);
         aptos_account::create_account(sender_address);
 
         let recipient = valid_eip55();
@@ -284,8 +319,8 @@ module aptos_framework::native_bridge {
     }
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
-    #[expected_failure(abort_code = EINVALID_BRIDGE_TRANSFER_ID, location = 0x1::smart_table)] // ENOT_FOUND
-    fun test_complete_bridge_with_errorneous_bridge_id_by_operator(
+    #[expected_failure(abort_code = EINVALID_BRIDGE_TRANSFER_ID, location = Self)] // ENOT_FOUND
+    fun test_complete_bridge_with_erroneous_bridge_id_by_operator(
         sender: &signer,
         aptos_framework: &signer
     ) acquires BridgeEvents {
@@ -337,7 +372,6 @@ module aptos_framework::native_bridge_store {
     const EINVALID_BRIDGE_TRANSFER_ID : u64 = 0x4;
     const ENATIVE_BRIDGE_NOT_ENABLED : u64 = 0x5;
     const EINCORRECT_NONCE : u64 = 0x6;
-    
 
     const MAX_U64 : u64 = 0xFFFFFFFFFFFFFFFF;
 
