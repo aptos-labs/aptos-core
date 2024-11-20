@@ -5,7 +5,6 @@ module aptos_framework::native_bridge {
     use aptos_framework::native_bridge_configuration;
     use aptos_framework::native_bridge_configuration::assert_is_caller_operator;
     use aptos_framework::native_bridge_store;
-    use aptos_framework::native_bridge_store::bridge_transfer_id;
     use aptos_framework::ethereum;
     use aptos_framework::ethereum::EthereumAddress;
     use aptos_framework::event::{Self, EventHandle}; 
@@ -385,11 +384,6 @@ module aptos_framework::native_bridge_store {
         inner: SmartTable<K, V>,
     }
 
-    // Unique bridge store nonce
-    struct Nonce has key {
-        inner: u64
-    }
-
     /// Details on the transfer
     struct OutboundBridgeTransfer<Initiator: store, Recipient: store> has store, copy {
         addresses: AddressPair<Initiator, Recipient>,
@@ -402,9 +396,6 @@ module aptos_framework::native_bridge_store {
     /// @param aptos_framework The signer for Aptos framework.
     public fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
-        move_to(aptos_framework, Nonce {
-            inner: 0,
-        });
 
         let initiators = SmartTableWrapper<vector<u8>, OutboundBridgeTransfer<address, EthereumAddress>> {
             inner: smart_table::new(),
@@ -484,8 +475,7 @@ module aptos_framework::native_bridge_store {
     ///
     /// @param details The bridge transfer details.
     /// @return The generated bridge transfer ID.
-    public(friend) fun bridge_transfer_id<Initiator: store, Recipient: store>(details: &OutboundBridgeTransfer<Initiator, Recipient>) : vector<u8> acquires Nonce {
-        let nonce = borrow_global_mut<Nonce>(@aptos_framework);
+    public(friend) fun bridge_transfer_id<Initiator: store, Recipient: store>(details: &OutboundBridgeTransfer<Initiator, Recipient>) : vector<u8> {
         let combined_bytes = vector::empty<u8>();
         vector::append(&mut combined_bytes, bcs::to_bytes(&details.addresses.initiator));
         vector::append(&mut combined_bytes, bcs::to_bytes(&details.addresses.recipient));
