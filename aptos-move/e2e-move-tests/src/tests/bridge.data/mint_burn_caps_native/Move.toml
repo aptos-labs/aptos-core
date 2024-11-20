@@ -1,5 +1,5 @@
 [package]
-name = "AtomicBridgeFeature"
+name = "MintBurnCapsNative"
 version = "0.0.0"
 
 [dependencies]

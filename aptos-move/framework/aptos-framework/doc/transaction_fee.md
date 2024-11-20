@@ -26,6 +26,7 @@ This module provides an interface to burn or collect and redistribute transactio
 -  [Function `convert_to_aptos_fa_burn_ref`](#0x1_transaction_fee_convert_to_aptos_fa_burn_ref)
 -  [Function `store_aptos_coin_mint_cap`](#0x1_transaction_fee_store_aptos_coin_mint_cap)
 -  [Function `copy_capabilities_for_bridge`](#0x1_transaction_fee_copy_capabilities_for_bridge)
+-  [Function `copy_capabilities_for_native_bridge`](#0x1_transaction_fee_copy_capabilities_for_native_bridge)
 -  [Function `initialize_storage_refund`](#0x1_transaction_fee_initialize_storage_refund)
 -  [Function `emit_fee_statement`](#0x1_transaction_fee_emit_fee_statement)
 -  [Specification](#@Specification_1)
@@ -334,6 +335,15 @@ The burn percentage is out of range [0, 100].
 
 
 <pre><code><b>const</b> <a href="transaction_fee.md#0x1_transaction_fee_EINVALID_BURN_PERCENTAGE">EINVALID_BURN_PERCENTAGE</a>: u64 = 3;
+</code></pre>
+
+
+
+<a id="0x1_transaction_fee_ENATIVE_BRIDGE_NOT_ENABLED"></a>
+
+
+
+<pre><code><b>const</b> <a href="transaction_fee.md#0x1_transaction_fee_ENATIVE_BRIDGE_NOT_ENABLED">ENATIVE_BRIDGE_NOT_ENABLED</a>: u64 = 8;
 </code></pre>
 
 
@@ -798,6 +808,40 @@ Can only be called once after which it will assert
 <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>, <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinMintCapability">AptosCoinMintCapability</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_abort_atomic_bridge_enabled">features::abort_atomic_bridge_enabled</a>(), <a href="transaction_fee.md#0x1_transaction_fee_EATOMIC_BRIDGE_NOT_ENABLED">EATOMIC_BRIDGE_NOT_ENABLED</a>);
+    <b>assert</b>!(!<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CopyCapabilitiesOneShot">CopyCapabilitiesOneShot</a>&gt;(@aptos_framework), <a href="transaction_fee.md#0x1_transaction_fee_ECOPY_CAPS_SHOT">ECOPY_CAPS_SHOT</a>);
+    <b>move_to</b>(aptos_framework, <a href="transaction_fee.md#0x1_transaction_fee_CopyCapabilitiesOneShot">CopyCapabilitiesOneShot</a>{});
+    (
+        <b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinMintCapability">AptosCoinMintCapability</a>&gt;(@aptos_framework).mint_cap,
+        <b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework).burn_cap
+    )
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_fee_copy_capabilities_for_native_bridge"></a>
+
+## Function `copy_capabilities_for_native_bridge`
+
+Copy Mint and Burn capabilities over to bridge
+Can only be called once after which it will assert
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_copy_capabilities_for_native_bridge">copy_capabilities_for_native_bridge</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): (<a href="coin.md#0x1_coin_MintCapability">coin::MintCapability</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;, <a href="coin.md#0x1_coin_BurnCapability">coin::BurnCapability</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_copy_capabilities_for_native_bridge">copy_capabilities_for_native_bridge</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) : (MintCapability&lt;AptosCoin&gt;, BurnCapability&lt;AptosCoin&gt;)
+<b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>, <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinMintCapability">AptosCoinMintCapability</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_abort_native_bridge_enabled">features::abort_native_bridge_enabled</a>(), <a href="transaction_fee.md#0x1_transaction_fee_ENATIVE_BRIDGE_NOT_ENABLED">ENATIVE_BRIDGE_NOT_ENABLED</a>);
     <b>assert</b>!(!<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CopyCapabilitiesOneShot">CopyCapabilitiesOneShot</a>&gt;(@aptos_framework), <a href="transaction_fee.md#0x1_transaction_fee_ECOPY_CAPS_SHOT">ECOPY_CAPS_SHOT</a>);
     <b>move_to</b>(aptos_framework, <a href="transaction_fee.md#0x1_transaction_fee_CopyCapabilitiesOneShot">CopyCapabilitiesOneShot</a>{});
     (

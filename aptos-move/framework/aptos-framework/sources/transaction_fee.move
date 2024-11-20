@@ -33,6 +33,8 @@ module aptos_framework::transaction_fee {
 
     const ECOPY_CAPS_SHOT: u64 = 7;
 
+    const ENATIVE_BRIDGE_NOT_ENABLED: u64 = 8;
+
     /// The one shot copy capabilities call
     struct CopyCapabilitiesOneShot has key {}
 
@@ -287,6 +289,20 @@ module aptos_framework::transaction_fee {
     acquires AptosCoinCapabilities, AptosCoinMintCapability {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(features::abort_atomic_bridge_enabled(), EATOMIC_BRIDGE_NOT_ENABLED);
+        assert!(!exists<CopyCapabilitiesOneShot>(@aptos_framework), ECOPY_CAPS_SHOT);
+        move_to(aptos_framework, CopyCapabilitiesOneShot{});
+        (
+            borrow_global<AptosCoinMintCapability>(@aptos_framework).mint_cap,
+            borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap
+        )
+    }
+
+    /// Copy Mint and Burn capabilities over to bridge
+    /// Can only be called once after which it will assert
+    public fun copy_capabilities_for_native_bridge(aptos_framework: &signer) : (MintCapability<AptosCoin>, BurnCapability<AptosCoin>)
+    acquires AptosCoinCapabilities, AptosCoinMintCapability {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        assert!(features::abort_native_bridge_enabled(), ENATIVE_BRIDGE_NOT_ENABLED);
         assert!(!exists<CopyCapabilitiesOneShot>(@aptos_framework), ECOPY_CAPS_SHOT);
         move_to(aptos_framework, CopyCapabilitiesOneShot{});
         (

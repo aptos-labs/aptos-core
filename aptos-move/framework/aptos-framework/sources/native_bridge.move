@@ -138,7 +138,7 @@ module aptos_framework::native_bridge {
         );  
     }
 
-     /// Completes a bridge transfer by the initiator.  
+    /// Completes a bridge transfer by the initiator.  
     ///  
     /// @param caller The signer representing the bridge operator.  
     /// @param initiator The initiator's Ethereum address as a vector of bytes.  
@@ -384,8 +384,15 @@ module aptos_framework::native_bridge_store {
         inner: SmartTable<K, V>,
     }
 
-    /// Details on the transfer
+    /// Details on the outbound transfer
     struct OutboundBridgeTransfer<Initiator: store, Recipient: store> has store, copy {
+        addresses: AddressPair<Initiator, Recipient>,
+        amount: u64,
+        nonce: u64
+    }
+
+    /// Details on the inbound transfer
+    struct InboundBridgeTransfer<Initiator: store, Recipient: store> has store, copy {
         addresses: AddressPair<Initiator, Recipient>,
         amount: u64,
         nonce: u64
@@ -439,7 +446,7 @@ module aptos_framework::native_bridge_store {
         }
     }
 
-    /// Record details of a transfer
+    /// Record details of a transfer, mapping 
     ///
     /// @param bridge_transfer_id Bridge transfer ID.
     /// @param details The bridge transfer details
@@ -451,7 +458,7 @@ module aptos_framework::native_bridge_store {
         smart_table::add(&mut table.inner, bridge_transfer_id, details);
     }
 
-     /// Record details of a transfer
+    /// Record details of a transfer
     ///
     /// @param bridge_transfer_id Bridge transfer ID.
     /// @param details The bridge transfer details

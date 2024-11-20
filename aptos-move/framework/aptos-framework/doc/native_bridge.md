@@ -8,6 +8,7 @@
 -  [Struct `AddressPair`](#0x1_native_bridge_store_AddressPair)
 -  [Resource `SmartTableWrapper`](#0x1_native_bridge_store_SmartTableWrapper)
 -  [Struct `OutboundBridgeTransfer`](#0x1_native_bridge_store_OutboundBridgeTransfer)
+-  [Struct `InboundBridgeTransfer`](#0x1_native_bridge_store_InboundBridgeTransfer)
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_native_bridge_store_initialize)
 -  [Function `now`](#0x1_native_bridge_store_now)
@@ -98,10 +99,50 @@ A smart table wrapper
 
 ## Struct `OutboundBridgeTransfer`
 
-Details on the transfer
+Details on the outbound transfer
 
 
 <pre><code><b>struct</b> <a href="native_bridge.md#0x1_native_bridge_store_OutboundBridgeTransfer">OutboundBridgeTransfer</a>&lt;Initiator: store, Recipient: store&gt; <b>has</b> <b>copy</b>, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>addresses: <a href="native_bridge.md#0x1_native_bridge_store_AddressPair">native_bridge_store::AddressPair</a>&lt;Initiator, Recipient&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>amount: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>nonce: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_native_bridge_store_InboundBridgeTransfer"></a>
+
+## Struct `InboundBridgeTransfer`
+
+Details on the inbound transfer
+
+
+<pre><code><b>struct</b> <a href="native_bridge.md#0x1_native_bridge_store_InboundBridgeTransfer">InboundBridgeTransfer</a>&lt;Initiator: store, Recipient: store&gt; <b>has</b> <b>copy</b>, store
 </code></pre>
 
 
@@ -148,6 +189,15 @@ Details on the transfer
 
 
 
+<a id="0x1_native_bridge_store_ENATIVE_BRIDGE_NOT_ENABLED"></a>
+
+
+
+<pre><code><b>const</b> <a href="native_bridge.md#0x1_native_bridge_store_ENATIVE_BRIDGE_NOT_ENABLED">ENATIVE_BRIDGE_NOT_ENABLED</a>: u64 = 5;
+</code></pre>
+
+
+
 <a id="0x1_native_bridge_store_EINVALID_BRIDGE_TRANSFER_ID"></a>
 
 
@@ -181,15 +231,6 @@ Error codes
 
 
 <pre><code><b>const</b> <a href="native_bridge.md#0x1_native_bridge_store_EINCORRECT_NONCE">EINCORRECT_NONCE</a>: u64 = 6;
-</code></pre>
-
-
-
-<a id="0x1_native_bridge_store_ENATIVE_BRIDGE_NOT_ENABLED"></a>
-
-
-
-<pre><code><b>const</b> <a href="native_bridge.md#0x1_native_bridge_store_ENATIVE_BRIDGE_NOT_ENABLED">ENATIVE_BRIDGE_NOT_ENABLED</a>: u64 = 5;
 </code></pre>
 
 
@@ -315,7 +356,7 @@ Creates bridge transfer details with validation.
 
 ## Function `add`
 
-Record details of a transfer
+Record details of a transfer, mapping
 
 @param bridge_transfer_id Bridge transfer ID.
 @param details The bridge transfer details
