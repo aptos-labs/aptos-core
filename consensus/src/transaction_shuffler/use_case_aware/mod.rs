@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::transaction_shuffler::TransactionShuffler;
-use aptos_types::transaction::{
-    use_case::{UseCaseAwareTransaction, UseCaseKey},
-    SignedTransaction,
-};
+use aptos_types::transaction::{use_case::UseCaseKey, SignedTransaction};
 use iterator::ShuffledTransactionIterator;
 use std::fmt::Debug;
 
@@ -45,7 +42,9 @@ pub struct UseCaseAwareShuffler {
 
 #[cfg(any(test, feature = "fuzzing"))]
 impl UseCaseAwareShuffler {
-    pub fn shuffle_generic<Txn: UseCaseAwareTransaction + Debug>(
+    pub fn shuffle_generic<
+        Txn: aptos_types::transaction::use_case::UseCaseAwareTransaction + Debug,
+    >(
         &self,
         txns: Vec<Txn>,
     ) -> Vec<Txn> {

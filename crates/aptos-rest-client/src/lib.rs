@@ -765,7 +765,7 @@ impl Client {
                         if let Some(state) = aptos_error_response.state {
                             if expiration_timestamp_secs <= state.timestamp_usecs / 1_000_000 {
                                 if reached_mempool {
-                                    return Err(anyhow!("Transaction expired. It is guaranteed it will not be committed on chain.").into());
+                                    return Err(anyhow!("Used to be pending and now not found. Transaction expired. It is guaranteed it will not be committed on chain.").into());
                                 } else {
                                     // We want to know whether we ever got Pending state from the mempool,
                                     // to warn in case we didn't.
