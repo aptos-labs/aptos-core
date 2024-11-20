@@ -11,7 +11,6 @@ use crate::{
     contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
     keyless::{KeylessPublicKey, KeylessSignature},
     ledger_info::LedgerInfo,
-    on_chain_config::{FeatureFlag, Features},
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
     transaction::authenticator::{
         AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator,
@@ -914,22 +913,6 @@ impl ExecutionStatus {
             _ => ExecutionStatus::MiscellaneousError(None),
         }
     }
-
-    pub fn remove_error_detail(self) -> Self {
-        match self {
-            ExecutionStatus::MoveAbort {
-                location,
-                code,
-                info: _,
-            } => ExecutionStatus::MoveAbort {
-                location,
-                code,
-                info: None,
-            },
-            ExecutionStatus::MiscellaneousError(_) => ExecutionStatus::MiscellaneousError(None),
-            _ => self,
-        }
-    }
 }
 
 /// The status of executing a transaction. The VM decides whether or not we should `Keep` the
@@ -982,7 +965,6 @@ impl TransactionStatus {
     pub fn from_vm_status(
         vm_status: VMStatus,
         charge_invariant_violation: bool,
-        features: &Features,
     ) -> (Self, TransactionAuxiliaryData) {
         let status_code = vm_status.status_code();
         let txn_aux = TransactionAuxiliaryData::from_vm_status(&vm_status);
@@ -1005,21 +987,7 @@ impl TransactionStatus {
                 }
             },
         };
-
-        if features.is_enabled(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH) {
-            (status.remove_error_detail(), txn_aux)
-        } else {
-            (status, txn_aux)
-        }
-    }
-
-    pub fn remove_error_detail(self) -> Self {
-        match self {
-            TransactionStatus::Keep(status) => {
-                TransactionStatus::Keep(status.remove_error_detail())
-            },
-            _ => self,
-        }
+        (status, txn_aux)
     }
 
     pub fn from_executed_vm_status(vm_status: VMStatus) -> Self {

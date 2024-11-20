@@ -309,12 +309,6 @@ impl AptosDB {
                     .commit_transaction_accumulator(chunk.first_version, chunk.transaction_infos)
                     .unwrap()
             });
-            s.spawn(|_| {
-                self.commit_transaction_auxiliary_data(
-                    chunk.first_version,
-                    chunk.transaction_outputs.iter().map(TransactionOutput::auxiliary_data))
-                    .unwrap()
-            });
         });
 
         Ok(new_root_hash)
@@ -489,6 +483,7 @@ impl AptosDB {
         Ok(root_hash)
     }
 
+    #[allow(dead_code)]
     fn commit_transaction_auxiliary_data<'a>(
         &self,
         first_version: Version,

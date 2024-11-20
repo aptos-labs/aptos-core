@@ -475,7 +475,6 @@ impl AptosVM {
             error_vm_status.clone(),
             self.features()
                 .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
-            self.features(),
         );
 
         match txn_status {
