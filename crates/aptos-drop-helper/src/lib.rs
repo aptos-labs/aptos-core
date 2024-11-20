@@ -4,11 +4,15 @@
 use crate::async_concurrent_dropper::AsyncConcurrentDropper;
 use derive_more::{Deref, DerefMut};
 use once_cell::sync::Lazy;
-use std::mem::ManuallyDrop;
+use std::{cell::Cell, mem::ManuallyDrop};
 
 pub mod async_concurrent_dropper;
 pub mod async_drop_queue;
 mod metrics;
+
+thread_local! {
+    static IN_ANY_DROP_POOL: Cell<bool> = const { Cell::new(false) };
+}
 
 pub static DEFAULT_DROPPER: Lazy<AsyncConcurrentDropper> =
     Lazy::new(|| AsyncConcurrentDropper::new("default", 32, 8));
