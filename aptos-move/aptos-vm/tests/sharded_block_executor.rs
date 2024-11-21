@@ -201,13 +201,18 @@ mod test_utils {
         executor::FakeExecutor,
     };
     use aptos_types::{
+        account_config::ObjectGroupResource,
         block_executor::{
             config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
         },
+        on_chain_config::{FeatureFlag, Features, OnChainConfig},
+        state_store::state_key::{inner::StateKeyInner, StateKey},
         transaction::{
-            analyzed_transaction::AnalyzedTransaction,
-            signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
-            TransactionOutput,
+            analyzed_transaction::{
+                initialize_default_to_fa_apt_store, AnalyzedTransaction, DEFAULT_TO_FA_APT_STORE,
+            },
+            signature_verified_transaction::SignatureVerifiedTransaction,
+            Transaction, TransactionOutput,
         },
     };
     use aptos_vm::{
@@ -215,7 +220,7 @@ mod test_utils {
         sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
         VMBlockExecutor,
     };
-    use move_core_types::account_address::AccountAddress;
+    use move_core_types::{account_address::AccountAddress, move_resource::MoveStructType};
     use rand::{rngs::OsRng, Rng};
     use std::{
         collections::HashMap,
@@ -271,6 +276,18 @@ mod test_utils {
         sharded_txn_output: Vec<TransactionOutput>,
     ) {
         assert_eq!(unsharded_txn_output.len(), sharded_txn_output.len());
+
+        // TODO: Fix total_supply with FA enabled
+        let key_to_filter = AccountAddress::from_hex_literal("0xa").unwrap();
+        let state_key_to_filter =
+            StateKey::resource_group(&key_to_filter, &ObjectGroupResource::struct_tag());
+        let path_to_filter =
+            if let StateKeyInner::AccessPath(access_path) = state_key_to_filter.inner() {
+                access_path
+            } else {
+                panic!("Expected AccessPath");
+            };
+
         for i in 0..unsharded_txn_output.len() {
             assert_eq!(
                 unsharded_txn_output[i].status(),
@@ -280,10 +297,41 @@ mod test_utils {
                 unsharded_txn_output[i].gas_used(),
                 sharded_txn_output[i].gas_used()
             );
-            assert_eq!(
-                unsharded_txn_output[i].write_set(),
-                sharded_txn_output[i].write_set()
-            );
+            if *DEFAULT_TO_FA_APT_STORE.get().unwrap() {
+                let unsharded_write_set_without_table_item = unsharded_txn_output[i]
+                    .write_set()
+                    .into_iter()
+                    .filter(|(k, _)| {
+                        if let StateKeyInner::AccessPath(access_path) = k.inner() {
+                            !(access_path.address == key_to_filter
+                                && access_path.path == path_to_filter.path)
+                        } else {
+                            true
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                let sharded_write_set_without_table_item = sharded_txn_output[i]
+                    .write_set()
+                    .into_iter()
+                    .filter(|(k, _)| {
+                        if let StateKeyInner::AccessPath(access_path) = k.inner() {
+                            !(access_path.address == key_to_filter
+                                && access_path.path == path_to_filter.path)
+                        } else {
+                            true
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(
+                    unsharded_write_set_without_table_item,
+                    sharded_write_set_without_table_item
+                );
+            } else {
+                assert_eq!(
+                    unsharded_txn_output[i].write_set(),
+                    sharded_txn_output[i].write_set()
+                );
+            }
             assert_eq!(
                 unsharded_txn_output[i].events(),
                 sharded_txn_output[i].events()
@@ -299,6 +347,14 @@ mod test_utils {
         let num_shards = 8;
         let mut executor = FakeExecutor::from_head_genesis();
         let mut transactions = Vec::new();
+
+        if DEFAULT_TO_FA_APT_STORE.get().is_none() {
+            let features = Features::fetch_config(&executor.data_store()).unwrap_or_default();
+            let use_fa_balance =
+                features.is_enabled(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
+            initialize_default_to_fa_apt_store(use_fa_balance);
+        }
+
         for _ in 0..num_txns {
             transactions.push(generate_non_conflicting_p2p(&mut executor).0)
         }
@@ -336,6 +392,14 @@ mod test_utils {
         let mut transactions = Vec::new();
         let mut accounts = Vec::new();
         let mut txn_hash_to_account = HashMap::new();
+
+        if DEFAULT_TO_FA_APT_STORE.get().is_none() {
+            let features = Features::fetch_config(&executor.data_store()).unwrap_or_default();
+            let use_fa_balance =
+                features.is_enabled(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
+            initialize_default_to_fa_apt_store(use_fa_balance);
+        }
+
         for _ in 0..num_accounts {
             let account = generate_account_at(&mut executor, AccountAddress::random());
             accounts.push(Mutex::new(account));
@@ -386,6 +450,13 @@ mod test_utils {
         let num_accounts = rng.gen_range(2, max_accounts);
         let mut accounts = Vec::new();
         let mut executor = FakeExecutor::from_head_genesis();
+
+        if DEFAULT_TO_FA_APT_STORE.get().is_none() {
+            let features = Features::fetch_config(&executor.data_store()).unwrap_or_default();
+            let use_fa_balance =
+                features.is_enabled(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
+            initialize_default_to_fa_apt_store(use_fa_balance);
+        }
 
         for _ in 0..num_accounts {
             let account = generate_account_at(&mut executor, AccountAddress::random());

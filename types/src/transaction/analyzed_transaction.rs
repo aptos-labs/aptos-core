@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_config::{AccountResource, CoinInfoResource, CoinStoreResource},
+    account_config,
+    account_config::{AccountResource, CoinInfoResource, CoinStoreResource, ObjectGroupResource},
     chain_id::ChainId,
     on_chain_config::{CurrentTimeMicroseconds, Features, TransactionFeeBurnCap},
     state_store::{state_key::StateKey, table::TableHandle},
@@ -16,9 +17,20 @@ use aptos_crypto::HashValue;
 pub use move_core_types::abi::{
     ArgumentABI, ScriptFunctionABI as EntryFunctionABI, TransactionScriptABI, TypeArgumentABI,
 };
-use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
+use move_core_types::{
+    account_address::AccountAddress, language_storage::StructTag, move_resource::MoveStructType,
+};
+use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
+
+pub static DEFAULT_TO_FA_APT_STORE: OnceCell<bool> = OnceCell::new();
+
+pub fn initialize_default_to_fa_apt_store(value: bool) {
+    DEFAULT_TO_FA_APT_STORE
+        .set(value)
+        .expect("DEFAULT_TO_FA_APT_STORE can only be initialized once");
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AnalyzedTransaction {
@@ -162,9 +174,17 @@ pub fn account_resource_location(address: AccountAddress) -> StorageLocation {
 }
 
 pub fn coin_store_location(address: AccountAddress) -> StorageLocation {
-    StorageLocation::Specific(
-        StateKey::resource_typed::<CoinStoreResource<AptosCoinType>>(&address).unwrap(),
-    )
+    let default_to_fa_apt_store = DEFAULT_TO_FA_APT_STORE.get();
+    if default_to_fa_apt_store.is_some() && *default_to_fa_apt_store.unwrap() {
+        StorageLocation::Specific(StateKey::resource_group(
+            &account_config::fungible_store::primary_apt_store(address),
+            &ObjectGroupResource::struct_tag(),
+        ))
+    } else {
+        StorageLocation::Specific(
+            StateKey::resource_typed::<CoinStoreResource<AptosCoinType>>(&address).unwrap(),
+        )
+    }
 }
 
 pub fn current_ts_location() -> StorageLocation {
