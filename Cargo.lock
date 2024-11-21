@@ -16369,30 +16369,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "test-generation"
-version = "0.1.0"
-dependencies = [
- "clap 4.5.21",
- "crossbeam-channel",
- "getrandom 0.2.11",
- "hex",
- "itertools 0.13.0",
- "module-generation",
- "move-binary-format",
- "move-bytecode-verifier",
- "move-compiler",
- "move-core-types",
- "move-stdlib",
- "move-vm-runtime",
- "move-vm-test-utils",
- "move-vm-types",
- "num_cpus",
- "rand 0.8.5",
- "tracing",
- "tracing-subscriber 0.3.18",
-]
-
-[[package]]
 name = "testdiff"
 version = "0.1.0"
 dependencies = [
