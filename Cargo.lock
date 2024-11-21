@@ -1373,7 +1373,6 @@ version = "0.1.0"
 dependencies = [
  "aptos-infallible",
  "aptos-metrics-core",
- "derive_more",
  "once_cell",
  "rayon",
  "threadpool",
