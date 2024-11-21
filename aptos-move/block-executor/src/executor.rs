@@ -1188,7 +1188,7 @@ where
         counters::update_state_counters(versioned_cache.stats(), true);
         module_cache_manager_guard
             .module_cache_mut()
-            .insert_verified_unsync(versioned_cache.take_modules_iter())
+            .insert_verified(versioned_cache.take_modules_iter())
             .map_err(|err| {
                 alert!("[BlockSTM] Encountered panic error: {:?}", err);
             })?;
@@ -1247,7 +1247,7 @@ where
             })?;
         let extension = Arc::new(AptosModuleExtension::new(state_value));
 
-        global_module_cache.mark_invalid_if_contains(&id);
+        global_module_cache.mark_overridden(&id);
         per_block_module_cache
             .insert_deserialized_module(id.clone(), compiled_module, extension, Some(txn_idx))
             .map_err(|err| {
@@ -1668,7 +1668,7 @@ where
         counters::update_state_counters(unsync_map.stats(), false);
         module_cache_manager_guard
             .module_cache_mut()
-            .insert_verified_unsync(unsync_map.into_modules_iter())?;
+            .insert_verified(unsync_map.into_modules_iter())?;
 
         let block_end_info = if self
             .config

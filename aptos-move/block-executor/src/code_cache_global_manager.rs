@@ -10,7 +10,8 @@ use crate::{
 };
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorModuleCacheLocalConfig, execution_state::TransactionSliceMetadata,
+        config::BlockExecutorModuleCacheLocalConfig,
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     error::PanicError,
     state_store::StateView,
@@ -298,7 +299,7 @@ fn prefetch_aptos_framework<S: StateView>(
         // Framework must have been loaded. Drain verified modules from local cache into
         // global cache.
         let verified_module_code_iter = code_storage.into_verified_module_code_iter()?;
-        module_cache.insert_verified_unsync(verified_module_code_iter)?;
+        module_cache.insert_verified(verified_module_code_iter)?;
     }
     Ok(())
 }

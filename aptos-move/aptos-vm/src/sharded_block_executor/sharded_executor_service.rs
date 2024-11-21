@@ -21,8 +21,8 @@ use aptos_logger::{info, trace};
 use aptos_types::{
     block_executor::{
         config::{BlockExecutorConfig, BlockExecutorLocalConfig},
-        execution_state::TransactionSliceMetadata,
         partitioner::{ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies},
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     state_store::StateView,
     transaction::{

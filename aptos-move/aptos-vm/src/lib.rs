@@ -128,8 +128,8 @@ pub use crate::aptos_vm::{AptosSimulationVM, AptosVM};
 use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor};
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
-        partitioner::PartitionedTransactions,
+        config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     state_store::StateView,
     transaction::{
