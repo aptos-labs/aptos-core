@@ -36,19 +36,11 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
     Lazy::new(|| TransactionValidation {
         module_addr: CORE_CODE_ADDRESS,
         module_name: Identifier::new("transaction_validation").unwrap(),
-        fee_payer_prologue_name: Identifier::new("fee_payer_script_prologue").unwrap(),
-        script_prologue_name: Identifier::new("script_prologue").unwrap(),
-        multi_agent_prologue_name: Identifier::new("multi_agent_script_prologue").unwrap(),
-        user_epilogue_name: Identifier::new("epilogue").unwrap(),
-        user_epilogue_gas_payer_name: Identifier::new("epilogue_gas_payer").unwrap(),
-        fee_payer_prologue_extended_name: Identifier::new("fee_payer_script_prologue_extended")
-            .unwrap(),
-        script_prologue_extended_name: Identifier::new("script_prologue_extended").unwrap(),
-        multi_agent_prologue_extended_name: Identifier::new("multi_agent_script_prologue_extended")
-            .unwrap(),
-        user_epilogue_extended_name: Identifier::new("epilogue_extended").unwrap(),
-        user_epilogue_gas_payer_extended_name: Identifier::new("epilogue_gas_payer_extended")
-            .unwrap(),
+        fee_payer_prologue_name: Identifier::new("fee_payer_script_prologue_extended").unwrap(),
+        script_prologue_name: Identifier::new("script_prologue_extended").unwrap(),
+        multi_agent_prologue_name: Identifier::new("multi_agent_script_prologue_extended").unwrap(),
+        user_epilogue_name: Identifier::new("epilogue_extended").unwrap(),
+        user_epilogue_gas_payer_name: Identifier::new("epilogue_gas_payer_extended").unwrap(),
     });
 
 /// On-chain functions used to validate transactions
@@ -61,11 +53,6 @@ pub struct TransactionValidation {
     pub multi_agent_prologue_name: Identifier,
     pub user_epilogue_name: Identifier,
     pub user_epilogue_gas_payer_name: Identifier,
-    pub fee_payer_prologue_extended_name: Identifier,
-    pub script_prologue_extended_name: Identifier,
-    pub multi_agent_prologue_extended_name: Identifier,
-    pub user_epilogue_extended_name: Identifier,
-    pub user_epilogue_gas_payer_extended_name: Identifier,
 }
 
 impl TransactionValidation {
@@ -121,10 +108,7 @@ pub(crate) fn run_script_prologue(
             MoveValue::U8(chain_id.id()),
             MoveValue::Bool(is_simulation),
         ];
-        (
-            &APTOS_TRANSACTION_VALIDATION.fee_payer_prologue_extended_name,
-            args,
-        )
+        (&APTOS_TRANSACTION_VALIDATION.fee_payer_prologue_name, args)
     } else if txn_data.is_multi_agent() {
         let args = vec![
             MoveValue::Signer(txn_data.sender),
@@ -139,7 +123,7 @@ pub(crate) fn run_script_prologue(
             MoveValue::Bool(is_simulation),
         ];
         (
-            &APTOS_TRANSACTION_VALIDATION.multi_agent_prologue_extended_name,
+            &APTOS_TRANSACTION_VALIDATION.multi_agent_prologue_name,
             args,
         )
     } else {
@@ -155,10 +139,7 @@ pub(crate) fn run_script_prologue(
             MoveValue::vector_u8(txn_data.script_hash.clone()),
             MoveValue::Bool(is_simulation),
         ];
-        (
-            &APTOS_TRANSACTION_VALIDATION.script_prologue_extended_name,
-            args,
-        )
+        (&APTOS_TRANSACTION_VALIDATION.script_prologue_name, args)
     };
     session
         .execute_function_bypass_visibility(
@@ -247,7 +228,7 @@ fn run_epilogue(
                 MoveValue::Bool(is_simulation),
             ];
             (
-                &APTOS_TRANSACTION_VALIDATION.user_epilogue_gas_payer_extended_name,
+                &APTOS_TRANSACTION_VALIDATION.user_epilogue_gas_payer_name,
                 args,
             )
         };
@@ -271,10 +252,7 @@ fn run_epilogue(
                 MoveValue::U64(gas_remaining.into()),
                 MoveValue::Bool(is_simulation),
             ];
-            (
-                &APTOS_TRANSACTION_VALIDATION.user_epilogue_extended_name,
-                args,
-            )
+            (&APTOS_TRANSACTION_VALIDATION.user_epilogue_name, args)
         };
         session.execute_function_bypass_visibility(
             &APTOS_TRANSACTION_VALIDATION.module_id(),
