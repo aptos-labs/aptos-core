@@ -13,10 +13,6 @@ use std::cell::RefCell;
 
 pub(crate) const MAX_TYPE_TAG_NESTING: u8 = 8;
 
-// For testability, we allow to serialize one more level than deserialize.
-pub(crate) const MAX_TYPE_TAG_NESTING_WHEN_SERIALIZING: u8 =
-    MAX_TYPE_TAG_NESTING + if cfg!(test) { 1 } else { 0 };
-
 thread_local! {
     static TYPE_TAG_DEPTH: RefCell<u8> = const { RefCell::new(0) };
 }
@@ -27,6 +23,10 @@ where
     T: Serialize,
 {
     use serde::ser::Error;
+
+    // For testability, we allow to serialize one more level than deserialize.
+    const MAX_TYPE_TAG_NESTING_WHEN_SERIALIZING: u8 =
+        MAX_TYPE_TAG_NESTING + if cfg!(test) { 1 } else { 0 };
 
     TYPE_TAG_DEPTH.with(|depth| {
         let mut r = depth.borrow_mut();
