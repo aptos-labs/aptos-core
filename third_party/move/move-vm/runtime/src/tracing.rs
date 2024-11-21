@@ -6,7 +6,7 @@
 use crate::debug::DebugContext;
 #[cfg(any(debug_assertions, feature = "debugging"))]
 use crate::{
-    interpreter::Interpreter,
+    interpreter::InterpreterImpl,
     loader::{LoadedFunction, Resolver},
 };
 #[cfg(any(debug_assertions, feature = "debugging"))]
@@ -72,7 +72,7 @@ pub(crate) fn trace(
     pc: u16,
     instr: &Bytecode,
     resolver: &Resolver,
-    interp: &Interpreter,
+    interp: &InterpreterImpl,
 ) {
     if *TRACING_ENABLED {
         let buf_writer = &mut *LOGGING_FILE_WRITER.lock().unwrap();

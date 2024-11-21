@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{interpreter::Interpreter, loader::Resolver, LoadedFunction};
+use crate::{interpreter::InterpreterDebugInterface, loader::Resolver, LoadedFunction};
 use move_binary_format::file_format::Bytecode;
 use move_vm_types::values::{self, Locals};
 use std::{
@@ -102,7 +102,7 @@ impl DebugContext {
         pc: u16,
         instr: &Bytecode,
         resolver: &Resolver,
-        interp: &Interpreter,
+        interp: &dyn InterpreterDebugInterface,
     ) {
         let instr_string = format!("{:?}", instr);
         let function_string = function.name_as_pretty_string();
