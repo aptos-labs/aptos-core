@@ -397,10 +397,9 @@ pub(crate) mod test {
         module_storage.assert_cached_state(vec![&a_id, &c_id], vec![&d_id, &e_id, &f_id, &g_id]);
 
         assert_ok!(module_storage.fetch_verified_module(a_id.address(), a_id.name()));
-        module_storage.assert_cached_state(
-            vec![],
-            vec![&a_id, &b_id, &c_id, &d_id, &e_id, &f_id, &g_id],
-        );
+        module_storage.assert_cached_state(vec![], vec![
+            &a_id, &b_id, &c_id, &d_id, &e_id, &f_id, &g_id,
+        ]);
     }
 
     #[test]
