@@ -83,5 +83,9 @@ jobs:
         run: docker logs aptos-tools-devnet && docker logs aptos-tools-testnet && docker logs aptos-tools-mainnet
 
       # Print out whether the job was skipped.
-      - run: echo "Skipping CLI E2E tests!"
+      - run: echo "Skipping CLI E2E tests!......"
         if: ${{ inputs.SKIP_JOB }}
+
+        # Print out whether the job was skipped.
+      - run: echo "Not Skipping CLI E2E tests!......"
+        if: ${{ !inputs.SKIP_JOB }}
