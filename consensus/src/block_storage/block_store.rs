@@ -87,7 +87,6 @@ pub struct BlockStore {
     payload_manager: Arc<dyn TPayloadManager>,
     #[cfg(any(test, feature = "fuzzing"))]
     back_pressure_for_test: AtomicBool,
-    order_vote_enabled: bool,
     pending_blocks: Arc<Mutex<PendingBlocks>>,
     pipeline_builder: Option<PipelineBuilder>,
 }
@@ -101,7 +100,6 @@ impl BlockStore {
         time_service: Arc<dyn TimeService>,
         vote_back_pressure_limit: Round,
         payload_manager: Arc<dyn TPayloadManager>,
-        order_vote_enabled: bool,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
         pipeline_builder: Option<PipelineBuilder>,
     ) -> Self {
@@ -119,7 +117,6 @@ impl BlockStore {
             time_service,
             vote_back_pressure_limit,
             payload_manager,
-            order_vote_enabled,
             pending_blocks,
             pipeline_builder,
             None,
@@ -160,7 +157,6 @@ impl BlockStore {
         time_service: Arc<dyn TimeService>,
         vote_back_pressure_limit: Round,
         payload_manager: Arc<dyn TPayloadManager>,
-        order_vote_enabled: bool,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
         pipeline_builder: Option<PipelineBuilder>,
         tree_to_replace: Option<Arc<RwLock<BlockTree>>>,
@@ -231,7 +227,6 @@ impl BlockStore {
             payload_manager,
             #[cfg(any(test, feature = "fuzzing"))]
             back_pressure_for_test: AtomicBool::new(false),
-            order_vote_enabled,
             pending_blocks,
             pipeline_builder,
         };
@@ -343,7 +338,6 @@ impl BlockStore {
             Arc::clone(&self.time_service),
             self.vote_back_pressure_limit,
             self.payload_manager.clone(),
-            self.order_vote_enabled,
             self.pending_blocks.clone(),
             self.pipeline_builder.clone(),
             Some(self.inner.clone()),

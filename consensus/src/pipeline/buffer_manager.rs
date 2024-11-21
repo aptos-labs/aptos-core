@@ -156,7 +156,6 @@ pub struct BufferManager {
     previous_commit_time: Instant,
     reset_flag: Arc<AtomicBool>,
     bounded_executor: BoundedExecutor,
-    order_vote_enabled: bool,
     back_pressure_enabled: bool,
     highest_committed_round: Round,
     latest_round: Round,
@@ -196,7 +195,6 @@ impl BufferManager {
         ongoing_tasks: Arc<AtomicU64>,
         reset_flag: Arc<AtomicBool>,
         executor: BoundedExecutor,
-        order_vote_enabled: bool,
         back_pressure_enabled: bool,
         highest_committed_round: Round,
         consensus_observer_config: ConsensusObserverConfig,
@@ -255,7 +253,6 @@ impl BufferManager {
             previous_commit_time: Instant::now(),
             reset_flag,
             bounded_executor: executor,
-            order_vote_enabled,
             back_pressure_enabled,
             highest_committed_round,
             latest_round: highest_committed_round,
@@ -689,7 +686,6 @@ impl BufferManager {
             executed_blocks,
             &self.epoch_state.verifier,
             self.end_epoch_timestamp.get().cloned(),
-            self.order_vote_enabled,
         );
         if let Some(commit_proof) = self.drain_pending_commit_proof_till(round) {
             if !new_item.is_aggregated()
