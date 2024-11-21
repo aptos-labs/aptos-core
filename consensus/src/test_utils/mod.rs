@@ -74,9 +74,7 @@ pub async fn build_simple_tree() -> (Vec<Arc<PipelinedBlock>>, Arc<BlockStore>) 
         .insert_block_with_qc(certificate_for_genesis(), &genesis_block, 1)
         .await;
     let a2 = inserter.insert_block(&a1, 2, None).await;
-    let a3 = inserter
-        .insert_block(&a2, 3, Some(genesis.block_info()))
-        .await;
+    let a3 = inserter.insert_block(&a2, 3, None).await;
     let b1 = inserter
         .insert_block_with_qc(certificate_for_genesis(), &genesis_block, 4)
         .await;
