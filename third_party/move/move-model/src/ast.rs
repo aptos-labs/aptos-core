@@ -1127,12 +1127,9 @@ impl ExpData {
     pub fn called_funs(&self) -> BTreeSet<QualifiedId<FunId>> {
         let mut called = BTreeSet::new();
         let mut visitor = |e: &ExpData| {
-            match e {
-                ExpData::Call(_, Operation::MoveFunction(mid, fid), _) => {
-                    called.insert(mid.qualified(*fid));
-                },
-                _ => {},
-            }
+            if let ExpData::Call(_, Operation::MoveFunction(mid, fid), _) = e {
+                called.insert(mid.qualified(*fid));
+            };
             true // keep going
         };
         self.visit_post_order(&mut visitor);

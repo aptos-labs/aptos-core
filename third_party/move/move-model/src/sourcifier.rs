@@ -538,21 +538,18 @@ impl<'a> ExpSourcifier<'a> {
             Value(id, v) => {
                 let ty = self.env().get_node_type(exp.node_id());
                 self.parent.print_value(v, Some(&ty));
-                match v {
-                    ast::Value::Function(..) => {
-                        let type_inst = self.env().get_node_instantiation(*id);
-                        if !type_inst.is_empty() {
-                            emit!(
-                                self.wr(),
-                                "<{}>",
-                                type_inst
-                                    .iter()
-                                    .map(|ty| ty.display(&self.type_display_context))
-                                    .join(", ")
-                            );
-                        }
-                    },
-                    _ => {},
+                if let ast::Value::Function(..) = v {
+                    let type_inst = self.env().get_node_instantiation(*id);
+                    if !type_inst.is_empty() {
+                        emit!(
+                            self.wr(),
+                            "<{}>",
+                            type_inst
+                                .iter()
+                                .map(|ty| ty.display(&self.type_display_context))
+                                .join(", ")
+                        );
+                    }
                 }
             },
             LocalVar(_, name) => {
