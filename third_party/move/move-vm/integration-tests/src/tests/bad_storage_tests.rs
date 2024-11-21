@@ -792,8 +792,7 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
             .unwrap_err();
 
         if *error_code == StatusCode::UNKNOWN_VERIFICATION_ERROR {
-            // MoveVM maps `UNKNOWN_VERIFICATION_ERROR` to `VERIFICATION_ERROR` in
-            // `maybe_core_dump` function in interpreter.rs.
+            // MoveVM maps `UNKNOWN_VERIFICATION_ERROR` to `VERIFICATION_ERROR`.
             assert_eq!(err.major_status(), StatusCode::VERIFICATION_ERROR);
         } else {
             assert_eq!(err.major_status(), *error_code);
