@@ -13,7 +13,7 @@ pub type StateUpdateRefWithOffset<'kv> = (usize, &'kv StateKey, Option<&'kv Stat
 
 pub struct ShardedStateUpdateRefs<'kv> {
     /// (idx, key, value) tuple per update, sharded
-    ///    Box<[]> to release over allocated memory during construction
+    ///    Converting to Box<[]> to release over-allocated memory during construction
     pub shards: [Box<[StateUpdateRefWithOffset<'kv>]>; NUM_STATE_SHARDS],
     pub num_versions: usize,
 }
@@ -40,7 +40,8 @@ impl<'kv> ShardedStateUpdateRefs<'kv> {
     ) -> Self {
         let _timer = TIMER.timer_with(&["index_state_updates"]);
 
-        let mut shards = arr![Vec::with_capacity(num_versions / 16); 16];
+        // Over-allocate a bit to minimize re-allocation.
+        let mut shards = arr![Vec::with_capacity(num_versions / 8); 16];
 
         let mut versions_seen = 0;
         for (idx, update_iter) in updates_by_version.into_iter().enumerate() {
