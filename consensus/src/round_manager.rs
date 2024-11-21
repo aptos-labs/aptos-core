@@ -1238,7 +1238,7 @@ impl RoundManager {
                 order_vote_msg
                     .quorum_cert()
                     .verify(&self.epoch_state.verifier)
-                    .context("[OrderVoteMsg QuorumCert verification failed")?;
+                    .context("[OrderVoteMsg QuorumCert verification failed]")?;
                 counters::VERIFY_MSG
                     .with_label_values(&["order_vote_qc"])
                     .observe(start.elapsed().as_secs_f64());
