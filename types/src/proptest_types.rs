@@ -497,8 +497,7 @@ impl TransactionPayload {
 
 prop_compose! {
     fn arb_transaction_status()(vm_status in any::<VMStatus>()) -> TransactionStatus {
-        let (txn_status, _) = TransactionStatus::from_vm_status(vm_status, true);
-        txn_status
+        TransactionStatus::from_vm_status(vm_status, true)
     }
 }
 

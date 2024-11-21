@@ -64,7 +64,7 @@ pub enum FeatureFlag {
     _DEPRECATED_RECONFIGURE_WITH_DKG = 45,
     KEYLESS_ACCOUNTS = 46,
     KEYLESS_BUT_ZKLESS_ACCOUNTS = 47,
-    REMOVE_DETAILED_ERROR_FROM_HASH = 48,
+    _DEPRECATED_REMOVE_DETAILED_ERROR_FROM_HASH = 48, // This feature is not used
     JWK_CONSENSUS = 49,
     CONCURRENT_FUNGIBLE_ASSETS = 50,
     REFUNDABLE_BYTES = 51,
@@ -304,10 +304,6 @@ impl Features {
 
     pub fn is_federated_keyless_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::FEDERATED_KEYLESS)
-    }
-
-    pub fn is_remove_detailed_error_from_hash_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH)
     }
 
     pub fn is_refundable_bytes_enabled(&self) -> bool {

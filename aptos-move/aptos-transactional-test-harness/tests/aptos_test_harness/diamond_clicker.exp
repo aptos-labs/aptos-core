@@ -73,4 +73,4 @@ bug: BYTECODE VERIFICATION FAILED
 
 
 task 3 'run'. lines 70-70:
-Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(None)
+Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(Some(LINKER_ERROR))

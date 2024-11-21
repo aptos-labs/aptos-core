@@ -962,14 +962,10 @@ impl TransactionStatus {
         }
     }
 
-    pub fn from_vm_status(
-        vm_status: VMStatus,
-        charge_invariant_violation: bool,
-    ) -> (Self, TransactionAuxiliaryData) {
+    pub fn from_vm_status(vm_status: VMStatus, charge_invariant_violation: bool) -> Self {
         let status_code = vm_status.status_code();
-        let txn_aux = TransactionAuxiliaryData::from_vm_status(&vm_status);
         // TODO: keep_or_discard logic should be deprecated from Move repo and refactored into here.
-        let status = match vm_status.keep_or_discard() {
+        match vm_status.keep_or_discard() {
             Ok(recorded) => match recorded {
                 // TODO(bowu):status code should be removed from transaction status
                 KeptVMStatus::MiscellaneousError => {
@@ -986,8 +982,7 @@ impl TransactionStatus {
                     TransactionStatus::Discard(code)
                 }
             },
-        };
-        (status, txn_aux)
+        }
     }
 
     pub fn from_executed_vm_status(vm_status: VMStatus) -> Self {
@@ -1232,17 +1227,6 @@ impl TransactionOutput {
             auxiliary_data,
         } = self;
         (write_set, events, gas_used, status, auxiliary_data)
-    }
-
-    // This function is supposed to be called in various tests only
-    pub fn fill_error_status(&mut self) {
-        if let TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)) = self.status {
-            if let Some(detail) = self.auxiliary_data.get_detail_error_message() {
-                self.status = TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
-                    detail.status_code(),
-                )));
-            }
-        }
     }
 
     pub fn ensure_match_transaction_info(
