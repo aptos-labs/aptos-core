@@ -203,8 +203,6 @@ spec aptos_framework::native_bridge_configuration {
 
         ensures exists<BridgeConfig>(signer::address_of(aptos_framework));
         ensures global<BridgeConfig>(signer::address_of(aptos_framework)).bridge_relayer == signer::address_of(aptos_framework);
-        ensures global<BridgeConfig>(signer::address_of(aptos_framework)).initiator_time_lock == INITIATOR_TIME_LOCK_DUARTION;
-        ensures global<BridgeConfig>(signer::address_of(aptos_framework)).counterparty_time_lock == COUNTERPARTY_TIME_LOCK_DUARTION;
     }
 
     spec update_bridge_relayer(aptos_framework: &signer, new_relayer: address) {
