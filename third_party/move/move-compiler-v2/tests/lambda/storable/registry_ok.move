@@ -1,9 +1,11 @@
 module 0x42::test {
-    struct Registry {
+    use std::vector;
+
+    struct Registry has key {
         functions: vector<Function>
     }
 
-    struct Function {
+    struct Function has store {
         f: |u64| u64 with store,
         key: u64
     }
@@ -51,16 +53,16 @@ module 0x42::test {
 
     fun invoke(addr: address, k: u64, x: u64): Option<u64> acquires Registry {
         if (!exists<Registry>(addr)) {
-            return Option<u64>::None
+            return Option::None
         };
         let registry = borrow_global<Registry>(addr);
-        match get_function(registry.functions, k) {
+        match (get_function(registry.functions, k)) {
             Some(func) => {
-                let Function { f: f, key: key } = &func;
+                let Function { f: f, key: key } = func;
                 Some(f(x))
             },
             _ => {
-                Option<u64>::None
+                Option::None
             }
         }
     }
@@ -78,7 +80,7 @@ module 0x42::test {
     }
 
     fun multiply_by_x(x: u64): |u64|u64 with store {
-        multiply(x..)
+        |y| multiply(x, y)
     }
 
     fun multiply_by_x2(x: u64): |u64|u64 with store {
@@ -86,32 +88,32 @@ module 0x42::test {
     }
 
     #[test(a = @0x42)]
-    test_registry1(a; signer) {
+    fun test_registry1(a: signer) {
         register(a, double, 2);
         register(a, negate, 3);
         register(a, multiply_by_x(4), 4);
         register(a, multiply_by_x(5), 5);
         register(a, multiply_by_x2(6), 6);
 
-        match invoke(a, 2, 10) {
+        match (invoke(a, 2, 10)) {
             Some(x) => { assert!(x == 20); }
-            _ => assert!(false);
-        }
-        match invoke(a, 3, 11) {
+            _ => assert!(false)
+        };
+        match (invoke(a, 3, 11)) {
             Some(x) => { assert!(x == 33); }
-            _ => assert!(false);
-        }
-        match invoke(a, 4, 2) {
+            _ => assert!(false)
+        };
+        match (invoke(a, 4, 2)) {
             Some(x) => { assert!(x == 8); }
-            _ => assert!(false);
-        }
-        match invoke(a, 5, 3) {
+            _ => assert!(false)
+        };
+        match (invoke(a, 5, 3)) {
             Some(x) => { assert!(x == 15); }
-            _ => assert!(false);
-        }
-        match invoke(a, 6, 3) {
+            _ => assert!(false)
+        };
+        match (invoke(a, 6, 3)) {
             Some(x) => { assert!(x == 18); }
-            _ => assert!(false);
-        }
+            _ => assert!(false)
+        };
     }
 }

@@ -52,27 +52,11 @@ error: expected a struct with field `address` but found `signer`
 43 │         let addr = owner.address;
    │                    ^^^^^
 
-error: type `Registry` is missing required ability `key`
-   ┌─ tests/lambda/storable/registry_errors.move:48:21
-   │
-48 │             move_to<Registry>(owner, registry);
-   │                     ^^^^^^^^
-   │
-   = required by instantiating type parameter `T:key` of function `move_to`
-
 error: undeclared `registry`
    ┌─ tests/lambda/storable/registry_errors.move:48:38
    │
 48 │             move_to<Registry>(owner, registry);
    │                                      ^^^^^^^^
-
-error: type `Registry` is missing required ability `key`
-   ┌─ tests/lambda/storable/registry_errors.move:55:21
-   │
-55 │         if (!exists<Registry>(addr)) {
-   │                     ^^^^^^^^
-   │
-   = required by instantiating type parameter `T:key` of function `exists`
 
 error: cannot pass `vector<Function>` to a function which expects argument of type `&vector<Function>`
    ┌─ tests/lambda/storable/registry_errors.move:68:29

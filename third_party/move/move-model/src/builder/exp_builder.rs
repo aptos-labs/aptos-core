@@ -1544,7 +1544,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 }
             },
             EA::Exp_::ExpCall(efexp, args) => {
-                let args_ref: Vec<_> = args.value.iter().map(|exp| exp).collect();
+                let args_ref: Vec<_> = args.value.iter().collect();
                 let (arg_types, args) = self.translate_exp_list(&args_ref);
 
                 let fun_t = Type::Fun(

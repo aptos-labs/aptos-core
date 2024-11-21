@@ -66,7 +66,7 @@ module 0x42::test {
                 let g = move |x, y| mod3::multiply(x, y) with copy+drop;
                 move |x| g(x, 11)
             } else if (key == 12) {
-                let h = move |x| mod3::multiply(x, 12);
+                let h = move |x| mod3::multiply(x, 12) with copy;
                 move |x| { h(x) } with copy + drop
             } else if (key == 14) {
                 let i = move |x| multiply3(2, x, 2);

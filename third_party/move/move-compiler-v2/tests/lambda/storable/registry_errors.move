@@ -1,11 +1,11 @@
 module 0x42::test {
     use std::vector;
 
-    struct Registry {
+    struct Registry has key {
         functions: vector<Function>
     }
 
-    struct Function {
+    struct Function has store {
         f: |u64| u64 with store,
         key: u64
     }
