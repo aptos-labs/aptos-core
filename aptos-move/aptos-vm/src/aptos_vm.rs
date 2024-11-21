@@ -70,8 +70,8 @@ use aptos_types::{
         authenticator::AnySignature, signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
         MultisigTransactionPayload, Script, SignedTransaction, Transaction, TransactionArgument,
-        TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
-        VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
+        TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
+        ViewFunctionOutput, WriteSetPayload,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
@@ -186,7 +186,6 @@ pub(crate) fn get_system_transaction_output(
         ModuleWriteSet::empty(),
         FeeStatement::zero(),
         TransactionStatus::Keep(ExecutionStatus::Success),
-        TransactionAuxiliaryData::default(),
     ))
 }
 
@@ -471,7 +470,7 @@ impl AptosVM {
             }
         }
 
-        let (txn_status, txn_aux_data) = TransactionStatus::from_vm_status(
+        let txn_status = TransactionStatus::from_vm_status(
             error_vm_status.clone(),
             self.features()
                 .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
@@ -493,7 +492,6 @@ impl AptosVM {
                         resolver,
                         module_storage,
                         status,
-                        txn_aux_data,
                         log_context,
                         change_set_configs,
                         traversal_context,
@@ -541,7 +539,6 @@ impl AptosVM {
         resolver: &impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
         status: ExecutionStatus,
-        txn_aux_data: TransactionAuxiliaryData,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
         traversal_context: &mut TraversalContext,
@@ -672,13 +669,7 @@ impl AptosVM {
             )
         })?;
 
-        epilogue_session.finish(
-            fee_statement,
-            status,
-            txn_aux_data,
-            change_set_configs,
-            module_storage,
-        )
+        epilogue_session.finish(fee_statement, status, change_set_configs, module_storage)
     }
 
     fn success_transaction_cleanup(
@@ -728,7 +719,6 @@ impl AptosVM {
         let output = epilogue_session.finish(
             fee_statement,
             ExecutionStatus::Success,
-            TransactionAuxiliaryData::default(),
             change_set_configs,
             module_storage,
         )?;
@@ -2307,7 +2297,6 @@ impl AptosVM {
             module_write_set,
             FeeStatement::zero(),
             TransactionStatus::Keep(ExecutionStatus::Success),
-            TransactionAuxiliaryData::default(),
         );
         Ok((VMStatus::Executed, output))
     }

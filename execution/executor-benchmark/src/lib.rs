@@ -44,7 +44,7 @@ use aptos_transaction_generator_lib::{
     create_txn_generator_creator, AlwaysApproveRootAccountHandle, TransactionGeneratorCreator,
     TransactionType::{self, CoinTransfer},
 };
-use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_types::on_chain_config::Features;
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
 use db_reliable_submitter::DbReliableTransactionSubmitter;
 use metrics::TIMER;
@@ -59,9 +59,7 @@ use std::{
 use tokio::runtime::Runtime;
 
 pub fn default_benchmark_features() -> Features {
-    let mut init_features = Features::default();
-    init_features.disable(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH);
-    init_features
+    Features::default()
 }
 
 pub fn init_db(config: &NodeConfig) -> DbReaderWriter {

@@ -41,7 +41,7 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, Transaction,
-        TransactionAuxiliaryData, TransactionOutput, TransactionStatus, WriteSetPayload,
+        TransactionOutput, TransactionStatus, WriteSetPayload,
     },
     write_set::WriteOp,
     AptosCoinType,
@@ -162,7 +162,6 @@ impl ExecutorTask for NativeVMExecutorTask {
                 ModuleWriteSet::empty(),
                 FeeStatement::new(gas_units, gas_units, 0, 0, 0),
                 TransactionStatus::Keep(aptos_types::transaction::ExecutionStatus::Success),
-                TransactionAuxiliaryData::default(),
             ))),
             Err(_) => ExecutionStatus::SpeculativeExecutionAbortError("something".to_string()),
         }
