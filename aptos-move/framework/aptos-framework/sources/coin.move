@@ -584,15 +584,7 @@ module aptos_framework::coin {
             if (coin.value == 0) {
                 destroy_zero(coin);
             } else {
-                if (std::features::module_event_migration_enabled()) {
-                    event::emit(CoinWithdraw { coin_type: type_name<CoinType>(), account, amount: coin.value });
-                } else {
-                    event::emit_event<WithdrawEvent>(
-                        &mut withdraw_events,
-                        WithdrawEvent { amount: coin.value },
-                    );
-                };
-                fungible_asset::deposit_internal(object_address(&store), coin_to_fungible_asset(coin));
+                fungible_asset::unchecked_deposit_with_no_events(object_address(&store), coin_to_fungible_asset(coin));
             };
             event::destroy_handle(deposit_events);
             event::destroy_handle(withdraw_events);
@@ -864,7 +856,7 @@ module aptos_framework::coin {
                 let fa = coin_to_fungible_asset(coin);
                 let metadata = fungible_asset::asset_metadata(&fa);
                 let store = primary_fungible_store::ensure_primary_store_exists(account_addr, metadata);
-                fungible_asset::deposit_internal(object::object_address(&store), fa);
+                fungible_asset::unchecked_deposit_with_no_events(object::object_address(&store), fa);
             } else {
                 abort error::not_found(ECOIN_STORE_NOT_PUBLISHED)
             }
