@@ -1,14 +1,16 @@
+use bcs;
 use std::collections::BTreeMap;
 use std::str::FromStr;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use tiny_keccak::{Hasher, Keccak};
 use move_core_types::account_address::AccountAddress;
 use move_core_types::language_storage::TypeTag;
 use move_core_types::transaction_argument::TransactionArgument;
 use move_core_types::value::MoveValue;
 use crate::{assert_abort, assert_success, MoveHarness};
 use crate::tests::common;
+use tiny_keccak::{Hasher, Keccak};
+
 
 pub static BRIDGE_SCRIPTS: Lazy<BTreeMap<String, Vec<u8>>> = Lazy::new(build_scripts);
 fn build_scripts() -> BTreeMap<String, Vec<u8>> {
@@ -18,7 +20,9 @@ fn build_scripts() -> BTreeMap<String, Vec<u8>> {
         "update_initiator_time_lock",
         "update_counterparty_time_lock",
         "mint_burn_caps",
+        "mint_burn_caps_native",
         "atomic_bridge_feature",
+        "native_bridge_feature"
     ];
     common::build_scripts(package_folder, package_names)
 }
@@ -100,15 +104,49 @@ fn run_mint_burn_caps(harness: &mut MoveHarness) {
 }
 
 #[cfg(test)]
+fn run_mint_burn_caps_native(harness: &mut MoveHarness) {
+    let core_resources = harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
+    let mint_burn_caps_code_native = BRIDGE_SCRIPTS
+        .get("mint_burn_caps_native")
+        .expect("mint_burn_caps_native script should be built");
+
+    let txn = harness.create_script(
+        &core_resources,
+        mint_burn_caps_code_native.clone(),
+        vec![],
+        vec![]
+    );
+
+    assert_success!(harness.run(txn));
+}
+
+#[cfg(test)]
 fn atomic_bridge_feature(harness: &mut MoveHarness) {
     let core_resources = harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
-    let mint_burn_caps_code = BRIDGE_SCRIPTS
+    let atomic_bridge_feature_code = BRIDGE_SCRIPTS
         .get("atomic_bridge_feature")
         .expect("atomic_bridge_feature script should be built");
 
     let txn = harness.create_script(
         &core_resources,
-        mint_burn_caps_code.clone(),
+        atomic_bridge_feature_code.clone(),
+        vec![],
+        vec![]
+    );
+
+    assert_success!(harness.run(txn));
+}
+
+#[cfg(test)]
+fn native_bridge_feature(harness: &mut MoveHarness) {
+    let core_resources = harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
+    let native_bridge_feature_code = BRIDGE_SCRIPTS
+        .get("native_bridge_feature")
+        .expect("native_bridge_feature script should be built");
+
+    let txn = harness.create_script(
+        &core_resources,
+        native_bridge_feature_code.clone(),
         vec![],
         vec![]
     );
@@ -121,7 +159,7 @@ fn atomic_bridge_feature(harness: &mut MoveHarness) {
 // `lock_bridge_transfer_assets` is called with a timelock
 // Wait for the timelock
 // `complete_bridge_transfer` to mint the tokens on the destination chain
-fn test_counterparty() {
+fn test_atomic_bridge_counterparty() {
     let mut harness = MoveHarness::new();
 
     atomic_bridge_feature(&mut harness);
@@ -172,10 +210,131 @@ struct BridgeTransferInitiatedEvent {
     time_lock: u64,
 }
 
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+struct NativeBridgeTransferInitiatedEvent {
+    bridge_transfer_id: Vec<u8>,
+    initiator: AccountAddress,
+    recipient: Vec<u8>,
+    amount: u64,
+    nonce: u64,
+}
+
+#[test]
+// A bridge is initiated with said amount to recipient on the destination chain
+// A relayer confirms that the initiate bridge transfer is successful and validates the details
+fn test_native_bridge_initiate() {
+    let mut harness = MoveHarness::new();
+
+    native_bridge_feature(&mut harness);
+    run_mint_burn_caps_native(&mut harness);
+
+    let initiator = harness.new_account_at(AccountAddress::from_hex_literal("0xCAFE").unwrap());
+    let recipient = b"32Be343B94f860124dC4fEe278FDCBD38C102D88".to_vec();
+    let amount = 1_000_000; // 0.1
+
+    let original_balance = harness.read_aptos_balance(initiator.address());
+    let gas_used = harness.evaluate_entry_function_gas(&initiator,
+                                str::parse("0x1::native_bridge::initiate_bridge_transfer").unwrap(),
+                                vec![],
+                                vec![
+                                    MoveValue::vector_u8(recipient.clone()).simple_serialize().unwrap(),
+                                    MoveValue::U64(amount).simple_serialize().unwrap(),
+                                ],);
+
+    let gas_used = gas_used * harness.default_gas_unit_price;
+    let new_balance = harness.read_aptos_balance(initiator.address());
+    assert_eq!(original_balance - amount - gas_used, new_balance);
+
+    let events = harness.get_events();
+    let bridge_transfer_initiated_event_tag = TypeTag::from_str("0x1::native_bridge::BridgeTransferInitiatedEvent").unwrap();
+    let bridge_transfer_initiated_event = events.iter().find(|element| element.type_tag() == &bridge_transfer_initiated_event_tag).unwrap();
+    let bridge_transfer_initiated_event = bcs::from_bytes::<NativeBridgeTransferInitiatedEvent>(bridge_transfer_initiated_event.event_data()).unwrap();
+
+    let bridge_transfer_id = bridge_transfer_initiated_event.bridge_transfer_id;
+    let initiator = bridge_transfer_initiated_event.initiator;
+    let recipient = bridge_transfer_initiated_event.recipient;
+    let amount = bridge_transfer_initiated_event.amount;
+    let nonce = bridge_transfer_initiated_event.nonce;
+
+    let mut combined_bytes = Vec::new();
+
+    // Append serialized values to `combined_bytes`
+    combined_bytes.extend(bcs::to_bytes(&initiator).expect("Failed to serialize initiator"));
+    combined_bytes.extend(bcs::to_bytes(&recipient).expect("Failed to serialize recipient"));
+    combined_bytes.extend(bcs::to_bytes(&amount).expect("Failed to serialize amount"));
+    combined_bytes.extend(bcs::to_bytes(&nonce).expect("Failed to serialize nonce"));
+
+    // Compute keccak256 hash using tiny-keccak
+    let mut hasher = Keccak::v256();
+    hasher.update(&combined_bytes);
+
+    let mut hash = [0u8; 32]; // Keccak256 outputs 32 bytes
+    hasher.finalize(&mut hash);
+
+    // Compare the computed hash to `bridge_transfer_id`
+    assert!(bridge_transfer_id == hash.to_vec());
+}
+
+#[test]
+// A bridge is initiated with said amount to recipient on the destination chain
+// A relayer confirms that the initiate bridge transfer is successful and validates the details
+fn test_native_bridge_complete() {
+    let mut harness = MoveHarness::new();
+
+    native_bridge_feature(&mut harness);
+    run_mint_burn_caps_native(&mut harness);
+
+    let initiator = harness.new_account_at(AccountAddress::from_hex_literal("0xCAFE").unwrap());
+    let recipient = b"32Be343B94f860124dC4fEe278FDCBD38C102D88".to_vec();
+    let amount = 1_000_000; // 0.1
+
+    let original_balance = harness.read_aptos_balance(initiator.address());
+    let gas_used = harness.evaluate_entry_function_gas(&initiator,
+                                str::parse("0x1::native_bridge::initiate_bridge_transfer").unwrap(),
+                                vec![],
+                                vec![
+                                    MoveValue::vector_u8(recipient.clone()).simple_serialize().unwrap(),
+                                    MoveValue::U64(amount).simple_serialize().unwrap(),
+                                ],);
+
+    let gas_used = gas_used * harness.default_gas_unit_price;
+    let new_balance = harness.read_aptos_balance(initiator.address());
+    assert_eq!(original_balance - amount - gas_used, new_balance);
+
+    let events = harness.get_events();
+    let bridge_transfer_initiated_event_tag = TypeTag::from_str("0x1::native_bridge::BridgeTransferInitiatedEvent").unwrap();
+    let bridge_transfer_initiated_event = events.iter().find(|element| element.type_tag() == &bridge_transfer_initiated_event_tag).unwrap();
+    let bridge_transfer_initiated_event = bcs::from_bytes::<NativeBridgeTransferInitiatedEvent>(bridge_transfer_initiated_event.event_data()).unwrap();
+
+    let bridge_transfer_id = bridge_transfer_initiated_event.bridge_transfer_id;
+    let initiator = bridge_transfer_initiated_event.initiator;
+    let recipient = bridge_transfer_initiated_event.recipient;
+    let amount = bridge_transfer_initiated_event.amount;
+    let nonce = bridge_transfer_initiated_event.nonce;
+
+    let mut combined_bytes = Vec::new();
+
+    // Append serialized values to `combined_bytes`
+    combined_bytes.extend(bcs::to_bytes(&initiator).expect("Failed to serialize initiator"));
+    combined_bytes.extend(bcs::to_bytes(&recipient).expect("Failed to serialize recipient"));
+    combined_bytes.extend(bcs::to_bytes(&amount).expect("Failed to serialize amount"));
+    combined_bytes.extend(bcs::to_bytes(&nonce).expect("Failed to serialize nonce"));
+
+    // Compute keccak256 hash using tiny-keccak
+    let mut hasher = Keccak::v256();
+    hasher.update(&combined_bytes);
+
+    let mut hash = [0u8; 32]; // Keccak256 outputs 32 bytes
+    hasher.finalize(&mut hash);
+
+    // Compare the computed hash to `bridge_transfer_id`
+    assert!(bridge_transfer_id == hash.to_vec());
+}
+
 #[test]
 // A bridge is initiated with said amount to recipient on the destination chain
 // A relayer confirms that the amount was minted on the destination chain
-fn test_initiator() {
+fn test_atomic_bridge_initiator() {
     let mut harness = MoveHarness::new();
 
     atomic_bridge_feature(&mut harness);
@@ -297,3 +456,4 @@ fn test_update_counterparty_time_lock() {
 
     assert_abort!(harness.run(txn), _);
 }
+

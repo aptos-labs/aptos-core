@@ -1687,4 +1687,3 @@ module aptos_framework::atomic_bridge_counterparty {
         complete_bridge_transfer(bridge_transfer_id, b"not the secret");
     }
 }
-

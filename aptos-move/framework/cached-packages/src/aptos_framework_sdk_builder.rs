@@ -714,6 +714,34 @@ pub enum EntryFunctionCall {
         approved: bool,
     },
 
+    /// Completes a bridge transfer by the initiator.
+
+    /// @param caller The signer representing the bridge relayer.  
+    /// @param initiator The initiator's Ethereum address as a vector of bytes.  
+    /// @param bridge_transfer_id The unique identifier for the bridge transfer.  
+    /// @param recipient The address of the recipient on the Aptos blockchain.  
+    /// @param amount The amount of assets to be locked.  
+    /// @param nonce The unique nonce for the transfer.    
+    /// @abort If the caller is not the bridge relayer or the transfer has already been processed.
+    NativeBridgeCompleteBridgeTransfer {
+        bridge_transfer_id: Vec<u8>,
+        initiator: Vec<u8>,
+        recipient: AccountAddress,
+        amount: u64,
+        nonce: u64,
+    },
+
+    /// Initiate a bridge transfer of MOVE from Movement to the base layer  
+    /// Anyone can initiate a bridge transfer from the source chain  
+    /// The amount is burnt from the initiator and the module-level nonce is incremented  
+    /// @param initiator The initiator's Ethereum address as a vector of bytes.  
+    /// @param recipient The address of the recipient on the Aptos blockchain.  
+    /// @param amount The amount of assets to be locked.
+    NativeBridgeInitiateBridgeTransfer {
+        recipient: Vec<u8>,
+        amount: u64,
+    },
+
     /// Entry function that can be used to transfer, if allow_ungated_transfer is set true.
     ObjectTransferCall {
         object: AccountAddress,
@@ -1497,6 +1525,22 @@ impl EntryFunctionCall {
                 sequence_number,
                 approved,
             } => multisig_account_vote_transanction(multisig_account, sequence_number, approved),
+            NativeBridgeCompleteBridgeTransfer {
+                bridge_transfer_id,
+                initiator,
+                recipient,
+                amount,
+                nonce,
+            } => native_bridge_complete_bridge_transfer(
+                bridge_transfer_id,
+                initiator,
+                recipient,
+                amount,
+                nonce,
+            ),
+            NativeBridgeInitiateBridgeTransfer { recipient, amount } => {
+                native_bridge_initiate_bridge_transfer(recipient, amount)
+            },
             ObjectTransferCall { object, to } => object_transfer_call(object, to),
             ObjectCodeDeploymentPublish {
                 metadata_serialized,
@@ -3650,6 +3694,69 @@ pub fn multisig_account_vote_transanction(
             bcs::to_bytes(&multisig_account).unwrap(),
             bcs::to_bytes(&sequence_number).unwrap(),
             bcs::to_bytes(&approved).unwrap(),
+        ],
+    ))
+}
+
+/// Completes a bridge transfer by the initiator.
+///
+/// @param caller The signer representing the bridge relayer.  
+/// @param initiator The initiator's Ethereum address as a vector of bytes.  
+/// @param bridge_transfer_id The unique identifier for the bridge transfer.  
+/// @param recipient The address of the recipient on the Aptos blockchain.  
+/// @param amount The amount of assets to be locked.  
+/// @param nonce The unique nonce for the transfer.    
+/// @abort If the caller is not the bridge relayer or the transfer has already been processed.
+pub fn native_bridge_complete_bridge_transfer(
+    bridge_transfer_id: Vec<u8>,
+    initiator: Vec<u8>,
+    recipient: AccountAddress,
+    amount: u64,
+    nonce: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("native_bridge").to_owned(),
+        ),
+        ident_str!("complete_bridge_transfer").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&bridge_transfer_id).unwrap(),
+            bcs::to_bytes(&initiator).unwrap(),
+            bcs::to_bytes(&recipient).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+            bcs::to_bytes(&nonce).unwrap(),
+        ],
+    ))
+}
+
+/// Initiate a bridge transfer of MOVE from Movement to the base layer  
+/// Anyone can initiate a bridge transfer from the source chain  
+/// The amount is burnt from the initiator and the module-level nonce is incremented  
+/// @param initiator The initiator's Ethereum address as a vector of bytes.  
+/// @param recipient The address of the recipient on the Aptos blockchain.  
+/// @param amount The amount of assets to be locked.
+pub fn native_bridge_initiate_bridge_transfer(
+    recipient: Vec<u8>,
+    amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("native_bridge").to_owned(),
+        ),
+        ident_str!("initiate_bridge_transfer").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&recipient).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
         ],
     ))
 }
@@ -5935,6 +6042,35 @@ mod decoder {
         }
     }
 
+    pub fn native_bridge_complete_bridge_transfer(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::NativeBridgeCompleteBridgeTransfer {
+                bridge_transfer_id: bcs::from_bytes(script.args().get(0)?).ok()?,
+                initiator: bcs::from_bytes(script.args().get(1)?).ok()?,
+                recipient: bcs::from_bytes(script.args().get(2)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(3)?).ok()?,
+                nonce: bcs::from_bytes(script.args().get(4)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn native_bridge_initiate_bridge_transfer(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::NativeBridgeInitiateBridgeTransfer {
+                recipient: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn object_transfer_call(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ObjectTransferCall {
@@ -6985,6 +7121,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "multisig_account_vote_transanction".to_string(),
             Box::new(decoder::multisig_account_vote_transanction),
+        );
+        map.insert(
+            "native_bridge_complete_bridge_transfer".to_string(),
+            Box::new(decoder::native_bridge_complete_bridge_transfer),
+        );
+        map.insert(
+            "native_bridge_initiate_bridge_transfer".to_string(),
+            Box::new(decoder::native_bridge_initiate_bridge_transfer),
         );
         map.insert(
             "object_transfer_call".to_string(),

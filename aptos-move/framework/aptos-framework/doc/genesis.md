@@ -53,6 +53,8 @@
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
 <b>use</b> <a href="gas_schedule.md#0x1_gas_schedule">0x1::gas_schedule</a>;
+<b>use</b> <a href="native_bridge.md#0x1_native_bridge">0x1::native_bridge</a>;
+<b>use</b> <a href="native_bridge.md#0x1_native_bridge_core">0x1::native_bridge_core</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map">0x1::simple_map</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
@@ -371,6 +373,8 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
     <a href="atomic_bridge.md#0x1_atomic_bridge_initialize">atomic_bridge::initialize</a>(&aptos_framework_account);
     <a href="atomic_bridge.md#0x1_atomic_bridge_initiator_initialize">atomic_bridge_initiator::initialize</a>(&aptos_framework_account);
     <a href="atomic_bridge.md#0x1_atomic_bridge_counterparty_initialize">atomic_bridge_counterparty::initialize</a>(&aptos_framework_account);
+    <a href="native_bridge.md#0x1_native_bridge_initialize">native_bridge::initialize</a>(&aptos_framework_account);
+    <a href="native_bridge.md#0x1_native_bridge_core_initialize">native_bridge_core::initialize</a>(&aptos_framework_account);
 }
 </code></pre>
 
