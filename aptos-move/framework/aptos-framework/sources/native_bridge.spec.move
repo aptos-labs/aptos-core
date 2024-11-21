@@ -54,14 +54,14 @@ spec aptos_framework::native_bridge {
         aborts_if !exists<native_bridge_configuration::BridgeConfig>(@aptos_framework);
         aborts_if global<native_bridge_configuration::BridgeConfig>(@aptos_framework).bridge_relayer != signer::address_of(caller);
 
-        // Abort if the bridge transfer ID is already associated with an incoming nonce
-        aborts_if native_bridge_store::is_incoming_nonce_set(bridge_transfer_id);
+        // Abort if the bridge transfer ID is already associated with an inbound nonce
+        aborts_if native_bridge_store::is_inbound_nonce_set(bridge_transfer_id);
 
         // Abort if the `BridgeEvents` resource does not exist
         aborts_if !exists<BridgeEvents>(@aptos_framework);
 
-        // Ensure the bridge transfer ID is associated with an incoming nonce after execution
-        ensures native_bridge_store::is_incoming_nonce_set(bridge_transfer_id);
+        // Ensure the bridge transfer ID is associated with an inbound nonce after execution
+        ensures native_bridge_store::is_inbound_nonce_set(bridge_transfer_id);
 
         // Ensure the event counter is incremented by 1
         ensures
@@ -121,7 +121,7 @@ spec aptos_framework::native_bridge_store {
         ensures exists<SmartTableWrapper<vector<u8>, u64>>(@aptos_framework);
     }
 
-    spec is_incoming_nonce_set(bridge_transfer_id: vector<u8>): bool {
+    spec is_inbound_nonce_set(bridge_transfer_id: vector<u8>): bool {
         ensures result == exists<SmartTableWrapper<vector<u8>, u64>>(@aptos_framework)
             && smart_table::spec_contains(
                 global<SmartTableWrapper<vector<u8>, u64>>(@aptos_framework).inner,
@@ -166,9 +166,9 @@ spec aptos_framework::native_bridge_store {
         )) + 1;
     }
 
-    spec set_bridge_transfer_id_to_incoming_nonce(
+    spec set_bridge_transfer_id_to_inbound_nonce(
         bridge_transfer_id: vector<u8>,
-        incoming_nonce: u64
+        inbound_nonce: u64
     ) {
         aborts_if !exists<SmartTableWrapper<vector<u8>, u64>>(@aptos_framework);
 

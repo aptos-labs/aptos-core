@@ -152,9 +152,9 @@ module aptos_framework::native_bridge {
         // Ensure the caller is the bridge relayer
         native_bridge_configuration::assert_is_caller_relayer(caller);  
 
-        // Check if the bridge transfer ID is already associated with an incoming nonce
-        let incoming_nonce_exists = native_bridge_store::is_incoming_nonce_set(bridge_transfer_id);
-        assert!(!incoming_nonce_exists, ETRANSFER_ALREADY_PROCESSED); // Abort if the transfer is already processed
+        // Check if the bridge transfer ID is already associated with an inbound nonce
+        let inbound_nonce_exists = native_bridge_store::is_inbound_nonce_set(bridge_transfer_id);
+        assert!(!inbound_nonce_exists, ETRANSFER_ALREADY_PROCESSED); // Abort if the transfer is already processed
         assert!(nonce > 0, EINVALID_NONCE); 
 
         // Validate the bridge_transfer_id by reconstructing the hash
@@ -165,8 +165,8 @@ module aptos_framework::native_bridge {
         vector::append(&mut combined_bytes, bcs::to_bytes(&nonce));
         assert!(keccak256(combined_bytes) == bridge_transfer_id, EINVALID_BRIDGE_TRANSFER_ID);
 
-        // Record the transfer as completed by associating the bridge_transfer_id with the incoming nonce
-        native_bridge_store::set_bridge_transfer_id_to_incoming_nonce(bridge_transfer_id, nonce);
+        // Record the transfer as completed by associating the bridge_transfer_id with the inbound nonce
+        native_bridge_store::set_bridge_transfer_id_to_inbound_nonce(bridge_transfer_id, nonce);
 
         // Mint to the recipient
         native_bridge_core::mint(recipient, amount);
@@ -380,17 +380,17 @@ module aptos_framework::native_bridge_store {
 
         move_to(aptos_framework, nonces_to_details);
 
-        let ids_to_incoming_nonces = SmartTableWrapper<vector<u8>, u64> {
+        let ids_to_inbound_nonces = SmartTableWrapper<vector<u8>, u64> {
             inner: smart_table::new(),
         };
 
-        move_to(aptos_framework, ids_to_incoming_nonces);
+        move_to(aptos_framework, ids_to_inbound_nonces);
     }
 
-    /// Checks if a bridge transfer ID is associated with an incoming nonce.
+    /// Checks if a bridge transfer ID is associated with an inbound nonce.
     /// @param bridge_transfer_id The bridge transfer ID.
-    /// @return `true` if the ID is associated with an existing incoming nonce, `false` otherwise.
-    public(friend) fun is_incoming_nonce_set(bridge_transfer_id: vector<u8>): bool acquires SmartTableWrapper {
+    /// @return `true` if the ID is associated with an existing inbound nonce, `false` otherwise.
+    public(friend) fun is_inbound_nonce_set(bridge_transfer_id: vector<u8>): bool acquires SmartTableWrapper {
         let table = borrow_global<SmartTableWrapper<vector<u8>, u64>>(@aptos_framework);
         smart_table::contains(&table.inner, bridge_transfer_id)
     }
@@ -434,16 +434,16 @@ module aptos_framework::native_bridge_store {
         smart_table::add(&mut table.inner, nonce, details);
     }
 
-    /// Record details of a completed transfer, mapping bridge transfer ID to incoming nonce
+    /// Record details of a completed transfer, mapping bridge transfer ID to inbound nonce
     ///
     /// @param bridge_transfer_id Bridge transfer ID.
     /// @param details The bridge transfer details
-    public(friend) fun set_bridge_transfer_id_to_incoming_nonce(bridge_transfer_id: vector<u8>, incoming_nonce: u64) acquires SmartTableWrapper {
+    public(friend) fun set_bridge_transfer_id_to_inbound_nonce(bridge_transfer_id: vector<u8>, inbound_nonce: u64) acquires SmartTableWrapper {
         assert!(features::abort_native_bridge_enabled(), ENATIVE_BRIDGE_NOT_ENABLED);
 
         assert_valid_bridge_transfer_id(&bridge_transfer_id);
         let table = borrow_global_mut<SmartTableWrapper<vector<u8>, u64>>(@aptos_framework);
-        smart_table::add(&mut table.inner, bridge_transfer_id, incoming_nonce);
+        smart_table::add(&mut table.inner, bridge_transfer_id, inbound_nonce);
     }
 
     /// Asserts that the bridge transfer ID is valid.
@@ -483,11 +483,11 @@ module aptos_framework::native_bridge_store {
     }
 
     #[view]
-    /// Gets incoming `nonce` from `bridge_transfer_id`
+    /// Gets inbound `nonce` from `bridge_transfer_id`
     /// @param bridge_transfer_id The ID bridge transfer.
     /// @return the nonce
     /// @abort If the nonce is not found in the smart table.
-    public fun get_incoming_nonce_from_bridge_transfer_id(bridge_transfer_id: vector<u8>): u64 acquires SmartTableWrapper {
+    public fun get_inbound_nonce_from_bridge_transfer_id(bridge_transfer_id: vector<u8>): u64 acquires SmartTableWrapper {
         let table = borrow_global<SmartTableWrapper<vector<u8>, u64>>(@aptos_framework);
 
          // Check if the nonce exists in the table
