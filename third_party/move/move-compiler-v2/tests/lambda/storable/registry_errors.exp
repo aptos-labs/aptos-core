@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: function type `|u64|u64:drop+store` is not allowed as a field type
+error: function type `|u64|u64 with drop+store` is not allowed as a field type
   ┌─ tests/lambda/storable/registry_errors.move:9:12
   │
 9 │         f: |u64| u64 with store,
@@ -8,7 +8,7 @@ error: function type `|u64|u64:drop+store` is not allowed as a field type
   │
   = required by declaration of field `f`
 
-error: function type `|u64|u64:drop+store` is not allowed as a type argument (type was inferred)
+error: function type `|u64|u64 with drop+store` is not allowed as a type argument (type was inferred)
    ┌─ tests/lambda/storable/registry_errors.move:22:21
    │
 13 │     enum Option<T> {
@@ -19,7 +19,7 @@ error: function type `|u64|u64:drop+store` is not allowed as a type argument (ty
    │
    = required by instantiating type parameter `T` of struct `Option`
 
-error: expected `&mut Function` but found a value of type `|u64|u64:drop+store`
+error: expected `&mut Function` but found a value of type `|u64|u64 with drop+store`
    ┌─ tests/lambda/storable/registry_errors.move:32:17
    │
 32 │                 f.f = f;
@@ -76,20 +76,8 @@ error: undeclared `func`
 70 │                 let Function { f: f, key: key } = &func;
    │                                                    ^^^^
 
-error: expected `|u64|u64` but found a value of type `&|u64|u64:drop+store`
+error: expected `|u64|u64 with copy+drop+store` but found a value of type `&|u64|u64 with drop+store`
    ┌─ tests/lambda/storable/registry_errors.move:71:22
    │
 71 │                 Some(f(x))
    │                      ^^^^
-
-error: type `|u64|u64` is missing required ability `store`
-   ┌─ tests/lambda/storable/registry_errors.move:92:9
-   │
-92 │         |y| multiply(x, y)
-   │         ^^^^^^^^^^^^^^^^^^
-
-error: type `|u64|u64` is missing required ability `store`
-   ┌─ tests/lambda/storable/registry_errors.move:96:9
-   │
-96 │         move |y| multiply(x, y)
-   │         ^^^^^^^^^^^^^^^^^^^^^^^

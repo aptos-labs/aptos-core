@@ -36,7 +36,7 @@ error: cannot pass `u256` to a function which expects argument of type `bool`
 32 │       wrongly_typed_callee(1, 1) // Wrongly typed function application
    │                               ^
 
-error: cannot pass `|num|bool` to a function which expects argument of type `|num|num`
+error: cannot pass `|num|bool with copy+drop+store` to a function which expects argument of type `|num|num`
    ┌─ tests/checking/specs/expressions_err.move:37:36
    │
 37 │       wrongly_typed_fun_arg_callee(|x| false) // Wrongly typed function argument.

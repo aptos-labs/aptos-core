@@ -29,7 +29,7 @@ module 0x42::test {
     }
     private fun choose_function1(key: u64,x: u64): u64 {
         {
-          let f: |u64|u64 = if Eq<u64>(key, 0) {
+          let f: |u64|u64 with copy+drop = if Eq<u64>(key, 0) {
             mod2::double
           } else {
             if Eq<u64>(key, 1) {
@@ -64,24 +64,24 @@ module 0x42::test {
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64:copy+drop =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                    let g: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
                                      move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64:copy+drop =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
+                                      let h: |u64|u64 with copy+drop+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
                                        move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 =  move|x: u64| test::multiply3(2, x, 2);
+                                        let i: |u64|u64 with copy+drop+store =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 =  move|(x: u64, y: u64): (u64, u64)| {
+                                        let i: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };

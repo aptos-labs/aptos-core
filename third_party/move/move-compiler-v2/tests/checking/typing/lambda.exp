@@ -24,7 +24,7 @@ error: cannot use `()` with an operator which expects a value of type `u64`
 56 │             i = i + action(XVector::borrow(v, i)); // expected to have wrong result type
    │                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: cannot return `u64` from a function with result type `|integer|`
+error: cannot return `u64` from a function with result type `|integer| with copy+drop+store`
    ┌─ tests/checking/typing/lambda.move:61:9
    │
 61 │         x(1) // expected to be not a function

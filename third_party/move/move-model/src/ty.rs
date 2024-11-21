@@ -3628,7 +3628,7 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                         .map(|a| a.to_string())
                         .reduce(|l, r| format!("{}+{}", l, r))
                         .unwrap_or_default();
-                    write!(f, ":{}", abilities_as_str)
+                    write!(f, " with {}", abilities_as_str)
                 } else {
                     Ok(())
                 }

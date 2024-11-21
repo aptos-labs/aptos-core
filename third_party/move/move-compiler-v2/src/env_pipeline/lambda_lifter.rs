@@ -214,6 +214,7 @@ impl<'a> LambdaLifter<'a> {
         // functions (courtesy of #12317)
         let mut param_index_mapping = BTreeMap::new();
         let mut params = vec![];
+
         for (used_param_count, (param, var_info)) in
             mem::take(&mut self.free_params).into_iter().enumerate()
         {

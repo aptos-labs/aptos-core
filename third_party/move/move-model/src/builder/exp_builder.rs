@@ -3232,12 +3232,16 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             if let Some(entry) = self.lookup_local(sym, false) {
                 // Check whether the local has the expected function type.
                 let sym_ty = entry.type_.clone();
-
                 let (arg_types, args) = self.translate_exp_list(args);
                 let fun_t = Type::Fun(
                     Box::new(Type::tuple(arg_types)),
                     Box::new(expected_type.clone()),
-                    AbilitySet::FUNCTIONS,
+                    if let Type::Fun(.., abilities) = &sym_ty {
+                        *abilities
+                    } else {
+                        // Don't constraint Abilities of sym_ty.
+                        AbilitySet::MAXIMAL_FUNCTIONS
+                    },
                 );
                 let sym_ty = self.check_type(loc, &sym_ty, &fun_t, context);
 
@@ -5260,7 +5264,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             &Type::Fun(
                 Box::new(arg_type.clone()),
                 Box::new(ty.clone()),
-                abilities.union(AbilitySet::FUNCTIONS),
+                abilities.union(AbilitySet::MAXIMAL_FUNCTIONS),
             ),
             expected_type,
             context,

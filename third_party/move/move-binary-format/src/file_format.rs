@@ -850,8 +850,10 @@ impl AbilitySet {
             | (Ability::Key as u8),
     );
     pub const EMPTY: Self = Self(0);
-    /// Base abilities for all `Functions`
+    /// Minimal abilities for all `Functions`
     pub const FUNCTIONS: AbilitySet = Self(Ability::Drop as u8);
+    /// Maximal abilities for all `Functions`.  This is used for UB when joining types.
+    pub const MAXIMAL_FUNCTIONS: AbilitySet = Self::PUBLIC_FUNCTIONS;
     /// Abilities for `Bool`, `U8`, `U64`, `U128`, and `Address`
     pub const PRIMITIVES: AbilitySet =
         Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));

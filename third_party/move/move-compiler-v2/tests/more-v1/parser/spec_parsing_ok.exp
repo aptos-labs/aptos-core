@@ -48,7 +48,7 @@ error: expression construct not supported in specifications
 69 │         ensures RET = {let y = x; y + 1};
    │                 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: cannot pass `|(num, num)|num` to a function which expects argument of type `|(num, num)|bool`
+error: cannot pass `|(num, num)|num with copy+drop+store` to a function which expects argument of type `|(num, num)|bool`
    ┌─ tests/more-v1/parser/spec_parsing_ok.move:77:24
    │
 77 │         ensures all(x, |y, z| x + y + z);
