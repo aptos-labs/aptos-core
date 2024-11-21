@@ -6,12 +6,14 @@
 mod mock_vm_test;
 
 use anyhow::Result;
+use aptos_block_executor::txn_provider::{default::DefaultTxnProvider, TxnProvider};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
     block_executor::{
         config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     bytes::NumToBytes,
     chain_id::ChainId,
@@ -52,9 +54,10 @@ enum MockVMTransaction {
 pub static KEEP_STATUS: Lazy<TransactionStatus> =
     Lazy::new(|| TransactionStatus::Keep(ExecutionStatus::Success));
 
-// We use 10 as the assertion error code for insufficient balance within the Aptos coin contract.
 pub static DISCARD_STATUS: Lazy<TransactionStatus> =
     Lazy::new(|| TransactionStatus::Discard(StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE));
+
+pub static RETRY_STATUS: Lazy<TransactionStatus> = Lazy::new(|| TransactionStatus::Retry);
 
 pub struct MockVM;
 
@@ -65,17 +68,30 @@ impl VMBlockExecutor for MockVM {
 
     fn execute_block(
         &self,
-        transactions: &[SignatureVerifiedTransaction],
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
         state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
+        _transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         // output_cache is used to store the output of transactions so they are visible to later
         // transactions.
         let mut output_cache = HashMap::new();
         let mut outputs = vec![];
 
-        for txn in transactions {
-            let txn = txn.expect_valid();
+        let mut skip_rest = false;
+        for idx in 0..txn_provider.num_txns() {
+            if skip_rest {
+                outputs.push(TransactionOutput::new(
+                    WriteSet::default(),
+                    vec![],
+                    0,
+                    RETRY_STATUS.clone(),
+                    TransactionAuxiliaryData::default(),
+                ));
+                continue;
+            }
+
+            let txn = txn_provider.get_txn(idx as u32).expect_valid();
             if matches!(txn, Transaction::StateCheckpoint(_)) {
                 outputs.push(TransactionOutput::new(
                     WriteSet::default(),
@@ -108,6 +124,7 @@ impl VMBlockExecutor for MockVM {
                     KEEP_STATUS.clone(),
                     TransactionAuxiliaryData::default(),
                 ));
+                skip_rest = true;
                 continue;
             }
 

@@ -143,7 +143,14 @@ pub async fn create_emitter_and_request(
 
     let chain_info = swarm.read().await.chain_info();
     let transaction_factory = TransactionFactory::new(chain_info.chain_id);
-    let emitter = TxnEmitter::new(transaction_factory, rng);
+    let rest_cli = swarm
+        .read()
+        .await
+        .validators()
+        .next()
+        .unwrap()
+        .rest_client();
+    let emitter = TxnEmitter::new(transaction_factory, rng, rest_cli);
 
     emit_job_request = emit_job_request.rest_clients(
         swarm

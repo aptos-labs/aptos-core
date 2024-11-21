@@ -75,7 +75,7 @@ SKIP_PERF_IMPROVEMENT_NOTICE = IS_MAINNET
 
 # bump after a bigger test or perf change, so you can easily distinguish runs
 # that are on top of this commit
-CODE_PERF_VERSION = "v8"
+CODE_PERF_VERSION = "v9"
 
 # default to using production number of execution threads for assertions
 NUMBER_OF_EXECUTION_THREADS = int(
@@ -161,47 +161,47 @@ CALIBRATION_SEPARATOR = "	"
 
 # transaction_type	module_working_set_size	executor_type	count	min_ratio	max_ratio	median
 CALIBRATION = """
-no-op	1	VM	5	0.914	1.024	40987.0
-no-op	1000	VM	5	0.880	1.008	20606.2
-apt-fa-transfer	1	VM	5	0.885	1.024	27345.0
-account-generation	1	VM	5	0.956	1.035	21446.3
-account-resource32-b	1	VM	5	0.917	1.055	35479.7
-modify-global-resource	1	VM	5	0.891	1.006	2396.8
-modify-global-resource	100	VM	5	0.888	1.010	33129.7
-publish-package	1	VM	5	0.988	1.026	127.6
-mix_publish_transfer	1	VM	5	0.802	1.068	3274.2
-batch100-transfer	1	VM	5	0.835	1.011	669.0
-vector-picture30k	1	VM	5	0.977	1.002	100.2
-vector-picture30k	100	VM	5	0.707	1.024	1818.0
-smart-table-picture30-k-with200-change	1	VM	5	0.969	1.009	16.0
-smart-table-picture30-k-with200-change	100	VM	5	0.950	1.044	246.9
-modify-global-resource-agg-v2	1	VM	5	0.870	1.033	37992.0
-modify-global-flag-agg-v2	1	VM	5	0.948	1.010	4607.8
-modify-global-bounded-agg-v2	1	VM	5	0.903	1.120	8233.1
-modify-global-milestone-agg-v2	1	VM	5	0.890	1.020	26334.6
-resource-groups-global-write-tag1-kb	1	VM	5	0.929	1.019	9515.8
-resource-groups-global-write-and-read-tag1-kb	1	VM	5	0.908	1.016	5791.6
-resource-groups-sender-write-tag1-kb	1	VM	5	0.966	1.105	19103.0
-resource-groups-sender-multi-change1-kb	1	VM	5	0.860	1.037	16597.8
-token-v1ft-mint-and-transfer	1	VM	5	0.840	1.004	1227.8
-token-v1ft-mint-and-transfer	100	VM	5	0.860	1.003	17399.7
-token-v1nft-mint-and-transfer-sequential	1	VM	5	0.874	1.011	763.7
-token-v1nft-mint-and-transfer-sequential	100	VM	5	0.860	1.006	12305.8
-coin-init-and-mint	1	VM	5	0.866	1.004	30075.3
-coin-init-and-mint	100	VM	5	0.880	1.024	22797.1
-fungible-asset-mint	1	VM	5	0.879	1.013	25097.7
-fungible-asset-mint	100	VM	5	0.868	1.016	19174.6
-no-op5-signers	1	VM	5	0.875	1.017	41438.6
-token-v2-ambassador-mint	1	VM	5	0.875	1.012	16335.1
-token-v2-ambassador-mint	100	VM	5	0.880	1.012	14124.9
-liquidity-pool-swap	1	VM	5	0.843	1.005	849.9
-liquidity-pool-swap	100	VM	5	0.906	1.006	9163.3
-liquidity-pool-swap-stable	1	VM	5	0.838	1.007	817.1
-liquidity-pool-swap-stable	100	VM	5	0.876	1.003	9024.6
-deserialize-u256	1	VM	5	0.844	1.010	39288.2
-no-op-fee-payer	1	VM	5	0.877	1.010	1657.7
-no-op-fee-payer	100	VM	5	0.857	1.017	23963.8
-simple-script	1	VM	5	0.863	1.072	35274.8
+no-op	1	VM	6	0.938	1.019	38925.3
+no-op	1000	VM	6	0.943	1.019	36444.6
+apt-fa-transfer	1	VM	6	0.927	1.018	26954.7
+account-generation	1	VM	6	0.96	1.02	20606.2
+account-resource32-b	1	VM	6	0.94	1.026	34260.4
+modify-global-resource	1	VM	6	0.993	1.021	2260.5
+modify-global-resource	100	VM	6	0.982	1.02	33129.7
+publish-package	1	VM	6	0.983	1.012	1672.6
+mix_publish_transfer	1	VM	6	0.972	1.044	20832.8
+batch100-transfer	1	VM	6	0.953	1.024	645.1
+vector-picture30k	1	VM	6	0.992	1.039	103.6
+vector-picture30k	100	VM	6	0.913	1.015	1831.5
+smart-table-picture30-k-with200-change	1	VM	6	0.976	1.034	16.1
+smart-table-picture30-k-with200-change	100	VM	6	0.985	1.018	212.9
+modify-global-resource-agg-v2	1	VM	6	0.976	1.035	33992.5
+modify-global-flag-agg-v2	1	VM	6	0.986	1.016	4224
+modify-global-bounded-agg-v2	1	VM	6	0.964	1.047	7661.6
+modify-global-milestone-agg-v2	1	VM	6	0.973	1.017	25187.1
+resource-groups-global-write-tag1-kb	1	VM	6	0.989	1.03	9215.7
+resource-groups-global-write-and-read-tag1-kb	1	VM	6	0.982	1.018	5538.3
+resource-groups-sender-write-tag1-kb	1	VM	6	0.985	1.059	20084.2
+resource-groups-sender-multi-change1-kb	1	VM	6	0.968	1.034	16400.4
+token-v1ft-mint-and-transfer	1	VM	6	0.987	1.022	1156.3
+token-v1ft-mint-and-transfer	100	VM	6	0.964	1.024	17842.6
+token-v1nft-mint-and-transfer-sequential	1	VM	6	0.984	1.017	735.7
+token-v1nft-mint-and-transfer-sequential	100	VM	6	0.966	1.017	12819.7
+coin-init-and-mint	1	VM	6	0.95	1.024	26906.4
+coin-init-and-mint	100	VM	6	0.985	1.022	22312.6
+fungible-asset-mint	1	VM	6	0.955	1.013	23001.6
+fungible-asset-mint	100	VM	6	0.955	1.015	19973.5
+no-op5-signers	1	VM	6	0.934	1.016	38708.6
+token-v2-ambassador-mint	1	VM	6	0.975	1.008	15179.3
+token-v2-ambassador-mint	100	VM	6	0.985	1.007	15150.8
+liquidity-pool-swap	1	VM	6	0.987	1.018	805.5
+liquidity-pool-swap	100	VM	6	0.993	1.02	11156.3
+liquidity-pool-swap-stable	1	VM	6	0.985	1.017	778.7
+liquidity-pool-swap-stable	100	VM	6	0.982	1.009	11056.6
+deserialize-u256	1	VM	6	0.968	1.026	36444.6
+no-op-fee-payer	1	VM	6	0.994	1.026	2046
+no-op-fee-payer	100	VM	6	0.96	1.014	32866.5
+simple-script	1	VM	6	0.941	1.012	38206.1
 """
 
 # when adding a new test, add estimated expected_tps to it, as well as waived=True.

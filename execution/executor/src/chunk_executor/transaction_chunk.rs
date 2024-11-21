@@ -11,7 +11,10 @@ use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
-    block_executor::config::BlockExecutorConfigFromOnchain,
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain,
+        transaction_slice_metadata::TransactionSliceMetadata,
+    },
     transaction::{Transaction, TransactionOutput, Version},
 };
 use aptos_vm::VMBlockExecutor;
@@ -88,7 +91,7 @@ impl TransactionChunk for ChunkToExecute {
             sig_verified_txns.into(),
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
-            None,
+            TransactionSliceMetadata::unknown(),
         )
     }
 }

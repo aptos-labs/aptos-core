@@ -10,8 +10,9 @@ use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
     metadata::Metadata,
 };
+use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
-    code::{ModuleCache, ModuleCode, ModuleCodeBuilder, WithBytes, WithHash},
+    code::{ModuleCache, ModuleCode, ModuleCodeBuilder, WithBytes, WithHash, WithSize},
     module_cyclic_dependency_error, module_linker_error,
 };
 use std::sync::Arc;
@@ -116,10 +117,9 @@ where
             Deserialized = CompiledModule,
             Verified = Module,
             Extension = E,
-            Version = V,
         >,
-    E: WithBytes + WithHash,
-    V: Clone + Ord,
+    E: WithBytes + WithSize + WithHash,
+    V: Clone + Default + Ord,
 {
     fn check_module_exists(
         &self,
@@ -138,7 +138,7 @@ where
         let id = ModuleId::new(*address, module_name.to_owned());
         Ok(self
             .get_module_or_build_with(&id, self)?
-            .map(|module| module.extension().bytes().clone()))
+            .map(|(module, _)| module.extension().bytes().clone()))
     }
 
     fn fetch_module_size_in_bytes(
@@ -149,7 +149,7 @@ where
         let id = ModuleId::new(*address, module_name.to_owned());
         Ok(self
             .get_module_or_build_with(&id, self)?
-            .map(|module| module.extension().bytes().len()))
+            .map(|(module, _)| module.extension().bytes().len()))
     }
 
     fn fetch_module_metadata(
@@ -160,7 +160,7 @@ where
         let id = ModuleId::new(*address, module_name.to_owned());
         Ok(self
             .get_module_or_build_with(&id, self)?
-            .map(|module| module.code().deserialized().metadata.clone()))
+            .map(|(module, _)| module.code().deserialized().metadata.clone()))
     }
 
     fn fetch_deserialized_module(
@@ -171,7 +171,7 @@ where
         let id = ModuleId::new(*address, module_name.to_owned());
         Ok(self
             .get_module_or_build_with(&id, self)?
-            .map(|module| module.code().deserialized().clone()))
+            .map(|(module, _)| module.code().deserialized().clone()))
     }
 
     fn fetch_verified_module(
@@ -183,8 +183,8 @@ where
 
         // Look up the verified module in cache, if it is not there, or if the module is not yet
         // verified, we need to load & verify its transitive dependencies.
-        let module = match self.get_module_or_build_with(&id, self)? {
-            Some(module) => module,
+        let (module, version) = match self.get_module_or_build_with(&id, self)? {
+            Some(module_and_version) => module_and_version,
             None => return Ok(None),
         };
 
@@ -192,11 +192,14 @@ where
             return Ok(Some(module.code().verified().clone()));
         }
 
+        let _timer = VM_TIMER.timer_with_label("ModuleStorage::fetch_verified_module [cache miss]");
+
         let mut visited = HashSet::new();
         visited.insert(id.clone());
         Ok(Some(visit_dependencies_and_verify(
             id,
             module,
+            version,
             &mut visited,
             self,
         )?))
@@ -218,7 +221,8 @@ where
 ///   is clearly infeasible.
 fn visit_dependencies_and_verify<T, E, V>(
     module_id: ModuleId,
-    module: Arc<ModuleCode<CompiledModule, Module, E, V>>,
+    module: Arc<ModuleCode<CompiledModule, Module, E>>,
+    version: V,
     visited: &mut HashSet<ModuleId>,
     module_cache_with_context: &T,
 ) -> VMResult<Arc<Module>>
@@ -235,10 +239,9 @@ where
             Deserialized = CompiledModule,
             Verified = Module,
             Extension = E,
-            Version = V,
         >,
-    E: WithBytes + WithHash,
-    V: Clone + Ord,
+    E: WithBytes + WithSize + WithHash,
+    V: Clone + Default + Ord,
 {
     let runtime_environment = module_cache_with_context.runtime_environment();
 
@@ -260,7 +263,7 @@ where
     for (addr, name) in locally_verified_code.immediate_dependencies_iter() {
         let dependency_id = ModuleId::new(*addr, name.to_owned());
 
-        let dependency = module_cache_with_context
+        let (dependency, dependency_version) = module_cache_with_context
             .get_module_or_build_with(&dependency_id, module_cache_with_context)?
             .ok_or_else(|| module_linker_error!(addr, name))?;
 
@@ -275,6 +278,7 @@ where
             let verified_dependency = visit_dependencies_and_verify(
                 dependency_id.clone(),
                 dependency,
+                dependency_version,
                 visited,
                 module_cache_with_context,
             )?;
@@ -294,7 +298,7 @@ where
         module_id,
         verified_code,
         module.extension().clone(),
-        module.version(),
+        version,
     )?;
     Ok(module.code().verified().clone())
 }

@@ -14,6 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-block-executor = { workspace = true }
 aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-drop-helper = { workspace = true }
@@ -50,7 +51,7 @@ aptos-executor-test-helpers = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-temppath = { workspace = true }
-aptos-types = { workspace = true }
+aptos-types = { workspace = true, features = ["testing"] }
 aptos-vm-genesis = { workspace = true }
 proptest = { workspace = true }
 rand = { workspace = true }

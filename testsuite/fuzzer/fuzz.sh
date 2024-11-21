@@ -4,7 +4,7 @@ export RUSTFLAGS="${RUSTFLAGS} --cfg tokio_unstable"
 export EXTRAFLAGS="-Ztarget-applies-to-host -Zhost-config"
 # Nightly version control
 # Pin nightly-2024-02-12 because of https://github.com/google/oss-fuzz/issues/11626
-NIGHTLY_VERSION="nightly-2024-02-12"
+NIGHTLY_VERSION="nightly-2024-04-06"
 
 # GDRIVE format https://docs.google.com/uc?export=download&id=DOCID
 CORPUS_ZIPS=("https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip" "https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_seed_corpus.zip")

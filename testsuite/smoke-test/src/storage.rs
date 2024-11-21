@@ -466,14 +466,16 @@ async fn do_transfer_or_reconfig(info: &mut AptosPublicInfo) -> Result<()> {
     const LOTS_MONEY: u64 = 100_000_000;
     let r = rand::random::<u64>() % 10;
     if r < 3 {
-        // reconfig
+        info!(
+            "{LINE} background task: triggering reconfig. Root account seq_num: {}. Ledger info: {:?}",
+            info.root_account().sequence_number(),
+            info.client().get_ledger_information().await.unwrap(),
+        );
         info.reconfig().await;
-    } else if r == 9 {
-        // drain backlog
-        let mut sender = info.create_and_fund_user_account(LOTS_MONEY).await?;
-        let receiver = info.create_and_fund_user_account(LOTS_MONEY).await?;
-        let pending_txn = info.transfer(&mut sender, &receiver, 1).await?;
-        info.client().wait_for_transaction(&pending_txn).await?;
+        info!(
+            "{LINE} background task: Reconfig done. Root account seq_num: {}",
+            info.root_account().sequence_number(),
+        );
     } else {
         let mut sender = info.create_and_fund_user_account(LOTS_MONEY).await?;
         let receiver = info.create_and_fund_user_account(LOTS_MONEY).await?;
@@ -531,23 +533,30 @@ async fn test_db_restart() {
     for round in 0..3 {
         info!("{LINE} Restart round {round}");
         for (v, vid) in restarting_validator_ids.iter().enumerate() {
-            info!("{LINE} Round {round}: Restarting validator {v}.");
-            info!(
-                "{LINE} ledger info: {:?}",
-                client.get_ledger_information().await.unwrap(),
-            );
             let validator = swarm.validator_mut(*vid).unwrap();
             // sometimes trigger reconfig right before the restart, to expose edge cases around
             // epoch change
             if rand::random::<usize>() % 3 == 0 {
-                info!("{LINE} Triggering reconfig right before restarting.");
+                info!(
+                    "{LINE} Triggering reconfig right before restarting. Root account seq_num: {}. Ledger info: {:?}",
+                    pub_chain_info.root_account().sequence_number(),
+                    client.get_ledger_information().await.unwrap(),
+                );
                 reconfig(
-                    &validator.rest_client(),
+                    &client,
                     &pub_chain_info.transaction_factory(),
                     pub_chain_info.root_account(),
                 )
                 .await;
+                info!(
+                    "{LINE} Reconfig done. Root account seq_num: {}",
+                    pub_chain_info.root_account().sequence_number(),
+                )
             }
+            info!(
+                "{LINE} Round {round}: Restarting validator {v}. ledger info: {:?}",
+                client.get_ledger_information().await.unwrap(),
+            );
             validator.restart().await.unwrap();
             swarm
                 .wait_for_all_nodes_to_catchup(Duration::from_secs(60))
@@ -558,11 +567,12 @@ async fn test_db_restart() {
         }
     }
 
-    info!("{LINE} Stopping background traffic, and check again that all validators are alive.");
+    info!("{LINE} Stopping background traffic, and make sure background task didn't panic.");
     quit_flag.store(true, Ordering::Release);
     // Make sure background thread didn't panic.
     background_traffic.await.unwrap();
 
+    info!("{LINE} Check again that all validators are alive.");
     swarm
         .wait_for_all_nodes_to_catchup(Duration::from_secs(60))
         .await

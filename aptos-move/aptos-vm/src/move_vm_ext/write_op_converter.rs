@@ -105,6 +105,22 @@ impl<'r> WriteOpConverter<'r> {
             )?;
 
             let state_key = StateKey::module_id(&module_id);
+
+            // Enforce read-before-write:
+            //   Modules can live in global cache, and so the DB may not see a module read even
+            //   when it gets republished. This violates read-before-write property. Here, we on
+            //   purpose enforce this by registering a read to the DB directly.
+            //   Note that we also do it here so that in case of storage errors, only a  single
+            //   transaction fails (e.g., if doing this read before commit in block executor we
+            //   have no way to alter the transaction outputs at that point).
+            self.remote.read_state_value(&state_key).map_err(|err| {
+                let msg = format!(
+                    "Error when enforcing read-before-write for module {}::{}: {:?}",
+                    addr, name, err
+                );
+                PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(msg)
+            })?;
+
             writes.insert(state_key, ModuleWrite::new(module_id, write_op));
         }
         Ok(writes)
@@ -282,10 +298,7 @@ mod tests {
     };
     use aptos_types::{
         account_address::AccountAddress,
-        state_store::{
-            errors::StateviewError, state_storage_usage::StateStorageUsage,
-            state_value::StateValue, TStateView,
-        },
+        state_store::{state_value::StateValue, MockStateView},
         write_set::TransactionWrite,
     };
     use aptos_vm_environment::environment::AptosEnvironment;
@@ -301,6 +314,7 @@ mod tests {
         identifier::Identifier,
         language_storage::{StructTag, TypeTag},
     };
+    use std::collections::HashMap;
 
     fn raw_metadata(v: u64) -> StateValueMetadata {
         StateValueMetadata::legacy(v, &CurrentTimeMicroseconds { microseconds: v })
@@ -331,31 +345,6 @@ mod tests {
             module: Identifier::new("abcdex").unwrap(),
             name: Identifier::new("fghx").unwrap(),
             type_args: vec![TypeTag::U128],
-        }
-    }
-
-    struct MockStateView {
-        data: BTreeMap<StateKey, StateValue>,
-    }
-
-    impl MockStateView {
-        fn new(data: BTreeMap<StateKey, StateValue>) -> Self {
-            Self { data }
-        }
-    }
-
-    impl TStateView for MockStateView {
-        type Key = StateKey;
-
-        fn get_state_value(
-            &self,
-            state_key: &Self::Key,
-        ) -> Result<Option<StateValue>, StateviewError> {
-            Ok(self.data.get(state_key).cloned())
-        }
-
-        fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
-            unimplemented!();
         }
     }
 
@@ -400,7 +389,7 @@ mod tests {
         let state_value = StateValue::new_legacy(bytes.into());
 
         // Setting up the state.
-        let state_view = MockStateView::new(BTreeMap::from([
+        let state_view = MockStateView::new(HashMap::from([
             (state_key, state_value),
             (a_state_key.clone(), a_state_value.clone()),
             (b_state_key.clone(), b_state_value.clone()),
@@ -472,7 +461,7 @@ mod tests {
         let metadata = raw_metadata(100);
         let key = StateKey::raw(&[0]);
 
-        let data = BTreeMap::from([(
+        let data = HashMap::from([(
             key.clone(),
             StateValue::new_with_metadata(bcs::to_bytes(&group).unwrap().into(), metadata.clone()),
         )]);
@@ -528,7 +517,7 @@ mod tests {
         let metadata = raw_metadata(100);
         let key = StateKey::raw(&[0]);
 
-        let data = BTreeMap::from([(
+        let data = HashMap::from([(
             key.clone(),
             StateValue::new_with_metadata(bcs::to_bytes(&group).unwrap().into(), metadata.clone()),
         )]);
@@ -562,7 +551,7 @@ mod tests {
     // #[test]
     #[allow(unused)]
     fn size_computation_new_group() {
-        let s = MockStateView::new(BTreeMap::new());
+        let s = MockStateView::empty();
         let resolver = as_resolver_with_group_size_kind(&s, GroupSizeKind::AsSum);
 
         // TODO[agg_v2](test): Layout hardcoded to None. Test with layout = Some(..)
@@ -595,7 +584,7 @@ mod tests {
         let metadata = raw_metadata(100);
         let key = StateKey::raw(&[0]);
 
-        let data = BTreeMap::from([(
+        let data = HashMap::from([(
             key.clone(),
             StateValue::new_with_metadata(bcs::to_bytes(&group).unwrap().into(), metadata.clone()),
         )]);
