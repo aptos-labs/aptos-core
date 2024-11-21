@@ -183,7 +183,7 @@ impl InMemoryStateCalculatorV2 {
             updates_after_last_checkpoint
         } else {
             let mut updates_since_latest_checkpoint =
-                parent_state.updates_since_base.deref().deref().clone();
+                parent_state.updates_since_base.deref().clone();
             zip_eq(
                 updates_since_latest_checkpoint.iter_mut(),
                 updates_after_last_checkpoint,
