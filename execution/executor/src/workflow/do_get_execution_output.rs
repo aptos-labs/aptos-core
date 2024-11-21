@@ -27,8 +27,8 @@ use aptos_types::transaction::ExecutionStatus;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain,
-        execution_state::TransactionSliceMetadata,
         partitioner::{ExecutableTransactions, PartitionedTransactions},
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     contract_event::ContractEvent,
     epoch_state::EpochState,
@@ -45,7 +45,7 @@ use aptos_types::{
 };
 use aptos_vm::VMBlockExecutor;
 use itertools::Itertools;
-use std::{iter, sync::Arc};
+use std::sync::Arc;
 
 pub struct DoGetExecutionOutput;
 
@@ -288,51 +288,31 @@ impl Parser {
         append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<ExecutionOutput> {
         let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output"]);
+
         let is_block = append_state_checkpoint_to_block.is_some();
-
-        // Parse all outputs.
-        let mut epoch_ending_flags = {
-            let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__epoch_ending_flags"]);
-            transaction_outputs
-                .iter()
-                .map(TransactionOutput::has_new_epoch_event)
-                .collect_vec()
-        };
-
-        // Isolate retries.
-        let (to_retry, has_reconfig) = {
-            let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__retries"]);
-            Self::extract_retries(
-                &mut transactions,
-                &mut transaction_outputs,
-                &mut epoch_ending_flags,
-            )
-        };
 
         // Collect all statuses.
         let statuses_for_input_txns = {
             let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__all_statuses"]);
-            let keeps_and_discards = transaction_outputs.iter().map(|t| t.status()).cloned();
-            // Forcibly overwriting statuses for retries, since VM can output otherwise.
-            let retries = iter::repeat(TransactionStatus::Retry).take(to_retry.len());
-            keeps_and_discards.chain(retries).collect()
+            transaction_outputs
+                .iter()
+                .map(|t| t.status())
+                .cloned()
+                .collect_vec()
         };
 
+        // Isolate retries.
+        let (to_retry, has_reconfig) =
+            Self::extract_retries(&mut transactions, &mut transaction_outputs);
+
         // Isolate discards.
-        let to_discard = {
-            let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__discards"]);
-            Self::extract_discards(
-                &mut transactions,
-                &mut transaction_outputs,
-                &mut epoch_ending_flags,
-            )
-        };
+        let to_discard = Self::extract_discards(&mut transactions, &mut transaction_outputs);
 
         // The rest is to be committed, attach block epilogue as needed and optionally get next EpochState.
         let to_commit = {
             let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__to_commit"]);
             let to_commit =
-                TransactionsWithOutput::new(transactions, transaction_outputs, epoch_ending_flags);
+                TransactionsWithOutput::new(transactions, transaction_outputs, has_reconfig);
             Self::maybe_add_block_epilogue(
                 to_commit,
                 has_reconfig,
@@ -380,48 +360,34 @@ impl Parser {
     fn extract_retries(
         transactions: &mut Vec<Transaction>,
         transaction_outputs: &mut Vec<TransactionOutput>,
-        epoch_ending_flags: &mut Vec<bool>,
     ) -> (TransactionsWithOutput, bool) {
-        // N.B. off-by-1 intentionally, for exclusive index
-        let new_epoch_marker = epoch_ending_flags
-            .iter()
-            .rposition(|f| *f)
-            .map(|idx| idx + 1);
+        let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__retries"]);
 
-        let block_gas_limit_marker = transaction_outputs
+        let last_non_retry = transaction_outputs
             .iter()
-            .position(|o| matches!(o.status(), TransactionStatus::Retry));
-
-        // Transactions after the epoch ending txn are all to be retried.
-        // Transactions after the txn that exceeded per-block gas limit are also to be retried.
-        if let Some(pos) = new_epoch_marker {
-            (
-                TransactionsWithOutput::new(
-                    transactions.drain(pos..).collect(),
-                    transaction_outputs.drain(pos..).collect(),
-                    epoch_ending_flags.drain(pos..).collect(),
-                ),
-                true,
-            )
-        } else if let Some(pos) = block_gas_limit_marker {
-            (
-                TransactionsWithOutput::new(
-                    transactions.drain(pos..).collect(),
-                    transaction_outputs.drain(pos..).collect(),
-                    epoch_ending_flags.drain(pos..).collect(),
-                ),
-                false,
-            )
+            .rposition(|t| !t.status().is_retry());
+        let is_reconfig = if let Some(idx) = last_non_retry {
+            transaction_outputs[idx].has_new_epoch_event()
         } else {
-            (TransactionsWithOutput::new_empty(), false)
-        }
+            false
+        };
+
+        let first_retry = last_non_retry.map_or(0, |pos| pos + 1);
+        let to_retry = TransactionsWithOutput::new(
+            transactions.drain(first_retry..).collect(),
+            transaction_outputs.drain(first_retry..).collect(),
+            false, // is_reconfig
+        );
+
+        (to_retry, is_reconfig)
     }
 
     fn extract_discards(
         transactions: &mut Vec<Transaction>,
         transaction_outputs: &mut Vec<TransactionOutput>,
-        epoch_ending_flags: &mut Vec<bool>,
     ) -> TransactionsWithOutput {
+        let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__discards"]);
+
         let to_discard = {
             let mut res = TransactionsWithOutput::new_empty();
             for idx in 0..transactions.len() {
@@ -429,25 +395,23 @@ impl Parser {
                     res.push(
                         transactions[idx].clone(),
                         transaction_outputs[idx].clone(),
-                        epoch_ending_flags[idx],
+                        false,
                     );
                 } else if !res.is_empty() {
                     transactions[idx - res.len()] = transactions[idx].clone();
                     transaction_outputs[idx - res.len()] = transaction_outputs[idx].clone();
-                    epoch_ending_flags[idx - res.len()] = epoch_ending_flags[idx];
                 }
             }
             if !res.is_empty() {
                 let remaining = transactions.len() - res.len();
                 transactions.truncate(remaining);
                 transaction_outputs.truncate(remaining);
-                epoch_ending_flags.truncate(remaining);
             }
             res
         };
 
         // Sanity check transactions with the Discard status:
-        to_discard.iter().for_each(|(t, o, _flag)| {
+        to_discard.iter().for_each(|(t, o)| {
             // In case a new status other than Retry, Keep and Discard is added:
             if !matches!(o.status(), TransactionStatus::Discard(_)) {
                 error!("Status other than Retry, Keep or Discard; Transaction discarded.");

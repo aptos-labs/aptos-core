@@ -27,8 +27,8 @@ use aptos_infallible::Mutex;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
-        partitioner::PartitionedTransactions,
+        config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     state_store::StateView,
     transaction::{

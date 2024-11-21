@@ -61,6 +61,31 @@ pub fn sample_jwt_payload_json() -> String {
     )
 }
 
+pub fn render_jwt_payload_json(
+    iss: &str,
+    aud: &str,
+    uid_key: &str,
+    uid_val: &str,
+    extra_field: &str,
+    iat: u64,
+    nonce: &str,
+    exp: u64,
+) -> String {
+    format!(
+        r#"{{
+            "iss":"{}",
+            "aud":"{}",
+            "{}":"{}",
+            {}
+            "iat":{},
+            "nonce":"{}",
+            "exp":{}
+        }}
+        "#,
+        iss, aud, uid_key, uid_val, extra_field, iat, nonce, exp
+    )
+}
+
 pub fn sample_jwt_payload_json_overrides(
     iss: &str,
     uid_val: &str,
@@ -109,7 +134,7 @@ pub(crate) static SAMPLE_JWK: Lazy<RSA_JWK> = Lazy::new(insecure_test_rsa_jwk);
 
 /// This is the SK from https://token.dev/.
 /// To convert it into a JSON, you can use https://irrte.ch/jwt-js-decode/pem2jwk.html
-pub(crate) static SAMPLE_JWK_SK: Lazy<&RsaKeyPair> = Lazy::new(|| &*INSECURE_TEST_RSA_KEY_PAIR);
+pub static SAMPLE_JWK_SK: Lazy<&RsaKeyPair> = Lazy::new(|| &*INSECURE_TEST_RSA_KEY_PAIR);
 
 pub(crate) const SAMPLE_UID_KEY: &str = "sub";
 

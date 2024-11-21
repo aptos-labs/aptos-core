@@ -8,7 +8,10 @@ use crate::{
 };
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_logger::info;
-use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
+use aptos_sdk::{
+    transaction_builder::{aptos_stdlib, TransactionFactory},
+    types::LocalAccount,
+};
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use aptos_types::{
     account_address::AccountAddress,
@@ -154,11 +157,12 @@ impl TransactionGenerator {
         reader: Arc<dyn DbReader>,
         num_accounts: usize,
         num_to_skip: usize,
+        is_keyless: bool,
     ) -> AccountCache {
         Self::resync_sequence_numbers(
             reader,
             Self::gen_account_cache(
-                AccountGenerator::new_for_user_accounts(num_to_skip as u64),
+                AccountGenerator::new_for_user_accounts(num_to_skip as u64, is_keyless),
                 num_accounts,
                 "user",
             ),
@@ -166,11 +170,15 @@ impl TransactionGenerator {
         )
     }
 
-    fn gen_seed_account_cache(reader: Arc<dyn DbReader>, num_accounts: usize) -> AccountCache {
+    fn gen_seed_account_cache(
+        reader: Arc<dyn DbReader>,
+        num_accounts: usize,
+        is_keyless: bool,
+    ) -> AccountCache {
         Self::resync_sequence_numbers(
             reader,
             Self::gen_account_cache(
-                AccountGenerator::new_for_seed_accounts(),
+                AccountGenerator::new_for_seed_accounts(is_keyless),
                 num_accounts,
                 "seed",
             ),
@@ -185,6 +193,7 @@ impl TransactionGenerator {
         db_dir: P,
         num_main_signer_accounts: Option<usize>,
         num_workers: usize,
+        is_keyless: bool,
     ) -> Self {
         let num_existing_accounts = TransactionGenerator::read_meta(&db_dir);
 
@@ -194,7 +203,7 @@ impl TransactionGenerator {
             main_signer_accounts: num_main_signer_accounts.map(|num_main_signer_accounts| {
                 let num_cached_accounts =
                     std::cmp::min(num_existing_accounts, num_main_signer_accounts);
-                Self::gen_user_account_cache(db.reader.clone(), num_cached_accounts, 0)
+                Self::gen_user_account_cache(db.reader.clone(), num_cached_accounts, 0, is_keyless)
             }),
             num_existing_accounts,
             block_sender: Some(block_sender),
@@ -256,6 +265,7 @@ impl TransactionGenerator {
         num_new_accounts: usize,
         init_account_balance: u64,
         block_size: usize,
+        is_keyless: bool,
     ) {
         assert!(self.block_sender.is_some());
         // Ensure that seed accounts have enough balance to transfer money to at least 10000 account with
@@ -265,12 +275,14 @@ impl TransactionGenerator {
             num_new_accounts,
             block_size,
             init_account_balance * 10_000,
+            is_keyless,
         );
         self.create_and_fund_accounts(
             num_existing_accounts,
             num_new_accounts,
             init_account_balance,
             block_size,
+            is_keyless,
         );
     }
 
@@ -351,11 +363,13 @@ impl TransactionGenerator {
         num_new_accounts: usize,
         block_size: usize,
         seed_account_balance: u64,
+        is_keyless: bool,
     ) {
         // We don't store the # of existing seed accounts now. Thus here we just blindly re-create
         // and re-mint seed accounts here.
         let num_seed_accounts = (num_new_accounts / 1000).clamp(1, 100000);
-        let seed_accounts_cache = Self::gen_seed_account_cache(reader, num_seed_accounts);
+        let seed_accounts_cache =
+            Self::gen_seed_account_cache(reader, num_seed_accounts, is_keyless);
 
         println!(
             "[{}] Generating {} seed account creation txns, with {} coins.",
@@ -374,13 +388,12 @@ impl TransactionGenerator {
             let transactions: Vec<_> = chunk
                 .iter()
                 .map(|new_account| {
-                    let txn = self.root_account.sign_with_transaction_builder(
-                        self.transaction_factory
-                            .implicitly_create_user_account_and_transfer(
-                                new_account.public_key(),
-                                seed_account_balance,
-                            ),
+                    let payload = aptos_stdlib::aptos_account_transfer(
+                        new_account.authentication_key().account_address(),
+                        seed_account_balance,
                     );
+                    let builder = self.transaction_factory.payload(payload);
+                    let txn = self.root_account.sign_with_transaction_builder(builder);
                     Transaction::UserTransaction(txn)
                 })
                 .collect();
@@ -401,13 +414,15 @@ impl TransactionGenerator {
         num_new_accounts: usize,
         init_account_balance: u64,
         block_size: usize,
+        is_keyless: bool,
     ) {
         println!(
             "[{}] Generating {} account creation txns.",
             now_fmt!(),
             num_new_accounts
         );
-        let mut generator = AccountGenerator::new_for_user_accounts(num_existing_accounts as u64);
+        let mut generator =
+            AccountGenerator::new_for_user_accounts(num_existing_accounts as u64, is_keyless);
         println!("Skipped first {} existing accounts.", num_existing_accounts);
 
         let bar = get_progress_bar(num_new_accounts);
@@ -431,13 +446,12 @@ impl TransactionGenerator {
                 Arc::new(AtomicUsize::new(0)),
                 |(sender_idx, new_account), account_cache| {
                     let sender = &account_cache.accounts[sender_idx];
-                    let txn = sender.sign_with_transaction_builder(
-                        self.transaction_factory
-                            .implicitly_create_user_account_and_transfer(
-                                new_account.public_key(),
-                                init_account_balance,
-                            ),
+                    let payload = aptos_stdlib::aptos_account_transfer(
+                        new_account.authentication_key().account_address(),
+                        init_account_balance,
                     );
+                    let txn = sender
+                        .sign_with_transaction_builder(self.transaction_factory.payload(payload));
                     Some(Transaction::UserTransaction(txn))
                 },
                 |(sender_idx, _)| *sender_idx,

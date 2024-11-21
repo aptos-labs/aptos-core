@@ -20,8 +20,8 @@ use aptos_language_e2e_tests::{
 use aptos_types::{
     block_executor::{
         config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain},
-        execution_state::TransactionSliceMetadata,
         partitioner::PartitionedTransactions,
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     block_metadata::BlockMetadata,
     on_chain_config::{OnChainConfig, ValidatorSet},

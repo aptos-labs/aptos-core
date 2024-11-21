@@ -43,7 +43,7 @@ use aptos_transaction_generator_lib::{
     create_txn_generator_creator, AlwaysApproveRootAccountHandle, TransactionGeneratorCreator,
     TransactionType::{self, CoinTransfer},
 };
-use aptos_types::on_chain_config::Features;
+use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_vm::VMBlockExecutor;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
 use metrics::TIMER;
@@ -56,6 +56,12 @@ use std::{
     time::Instant,
 };
 use tokio::runtime::Runtime;
+
+pub fn default_benchmark_features() -> Features {
+    let mut init_features = Features::default();
+    init_features.disable(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH);
+    init_features
+}
 
 pub fn init_db_and_executor<V>(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<V>)
 where
@@ -120,6 +126,7 @@ pub fn run_benchmark<V>(
     enable_storage_sharding: bool,
     pipeline_config: PipelineConfig,
     init_features: Features,
+    is_keyless: bool,
 ) where
     V: VMBlockExecutor + 'static,
 {
@@ -164,6 +171,7 @@ pub fn run_benchmark<V>(
             db.reader.clone(),
             num_accounts_to_be_loaded,
             num_accounts_to_skip,
+            is_keyless,
         );
         let (main_signer_accounts, burner_accounts) =
             accounts_cache.split(num_main_signer_accounts);
@@ -220,6 +228,7 @@ pub fn run_benchmark<V>(
         source_dir,
         Some(num_accounts_to_load),
         pipeline_config.num_generator_workers,
+        is_keyless,
     );
 
     let mut overall_measuring = OverallMeasuring::start();
@@ -341,6 +350,7 @@ pub fn add_accounts<V>(
     enable_storage_sharding: bool,
     pipeline_config: PipelineConfig,
     init_features: Features,
+    is_keyless: bool,
 ) where
     V: VMBlockExecutor + 'static,
 {
@@ -361,6 +371,7 @@ pub fn add_accounts<V>(
         enable_storage_sharding,
         pipeline_config,
         init_features,
+        is_keyless,
     );
 }
 
@@ -375,6 +386,7 @@ fn add_accounts_impl<V>(
     enable_storage_sharding: bool,
     pipeline_config: PipelineConfig,
     init_features: Features,
+    is_keyless: bool,
 ) where
     V: VMBlockExecutor + 'static,
 {
@@ -401,6 +413,7 @@ fn add_accounts_impl<V>(
         &source_dir,
         None,
         pipeline_config.num_generator_workers,
+        is_keyless,
     );
 
     let start_time = Instant::now();
@@ -410,6 +423,7 @@ fn add_accounts_impl<V>(
         num_new_accounts,
         init_account_balance,
         block_size,
+        is_keyless,
     );
     generator.drop_sender();
     pipeline.start_pipeline_processing();
@@ -770,7 +784,7 @@ fn log_total_supply(db_reader: &Arc<dyn DbReader>) {
 #[cfg(test)]
 mod tests {
     use crate::{
-        db_generator::bootstrap_with_genesis, init_db_and_executor,
+        db_generator::bootstrap_with_genesis, default_benchmark_features, init_db_and_executor,
         native::native_config::NativeConfig, pipeline::PipelineConfig,
         transaction_executor::BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         transaction_generator::TransactionGenerator, BenchmarkWorkload,
@@ -781,10 +795,7 @@ mod tests {
     use aptos_sdk::{transaction_builder::aptos_stdlib, types::LocalAccount};
     use aptos_temppath::TempPath;
     use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
-    use aptos_types::{
-        on_chain_config::{FeatureFlag, Features},
-        transaction::Transaction,
-    };
+    use aptos_types::{on_chain_config::FeatureFlag, transaction::Transaction};
     use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
     use rand::thread_rng;
     use std::fs;
@@ -797,7 +808,7 @@ mod tests {
 
         fs::create_dir_all(db_dir.as_ref()).unwrap();
 
-        let mut init_features = Features::default();
+        let mut init_features = default_benchmark_features();
         init_features.enable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
         init_features.enable(FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE);
 
@@ -890,7 +901,7 @@ mod tests {
 
         println!("db_generator::create_db_with_accounts");
 
-        let mut features = Features::default();
+        let mut features = default_benchmark_features();
         features.enable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
         features.enable(FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE);
 
@@ -905,6 +916,7 @@ mod tests {
             false,
             PipelineConfig::default(),
             features.clone(),
+            false,
         );
 
         println!("run_benchmark");
@@ -935,6 +947,7 @@ mod tests {
             false,
             PipelineConfig::default(),
             features,
+            false,
         );
     }
 

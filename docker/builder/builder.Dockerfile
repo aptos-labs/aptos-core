@@ -3,21 +3,23 @@
 FROM rust as rust-base
 WORKDIR /aptos
 
+
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    sed -i 's|http://deb.debian.org/debian|http://cloudfront.debian.net/debian|g' /etc/apt/sources.list &&  \
     apt update && apt-get --no-install-recommends install -y \
-    cmake \
-    curl \
-    clang \
-    git \
-    pkg-config \
-    libssl-dev \
-    libpq-dev \
-    libdw-dev \
-    binutils \
-    lld \
-    libudev-dev
+        binutils \
+        clang \
+        cmake \
+        curl \
+        git \
+        libdw-dev \
+        libpq-dev \
+        libssl-dev \
+        libudev-dev \
+        lld \
+        pkg-config
 
 ### Build Rust code ###
 FROM rust-base as builder-base

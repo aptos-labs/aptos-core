@@ -21,8 +21,8 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-mod bn254_circom;
-mod circuit_constants;
+pub mod bn254_circom;
+pub mod circuit_constants;
 pub mod circuit_testcases;
 mod configuration;
 mod groth16_sig;
@@ -420,7 +420,7 @@ pub fn get_authenticators(
     Ok(authenticators)
 }
 
-pub(crate) fn base64url_encode_str(data: &str) -> String {
+pub fn base64url_encode_str(data: &str) -> String {
     base64::encode_config(data.as_bytes(), URL_SAFE_NO_PAD)
 }
 

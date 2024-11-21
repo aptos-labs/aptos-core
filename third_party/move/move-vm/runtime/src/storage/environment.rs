@@ -25,6 +25,7 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
+use move_vm_metrics::{Timer, VM_TIMER};
 #[cfg(any(test, feature = "testing"))]
 use move_vm_types::loaded_data::runtime_types::{StructIdentifier, StructNameIndex};
 use std::sync::Arc;
@@ -152,6 +153,10 @@ impl RuntimeEnvironment {
         module_hash: &[u8; 32],
     ) -> VMResult<LocallyVerifiedModule> {
         if !VERIFIED_MODULES_V2.contains(module_hash) {
+            let _timer = VM_TIMER.timer_with_label(
+                "LoaderV2::build_locally_verified_module [verification cache miss]",
+            );
+
             // For regular execution, we cache already verified modules. Note that this even caches
             // verification for the published modules. This should be ok because as long as the
             // hash is the same, the deployed bytecode and any dependencies are the same, and so

@@ -93,12 +93,7 @@ impl DoLedgerUpdate {
             writeset_hashes
         )
         .map(
-            |(
-                (txn, txn_out, _is_reconfig),
-                state_checkpoint_hash,
-                event_root_hash,
-                write_set_hash,
-            )| {
+            |((txn, txn_out), state_checkpoint_hash, event_root_hash, write_set_hash)| {
                 TransactionInfo::new(
                     txn.hash(),
                     write_set_hash,

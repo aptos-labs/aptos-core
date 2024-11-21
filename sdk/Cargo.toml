@@ -25,6 +25,7 @@ bcs = { workspace = true }
 ed25519-dalek-bip32 = { workspace = true }
 hex = { workspace = true }
 move-core-types = { workspace = true }
+rand = { workspace = true }
 rand_core = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }

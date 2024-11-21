@@ -14,8 +14,8 @@ use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };
 use aptos_executor_benchmark::{
-    native::native_config::NativeConfig, native_executor::NativeExecutor, pipeline::PipelineConfig,
-    BenchmarkWorkload,
+    default_benchmark_features, native::native_config::NativeConfig,
+    native_executor::NativeExecutor, pipeline::PipelineConfig, BenchmarkWorkload,
 };
 use aptos_executor_service::remote_executor_client;
 use aptos_experimental_ptx_executor::PtxBlockExecutor;
@@ -243,6 +243,9 @@ enum BlockExecutorTypeOpt {
 
 #[derive(Parser, Debug)]
 struct Opt {
+    #[clap(long)]
+    use_keyless_accounts: bool,
+
     #[clap(long, default_value_t = 10000)]
     block_size: usize,
 
@@ -410,7 +413,7 @@ fn get_init_features(
         "Enable and disable feature flags cannot overlap."
     );
 
-    let mut init_features = Features::default();
+    let mut init_features = default_benchmark_features();
     for feature in enable_feature.iter() {
         init_features.enable(*feature);
     }
@@ -442,6 +445,7 @@ where
                 opt.enable_storage_sharding,
                 opt.pipeline_opt.pipeline_config(),
                 get_init_features(enable_feature, disable_feature),
+                opt.use_keyless_accounts,
             );
         },
         Command::RunExecutor {
@@ -503,6 +507,7 @@ where
                 opt.enable_storage_sharding,
                 opt.pipeline_opt.pipeline_config(),
                 get_init_features(enable_feature, disable_feature),
+                opt.use_keyless_accounts,
             );
         },
         Command::AddAccounts {
@@ -522,6 +527,7 @@ where
                 opt.enable_storage_sharding,
                 opt.pipeline_opt.pipeline_config(),
                 Features::default(),
+                opt.use_keyless_accounts,
             );
         },
     }
