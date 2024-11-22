@@ -453,6 +453,7 @@ impl Constraint {
 
     /// Joins the two constraints. If they are incompatible, produces a type unification error.
     /// Otherwise, returns true if `self` absorbs the `other` constraint (and waives the `other`).
+    /// ctx_opt is for additional error info
     pub fn join(
         &mut self,
         context: &mut impl UnificationContext,
@@ -544,8 +545,10 @@ impl Constraint {
                 *a1 = a1.union(*a2);
                 Ok(true)
             },
-            // After the above checks on same type of contraint
+            // After the above checks on same type of constraint
             // Check compatibility between ability and number
+            // This check is needed because sometime the concrete integer type is not available
+            // TODO: check other combination of constraints may be necessary as well.
             (Constraint::HasAbilities(a1, _), Constraint::SomeNumber(_)) => {
                 let unsupported_abilities = a1.setminus(AbilitySet::PRIMITIVES);
                 if !unsupported_abilities.is_empty() {

@@ -15,6 +15,15 @@ module 0x8675309::M {
           }
         }
     }
+    private fun t0_u128() {
+        {
+          let y: R<X<u128>> = pack M::R<X<u128>>(pack M::X<u128>(18446744073709551616));
+          {
+            let M::R<X<u128>>{ r: _r } = y;
+            Tuple()
+          }
+        }
+    }
 } // end 0x8675309::M
 
 // -- Sourcified model before bytecode pipeline
@@ -28,6 +37,10 @@ module 0x8675309::M {
     fun t0() {
         let y = R<X<u64>>{r: X<u64>{r: 0}};
         let R<X<u64>>{r: _r} = y;
+    }
+    fun t0_u128() {
+        let y = R<X<u128>>{r: X<u128>{r: 18446744073709551616u128}};
+        let R<X<u128>>{r: _r} = y;
     }
 }
 
@@ -43,6 +56,20 @@ fun M::t0() {
   1: $t1 := pack 0x8675309::M::X<u64>($t2)
   2: $t0 := pack 0x8675309::M::R<0x8675309::M::X<u64>>($t1)
   3: $t3 := unpack 0x8675309::M::R<0x8675309::M::X<u64>>($t0)
+  4: return ()
+}
+
+
+[variant baseline]
+fun M::t0_u128() {
+     var $t0: 0x8675309::M::R<0x8675309::M::X<u128>>
+     var $t1: 0x8675309::M::X<u128>
+     var $t2: u128
+     var $t3: 0x8675309::M::X<u128>
+  0: $t2 := 18446744073709551616
+  1: $t1 := pack 0x8675309::M::X<u128>($t2)
+  2: $t0 := pack 0x8675309::M::R<0x8675309::M::X<u128>>($t1)
+  3: $t3 := unpack 0x8675309::M::R<0x8675309::M::X<u128>>($t0)
   4: return ()
 }
 
