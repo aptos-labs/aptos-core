@@ -3,10 +3,13 @@ module aptos_framework::native_bridge {
     use aptos_framework::account;
     use aptos_framework::native_bridge_core;
     use aptos_framework::native_bridge_configuration;
+    // use aptos_framework::native_bridge_configuration::assert_is_caller_relayer;
     use aptos_framework::native_bridge_store;
     use aptos_framework::ethereum;
+    // use aptos_framework::ethereum::EthereumAddress;
     use aptos_framework::event::{Self, EventHandle}; 
     use aptos_framework::signer;
+    use aptos_std::smart_table;
     use aptos_framework::system_addresses;
     #[test_only]
     use aptos_framework::aptos_account;
@@ -49,6 +52,10 @@ module aptos_framework::native_bridge {
 
     struct Nonce has key {
         value: u64
+    }
+
+    struct TransferStatuses has key, store {
+        inner: smart_table::SmartTable<u64, bool>
     }
 
     /// Increment and get the current nonce  
@@ -167,6 +174,59 @@ module aptos_framework::native_bridge {
 
         // Record the transfer as completed by associating the bridge_transfer_id with the inbound nonce
         native_bridge_store::set_bridge_transfer_id_to_inbound_nonce(bridge_transfer_id, nonce);
+
+        // Mint to the recipient
+        native_bridge_core::mint(recipient, amount);
+
+        // Emit the event
+        let bridge_events = borrow_global_mut<BridgeEvents>(@aptos_framework);
+        event::emit_event(  
+            &mut bridge_events.bridge_transfer_completed_events,
+            BridgeTransferCompletedEvent {  
+                bridge_transfer_id,  
+                initiator,  
+                recipient,  
+                amount,  
+                nonce,  
+            },  
+        );  
+    } 
+
+
+    /// Simplified version of complete_bridge_transfer
+    ///  
+    /// @param caller The signer representing the bridge relayer.  
+    /// @param initiator The initiator's Ethereum address as a vector of bytes.  
+    /// @param bridge_transfer_id The unique identifier for the bridge transfer.  
+    /// @param recipient The address of the recipient on the Aptos blockchain.  
+    /// @param amount The amount of assets to be locked.  
+    /// @param nonce The unique nonce for the transfer.    
+    /// @abort If the caller is not the bridge relayer or the transfer has already been processed.  
+    public entry fun complete_bridge_transfer_v2(  
+        caller: &signer,  
+        bridge_transfer_id: vector<u8>,
+        initiator: vector<u8>,  
+        recipient: address,  
+        amount: u64,  
+        nonce: u64  
+    ) acquires BridgeEvents, TransferStatuses {  
+        // Ensure the caller is the bridge relayer
+        native_bridge_configuration::assert_is_caller_relayer(caller);  
+
+        // Add key (nonce) to smaftr table (aborts if key already exists)
+        let table = borrow_global_mut<TransferStatuses>(@aptos_framework);
+        smart_table::add(&mut table.inner, nonce, true);
+
+        // Check if the bridge transfer ID is already associated with an incoming nonce
+        // let incoming_nonce_exists = native_bridge_store::is_incoming_nonce_set(bridge_transfer_id);
+        // assert!(!incoming_nonce_exists, ETRANSFER_ALREADY_PROCESSED); // Abort if the transfer is already processed
+        // assert!(nonce > 0, EINVALID_NONCE); 
+        // let ethereum_address = ethereum::ethereum_address_no_eip55(initiator);
+
+        // Record the transfer as completed by associating the bridge_transfer_id with the incoming nonce
+        // let table = borrow_global_mut<SmartTableWrapper<u64, OutboundTransfer>>(@aptos_framework);
+        // smart_table::add(&mut table.inner, nonce, details);
+        // native_bridge_store::set_bridge_transfer_id_to_incoming_nonce(bridge_transfer_id, nonce);
 
         // Mint to the recipient
         native_bridge_core::mint(recipient, amount);
@@ -341,7 +401,7 @@ module aptos_framework::native_bridge_store {
     use aptos_std::smart_table::SmartTable;
     use aptos_framework::ethereum::EthereumAddress;
     use aptos_framework::system_addresses;
-    use std::signer;
+    // use std::signer;
 
     friend aptos_framework::native_bridge;
 
