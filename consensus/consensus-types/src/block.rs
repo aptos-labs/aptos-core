@@ -52,6 +52,7 @@ pub struct Block {
     /// Signature that the hash of this block has been authored by the owner of the private key,
     /// this is only set within Proposal blocks
     signature: Option<bls12381::Signature>,
+    is_opt: bool,
 }
 
 impl fmt::Debug for Block {
@@ -68,18 +69,36 @@ impl Display for Block {
             .unwrap_or_else(|| "(NIL)".to_string());
         write!(
             f,
-            "[id: {}, author: {}, epoch: {}, round: {:02}, parent_id: {}, timestamp: {}]",
+            "[id: {}, author: {}, epoch: {}, round: {:02}, parent_id: {}, parent_round: {}, timestamp: {}, is_opt: {}]",
             self.id,
             author,
             self.epoch(),
             self.round(),
             self.parent_id(),
+            self.quorum_cert().certified_block().round(),
             self.timestamp_usecs(),
+            self.is_opt(),
         )
     }
 }
 
 impl Block {
+    pub fn is_opt(&self) -> bool {
+        self.is_opt
+    }
+
+    pub fn set_quorum_cert(&mut self, qc: QuorumCert) {
+        self.block_data.set_quorum_cert(qc);
+    }
+
+    pub fn set_failed_authors(&mut self, failed_authors: Vec<(Round, Author)>) {
+        self.block_data.set_failed_authors(failed_authors);
+    }
+
+    pub fn reset_id(&mut self) {
+        self.id = self.block_data.hash();
+    }
+
     pub fn author(&self) -> Option<Author> {
         self.block_data.author()
     }
@@ -181,6 +200,7 @@ impl Block {
             id: block_data.hash(),
             block_data,
             signature: None,
+            is_opt: false,
         }
     }
 
@@ -195,6 +215,7 @@ impl Block {
             id,
             block_data,
             signature,
+            is_opt: false,
         }
     }
 
@@ -211,6 +232,7 @@ impl Block {
             id: block_data.hash(),
             block_data,
             signature: None,
+            is_opt: false,
         }
     }
 
@@ -242,6 +264,7 @@ impl Block {
             id: block_data.hash(),
             block_data,
             signature: None,
+            is_opt: false,
         }
     }
 
@@ -252,59 +275,67 @@ impl Block {
         quorum_cert: QuorumCert,
         validator_signer: &ValidatorSigner,
         failed_authors: Vec<(Round, Author)>,
+        is_opt: bool,
     ) -> anyhow::Result<Self> {
         let block_data = BlockData::new_proposal(
             payload,
             validator_signer.author(),
             failed_authors,
+            quorum_cert.certified_block().epoch(),
             round,
             timestamp_usecs,
             quorum_cert,
         );
 
-        Self::new_proposal_from_block_data(block_data, validator_signer)
+        Self::new_proposal_from_block_data(block_data, validator_signer, is_opt)
     }
 
     pub fn new_proposal_ext(
         validator_txns: Vec<ValidatorTransaction>,
         payload: Payload,
+        epoch: u64,
         round: Round,
         timestamp_usecs: u64,
         quorum_cert: QuorumCert,
         validator_signer: &ValidatorSigner,
         failed_authors: Vec<(Round, Author)>,
+        is_opt: bool,
     ) -> anyhow::Result<Self> {
         let block_data = BlockData::new_proposal_ext(
             validator_txns,
             payload,
             validator_signer.author(),
             failed_authors,
+            epoch,
             round,
             timestamp_usecs,
             quorum_cert,
         );
 
-        Self::new_proposal_from_block_data(block_data, validator_signer)
+        Self::new_proposal_from_block_data(block_data, validator_signer, is_opt)
     }
 
     pub fn new_proposal_from_block_data(
         block_data: BlockData,
         validator_signer: &ValidatorSigner,
+        is_opt: bool,
     ) -> anyhow::Result<Self> {
         let signature = validator_signer.sign(&block_data)?;
         Ok(Self::new_proposal_from_block_data_and_signature(
-            block_data, signature,
+            block_data, signature, is_opt,
         ))
     }
 
     pub fn new_proposal_from_block_data_and_signature(
         block_data: BlockData,
         signature: bls12381::Signature,
+        is_opt: bool,
     ) -> Self {
         Block {
             id: block_data.hash(),
             block_data,
             signature: Some(signature),
+            is_opt,
         }
     }
 
@@ -323,7 +354,17 @@ impl Block {
                     .signature
                     .as_ref()
                     .ok_or_else(|| format_err!("Missing signature in Proposal"))?;
-                validator.verify(*author, &self.block_data, signature)?;
+                // for optimistic proposal, the proposer signs with an empty qc
+                let block_data= match self.is_opt() {
+                    true => {
+                        let mut block_data = self.block_data.clone();
+                        block_data.set_quorum_cert(QuorumCert::empty());
+                        block_data.set_failed_authors(vec![]);
+                        block_data
+                    },
+                    false => self.block_data.clone(),
+                };
+                validator.verify(*author, &block_data, signature)?;
                 self.quorum_cert().verify(validator)
             },
             BlockType::ProposalExt(proposal_ext) => {
@@ -331,7 +372,17 @@ impl Block {
                     .signature
                     .as_ref()
                     .ok_or_else(|| format_err!("Missing signature in Proposal"))?;
-                validator.verify(*proposal_ext.author(), &self.block_data, signature)?;
+                // for optimistic proposal, the proposer signs with an empty qc
+                let block_data= match self.is_opt() {
+                    true => {
+                        let mut block_data = self.block_data.clone();
+                        block_data.set_quorum_cert(QuorumCert::empty());
+                        block_data.set_failed_authors(vec![]);
+                        block_data
+                    },
+                    false => self.block_data.clone(),
+                };
+                validator.verify(*proposal_ext.author(), &block_data, signature)?;
                 self.quorum_cert().verify(validator)
             },
             BlockType::DAGBlock { .. } => bail!("We should not accept DAG block from others"),
@@ -341,6 +392,10 @@ impl Block {
     /// Makes sure that the proposal makes sense, independently of the current state.
     /// If this is the genesis block, we skip these checks.
     pub fn verify_well_formed(&self) -> anyhow::Result<()> {
+        if self.is_opt() {
+            // optimistic proposal hack
+            return Ok(());
+        }
         ensure!(
             !self.is_genesis_block(),
             "We must not accept genesis from others"
@@ -448,7 +503,7 @@ impl Block {
             self.epoch(),
             self.round(),
             self.author().unwrap_or(AccountAddress::ZERO),
-            self.previous_bitvec().into(),
+            vec![1; self.previous_bitvec().num_buckets()], // optimistic proposal hack
             // For nil block, we use 0x0 which is convention for nil address in move.
             self.block_data()
                 .failed_authors()
@@ -469,7 +524,7 @@ impl Block {
             self.epoch(),
             self.round(),
             self.author().unwrap_or(AccountAddress::ZERO),
-            self.previous_bitvec().into(),
+            vec![1; self.previous_bitvec().num_buckets()], // optimistic proposal hack
             // For nil block, we use 0x0 which is convention for nil address in move.
             self.block_data()
                 .failed_authors()
@@ -513,17 +568,20 @@ impl<'de> Deserialize<'de> for Block {
         struct BlockWithoutId {
             block_data: BlockData,
             signature: Option<bls12381::Signature>,
+            is_opt: bool,
         }
 
         let BlockWithoutId {
             block_data,
             signature,
+            is_opt,
         } = BlockWithoutId::deserialize(deserializer)?;
 
         Ok(Block {
             id: block_data.hash(),
             block_data,
             signature,
+            is_opt,
         })
     }
 }
