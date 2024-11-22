@@ -52,6 +52,10 @@ use std::{
 #[path = "block_store_test.rs"]
 mod block_store_test;
 
+#[cfg(test)]
+#[path = "execution_pool_test.rs"]
+mod execution_pool_test;
+
 #[path = "sync_manager.rs"]
 pub mod sync_manager;
 

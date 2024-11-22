@@ -12,7 +12,7 @@ use crate::{
         rotating_proposer_election::RotatingProposer,
         unequivocal_proposer_election::UnequivocalProposerElection,
     },
-    test_utils::{build_empty_tree, MockPayloadManager, TreeInserter},
+    test_utils::{build_default_empty_tree, MockPayloadManager, TreeInserter},
     util::mock_time_service::SimulatedTimeService,
 };
 use aptos_consensus_types::{
@@ -40,7 +40,7 @@ impl TOptQSPullParamsProvider for MockOptQSPayloadProvider {
 #[tokio::test]
 async fn test_proposal_generation_empty_tree() {
     let signer = ValidatorSigner::random(None);
-    let block_store = build_empty_tree();
+    let block_store = build_default_empty_tree();
     let proposal_generator = ProposalGenerator::new(
         signer.author(),
         block_store.clone(),
