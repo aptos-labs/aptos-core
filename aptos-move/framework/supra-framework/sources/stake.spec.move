@@ -437,7 +437,8 @@ spec supra_framework::stake {
 
     spec on_new_epoch {
         pragma verify = false; // TODO: set because of timeout (property proved).
-        pragma disable_invariants_in_body;
+        // TODO: Why we need to disable invariants in body? (SUPRA)
+        // pragma disable_invariants_in_body;
         // The following resource requirement cannot be discharged by the global
         // invariants because this function is called during genesis.
         include ResourceRequirement;
