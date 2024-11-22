@@ -6,7 +6,8 @@ use crate::{
     block_storage::{block_store::sync_manager::NeedFetchResult, BlockReader},
     pending_votes::{PendingVotes, VoteReceptionResult},
     test_utils::{
-        build_empty_tree, build_simple_tree, consensus_runtime, timed_block_on, TreeInserter,
+        build_default_empty_tree, build_simple_tree, consensus_runtime, timed_block_on,
+        TreeInserter,
     },
 };
 use aptos_consensus_types::{
@@ -121,7 +122,7 @@ proptest! {
             |key| Author::from_bytes(&key.public_key().to_bytes()[0..32]).unwrap()
         ).collect();
         let runtime = consensus_runtime();
-        let block_store = build_empty_tree();
+        let block_store = build_default_empty_tree();
         for block in blocks {
             if block.round() > 0 && authors.contains(&block.author().unwrap()) {
                 let known_parent = block_store.block_exists(block.parent_id());
@@ -351,7 +352,7 @@ async fn test_insert_vote() {
 #[tokio::test]
 async fn test_illegal_timestamp() {
     let signer = ValidatorSigner::random(None);
-    let block_store = build_empty_tree();
+    let block_store = build_default_empty_tree();
     let genesis = block_store.ordered_root();
     let block_with_illegal_timestamp = Block::new_proposal(
         Payload::empty(false, true),
