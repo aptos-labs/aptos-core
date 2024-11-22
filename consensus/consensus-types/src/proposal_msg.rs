@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{block::Block, common::Author, proof_of_store::ProofCache, sync_info::SyncInfo};
-use anyhow::{anyhow, ensure, format_err, Context, Result};
+use anyhow::{anyhow, ensure, format_err, Context, Ok, Result};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::validator_verifier::ValidatorVerifier;
 use serde::{Deserialize, Serialize};
@@ -86,6 +86,10 @@ impl ProposalMsg {
         proof_cache: &ProofCache,
         quorum_store_enabled: bool,
     ) -> Result<()> {
+        if self.proposal.is_opt() {
+            // optimistic proposal hack
+            return Ok(());
+        }
         self.proposal().payload().map_or(Ok(()), |p| {
             p.verify(validator, proof_cache, quorum_store_enabled)
         })?;

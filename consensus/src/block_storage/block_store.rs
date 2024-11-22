@@ -273,7 +273,7 @@ impl BlockStore {
             .path_from_ordered_root(block_id_to_commit)
             .unwrap_or_default();
 
-        assert!(!blocks_to_commit.is_empty());
+        assert!(!blocks_to_commit.is_empty(), "block_to_commit: {:?},\n\n block_to_commit qc: {:?},\n\n ordered_root: {:?}\n\n", block_to_commit, block_to_commit.as_ref().quorum_cert(), self.ordered_root());
 
         let block_tree = self.inner.clone();
         let storage = self.storage.clone();
@@ -365,6 +365,8 @@ impl BlockStore {
         if let Some(existing_block) = self.get_block(block.id()) {
             return Ok(existing_block);
         }
+        debug!("Inserting block id {}, {:?}", block.id(), block.clone());
+
         ensure!(
             self.inner.read().ordered_root().round() < block.round(),
             "Block with old round"
