@@ -283,6 +283,7 @@ impl TransactionGenerator {
         connected_tx_grps: usize,
         clustered_txns_gen_config: Option<ClusteredTxnsGenConfig>,
         shuffle_connected_txns: bool,
+        self_transfer_txns: bool,
         hotspot_probability: Option<f32>,
     ) -> usize {
         assert!(self.block_sender.is_some());
@@ -293,6 +294,7 @@ impl TransactionGenerator {
             connected_tx_grps,
             clustered_txns_gen_config,
             shuffle_connected_txns,
+            self_transfer_txns,
             hotspot_probability,
         );
         num_transfer_blocks
@@ -595,6 +597,28 @@ impl TransactionGenerator {
         transfer_indices
     }
 
+    pub fn gen_non_conflicting_self_transfer_transactions(
+        &mut self,
+        block_size: usize,
+        num_blocks: usize,
+    ) {
+        let num_signer_accounts = self.main_signer_accounts.as_ref().unwrap().accounts.len();
+        if block_size > num_signer_accounts {
+            panic!(
+                "gen_non_conflicting_self_transfer_transactions: block_size ({}) > num_signer_accounts ({})",
+                block_size, num_signer_accounts);
+        }
+        for _ in 0..num_blocks {
+            let mut transfer_indices: Vec<_> = (0..block_size).map(|i| (i, i)).collect();
+            let rng = &mut self.main_signer_accounts.as_mut().unwrap().rng;
+            transfer_indices.shuffle(rng);
+            self.generate_and_send_transfer_block(
+                self.main_signer_accounts.as_ref().unwrap(),
+                transfer_indices,
+            );
+        }
+    }
+
     /// A 'connected transaction group' is a group of transactions where all the transactions are
     /// connected to each other. For now we generate connected groups of txns as conflicting, but
     /// real world workloads can be more complex (and we can generate them as needed in the future).
@@ -777,12 +801,16 @@ impl TransactionGenerator {
         connected_tx_grps: usize,
         clustered_txns_gen_config: Option<ClusteredTxnsGenConfig>,
         shuffle_connected_txns: bool,
+        self_transfer_txns: bool,
         hotspot_probability: Option<f32>,
     ) {
         info!("Starting block generation.");
         info!("block_size={block_size}");
         info!("num_blocks={num_blocks}");
-        if connected_tx_grps > 0 {
+        if self_transfer_txns {
+            info!("block_generation_mode=self_transfer_txns");
+            self.gen_non_conflicting_self_transfer_transactions(block_size, num_blocks);
+        } else if connected_tx_grps > 0 {
             info!("block_generation_mode=connected_tx_grps");
             info!("connected_tx_grps={connected_tx_grps}");
             info!("shuffle_connected_txns={shuffle_connected_txns}");
