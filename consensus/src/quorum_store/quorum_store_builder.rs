@@ -260,6 +260,7 @@ impl InnerBuilder {
             self.config.db_quota,
             self.config.batch_quota,
             signer,
+            Duration::from_secs(60).as_micros() as u64,
         ));
         self.batch_store = Some(batch_store.clone());
         let batch_reader = Arc::new(BatchReaderImpl::new(batch_store.clone(), batch_requester));
