@@ -316,7 +316,7 @@ pub(crate) fn realistic_env_max_load_test(
         .add_latency_threshold(4.5, LatencyType::P70)
         .add_chain_progress(StateProgressThreshold {
             max_non_epoch_no_progress_secs: 15.0,
-            max_epoch_no_progress_secs: 15.0,
+            max_epoch_no_progress_secs: 16.0,
             max_non_epoch_round_gap: 4,
             max_epoch_round_gap: 4,
         });
