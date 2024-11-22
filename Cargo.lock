@@ -1564,6 +1564,7 @@ dependencies = [
  "ctrlc",
  "dashmap",
  "itertools 0.13.0",
+ "move-core-types",
  "num_cpus",
  "once_cell",
  "rayon",

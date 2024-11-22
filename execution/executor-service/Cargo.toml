@@ -32,6 +32,7 @@ crossbeam-channel = { workspace = true }
 ctrlc = "3.4.0"
 dashmap = { workspace = true }
 itertools = { workspace = true }
+move-core-types = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
 rayon = { workspace = true }
