@@ -37,16 +37,7 @@ use aptos_consensus_types::{
     block::{
         block_test_utils::{certificate_for_genesis, gen_test_certificate},
         Block,
-    },
-    block_retrieval::{BlockRetrievalRequest, BlockRetrievalStatus},
-    common::{Author, Payload, Round},
-    pipeline::commit_decision::CommitDecision,
-    proposal_msg::ProposalMsg,
-    round_timeout::RoundTimeoutMsg,
-    sync_info::SyncInfo,
-    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithPartialSignatures},
-    utils::PayloadTxnsSize,
-    vote_msg::VoteMsg,
+    }, block_retrieval::{BlockRetrievalRequest, BlockRetrievalStatus}, common::{Author, Payload, Round}, order_vote_msg::OrderVoteMsg, pipeline::commit_decision::CommitDecision, proposal_msg::ProposalMsg, round_timeout::RoundTimeoutMsg, sync_info::SyncInfo, timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithPartialSignatures}, utils::PayloadTxnsSize, vote_msg::VoteMsg
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
@@ -86,12 +77,10 @@ use futures::{
 };
 use maplit::hashmap;
 use std::{
-    iter::FromIterator,
-    sync::{
+    collections::VecDeque, iter::FromIterator, sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
-    },
-    time::Duration,
+    }, time::Duration
 };
 use tokio::{
     runtime::{Handle, Runtime},
@@ -117,6 +106,11 @@ pub struct NodeSetup {
     local_consensus_config: ConsensusConfig,
     onchain_randomness_config: OnChainRandomnessConfig,
     onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
+    vote_queue: VecDeque<VoteMsg>,
+    order_vote_queue: VecDeque<OrderVoteMsg>,
+    proposal_queue: VecDeque<ProposalMsg>,
+    round_timeout_queue: VecDeque<RoundTimeoutMsg>,
+    commit_decision_queue: VecDeque<CommitDecision>
 }
 
 impl NodeSetup {
@@ -317,7 +311,7 @@ impl NodeSetup {
         let (round_manager_tx, _) = aptos_channel::new(QueueStyle::LIFO, 1, None);
 
         let mut local_config = local_consensus_config.clone();
-        local_config.enable_broadcast_vote(false);
+        local_config.enable_broadcast_vote(true);
 
         let mut round_manager = RoundManager::new(
             epoch_state,
@@ -354,6 +348,11 @@ impl NodeSetup {
             local_consensus_config,
             onchain_randomness_config,
             onchain_jwk_consensus_config,
+            vote_queue: VecDeque::new(),
+            order_vote_queue: VecDeque::new(),
+            proposal_queue: VecDeque::new(),
+            round_timeout_queue: VecDeque::new(),
+            commit_decision_queue: VecDeque::new(),
         }
     }
 
@@ -401,8 +400,8 @@ impl NodeSetup {
         }
     }
 
-    pub async fn next_network_message(&mut self) -> ConsensusMsg {
-        match self.next_network_event().await {
+    pub async fn next_network_message(&mut self) {
+        let consensus_msg = match self.next_network_event().await {
             Event::Message(_, msg) => msg,
             Event::RpcRequest(_, msg, _, _) if matches!(msg, ConsensusMsg::CommitMessage(_)) => msg,
             Event::RpcRequest(_, msg, _, _) => {
@@ -412,6 +411,37 @@ impl NodeSetup {
                     self.identity_desc()
                 )
             },
+        };
+
+        match consensus_msg {
+            ConsensusMsg::ProposalMsg(proposal) => {
+                self.proposal_queue.push_back(*proposal);
+            },
+            ConsensusMsg::VoteMsg(vote) => {
+                self.vote_queue.push_back(*vote);
+            },
+            ConsensusMsg::OrderVoteMsg(order_vote) => {
+                self.order_vote_queue.push_back(*order_vote);
+            },
+            ConsensusMsg::RoundTimeoutMsg(round_timeout) => {
+                self.round_timeout_queue.push_back(*round_timeout);
+            },
+            ConsensusMsg::CommitDecisionMsg(commit_decision) => {
+                self.commit_decision_queue.push_back(*commit_decision);
+            },
+            ConsensusMsg::CommitMessage(d) if matches!(*d, CommitMessage::Decision(_)) => {
+                match *d {
+                    CommitMessage::Decision(commit_decision) => {
+                        self.commit_decision_queue.push_back(commit_decision);
+                    },
+                    _ => unreachable!(),
+                }
+            },
+            msg => panic!(
+                "Unexpected Consensus Message: {:?} on node {}",
+                msg,
+                self.identity_desc()
+            ),
         }
     }
 
@@ -427,53 +457,38 @@ impl NodeSetup {
     }
 
     pub async fn next_proposal(&mut self) -> ProposalMsg {
-        match self.next_network_message().await {
-            ConsensusMsg::ProposalMsg(p) => *p,
-            msg => panic!(
-                "Unexpected Consensus Message: {:?} on node {}",
-                msg,
-                self.identity_desc()
-            ),
+        while self.proposal_queue.is_empty() {
+            self.next_network_message().await;
         }
+        return self.proposal_queue.pop_front().unwrap();
     }
 
     pub async fn next_vote(&mut self) -> VoteMsg {
-        match self.next_network_message().await {
-            ConsensusMsg::VoteMsg(v) => *v,
-            msg => panic!(
-                "Unexpected Consensus Message: {:?} on node {}",
-                msg,
-                self.identity_desc()
-            ),
+        while self.vote_queue.is_empty() {
+            self.next_network_message().await;
         }
+        return self.vote_queue.pop_front().unwrap();
+    }
+
+    pub async fn next_order_vote(&mut self) -> OrderVoteMsg {
+        while self.order_vote_queue.is_empty() {
+            self.next_network_message().await;
+        }
+        return self.order_vote_queue.pop_front().unwrap();
     }
 
     pub async fn next_timeout(&mut self) -> RoundTimeoutMsg {
-        match self.next_network_message().await {
-            ConsensusMsg::RoundTimeoutMsg(v) => *v,
-            msg => panic!(
-                "Unexpected Consensus Message: {:?} on node {}",
-                msg,
-                self.identity_desc()
-            ),
+        while self.round_timeout_queue.is_empty() {
+            self.next_network_message().await;
         }
+        return self.round_timeout_queue.pop_front().unwrap();
     }
 
     pub async fn next_commit_decision(&mut self) -> CommitDecision {
-        match self.next_network_message().await {
-            ConsensusMsg::CommitDecisionMsg(v) => *v,
-            ConsensusMsg::CommitMessage(d) if matches!(*d, CommitMessage::Decision(_)) => {
-                match *d {
-                    CommitMessage::Decision(d) => d,
-                    _ => unreachable!(),
-                }
-            },
-            msg => panic!(
-                "Unexpected Consensus Message: {:?} on node {}",
-                msg,
-                self.identity_desc()
-            ),
+        while self.commit_decision_queue.is_empty() {
+            self.next_network_message().await;
         }
+        return self.commit_decision_queue.pop_front().unwrap();
     }
 
     pub async fn poll_block_retreival(&mut self) -> Option<IncomingBlockRetrievalRequest> {
@@ -506,7 +521,7 @@ impl NodeSetup {
     }
 
     pub async fn commit_next_ordered(&mut self, expected_rounds: &[Round]) {
-        info!(
+        println!(
             "Starting commit_next_ordered to wait for {:?} on node {:?}",
             expected_rounds,
             self.identity_desc()
@@ -540,10 +555,10 @@ fn start_replying_to_block_retreival(nodes: Vec<NodeSetup>) -> ReplyingRPCHandle
         let done_clone = done.clone();
         handles.push(tokio::spawn(async move {
             while !done_clone.load(Ordering::Relaxed) {
-                info!("Asking for RPC request on {:?}", node.identity_desc());
+                println!("Asking for RPC request on {:?}", node.identity_desc());
                 let maybe_request = node.poll_block_retreival().await;
                 if let Some(request) = maybe_request {
-                    info!(
+                    println!(
                         "RPC request received: {:?} on {:?}",
                         request,
                         node.identity_desc()
@@ -574,7 +589,7 @@ impl ReplyingRPCHandle {
         for handle in self.handles.into_iter() {
             result.push(handle.await.unwrap());
         }
-        info!(
+        println!(
             "joined nodes in order: {:?}",
             result.iter().map(|v| v.id).collect::<Vec<_>>()
         );
@@ -594,22 +609,22 @@ fn process_and_vote_on_proposal(
     expected_qc_ordered_round: u64,
     expected_qc_committed_round: u64,
 ) {
-    info!(
+    println!(
         "Called {} with current {} and apply commit prev {:?}",
         expected_round, next_proposer, apply_commit_prev_proposer
     );
     let mut num_votes = 0;
 
     for node in nodes.iter_mut() {
-        info!("Waiting on next_proposal on node {}", node.identity_desc());
+        println!("Waiting on next_proposal on node {}", node.identity_desc());
         if down_nodes.contains(&node.id) {
             // Drop the proposal on down nodes
             timed_block_on(runtime, node.next_proposal());
-            info!("Dropping proposal on down node {}", node.identity_desc());
+            println!("Dropping proposal on down node {}", node.identity_desc());
         } else {
             // Proccess proposal on other nodes
             let proposal_msg = timed_block_on(runtime, node.next_proposal());
-            info!("Processing proposal on {}", node.identity_desc());
+            println!("Processing proposal on {}", node.identity_desc());
 
             assert_eq!(proposal_msg.proposal().round(), expected_round);
             assert_eq!(
@@ -626,12 +641,12 @@ fn process_and_vote_on_proposal(
                 node.round_manager.process_proposal_msg(proposal_msg),
             )
             .unwrap();
-            info!("Finish process proposal on {}", node.identity_desc());
+            println!("Finish process proposal on {}", node.identity_desc());
             num_votes += 1;
 
             if let Some(prev_proposer) = apply_commit_prev_proposer {
                 if prev_proposer != node.id && expected_round > 2 {
-                    info!(
+                    println!(
                         "Applying commit {} on node {}",
                         expected_round - 2,
                         node.identity_desc()
@@ -642,39 +657,84 @@ fn process_and_vote_on_proposal(
         }
     }
 
-    let proposer_node = nodes.get_mut(next_proposer).unwrap();
-    info!(
-        "Fetching {} votes in round {} on node {}",
-        num_votes,
-        expected_round,
-        proposer_node.identity_desc()
-    );
-    let mut votes = Vec::new();
-    for _ in 0..num_votes {
-        votes.push(timed_block_on(runtime, proposer_node.next_vote()));
+    for node in nodes.iter_mut() {
+        println!(
+            "Fetching {} votes in round {} on node {}",
+            num_votes,
+            expected_round,
+            node.identity_desc()
+        );    
+        if down_nodes.contains(&node.id) {
+            // Drop the votes on down nodes
+            println!("Dropping votes on down node {}", node.identity_desc());
+            for _ in 0..num_votes {
+                timed_block_on(runtime, node.next_vote());
+                
+            }
+        } else {
+            let mut votes = Vec::new();
+            for _ in 0..num_votes {
+                votes.push(timed_block_on(runtime, node.next_vote()));
+            }
+
+            println!("Processing votes on node {}", node.identity_desc());
+            if process_votes {
+                for vote_msg in votes {
+                    timed_block_on(
+                        runtime,
+                        node.round_manager.process_vote_msg(vote_msg),
+                    )
+                    .unwrap();
+                }
+                if apply_commit_prev_proposer.is_some() && expected_round > 1 && apply_commit_on_votes {
+                    println!(
+                        "Applying next commit {} on proposer node {}",
+                        expected_round - 2,
+                        node.identity_desc()
+                    );
+                    timed_block_on(
+                        runtime,
+                        node.commit_next_ordered(&[expected_round - 1]),
+                    );
+                }
+            }
+        
+        }
     }
 
-    info!("Processing votes on node {}", proposer_node.identity_desc());
-    if process_votes {
-        for vote_msg in votes {
-            timed_block_on(
-                runtime,
-                proposer_node.round_manager.process_vote_msg(vote_msg),
-            )
-            .unwrap();
-        }
-        if apply_commit_prev_proposer.is_some() && expected_round > 1 && apply_commit_on_votes {
-            info!(
-                "Applying next commit {} on proposer node {}",
-                expected_round - 2,
-                proposer_node.identity_desc()
-            );
-            timed_block_on(
-                runtime,
-                proposer_node.commit_next_ordered(&[expected_round - 1]),
-            );
-        }
-    }
+    // let proposer_node = nodes.get_mut(next_proposer).unwrap();
+    // println!(
+    //     "Fetching {} votes in round {} on node {}",
+    //     num_votes,
+    //     expected_round,
+    //     proposer_node.identity_desc()
+    // );
+    // let mut votes = Vec::new();
+    // for _ in 0..num_votes {
+    //     votes.push(timed_block_on(runtime, proposer_node.next_vote()));
+    // }
+
+    // println!("Processing votes on node {}", proposer_node.identity_desc());
+    // if process_votes {
+    //     for vote_msg in votes {
+    //         timed_block_on(
+    //             runtime,
+    //             proposer_node.round_manager.process_vote_msg(vote_msg),
+    //         )
+    //         .unwrap();
+    //     }
+    //     if apply_commit_prev_proposer.is_some() && expected_round > 1 && apply_commit_on_votes {
+    //         println!(
+    //             "Applying next commit {} on proposer node {}",
+    //             expected_round - 2,
+    //             proposer_node.identity_desc()
+    //         );
+    //         timed_block_on(
+    //             runtime,
+    //             proposer_node.commit_next_ordered(&[expected_round - 1]),
+    //         );
+    //     }
+    // }
 }
 
 #[test]
@@ -1936,7 +1996,7 @@ fn commit_pipeline_test() {
     for i in 0..10 {
         let next_proposer = proposers[(i + 2) as usize % proposers.len()];
         let prev_proposer = proposers[(i + 1) as usize % proposers.len()];
-        info!("processing {}", i);
+        println!("processing {}", i);
         process_and_vote_on_proposal(
             &runtime,
             &mut nodes,
@@ -1975,7 +2035,7 @@ fn block_retrieval_test() {
     runtime.spawn(playground.start());
 
     for i in 0..4 {
-        info!("processing {}", i);
+        println!("processing {}", i);
         process_and_vote_on_proposal(
             &runtime,
             &mut nodes,
@@ -1998,7 +2058,7 @@ fn block_retrieval_test() {
             let _ = node.next_proposal().await;
         }
 
-        info!(
+        println!(
             "Processing proposals for behind node {}",
             behind_node.identity_desc()
         );
@@ -2032,7 +2092,7 @@ fn block_retrieval_timeout_test() {
     runtime.spawn(playground.start());
 
     for i in 0..4 {
-        info!("processing {}", i);
+        println!("processing {}", i);
         process_and_vote_on_proposal(
             &runtime,
             &mut nodes,
@@ -2068,7 +2128,7 @@ fn block_retrieval_timeout_test() {
             let _ = node.next_proposal().await;
         }
 
-        info!(
+        println!(
             "Processing proposals for behind node {}",
             behind_node.identity_desc()
         );
@@ -2113,7 +2173,7 @@ pub fn forking_retrieval_test() {
     );
     runtime.spawn(playground.start());
 
-    info!("Propose vote and commit on first block");
+    println!("Propose vote and commit on first block");
     process_and_vote_on_proposal(
         &runtime,
         &mut nodes,
@@ -2127,7 +2187,7 @@ pub fn forking_retrieval_test() {
         0,
     );
 
-    info!("Propose vote and commit on second block");
+    println!("Propose vote and commit on second block");
     process_and_vote_on_proposal(
         &runtime,
         &mut nodes,
@@ -2141,7 +2201,7 @@ pub fn forking_retrieval_test() {
         0,
     );
 
-    info!("Propose vote and commit on second block");
+    println!("Propose vote and commit on second block");
     process_and_vote_on_proposal(
         &runtime,
         &mut nodes,
@@ -2155,7 +2215,7 @@ pub fn forking_retrieval_test() {
         0,
     );
 
-    info!("Propose vote and commit on third (dangling) block");
+    println!("Propose vote and commit on third (dangling) block");
     process_and_vote_on_proposal(
         &runtime,
         &mut nodes,
@@ -2218,7 +2278,7 @@ pub fn forking_retrieval_test() {
         println!("Got {}", nodes[forking_node].next_commit_decision().await);
     });
 
-    info!("Create forked block");
+    println!("Create forked block");
     process_and_vote_on_proposal(
         &runtime,
         &mut nodes,
@@ -2311,19 +2371,19 @@ pub fn forking_retrieval_test() {
         3,
     );
 
-    let next_message = timed_block_on(&runtime, nodes[proposal_node].next_network_message());
-    match next_message {
-        ConsensusMsg::VoteMsg(_) => info!("Skip extra vote msg"),
-        ConsensusMsg::ProposalMsg(msg) => {
-            // put the message back in the queue.
-            // actual peer doesn't matter, it is ignored, so use self.
-            let peer = nodes[proposal_node].signer.author();
-            nodes[proposal_node]
-                .pending_network_events
-                .push(Event::Message(peer, ConsensusMsg::ProposalMsg(msg)))
-        },
-        _ => panic!("unexpected network message {:?}", next_message),
-    }
+    // let next_message = timed_block_on(&runtime, nodes[proposal_node].next_network_message());
+    // match next_message {
+    //     ConsensusMsg::VoteMsg(_) => println!("Skip extra vote msg"),
+    //     ConsensusMsg::ProposalMsg(msg) => {
+    //         // put the message back in the queue.
+    //         // actual peer doesn't matter, it is ignored, so use self.
+    //         let peer = nodes[proposal_node].signer.author();
+    //         nodes[proposal_node]
+    //             .pending_network_events
+    //             .push(Event::Message(peer, ConsensusMsg::ProposalMsg(msg)))
+    //     },
+    //     _ => panic!("unexpected network message {:?}", next_message),
+    // }
     process_and_vote_on_proposal(
         &runtime,
         &mut nodes,
