@@ -165,6 +165,36 @@ impl ExecutionProxy {
         finality_proof: LedgerInfoWithSignatures,
     ) -> NotificationType {
         let payload_manager = self
+<<<<<<< HEAD
+=======
+            .state
+            .read()
+            .as_ref()
+            .expect("must be set within an epoch")
+            .payload_manager
+            .clone();
+        let blocks = blocks.to_vec();
+        Box::pin(async move {
+            for block in blocks.iter() {
+                let payload = block.payload().cloned();
+                let payload_vec = payload.into_iter().collect();
+                let timestamp = block.timestamp_usecs();
+                payload_manager.notify_commit(timestamp, payload_vec);
+            }
+            callback(&blocks, finality_proof);
+        })
+    }
+
+    pub fn pipeline_builder(&self, commit_signer: Arc<ValidatorSigner>) -> PipelineBuilder {
+        let MutableState {
+            validators,
+            payload_manager,
+            transaction_shuffler,
+            block_executor_onchain_config,
+            transaction_deduper,
+            is_randomness_enabled,
+        } = self
+>>>>>>> 7d41b656ce (Move payload_manager.notify_commit to after commit (#15361))
             .state
             .read()
             .as_ref()
