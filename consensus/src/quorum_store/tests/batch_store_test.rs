@@ -36,6 +36,7 @@ pub fn batch_store_for_test(memory_quota: usize) -> Arc<BatchStore> {
         2001,         // db quota
         2001,         // batch quota
         signers[0].clone(),
+        0,
     ))
 }
 

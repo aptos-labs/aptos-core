@@ -117,6 +117,7 @@ pub struct BatchStore {
     batch_quota: usize,
     validator_signer: ValidatorSigner,
     persist_subscribers: DashMap<HashValue, Vec<oneshot::Sender<PersistedValue>>>,
+    expiration_buffer_usecs: u64,
 }
 
 impl BatchStore {
@@ -128,6 +129,7 @@ impl BatchStore {
         db_quota: usize,
         batch_quota: usize,
         validator_signer: ValidatorSigner,
+        expiration_buffer_usecs: u64,
     ) -> Self {
         let db_clone = db.clone();
         let batch_store = Self {
@@ -142,6 +144,7 @@ impl BatchStore {
             batch_quota,
             validator_signer,
             persist_subscribers: DashMap::new(),
+            expiration_buffer_usecs,
         };
         let db_content = db_clone
             .get_all_batches()
@@ -283,7 +286,11 @@ impl BatchStore {
     // pub(crate) for testing
     #[allow(clippy::unwrap_used)]
     pub(crate) fn clear_expired_payload(&self, certified_time: u64) -> Vec<HashValue> {
-        let expired_digests = self.expirations.lock().unwrap().expire(certified_time);
+        // To help slow nodes catch up via execution without going to state sync we keep the blocks for 60 extra seconds
+        // after the expiration time. This will help remote peers fetch batches that just expired but are within their
+        // execution window.
+        let expiration_time = certified_time.saturating_sub(self.expiration_buffer_usecs);
+        let expired_digests = self.expirations.lock().unwrap().expire(expiration_time);
         let mut ret = Vec::new();
         for h in expired_digests {
             let removed_value = match self.db_cache.entry(h) {
@@ -291,7 +298,7 @@ impl BatchStore {
                     // We need to check up-to-date expiration again because receiving the same
                     // digest with a higher expiration would update the persisted value and
                     // effectively extend the expiration.
-                    if entry.get().expiration() <= certified_time {
+                    if entry.get().expiration() <= expiration_time {
                         self.persist_subscribers.remove(entry.get().digest());
                         Some(entry.remove())
                     } else {
