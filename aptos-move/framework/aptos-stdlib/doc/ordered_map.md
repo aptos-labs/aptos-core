@@ -22,6 +22,11 @@ All methods that start with iter_*, operate with Iterator being <code>self</code
 Uses cmp::compare for ordering, which compares primitive types natively, and uses common
 lexicographical sorting for complex types.
 
+TODO: all iterator functions are public(friend) for now, so that they can be modified in a
+backward incompatible way.
+They are waiting for Move improvement that will allow references to be part of the struct
+Allowing cleaner iterator APIs
+
 
 -  [Struct `Entry`](#0x1_ordered_map_Entry)
 -  [Enum `OrderedMap`](#0x1_ordered_map_OrderedMap)
@@ -39,6 +44,7 @@ lexicographical sorting for complex types.
 -  [Function `borrow_mut`](#0x1_ordered_map_borrow_mut)
 -  [Function `replace_key_inplace`](#0x1_ordered_map_replace_key_inplace)
 -  [Function `add_all`](#0x1_ordered_map_add_all)
+-  [Function `upsert_all`](#0x1_ordered_map_upsert_all)
 -  [Function `append`](#0x1_ordered_map_append)
 -  [Function `trim`](#0x1_ordered_map_trim)
 -  [Function `lower_bound`](#0x1_ordered_map_lower_bound)
@@ -253,7 +259,7 @@ New key used in replace_key_inplace doesn't respect the order
 
 ## Function `new`
 
-Creates a new empty OrderedMap, using default (SortedVectorMap) implementation.
+Create a new empty OrderedMap, using default (SortedVectorMap) implementation.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_new">new</a>&lt;K, V&gt;(): <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;
@@ -531,7 +537,7 @@ Returns whether map contains a given key.
 
 ## Function `replace_key_inplace`
 
-Changes the key, with keeping the same value attached to it
+Changes the key, while keeping the same value attached to it
 Aborts with EKEY_NOT_FOUND if <code>old_key</code> doesn't exist.
 Aborts with ENEW_KEY_NOT_IN_ORDER if <code>new_key</code> doesn't keep the order <code>old_key</code> was in.
 
@@ -586,8 +592,38 @@ Aborts with EKEY_ALREADY_EXISTS if key already exist, or duplicate keys are pass
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_add_all">add_all</a>&lt;K, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, keys: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, values: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;V&gt;) {
+    // TODO: Can be optimized, by sorting keys and values, and then creating map.
     <a href="../../move-stdlib/doc/vector.md#0x1_vector_zip">vector::zip</a>(keys, values, |key, value| {
         <a href="ordered_map.md#0x1_ordered_map_add">add</a>(self, key, value);
+    });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_ordered_map_upsert_all"></a>
+
+## Function `upsert_all`
+
+Add multiple key/value pairs to the map, overwrites values if they exist already,
+or if duplicate keys are passed in.s
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_upsert_all">upsert_all</a>&lt;K: drop, V: drop&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, keys: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, values: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;V&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_upsert_all">upsert_all</a>&lt;K: drop, V: drop&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, keys: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, values: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;V&gt;) {
+    // TODO: Can be optimized, by sorting keys and values, and then creating map.
+    <a href="../../move-stdlib/doc/vector.md#0x1_vector_zip">vector::zip</a>(keys, values, |key, value| {
+        <a href="ordered_map.md#0x1_ordered_map_upsert">upsert</a>(self, key, value);
     });
 }
 </code></pre>
@@ -639,13 +675,15 @@ Aborts with EKEY_ALREADY_EXISTS if <code>other</code> has a key already present 
     <b>let</b> cur_i = self.entries.<a href="ordered_map.md#0x1_ordered_map_length">length</a>() - 1;
     <b>let</b> other_i = other_entries.<a href="ordered_map.md#0x1_ordered_map_length">length</a>() - 1;
 
-    // after the end of the <b>loop</b>, entries is empty, and <a href="any.md#0x1_any">any</a> leftover is in other_entries
+    // after the end of the <b>loop</b>, other_entries is empty, and <a href="any.md#0x1_any">any</a> leftover is in entries
     <b>loop</b> {
         <b>let</b> ord = <a href="../../move-stdlib/doc/cmp.md#0x1_cmp_compare">cmp::compare</a>(&self.entries[cur_i].key, &other_entries[other_i].key);
         <b>assert</b>!(!ord.is_eq(), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="ordered_map.md#0x1_ordered_map_EKEY_ALREADY_EXISTS">EKEY_ALREADY_EXISTS</a>));
         <b>if</b> (ord.is_gt()) {
             reverse_result.push_back(self.entries.pop_back());
             <b>if</b> (cur_i == 0) {
+                // make other_entries empty, and rest in entries.
+                <a href="../../move-stdlib/doc/mem.md#0x1_mem_swap">mem::swap</a>(&<b>mut</b> self.entries, &<b>mut</b> other_entries);
                 <b>break</b>;
             } <b>else</b> {
                 cur_i = cur_i - 1;
@@ -653,8 +691,6 @@ Aborts with EKEY_ALREADY_EXISTS if <code>other</code> has a key already present 
         } <b>else</b> {
             reverse_result.push_back(other_entries.pop_back());
             <b>if</b> (other_i == 0) {
-                // make entries empty, and rest in other_entries.
-                <a href="../../move-stdlib/doc/mem.md#0x1_mem_swap">mem::swap</a>(&<b>mut</b> other_entries, &<b>mut</b> self.entries);
                 <b>break</b>;
             } <b>else</b> {
                 other_i = other_i - 1;
@@ -662,7 +698,7 @@ Aborts with EKEY_ALREADY_EXISTS if <code>other</code> has a key already present 
         };
     };
 
-    reverse_result.reverse_append(other_entries);
+    other_entries.<a href="ordered_map.md#0x1_ordered_map_destroy_empty">destroy_empty</a>();
     self.entries.reverse_append(reverse_result);
 }
 </code></pre>
@@ -677,8 +713,7 @@ Aborts with EKEY_ALREADY_EXISTS if <code>other</code> has a key already present 
 
 Splits the collection into two, such to leave <code>self</code> with <code>at</code> number of elements.
 Returns a newly allocated map containing the elements in the range [at, len).
-After the call, the original map will be left containing the elements [0, at)
-with its previous capacity unchanged.
+After the call, the original map will be left containing the elements [0, at).
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_trim">trim</a>&lt;K, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, at: u64): <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;
@@ -707,10 +742,6 @@ with its previous capacity unchanged.
 
 ## Function `lower_bound`
 
-TODO: all iterator functions are public(friend) for now, so that they can be modified in a
-backward incompatible way.
-They are waiting for Move improvement that will allow references to be part of the struct
-Allowing cleaner iterator APIs
 Returns an iterator pointing to the first element that is greater or equal to the provided
 key, or an end iterator if such element doesn't exist.
 
@@ -1294,6 +1325,7 @@ Apply the function to a reference of each key-value pair in the table.
         f(iter.<a href="ordered_map.md#0x1_ordered_map_iter_borrow_key">iter_borrow_key</a>(self), iter.<a href="ordered_map.md#0x1_ordered_map_iter_borrow">iter_borrow</a>(self));
         iter = iter.<a href="ordered_map.md#0x1_ordered_map_iter_next">iter_next</a>(self);
     }
+    // TODO: once <b>move</b> supports private functions udpate <b>to</b>:
     // <a href="../../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(
     //     &self.entries,
     //     |entry| {
@@ -1330,6 +1362,7 @@ Apply the function to a mutable reference of each key-value pair in the table.
         f(key, iter.<a href="ordered_map.md#0x1_ordered_map_iter_borrow_mut">iter_borrow_mut</a>(self));
         iter = iter.<a href="ordered_map.md#0x1_ordered_map_iter_next">iter_next</a>(self);
     }
+    // TODO: once <b>move</b> supports private functions udpate <b>to</b>:
     // <a href="../../move-stdlib/doc/vector.md#0x1_vector_for_each_mut">vector::for_each_mut</a>(
     //     &<b>mut</b> self.entries,
     //     |entry| {
@@ -1390,11 +1423,6 @@ Apply the function to a mutable reference of each key-value pair in the table.
     <b>while</b> (l != r) {
         <b>let</b> mid = l + (r - l) / 2;
         <b>let</b> comparison = <a href="../../move-stdlib/doc/cmp.md#0x1_cmp_compare">cmp::compare</a>(&entries.<a href="ordered_map.md#0x1_ordered_map_borrow">borrow</a>(mid).key, key);
-        // TODO: check why this short-circuiting actually performs worse
-        // <b>if</b> (comparison.is_equal()) {
-        //     // there can only be one equal value, so end the search.
-        //     <b>return</b> mid;
-        // } <b>else</b>
         <b>if</b> (comparison.is_lt()) {
             l = mid + 1;
         } <b>else</b> {
