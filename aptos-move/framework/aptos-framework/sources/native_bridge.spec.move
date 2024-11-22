@@ -1,5 +1,8 @@
 spec aptos_framework::native_bridge {
 
+    use std::features;
+    use aptos_framework::coin;
+
     // spec initialize(aptos_framework: &signer) {
     //     aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
     //     aborts_if exists<Nonce>(signer::address_of(aptos_framework));
@@ -70,19 +73,52 @@ spec aptos_framework::native_bridge {
     //             global<BridgeEvents>(@aptos_framework).bridge_transfer_completed_events.counter
     //         ) + 1;
     // }
+
+    spec complete_bridge_transfer_v2 {
+        pragma aborts_if_is_partial = true;
+
+        // req 0 : Ensure the bridge configuration exists
+        aborts_if !exists<native_bridge_configuration::BridgeConfig>(@aptos_framework);
+        // req 1: Ensure the caller is the relayer
+        aborts_if global<native_bridge_configuration::BridgeConfig>(@aptos_framework).bridge_relayer
+            != signer::address_of(caller);
+        // req 2: Ensure the bridge transfer ID is not already associated with an incoming nonce
+        aborts_if smart_table::spec_contains(borrow_global<TransferStatuses>(@aptos_framework).inner, nonce);
+        // req 3: Ensure the native bridge is enabled
+        // Todo: fix std::features that has ATOMIC_BRIDGE flag
+        aborts_if !features::spec_is_enabled(features::NATIVE_BRIDGE);
+        // req 4: Ensutre we have a mintable coin
+        aborts_if !exists<native_bridge_core::AptosCoinMintCapability>(@aptos_framework);
+        // req 5: if insufficient balance in the bridge
+        // let account_addr = signer::address_of(caller); // shopuld be relayer heer
+        // let coin_store = global<native_bridge_core::AptosCoinMintCapability>(account_addr);
+        // let balance = coin_store.coin.value;
+        // let bal == global<CoinStore<CoinType>>(@aptos_framework).coin.value;
+        // let balance_post = global<Balance<native_bridge_core::AptosCoinMintCapability>>(@aptos_framework).coin.value;
+        // aborts_if [abstract] balance_of<native_bridge_core::AptosCoinMintCapability>(@aptos_framework) < amount;
+        // aborts_if global<native_bridge_core::AptosCoinMintCapability>(@aptos_framework).balance(
+        //     signer::address_of(caller)
+        // ) < amount;
+
+        // req 6: recipient has received the coins 
+        // ensures coin::balance<native_bridge_core::AptosCoinMintCapability>(recipient) == old(
+        //     coin::balance<native_bridge_core::AptosCoinMintCapability>(recipient)
+        // ) + amount;
+    }
 }
 
 spec aptos_framework::native_bridge_core {
 
-    // spec initialize(aptos_framework: &signer) {
-    //     aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
-    //     aborts_if exists<AptosCoinBurnCapability>(@aptos_framework);
-    //     aborts_if exists<AptosCoinMintCapability>(@aptos_framework);
+    spec initialize(aptos_framework: &signer) {
+        pragma aborts_if_is_partial = true;
 
-    //     ensures exists<AptosCoinBurnCapability>(@aptos_framework);
-    //     ensures exists<AptosCoinMintCapability>(@aptos_framework);
-    // }
+        aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
+        // aborts_if exists<AptosCoinBurnCapability>(@aptos_framework);
+        // aborts_if exists<AptosCoinMintCapability>(@aptos_framework);
 
+        // ensures exists<AptosCoinBurnCapability>(@aptos_framework);
+        // ensures exists<AptosCoinMintCapability>(@aptos_framework);
+    }
     // spec store_aptos_coin_burn_cap(aptos_framework: &signer, burn_cap: BurnCapability<AptosCoin>) {
     //     aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
     //     aborts_if exists<AptosCoinBurnCapability>(@aptos_framework);
@@ -121,13 +157,13 @@ spec aptos_framework::native_bridge_store {
     //     ensures exists<SmartTableWrapper<vector<u8>, u64>>(@aptos_framework);
     // }
 
-    spec is_incoming_nonce_set(bridge_transfer_id: vector<u8>): bool {
-        ensures result == exists<SmartTableWrapper<vector<u8>, u64>>(@aptos_framework)
-            && smart_table::spec_contains(
-                global<SmartTableWrapper<vector<u8>, u64>>(@aptos_framework).inner,
-                bridge_transfer_id
-            );
-    }
+    // spec is_incoming_nonce_set(bridge_transfer_id: vector<u8>): bool {
+    //     ensures result == exists<SmartTableWrapper<vector<u8>, u64>>(@aptos_framework)
+    //         && smart_table::spec_contains(
+    //             global<SmartTableWrapper<vector<u8>, u64>>(@aptos_framework).inner,
+    //             bridge_transfer_id
+    //         );
+    // }
 
     // spec create_details(
     //     initiator: address,
@@ -166,11 +202,11 @@ spec aptos_framework::native_bridge_store {
     //     )) + 1;
     // }
 
-    spec set_bridge_transfer_id_to_incoming_nonce(
-        bridge_transfer_id: vector<u8>,
-        incoming_nonce: u64
-    ) {
-        aborts_if !exists<SmartTableWrapper<vector<u8>, u64>>(@aptos_framework);
+    // spec set_bridge_transfer_id_to_inbound_nonce(
+    //     bridge_transfer_id: vector<u8>,
+    //     inbound_nonce: u64
+    // ) {
+    //     aborts_if !exists<SmartTableWrapper<vector<u8>, u64>>(@aptos_framework);
 
     //     ensures smart_table::spec_contains(
     //         global<SmartTableWrapper<vector<u8>, u64>>(@aptos_framework).inner,
@@ -189,7 +225,7 @@ spec aptos_framework::native_bridge_store {
         combined_bytes = vector::append(combined_bytes, bcs::to_bytes(&recipient));
         combined_bytes = vector::append(combined_bytes, bcs::to_bytes(&amount));
         combined_bytes = vector::append(combined_bytes, bcs::to_bytes(&nonce));
-        
+
         ensures result == aptos_std::aptos_hash::keccak256(combined_bytes);
     }
     */
@@ -201,11 +237,9 @@ spec aptos_framework::native_bridge_store {
 //         aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
 //         aborts_if exists<BridgeConfig>(signer::address_of(aptos_framework));
 
-        ensures exists<BridgeConfig>(signer::address_of(aptos_framework));
-        ensures global<BridgeConfig>(signer::address_of(aptos_framework)).bridge_relayer == signer::address_of(aptos_framework);
-        ensures global<BridgeConfig>(signer::address_of(aptos_framework)).initiator_time_lock == INITIATOR_TIME_LOCK_DUARTION;
-        ensures global<BridgeConfig>(signer::address_of(aptos_framework)).counterparty_time_lock == COUNTERPARTY_TIME_LOCK_DUARTION;
-    }
+//         ensures exists<BridgeConfig>(signer::address_of(aptos_framework));
+//         ensures global<BridgeConfig>(signer::address_of(aptos_framework)).bridge_relayer == signer::address_of(aptos_framework);
+//     }
 
 //     spec update_bridge_relayer(aptos_framework: &signer, new_relayer: address) {
 //         aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
