@@ -15,7 +15,7 @@ use aptos_transaction_generator_lib::{
 use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
 use rand::{rngs::StdRng, SeedableRng};
 use serde_json::json;
-use std::{collections::HashMap, process::exit};
+use std::{collections::HashMap, fs, process::exit};
 
 // bump after a bigger test or perf change, so you can easily distinguish runs
 // that are on top of this commit
@@ -85,42 +85,14 @@ const ALLOWED_REGRESSION: f64 = 0.15;
 const ALLOWED_IMPROVEMENT: f64 = 0.15;
 const ABSOLUTE_BUFFER_US: f64 = 2.0;
 
-const CALIBRATION_VALUES: &str = "
-Loop { loop_count: Some(100000), loop_type: NoOp }	60	0.955	1.074	41893.7
-Loop { loop_count: Some(10000), loop_type: Arithmetic }	60	0.965	1.078	25915.0
-CreateObjects { num_objects: 10, object_payload_size: 0 }	60	0.924	1.082	158.1
-CreateObjects { num_objects: 10, object_payload_size: 10240 }	60	0.951	1.118	9356.2
-CreateObjects { num_objects: 100, object_payload_size: 0 }	60	0.926	1.082	1574.2
-CreateObjects { num_objects: 100, object_payload_size: 10240 }	60	0.952	1.092	11541.9
-InitializeVectorPicture { length: 128 }	10	0.965	1.038	163.3
-VectorPicture { length: 128 }	10	0.938	1.060	48.8
-VectorPictureRead { length: 128 }	10	0.977	1.077	46.4
-InitializeVectorPicture { length: 30720 }	60	0.948	1.123	27893.4
-VectorPicture { length: 30720 }	60	0.931	1.125	6923.1
-VectorPictureRead { length: 30720 }	60	0.934	1.102	6923.1
-SmartTablePicture { length: 30720, num_points_per_txn: 200 }	60	0.952	1.109	43594.7
-SmartTablePicture { length: 1048576, num_points_per_txn: 300 }	60	0.957	1.120	73865.4
-ResourceGroupsSenderWriteTag { string_length: 1024 }	60	0.934	1.134	15.0
-ResourceGroupsSenderMultiChange { string_length: 1024 }	60	0.929	1.122	32.3
-TokenV1MintAndTransferFT	60	0.958	1.093	385.2
-TokenV1MintAndTransferNFTSequential	60	0.973	1.139	588.1
-TokenV2AmbassadorMint { numbered: true }	60	0.960	1.141	512.5
-LiquidityPoolSwap { is_stable: true }	60	0.961	1.103	590.3
-LiquidityPoolSwap { is_stable: false }	60	0.954	1.134	552.2
-CoinInitAndMint	10	0.975	1.043	199.6
-FungibleAssetMint	10	0.954	1.038	236.3
-IncGlobalMilestoneAggV2 { milestone_every: 1 }	10	0.960	1.047	32.9
-IncGlobalMilestoneAggV2 { milestone_every: 2 }	10	0.971	1.066	18.1
-EmitEvents { count: 1000 }	10	0.969	1.052	8615.5
-";
-
 struct CalibrationInfo {
     // count: usize,
     expected_time_micros: f64,
 }
 
 fn get_parsed_calibration_values() -> HashMap<String, CalibrationInfo> {
-    CALIBRATION_VALUES
+    let calibration_values = fs::read_to_string("aptos-move/e2e-benchmark/data/calibration_values.tsv").expect("Unable to read file");
+    calibration_values
         .trim()
         .split('\n')
         .map(|line| {

@@ -166,52 +166,9 @@ CALIBRATED_MAX_RATIO_INDEX = -2
 CALIBRATION_SEPARATOR = "	"
 
 # transaction_type	module_working_set_size	executor_type	count	min_ratio	max_ratio	median
-CALIBRATION = """
-no-op	1	VM	6	0.938	1.019	38925.3
-no-op	1000	VM	6	0.943	1.019	36444.6
-apt-fa-transfer	1	VM	6	0.927	1.018	26954.7
-apt-fa-transfer	1	NativeVM	6	0.927	1.018	35259.7
-account-generation	1	VM	6	0.96	1.02	20606.2
-account-generation	1	NativeVM	6	0.96	1.02	28216.2
-account-resource32-b	1	VM	6	0.94	1.026	34260.4
-modify-global-resource	1	VM	6	0.993	1.021	2260.5
-modify-global-resource	100	VM	6	0.982	1.02	33129.7
-publish-package	1	VM	6	0.983	1.012	1672.6
-mix_publish_transfer	1	VM	6	0.972	1.044	20832.8
-batch100-transfer	1	VM	6	0.953	1.024	645.1
-batch100-transfer	1	NativeVM	6	0.953	1.024	1437.0
-vector-picture30k	1	VM	6	0.992	1.039	103.6
-vector-picture30k	100	VM	6	0.913	1.015	1831.5
-smart-table-picture30-k-with200-change	1	VM	6	0.976	1.034	16.1
-smart-table-picture30-k-with200-change	100	VM	6	0.985	1.018	212.9
-modify-global-resource-agg-v2	1	VM	6	0.976	1.035	33992.5
-modify-global-flag-agg-v2	1	VM	6	0.986	1.016	4224
-modify-global-bounded-agg-v2	1	VM	6	0.964	1.047	7661.6
-modify-global-milestone-agg-v2	1	VM	6	0.973	1.017	25187.1
-resource-groups-global-write-tag1-kb	1	VM	6	0.989	1.03	9215.7
-resource-groups-global-write-and-read-tag1-kb	1	VM	6	0.982	1.018	5538.3
-resource-groups-sender-write-tag1-kb	1	VM	6	0.985	1.059	20084.2
-resource-groups-sender-multi-change1-kb	1	VM	6	0.968	1.034	16400.4
-token-v1ft-mint-and-transfer	1	VM	6	0.987	1.022	1156.3
-token-v1ft-mint-and-transfer	100	VM	6	0.964	1.024	17842.6
-token-v1nft-mint-and-transfer-sequential	1	VM	6	0.984	1.017	735.7
-token-v1nft-mint-and-transfer-sequential	100	VM	6	0.966	1.017	12819.7
-coin-init-and-mint	1	VM	6	0.95	1.024	26906.4
-coin-init-and-mint	100	VM	6	0.985	1.022	22312.6
-fungible-asset-mint	1	VM	6	0.955	1.013	23001.6
-fungible-asset-mint	100	VM	6	0.955	1.015	19973.5
-no-op5-signers	1	VM	6	0.934	1.016	38708.6
-token-v2-ambassador-mint	1	VM	6	0.975	1.008	15179.3
-token-v2-ambassador-mint	100	VM	6	0.985	1.007	15150.8
-liquidity-pool-swap	1	VM	6	0.987	1.018	805.5
-liquidity-pool-swap	100	VM	6	0.993	1.02	11156.3
-liquidity-pool-swap-stable	1	VM	6	0.985	1.017	778.7
-liquidity-pool-swap-stable	100	VM	6	0.982	1.009	11056.6
-deserialize-u256	1	VM	6	0.968	1.026	36444.6
-no-op-fee-payer	1	VM	6	0.994	1.026	2046
-no-op-fee-payer	100	VM	6	0.96	1.014	32866.5
-simple-script	1	VM	6	0.941	1.012	38206.1
-"""
+with open('testsuite/single_node_performance_values.tsv', 'r') as file:
+    CALIBRATION = file.read()
+
 
 # when adding a new test, add estimated expected_tps to it, as well as waived=True.
 # And then after a day or two - add calibration result for it above, removing expected_tps/waived fields.
