@@ -44,7 +44,7 @@ impl TimedFeatureOverride {
             Replay => match flag {
                 LimitTypeTagSize => true,
                 ModuleComplexityCheck => true,
-                EntryCompatibility => true,
+                EntryCompatibility => false,
                 // Add overrides for replay here.
                 _ => return None,
             },
