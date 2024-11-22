@@ -328,7 +328,8 @@ impl Features {
     }
 
     pub fn is_loader_v2_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::ENABLE_LOADER_V2)
+        true
+        // self.is_enabled(FeatureFlag::ENABLE_LOADER_V2)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {
