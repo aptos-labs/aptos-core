@@ -5,6 +5,7 @@ use aptos_types::{
     account_address::AccountAddress,
     transaction::signature_verified_transaction::SignatureVerifiedTransaction,
 };
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub enum NativeTransaction {
@@ -117,4 +118,31 @@ impl NativeTransaction {
             _ => unimplemented!(),
         }
     }
+}
+
+pub fn compute_deltas_for_batch(
+    recipient_addresses: Vec<AccountAddress>,
+    transfer_amounts: Vec<u64>,
+    sender_address: AccountAddress,
+) -> (HashMap<AccountAddress, i64>, u64) {
+    let mut deltas = HashMap::new();
+    for (recipient, amount) in recipient_addresses
+        .into_iter()
+        .zip(transfer_amounts.into_iter())
+    {
+        let amount = amount as i64;
+        deltas
+            .entry(recipient)
+            .and_modify(|counter| *counter += amount)
+            .or_insert(amount);
+        deltas
+            .entry(sender_address)
+            .and_modify(|counter| *counter -= amount)
+            .or_insert(-amount);
+    }
+
+    let amount_from_sender = -deltas.remove(&sender_address).unwrap_or(0);
+    assert!(amount_from_sender >= 0);
+
+    (deltas, amount_from_sender as u64)
 }

@@ -6,7 +6,7 @@ use crate::{
     db_access::DbAccessUtil,
     native::{
         native_config::{NativeConfig, NATIVE_EXECUTOR_POOL},
-        native_transaction::NativeTransaction,
+        native_transaction::{compute_deltas_for_batch, NativeTransaction},
     },
 };
 use aptos_aggregator::{
@@ -302,8 +302,54 @@ impl NativeVMExecutorTask {
                     )?;
                 }
             },
-            NativeTransaction::BatchTransfer { .. } => {
-                todo!("to implement");
+            NativeTransaction::BatchTransfer {
+                sender,
+                sequence_number,
+                recipients,
+                amounts,
+                fail_on_recipient_account_existing,
+                fail_on_recipient_account_missing,
+            } => {
+                self.check_and_set_sequence_number(
+                    sender,
+                    sequence_number,
+                    view,
+                    &mut resource_write_set,
+                )?;
+
+                let (deltas, amount_to_sender) =
+                    compute_deltas_for_batch(recipients, amounts, sender);
+
+                self.withdraw_apt(
+                    fa_migration_complete,
+                    sender,
+                    amount_to_sender,
+                    view,
+                    gas,
+                    &mut resource_write_set,
+                    &mut events,
+                )?;
+
+                for (recipient_address, transfer_amount) in deltas.into_iter() {
+                    let existed = self.deposit_apt(
+                        fa_migration_complete,
+                        recipient_address,
+                        transfer_amount as u64,
+                        view,
+                        &mut resource_write_set,
+                        &mut events,
+                    )?;
+
+                    if !existed || fail_on_recipient_account_existing {
+                        self.check_or_create_account(
+                            recipient_address,
+                            fail_on_recipient_account_existing,
+                            fail_on_recipient_account_missing,
+                            view,
+                            &mut resource_write_set,
+                        )?;
+                    }
+                }
             },
         };
 
@@ -646,13 +692,6 @@ impl NativeVMExecutorTask {
 
         // first need to create events, to update the handle, and then serialize sender_coin_store
         if transfer_amount > 0 {
-            // events.push((
-            //     WithdrawEvent {
-            //         amount: transfer_amount,
-            //     }
-            //     .create_event_v1(sender_coin_store.withdraw_events_mut()),
-            //     None,
-            // ));
             events.push((
                 CoinWithdraw {
                     coin_type: self.db_util.common.apt_coin_type_name.clone(),
@@ -809,13 +848,6 @@ impl NativeVMExecutorTask {
 
         // first need to create events, to update the handle, and then serialize sender_coin_store
         if transfer_amount > 0 {
-            // events.push((
-            //     DepositEvent {
-            //         amount: transfer_amount,
-            //     }
-            //     .create_event_v1(recipient_coin_store.deposit_events_mut()),
-            //     None,
-            // ));
             events.push((
                 CoinDeposit {
                     coin_type: self.db_util.common.apt_coin_type_name.clone(),

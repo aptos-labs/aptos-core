@@ -261,15 +261,19 @@ pub fn run_benchmark<V>(
     info!("Done creating workload");
     pipeline.start_pipeline_processing();
     info!("Waiting for pipeline to finish");
-    pipeline.join();
+    let num_pipeline_txns = pipeline.join();
 
     info!("Executed workload {}", workload_name);
 
-    if !pipeline_config.skip_commit {
-        let num_txns =
-            db.reader.expect_synced_version() - start_version - num_blocks_created as u64;
-        overall_measuring.print_end("Overall", num_txns);
+    let num_txns = if !pipeline_config.skip_commit {
+        db.reader.expect_synced_version() - start_version - num_blocks_created as u64
+    } else {
+        num_pipeline_txns.unwrap_or_default()
+    };
 
+    overall_measuring.print_end("Overall", num_txns);
+
+    if !pipeline_config.skip_commit {
         if verify_sequence_numbers {
             generator.verify_sequence_numbers(db.reader.clone());
         }
@@ -941,13 +945,13 @@ mod tests {
         let vm_to_commit = &vm_result.to_commit;
         let other_to_commit = &other_result.to_commit;
 
-        assert_eq!(2, vm_to_commit.transaction_outputs().len());
-        let vm_txn_output = &vm_to_commit.transaction_outputs()[0];
-        let vm_cp_txn_output = &vm_to_commit.transaction_outputs()[1];
+        assert_eq!(2, vm_to_commit.transaction_outputs.len());
+        let vm_txn_output = &vm_to_commit.transaction_outputs[0];
+        let vm_cp_txn_output = &vm_to_commit.transaction_outputs[1];
 
-        assert_eq!(2, other_to_commit.transaction_outputs().len());
-        let other_txn_output = &other_to_commit.transaction_outputs()[0];
-        let other_cp_txn_output = &other_to_commit.transaction_outputs()[1];
+        assert_eq!(2, other_to_commit.transaction_outputs.len());
+        let other_txn_output = &other_to_commit.transaction_outputs[0];
+        let other_cp_txn_output = &other_to_commit.transaction_outputs[1];
 
         assert_eq!(vm_cp_txn_output, other_cp_txn_output);
 

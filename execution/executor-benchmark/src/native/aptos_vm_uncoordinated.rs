@@ -63,18 +63,6 @@ impl VMBlockExecutor for AptosVMParallelUncoordinatedBlockExecutor {
                         vm_output
                             .try_materialize_into_transaction_output(state_view)
                             .unwrap()
-
-                        // if vm_status == VMStatus::Executed {
-
-                        // } else {
-                        //     TransactionOutput::new(
-                        //         Default::default(),
-                        //         vec![],
-                        //         0,
-                        //         TransactionStatus::from_vm_status(vm_status, false, &features),
-                        //         TransactionAuxiliaryData::default(),
-                        //     )
-                        // }
                     })
                 })
                 .collect::<Result<Vec<_>, _>>()

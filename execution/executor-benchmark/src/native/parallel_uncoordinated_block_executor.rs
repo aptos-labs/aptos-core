@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::native_transaction::compute_deltas_for_batch;
 use crate::{
     db_access::DbAccessUtil,
     metrics::TIMER,
@@ -43,7 +44,7 @@ use once_cell::sync::OnceCell;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::{
     cell::Cell,
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     hash::RandomState,
     sync::atomic::{AtomicU64, Ordering},
     u64,
@@ -140,16 +141,6 @@ impl IncrementalOutput {
             TransactionAuxiliaryData::default(),
         ))
     }
-
-    // fn to_abort(status: TransactionStatus) -> TransactionOutput {
-    //     TransactionOutput::new(
-    //         Default::default(),
-    //         vec![],
-    //         0,
-    //         status,
-    //         TransactionAuxiliaryData::default(),
-    //     )
-    // }
 }
 
 pub trait CommonNativeRawTransactionExecutor: Sync + Send {
@@ -381,20 +372,18 @@ impl<T: CommonNativeRawTransactionExecutor> RawTransactionExecutor for T {
                 sequence_number,
                 recipients,
                 amounts,
-                fail_on_recipient_account_existing: fail_on_account_existing,
-                fail_on_recipient_account_missing: fail_on_account_missing,
+                fail_on_recipient_account_existing,
+                fail_on_recipient_account_missing,
             } => {
                 self.update_sequence_number(sender, sequence_number, state_view, &mut output)?;
 
-                let mut deltas = compute_deltas_for_batch(recipients, amounts, sender);
-
-                let amount_to_sender = -deltas.remove(&sender).unwrap_or(0);
-                assert!(amount_to_sender >= 0);
+                let (deltas, amount_to_sender) =
+                    compute_deltas_for_batch(recipients, amounts, sender);
 
                 self.withdraw_apt_from_signer(
                     fa_migration_complete,
                     sender,
-                    amount_to_sender as u64,
+                    amount_to_sender,
                     gas,
                     state_view,
                     &mut output,
@@ -409,11 +398,11 @@ impl<T: CommonNativeRawTransactionExecutor> RawTransactionExecutor for T {
                         &mut output,
                     )?;
 
-                    if !existed || fail_on_account_existing {
+                    if !existed || fail_on_recipient_account_existing {
                         self.check_or_create_account(
                             recipient_address,
-                            fail_on_account_existing,
-                            fail_on_account_missing,
+                            fail_on_recipient_account_existing,
+                            fail_on_recipient_account_missing,
                             state_view,
                             &mut output,
                         )?;
@@ -778,31 +767,7 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
     }
 }
 
-fn compute_deltas_for_batch(
-    recipient_addresses: Vec<AccountAddress>,
-    transfer_amounts: Vec<u64>,
-    sender_address: AccountAddress,
-) -> HashMap<AccountAddress, i64> {
-    let mut deltas = HashMap::new();
-    for (recipient, amount) in recipient_addresses
-        .into_iter()
-        .zip(transfer_amounts.into_iter())
-    {
-        let amount = amount as i64;
-        deltas
-            .entry(recipient)
-            .and_modify(|counter| *counter += amount)
-            .or_insert(amount);
-        deltas
-            .entry(sender_address)
-            .and_modify(|counter| *counter -= amount)
-            .or_insert(-amount);
-    }
-    deltas
-}
-
 const USE_THREAD_LOCAL_SUPPLY: bool = true;
-
 struct CoinSupply {
     pub total_supply: u128,
 }
@@ -1180,88 +1145,6 @@ pub struct NativeNoStorageRawTransactionExecutor {
     total_supply: AtomicU64,
 }
 
-// impl CommonNativeRawTransactionExecutor for NativeNoStorageRawTransactionExecutor {
-//     fn new_impl() -> Self {
-//         Self {
-//             seq_nums: DashMap::new(),
-//             balances: DashMap::new(),
-//             total_supply: AtomicU64::new(u64::MAX),
-//         }
-//     }
-
-//     fn update_sequence_number(
-//         &self,
-//         sender_address: AccountAddress,
-//         sequence_number: u64,
-//         state_view: &(impl StateView + Sync),
-//         output: &mut IncrementalOutput,
-//     ) -> Result<()> {
-//         self.seq_nums.insert(sender, sequence_number);
-//         Ok(())
-//     }
-
-//     fn reduce_fa_apt_supply(
-//         &self,
-//         gas: u64,
-//         state_view: &(impl StateView + Sync),
-//         output: &mut IncrementalOutput,
-//     ) -> Result<()> {
-
-//     }
-
-//     fn reduce_coin_apt_supply(
-//         &self,
-//         gas: u64,
-//         state_view: &(impl StateView + Sync),
-//         output: &mut IncrementalOutput,
-//     ) -> Result<()>;
-
-//     fn withdraw_fa_apt_from_signer(
-//         &self,
-//         sender_address: AccountAddress,
-//         transfer_amount: u64,
-//         gas: u64,
-//         state_view: &(impl StateView + Sync),
-//         output: &mut IncrementalOutput,
-//     ) -> Result<()>;
-
-//     fn withdraw_coin_apt_from_signer(
-//         &self,
-//         sender_address: AccountAddress,
-//         transfer_amount: u64,
-//         gas: u64,
-//         state_view: &(impl StateView + Sync),
-//         output: &mut IncrementalOutput,
-//     ) -> Result<()>;
-
-//     fn deposit_fa_apt(
-//         &self,
-//         recipient_address: AccountAddress,
-//         transfer_amount: u64,
-//         state_view: &(impl StateView + Sync),
-//         output: &mut IncrementalOutput,
-//     ) -> Result<bool>;
-
-//     fn deposit_coin_apt(
-//         &self,
-//         recipient_address: AccountAddress,
-//         transfer_amount: u64,
-//         state_view: &(impl StateView + Sync),
-//         output: &mut IncrementalOutput,
-//     ) -> Result<bool>;
-
-//     fn check_or_create_account(
-//         &self,
-//         address: AccountAddress,
-//         fail_on_account_existing: bool,
-//         fail_on_account_missing: bool,
-//         state_view: &(impl StateView + Sync),
-//         output: &mut IncrementalOutput,
-//     ) -> Result<()> {
-//         Ok(())
-//     }
-// }
-
 impl RawTransactionExecutor for NativeNoStorageRawTransactionExecutor {
     type BlockState = ();
 
@@ -1334,15 +1217,13 @@ impl RawTransactionExecutor for NativeNoStorageRawTransactionExecutor {
                 amounts,
                 ..
             } => {
-                let mut deltas = compute_deltas_for_batch(recipients, amounts, sender);
-
-                let amount_from_sender = -deltas.remove(&sender).unwrap_or(0);
-                assert!(amount_from_sender >= 0);
+                let (deltas, amount_from_sender) =
+                    compute_deltas_for_batch(recipients, amounts, sender);
 
                 *self
                     .balances
                     .entry(sender)
-                    .or_insert(100_000_000_000_000_000) -= amount_from_sender as u64;
+                    .or_insert(100_000_000_000_000_000) -= amount_from_sender;
 
                 for (recipient, amount) in deltas.into_iter() {
                     *self
