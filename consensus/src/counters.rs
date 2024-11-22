@@ -126,6 +126,14 @@ pub static PROPOSAL_VOTE_BROADCASTED: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static PROPOSAL_OPT_VOTE_BROADCASTED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_proposal_opt_vote_broadcasted",
+        "Count of the number of opt proposal votes broadcasted"
+    )
+    .unwrap()
+});
+
 //////////////////////
 // PROPOSAL ELECTION
 //////////////////////

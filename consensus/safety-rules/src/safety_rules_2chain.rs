@@ -56,7 +56,6 @@ impl SafetyRules {
     ) -> Result<Vote, Error> {
         // Exit early if we cannot sign
         self.signer()?;
-
         let vote_data = self.verify_proposal(vote_proposal)?;
         if let Some(tc) = timeout_cert {
             self.verify_tc(tc)?;
@@ -66,18 +65,49 @@ impl SafetyRules {
 
         // if already voted on this round, send back the previous vote
         // note: this needs to happen after verifying the epoch as we just check the round here
-        if let Some(vote) = safety_data.last_vote.clone() {
+        // allow voting twice for each round, one for block certified by qc and one for block certified by tc
+        let is_opt = proposed_block.is_opt();
+        let qc_round = proposed_block.quorum_cert().certified_block().round();
+        let tc_round = timeout_cert.map_or(0, |tc| tc.round());
+        let hqc_round = timeout_cert.map_or(0, |tc| tc.highest_hqc_round());
+        let block_round = proposed_block.round();
+
+        let certified_by_qc = block_round == next_round(qc_round)?;
+        let certified_by_tc = (block_round == next_round(tc_round)? && qc_round >= hqc_round) && timeout_cert.is_some();
+
+        if let Some(vote) = safety_data.last_vote_block_with_qc.clone() {
             if vote.vote_data().proposed().round() == proposed_block.round() {
+                if certified_by_qc {
+                    return Ok(vote);
+                } else {
+                    return Err(Error::AlreadyVotedForRegularBlock(block_round));
+                }
+            }
+        }
+        if let Some(vote) = safety_data.last_vote_block_with_tc.clone() {
+            if vote.vote_data().proposed().round() == proposed_block.round() {
+                if certified_by_tc {
+                    return Ok(vote);
+                } else {
+                    return Err(Error::AlreadyVotedForRegularBlock(block_round));
+                }
+            }
+        }
+        if let Some(vote) = safety_data.last_vote_block_opt.clone() {
+            if vote.vote_data().proposed().round() == proposed_block.round() && is_opt {
                 return Ok(vote);
             }
         }
 
         // Two voting rules
-        self.verify_and_update_last_vote_round(
-            proposed_block.block_data().round(),
-            &mut safety_data,
-        )?;
+        if !is_opt {
+            self.verify_and_update_last_vote_round(
+                proposed_block.block_data().round(),
+                &mut safety_data,
+            )?;
+        }
         self.safe_to_vote(proposed_block, timeout_cert)?;
+        self.safe_to_opt_vote(proposed_block, &safety_data)?;
 
         // Record 1-chain data
         self.observe_qc(proposed_block.quorum_cert(), &mut safety_data);
@@ -87,7 +117,15 @@ impl SafetyRules {
         let signature = self.sign(&ledger_info)?;
         let vote = Vote::new_with_signature(vote_data, author, ledger_info, signature);
 
-        safety_data.last_vote = Some(vote.clone());
+        if is_opt {
+            safety_data.last_vote_block_opt = Some(vote.clone());
+        }
+        if !is_opt && certified_by_qc {
+            safety_data.last_vote_block_with_qc = Some(vote.clone());
+        }
+        if !is_opt && certified_by_tc {
+            safety_data.last_vote_block_with_tc = Some(vote.clone());
+        }
         self.persistent_storage.set_safety_data(safety_data)?;
 
         Ok(vote)
@@ -161,6 +199,17 @@ impl SafetyRules {
             Ok(())
         } else {
             Err(Error::NotSafeToVote(round, qc_round, tc_round, hqc_round))
+        }
+    }
+
+    fn safe_to_opt_vote(&self, block: &Block, safety_data: &SafetyData) -> Result<(), Error> {
+        if !block.is_opt() {
+            return Ok(());
+        }
+        if block.round() > next_round(safety_data.highest_timeout_round)? {
+            Ok(())
+        } else {
+            Err(Error::NotSafeToOptVote(block.round(), safety_data.highest_timeout_round))
         }
     }
 
