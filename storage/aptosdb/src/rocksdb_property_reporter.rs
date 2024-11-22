@@ -23,7 +23,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::IntGaugeVec;
 use aptos_schemadb::DB;
-use aptos_types::state_store::NUM_STATE_SHARDS;
+use aptos_storage_interface::state_store::NUM_STATE_SHARDS;
 use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,

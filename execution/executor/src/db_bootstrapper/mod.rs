@@ -12,8 +12,10 @@ use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_storage_interface::{
-    async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
-    DbWriter, ExecutedTrees,
+    state_store::state_view::{
+        async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView,
+    },
+    DbReaderWriter, DbWriter, ExecutedTrees,
 };
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,

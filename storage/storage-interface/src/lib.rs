@@ -34,18 +34,14 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
-pub mod async_proof_fetcher;
 pub mod block_info;
-pub mod cached_state_view;
 pub mod chunk_to_commit;
 pub mod errors;
 mod executed_trees;
 mod metrics;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod mock;
-pub mod sharded_state_update_refs;
-pub mod state_delta;
-pub mod state_view;
+pub mod state_store;
 
 use crate::chunk_to_commit::ChunkToCommit;
 use aptos_scratchpad::SparseMerkleTree;
