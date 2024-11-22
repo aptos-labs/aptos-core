@@ -16,6 +16,12 @@
 ///
 /// Uses cmp::compare for ordering, which compares primitive types natively, and uses common
 /// lexicographical sorting for complex types.
+///
+/// TODO: all iterator functions are public(friend) for now, so that they can be modified in a
+/// backward incompatible way.
+/// They are waiting for Move improvement that will allow references to be part of the struct
+/// Allowing cleaner iterator APIs
+///
 module aptos_std::ordered_map {
     // friend aptos_std::big_ordered_map;
 
@@ -61,7 +67,7 @@ module aptos_std::ordered_map {
         },
     }
 
-    /// Creates a new empty OrderedMap, using default (SortedVectorMap) implementation.
+    /// Create a new empty OrderedMap, using default (SortedVectorMap) implementation.
     public fun new<K, V>(): OrderedMap<K, V> {
         OrderedMap::SortedVectorMap {
             entries: vector::empty(),
@@ -139,7 +145,7 @@ module aptos_std::ordered_map {
         self.find(key).iter_borrow_mut(self)
     }
 
-    /// Changes the key, with keeping the same value attached to it
+    /// Changes the key, while keeping the same value attached to it
     /// Aborts with EKEY_NOT_FOUND if `old_key` doesn't exist.
     /// Aborts with ENEW_KEY_NOT_IN_ORDER if `new_key` doesn't keep the order `old_key` was in.
     public(friend) fun replace_key_inplace<K: drop, V>(self: &mut OrderedMap<K, V>, old_key: &K, new_key: K) {
@@ -163,8 +169,18 @@ module aptos_std::ordered_map {
     /// Add multiple key/value pairs to the map. The keys must not already exist.
     /// Aborts with EKEY_ALREADY_EXISTS if key already exist, or duplicate keys are passed in.
     public fun add_all<K, V>(self: &mut OrderedMap<K, V>, keys: vector<K>, values: vector<V>) {
+        // TODO: Can be optimized, by sorting keys and values, and then creating map.
         vector::zip(keys, values, |key, value| {
             add(self, key, value);
+        });
+    }
+
+    /// Add multiple key/value pairs to the map, overwrites values if they exist already,
+    /// or if duplicate keys are passed in.s
+    public fun upsert_all<K, V>(self: &mut OrderedMap<K, V>, keys: vector<K>, values: vector<V>) {
+        // TODO: Can be optimized, by sorting keys and values, and then creating map.
+        vector::zip(keys, values, |key, value| {
+            upsert(self, key, value);
         });
     }
 
@@ -196,13 +212,15 @@ module aptos_std::ordered_map {
         let cur_i = self.entries.length() - 1;
         let other_i = other_entries.length() - 1;
 
-        // after the end of the loop, entries is empty, and any leftover is in other_entries
+        // after the end of the loop, other_entries is empty, and any leftover is in entries
         loop {
             let ord = cmp::compare(&self.entries[cur_i].key, &other_entries[other_i].key);
             assert!(!ord.is_eq(), error::invalid_argument(EKEY_ALREADY_EXISTS));
             if (ord.is_gt()) {
                 reverse_result.push_back(self.entries.pop_back());
                 if (cur_i == 0) {
+                    // make other_entries empty, and rest in entries.
+                    mem::swap(&mut self.entries, &mut other_entries);
                     break;
                 } else {
                     cur_i = cur_i - 1;
@@ -210,8 +228,6 @@ module aptos_std::ordered_map {
             } else {
                 reverse_result.push_back(other_entries.pop_back());
                 if (other_i == 0) {
-                    // make entries empty, and rest in other_entries.
-                    mem::swap(&mut other_entries, &mut self.entries);
                     break;
                 } else {
                     other_i = other_i - 1;
@@ -219,14 +235,12 @@ module aptos_std::ordered_map {
             };
         };
 
-        reverse_result.reverse_append(other_entries);
         self.entries.reverse_append(reverse_result);
     }
 
     /// Splits the collection into two, such to leave `self` with `at` number of elements.
     /// Returns a newly allocated map containing the elements in the range [at, len).
-    /// After the call, the original map will be left containing the elements [0, at)
-    /// with its previous capacity unchanged.
+    /// After the call, the original map will be left containing the elements [0, at).
     public fun trim<K, V>(self: &mut OrderedMap<K, V>, at: u64): OrderedMap<K, V> {
         let rest = self.entries.trim(at);
 
@@ -234,11 +248,6 @@ module aptos_std::ordered_map {
             entries: rest
         }
     }
-
-    /// TODO: all iterator functions are public(friend) for now, so that they can be modified in a
-    /// backward incompatible way.
-    /// They are waiting for Move improvement that will allow references to be part of the struct
-    /// Allowing cleaner iterator APIs
 
     // TODO: see if it is more understandable if iterator points between elements,
     // and there is iter_borrow_next and iter_borrow_prev, and provide iter_insert.
@@ -441,6 +450,7 @@ module aptos_std::ordered_map {
             f(iter.iter_borrow_key(self), iter.iter_borrow(self));
             iter = iter.iter_next(self);
         }
+        // TODO: once move supports private functions udpate to:
         // vector::for_each_ref(
         //     &self.entries,
         //     |entry| {
@@ -457,6 +467,7 @@ module aptos_std::ordered_map {
             f(key, iter.iter_borrow_mut(self));
             iter = iter.iter_next(self);
         }
+        // TODO: once move supports private functions udpate to:
         // vector::for_each_mut(
         //     &mut self.entries,
         //     |entry| {
@@ -481,11 +492,6 @@ module aptos_std::ordered_map {
         while (l != r) {
             let mid = l + (r - l) / 2;
             let comparison = cmp::compare(&entries.borrow(mid).key, key);
-            // TODO: check why this short-circuiting actually performs worse
-            // if (comparison.is_equal()) {
-            //     // there can only be one equal value, so end the search.
-            //     return mid;
-            // } else
             if (comparison.is_lt()) {
                 l = mid + 1;
             } else {
@@ -495,7 +501,9 @@ module aptos_std::ordered_map {
         l
     }
 
-    // public fun num_below_iter<K, V>(self: Iterator, map: &OrderedMap<K, V>): u64 {
+    // see if useful, and add
+    //
+    // public fun iter_num_below<K, V>(self: Iterator, map: &OrderedMap<K, V>): u64 {
     //     if (self.iter_is_end()) {
     //         map.entries.length()
     //     } else {
