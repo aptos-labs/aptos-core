@@ -690,7 +690,6 @@ module aptos_framework::atomic_bridge_store {
         state: u8,
     }
 
-    /// A nonce for the bridge store
     struct Nonce has key {
         inner: u64
     }
@@ -1111,17 +1110,6 @@ module aptos_framework::atomic_bridge_configuration {
         counterparty_time_lock: u64,
     }
 
-    /// Default minimum sponsored transfer amount is 1_000_000_000
-    const DEFAULT_MINIMUM_TRANSFER_AMOUNT: u64 = 1_000_000_000;
-    /// Default sponsorship amount is 1_000
-    const DEFAULT_SPONSORSHIP_AMOUNT: u64 = 1_000;
-
-    /// Configuration for sponsorship
-    struct SponsorshipConfig has key {
-        minimum_transfer_amount: u64,
-        sponsorship_amount: u64,
-    }
-
     #[event]
     /// Event emitted when the bridge operator is updated.
     struct BridgeConfigOperatorUpdated has store, drop {
@@ -1152,12 +1140,6 @@ module aptos_framework::atomic_bridge_configuration {
             counterparty_time_lock: COUNTERPARTY_TIME_LOCK_DUARTION,
         };
         move_to(aptos_framework, bridge_config);
-
-        let sponsorship_config = SponsorshipConfig {
-            minimum_transfer_amount: DEFAULT_MINIMUM_TRANSFER_AMOUNT,
-            sponsorship_amount: DEFAULT_SPONSORSHIP_AMOUNT,
-        };
-        move_to(aptos_framework, sponsorship_config);
     }
 
     /// Updates the bridge operator, requiring governance validation.
@@ -1231,42 +1213,6 @@ module aptos_framework::atomic_bridge_configuration {
     public(friend) fun assert_is_caller_operator(caller: &signer
     ) acquires BridgeConfig {
         assert!(borrow_global<BridgeConfig>(@aptos_framework).bridge_operator == signer::address_of(caller), EINVALID_BRIDGE_OPERATOR);
-    }
-
-    #[view]
-    /// Gets the current minimum transfer amount for sponsorship.
-    ///
-    /// @return The minimum transfer amount for sponsorship.
-    public fun minimum_transfer_amount() : u64 acquires SponsorshipConfig {
-        borrow_global<SponsorshipConfig>(@aptos_framework).minimum_transfer_amount
-    }
-
-    #[view]
-    /// Gets the current sponsorship amount.
-    ///
-    /// @return The sponsorship amount.
-    public fun sponsorship_amount() : u64 acquires SponsorshipConfig {
-        borrow_global<SponsorshipConfig>(@aptos_framework).sponsorship_amount
-    }
-
-    /// Updates the minimum transfer amount for sponsorship.
-    ///
-    /// @param aptos_framework The signer representing the Aptos framework.
-    /// @param minimum_transfer_amount The new minimum transfer amount.
-    public fun update_minimum_transfer_amount(aptos_framework: &signer, minimum_transfer_amount: u64
-    ) acquires SponsorshipConfig {
-        system_addresses::assert_aptos_framework(aptos_framework);
-        borrow_global_mut<SponsorshipConfig>(@aptos_framework).minimum_transfer_amount = minimum_transfer_amount;
-    }
-
-    /// Updates the sponsorship amount.
-    ///
-    /// @param aptos_framework The signer representing the Aptos framework.
-    /// @param sponsorship_amount The new sponsorship amount.
-    public fun update_sponsorship_amount(aptos_framework: &signer, sponsorship_amount: u64
-    ) acquires SponsorshipConfig {
-        system_addresses::assert_aptos_framework(aptos_framework);
-        borrow_global_mut<SponsorshipConfig>(@aptos_framework).sponsorship_amount = sponsorship_amount;
     }
 
     #[test(aptos_framework = @aptos_framework)]
@@ -1349,39 +1295,6 @@ module aptos_framework::atomic_bridge_configuration {
         initialize(aptos_framework);
         set_counterparty_time_lock_duration(bad, 1);
     }
-
-    #[test(aptos_framework = @aptos_framework)]
-    /// Tests we can update the minimum transfer amount
-    fun test_update_minimum_transfer_amount(aptos_framework: &signer) acquires SponsorshipConfig {
-        initialize(aptos_framework);
-        update_minimum_transfer_amount(aptos_framework, 1);
-        assert!(minimum_transfer_amount() == 1, 0);
-    }
-
-    #[test(aptos_framework = @aptos_framework, bad = @0xbad)]
-    #[expected_failure(abort_code = 0x50003, location = 0x1::system_addresses)]
-    /// Tests that an incorrect signer cannot update the minimum transfer amount
-    fun test_not_able_to_update_minimum_transfer_amount(aptos_framework: &signer, bad: &signer) acquires SponsorshipConfig {
-        initialize(aptos_framework);
-        update_minimum_transfer_amount(bad, 1);
-    }
-
-    #[test(aptos_framework = @aptos_framework)]
-    /// Tests we can update the sponsorship amount
-    fun test_update_sponsorship_amount(aptos_framework: &signer) acquires SponsorshipConfig {
-        initialize(aptos_framework);
-        update_sponsorship_amount(aptos_framework, 1);
-        assert!(sponsorship_amount() == 1, 0);
-    }
-
-    #[test(aptos_framework = @aptos_framework, bad = @0xbad)]
-    #[expected_failure(abort_code = 0x50003, location = 0x1::system_addresses)]
-    /// Tests that an incorrect signer cannot update the sponsorship amount
-    fun test_not_able_to_update_sponsorship_amount(aptos_framework: &signer, bad: &signer) acquires SponsorshipConfig {
-        initialize(aptos_framework);
-        update_sponsorship_amount(bad, 1);
-    }
-
 }
 
 module aptos_framework::atomic_bridge {
@@ -1505,9 +1418,6 @@ module aptos_framework::atomic_bridge {
 
 module aptos_framework::atomic_bridge_counterparty {
     use aptos_framework::account;
-    use aptos_framework::coin;
-    use aptos_framework::aptos_coin::AptosCoin;
-    use aptos_framework::aptos_account;
     use aptos_framework::atomic_bridge;
     use aptos_framework::atomic_bridge_configuration;
     use aptos_framework::atomic_bridge_store;
@@ -1515,6 +1425,8 @@ module aptos_framework::atomic_bridge_counterparty {
     use aptos_framework::ethereum;
     use aptos_framework::ethereum::EthereumAddress;
     use aptos_framework::event::{Self, EventHandle}; 
+    #[test_only]
+    use aptos_framework::aptos_account;
     #[test_only]
     use aptos_framework::atomic_bridge::initialize_for_test;
     #[test_only]
@@ -1566,45 +1478,6 @@ module aptos_framework::atomic_bridge_counterparty {
         });
     }
 
-    /// Checks whether a recipient is eligible for sponsorship.
-    ///
-    /// @param recipient The address of the recipient to check.
-    /// @return A boolean indicating whether the recipient is eligible for sponsorship.
-    public(friend) fun is_sponsorship_eligible(recipient: address, transfer_amount : u64) : bool {
-        // A minimum transfer amount is required to be eligible for sponsorship
-        // This is used to make attacks on this sponsorhip mechanism prohibitively expensive
-        if (transfer_amount < atomic_bridge_configuration::minimum_transfer_amount()) {
-            return false
-        };
-        !account::exists_at(recipient) || coin::balance<AptosCoin>(recipient) == 0
-    }
-
-    /// Sponsors a recipient by transferring enought Aptos Coint to make the claim to them
-    ///
-    /// @param recipient The address of the recipient to sponsor.
-    /// @param amount The amount of Aptos Coin to transfer.
-    /// @abort If the transfer fails.
-    public(friend) fun sponsor(sponsor: &signer, recipient: address) : u64 {
-        let amount = atomic_bridge_configuration::sponsorship_amount();
-        aptos_account::transfer(sponsor, recipient, amount);
-        amount
-    }
-
-    /// Sponsors a recipient by transferring enough Aptos Coin to make the claim to them if they are eligible
-    ///
-    /// @param recipient The address of the recipient to sponsor.
-    /// @param amount The amount of Aptos Coin to transfer.
-    /// @abort If the transfer fails.
-    /// Returns the amount remaining in the transfer.
-    public(friend) fun sponsor_if_eligible(sponsor: &signer, recipient: address, amount: u64) : u64 {
-        if(is_sponsorship_eligible(recipient, amount)) {
-            amount - sponsor(sponsor, recipient)
-        } else {
-            amount
-        }
-    }
-
-
     /// Locks assets for a bridge transfer by the initiator.
     ///
     /// @param caller The signer representing the bridge operator.
@@ -1626,15 +1499,10 @@ module aptos_framework::atomic_bridge_counterparty {
         atomic_bridge_configuration::assert_is_caller_operator(caller);
         let ethereum_address = ethereum::ethereum_address_no_eip55(initiator);
         let time_lock = atomic_bridge_configuration::counterparty_timelock_duration();
-
-        // sponsor the claim transaction if the recipient is valid for sponsorship
-        // sponsorship will always be restricted by the amount of Aptos Coin available to the bridge operator
-        let post_sponsorship_amount = sponsor_if_eligible(caller, recipient, amount);
-
         let details = atomic_bridge_store::create_details(
             ethereum_address,
             recipient,
-            post_sponsorship_amount,
+            amount,
             hash_lock,
             time_lock
         );
@@ -1818,65 +1686,4 @@ module aptos_framework::atomic_bridge_counterparty {
 
         complete_bridge_transfer(bridge_transfer_id, b"not the secret");
     }
-
-    #[test(aptos_framework = @aptos_framework, third_party = @0xdead)]
-    /// Test eligible sponsor 
-    fun test_lock_for_eligible_sponsor(aptos_framework: &signer, third_party: &signer) acquires BridgeCounterpartyEvents {
-        initialize_for_test(aptos_framework);
-        initialize(aptos_framework);
-
-        // transfer some Aptos Coin from the third party to the framework
-        aptos_account::create_account(signer::address_of(third_party));
-        atomic_bridge::mint(signer::address_of(third_party), 1_000_000_000);
-        aptos_account::transfer(third_party, signer::address_of(aptos_framework), 1_000_000_000);
-
-        let initiator = valid_eip55();
-        let bridge_transfer_id = valid_bridge_transfer_id();
-        let hash_lock = valid_hash_lock();
-        let recipient = @0xcafe;
-        let amount = atomic_bridge_configuration::minimum_transfer_amount();
-
-        lock_bridge_transfer_assets(aptos_framework,
-            initiator,
-            bridge_transfer_id,
-            hash_lock,
-            recipient,
-            amount);
-
-        let sponsored_amount = atomic_bridge_configuration::sponsorship_amount();
-
-        // check that the recipient has been sponsored
-        assert!(coin::balance<AptosCoin>(recipient) == sponsored_amount, 0);
-
-    }
-
-    #[test(aptos_framework = @aptos_framework, third_party = @0xdead)]
-    /// Test ineligible sponsor
-    fun test_lock_for_ineligible_sponsor(aptos_framework: &signer,  third_party: &signer) acquires BridgeCounterpartyEvents {
-        initialize_for_test(aptos_framework);
-        initialize(aptos_framework);
-
-        // mint some coin for the framework
-        aptos_account::create_account(signer::address_of(third_party));
-        atomic_bridge::mint(signer::address_of(third_party), 1_000_000_000);
-        aptos_account::transfer(third_party, signer::address_of(aptos_framework), 1_000_000_000);
-
-        let initiator = valid_eip55();
-        let bridge_transfer_id = valid_bridge_transfer_id();
-        let hash_lock = valid_hash_lock();
-        let recipient = @0xcafe;
-        let amount = atomic_bridge_configuration::minimum_transfer_amount() - 1;
-
-        lock_bridge_transfer_assets(aptos_framework,
-            initiator,
-            bridge_transfer_id,
-            hash_lock,
-            recipient,
-            amount);
-
-        // check that the recipient has not been sponsored
-        assert!(coin::balance<AptosCoin>(recipient) == 0, 0);
-
-    }
-
 }
