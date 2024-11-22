@@ -1814,14 +1814,12 @@ impl ExpRewriterFunctions for LoopNestRewriter {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Operation {
     MoveFunction(ModuleId, FunId),
-    /// Build a closure by binding 1 or more parameters to a function value.
-    /// First argument to the operation must be a function; the next bitcount(mask)
+    /// Build a closure by binding 1 or more leading arguments to a function value.
+    /// First argument to the operation must be a function; the reamining
     /// arguments will be bound to corresponding parameters of that function.
-    ///     (move |x, y| f(x, y, z)) === ExpData::Call(_, Bind(0b001u64), vec![f, z])
-    ///     (move |y, z| f(x, z, y)) === ExpData::Call(_, Bind(0b100u64), vec![f, x])
-    Bind(
-        u64, // mask: 1 bit for arg position of each early-bound parameter
-    ),
+    ///     (move |x, y| f(z, x, y)) === ExpData::Call(_, EarlyBind, vec![f, z])
+    ///     (move || f(z, x, y)) === ExpData::Call(_, EarlyBind, vec![f, z, x, y])
+    EarlyBind,
     Pack(ModuleId, StructId, /*variant*/ Option<Symbol>),
     Tuple,
     Select(ModuleId, StructId, FieldId),
@@ -2674,7 +2672,7 @@ impl Operation {
             Select(..) => false,         // Move-related
             SelectVariants(..) => false, // Move-related
             UpdateField(..) => false,    // Move-related
-            Bind(..) => true,
+            EarlyBind => true,
 
             // Specification specific
             Result(..) => false, // Spec
@@ -3571,8 +3569,8 @@ impl<'a> fmt::Display for OperationDisplay<'a> {
                         .unwrap_or_else(|| "<?unknown function?>".to_string())
                 )
             },
-            Bind(mask) => {
-                write!(f, "bind({:b})", mask)
+            EarlyBind => {
+                write!(f, "earlybind")
             },
             Global(label_opt) => {
                 write!(f, "global")?;

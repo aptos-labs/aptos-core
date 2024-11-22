@@ -827,8 +827,8 @@ impl<'a> ExpSourcifier<'a> {
                     self.print_exp_list("(", ")", args)
                 })
             },
-            Operation::Bind(mask) => self.parenthesize(context_prio, Prio::Postfix, || {
-                emit!(self.wr(), "bind({:b})", mask);
+            Operation::EarlyBind => self.parenthesize(context_prio, Prio::Postfix, || {
+                emit!(self.wr(), "earlybind");
                 self.print_node_inst(id);
                 self.print_exp_list("(", ")", args)
             }),

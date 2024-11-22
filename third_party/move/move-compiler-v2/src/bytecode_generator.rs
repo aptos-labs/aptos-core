@@ -792,7 +792,7 @@ impl<'env> Generator<'env> {
                 self.gen_function_call(targets, id, m.qualified(*f), args)
             },
             // TODO(LAMBDA)
-            Operation::Bind(_mask) => self.error(
+            Operation::EarlyBind => self.error(
                 id,
                 "Function-typed values not yet supported except as parameters to calls to inline functions",
             ),

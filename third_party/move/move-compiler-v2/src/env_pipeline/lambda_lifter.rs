@@ -15,16 +15,15 @@
 //! Lambda lifting rewrites lambda expressions into construction
 //! of *closures*. A closure refers to a function and contains a partial list
 //! of arguments for that function, essentially currying it.  We use the
-//! `Bind` operation to construct a closure from a function and set of arguemnts,
-//! qualified by a mask which allows early-bound arguments to be anywhere in
-//! the function argument list.
+//! `EarlyBind` operation to construct a closure from a function and set of arguemnts,
+//! which must be the first `k` arguments to the function argument list.
 //!
 //! ```ignore
 //! let c = 1;
 //! vec.any(|x| x > c)
 //! ==>
 //! let c = 1;
-//! vec.any(Bind(0x10u64)(lifted, c))
+//! vec.any(EarlyBind(lifted, c))
 //! where
 //!   fun lifted(c: u64, x: u64): bool { x > c }
 //! ```
@@ -37,7 +36,7 @@
 //! vec.any(|S{x}| x > c)
 //! ==>
 //! let c = 1;
-//! vec.any(Bind(0x10)(lifted, c))
+//! vec.any(EarlyBind(lifted, c))
 //! where
 //!   fun lifted(c: u64, arg$2: S): bool { let S{x} = arg$2; x > y }
 //! ```
@@ -282,62 +281,64 @@ impl<'a> LambdaLifter<'a> {
         }
     }
 
-    fn get_args_if_simple(args: &[Exp]) -> Option<Vec<&Exp>> {
-        let result: Vec<&Exp> = args
-            .iter()
-            .filter_map(|exp| Self::get_arg_if_simple(exp))
-            .collect();
-        if result.len() == args.len() && result.len() <= 64 {
-            // Curry/Bind bitmask is only a u64, so we limit to 64 args here.
-            Some(result)
-        } else {
-            None
+    // If final `args` match `lambda_params`, and all other args are simple, then returns
+    // the simple prefix of `args`.
+    fn get_args_if_simple<'b>(
+        lambda_params: &Vec<Parameter>,
+        args: &'b [Exp],
+    ) -> Option<Vec<&'b Exp>> {
+        if lambda_params.len() <= args.len() {
+            let mut simple_args: Vec<&Exp> = args
+                .iter()
+                .filter_map(|exp| Self::get_arg_if_simple(exp))
+                .collect();
+            if simple_args.len() == args.len()
+                && lambda_params
+                    .iter()
+                    .rev()
+                    .zip(simple_args.iter().rev())
+                    .all(|(param, arg)| {
+                        if let ExpData::LocalVar(_, name) = arg.as_ref() {
+                            *name == param.get_name()
+                        } else {
+                            false
+                        }
+                    })
+            {
+                let remaining_size = args.len() - lambda_params.len();
+                simple_args.truncate(remaining_size);
+                return Some(simple_args);
+            }
         }
+        None
     }
 
-    fn get_fun_if_simple(&self, lambda_params: &Vec<Parameter>, fn_exp: &Exp) -> Option<Exp> {
+    // Only allow simple expressions which cannot vary or abort
+    fn exp_is_simple(fn_exp: &Exp) -> bool {
         use ExpData::*;
         match fn_exp.as_ref() {
-            Value(_, ast::Value::Function(..)) => Some(fn_exp.clone()),
-            Call(id, Operation::Bind(mask), args) => {
-                let mut args_iter = args.iter();
-                args_iter.next().and_then(|fn_exp| {
-                    let fn_args: Vec<_> = args_iter.cloned().collect();
-                    Self::get_args_if_simple(&fn_args).map(|simp_args| {
-                        let mut bind_args: Vec<_> =
-                            simp_args.iter().map(|expref| (*expref).clone()).collect();
-                        bind_args.insert(0, fn_exp.clone());
-                        ExpData::Call(*id, Operation::Bind(*mask), bind_args).into_exp()
-                    })
-                })
+            Call(_, Operation::EarlyBind, args) => args.iter().all(|exp| Self::exp_is_simple(exp)),
+            Call(_, op, args) => {
+                op.is_ok_to_remove_from_code() && args.iter().all(|exp| Self::exp_is_simple(exp))
             },
             Sequence(_, exp_vec) => {
                 if let [exp] = &exp_vec[..] {
-                    self.get_fun_if_simple(lambda_params, exp)
+                    Self::exp_is_simple(exp)
                 } else {
-                    None
+                    false
                 }
+            },
+            IfElse(_, e1, e2, e3) => {
+                Self::exp_is_simple(e1) && Self::exp_is_simple(e2) && Self::exp_is_simple(e3)
             },
             Lambda(_, _pat, _body, _capture_kind, _abilities) => {
                 // maybe could test lambda_is_direct_curry(pat, body)
                 // and do something with it, but it is nontrivial.
-                None
+                false
             },
-            LocalVar(_, name) => {
-                // Make sure `name` is a free var, not a lambda param.
-                if lambda_params.iter().any(|param| param.get_name() == *name) {
-                    None
-                } else {
-                    Some(fn_exp.clone())
-                }
-            },
-            Temporary(..) => {
-                // Lambda doesn't bind temps, must be a free var
-                Some(fn_exp.clone())
-            },
-            Value(..) | Invalid(..) | Call(..) | Invoke(..) | Quant(..) | Block(..)
-            | IfElse(..) | Match(..) | Return(..) | Loop(..) | LoopCont(..) | Assign(..)
-            | Mutate(..) | SpecBlock(..) => None,
+            LocalVar(..) | Temporary(..) | Value(..) => true,
+            Invalid(..) | Invoke(..) | Quant(..) | Block(..) | Match(..) | Return(..)
+            | Loop(..) | LoopCont(..) | Assign(..) | Mutate(..) | SpecBlock(..) => false,
         }
     }
 
@@ -379,8 +380,9 @@ impl<'a> LambdaLifter<'a> {
     }
 
     // If body is a function call expression with the function value and each parameter a
-    // simple expression (constant, var, or Move function name) then returns expressions for
-    // the function and the arguments.  Otherwise, returns `None`.
+    // simple expression (constant, var, or Move function name), with the last arguments the
+    // provided `lambda_params` in sequence, then returns the function name and the prefix
+    // arguments.  Otherwise, returns `None`.
     fn lambda_reduces_to_curry<'b>(
         &mut self,
         lambda_params: &Vec<Parameter>,
@@ -391,13 +393,13 @@ impl<'a> LambdaLifter<'a> {
         match body.as_ref() {
             Call(id, oper, args) => {
                 match oper {
-                    Operation::Bind(_mask) => {
-                        // TODO(LAMBDA): We may be able to do something with this,
+                    Operation::EarlyBind => {
+                        // TODO(LAMBDA): We might be able to to do something with this,
                         // but skip for now because it will be complicated.
                         None
                     },
                     Operation::MoveFunction(mid, fid) => {
-                        Self::get_args_if_simple(args).map(|args| {
+                        Self::get_args_if_simple(lambda_params, args).map(|args| {
                             let fn_type = self.get_move_fn_type(*id, *mid, *fid);
                             let loc = env.get_node_loc(*id);
                             let fn_exp = self.make_move_fn_exp(
@@ -413,10 +415,24 @@ impl<'a> LambdaLifter<'a> {
                     _ => None,
                 }
             },
-            Invoke(_id, fn_exp, args) => Self::get_args_if_simple(args).and_then(|args| {
-                self.get_fun_if_simple(lambda_params, fn_exp)
-                    .map(|exp| (exp, args))
-            }),
+            Invoke(_id, fn_exp, args) => {
+                Self::get_args_if_simple(lambda_params, args).and_then(|args| {
+                    // Function expression may not contain lambda params
+                    let free_vars = fn_exp.as_ref().free_vars();
+                    if lambda_params
+                        .iter()
+                        .any(|param| free_vars.contains(&param.get_name()))
+                    {
+                        None
+                    } else {
+                        if Self::exp_is_simple(fn_exp) {
+                            Some((fn_exp.clone(), args))
+                        } else {
+                            None
+                        }
+                    }
+                })
+            },
             ExpData::Sequence(_id, exp_vec) => {
                 if let [exp] = &exp_vec[..] {
                     self.lambda_reduces_to_curry(lambda_params, exp)
@@ -434,8 +450,9 @@ impl<'a> LambdaLifter<'a> {
     //
     // Then, we can reduce to curry if:
     // - lambda body is a function call with
-    //   - each lambda parameter used exactly once as a call argument, in order (possibly with gaps)
-    //   - every other argument is a simple expression containing only constants and free variables
+    //   - lambda parameters used (in order) as the last arguments to the function call.
+    //   - the function called and every other argument is a simple expression containing only
+    //     constants and free variables which cannot abort
     // Arguments here are
     //   - id: original lambda expr NodeId
     //   - body: body of lambda
@@ -448,117 +465,79 @@ impl<'a> LambdaLifter<'a> {
         abilities: &AbilitySet,
     ) -> Option<Exp> {
         if let Some((fn_exp, args)) = self.lambda_reduces_to_curry(&lambda_params, body) {
-            // lambda has form |lambda_params| fn_exp(args)
-            // where each arg is a constant or simple variable
-            let mut new_args = vec![];
-            let mut mask: u64 = 0; // has a 1 bit for the position of each lambda parameter in call
-            let mut param_cursor = 0; // tracks which lambda param we are expecting
-            let mut has_mismatch = false;
-            let param_syms: BTreeSet<Symbol> =
-                lambda_params.iter().map(|param| param.get_name()).collect();
-            let mut mask_cursor = 1u64; // = 1u64<<(loop index)
-            for arg in args.iter() {
-                let this_arg_is_lambda_param = if let ExpData::LocalVar(_id, name) = arg.as_ref() {
-                    if param_syms.contains(name) {
-                        if let Some(param) = lambda_params.get(param_cursor) {
-                            if param.get_name() == *name {
-                                param_cursor += 1;
-                                true
-                            } else {
-                                has_mismatch = true;
-                                break;
-                            }
+            // lambda has form |lambda_params| fn_exp(args, ...lambda_params)
+            // where each arg is a constant or simple variable, not in lambda_params,
+            // except the trailing k params which are all lambda_params
+            let mut new_args: Vec<_> = args.into_iter().map(|exp| exp.clone()).collect();
+
+            let env = self.fun_env.module_env.env;
+            let fn_id = fn_exp.node_id();
+            let fn_type = env.get_node_type(fn_id);
+            if let Type::Fun(_fn_param_type, _fn_result_type, fun_abilities) = &fn_type {
+                // First param to EarlyBind is the function expr
+                new_args.insert(0, fn_exp);
+                let ty_params = self.fun_env.get_type_parameters_ref();
+                // Check bound value abilities
+                let ability_inferer = AbilityInferer::new(env, ty_params);
+                let bound_value_abilities: Vec<_> = new_args
+                    .iter()
+                    .map(|exp| {
+                        let node = exp.as_ref().node_id();
+                        let ty = env.get_node_type(node);
+                        let node_abilities = ability_inferer.infer_abilities(&ty).1;
+                        (env.get_node_loc(node), node_abilities)
+                    })
+                    .collect();
+                let mut bound_value_missing_abilities: Vec<_> = bound_value_abilities
+                    .iter()
+                    .filter_map(|(loc, node_abilities)| {
+                        if !abilities.is_subset(*node_abilities) {
+                            let missing = abilities.setminus(*node_abilities);
+                            Some((
+                                loc.clone(),
+                                format!("Captured free value is missing abilities: {}", missing),
+                            ))
                         } else {
-                            has_mismatch = true;
-                            break;
+                            None
                         }
-                    } else {
-                        false
-                    }
-                } else {
-                    false
+                    })
+                    .collect();
+                if !abilities.is_subset(*fun_abilities) {
+                    let missing = abilities.setminus(*fun_abilities);
+                    let tdc = env.get_type_display_ctx();
+                    bound_value_missing_abilities.push((
+                        env.get_node_loc(fn_id),
+                        format!(
+                            "Base function of closure has type {}, is missing abilities: {}",
+                            fn_type.display(&tdc),
+                            missing
+                        ),
+                    ));
+                }
+                let closure_abilities = bound_value_abilities
+                    .iter()
+                    .map(|(_loc, node_abilities)| *node_abilities)
+                    .reduce(|abs1, abs2| abs1.intersect(abs2))
+                    .unwrap_or(*fun_abilities);
+                if !bound_value_missing_abilities.is_empty() {
+                    let missing_abilities = abilities.setminus(closure_abilities);
+                    let loc = env.get_node_loc(id);
+                    env.error_with_labels(
+                        &loc,
+                        &format!("Lambda captures free variables with types that do not have some declared abilities: {}",
+                                 missing_abilities),
+                        bound_value_missing_abilities);
+                    return None;
                 };
-                if !this_arg_is_lambda_param {
-                    // this arg is a free var and is provided as an arg to curry
-                    new_args.push((*arg).clone());
-                    mask |= mask_cursor;
+                if new_args.len() == 1 {
+                    // We have no parameters, just use the function directly.
+                    return Some(new_args.pop().unwrap());
                 } else {
-                    // this arg is a lambda parameter
+                    return Some(ExpData::Call(id, Operation::EarlyBind, new_args).into_exp());
                 }
-                mask_cursor <<= 1;
             }
-            if !has_mismatch {
-                let env = self.fun_env.module_env.env;
-                let fn_id = fn_exp.node_id();
-                let fn_type = env.get_node_type(fn_id);
-                if let Type::Fun(_fn_param_type, _fn_result_type, fun_abilities) = &fn_type {
-                    new_args.insert(0, fn_exp);
-                    let ty_params = self.fun_env.get_type_parameters_ref();
-                    // Check bound free var abilities
-                    let ability_inferer = AbilityInferer::new(env, ty_params);
-                    let bound_value_abilities: Vec<_> = new_args
-                        .iter()
-                        .map(|exp| {
-                            let node = exp.as_ref().node_id();
-                            let ty = env.get_node_type(node);
-                            let node_abilities = ability_inferer.infer_abilities(&ty).1;
-                            (env.get_node_loc(node), node_abilities)
-                        })
-                        .collect();
-                    let mut bound_value_missing_abilities: Vec<_> = bound_value_abilities
-                        .iter()
-                        .filter_map(|(loc, node_abilities)| {
-                            if !abilities.is_subset(*node_abilities) {
-                                let missing = abilities.setminus(*node_abilities);
-                                Some((
-                                    loc.clone(),
-                                    format!(
-                                        "Captured free value is missing abilities: {}",
-                                        missing
-                                    ),
-                                ))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
-                    if !abilities.is_subset(*fun_abilities) {
-                        let missing = abilities.setminus(*fun_abilities);
-                        let tdc = env.get_type_display_ctx();
-                        bound_value_missing_abilities.push((
-                            env.get_node_loc(fn_id),
-                            format!(
-                                "Base function of closure has type {}, is missing abilities: {}",
-                                fn_type.display(&tdc),
-                                missing
-                            ),
-                        ));
-                    }
-                    let closure_abilities = bound_value_abilities
-                        .iter()
-                        .map(|(_loc, node_abilities)| *node_abilities)
-                        .reduce(|abs1, abs2| abs1.intersect(abs2))
-                        .unwrap_or(*fun_abilities);
-                    if !bound_value_missing_abilities.is_empty() {
-                        let missing_abilities = abilities.setminus(closure_abilities);
-                        let loc = env.get_node_loc(id);
-                        env.error_with_labels(
-                            &loc,
-                            &format!("Lambda captures free variables with types that do not have some declared abilities: {}",
-                                     missing_abilities),
-                            bound_value_missing_abilities);
-                        return None;
-                    };
-                    Some(ExpData::Call(id, Operation::Bind(mask), new_args).into_exp())
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        } else {
-            None
         }
+        None
     }
 }
 
@@ -781,16 +760,13 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
             // No free variables, just return the function reference
             Some(fn_exp)
         } else {
-            // Create a bitmask for the early-bound parameters.
-            let bitmask: u64 = (1u64 << bound_param_count) - 1;
-
             // Create and return closure expression
             let id = env.new_node(lambda_loc, lambda_type);
             if let Some(inst) = lambda_inst_opt {
                 env.set_node_instantiation(id, inst);
             }
             closure_args.insert(0, fn_exp);
-            Some(ExpData::Call(id, Operation::Bind(bitmask), closure_args).into_exp())
+            Some(ExpData::Call(id, Operation::EarlyBind, closure_args).into_exp())
         }
     }
 }

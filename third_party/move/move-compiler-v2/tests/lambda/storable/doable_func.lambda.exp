@@ -1852,53 +1852,53 @@ module 0x42::test {
               mod1::triple
             } else {
               if Eq<u64>(key, 2) {
-                bind(1)(mod3::multiply, 4)
+                earlybind(mod3::multiply, 4)
               } else {
                 if Eq<u64>(key, 3) {
-                  bind(1)(mod4::alt_multiply, 5)
+                  earlybind(mod4::alt_multiply, 5)
                 } else {
                   if Eq<u64>(key, 4) {
-                    bind(10)(mod3::multiply, 6)
+                    test::choose_function1$lambda$1
                   } else {
                     if Eq<u64>(key, 5) {
-                      bind(110)(test::multiply3, 3, 2)
+                      test::choose_function1$lambda$2
                     } else {
                       if Eq<u64>(key, 6) {
-                        bind(10)(mod3::multiply, 7)
+                        test::choose_function1$lambda$3
                       } else {
                         if Eq<u64>(key, 7) {
-                          bind(101)(test::multiply3, 4, 2)
+                          test::choose_function1$lambda$4
                         } else {
                           if Eq<u64>(key, 8) {
-                            bind(11)(test::multiply3, 3, 3)
+                            earlybind(test::multiply3, 3, 3)
                           } else {
                             if Eq<u64>(key, 9) {
-                              bind(11)(test::multiply3, 2, 5)
+                              earlybind(test::multiply3, 2, 5)
                             } else {
                               if Eq<u64>(key, 10) {
-                                bind(10)(mod4::alt_multiply, 11)
+                                test::choose_function1$lambda$5
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64 with copy+drop+store = bind(0)(mod3::multiply);
-                                    bind(10)(g, 11)
+                                    let g: |(u64, u64)|u64 with copy+drop+store = mod3::multiply;
+                                    earlybind(test::choose_function1$lambda$6, g)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 with copy+drop+store = bind(10)(mod3::multiply, 12);
-                                      bind(0)(h)
+                                      let h: |u64|u64 with copy+drop+store = test::choose_function1$lambda$7;
+                                      h
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 with copy+drop+store = bind(101)(test::multiply3, 2, 2);
-                                        bind(0)(i)
+                                        let i: |u64|u64 with copy+drop+store = test::choose_function1$lambda$8;
+                                        i
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+drop+store = test::choose_function1$lambda$1;
-                                        bind(10)(i, 15)
+                                        let i: |(u64, u64)|u64 with copy+drop+store = test::choose_function1$lambda$9;
+                                        earlybind(test::choose_function1$lambda$10, i)
                                       }
                                     }
                                   }
@@ -1954,11 +1954,38 @@ module 0x42::test {
           }
         }
     }
-    private fun choose_function1$lambda$1(x: u64,y: u64): u64 {
+    private fun choose_function1$lambda$1(y: u64): u64 {
+        mod3::multiply(y, 6)
+    }
+    private fun choose_function1$lambda$2(x: u64): u64 {
+        test::multiply3(x, 3, 2)
+    }
+    private fun choose_function1$lambda$3(x: u64): u64 {
+        mod3::multiply(x, 7)
+    }
+    private fun choose_function1$lambda$4(x: u64): u64 {
+        test::multiply3(4, x, 2)
+    }
+    private fun choose_function1$lambda$5(x: u64): u64 {
+        mod4::alt_multiply(x, 11)
+    }
+    private fun choose_function1$lambda$6(g: |(u64, u64)|u64 with copy+drop+store,x: u64): u64 {
+        (g)(x, 11)
+    }
+    private fun choose_function1$lambda$7(x: u64): u64 {
+        mod3::multiply(x, 12)
+    }
+    private fun choose_function1$lambda$8(x: u64): u64 {
+        test::multiply3(2, x, 2)
+    }
+    private fun choose_function1$lambda$9(x: u64,y: u64): u64 {
         {
           let q: u64 = Sub<u64>(y, 1);
           mod3::multiply(x, Add<u64>(q, 1))
         }
+    }
+    private fun choose_function1$lambda$10(i: |(u64, u64)|u64 with copy+drop+store,x: u64): u64 {
+        (i)(x, 15)
     }
 } // end 0x42::test
 
@@ -2001,53 +2028,53 @@ module 0x42::test {
               mod1::triple
             } else {
               if Eq<u64>(key, 2) {
-                bind(1)(mod3::multiply, 4)
+                earlybind(mod3::multiply, 4)
               } else {
                 if Eq<u64>(key, 3) {
-                  bind(1)(mod4::alt_multiply, 5)
+                  earlybind(mod4::alt_multiply, 5)
                 } else {
                   if Eq<u64>(key, 4) {
-                    bind(10)(mod3::multiply, 6)
+                    test::choose_function1$lambda$1
                   } else {
                     if Eq<u64>(key, 5) {
-                      bind(110)(test::multiply3, 3, 2)
+                      test::choose_function1$lambda$2
                     } else {
                       if Eq<u64>(key, 6) {
-                        bind(10)(mod3::multiply, 7)
+                        test::choose_function1$lambda$3
                       } else {
                         if Eq<u64>(key, 7) {
-                          bind(101)(test::multiply3, 4, 2)
+                          test::choose_function1$lambda$4
                         } else {
                           if Eq<u64>(key, 8) {
-                            bind(11)(test::multiply3, 3, 3)
+                            earlybind(test::multiply3, 3, 3)
                           } else {
                             if Eq<u64>(key, 9) {
-                              bind(11)(test::multiply3, 2, 5)
+                              earlybind(test::multiply3, 2, 5)
                             } else {
                               if Eq<u64>(key, 10) {
-                                bind(10)(mod4::alt_multiply, 11)
+                                test::choose_function1$lambda$5
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64 with copy+drop+store = bind(0)(mod3::multiply);
-                                    bind(10)(g, 11)
+                                    let g: |(u64, u64)|u64 with copy+drop+store = mod3::multiply;
+                                    earlybind(test::choose_function1$lambda$6, g)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 with copy+drop+store = bind(10)(mod3::multiply, 12);
-                                      bind(0)(h)
+                                      let h: |u64|u64 with copy+drop+store = test::choose_function1$lambda$7;
+                                      h
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 with copy+drop+store = bind(101)(test::multiply3, 2, 2);
-                                        bind(0)(i)
+                                        let i: |u64|u64 with copy+drop+store = test::choose_function1$lambda$8;
+                                        i
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+drop+store = test::choose_function1$lambda$1;
-                                        bind(10)(i, 15)
+                                        let i: |(u64, u64)|u64 with copy+drop+store = test::choose_function1$lambda$9;
+                                        earlybind(test::choose_function1$lambda$10, i)
                                       }
                                     }
                                   }
@@ -2103,11 +2130,38 @@ module 0x42::test {
           }
         }
     }
-    private fun choose_function1$lambda$1(x: u64,y: u64): u64 {
+    private fun choose_function1$lambda$1(y: u64): u64 {
+        mod3::multiply(y, 6)
+    }
+    private fun choose_function1$lambda$2(x: u64): u64 {
+        test::multiply3(x, 3, 2)
+    }
+    private fun choose_function1$lambda$3(x: u64): u64 {
+        mod3::multiply(x, 7)
+    }
+    private fun choose_function1$lambda$4(x: u64): u64 {
+        test::multiply3(4, x, 2)
+    }
+    private fun choose_function1$lambda$5(x: u64): u64 {
+        mod4::alt_multiply(x, 11)
+    }
+    private fun choose_function1$lambda$6(g: |(u64, u64)|u64 with copy+drop+store,x: u64): u64 {
+        (g)(x, 11)
+    }
+    private fun choose_function1$lambda$7(x: u64): u64 {
+        mod3::multiply(x, 12)
+    }
+    private fun choose_function1$lambda$8(x: u64): u64 {
+        test::multiply3(2, x, 2)
+    }
+    private fun choose_function1$lambda$9(x: u64,y: u64): u64 {
         {
           let q: u64 = Sub<u64>(y, 1);
           mod3::multiply(x, Add<u64>(q, 1))
         }
+    }
+    private fun choose_function1$lambda$10(i: |(u64, u64)|u64 with copy+drop+store,x: u64): u64 {
+        (i)(x, 15)
     }
 } // end 0x42::test
 
@@ -2150,53 +2204,53 @@ module 0x42::test {
               mod1::triple
             } else {
               if Eq<u64>(key, 2) {
-                bind(1)(mod3::multiply, 4)
+                earlybind(mod3::multiply, 4)
               } else {
                 if Eq<u64>(key, 3) {
-                  bind(1)(mod4::alt_multiply, 5)
+                  earlybind(mod4::alt_multiply, 5)
                 } else {
                   if Eq<u64>(key, 4) {
-                    bind(10)(mod3::multiply, 6)
+                    test::choose_function1$lambda$1
                   } else {
                     if Eq<u64>(key, 5) {
-                      bind(110)(test::multiply3, 3, 2)
+                      test::choose_function1$lambda$2
                     } else {
                       if Eq<u64>(key, 6) {
-                        bind(10)(mod3::multiply, 7)
+                        test::choose_function1$lambda$3
                       } else {
                         if Eq<u64>(key, 7) {
-                          bind(101)(test::multiply3, 4, 2)
+                          test::choose_function1$lambda$4
                         } else {
                           if Eq<u64>(key, 8) {
-                            bind(11)(test::multiply3, 3, 3)
+                            earlybind(test::multiply3, 3, 3)
                           } else {
                             if Eq<u64>(key, 9) {
-                              bind(11)(test::multiply3, 2, 5)
+                              earlybind(test::multiply3, 2, 5)
                             } else {
                               if Eq<u64>(key, 10) {
-                                bind(10)(mod4::alt_multiply, 11)
+                                test::choose_function1$lambda$5
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64 with copy+drop+store = bind(0)(mod3::multiply);
-                                    bind(10)(g, 11)
+                                    let g: |(u64, u64)|u64 with copy+drop+store = mod3::multiply;
+                                    earlybind(test::choose_function1$lambda$6, g)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 with copy+drop+store = bind(10)(mod3::multiply, 12);
-                                      bind(0)(h)
+                                      let h: |u64|u64 with copy+drop+store = test::choose_function1$lambda$7;
+                                      h
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 with copy+drop+store = bind(101)(test::multiply3, 2, 2);
-                                        bind(0)(i)
+                                        let i: |u64|u64 with copy+drop+store = test::choose_function1$lambda$8;
+                                        i
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+drop+store = test::choose_function1$lambda$1;
-                                        bind(10)(i, 15)
+                                        let i: |(u64, u64)|u64 with copy+drop+store = test::choose_function1$lambda$9;
+                                        earlybind(test::choose_function1$lambda$10, i)
                                       }
                                     }
                                   }
@@ -2252,11 +2306,38 @@ module 0x42::test {
           }
         }
     }
-    private fun choose_function1$lambda$1(x: u64,y: u64): u64 {
+    private fun choose_function1$lambda$1(y: u64): u64 {
+        mod3::multiply(y, 6)
+    }
+    private fun choose_function1$lambda$2(x: u64): u64 {
+        test::multiply3(x, 3, 2)
+    }
+    private fun choose_function1$lambda$3(x: u64): u64 {
+        mod3::multiply(x, 7)
+    }
+    private fun choose_function1$lambda$4(x: u64): u64 {
+        test::multiply3(4, x, 2)
+    }
+    private fun choose_function1$lambda$5(x: u64): u64 {
+        mod4::alt_multiply(x, 11)
+    }
+    private fun choose_function1$lambda$6(g: |(u64, u64)|u64 with copy+drop+store,x: u64): u64 {
+        (g)(x, 11)
+    }
+    private fun choose_function1$lambda$7(x: u64): u64 {
+        mod3::multiply(x, 12)
+    }
+    private fun choose_function1$lambda$8(x: u64): u64 {
+        test::multiply3(2, x, 2)
+    }
+    private fun choose_function1$lambda$9(x: u64,y: u64): u64 {
         {
           let q: u64 = Sub<u64>(y, 1);
           mod3::multiply(x, Add<u64>(q, 1))
         }
+    }
+    private fun choose_function1$lambda$10(i: |(u64, u64)|u64 with copy+drop+store,x: u64): u64 {
+        (i)(x, 15)
     }
 } // end 0x42::test
 
@@ -2330,10 +2411,16 @@ error: Function-typed values not yet supported except as parameters to calls to 
    │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: Function-typed values not yet supported except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:66:25
+   ┌─ tests/lambda/storable/doable_func.move:66:37
    │
 66 │                 let g = move |x, y| mod3::multiply(x, y) with copy+drop;
-   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                                     ^^^^^^^^^^^^^^^^^^^^
+
+error: Calls to function values other than inline function parameters not yet supported
+   ┌─ tests/lambda/storable/doable_func.move:67:26
+   │
+67 │                 move |x| g(x, 11)
+   │                          ^^^^^^^^
 
 error: Function-typed values not yet supported except as parameters to calls to inline functions
    ┌─ tests/lambda/storable/doable_func.move:67:17
@@ -2348,28 +2435,22 @@ error: Function-typed values not yet supported except as parameters to calls to 
    │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: Function-typed values not yet supported except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:70:17
-   │
-70 │                 move |x| { h(x) } with copy + drop
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet supported except as parameters to calls to inline functions
    ┌─ tests/lambda/storable/doable_func.move:72:25
    │
 72 │                 let i = move |x| multiply3(2, x, 2);
    │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: Function-typed values not yet supported except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:73:17
-   │
-73 │                 move |z| i(z)
-   │                 ^^^^^^^^^^^^^
-
-error: Function-typed values not yet supported except as parameters to calls to inline functions
    ┌─ tests/lambda/storable/doable_func.move:75:25
    │
 75 │                 let i = move |x, y| { let q = y - 1; 0x42::mod3::multiply(x, q + 1)  };
    │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: Calls to function values other than inline function parameters not yet supported
+   ┌─ tests/lambda/storable/doable_func.move:76:26
+   │
+76 │                 move |x| i(x, 15)
+   │                          ^^^^^^^^
 
 error: Function-typed values not yet supported except as parameters to calls to inline functions
    ┌─ tests/lambda/storable/doable_func.move:76:17
