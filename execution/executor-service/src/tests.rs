@@ -10,6 +10,7 @@ use aptos_language_e2e_tests::data_store::FakeDataStore;
 use aptos_secure_net::network_controller::NetworkController;
 use aptos_vm::sharded_block_executor::ShardedBlockExecutor;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use aptos_vm::AptosVM;
 
 pub fn create_thread_remote_executor_shards(
     num_shards: usize,
@@ -36,6 +37,7 @@ pub fn create_thread_remote_executor_shards(
     let num_threads =
         num_threads.unwrap_or_else(|| (num_cpus::get() as f64 / num_shards as f64).ceil() as usize);
 
+    AptosVM::set_concurrency_level_once(num_threads);
     let remote_executor_services = (0..num_shards)
         .map(|shard_id| {
             ThreadExecutorService::new(

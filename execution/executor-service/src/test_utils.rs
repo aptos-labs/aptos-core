@@ -26,6 +26,7 @@ use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
+use aptos_block_partitioner::v3::V3NaivePartitionerConfig;
 
 pub fn generate_account_at(executor: &mut FakeExecutor, address: AccountAddress) -> AccountData {
     executor.new_account_data_at(address)
@@ -82,27 +83,10 @@ pub fn compare_txn_outputs(
             unsharded_txn_output[i].gas_used(),
             sharded_txn_output[i].gas_used()
         );
-        //assert_eq!(unsharded_txn_output[i].write_set(), sharded_txn_output[i].write_set());
+        assert_eq!(unsharded_txn_output[i].write_set(), sharded_txn_output[i].write_set());
         assert_eq!(
             unsharded_txn_output[i].events(),
             sharded_txn_output[i].events()
-        );
-        // Global supply tracking for coin is not supported in sharded execution yet, so we filter
-        // out the table item from the write set, which has the global supply. This is a hack until
-        // we support global supply tracking in sharded execution.
-        let unsharded_write_set_without_table_item = unsharded_txn_output[i]
-            .write_set()
-            .into_iter()
-            .filter(|(k, _)| matches!(k.inner(), &StateKeyInner::AccessPath(_)))
-            .collect::<Vec<_>>();
-        let sharded_write_set_without_table_item = sharded_txn_output[i]
-            .write_set()
-            .into_iter()
-            .filter(|(k, _)| matches!(k.inner(), &StateKeyInner::AccessPath(_)))
-            .collect::<Vec<_>>();
-        assert_eq!(
-            unsharded_write_set_without_table_item,
-            sharded_write_set_without_table_item
         );
     }
 }
@@ -117,16 +101,13 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>
     for _ in 0..num_txns {
         transactions.push(generate_non_conflicting_p2p(&mut executor).0)
     }
-    let partitioner = PartitionerV2Config::default()
-        .max_partitioning_rounds(2)
-        .cross_shard_dep_avoid_threshold(0.9)
-        .partition_last_round(true)
-        .build();
+    let partitioner = V3NaivePartitionerConfig::default().build();
     let partitioned_txns = partitioner.partition(transactions.clone(), num_shards);
+    let partitioned_txns_arc = Arc::new(partitioned_txns.clone());
     let sharded_txn_output = sharded_block_executor
-        .execute_block(
+        .execute_block_remote(
             Arc::new(executor.data_store().clone()),
-            partitioned_txns.clone(),
+            partitioned_txns_arc,
             2,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
         )
@@ -169,27 +150,24 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>>(
         }
     }
 
-    let partitioner = PartitionerV2Config::default()
-        .max_partitioning_rounds(2)
-        .cross_shard_dep_avoid_threshold(0.9)
-        .partition_last_round(true)
-        .build();
+    let partitioner = V3NaivePartitionerConfig::default().build();
     let partitioned_txns = partitioner.partition(transactions.clone(), num_shards);
+    let partitioned_txns_arc = Arc::new(partitioned_txns.clone());
 
-    let execution_ordered_txns: Vec<SignatureVerifiedTransaction> =
-        PartitionedTransactions::flatten(partitioned_txns.clone())
-            .into_iter()
-            .map(|t| t.into_txn())
-            .collect();
     let sharded_txn_output = sharded_block_executor
-        .execute_block(
+        .execute_block_remote(
             Arc::new(executor.data_store().clone()),
-            partitioned_txns,
+            partitioned_txns_arc,
             concurrency,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
         )
         .unwrap();
 
+    let execution_ordered_txns: Vec<SignatureVerifiedTransaction> =
+        PartitionedTransactions::flatten(partitioned_txns)
+            .into_iter()
+            .map(|t| t.into_txn())
+            .collect();
     let unsharded_txn_output =
         AptosVM::execute_block_no_limit(execution_ordered_txns, executor.data_store()).unwrap();
     compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
