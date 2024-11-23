@@ -114,6 +114,12 @@ impl Table {
     }
 }
 
+fn read_u8_internal(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u8> {
+    cursor.read_u8().map_err(|_| {
+        PartialVMError::new(StatusCode::MALFORMED).with_message("Unexpected EOF".to_string())
+    })
+}
+
 fn read_u16_internal(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u16> {
     let mut u16_bytes = [0; 2];
     cursor
@@ -1814,6 +1820,15 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
             Opcodes::CAST_U16 => Bytecode::CastU16,
             Opcodes::CAST_U32 => Bytecode::CastU32,
             Opcodes::CAST_U256 => Bytecode::CastU256,
+
+            Opcodes::LD_FUNCTION => Bytecode::LdFunction(load_function_handle_index(cursor)?),
+            Opcodes::LD_FUNCTION_GENERIC => {
+                Bytecode::LdFunctionGeneric(load_function_inst_index(cursor)?)
+            },
+            Opcodes::INVOKE => Bytecode::Invoke(load_signature_index(cursor)?),
+            Opcodes::EARLY_BIND => {
+                Bytecode::EarlyBind(load_signature_index(cursor)?, read_u8_internal(cursor)?)
+            },
         };
         code.push(bytecode);
     }

@@ -11,10 +11,10 @@ use move_binary_format::{
     control_flow_graph::ControlFlowGraph,
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        Ability, AbilitySet, Bytecode, ClosureMask, CodeOffset, FunctionDefinitionIndex,
-        FunctionHandle, FunctionHandleIndex, LocalIndex, Signature, SignatureToken,
-        SignatureToken as ST, StructDefinition, StructDefinitionIndex, StructFieldInformation,
-        StructHandleIndex, VariantIndex, Visibility,
+        AbilitySet, Bytecode, CodeOffset, FunctionDefinitionIndex, FunctionHandle,
+        FunctionHandleIndex, LocalIndex, Signature, SignatureToken, SignatureToken as ST,
+        StructDefinition, StructDefinitionIndex, StructFieldInformation, StructHandleIndex,
+        VariantIndex, Visibility,
     },
     safe_assert, safe_unwrap,
     views::FieldOrVariantIndex,
@@ -301,7 +301,7 @@ fn call(
     Ok(())
 }
 
-fn clos_eval(
+fn invoke(
     verifier: &mut TypeSafetyChecker,
     meter: &mut impl Meter,
     offset: CodeOffset,
@@ -312,6 +312,7 @@ fn clos_eval(
         safe_assert!(false);
         unreachable!()
     };
+
     // On top of the stack is the closure, pop it.
     let closure_ty = safe_unwrap!(verifier.stack.pop());
     // Verify that the closure type matches the expected type
@@ -331,6 +332,7 @@ fn clos_eval(
             .error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset)
             .with_message("closure ability mismatch".to_owned()));
     }
+
     // Pop and verify arguments
     for param_ty in param_tys.iter().rev() {
         let arg_ty = safe_unwrap!(verifier.stack.pop());
@@ -344,36 +346,14 @@ fn clos_eval(
     Ok(())
 }
 
-fn clos_pack(
+fn ld_function(
     verifier: &mut TypeSafetyChecker,
     meter: &mut impl Meter,
-    offset: CodeOffset,
-    func_handle_idx: FunctionHandleIndex,
+    _offset: CodeOffset,
+    function_handle_idx: &FunctionHandleIndex,
     type_actuals: &Signature,
-    mask: ClosureMask,
 ) -> PartialVMResult<()> {
-    let func_handle = verifier.resolver.function_handle_at(func_handle_idx);
-    // Check the captured arguments on the stack
-    let param_sign = verifier.resolver.signature_at(func_handle.parameters);
-    let captured_param_tys = mask.extract(&param_sign.0, true);
-    let mut abilities = AbilitySet::ALL;
-    for ty in captured_param_tys.iter().rev() {
-        abilities = abilities.intersect(verifier.abilities(ty)?);
-        let arg = safe_unwrap!(verifier.stack.pop());
-        if (type_actuals.is_empty() && &arg != ty)
-            || (!type_actuals.is_empty() && arg != instantiate(ty, type_actuals))
-        {
-            return Err(verifier
-                .error(StatusCode::PACK_TYPE_MISMATCH_ERROR, offset)
-                .with_message("captured argument type mismatch".to_owned()));
-        }
-        // A captured argument must not be a reference
-        if ty.is_reference() {
-            return Err(verifier
-                .error(StatusCode::PACK_TYPE_MISMATCH_ERROR, offset)
-                .with_message("captured argument must not be a reference".to_owned()));
-        }
-    }
+    let func_handle = verifier.resolver.function_handle_at(*function_handle_idx);
 
     // In order to determine whether this closure can be storable, we need to figure whether
     // this function is public.
@@ -385,7 +365,7 @@ fn clos_pack(
     //   and adding visibility there.
     let mut is_storable = false;
     for fun_def in verifier.resolver.function_defs().unwrap_or(&[]) {
-        if fun_def.function == func_handle_idx {
+        if fun_def.function == *function_handle_idx {
             // Function defined in this module, so we can check visibility.
             if fun_def.visibility == Visibility::Public {
                 is_storable = true;
@@ -393,21 +373,78 @@ fn clos_pack(
             break;
         }
     }
-    if !is_storable {
-        abilities.remove(Ability::Store);
-    }
-    abilities.remove(Ability::Key);
+    let abilities = if is_storable {
+        AbilitySet::PUBLIC_FUNCTIONS
+    } else {
+        AbilitySet::PRIVATE_FUNCTIONS
+    };
 
     // Construct the resulting function type
-    let not_captured_param_tys = mask.extract(&param_sign.0, false);
+    let parameters = verifier.resolver.signature_at(func_handle.parameters);
     let ret_sign = verifier.resolver.signature_at(func_handle.return_);
     verifier.push(
         meter,
         instantiate(
-            &SignatureToken::Function(not_captured_param_tys, ret_sign.0.to_vec(), abilities),
+            &SignatureToken::Function(parameters.0.to_vec(), ret_sign.0.to_vec(), abilities),
             type_actuals,
         ),
     )
+}
+
+fn early_bind(
+    verifier: &mut TypeSafetyChecker,
+    meter: &mut impl Meter,
+    offset: CodeOffset,
+    expected_ty: &SignatureToken,
+    count: u8,
+) -> PartialVMResult<()> {
+    let count = count as usize;
+    let SignatureToken::Function(param_tys, ret_tys, abilities) = expected_ty else {
+        // The signature checker has ensured this is a function
+        safe_assert!(false);
+        unreachable!()
+    };
+
+    // On top of the stack is the closure, pop it.
+    let closure_ty = safe_unwrap!(verifier.stack.pop());
+    // Verify that the closure type matches the expected type
+    if &closure_ty != expected_ty {
+        return Err(verifier
+            .error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset)
+            .with_message("closure type mismatch".to_owned()));
+    }
+    // Verify that the abilities match
+    let SignatureToken::Function(_, _, closure_abilities) = closure_ty else {
+        // Ensured above, but never panic
+        safe_assert!(false);
+        unreachable!()
+    };
+    if !abilities.is_subset(closure_abilities) {
+        return Err(verifier
+            .error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset)
+            .with_message("closure ability mismatch".to_owned()));
+    }
+
+    if param_tys.len() < count {
+        return Err(verifier.error(StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH, offset));
+    }
+
+    let binding_param_tys = &param_tys[0..count];
+    let remaining_param_tys = &param_tys[count..];
+
+    // Pop and verify arguments
+    for param_ty in binding_param_tys.iter().rev() {
+        let arg_ty = safe_unwrap!(verifier.stack.pop());
+        if &arg_ty != param_ty {
+            return Err(verifier.error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset));
+        }
+    }
+    let result_ty = SignatureToken::Function(
+        (*remaining_param_tys).to_vec(),
+        ret_tys.to_vec(),
+        *abilities,
+    );
+    verifier.push(meter, result_ty)
 }
 
 fn type_fields_signature(
@@ -835,19 +872,25 @@ fn verify_instr(
             call(verifier, meter, offset, func_handle, type_args)?
         },
 
-        Bytecode::ClosPack(idx, mask) => {
-            clos_pack(verifier, meter, offset, *idx, &Signature(vec![]), *mask)?
-        },
-        Bytecode::ClosPackGeneric(idx, mask) => {
+        Bytecode::LdFunction(idx) => ld_function(verifier, meter, offset, idx, &Signature(vec![]))?,
+
+        Bytecode::LdFunctionGeneric(idx) => {
             let func_inst = verifier.resolver.function_instantiation_at(*idx);
             let type_args = &verifier.resolver.signature_at(func_inst.type_parameters);
             verifier.charge_tys(meter, &type_args.0)?;
-            clos_pack(verifier, meter, offset, func_inst.handle, type_args, *mask)?
+            ld_function(verifier, meter, offset, &func_inst.handle, type_args)?
         },
-        Bytecode::ClosEval(idx) => {
+
+        Bytecode::EarlyBind(idx, count) => {
             // The signature checker has verified this is a function type.
             let expected_ty = safe_unwrap!(verifier.resolver.signature_at(*idx).0.first());
-            clos_eval(verifier, meter, offset, expected_ty)?
+            early_bind(verifier, meter, offset, expected_ty, *count)?
+        },
+
+        Bytecode::Invoke(idx) => {
+            // The signature checker has verified this is a function type.
+            let expected_ty = safe_unwrap!(verifier.resolver.signature_at(*idx).0.first());
+            invoke(verifier, meter, offset, expected_ty)?
         },
 
         Bytecode::Pack(idx) => {

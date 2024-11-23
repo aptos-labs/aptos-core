@@ -703,6 +703,13 @@ pub fn zero_cost_instruction_table() -> Vec<(Bytecode, GasCost)> {
         (CastU16, GasCost::new(0, 0)),
         (CastU32, GasCost::new(0, 0)),
         (CastU256, GasCost::new(0, 0)),
+        (LdFunction(FunctionHandleIndex::new(0)), GasCost::new(0, 0)),
+        (
+            LdFunctionGeneric(FunctionInstantiationIndex::new(0)),
+            GasCost::new(0, 0),
+        ),
+        (Invoke(SignatureIndex::new(0)), GasCost::new(0, 0)),
+        (EarlyBind(SignatureIndex::new(0), 0u8), GasCost::new(0, 0)),
     ]
 }
 
@@ -876,13 +883,23 @@ pub fn bytecode_instruction_costs() -> Vec<(Bytecode, GasCost)> {
         (CastU16, GasCost::new(2, 1)),
         (CastU32, GasCost::new(2, 1)),
         (CastU256, GasCost::new(2, 1)),
+        (
+            LdFunction(FunctionHandleIndex::new(0)),
+            GasCost::new(1132, 1),
+        ),
+        (
+            LdFunctionGeneric(FunctionInstantiationIndex::new(0)),
+            GasCost::new(1132, 1),
+        ),
+        (Invoke(SignatureIndex::new(0)), GasCost::new(1132, 1)),
+        (
+            EarlyBind(SignatureIndex::new(0), 0u8),
+            GasCost::new(1132, 1),
+        ),
     ]
 }
 
 pub static INITIAL_COST_SCHEDULE: Lazy<CostTable> = Lazy::new(|| {
-    let mut instrs = bytecode_instruction_costs();
-    // Note that the DiemVM is expecting the table sorted by instruction order.
-    instrs.sort_by_key(|cost| instruction_key(&cost.0));
-
+    let instrs = bytecode_instruction_costs();
     new_from_instructions(instrs)
 });

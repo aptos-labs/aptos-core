@@ -262,7 +262,7 @@ impl<'a> BinaryComplexityMeter<'a> {
 
         for instr in &code.code {
             match instr {
-                CallGeneric(idx) | ClosPackGeneric(idx, ..) => {
+                CallGeneric(idx) | LdFunctionGeneric(idx, ..) => {
                     self.meter_function_instantiation(*idx)?;
                 },
                 PackGeneric(idx) | UnpackGeneric(idx) => {
@@ -284,15 +284,16 @@ impl<'a> BinaryComplexityMeter<'a> {
                 ImmBorrowVariantFieldGeneric(idx) | MutBorrowVariantFieldGeneric(idx) => {
                     self.meter_variant_field_instantiation(*idx)?;
                 },
-                ClosEval(idx)
-                | VecPack(idx, _)
+                VecPack(idx, _)
                 | VecLen(idx)
                 | VecImmBorrow(idx)
                 | VecMutBorrow(idx)
                 | VecPushBack(idx)
                 | VecPopBack(idx)
                 | VecUnpack(idx, _)
-                | VecSwap(idx) => {
+                | VecSwap(idx)
+                | Invoke(idx)
+                | EarlyBind(idx, _) => {
                     self.meter_signature(*idx)?;
                 },
 
@@ -324,7 +325,7 @@ impl<'a> BinaryComplexityMeter<'a> {
                 | PackVariant(_)
                 | UnpackVariant(_)
                 | TestVariant(_)
-                | ClosPack(..)
+                | LdFunction(_)
                 | ReadRef
                 | WriteRef
                 | FreezeRef

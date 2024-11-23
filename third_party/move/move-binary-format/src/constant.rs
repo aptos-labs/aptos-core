@@ -18,7 +18,7 @@ fn sig_to_ty(sig: &SignatureToken) -> Option<MoveTypeLayout> {
         SignatureToken::U256 => Some(MoveTypeLayout::U256),
         SignatureToken::Vector(v) => Some(MoveTypeLayout::Vector(Box::new(sig_to_ty(v.as_ref())?))),
         SignatureToken::Function(..) => {
-            // TODO: do we need representation in MoveTypeLayout?
+            // TODO(LAMBDA): do we need representation in MoveTypeLayout?
             None
         },
         SignatureToken::Reference(_)

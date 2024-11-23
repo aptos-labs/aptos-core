@@ -498,7 +498,23 @@ impl<'a> ApplyCodeUnitBoundsContext<'a> {
                         // TODO(#13806): implement
                         panic!("Enum types bytecode NYI: {:?}", code[bytecode_idx])
                     },
-                    ClosPack(..) | ClosPackGeneric(..) | ClosEval(..) => {
+                    LdFunction(_) => struct_bytecode!(
+                        function_handles_len,
+                        current_fdef,
+                        bytecode_idx,
+                        offset,
+                        FunctionHandleIndex,
+                        LdFunction
+                    ),
+                    LdFunctionGeneric(_) => struct_bytecode!(
+                        function_inst_len,
+                        current_fdef,
+                        bytecode_idx,
+                        offset,
+                        FunctionInstantiationIndex,
+                        LdFunctionGeneric
+                    ),
+                    Invoke(..) | EarlyBind(..) => {
                         panic!("Closure bytecode NYI: {:?}", code[bytecode_idx])
                     },
                 };
@@ -560,10 +576,11 @@ fn is_interesting(bytecode: &Bytecode) -> bool {
         | LdFalse | ReadRef | WriteRef | Add | Sub | Mul | Mod | Div | BitOr | BitAnd | Xor
         | Shl | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | Abort | Nop => false,
 
-        ClosPack(..)
-        | ClosPackGeneric(..)
-        | ClosEval(..)
-        | PackVariant(_)
+        LdFunction(_) | LdFunctionGeneric(_) | Invoke(_) | EarlyBind(..) => {
+            // TODO(LAMBDA): implement
+            false
+        },
+        PackVariant(_)
         | PackVariantGeneric(_)
         | UnpackVariant(_)
         | UnpackVariantGeneric(_)
