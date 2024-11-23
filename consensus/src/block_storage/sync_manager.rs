@@ -68,13 +68,6 @@ impl BlockStore {
             && !self.block_exists(li.commit_info().id()))
             || self.commit_root().round() + 30.max(2 * self.vote_back_pressure_limit)
                 < li.commit_info().round()
-            // If the LI commit block timestamp is more than 30 secs ahead of self commit block
-            // timestamp, sync to the ledger info
-            || li
-                .commit_info()
-                .timestamp_usecs()
-                .saturating_sub(self.commit_root().timestamp_usecs())
-                >= Duration::from_secs(30).as_micros() as u64
     }
 
     /// Checks if quorum certificate can be inserted in block store without RPC
