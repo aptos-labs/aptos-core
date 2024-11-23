@@ -46,7 +46,7 @@ pub struct PipelineConfig {
 }
 
 pub struct Pipeline<V> {
-    join_handles: Vec<JoinHandle<()>>,
+    join_handles: Vec<JoinHandle<u64>>,
     phantom: PhantomData<V>,
     start_pipeline_tx: Option<SyncSender<()>>,
 }
@@ -137,12 +137,15 @@ where
             .name("block_preparation".to_string())
             .spawn(move || {
                 start_pipeline_rx.map(|rx| rx.recv());
+                let mut processed = 0;
                 while let Ok(txns) = raw_block_receiver.recv() {
+                    processed += txns.len() as u64;
                     let exe_block_msg = preparation_stage.process(txns);
                     executable_block_sender.send(exe_block_msg).unwrap();
                 }
                 info!("Done preparation");
                 start_execution_tx.map(|tx| tx.send(()));
+                processed
             })
             .expect("Failed to spawn block partitioner thread.");
         join_handles.push(preparation_thread);
@@ -202,6 +205,7 @@ where
                     overall_measuring.print_end("Overall execution", executed);
                 }
                 start_ledger_update_tx.map(|tx| tx.send(()));
+                executed
             })
             .expect("Failed to spawn transaction executor thread.");
         join_handles.push(exe_thread);
@@ -218,6 +222,8 @@ where
                     ledger_update_stage.ledger_update(ledger_update_msg);
                 }
                 start_commit_tx.map(|tx| tx.send(()));
+
+                0
             })
             .expect("Failed to spawn ledger update thread.");
         join_handles.push(ledger_update_thread);
@@ -231,6 +237,8 @@ where
                     let mut committer =
                         TransactionCommitter::new(executor_3, start_version, commit_receiver);
                     committer.run();
+
+                    0
                 })
                 .expect("Failed to spawn transaction committer thread.");
             join_handles.push(commit_thread);
@@ -250,10 +258,15 @@ where
         self.start_pipeline_tx.as_ref().map(|tx| tx.send(()));
     }
 
-    pub fn join(self) {
+    pub fn join(self) -> Option<u64> {
+        let mut counts = vec![];
         for handle in self.join_handles {
-            handle.join().unwrap()
+            let count = handle.join().unwrap();
+            if count > 0 {
+                counts.push(count);
+            }
         }
+        counts.into_iter().min()
     }
 }
 

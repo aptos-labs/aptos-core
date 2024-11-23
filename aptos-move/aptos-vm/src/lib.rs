@@ -194,9 +194,11 @@ pub trait VMBlockExecutor: Send + Sync {
 
     /// Executes a block of transactions using a sharded block executor and returns the results.
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(
-        sharded_block_executor: &ShardedBlockExecutor<S, E>,
-        transactions: PartitionedTransactions,
-        state_view: Arc<S>,
-        onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<Vec<TransactionOutput>, VMStatus>;
+        _sharded_block_executor: &ShardedBlockExecutor<S, E>,
+        _transactions: PartitionedTransactions,
+        _state_view: Arc<S>,
+        _onchain_config: BlockExecutorConfigFromOnchain,
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        unimplemented!("sharded not supported")
+    }
 }
