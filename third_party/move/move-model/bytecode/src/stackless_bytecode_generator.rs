@@ -293,9 +293,10 @@ impl<'a> StacklessBytecodeGenerator<'a> {
         };
 
         match bytecode {
-            MoveBytecode::ClosPack(..)
-            | MoveBytecode::ClosPackGeneric(..)
-            | MoveBytecode::ClosEval(..) => {
+            MoveBytecode::Invoke(..)
+            | MoveBytecode::LdFunction(..)
+            | MoveBytecode::LdFunctionGeneric(..)
+            | MoveBytecode::EarlyBind(..) => {
                 unimplemented!("stackless bytecode generation for closure opcodes")
             },
             MoveBytecode::Pop => {

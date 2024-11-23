@@ -49,7 +49,6 @@ use proptest::{collection::vec, prelude::*, strategy::BoxedStrategy};
 use ref_cast::RefCast;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
     fmt::{self, Formatter},
     ops::BitOr,
 };
@@ -1011,6 +1010,13 @@ impl AbilitySet {
     pub fn into_u8(self) -> u8 {
         self.0
     }
+
+    pub fn to_string_concise(self) -> String {
+        self.iter()
+            .map(|a| a.to_string())
+            .collect::<Vec<_>>()
+            .join("+")
+    }
 }
 
 impl fmt::Display for AbilitySet {
@@ -1019,8 +1025,8 @@ impl fmt::Display for AbilitySet {
             &self
                 .iter()
                 .map(|a| a.to_string())
-                .reduce(|l, r| format!("{} + {}", l, r))
-                .unwrap_or_default(),
+                .collect::<Vec<_>>()
+                .join(" + "),
         )
     }
 }
@@ -1476,6 +1482,13 @@ impl SignatureToken {
         }
     }
 
+    /// Returns true if the `SignatureToken` is a function.
+    pub fn is_function(&self) -> bool {
+        use SignatureToken::*;
+
+        matches!(self, Function(..))
+    }
+
     /// Set the index to this one. Useful for random testing.
     ///
     /// Panics if this token doesn't contain a struct handle.
@@ -1535,101 +1548,6 @@ impl SignatureToken {
             MutableReference(ty) => MutableReference(Box::new(ty.instantiate(subst_mapping))),
             TypeParameter(idx) => subst_mapping[*idx as usize].clone(),
         }
-    }
-}
-
-/// A `ClosureMask` is a value which determines how to distinguish those function arguments
-/// which are captured and which are not when a closure is constructed. For instance,
-/// with `_` representing an omitted argument, the mask for `f(a,_,b,_)` would have the argument
-/// at index 0 and at index 2 captured. The mask can be used to transform lists of types.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
-#[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub struct ClosureMask {
-    pub mask: u64,
-}
-
-impl fmt::Display for ClosureMask {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:b}", self.mask)
-    }
-}
-
-impl ClosureMask {
-    pub fn new(mask: u64) -> Self {
-        Self { mask }
-    }
-
-    /// Apply a closure mask to a list of elements, returning only those
-    /// where position `i` is set in the mask (if `collect_captured` is true) or not
-    /// set (otherwise).
-    pub fn extract<T: Clone>(&self, tys: &[T], collect_captured: bool) -> Vec<T> {
-        tys.iter()
-            .enumerate()
-            .filter_map(|(pos, x)| {
-                let set = (1 << pos) & self.mask != 0;
-                if set && collect_captured || !set && !collect_captured {
-                    Some(x.clone())
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    /// Compose two lists of elements into one based on the given mask such that the
-    /// following holds:
-    /// ```ignore
-    ///   mask.compose(mask.extract(v, true), mask.extract(v, false)) == v
-    /// ```
-    /// This returns `None` if the provided lists are inconsistent w.r.t the mask
-    /// and cannot be composed. This should not happen in verified code, but
-    /// a caller should decide whether to crash or to error.
-    pub fn compose<T: Clone>(&self, captured: &[T], provided: &[T]) -> Option<Vec<T>> {
-        let mut result = BTreeMap::new(); // expect ordered enumeration
-        let mut cap_idx = 0;
-        let mut pro_idx = 0;
-        for i in 0..64 {
-            if cap_idx >= captured.len() && pro_idx >= provided.len() {
-                // all covered
-                break;
-            }
-            if (1 << i) & self.mask != 0 {
-                if cap_idx >= captured.len() {
-                    // Inconsistency
-                    return None;
-                }
-                result.insert(i, captured[cap_idx].clone());
-                cap_idx += 1
-            } else {
-                if pro_idx >= provided.len() {
-                    // Inconsistency
-                    return None;
-                }
-                result.insert(i, provided[pro_idx].clone());
-                pro_idx += 1
-            }
-        }
-        let map_len = result.len();
-        let vec = result.into_values().collect::<Vec<_>>();
-        if vec.len() != map_len {
-            // Inconsistency: all indices must be contiguously covered
-            None
-        } else {
-            Some(vec)
-        }
-    }
-
-    /// Return the max index of captured arguments
-    pub fn max_captured(&self) -> usize {
-        let mut i = 0;
-        let mut mask = self.mask;
-        while mask != 0 {
-            mask >>= 1;
-            i += 1
-        }
-        i
     }
 }
 
@@ -1786,7 +1704,7 @@ pub enum Bytecode {
             arithmetic error
         else:
             stack << int_val as u8
-    "#]
+     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> _
         ty_stack << u8
@@ -1974,6 +1892,7 @@ pub enum Bytecode {
         ty_stack << struct_ty
     "#]
     Pack(StructDefinitionIndex),
+
     #[group = "struct"]
     #[static_operands = "[struct_inst_idx]"]
     #[description = "Generic version of `Pack`."]
@@ -3051,81 +2970,132 @@ pub enum Bytecode {
     VecSwap(SignatureIndex),
 
     #[group = "closure"]
-    #[description = r#"
-        `ClosPack(fun, mask)` creates a closure for a given function handle as controlled by
-        the given `mask`. `mask` is a u64 bitset which describes which of the arguments
-        of `fun` are captured by the closure.
-
-        If the function `fun` has type `|t1..tn|r`, then the following holds:
-
-        - If `m` are the number of bits set in the mask, then `m <= n`, and the stack is
-          `[vm..v1] + stack`, and if `i` is the `j`th bit set in the mask,
-           then `vj` has type `ti`.
-        - type ti is not a reference.
-
-        Thus the values on the stack must match the types in the function
-        signature which have the bit to be captured set in the mask.
-
-        The type of the resulting value on the stack is derived from the types `|t1..tn|`
-        for which the bit is not set, which build the arguments of a function type
-        with `fun`'s result types.
-
-        The `abilities` of this function type are derived from the inputs as follows.
-        First, take the intersection of the abilities of all captured arguments
-        with type `t1..tn`. Then intersect this with the abilities derived from the
-        function: a function handle has `drop` and `copy`, never has `key`, and only
-        `store` if the underlying function is public, and therefore cannot change
-        its signature.
-
-        Notice that an implementation can derive the types of the captured arguments
-        at runtime from a closure value as long as the closure value stores the function
-        handle (or a derived form of it) and the mask, and the handle allows to lookup the
-        function's type at runtime. Then the same procedure as outlined above can be used.
-    "#]
-    #[static_operands = "[fun, mask]"]
-    #[semantics = ""]
-    #[runtime_check_epilogue = ""]
-    #[gas_type_creation_tier_0 = "closure_ty"]
-    ClosPack(FunctionHandleIndex, ClosureMask),
+    #[description = "Load a function value onto the stack."]
+    #[static_operands = "[func_handle_idx]"]
+    #[semantics = "stack << functions[function_handle_idx]"]
+    #[runtime_check_epilogue = "ty_stack << func_ty"]
+    #[gas_type_creation_tier_1 = "func_ty"]
+    LdFunction(FunctionHandleIndex),
 
     #[group = "closure"]
-    #[static_operands = "[fun, mask]"]
-    #[semantics = ""]
-    #[runtime_check_epilogue = ""]
-    #[description = r#"
-        Same as `ClosPack` but for the instantiation of a generic function.
-
-        Notice that an uninstantiated generic function cannot be used to create a closure.
-    "#]
-    #[gas_type_creation_tier_0 = "closure_ty"]
-    ClosPackGeneric(FunctionInstantiationIndex, ClosureMask),
+    #[description = "Generic version of `LdFunction`."]
+    #[static_operands = "[func_inst_idx]"]
+    #[semantics = "See `LdFunction`."]
+    #[runtime_check_epilogue = "See `LdFunction`."]
+    #[gas_type_creation_tier_0 = "ty_args"]
+    #[gas_type_creation_tier_1 = "local_tys"]
+    LdFunctionGeneric(FunctionInstantiationIndex),
 
     #[group = "closure"]
     #[description = r#"
-        `ClosEval(|t1..tn|r has a)` evalutes a closure of the given function type, taking
-        the captured arguments and mixing in the provided ones on the stack.
+        `EarlyBind(|t1..tn|r with a, count)` creates new function value based
+        on the function value at top of stack by adding `count` arguments
+        popped from the stack to the closure found on top of stack.
+
+        If the function value's type has at least `count` parameters with types
+        that match the `count` arguments on the stack, then a function closure
+        capturing those values with the provided function is pushed on top of
+        stack.
+
+        Notice that the type as part of this instruction is redundant for
+        execution semantics. Since the closure is expected to be on top of the stack,
+        it can decode the arguments underneath without type information.
+        However, the type is required for the current implementation of
+        static bytecode verification.
+    "#]
+    #[static_operands = "[u8_value]"]
+    #[semantics = r#"
+        stack >> function_handle
+
+        let [func, k, [arg_0, .., arg_{k-1}]] = function_handle
+        // Information like the function signature are loaded from the file format
+        i = u8_value
+        n = func.num_params
+        if i + k > n then abort
+
+        stack >> arg'_{i-1}
+        ..
+        stack >> arg'_0
+        new_function_handle = [func, k + i, [arg_0, .., arg_{k-1}, arg'_0, .., arg'_{i-1}]]
+        stack << new_function_handle
+    "#]
+    #[runtime_check_epilogue = r#"
+        // NOT: assert func visibility rules
+        func param types match provided parameter types
+    "#]
+    #[gas_type_creation_tier_0 = "closure_ty"]
+    EarlyBind(SignatureIndex, u8),
+
+    #[group = "closure"]
+    #[description = r#"
+        `Invoke(|t1..tn|r with a)` calls a function value of the specified type,
+        with `n` argument values from the stack.
 
         On top of the stack is the closure being evaluated, underneath the arguments:
         `[c,vn,..,v1] + stack`. The type of the closure must match the type specified in
         the instruction, with abilities `a` a subset of the abilities of the closure value.
         A value `vi` on the stack must have type `ti`.
 
-        Notice that the type as part of the closure instruction is redundant for
+        Notice that the type as part of this instruction is redundant for
         execution semantics. Since the closure is expected to be on top of the stack,
         it can decode the arguments underneath without type information.
-        However, the type is required to do static bytecode verification.
+        However, the type is required for the current implementation of
+        static bytecode verification.
 
-        The semantics of this instruction can be characterized by the following equation:
+        The arguments are consumed and pushed to the locals of the function.
 
-        ```
-          CloseEval(ClosPack(f, mask, c1..cn), a1..am) = f(mask.compose(c1..cn, a1..am))
-        ```
+        Return values are pushed onto the stack from the first to the last and
+        available to the caller after returning from the callee.
+
+        During execution of the function conservative_invocation_mode is enabled;
+        afterwards, it is restored to its original state.
     "#]
-    #[static_operands = "[]"]
-    #[semantics = ""]
-    #[runtime_check_epilogue = ""]
-    #[gas_type_creation_tier_0 = "closure_ty"]
-    ClosEval(SignatureIndex),
+    #[semantics = r#"
+        stack >> function_handle
+        let [func, k, [arg_0, .., arg_{k-1}]] = function_handle
+        // Information like the function signature are loaded from the file format
+        // and compared with the signature parameter.
+        n = func.num_params
+        ty_args = if func.is_generic then func.ty_args else []
+
+        n = func.num_params
+        stack >> arg_{n-1}
+        ..
+        stack >> arg_k
+
+        old_conservative_invocation_mode = conservative_invocation_mode
+        conservative_invocation_mode = true
+
+        let module = func.module
+        if module is on invocation_stack then
+           abort
+        else
+           invocation_stack << module
+
+        if func.is_native()
+            call_native(func.name, ty_args, args = [arg_0, .., arg_{n-1}])
+            current_frame.pc += 1
+        else
+            call_stack << current_frame
+
+            current_frame = new_frame_from_func(
+                func,
+                ty_args,
+                locals = [arg_0, .., arg_n-1, invalid, ..]
+                                           // ^ other locals
+            )
+
+        invocation_stack >> _
+        conservative_invocation_mode = old_conservative_invocation_mode
+    "#]
+    #[runtime_check_epilogue = r#"
+        // NOT: assert func visibility rules
+        for i in 0..#args:
+            ty_stack >> ty
+            assert ty == locals[#args -  i - 1]
+    "#]
+    #[gas_type_creation_tier_1 = "closure_ty"]
+    Invoke(SignatureIndex),
 
     #[group = "stack_and_local"]
     #[description = "Push a u16 constant onto the stack."]
@@ -3237,9 +3207,10 @@ impl ::std::fmt::Debug for Bytecode {
             Bytecode::UnpackGeneric(a) => write!(f, "UnpackGeneric({})", a),
             Bytecode::UnpackVariant(a) => write!(f, "UnpackVariant({})", a),
             Bytecode::UnpackVariantGeneric(a) => write!(f, "UnpackVariantGeneric({})", a),
-            Bytecode::ClosPackGeneric(a, mask) => write!(f, "ClosPackGeneric({}, {})", a, mask),
-            Bytecode::ClosPack(a, mask) => write!(f, "ClosPack({}, {})", a, mask),
-            Bytecode::ClosEval(a) => write!(f, "ClosEval({})", a),
+            Bytecode::LdFunction(a) => write!(f, "LdFunction({})", a),
+            Bytecode::LdFunctionGeneric(a) => write!(f, "LdFunctionGeneric({})", a),
+            Bytecode::EarlyBind(sig_idx, a) => write!(f, "EarlyBind({}, {})", sig_idx, a),
+            Bytecode::Invoke(sig_idx) => write!(f, "Invoke({})", sig_idx),
             Bytecode::ReadRef => write!(f, "ReadRef"),
             Bytecode::WriteRef => write!(f, "WriteRef"),
             Bytecode::FreezeRef => write!(f, "FreezeRef"),

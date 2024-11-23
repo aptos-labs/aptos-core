@@ -11,9 +11,9 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        Bytecode, ClosureMask, CodeOffset, CodeUnit, CompiledModule, CompiledScript,
-        FieldHandleIndex, FunctionDefinitionIndex, FunctionHandleIndex, StructDefinitionIndex,
-        StructVariantHandleIndex, TableIndex, VariantFieldHandleIndex,
+        Bytecode, CodeOffset, CodeUnit, CompiledModule, CompiledScript, FieldHandleIndex,
+        FunctionDefinitionIndex, FunctionHandleIndex, SignatureIndex, SignatureToken,
+        StructDefinitionIndex, StructVariantHandleIndex, TableIndex, VariantFieldHandleIndex,
     },
 };
 use move_core_types::vm_status::StatusCode;
@@ -91,21 +91,25 @@ impl<'a> InstructionConsistency<'a> {
                     )?;
                 },
                 Call(idx) => {
-                    // Nothing to verify for `_mask`, so  merge with Call
                     self.check_function_op(offset, *idx, /* generic */ false)?;
                 },
                 CallGeneric(idx) => {
                     let func_inst = self.resolver.function_instantiation_at(*idx);
                     self.check_function_op(offset, func_inst.handle, /* generic */ true)?;
                 },
-                ClosPack(idx, mask) => {
-                    self.check_function_op(offset, *idx, /* generic */ false)?;
-                    self.check_closure_mask(offset, *idx, *mask)?
+                LdFunction(idx) => {
+                    self.check_ld_function_op(offset, *idx, /* generic */ false)?;
                 },
-                ClosPackGeneric(idx, mask) => {
+                LdFunctionGeneric(idx) => {
                     let func_inst = self.resolver.function_instantiation_at(*idx);
-                    self.check_function_op(offset, func_inst.handle, /* generic */ true)?;
-                    self.check_closure_mask(offset, func_inst.handle, *mask)?
+                    self.check_ld_function_op(offset, func_inst.handle, /* generic */ true)?;
+                },
+                Invoke(sig_idx) => {
+                    // reuse code to check for signature issues.
+                    self.check_bind_count(offset, *sig_idx, 0)?;
+                },
+                EarlyBind(sig_idx, count) => {
+                    self.check_bind_count(offset, *sig_idx, *count)?;
                 },
                 Pack(idx) | Unpack(idx) => {
                     self.check_struct_op(offset, *idx, /* generic */ false)?;
@@ -145,11 +149,11 @@ impl<'a> InstructionConsistency<'a> {
 
                 // List out the other options explicitly so there's a compile error if a new
                 // bytecode gets added.
-                ClosEval(_) | FreezeRef | Pop | Ret | Branch(_) | BrTrue(_) | BrFalse(_)
-                | LdU8(_) | LdU16(_) | LdU32(_) | LdU64(_) | LdU128(_) | LdU256(_) | LdConst(_)
-                | CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 | LdTrue | LdFalse
-                | ReadRef | WriteRef | Add | Sub | Mul | Mod | Div | BitOr | BitAnd | Xor | Shl
-                | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | CopyLoc(_) | MoveLoc(_)
+                FreezeRef | Pop | Ret | Branch(_) | BrTrue(_) | BrFalse(_) | LdU8(_) | LdU16(_)
+                | LdU32(_) | LdU64(_) | LdU128(_) | LdU256(_) | LdConst(_) | CastU8 | CastU16
+                | CastU32 | CastU64 | CastU128 | CastU256 | LdTrue | LdFalse | ReadRef
+                | WriteRef | Add | Sub | Mul | Mod | Div | BitOr | BitAnd | Xor | Shl | Shr
+                | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | CopyLoc(_) | MoveLoc(_)
                 | StLoc(_) | MutBorrowLoc(_) | ImmBorrowLoc(_) | VecLen(_) | VecImmBorrow(_)
                 | VecMutBorrow(_) | VecPushBack(_) | VecPopBack(_) | VecSwap(_) | Abort | Nop => (),
             }
@@ -222,6 +226,22 @@ impl<'a> InstructionConsistency<'a> {
         Ok(())
     }
 
+    fn check_ld_function_op(
+        &self,
+        offset: usize,
+        func_handle_index: FunctionHandleIndex,
+        generic: bool,
+    ) -> PartialVMResult<()> {
+        let function_handle = self.resolver.function_handle_at(func_handle_index);
+        if function_handle.type_parameters.is_empty() == generic {
+            return Err(
+                PartialVMError::new(StatusCode::GENERIC_MEMBER_OPCODE_MISMATCH)
+                    .at_code_offset(self.current_function(), offset as CodeOffset),
+            );
+        }
+        Ok(())
+    }
+
     fn check_function_op(
         &self,
         offset: usize,
@@ -238,16 +258,27 @@ impl<'a> InstructionConsistency<'a> {
         Ok(())
     }
 
-    fn check_closure_mask(
+    fn check_bind_count(
         &self,
         offset: usize,
-        func_handle_index: FunctionHandleIndex,
-        mask: ClosureMask,
+        sig_index: SignatureIndex,
+        count: u8,
     ) -> PartialVMResult<()> {
-        let function_handle = self.resolver.function_handle_at(func_handle_index);
-        let signature = self.resolver.signature_at(function_handle.parameters);
-        if mask.max_captured() >= signature.len() {
-            return Err(PartialVMError::new(StatusCode::INVALID_CLOSURE_MASK)
+        let signature = self.resolver.signature_at(sig_index);
+        if let Some(sig_token) = signature.0.first() {
+            if let SignatureToken::Function(params, _returns, _abilities) = sig_token {
+                if count as usize > params.len() {
+                    return Err(
+                        PartialVMError::new(StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH)
+                            .at_code_offset(self.current_function(), offset as CodeOffset),
+                    );
+                }
+            } else {
+                return Err(PartialVMError::new(StatusCode::REQUIRES_FUNCTION)
+                    .at_code_offset(self.current_function(), offset as CodeOffset));
+            }
+        } else {
+            return Err(PartialVMError::new(StatusCode::UNKNOWN_SIGNATURE_TYPE)
                 .at_code_offset(self.current_function(), offset as CodeOffset));
         }
         Ok(())

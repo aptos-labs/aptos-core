@@ -568,7 +568,22 @@ impl AbstractState {
         Ok(return_values)
     }
 
-    pub fn clos_eval(
+    pub fn ld_function(
+        &mut self,
+        offset: CodeOffset,
+        acquired_resources: &BTreeSet<StructDefinitionIndex>,
+        _meter: &mut impl Meter,
+    ) -> PartialVMResult<AbstractValue> {
+        if !acquired_resources.is_empty() {
+            // TODO(LAMBDA): Currently acquires must be empty unless we disallow
+            //    Invoke to call to functions defined in the same module.
+            return Err(self.error(StatusCode::INVALID_ACQUIRES_ANNOTATION, offset));
+        }
+        // TODO(LAMBDA): Double-check that we don't need meter adjustments here.
+        Ok(AbstractValue::NonReference)
+    }
+
+    pub fn invoke(
         &mut self,
         offset: CodeOffset,
         arguments: Vec<AbstractValue>,

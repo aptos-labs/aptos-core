@@ -546,12 +546,12 @@ impl<'a> BoundsChecker<'a> {
                         )?;
                     }
                 },
-                Call(idx) | ClosPack(idx, _) => self.check_code_unit_bounds_impl(
+                Call(idx) | LdFunction(idx) => self.check_code_unit_bounds_impl(
                     self.view.function_handles(),
                     *idx,
                     bytecode_offset,
                 )?,
-                CallGeneric(idx) | ClosPackGeneric(idx, _) => {
+                CallGeneric(idx) | LdFunctionGeneric(idx) => {
                     self.check_code_unit_bounds_impl(
                         self.view.function_instantiations(),
                         *idx,
@@ -650,15 +650,16 @@ impl<'a> BoundsChecker<'a> {
                 },
 
                 // Instructions that refer to a signature
-                ClosEval(idx)
-                | VecPack(idx, _)
+                VecPack(idx, _)
                 | VecLen(idx)
                 | VecImmBorrow(idx)
                 | VecMutBorrow(idx)
                 | VecPushBack(idx)
                 | VecPopBack(idx)
                 | VecUnpack(idx, _)
-                | VecSwap(idx) => {
+                | VecSwap(idx)
+                | Invoke(idx)
+                | EarlyBind(idx, _) => {
                     self.check_code_unit_bounds_impl(
                         self.view.signatures(),
                         *idx,

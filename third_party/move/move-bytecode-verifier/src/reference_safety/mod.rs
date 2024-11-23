@@ -22,9 +22,8 @@ use move_binary_format::{
     binary_views::{BinaryIndexedView, FunctionView},
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        Bytecode, ClosureMask, CodeOffset, FunctionDefinitionIndex, FunctionHandle,
-        IdentifierIndex, SignatureIndex, SignatureToken, StructDefinition, StructVariantHandle,
-        VariantIndex,
+        Bytecode, CodeOffset, FunctionDefinitionIndex, FunctionHandle, IdentifierIndex,
+        SignatureIndex, SignatureToken, StructDefinition, StructVariantHandle, VariantIndex,
     },
     safe_assert, safe_unwrap,
     views::FieldOrVariantIndex,
@@ -101,24 +100,47 @@ fn call(
     Ok(())
 }
 
-fn clos_pack(
+fn ld_function(
     verifier: &mut ReferenceSafetyAnalysis,
+    state: &mut AbstractState,
+    offset: CodeOffset,
     function_handle: &FunctionHandle,
-    mask: ClosureMask,
+    meter: &mut impl Meter,
 ) -> PartialVMResult<()> {
-    let parameters = verifier.resolver.signature_at(function_handle.parameters);
-    // Extract the captured arguments and pop them from the stack
-    let argc = mask.extract(&parameters.0, true).len();
-    for _ in 0..argc {
+    let _parameters = verifier.resolver.signature_at(function_handle.parameters);
+    let acquired_resources = match verifier.name_def_map.get(&function_handle.name) {
+        Some(idx) => {
+            let func_def = verifier.resolver.function_def_at(*idx)?;
+            let fh = verifier.resolver.function_handle_at(func_def.function);
+            if function_handle == fh {
+                func_def.acquires_global_resources.iter().cloned().collect()
+            } else {
+                BTreeSet::new()
+            }
+        },
+        None => BTreeSet::new(),
+    };
+    let value = state.ld_function(offset, &acquired_resources, meter)?;
+    verifier.stack.push(value);
+    Ok(())
+}
+
+fn early_bind(
+    verifier: &mut ReferenceSafetyAnalysis,
+    _arg_tys: Vec<SignatureToken>,
+    k: u8,
+) -> PartialVMResult<()> {
+    safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
+    for _ in 0..k {
         // Currently closures require captured arguments to be values. This is verified
         // by type safety.
-        safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value())
+        safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
     }
     verifier.stack.push(AbstractValue::NonReference);
     Ok(())
 }
 
-fn clos_eval(
+fn invoke(
     verifier: &mut ReferenceSafetyAnalysis,
     state: &mut AbstractState,
     offset: CodeOffset,
@@ -131,7 +153,7 @@ fn clos_eval(
         .map(|_| verifier.stack.pop().unwrap())
         .rev()
         .collect();
-    let values = state.clos_eval(offset, arguments, &result_tys, meter)?;
+    let values = state.invoke(offset, arguments, &result_tys, meter)?;
     for value in values {
         verifier.stack.push(value)
     }
@@ -547,18 +569,22 @@ fn execute_inner(
             unpack_variant(verifier, handle)?
         },
 
-        Bytecode::ClosPack(idx, mask) => {
+        Bytecode::LdFunction(idx) => {
             let function_handle = verifier.resolver.function_handle_at(*idx);
-            clos_pack(verifier, function_handle, *mask)?
+            ld_function(verifier, state, offset, function_handle, meter)?
         },
-        Bytecode::ClosPackGeneric(idx, mask) => {
+        Bytecode::LdFunctionGeneric(idx) => {
             let func_inst = verifier.resolver.function_instantiation_at(*idx);
             let function_handle = verifier.resolver.function_handle_at(func_inst.handle);
-            clos_pack(verifier, function_handle, *mask)?
+            ld_function(verifier, state, offset, function_handle, meter)?
         },
-        Bytecode::ClosEval(idx) => {
-            let (arg_tys, result_tys) = fun_type(verifier, *idx)?;
-            clos_eval(verifier, state, offset, arg_tys, result_tys, meter)?
+        Bytecode::EarlyBind(sig_idx, k) => {
+            let (arg_tys, _result_tys) = fun_type(verifier, *sig_idx)?;
+            early_bind(verifier, arg_tys, *k)?
+        },
+        Bytecode::Invoke(sig_idx) => {
+            let (arg_tys, result_tys) = fun_type(verifier, *sig_idx)?;
+            invoke(verifier, state, offset, arg_tys, result_tys, meter)?
         },
 
         Bytecode::VecPack(idx, num) => {

@@ -734,16 +734,14 @@ pub enum StatusCode {
     ZERO_VARIANTS_ERROR = 1130,
     // A feature is not enabled.
     FEATURE_NOT_ENABLED = 1131,
-    // Closure mask invalid
-    INVALID_CLOSURE_MASK = 1132,
-    // Closure eval type is not a function
-    CLOSURE_EVAL_REQUIRES_FUNCTION = 1133,
+    // Invoke or EarlyBind parameter type is not a function
+    REQUIRES_FUNCTION = 1132,
 
     // Reserved error code for future use
-    RESERVED_VERIFICATION_ERROR_2 = 1134,
-    RESERVED_VERIFICATION_ERROR_3 = 1135,
-    RESERVED_VERIFICATION_ERROR_4 = 1136,
-    RESERVED_VERIFICATION_ERROR_5 = 1137,
+    RESERVED_VERIFICATION_ERROR_2 = 1133,
+    RESERVED_VERIFICATION_ERROR_3 = 1134,
+    RESERVED_VERIFICATION_ERROR_4 = 1135,
+    RESERVED_VERIFICATION_ERROR_5 = 1136,
 
     // These are errors that the VM might raise if a violation of internal
     // invariants takes place.
@@ -784,13 +782,14 @@ pub enum StatusCode {
     // Should never be committed on chain
     SPECULATIVE_EXECUTION_ABORT_ERROR = 2024,
     ACCESS_CONTROL_INVARIANT_VIOLATION = 2025,
+    LD_FUNCTION_NONEMPTY_ACQUIRES = 2026,
 
     // Reserved error code for future use
-    RESERVED_INVARIANT_VIOLATION_ERROR_1 = 2026,
-    RESERVED_INVARIANT_VIOLATION_ERROR_2 = 2027,
-    RESERVED_INVARIANT_VIOLATION_ERROR_3 = 2028,
-    RESERVED_INVARIANT_VIOLATION_ERROR_4 = 2039,
-    RESERVED_INVARIANT_VIOLATION_ERROR_5 = 2040,
+    RESERVED_INVARIANT_VIOLATION_ERROR_1 = 2027,
+    RESERVED_INVARIANT_VIOLATION_ERROR_2 = 2028,
+    RESERVED_INVARIANT_VIOLATION_ERROR_3 = 2039,
+    RESERVED_INVARIANT_VIOLATION_ERROR_4 = 2040,
+    RESERVED_INVARIANT_VIOLATION_ERROR_5 = 2041,
 
     // Errors that can arise from binary decoding (deserialization)
     // Deserialization Errors: 3000-3999

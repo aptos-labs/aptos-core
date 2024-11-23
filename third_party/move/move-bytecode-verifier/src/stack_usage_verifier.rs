@@ -228,13 +228,24 @@ impl<'a> StackUsageVerifier<'a> {
                 (arg_count, return_count)
             },
 
-            // ClosEval pops the number of arguments and pushes the results of the given function
-            // type
-            Bytecode::ClosEval(idx) => {
-                if let Some(SignatureToken::Function(args, result, _)) =
+            // LdFunction pushes the function handle
+            Bytecode::LdFunction(idx) => {
+                let _function_handle = self.resolver.function_handle_at(*idx);
+                (0, 1)
+            },
+            Bytecode::LdFunctionGeneric(idx) => {
+                let func_inst = self.resolver.function_instantiation_at(*idx);
+                let _function_handle = self.resolver.function_handle_at(func_inst.handle);
+                (0, 1)
+            },
+
+            // Invoke pops a function and the number of arguments and pushes the results of the
+            // given function type
+            Bytecode::Invoke(idx) => {
+                if let Some(SignatureToken::Function(args, results, _)) =
                     self.resolver.signature_at(*idx).0.first()
                 {
-                    ((1 + args.len()) as u64, result.len() as u64)
+                    ((1 + args.len()) as u64, results.len() as u64)
                 } else {
                     // We don't know what it will pop/push, but the signature checker
                     // ensures we never reach this
@@ -242,27 +253,23 @@ impl<'a> StackUsageVerifier<'a> {
                 }
             },
 
-            // ClosPack pops the captured arguments and returns 1 value
-            Bytecode::ClosPack(idx, mask) => {
-                let function_handle = self.resolver.function_handle_at(*idx);
-                let arg_count = mask
-                    .extract(
-                        &self.resolver.signature_at(function_handle.parameters).0,
-                        true,
-                    )
-                    .len() as u64;
-                (arg_count, 1)
-            },
-            Bytecode::ClosPackGeneric(idx, mask) => {
-                let func_inst = self.resolver.function_instantiation_at(*idx);
-                let function_handle = self.resolver.function_handle_at(func_inst.handle);
-                let arg_count = mask
-                    .extract(
-                        &self.resolver.signature_at(function_handle.parameters).0,
-                        true,
-                    )
-                    .len() as u64;
-                (arg_count, 1)
+            // EarlyBind pops a function value and the captured arguments and returns 1 value
+            Bytecode::EarlyBind(idx, arg_count) => {
+                if let Some(SignatureToken::Function(args, _results, _)) =
+                    self.resolver.signature_at(*idx).0.first()
+                {
+                    if args.len() <= *arg_count as usize {
+                        (1 + *arg_count as u64, 1)
+                    } else {
+                        // We don't know what it will pop/push, but the signature checker
+                        // ensures we never reach this
+                        (0, 0)
+                    }
+                } else {
+                    // We don't know what it will pop/push, but the signature checker
+                    // ensures we never reach this
+                    (0, 0)
+                }
             },
 
             // Pack performs `num_fields` pops and one push

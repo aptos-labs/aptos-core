@@ -820,6 +820,8 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
         let mut checked_struct_def_insts = BTreeMap::<StructDefInstantiationIndex, ()>::new();
         let mut checked_struct_def_insts_with_key =
             BTreeMap::<StructDefInstantiationIndex, ()>::new();
+        let mut checked_fun_insts = BTreeMap::<SignatureIndex, ()>::new();
+        let mut checked_early_bind_insts = BTreeMap::<(SignatureIndex, u8), ()>::new();
         let mut checked_vec_insts = BTreeMap::<SignatureIndex, ()>::new();
         let mut checked_field_insts = BTreeMap::<FieldInstantiationIndex, ()>::new();
         let mut checked_variant_field_insts = BTreeMap::<VariantFieldInstantiationIndex, ()>::new();
@@ -839,7 +841,7 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                 })
             };
             match instr {
-                CallGeneric(idx) | ClosPackGeneric(idx, _) => {
+                CallGeneric(idx) | LdFunctionGeneric(idx) => {
                     if let btree_map::Entry::Vacant(entry) = checked_func_insts.entry(*idx) {
                         let constraints = self.verify_function_instantiation_contextless(*idx)?;
                         map_err(constraints.check_in_context(&ability_context))?;
@@ -898,12 +900,32 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                         entry.insert(());
                     }
                 },
-                ClosEval(idx) => {
-                    let sign = self.resolver.signature_at(*idx);
-                    if sign.len() != 1 || !matches!(&sign.0[0], SignatureToken::Function(..)) {
-                        return map_err(Err(PartialVMError::new(
-                            StatusCode::CLOSURE_EVAL_REQUIRES_FUNCTION,
-                        )));
+                Invoke(idx) => map_err(self.verify_fun_sig_idx(
+                    *idx,
+                    &mut checked_fun_insts,
+                    &ability_context,
+                ))?,
+                EarlyBind(idx, count) => {
+                    map_err(self.verify_fun_sig_idx(
+                        *idx,
+                        &mut checked_fun_insts,
+                        &ability_context,
+                    ))?;
+                    if let btree_map::Entry::Vacant(entry) =
+                        checked_early_bind_insts.entry((*idx, *count))
+                    {
+                        // Note non-function case is checked in `verify_fun_sig_idx` above.
+                        if let Some(SignatureToken::Function(params, _results, _abilities)) =
+                            self.resolver.signature_at(*idx).0.first()
+                        {
+                            if *count as usize > params.len() {
+                                return map_err(Err(PartialVMError::new(
+                                    StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH,
+                                )
+                                .with_message("in EarlyBind".to_string())));
+                            };
+                        };
+                        entry.insert(());
                     }
                 },
                 VecPack(idx, _)
@@ -961,7 +983,7 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                 | LdTrue
                 | LdFalse
                 | Call(_)
-                | ClosPack(..)
+                | LdFunction(..)
                 | Pack(_)
                 | Unpack(_)
                 | TestVariant(_)
@@ -1117,6 +1139,37 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
             self.verify_struct_def(struct_def)
                 .map_err(|err| err.at_index(IndexKind::StructDefinition, idx as u16))?;
         }
+        Ok(())
+    }
+
+    // Checks that a `sig_idx` parameter to `Invoke` or `EarlyBind` is well-formed.
+    fn verify_fun_sig_idx(
+        &self,
+        idx: SignatureIndex,
+        checked_fun_insts: &mut BTreeMap<SignatureIndex, ()>,
+        ability_context: &BitsetTypeParameterConstraints<N>,
+    ) -> PartialVMResult<()> {
+        if let btree_map::Entry::Vacant(entry) = checked_fun_insts.entry(idx) {
+            let ty_args = &self.resolver.signature_at(idx).0;
+            if ty_args.len() != 1 {
+                return Err(PartialVMError::new(
+                    StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH,
+                ))
+                .map_err(|err| {
+                    err.with_message(format!(
+                        "expected 1 type token for function operations, got {}",
+                        ty_args.len()
+                    ))
+                });
+            }
+            if !ty_args[0].is_function() {
+                return Err(PartialVMError::new(StatusCode::INVALID_SIGNATURE_TOKEN))
+                    .map_err(|err| err.with_message("function required".to_string()));
+            }
+            self.verify_signature_in_context(ability_context, idx)?;
+
+            entry.insert(());
+        };
         Ok(())
     }
 }

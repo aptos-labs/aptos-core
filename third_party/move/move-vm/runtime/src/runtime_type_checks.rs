@@ -120,12 +120,14 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         instruction: &Bytecode,
     ) -> PartialVMResult<()> {
         match instruction {
-            // TODO: implement closures
-            Bytecode::ClosPack(..) | Bytecode::ClosPackGeneric(..) | Bytecode::ClosEval(..) => {
+            // TODO(LAMBDA): implement closures
+            Bytecode::LdFunction(..)
+            | Bytecode::LdFunctionGeneric(..)
+            | Bytecode::Invoke(..)
+            | Bytecode::EarlyBind(..) => {
                 return Err(PartialVMError::new(StatusCode::UNIMPLEMENTED_FEATURE)
                     .with_message("closure opcodes in interpreter".to_owned()))
             },
-
             // Call instruction will be checked at execute_main.
             Bytecode::Call(_) | Bytecode::CallGeneric(_) => (),
             Bytecode::BrFalse(_) | Bytecode::BrTrue(_) => {
@@ -254,11 +256,13 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
 
         match instruction {
             // TODO: implement closures
-            Bytecode::ClosPack(..) | Bytecode::ClosPackGeneric(..) | Bytecode::ClosEval(..) => {
+            Bytecode::LdFunction(..)
+            | Bytecode::LdFunctionGeneric(..)
+            | Bytecode::Invoke(..)
+            | Bytecode::EarlyBind(..) => {
                 return Err(PartialVMError::new(StatusCode::UNIMPLEMENTED_FEATURE)
                     .with_message("closure opcodes in interpreter".to_owned()))
             },
-
             Bytecode::BrTrue(_) | Bytecode::BrFalse(_) => (),
             Bytecode::Branch(_)
             | Bytecode::Ret
