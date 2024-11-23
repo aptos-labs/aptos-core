@@ -252,12 +252,14 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         let results_ptr = Pointer(results.as_mut_ptr());
         let num_deser_threads = self.num_shards();
 
-        let (aggr_tx, aggr_rx) = mpsc::channel();;
+        let (aggr_start_tx, aggr_start_rx) = mpsc::channel();
+        let (aggr_tx, aggr_rx) = mpsc::channel();
         let (deser_tx, deser_rx) = crossbeam_channel::unbounded();
         let (deser_finished_tx, deser_finished_rx) = crossbeam_channel::unbounded();
         let deser_finished_tx = Arc::new(deser_finished_tx);
 
         self.cmd_tx_thread_pool.spawn(move || {
+            aggr_start_rx.recv().unwrap();
             // loop to see if results are received; as results are received update the total supply
             let mut curr_txn_idx = 0;
             let mut aggr_total_supply_delta = total_supply_base_val;
@@ -302,6 +304,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
                 deser_finished_tx_clone.send(()).unwrap();
             });
         }
+        let mut result_recv_start: AtomicBool = AtomicBool::new(false);
         (0..self.num_shards()).into_par_iter().for_each(|shard_id| {
             let mut num_outputs_received: u64 = 0;
             loop {
@@ -309,6 +312,10 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
                 let num_txn = received_msg.seq_num.unwrap(); // seq_num field is used to pass num_txn in the network message
                 num_outputs_received += num_txn;
                 deser_tx.send(received_msg).unwrap();
+                if !result_recv_start.load(std::sync::atomic::Ordering::Relaxed) {
+                    result_recv_start.store(true, std::sync::atomic::Ordering::Relaxed);
+                    aggr_start_tx.send(()).unwrap();
+                }
                 if num_outputs_received == expected_outputs[shard_id] {
                     let delta = get_delta_time(duration_since_epoch);
                     REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
