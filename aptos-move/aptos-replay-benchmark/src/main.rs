@@ -72,7 +72,16 @@ async fn main() -> anyhow::Result<()> {
         .init();
     let _mp = MetricsPusher::start(vec![]);
 
+    // TODO:
+    //   Right now we fetch transactions from debugger, but ideally we need a way to save them
+    //   locally (with corresponding read-sets) so we can use this for CI.
     let debugger = AptosDebugger::rest_client(Client::new(Url::parse(&command.rest_endpoint)?))?;
+
+    // TODO:
+    //  Right now, only features can be overridden. In general, this can be allowed for anything:
+    //      1. Framework code, e.g., to test performance of new natives or compiler,
+    //      2. Gas schedule, to track the costs of charging gas or tracking limits.
+    //  We probably should support at least these.
     let override_config = OverrideConfig::new(command.enable_features, command.disable_features);
 
     let blocks = BenchmarkGenerator::new(

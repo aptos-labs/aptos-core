@@ -20,12 +20,10 @@ aptos-move-debugger = { workspace = true }
 aptos-push-metrics = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-types = { workspace = true }
-aptos-validator-interface = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
 claims = { workspace = true }
-move-core-types = { workspace = true }
 serde = { workspace = true }
 parking_lot = { workspace = true }
 tokio = { workspace = true }

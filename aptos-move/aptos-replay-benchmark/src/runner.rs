@@ -5,6 +5,7 @@ use crate::block::Block;
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
 use std::time::Instant;
 
+/// Holds configuration for running the benchmarks and measuring the time taken.
 pub struct BenchmarkRunner {
     concurrency_levels: Vec<usize>,
     num_repeats: usize,
@@ -43,6 +44,9 @@ impl BenchmarkRunner {
         }
     }
 
+    // TODO:
+    //   This measures execution time from a cold-start. Ideally, we want to warm-up with executing
+    //   1-2 blocks prior to selected range, but not timing them.
     pub fn measure_execution_time(&self, blocks: &[Block]) {
         for concurrency_level in &self.concurrency_levels {
             if self.measure_block_time {
@@ -53,6 +57,7 @@ impl BenchmarkRunner {
         }
     }
 
+    /// Runs a sequence of blocks, measuring execution time for each block. The median is reported.
     fn measure_block_execution_time(&self, blocks: &[Block], concurrency_level: usize) {
         let mut times = Vec::with_capacity(blocks.len());
         for _ in blocks {
@@ -65,7 +70,6 @@ impl BenchmarkRunner {
                 let start_time = Instant::now();
                 block.run(&executor, concurrency_level);
                 let time = start_time.elapsed().as_millis();
-
                 println!(
                     "[{}/{}] Block {} execution time is {}ms",
                     i + 1,
@@ -80,13 +84,14 @@ impl BenchmarkRunner {
         for (idx, mut time) in times.into_iter().enumerate() {
             time.sort();
             println!(
-                "Block {} median execution time is {}ms\n",
+                "Block {} median execution time is {}ms",
                 idx + 1,
                 time[self.num_repeats / 2],
             );
         }
     }
 
+    /// Runs the sequence of blocks, measuring end-to-end execution time.
     fn measure_overall_execution_time(&self, blocks: &[Block], concurrency_level: usize) {
         let mut times = Vec::with_capacity(self.num_repeats);
         for i in 0..self.num_repeats {

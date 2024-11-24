@@ -6,7 +6,6 @@ use crate::{
     state_view::{ReadSet, ReadSetCapturingStateView},
     workload::Workload,
 };
-use anyhow::bail;
 use aptos_types::{
     block_executor::config::{
         BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
@@ -43,7 +42,7 @@ impl Block {
         workload: Workload,
         state_view: &(impl StateView + Sync),
         state_override: HashMap<StateKey, StateValue>,
-    ) -> anyhow::Result<Self> {
+    ) -> Self {
         let onchain_outputs = if state_override.is_empty() {
             None
         } else {
@@ -57,7 +56,7 @@ impl Block {
             for (idx, output) in onchain_outputs.iter().enumerate() {
                 for (state_key, _) in output.write_set() {
                     if state_override.contains_key(state_key) {
-                        bail!(
+                        println!(
                             "Transaction {} writes to overridden state value for {:?}",
                             begin + idx as Version,
                             state_key
@@ -84,13 +83,14 @@ impl Block {
             vec![]
         };
 
-        Ok(Self {
+        Self {
             inputs,
             workload,
             comparisons,
-        })
+        }
     }
 
+    /// Prints the difference in transaction outputs when running with overrides.
     pub fn print_diffs(&self) {
         let begin = self.workload.first_version();
 

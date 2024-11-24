@@ -25,6 +25,14 @@ impl Write {
     }
 }
 
+/// Different parts of [TransactionOutput] that can be different:
+///   1. gas used,
+///   2. status (must be kept since transactions are replayed),
+///   3. events,
+///   4. writes.
+/// Note that fine-grained comparison allows for some differences to be okay, e.g., using more gas
+/// implies that the fee statement event, the account balance of the fee payer, and the total token
+/// supply are different.
 enum Diff {
     GasUsed {
         left: u64,
@@ -44,11 +52,14 @@ enum Diff {
     },
 }
 
+/// Holds all differences for a pair of transaction outputs.
 pub(crate) struct Comparison {
     diffs: Vec<Diff>,
 }
 
 impl Comparison {
+    /// Given a  pair of transaction outputs, computes its diff for gas used, status, events and
+    /// write sets.
     pub(crate) fn diff(left: TransactionOutput, right: TransactionOutput) -> Self {
         let (left_write_set, left_events, left_gas_used, left_transaction_status, _) =
             left.unpack();
@@ -151,18 +162,10 @@ impl Comparison {
 
 impl std::fmt::Display for Comparison {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut gas_used_diffs = false;
-        let mut total_left_gas_used = 0;
-        let mut total_right_gas_used = 0;
-
         writeln!(f, " >>>>> ")?;
         for diff in &self.diffs {
             match diff {
                 Diff::GasUsed { left, right } => {
-                    total_left_gas_used += left;
-                    total_right_gas_used += right;
-                    gas_used_diffs = true;
-
                     writeln!(f, "[gas used] before: {}, after: {}", left, right)?;
                 },
                 Diff::ExecutionStatus { left, right } => {
@@ -221,14 +224,6 @@ impl std::fmt::Display for Comparison {
                     }
                 },
             }
-        }
-
-        if gas_used_diffs {
-            writeln!(
-                f,
-                "[total gas used] before: {}, after: {}",
-                total_left_gas_used, total_right_gas_used
-            )?;
         }
         writeln!(f, " <<<<< ")
     }
