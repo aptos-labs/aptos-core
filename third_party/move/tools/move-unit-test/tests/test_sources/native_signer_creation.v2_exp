@@ -15,13 +15,13 @@ Failures in 0x1::M:
 
 ┌── test_doesnt_exist ──────
 │ error[E11001]: test failure
-│    ┌─ native_signer_creation.move:43:17
+│    ┌─ native_signer_creation.move:47:9
 │    │
 │ 36 │     fun test_doesnt_exist() {
 │    │         ----------------- In this function in 0x1::M
 │    ·
-│ 43 │             i = i + 1;
-│    │                 ^^^^^ Test was not expected to error, but it aborted with code 0 originating in the module 0000000000000000000000000000000000000000000000000000000000000001::M rooted here
+│ 47 │         abort 0
+│    │         ^^^^^^^ Test was not expected to error, but it aborted with code 0 originating in the module 0000000000000000000000000000000000000000000000000000000000000001::M rooted here
 │ 
 │ 
 └──────────────────

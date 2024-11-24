@@ -39,7 +39,9 @@
 //! Finally, note that fixed window optimizations are performed on windows within a basic
 //! block, not spanning across multiple basic blocks.
 
-use crate::file_format_generator::peephole_optimizer::optimizers::WindowOptimizer;
+use crate::file_format_generator::peephole_optimizer::optimizers::{
+    TransformedCodeChunk, WindowOptimizer,
+};
 use move_binary_format::file_format::Bytecode;
 
 pub struct ReduciblePairs;
@@ -49,7 +51,7 @@ impl ReduciblePairs {
 }
 
 impl WindowOptimizer for ReduciblePairs {
-    fn optimize_window(&self, window: &[Bytecode]) -> Option<(Vec<Bytecode>, usize)> {
+    fn optimize_window(&self, window: &[Bytecode]) -> Option<(TransformedCodeChunk, usize)> {
         use Bytecode::*;
         if window.len() < Self::WINDOW_SIZE {
             return None;
@@ -59,13 +61,17 @@ impl WindowOptimizer for ReduciblePairs {
             (StLoc(u), MoveLoc(v)) | (CopyLoc(u), StLoc(v)) | (MoveLoc(u), StLoc(v))
                 if *u == *v =>
             {
-                vec![]
+                TransformedCodeChunk::new(vec![], vec![])
             },
-            (CopyLoc(_), Pop) => vec![],
-            (LdTrue, BrTrue(target)) | (LdFalse, BrFalse(target)) => vec![Branch(*target)],
-            (LdTrue, BrFalse(_)) | (LdFalse, BrTrue(_)) => vec![],
-            (Not, BrFalse(target)) => vec![BrTrue(*target)],
-            (Not, BrTrue(target)) => vec![BrFalse(*target)],
+            (CopyLoc(_), Pop) => TransformedCodeChunk::new(vec![], vec![]),
+            (LdTrue, BrTrue(target)) | (LdFalse, BrFalse(target)) => {
+                TransformedCodeChunk::new(vec![Branch(*target)], vec![0])
+            },
+            (LdTrue, BrFalse(_)) | (LdFalse, BrTrue(_)) => {
+                TransformedCodeChunk::new(vec![], vec![])
+            },
+            (Not, BrFalse(target)) => TransformedCodeChunk::new(vec![BrTrue(*target)], vec![0]),
+            (Not, BrTrue(target)) => TransformedCodeChunk::new(vec![BrFalse(*target)], vec![0]),
             _ => return None,
         };
         Some((optimized, Self::WINDOW_SIZE))
