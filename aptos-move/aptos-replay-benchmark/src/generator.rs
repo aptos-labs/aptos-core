@@ -58,7 +58,7 @@ impl BenchmarkGenerator {
         let state_override = self.override_config.get_state_override(&state_view);
 
         let state_view = self.debugger.state_view_at_version(begin);
-        Block::new(workload, &state_view, state_override, 32)
+        Block::new(workload, &state_view, state_override)
     }
 
     /// Partitions a sequence of transactions into blocks.

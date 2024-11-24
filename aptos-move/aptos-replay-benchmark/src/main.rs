@@ -84,6 +84,10 @@ async fn main() -> anyhow::Result<()> {
     .generate_blocks()
     .await?;
 
+    for block in &blocks {
+        block.print_diffs();
+    }
+
     BenchmarkRunner::new(
         command.concurrency_levels,
         command.num_repeats,
