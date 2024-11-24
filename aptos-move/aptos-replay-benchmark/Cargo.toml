@@ -25,5 +25,6 @@ aptos-vm = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
 serde = { workspace = true }
+parking_lot = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }

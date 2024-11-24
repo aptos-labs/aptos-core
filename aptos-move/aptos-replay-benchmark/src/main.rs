@@ -4,9 +4,11 @@
 use aptos_logger::{Level, Logger};
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_push_metrics::MetricsPusher;
-use aptos_replay_benchmark::{AptosBenchmarkRunner, ClosedInterval, EnvironmentOverride};
+use aptos_replay_benchmark::{
+    generator::BenchmarkGenerator, overrides::OverrideConfig, runner::BenchmarkRunner,
+};
 use aptos_rest_client::Client;
-use aptos_types::on_chain_config::FeatureFlag;
+use aptos_types::{on_chain_config::FeatureFlag, transaction::Version};
 use clap::Parser;
 use url::Url;
 
@@ -17,6 +19,12 @@ pub struct Command {
 
     #[clap(long, help = "Fullnode's REST API query endpoint")]
     rest_endpoint: String,
+
+    #[clap(long, help = "First transaction to include for benchmarking")]
+    begin_version: Version,
+
+    #[clap(long, help = "Last transaction to include for benchmarking")]
+    end_version: Version,
 
     #[clap(
         long,
@@ -32,11 +40,11 @@ pub struct Command {
     )]
     num_repeats: Option<usize>,
 
-    #[clap(long, help = "First transaction to include for benchmarking")]
-    begin_version: u64,
-
-    #[clap(long, help = "Last transaction to include for benchmarking")]
-    end_version: u64,
+    #[clap(
+        long,
+        help = "If true, measure time taken to execute each block, and overall time otherwise"
+    )]
+    measure_block_time: bool,
 
     #[clap(
         long,
@@ -53,35 +61,35 @@ pub struct Command {
         help = "List of space-separated feature flags to disable",
     )]
     disable_features: Vec<FeatureFlag>,
-
-    #[clap(long, help = "If specified, used as the gas feature version")]
-    gas_feature_version: Option<u64>,
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let command = Command::parse();
 
-    let level = command.log_level.unwrap_or(Level::Error);
-    Logger::new().level(level).init();
+    Logger::new()
+        .level(command.log_level.unwrap_or(Level::Error))
+        .init();
     let _mp = MetricsPusher::start(vec![]);
 
     let debugger = AptosDebugger::rest_client(Client::new(Url::parse(&command.rest_endpoint)?))?;
-    let versions = ClosedInterval::new(command.begin_version, command.end_version);
-    let environment_override = EnvironmentOverride::new(
-        command.enable_features,
-        command.disable_features,
-        command.gas_feature_version,
-    );
+    let override_config = OverrideConfig::new(command.enable_features, command.disable_features);
 
-    let runner = AptosBenchmarkRunner::new(
+    let blocks = BenchmarkGenerator::new(
         debugger,
-        versions,
+        command.begin_version,
+        command.end_version,
+        override_config,
+    )
+    .generate_blocks()
+    .await?;
+
+    BenchmarkRunner::new(
         command.concurrency_levels,
         command.num_repeats,
-        environment_override,
-    );
-    runner.benchmark_past_transactions().await?;
+        command.measure_block_time,
+    )
+    .measure_execution_time(&blocks);
 
     Ok(())
 }
