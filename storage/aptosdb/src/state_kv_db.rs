@@ -201,6 +201,10 @@ impl StateKvDb {
         &self.state_kv_metadata_db
     }
 
+    pub(crate) fn metadata_db_arc(&self) -> Arc<DB> {
+        Arc::clone(&self.state_kv_metadata_db)
+    }
+
     pub(crate) fn db_shard(&self, shard_id: u8) -> &DB {
         &self.state_kv_db_shards[shard_id as usize]
     }
