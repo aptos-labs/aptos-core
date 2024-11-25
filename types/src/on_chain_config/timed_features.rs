@@ -6,10 +6,6 @@ use serde::Serialize;
 use strum::{EnumCount, IntoEnumIterator};
 use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
 
-// A placeholder that can be used to represent activation times that have not been determined.
-const NOT_YET_SPECIFIED: u64 = END_OF_TIME; /* Thursday, December 31, 2099 11:59:59 PM */
-
-pub const END_OF_TIME: u64 = 4102444799000; /* Thursday, December 31, 2099 11:59:59 PM */
 #[derive(Debug, EnumCountMacro, EnumIter, Clone, Copy, Eq, PartialEq)]
 pub enum TimedFeatureFlag {
     DisableInvariantViolationCheckInSwapLoc,
@@ -44,7 +40,6 @@ impl TimedFeatureOverride {
             Replay => match flag {
                 LimitTypeTagSize => true,
                 ModuleComplexityCheck => true,
-                EntryCompatibility => true,
                 // Add overrides for replay here.
                 _ => return None,
             },
@@ -57,19 +52,22 @@ impl TimedFeatureOverride {
 }
 
 impl TimedFeatureFlag {
+    /// Returns the activation time of the feature on the given chain.
+    /// The time is specified as a Unix Epoch timestamp in microseconds.
     pub const fn activation_time_on(&self, chain_id: &NamedChain) -> u64 {
         use NamedChain::*;
         use TimedFeatureFlag::*;
 
         match (self, chain_id) {
-            (DisableInvariantViolationCheckInSwapLoc, TESTNET) => NOT_YET_SPECIFIED,
-            (DisableInvariantViolationCheckInSwapLoc, MAINNET) => NOT_YET_SPECIFIED,
+            // Enabled from the beginning of time.
+            (DisableInvariantViolationCheckInSwapLoc, TESTNET) => 0,
+            (DisableInvariantViolationCheckInSwapLoc, MAINNET) => 0,
 
-            (ModuleComplexityCheck, TESTNET) => 1719356400000, /* Tuesday, June 21, 2024 16:00:00 AM GMT-07:00 */
-            (ModuleComplexityCheck, MAINNET) => 1720033200000, /* Wednesday, July 3, 2024 12:00:00 AM GMT-07:00 */
+            (ModuleComplexityCheck, TESTNET) => 1_719_356_400_000_000, /* Tuesday, June 21, 2024 16:00:00 AM GMT-07:00 */
+            (ModuleComplexityCheck, MAINNET) => 1_720_033_200_000_000, /* Wednesday, July 3, 2024 12:00:00 AM GMT-07:00 */
 
-            (EntryCompatibility, TESTNET) => 1730923200000, /* Wednesday, Nov 6, 2024 12:00:00 AM GMT-07:00 */
-            (EntryCompatibility, MAINNET) => 1731441600000, /* Tuesday, Nov 12, 2024 12:00:00 AM GMT-07:00 */
+            (EntryCompatibility, TESTNET) => 1_730_923_200_000_000, /* Wednesday, Nov 6, 2024 12:00:00 AM GMT-07:00 */
+            (EntryCompatibility, MAINNET) => 1_731_441_600_000_000, /* Tuesday, Nov 12, 2024 12:00:00 AM GMT-07:00 */
 
             // If unspecified, a timed feature is considered enabled from the very beginning of time.
             _ => 0,
@@ -84,6 +82,7 @@ pub struct TimedFeaturesBuilder {
 }
 
 impl TimedFeaturesBuilder {
+    /// `timestamp` is a Unix Epoch timestamp in microseconds.
     pub fn new(chain_id: ChainId, timestamp: u64) -> Self {
         let inner = match NamedChain::from_chain_id(&chain_id) {
             Ok(named_chain) => TimedFeaturesImpl::OnNamedChain {
@@ -160,5 +159,87 @@ mod test {
         let replay = assert_ok!(bcs::to_bytes(&TimedFeatureOverride::Replay));
         let testing = assert_ok!(bcs::to_bytes(&TimedFeatureOverride::Testing));
         assert_ne!(replay, testing);
+    }
+
+    #[test]
+    fn test_timed_features_activation() {
+        use TimedFeatureFlag::*;
+        // Monday, Jan 01, 2024 12:00:00.000 AM GMT
+        let jan_1_2024_micros: u64 = 1_704_067_200_000_000;
+        // Friday, November 15, 2024 12:00:00 AM GMT
+        let nov_15_2024_micros: u64 = 1_731_628_800_000_000;
+
+        // Check testnet on Jan 1, 2024.
+        let testnet_jan_1_2024 = TimedFeaturesBuilder::new(ChainId::testnet(), jan_1_2024_micros);
+        assert!(
+            testnet_jan_1_2024.is_enabled(DisableInvariantViolationCheckInSwapLoc),
+            "DisableInvariantViolationCheckInSwapLoc should always be enabled"
+        );
+        assert!(
+            testnet_jan_1_2024.is_enabled(LimitTypeTagSize),
+            "LimitTypeTagSize should always be enabled"
+        );
+        assert!(
+            !testnet_jan_1_2024.is_enabled(ModuleComplexityCheck),
+            "ModuleComplexityCheck should be disabled on Jan 1, 2024 on testnet"
+        );
+        assert!(
+            !testnet_jan_1_2024.is_enabled(EntryCompatibility),
+            "EntryCompatibility should be disabled on Jan 1, 2024 on testnet"
+        );
+        // Check testnet on Nov 15, 2024.
+        let testnet_nov_15_2024 = TimedFeaturesBuilder::new(ChainId::testnet(), nov_15_2024_micros);
+        assert!(
+            testnet_nov_15_2024.is_enabled(DisableInvariantViolationCheckInSwapLoc),
+            "DisableInvariantViolationCheckInSwapLoc should always be enabled"
+        );
+        assert!(
+            testnet_nov_15_2024.is_enabled(LimitTypeTagSize),
+            "LimitTypeTagSize should always be enabled"
+        );
+        assert!(
+            testnet_nov_15_2024.is_enabled(ModuleComplexityCheck),
+            "ModuleComplexityCheck should be enabled on Nov 15, 2024 on testnet"
+        );
+        assert!(
+            testnet_nov_15_2024.is_enabled(EntryCompatibility),
+            "EntryCompatibility should be enabled on Nov 15, 2024 on testnet"
+        );
+        // Check mainnet on Jan 1, 2024.
+        let mainnet_jan_1_2024 = TimedFeaturesBuilder::new(ChainId::mainnet(), jan_1_2024_micros);
+        assert!(
+            mainnet_jan_1_2024.is_enabled(DisableInvariantViolationCheckInSwapLoc),
+            "DisableInvariantViolationCheckInSwapLoc should always be enabled"
+        );
+        assert!(
+            mainnet_jan_1_2024.is_enabled(LimitTypeTagSize),
+            "LimitTypeTagSize should always be enabled"
+        );
+        assert!(
+            !mainnet_jan_1_2024.is_enabled(ModuleComplexityCheck),
+            "ModuleComplexityCheck should be disabled on Jan 1, 2024 on mainnet"
+        );
+        assert!(
+            !mainnet_jan_1_2024.is_enabled(EntryCompatibility),
+            "EntryCompatibility should be disabled on Jan 1, 2024 on mainnet"
+        );
+        // Check mainnet on Nov 15, 2024.
+        let mainnet_nov_15_2024 = TimedFeaturesBuilder::new(ChainId::mainnet(), nov_15_2024_micros);
+        assert!(
+            mainnet_nov_15_2024.is_enabled(DisableInvariantViolationCheckInSwapLoc),
+            "DisableInvariantViolationCheckInSwapLoc should always be enabled"
+        );
+        assert!(
+            mainnet_nov_15_2024.is_enabled(LimitTypeTagSize),
+            "LimitTypeTagSize should always be enabled"
+        );
+        assert!(
+            mainnet_nov_15_2024.is_enabled(ModuleComplexityCheck),
+            "ModuleComplexityCheck should be enabled on Nov 15, 2024 on mainnet"
+        );
+        assert!(
+            mainnet_nov_15_2024.is_enabled(EntryCompatibility),
+            "EntryCompatibility should be enabled on Nov 15, 2024 on mainnet"
+        );
     }
 }

@@ -238,6 +238,7 @@ pub fn struct_tag_for_config(config_id: ConfigID) -> StructTag {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ConfigurationResource {
     epoch: u64,
+    /// Unix epoch timestamp (in microseconds) of the last reconfiguration time.
     last_reconfiguration_time: u64,
     events: EventHandle,
 }
@@ -247,6 +248,7 @@ impl ConfigurationResource {
         self.epoch
     }
 
+    /// Return the last Unix epoch timestamp (in microseconds) of the last reconfiguration time.
     pub fn last_reconfiguration_time(&self) -> u64 {
         self.last_reconfiguration_time
     }
