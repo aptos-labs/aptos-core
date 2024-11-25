@@ -1520,11 +1520,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             ConsensusMsg::VoteMsg(vote) => Some(vote.vote().author()),
             ConsensusMsg::OrderVoteMsg(order_vote) => Some(order_vote.order_vote().author()),
             ConsensusMsg::CommitVoteMsg(commit_vote) => Some(commit_vote.author()),
-            ConsensusMsg::BatchMsg(batch) => Some(batch.author()),
+            ConsensusMsg::BatchMsg(batch) => batch.author(),
             ConsensusMsg::RoundTimeoutMsg(round_timeout) => Some(round_timeout.author()),
             ConsensusMsg::BatchResponse(batch_response) => Some(batch_response.author()),
             ConsensusMsg::BatchRequestMsg(batch_request) => Some(batch_request.source()),
-            ConsensusMsg::SignedBatchInfo(sign_batch_info) => Some(sign_batch_info.author()),
+            ConsensusMsg::SignedBatchInfo(sign_batch_info) => sign_batch_info.author(),
 
             ConsensusMsg::CommitDecisionMsg(_)
             | ConsensusMsg::DAGMessage(_)

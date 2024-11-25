@@ -212,8 +212,10 @@ impl SignedBatchInfoMsg {
         self.signed_infos
     }
 
-    pub fn author(&self) -> PeerId {
-        self.signed_infos[0].signer()
+    pub fn author(&self) -> Option<PeerId> {
+        self.signed_infos
+            .first()
+            .map(|signed_info| signed_info.author())
     }
 }
 

@@ -69,7 +69,8 @@ impl NetworkListener {
                         counters::QUORUM_STORE_MSG_COUNT
                             .with_label_values(&["NetworkListener::batchmsg"])
                             .inc();
-                        let author = batch_msg.author();
+                        // Batch msg verify function alreay ensures that the batch_msg is not empty.
+                        let author = batch_msg.author().expect("Empty batch message");
                         let batches = batch_msg.take();
                         counters::RECEIVED_BATCH_MSG_COUNT.inc();
 
