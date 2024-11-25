@@ -453,12 +453,14 @@ impl Constraint {
 
     /// Joins the two constraints. If they are incompatible, produces a type unification error.
     /// Otherwise, returns true if `self` absorbs the `other` constraint (and waives the `other`).
+    /// ctx_opt is for additional error info
     pub fn join(
         &mut self,
         context: &mut impl UnificationContext,
         subs: &mut Substitution,
         loc: &Loc,
         other: &Constraint,
+        ctx_opt: Option<ConstraintContext>,
     ) -> Result<bool, TypeUnificationError> {
         match (&mut *self, other) {
             (Constraint::SomeNumber(opts1), Constraint::SomeNumber(opts2)) => {
@@ -542,6 +544,34 @@ impl Constraint {
             {
                 *a1 = a1.union(*a2);
                 Ok(true)
+            },
+            // After the above checks on same type of constraint
+            // Check compatibility between ability and number
+            // This check is needed because sometime the concrete integer type is not available
+            // TODO: check other combination of constraints may be necessary as well.
+            (Constraint::HasAbilities(a1, _), Constraint::SomeNumber(_)) => {
+                let unsupported_abilities = a1.setminus(AbilitySet::PRIMITIVES);
+                if !unsupported_abilities.is_empty() {
+                    return Err(TypeUnificationError::MissingAbilitiesForConstraints(
+                        loc.clone(),
+                        other.clone(),
+                        unsupported_abilities,
+                        ctx_opt,
+                    ));
+                }
+                Ok(false)
+            },
+            (Constraint::SomeNumber(_), Constraint::HasAbilities(a1, _)) => {
+                let unsupported_abilities = a1.setminus(AbilitySet::PRIMITIVES);
+                if !unsupported_abilities.is_empty() {
+                    return Err(TypeUnificationError::MissingAbilitiesForConstraints(
+                        loc.clone(),
+                        self.clone(),
+                        unsupported_abilities,
+                        ctx_opt,
+                    ));
+                }
+                Ok(false)
             },
             // After the above checks, if one of the constraints is
             // accumulating, indicate its compatible but cannot be joined.
@@ -702,6 +732,8 @@ pub enum TypeUnificationError {
     ),
     /// The `HasAbilities` constraint failed: `MissingAbilities(loc, ty, missing, ctx)`.
     MissingAbilities(Loc, Type, AbilitySet, Option<ConstraintContext>),
+    /// The `HasAbilities` constraint failed: `MissingAbilitiesForConstraints(loc, ctr, missing, ctx)`.
+    MissingAbilitiesForConstraints(Loc, Constraint, AbilitySet, Option<ConstraintContext>),
     /// The two constraints are incompatible and cannot be joined.
     ConstraintsIncompatible(Loc, Constraint, Constraint),
     /// A cyclic substitution when trying to unify the given types.
@@ -1668,7 +1700,7 @@ impl Substitution {
         let mut absorbed = false;
         for (_, _, c) in current.iter_mut() {
             // Join constraints. If join returns true the constraint is absorbed.
-            absorbed = c.join(context, self, &loc, &ctr)?;
+            absorbed = c.join(context, self, &loc, &ctr, ctx_opt.clone())?;
             if absorbed {
                 break;
             }
@@ -3003,6 +3035,27 @@ impl TypeUnificationError {
                     format!(
                         "type `{}` is missing required {} `{}`{}",
                         ty.display(display_context),
+                        pluralize("ability", missing.iter().count()),
+                        missing,
+                        if !note.is_empty() {
+                            format!(" ({})", note)
+                        } else {
+                            "".to_string()
+                        }
+                    ),
+                    hints,
+                    labels,
+                )
+            },
+            TypeUnificationError::MissingAbilitiesForConstraints(_, ctr, missing, ctx_opt) => {
+                let (note, hints, labels) = ctx_opt
+                    .as_ref()
+                    .map(|ctx| ctx.describe(display_context))
+                    .unwrap_or_default();
+                (
+                    format!(
+                        "constraint `{}` does not have required {} `{}`{}",
+                        ctr.display(display_context),
                         pluralize("ability", missing.iter().count()),
                         missing,
                         if !note.is_empty() {
