@@ -139,7 +139,7 @@ impl Interpreter {
         let mut locals = Locals::new(function.local_tys().len());
         for (i, value) in args.into_iter().enumerate() {
             locals
-                .store_loc(i, value, loader.vm_config().check_invariant_in_swap_loc)
+                .store_loc(i, value)
                 .map_err(|e| self.set_location(e))?;
         }
 
@@ -359,11 +359,7 @@ impl Interpreter {
         let num_param_tys = function.param_tys().len();
 
         for i in 0..num_param_tys {
-            locals.store_loc(
-                num_param_tys - i - 1,
-                self.operand_stack.pop()?,
-                loader.vm_config().check_invariant_in_swap_loc,
-            )?;
+            locals.store_loc(num_param_tys - i - 1, self.operand_stack.pop()?)?;
 
             let ty_args = function.ty_args();
             if self.paranoid_type_checks {
@@ -2416,10 +2412,7 @@ impl Frame {
                         interpreter.operand_stack.push(local)?;
                     },
                     Bytecode::MoveLoc(idx) => {
-                        let local = self.locals.move_loc(
-                            *idx as usize,
-                            resolver.vm_config().check_invariant_in_swap_loc,
-                        )?;
+                        let local = self.locals.move_loc(*idx as usize)?;
                         gas_meter.charge_move_loc(&local)?;
 
                         interpreter.operand_stack.push(local)?;
@@ -2427,11 +2420,7 @@ impl Frame {
                     Bytecode::StLoc(idx) => {
                         let value_to_store = interpreter.operand_stack.pop()?;
                         gas_meter.charge_store_loc(&value_to_store)?;
-                        self.locals.store_loc(
-                            *idx as usize,
-                            value_to_store,
-                            resolver.vm_config().check_invariant_in_swap_loc,
-                        )?;
+                        self.locals.store_loc(*idx as usize, value_to_store)?;
                     },
                     Bytecode::Call(idx) => {
                         return Ok(ExitCode::Call(*idx));

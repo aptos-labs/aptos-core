@@ -13,22 +13,22 @@ fn locals() -> PartialVMResult<()> {
     let mut locals = Locals::new(LEN);
     for i in 0..LEN {
         assert!(locals.copy_loc(i).is_err());
-        assert!(locals.move_loc(i, false).is_err());
+        assert!(locals.move_loc(i).is_err());
         assert!(locals.borrow_loc(i).is_err());
     }
-    locals.store_loc(1, Value::u64(42), false)?;
+    locals.store_loc(1, Value::u64(42))?;
 
     assert!(locals.copy_loc(1)?.equals(&Value::u64(42))?);
     let r = locals.borrow_loc(1)?.value_as::<Reference>()?;
     assert!(r.read_ref()?.equals(&Value::u64(42))?);
-    assert!(locals.move_loc(1, false)?.equals(&Value::u64(42))?);
+    assert!(locals.move_loc(1)?.equals(&Value::u64(42))?);
 
     assert!(locals.copy_loc(1).is_err());
-    assert!(locals.move_loc(1, false).is_err());
+    assert!(locals.move_loc(1).is_err());
     assert!(locals.borrow_loc(1).is_err());
 
     assert!(locals.copy_loc(LEN + 1).is_err());
-    assert!(locals.move_loc(LEN + 1, false).is_err());
+    assert!(locals.move_loc(LEN + 1).is_err());
     assert!(locals.borrow_loc(LEN + 1).is_err());
 
     Ok(())
@@ -68,7 +68,6 @@ fn struct_borrow_field() -> PartialVMResult<()> {
     locals.store_loc(
         0,
         Value::struct_(Struct::pack(vec![Value::u8(10), Value::bool(false)])),
-        false,
     )?;
     let r: StructRef = locals.borrow_loc(0)?.value_as()?;
 
@@ -101,7 +100,7 @@ fn struct_borrow_nested() -> PartialVMResult<()> {
         Value::struct_(Struct::pack(vec![Value::u8(10), inner(x)]))
     }
 
-    locals.store_loc(0, outer(20), false)?;
+    locals.store_loc(0, outer(20))?;
     let r1: StructRef = locals.borrow_loc(0)?.value_as()?;
     let r2: StructRef = r1.borrow_field(1)?.value_as()?;
 
@@ -132,7 +131,7 @@ fn global_value_non_struct() -> PartialVMResult<()> {
     assert!(GlobalValue::cached(Value::bool(false)).is_err());
 
     let mut locals = Locals::new(1);
-    locals.store_loc(0, Value::u8(0), false)?;
+    locals.store_loc(0, Value::u8(0))?;
     let r = locals.borrow_loc(0)?;
     assert!(GlobalValue::cached(r).is_err());
 
@@ -143,11 +142,11 @@ fn global_value_non_struct() -> PartialVMResult<()> {
 fn legacy_ref_abstract_memory_size_consistency() -> PartialVMResult<()> {
     let mut locals = Locals::new(10);
 
-    locals.store_loc(0, Value::u128(0), false)?;
+    locals.store_loc(0, Value::u128(0))?;
     let r = locals.borrow_loc(0)?;
     assert_eq!(r.legacy_abstract_memory_size(), r.legacy_size());
 
-    locals.store_loc(1, Value::vector_u8([1, 2, 3]), false)?;
+    locals.store_loc(1, Value::vector_u8([1, 2, 3]))?;
     let r = locals.borrow_loc(1)?;
     assert_eq!(r.legacy_abstract_memory_size(), r.legacy_size());
 
@@ -158,7 +157,7 @@ fn legacy_ref_abstract_memory_size_consistency() -> PartialVMResult<()> {
     let r = r.borrow_elem(0, &u8_ty)?;
     assert_eq!(r.legacy_abstract_memory_size(), r.legacy_size());
 
-    locals.store_loc(2, Value::struct_(Struct::pack([])), false)?;
+    locals.store_loc(2, Value::struct_(Struct::pack([])))?;
     let r: Reference = locals.borrow_loc(2)?.value_as()?;
     assert_eq!(r.legacy_abstract_memory_size(), r.legacy_size());
 
@@ -208,7 +207,7 @@ fn legacy_val_abstract_memory_size_consistency() -> PartialVMResult<()> {
         let val_size_old = val.legacy_size();
         assert_eq!(val_size_new, val_size_old);
 
-        locals.store_loc(idx, val, false)?;
+        locals.store_loc(idx, val)?;
 
         let val_size_through_ref = locals
             .borrow_loc(idx)?
@@ -234,50 +233,46 @@ fn test_vm_value_vector_u64_casting() {
 fn test_mem_swap() -> PartialVMResult<()> {
     let mut locals = Locals::new(20);
     // IndexedRef(Locals)
-    locals.store_loc(0, Value::u64(0), false)?;
-    locals.store_loc(1, Value::u64(1), false)?;
-    locals.store_loc(2, Value::address(AccountAddress::ZERO), false)?;
-    locals.store_loc(3, Value::address(AccountAddress::ONE), false)?;
+    locals.store_loc(0, Value::u64(0))?;
+    locals.store_loc(1, Value::u64(1))?;
+    locals.store_loc(2, Value::address(AccountAddress::ZERO))?;
+    locals.store_loc(3, Value::address(AccountAddress::ONE))?;
 
     // ContainerRef
 
     // - Specialized
-    locals.store_loc(4, Value::vector_u64(vec![1, 2]), false)?;
-    locals.store_loc(5, Value::vector_u64(vec![3, 4, 5]), false)?;
-    locals.store_loc(6, Value::vector_address(vec![AccountAddress::ZERO]), false)?;
-    locals.store_loc(7, Value::vector_address(vec![AccountAddress::ONE]), false)?;
+    locals.store_loc(4, Value::vector_u64(vec![1, 2]))?;
+    locals.store_loc(5, Value::vector_u64(vec![3, 4, 5]))?;
+    locals.store_loc(6, Value::vector_address(vec![AccountAddress::ZERO]))?;
+    locals.store_loc(7, Value::vector_address(vec![AccountAddress::ONE]))?;
 
     // - Generic
     // -- Container of container
-    locals.store_loc(8, Value::struct_(Struct::pack(vec![Value::u16(4)])), false)?;
-    locals.store_loc(9, Value::struct_(Struct::pack(vec![Value::u16(5)])), false)?;
-    locals.store_loc(10, Value::signer(AccountAddress::ZERO), false)?;
-    locals.store_loc(11, Value::signer(AccountAddress::ONE), false)?;
+    locals.store_loc(8, Value::struct_(Struct::pack(vec![Value::u16(4)])))?;
+    locals.store_loc(9, Value::struct_(Struct::pack(vec![Value::u16(5)])))?;
+    locals.store_loc(10, Value::signer(AccountAddress::ZERO))?;
+    locals.store_loc(11, Value::signer(AccountAddress::ONE))?;
 
     // -- Container of vector
     locals.store_loc(
         12,
         Value::vector_for_testing_only(vec![Value::u64(1u64), Value::u64(2u64)]),
-        false,
     )?;
     locals.store_loc(
         13,
         Value::vector_for_testing_only(vec![Value::u64(3u64), Value::u64(4u64)]),
-        false,
     )?;
     locals.store_loc(
         14,
         Value::vector_for_testing_only(vec![Value::signer(AccountAddress::ZERO)]),
-        false,
     )?;
     locals.store_loc(
         15,
         Value::vector_for_testing_only(vec![Value::signer(AccountAddress::ONE)]),
-        false,
     )?;
 
     let mut locals2 = Locals::new(2);
-    locals2.store_loc(0, Value::u64(0), false)?;
+    locals2.store_loc(0, Value::u64(0))?;
 
     let get_local =
         |ls: &Locals, idx: usize| ls.borrow_loc(idx).unwrap().value_as::<Reference>().unwrap();
@@ -363,7 +358,7 @@ mod native_values {
     fn test_native_value_borrow() {
         let delayed_value = Value::delayed_value(DelayedFieldID::new_with_width(0, 8));
         let mut locals = Locals::new(1);
-        assert_ok!(locals.store_loc(0, delayed_value, false));
+        assert_ok!(locals.store_loc(0, delayed_value));
 
         let local = assert_ok!(locals.borrow_loc(0));
         let reference = assert_ok!(local.value_as::<Reference>());

@@ -108,8 +108,6 @@ pub fn aptos_prod_vm_config(
     timed_features: &TimedFeatures,
     ty_builder: TypeBuilder,
 ) -> VMConfig {
-    let check_invariant_in_swap_loc =
-        !timed_features.is_enabled(TimedFeatureFlag::DisableInvariantViolationCheckInSwapLoc);
     let paranoid_type_checks = get_paranoid_type_checks();
 
     let mut type_max_cost = 0;
@@ -133,7 +131,6 @@ pub fn aptos_prod_vm_config(
         verifier_config,
         deserializer_config,
         paranoid_type_checks,
-        check_invariant_in_swap_loc,
         max_value_nest_depth: Some(128),
         type_max_cost,
         type_base_cost,
