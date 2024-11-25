@@ -157,7 +157,7 @@ pub trait GasMeter {
     fn charge_call(
         &mut self,
         module_id: &ModuleId,
-        func_name: &str,
+        func_name: &IdentStr,
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
         num_locals: NumArgs,
     ) -> PartialVMResult<()>;
@@ -165,7 +165,7 @@ pub trait GasMeter {
     fn charge_call_generic(
         &mut self,
         module_id: &ModuleId,
-        func_name: &str,
+        func_name: &IdentStr,
         ty_args: impl ExactSizeIterator<Item = impl TypeView> + Clone,
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
         num_locals: NumArgs,
@@ -372,7 +372,7 @@ impl GasMeter for UnmeteredGasMeter {
     fn charge_call(
         &mut self,
         _module_id: &ModuleId,
-        _func_name: &str,
+        _func_name: &IdentStr,
         _args: impl IntoIterator<Item = impl ValueView>,
         _num_locals: NumArgs,
     ) -> PartialVMResult<()> {
@@ -382,7 +382,7 @@ impl GasMeter for UnmeteredGasMeter {
     fn charge_call_generic(
         &mut self,
         _module_id: &ModuleId,
-        _func_name: &str,
+        _func_name: &IdentStr,
         _ty_args: impl ExactSizeIterator<Item = impl TypeView>,
         _args: impl ExactSizeIterator<Item = impl ValueView>,
         _num_locals: NumArgs,

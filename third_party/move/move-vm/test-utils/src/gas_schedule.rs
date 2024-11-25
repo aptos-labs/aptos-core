@@ -242,7 +242,7 @@ impl GasMeter for GasStatus {
     fn charge_call(
         &mut self,
         _module_id: &ModuleId,
-        _func_name: &str,
+        _func_name: &IdentStr,
         args: impl ExactSizeIterator<Item = impl ValueView>,
         _num_locals: NumArgs,
     ) -> PartialVMResult<()> {
@@ -252,7 +252,7 @@ impl GasMeter for GasStatus {
     fn charge_call_generic(
         &mut self,
         _module_id: &ModuleId,
-        _func_name: &str,
+        _func_name: &IdentStr,
         ty_args: impl ExactSizeIterator<Item = impl TypeView>,
         args: impl ExactSizeIterator<Item = impl ValueView>,
         _num_locals: NumArgs,

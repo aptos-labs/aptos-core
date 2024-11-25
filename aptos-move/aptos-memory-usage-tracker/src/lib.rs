@@ -110,7 +110,7 @@ where
         fn charge_call(
             &mut self,
             module_id: &ModuleId,
-            func_name: &str,
+            func_name: &IdentStr,
             args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
             num_locals: NumArgs,
         ) -> PartialVMResult<()>;
@@ -177,7 +177,7 @@ where
     fn charge_call_generic(
         &mut self,
         module_id: &ModuleId,
-        func_name: &str,
+        func_name: &IdentStr,
         ty_args: impl ExactSizeIterator<Item = impl TypeView> + Clone,
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
         num_locals: NumArgs,

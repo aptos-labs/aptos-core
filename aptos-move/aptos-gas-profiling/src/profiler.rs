@@ -409,7 +409,7 @@ where
     fn charge_call(
         &mut self,
         module_id: &ModuleId,
-        func_name: &str,
+        func_name: &IdentStr,
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
         num_locals: NumArgs,
     ) -> PartialVMResult<()> {
@@ -419,7 +419,7 @@ where
         self.record_bytecode(Opcodes::CALL, cost);
         self.frames.push(CallFrame::new_function(
             module_id.clone(),
-            Identifier::new(func_name).unwrap(),
+            func_name.to_owned(),
             vec![],
         ));
 
@@ -429,7 +429,7 @@ where
     fn charge_call_generic(
         &mut self,
         module_id: &ModuleId,
-        func_name: &str,
+        func_name: &IdentStr,
         ty_args: impl ExactSizeIterator<Item = impl TypeView> + Clone,
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
         num_locals: NumArgs,
@@ -446,7 +446,7 @@ where
         self.record_bytecode(Opcodes::CALL_GENERIC, cost);
         self.frames.push(CallFrame::new_function(
             module_id.clone(),
-            Identifier::new(func_name).unwrap(),
+            func_name.to_owned(),
             ty_tags,
         ));
 

@@ -114,7 +114,7 @@ fn native_check_dispatch_type_compatibility_impl(
     Ok(smallvec![Value::bool(
         rhs.ty_param_abilities() == lhs.ty_param_abilities()
             && rhs.return_tys() == lhs.return_tys()
-            && &lhs.param_tys()[0..lhs.param_count() - 1] == rhs.param_tys()
+            && &lhs.param_tys()[0..lhs.param_tys().len() - 1] == rhs.param_tys()
             && !rhs.is_friend_or_private()
             && (!context
                 .get_feature_flags()

@@ -1180,7 +1180,7 @@ pub(crate) struct Resolver<'a> {
 }
 
 impl<'a> Resolver<'a> {
-    fn for_module(
+    pub(crate) fn for_module(
         loader: &'a Loader,
         module_store: &'a LegacyModuleStorageAdapter,
         module_storage: &'a dyn ModuleStorage,
@@ -1195,7 +1195,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn for_script(
+    pub(crate) fn for_script(
         loader: &'a Loader,
         module_store: &'a LegacyModuleStorageAdapter,
         module_storage: &'a dyn ModuleStorage,

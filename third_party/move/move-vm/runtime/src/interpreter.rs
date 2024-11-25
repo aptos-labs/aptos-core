@@ -5,7 +5,7 @@
 use crate::{
     access_control::AccessControlState,
     data_cache::TransactionDataCache,
-    loader::{LegacyModuleStorageAdapter, Loader, Resolver},
+    loader::{LegacyModuleStorageAdapter, LoadedFunctionOwner, Loader, Resolver},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
@@ -504,7 +504,7 @@ impl Interpreter {
             gas_meter.balance_internal(),
             traversal_context,
         );
-        let native_function = function.get_native()?;
+        let native_function = function.as_native_function()?;
 
         gas_meter.charge_native_function_before_execution(
             ty_args.iter().map(|ty| TypeWithLoader { ty, resolver }),
@@ -1007,19 +1007,20 @@ impl Interpreter {
         }
         debug_writeln!(buf)?;
 
-        // Print out the current instruction.
-        debug_writeln!(buf)?;
-        debug_writeln!(buf, "        Code:")?;
-        let pc = frame.pc as usize;
-        let code = function.code();
-        let before = if pc > 3 { pc - 3 } else { 0 };
-        let after = min(code.len(), pc + 4);
-        for (idx, instr) in code.iter().enumerate().take(pc).skip(before) {
-            debug_writeln!(buf, "            [{}] {:?}", idx, instr)?;
-        }
-        debug_writeln!(buf, "          > [{}] {:?}", pc, &code[pc])?;
-        for (idx, instr) in code.iter().enumerate().take(after).skip(pc + 1) {
-            debug_writeln!(buf, "            [{}] {:?}", idx, instr)?;
+        if let Some(code) = function.code() {
+            // Print out the current instruction.
+            debug_writeln!(buf)?;
+            debug_writeln!(buf, "        Code:")?;
+            let pc = frame.pc as usize;
+            let before = if pc > 3 { pc - 3 } else { 0 };
+            let after = min(code.len(), pc + 4);
+            for (idx, instr) in code.iter().enumerate().take(pc).skip(before) {
+                debug_writeln!(buf, "            [{}] {:?}", idx, instr)?;
+            }
+            debug_writeln!(buf, "          > [{}] {:?}", pc, &code[pc])?;
+            for (idx, instr) in code.iter().enumerate().take(after).skip(pc + 1) {
+                debug_writeln!(buf, "            [{}] {:?}", idx, instr)?;
+            }
         }
 
         // Print out the locals.
@@ -1085,15 +1086,16 @@ impl Interpreter {
             )
             .as_str(),
         );
-        let code = current_frame.function.code();
-        let pc = current_frame.pc as usize;
-        if pc < code.len() {
-            let mut i = 0;
-            for bytecode in &code[..pc] {
-                internal_state.push_str(format!("{}> {:?}\n", i, bytecode).as_str());
-                i += 1;
+        if let Some(code) = current_frame.function.code() {
+            let pc = current_frame.pc as usize;
+            if pc < code.len() {
+                let mut i = 0;
+                for bytecode in &code[..pc] {
+                    internal_state.push_str(format!("{}> {:?}\n", i, bytecode).as_str());
+                    i += 1;
+                }
+                internal_state.push_str(format!("{}* {:?}\n", i, code[pc]).as_str());
             }
-            internal_state.push_str(format!("{}* {:?}\n", i, code[pc]).as_str());
         }
         internal_state.push_str(
             format!(
@@ -2284,7 +2286,10 @@ impl Frame {
             };
         }
 
-        let code = self.function.code();
+        let code = self.function.code().ok_or_else(|| {
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message("Native function cannot be an entry point".to_string())
+        })?;
         loop {
             for instruction in &code[self.pc as usize..] {
                 trace!(
@@ -3139,8 +3144,14 @@ impl Frame {
         module_store: &'a LegacyModuleStorageAdapter,
         module_storage: &'a impl ModuleStorage,
     ) -> Resolver<'a> {
-        self.function
-            .get_resolver(loader, module_store, module_storage)
+        match &self.function.owner {
+            LoadedFunctionOwner::Module(module) => {
+                Resolver::for_module(loader, module_store, module_storage, module.clone())
+            },
+            LoadedFunctionOwner::Script(script) => {
+                Resolver::for_script(loader, module_store, module_storage, script.clone())
+            },
+        }
     }
 
     fn location(&self) -> Location {
