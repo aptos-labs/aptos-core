@@ -1524,6 +1524,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             ConsensusMsg::RoundTimeoutMsg(round_timeout) => Some(round_timeout.author()),
             ConsensusMsg::BatchResponse(batch_response) => Some(batch_response.author()),
             ConsensusMsg::BatchRequestMsg(batch_request) => Some(batch_request.source()),
+            ConsensusMsg::SignedBatchInfo(sign_batch_info) => Some(sign_batch_info.author()),
 
             ConsensusMsg::CommitDecisionMsg(_)
             | ConsensusMsg::DAGMessage(_)
@@ -1534,20 +1535,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             | ConsensusMsg::RandGenMessage(_)
             | ConsensusMsg::BatchResponseV2(_)
             | ConsensusMsg::BlockRetrievalRequest(_)
-            |  ConsensusMsg::BlockRetrievalResponse(_)
-            // For SignedBatchInfo, the verify function will check the author
-            |  ConsensusMsg::SignedBatchInfo(_) => None,
+            | ConsensusMsg::BlockRetrievalResponse(_) => None,
         };
 
         if let Some(author) = author {
-            if author != peer_id {
-                bail!(
-                    "Received {:?} message from peer {} with different author {}",
-                    discriminant(msg),
-                    peer_id,
-                    author
-                );
-            }
+            ensure!(
+                author == peer_id,
+                "Received {:?} message from peer {} with different author {}",
+                discriminant(msg),
+                peer_id,
+                author
+            );
         }
 
         Ok(())

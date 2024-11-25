@@ -211,6 +211,10 @@ impl SignedBatchInfoMsg {
     pub fn take(self) -> Vec<SignedBatchInfo> {
         self.signed_infos
     }
+
+    pub fn author(&self) -> PeerId {
+        self.signed_infos[0].signer()
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
