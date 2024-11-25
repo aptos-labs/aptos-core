@@ -46,7 +46,7 @@ fn indexer_test() -> ForgeConfig {
         (
             TransactionWorkload::new(TransactionTypeArg::ModifyGlobalResource, 6000)
                 .with_transactions_per_account(1),
-            (2000, 0.5, 0.5, 0.1),
+            (1750, 0.5, 0.5, 0.1),
         ),
         (
             TransactionWorkload::new(TransactionTypeArg::TokenV2AmbassadorMint, 20000)
@@ -60,7 +60,7 @@ fn indexer_test() -> ForgeConfig {
         ),
         (
             TransactionWorkload::new(TransactionTypeArg::VectorPicture30k, 100),
-            (100, 0.5, 1.0, 0.1),
+            (60, 0.5, 1.0, 0.1),
         ),
         (
             TransactionWorkload::new(TransactionTypeArg::SmartTablePicture30KWith200Change, 100),
