@@ -1722,7 +1722,6 @@ After changing the collection's name, to create tokens - only call functions tha
 <pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_set_description">set_description</a>(mutator_ref: &<a href="collection.md#0x4_collection_MutatorRef">MutatorRef</a>, description: String) <b>acquires</b> <a href="collection.md#0x4_collection_Collection">Collection</a> {
     <b>assert</b>!(<a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_length">string::length</a>(&description) &lt;= <a href="collection.md#0x4_collection_MAX_DESCRIPTION_LENGTH">MAX_DESCRIPTION_LENGTH</a>, <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="collection.md#0x4_collection_EDESCRIPTION_TOO_LONG">EDESCRIPTION_TOO_LONG</a>));
     <b>let</b> <a href="collection.md#0x4_collection">collection</a> = <a href="collection.md#0x4_collection_borrow_mut">borrow_mut</a>(mutator_ref);
-    <a href="collection.md#0x4_collection">collection</a>.description = description;
     <b>if</b> (std::features::module_event_migration_enabled()) {
         <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit">event::emit</a>(<a href="collection.md#0x4_collection_Mutation">Mutation</a> {
             mutated_field_name: <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_utf8">string::utf8</a>(b"description"),
@@ -1736,6 +1735,7 @@ After changing the collection's name, to create tokens - only call functions tha
             <a href="collection.md#0x4_collection_MutationEvent">MutationEvent</a> { mutated_field_name: <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_utf8">string::utf8</a>(b"description") },
         );
     };
+    <a href="collection.md#0x4_collection">collection</a>.description = description;
 }
 </code></pre>
 
@@ -1761,7 +1761,6 @@ After changing the collection's name, to create tokens - only call functions tha
 <pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_set_uri">set_uri</a>(mutator_ref: &<a href="collection.md#0x4_collection_MutatorRef">MutatorRef</a>, uri: String) <b>acquires</b> <a href="collection.md#0x4_collection_Collection">Collection</a> {
     <b>assert</b>!(<a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_length">string::length</a>(&uri) &lt;= <a href="collection.md#0x4_collection_MAX_URI_LENGTH">MAX_URI_LENGTH</a>, <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="collection.md#0x4_collection_EURI_TOO_LONG">EURI_TOO_LONG</a>));
     <b>let</b> <a href="collection.md#0x4_collection">collection</a> = <a href="collection.md#0x4_collection_borrow_mut">borrow_mut</a>(mutator_ref);
-    <a href="collection.md#0x4_collection">collection</a>.uri = uri;
     <b>if</b> (std::features::module_event_migration_enabled()) {
         <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit">event::emit</a>(<a href="collection.md#0x4_collection_Mutation">Mutation</a> {
             mutated_field_name: <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_utf8">string::utf8</a>(b"uri"),
@@ -1775,6 +1774,7 @@ After changing the collection's name, to create tokens - only call functions tha
             <a href="collection.md#0x4_collection_MutationEvent">MutationEvent</a> { mutated_field_name: <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_utf8">string::utf8</a>(b"uri") },
         );
     };
+    <a href="collection.md#0x4_collection">collection</a>.uri = uri;
 }
 </code></pre>
 
