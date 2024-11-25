@@ -2,6 +2,11 @@
 
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+# Unreleased
+
+- Add `--node-api-key` flag to `aptos move replay` to allow for querying the fullnode with an API key.
+
+
 ## [4.5.0] - 2024/11/15
 - Determine network from URL to make explorer links better for legacy users
 - Add support for AIP-80 compliant strings when importing using the CLI arguments or manual input.
