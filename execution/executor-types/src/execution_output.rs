@@ -4,7 +4,10 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{planned::Planned, transactions_with_output::TransactionsWithOutput};
+use crate::{
+    planned::Planned,
+    transactions_with_output::{TransactionsToKeep, TransactionsWithOutput},
+};
 use aptos_drop_helper::DropHelper;
 use aptos_storage_interface::{cached_state_view::StateCache, state_delta::StateDelta};
 use aptos_types::{
@@ -28,7 +31,7 @@ impl ExecutionOutput {
         is_block: bool,
         first_version: Version,
         statuses_for_input_txns: Vec<TransactionStatus>,
-        to_commit: TransactionsWithOutput,
+        to_commit: TransactionsToKeep,
         to_discard: TransactionsWithOutput,
         to_retry: TransactionsWithOutput,
         state_cache: StateCache,
@@ -63,7 +66,7 @@ impl ExecutionOutput {
             is_block: false,
             first_version: state.next_version(),
             statuses_for_input_txns: vec![],
-            to_commit: TransactionsWithOutput::new_empty(),
+            to_commit: TransactionsToKeep::new_empty(),
             to_discard: TransactionsWithOutput::new_empty(),
             to_retry: TransactionsWithOutput::new_empty(),
             state_cache: StateCache::new_empty(state.current.clone()),
@@ -80,7 +83,7 @@ impl ExecutionOutput {
             is_block: false,
             first_version: 0,
             statuses_for_input_txns: vec![success_status; num_txns],
-            to_commit: TransactionsWithOutput::new_dummy_success(txns),
+            to_commit: TransactionsToKeep::new_dummy_success(txns),
             to_discard: TransactionsWithOutput::new_empty(),
             to_retry: TransactionsWithOutput::new_empty(),
             state_cache: StateCache::new_dummy(),
@@ -99,7 +102,7 @@ impl ExecutionOutput {
             is_block: false,
             first_version: self.next_version(),
             statuses_for_input_txns: vec![],
-            to_commit: TransactionsWithOutput::new_empty(),
+            to_commit: TransactionsToKeep::new_empty(),
             to_discard: TransactionsWithOutput::new_empty(),
             to_retry: TransactionsWithOutput::new_empty(),
             state_cache: StateCache::new_dummy(),
@@ -116,7 +119,7 @@ impl ExecutionOutput {
     }
 
     pub fn num_transactions_to_commit(&self) -> usize {
-        self.to_commit.txns().len()
+        self.to_commit.transactions.len()
     }
 
     pub fn next_version(&self) -> Version {
@@ -137,7 +140,7 @@ pub struct Inner {
     // but doesn't contain StateCheckpoint/BlockEpilogue, as those get added during execution
     pub statuses_for_input_txns: Vec<TransactionStatus>,
     // List of all transactions to be committed, including StateCheckpoint/BlockEpilogue if needed.
-    pub to_commit: TransactionsWithOutput,
+    pub to_commit: TransactionsToKeep,
     pub to_discard: TransactionsWithOutput,
     pub to_retry: TransactionsWithOutput,
 

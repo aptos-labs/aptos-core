@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_executor::{AptosTransactionOutput, BlockAptosVM},
+    block_executor::{AptosTransactionOutput, AptosVMBlockExecutorWrapper},
     counters::*,
     data_cache::{AsMoveResolver, StorageAdapter},
     errors::{discarded_output, expect_only_successful_execution},
@@ -22,8 +22,8 @@ use crate::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
-    transaction_validation, verifier,
-    verifier::randomness::get_randomness_annotation,
+    transaction_validation,
+    verifier::{self, randomness::get_randomness_annotation},
     VMBlockExecutor, VMValidator,
 };
 use anyhow::anyhow;
@@ -2781,7 +2781,7 @@ impl AptosVM {
 
 // TODO - move out from this file?
 
-/// Production implementation of TransactionBlockExecutor.
+/// Production implementation of VMBlockExecutor.
 ///
 /// Transaction execution: AptosVM
 /// Executing conflicts: in the input order, via BlockSTM,
@@ -2820,7 +2820,7 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
         );
 
         let count = txn_provider.num_txns();
-        let ret = BlockAptosVM::execute_block::<
+        let ret = AptosVMBlockExecutorWrapper::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
             DefaultTxnProvider<SignatureVerifiedTransaction>,

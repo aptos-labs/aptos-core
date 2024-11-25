@@ -2089,7 +2089,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 Pattern::Struct(sid, std, variant, patterns) => {
                     let mut new_inst = vec![];
                     for ty in &std.inst {
-                        let nty = subs.specialize(ty);
+                        // use `specialize_with_defaults` to get type info from constraints
+                        let nty: Type = subs.specialize_with_defaults(ty);
                         new_inst.push(nty);
                     }
                     let mut new_std = std.clone();

@@ -667,11 +667,18 @@ pub async fn simulate_multistep_proposal(
         };
         // TODO: ensure all scripts trigger reconfiguration.
 
+        println!(
+            "{}",
+            format!("Fee statement: {:#?}", vm_output.fee_statement())
+                .lines()
+                .map(|line| format!("        {}", line))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+
         let txn_output = vm_output
             .try_materialize_into_transaction_output(&resolver)
             .context("failed to materialize transaction output")?;
-
-        println!("        Gas used: {}", txn_output.gas_used());
 
         let txn_status = txn_output.status();
         match txn_status {

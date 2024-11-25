@@ -159,7 +159,6 @@ impl Cmd {
 mod test {
     use super::*;
     use crate::{
-        common::NUM_STATE_SHARDS,
         db::{
             test_helper::{arb_blocks_to_commit_with_block_nums, update_in_memory_state},
             AptosDB,
@@ -180,6 +179,7 @@ mod test {
     };
     use aptos_storage_interface::DbReader;
     use aptos_temppath::TempPath;
+    use aptos_types::state_store::NUM_STATE_SHARDS;
     use proptest::prelude::*;
 
     proptest! {

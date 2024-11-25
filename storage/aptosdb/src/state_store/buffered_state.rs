@@ -11,9 +11,7 @@ use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::SmtAncestors;
 use aptos_storage_interface::{db_ensure as ensure, state_delta::StateDelta, AptosDbError, Result};
-use aptos_types::state_store::{
-    combine_sharded_state_updates, state_value::StateValue, ShardedStateUpdates,
-};
+use aptos_types::state_store::{state_value::StateValue, ShardedStateUpdates};
 use std::{
     sync::{
         mpsc,
@@ -108,6 +106,7 @@ impl BufferedState {
                     self.state_until_checkpoint.as_ref().expect("Must exist");
                 state_until_checkpoint
                     .updates_since_base
+                    .shards
                     .iter()
                     .map(|shard| shard.len())
                     .sum::<usize>()
@@ -156,7 +155,6 @@ impl BufferedState {
     ) -> Result<()> {
         {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["update_current_state"]);
-
             let mut state_after_checkpoint = self.state_after_checkpoint.lock();
 
             assert!(new_state_after_checkpoint
@@ -173,10 +171,10 @@ impl BufferedState {
                     new_state_after_checkpoint.base_version > state_after_checkpoint.base_version,
                     "Diff between base and latest checkpoints provided, while they are the same.",
                 );
-                combine_sharded_state_updates(
-                    &mut state_after_checkpoint.updates_since_base,
-                    updates_until_next_checkpoint_since_current,
-                );
+                state_after_checkpoint
+                    .updates_since_base
+                    .clone_merge(updates_until_next_checkpoint_since_current);
+
                 let mut old_state =
                     state_after_checkpoint.replace_with(new_state_after_checkpoint.clone());
                 old_state.current = state_after_checkpoint.base.clone();
