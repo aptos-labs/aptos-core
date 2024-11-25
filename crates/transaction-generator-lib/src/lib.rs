@@ -94,7 +94,6 @@ pub enum EconiaFlowType {
     Basic,
     Mixed,
     Market,
-    Real,
 }
 
 #[derive(Debug, Copy, Clone, ValueEnum, Default, Deserialize, Parser, Serialize)]
@@ -117,6 +116,11 @@ pub enum WorkflowKind {
         num_markets: u64,
         // If this is flag is set, the same accounts will be reused for placing multiple orders
         reuse_accounts_for_orders: bool,
+        // Publish Econia package during the test
+        publish_packages: bool,
+    },
+    EconiaReal {
+        num_users: usize,
         // Publish Econia package during the test
         publish_packages: bool,
     },

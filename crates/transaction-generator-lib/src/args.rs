@@ -573,11 +573,8 @@ progress_type: WorkflowProgress::WhenDone {
                 use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::EconiaReal => TransactionType::Workflow {
-                workflow_kind: WorkflowKind::Econia {
+                workflow_kind: WorkflowKind::EconiaReal {
                     num_users: 600000,
-                    flow_type: crate::EconiaFlowType::Real,
-                    num_markets: 2,
-                    reuse_accounts_for_orders: true,
                     publish_packages: true,
                 },
                 // progress_type: WorkflowProgress::MoveByPhases,
@@ -588,11 +585,8 @@ progress_type: WorkflowProgress::WhenDone {
                 use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::EconiaRealNoPublish => TransactionType::Workflow {
-                workflow_kind: WorkflowKind::Econia {
+                workflow_kind: WorkflowKind::EconiaReal {
                     num_users: 600000,
-                    flow_type: crate::EconiaFlowType::Real,
-                    num_markets: 2,
-                    reuse_accounts_for_orders: true,
                     publish_packages: false,
                 },
                 // progress_type: WorkflowProgress::MoveByPhases,
