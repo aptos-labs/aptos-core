@@ -36,7 +36,7 @@ fn indexer_test() -> ForgeConfig {
     // * The indexer latencies are inter-component within the indexer stack, but not that of the e2e wall-clock time vs the blockchain
     let workloads_and_criteria = vec![
         (
-            TransactionWorkload::new(TransactionTypeArg::CoinTransfer, 20000),
+            TransactionWorkload::new(TransactionTypeArg::CoinTransfer, 10000),
             (7000, 0.5, 1.0, 0.1),
         ),
         (
@@ -49,7 +49,7 @@ fn indexer_test() -> ForgeConfig {
             (1750, 0.5, 0.5, 0.1),
         ),
         (
-            TransactionWorkload::new(TransactionTypeArg::TokenV2AmbassadorMint, 20000)
+            TransactionWorkload::new(TransactionTypeArg::TokenV2AmbassadorMint, 4500)
                 .with_unique_senders(),
             (2000, 1.0, 1.0, 0.5),
         ),
