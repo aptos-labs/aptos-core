@@ -9,7 +9,9 @@ use crate::{
     transactions_with_output::{TransactionsToKeep, TransactionsWithOutput},
 };
 use aptos_drop_helper::DropHelper;
-use aptos_storage_interface::{cached_state_view::StateCache, state_delta::StateDelta};
+use aptos_storage_interface::state_store::{
+    state_delta::StateDelta, state_view::cached_state_view::StateCache,
+};
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,

@@ -11,7 +11,7 @@ use crate::{
     },
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_storage_interface::{state_delta::StateDelta, DbReader, ExecutedTrees};
+use aptos_storage_interface::{state_store::state_delta::StateDelta, DbReader, ExecutedTrees};
 use aptos_types::{proof::accumulator::InMemoryTransactionAccumulator, transaction::Version};
 use std::{collections::VecDeque, sync::Arc};
 

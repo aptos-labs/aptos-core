@@ -5,8 +5,9 @@
 
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DropHelper;
-use aptos_storage_interface::state_delta::StateDelta;
-use aptos_types::state_store::ShardedStateUpdates;
+use aptos_storage_interface::state_store::{
+    sharded_state_updates::ShardedStateUpdates, state_delta::StateDelta,
+};
 use derive_more::Deref;
 use std::sync::Arc;
 
