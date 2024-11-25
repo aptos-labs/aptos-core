@@ -550,12 +550,12 @@ fn fullnode_reboot_stress_test() -> ForgeConfig {
 
 fn validator_reboot_stress_test() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
-        .with_initial_fullnode_count(1)
+        .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
+        // .with_initial_fullnode_count(1)
         .add_network_test(ValidatorRebootStressTest {
             num_simultaneously: 2,
-            down_time_secs: 5.0,
-            pause_secs: 5.0,
+            down_time_secs: 15.0,
+            pause_secs: 30.0,
         })
         .with_success_criteria(SuccessCriteria::new(2000).add_wait_for_catchup_s(600))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
