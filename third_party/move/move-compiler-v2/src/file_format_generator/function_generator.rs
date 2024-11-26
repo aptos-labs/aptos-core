@@ -159,8 +159,15 @@ impl<'a> FunctionGenerator<'a> {
                     .get_extension::<Options>()
                     .expect("Options is available");
                 if options.experiment_on(Experiment::PEEPHOLE_OPTIMIZATION) {
-                    // TODO: fix source mapping (#14167)
-                    peephole_optimizer::run(&mut code);
+                    let transformed_code_chunk = peephole_optimizer::optimize(&code.code);
+                    // Fix the source map for the optimized code.
+                    fun_gen
+                        .gen
+                        .source_map
+                        .remap_code_map(def_idx, transformed_code_chunk.original_offsets)
+                        .expect(SOURCE_MAP_OK);
+                    // Replace the code with the optimized one.
+                    code.code = transformed_code_chunk.code;
                 }
             } else {
                 // Write the spec block table back to the environment.

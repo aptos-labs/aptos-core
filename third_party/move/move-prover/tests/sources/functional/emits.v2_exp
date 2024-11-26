@@ -76,7 +76,6 @@ error: function does not emit the expected event
     =         x = <redacted>
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:106: conditional_wrong_condition_incorrect
-    =     at tests/sources/functional/emits.move:107: conditional_wrong_condition_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:111: conditional_wrong_condition_incorrect (spec)
 
@@ -90,7 +89,6 @@ error: function does not emit the expected event
     =         x = <redacted>
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:115: conditional_missing_condition_incorrect
-    =     at tests/sources/functional/emits.move:116: conditional_missing_condition_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:120: conditional_missing_condition_incorrect (spec)
 
