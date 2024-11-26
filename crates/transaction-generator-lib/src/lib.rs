@@ -401,7 +401,7 @@ pub async fn create_txn_generator_creator(
                         &root_account,
                         txn_executor,
                         *num_modules,
-                        use_account_pool.then(|| accounts_pool.clone()),
+                        Some(accounts_pool.clone()),
                         cur_phase.clone(),
                         *progress_type,
                     )
