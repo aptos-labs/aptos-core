@@ -147,7 +147,7 @@ pub struct InnerBuilder {
     batch_store: Option<Arc<BatchStore>>,
     batch_reader: Option<Arc<dyn BatchReader>>,
     broadcast_proofs: bool,
-    consensus_key: Option<Arc<PrivateKey>>,
+    consensus_key: Arc<PrivateKey>,
 }
 
 impl InnerBuilder {
@@ -167,7 +167,7 @@ impl InnerBuilder {
         backend: SecureBackend,
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
         broadcast_proofs: bool,
-        consensus_key: Option<Arc<PrivateKey>>,
+        consensus_key: Arc<PrivateKey>,
     ) -> Self {
         let (coordinator_tx, coordinator_rx) = futures_channel::mpsc::channel(config.channel_size);
         let (batch_generator_cmd_tx, batch_generator_cmd_rx) =
@@ -228,11 +228,7 @@ impl InnerBuilder {
     }
 
     fn create_batch_store(&mut self) -> Arc<BatchReaderImpl<NetworkSender>> {
-        let private_key = self
-            .consensus_key
-            .clone()
-            .expect("Consensus key is not available!");
-        let signer = ValidatorSigner::new(self.author, private_key);
+        let signer = ValidatorSigner::new(self.author, self.consensus_key.clone());
 
         let latest_ledger_info_with_sigs = self
             .aptos_db
