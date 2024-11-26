@@ -513,6 +513,8 @@ impl TransactionRestoreBatchController {
         >,
     ) -> Result<()> {
         let (first_version, _) = self.replay_from_version.unwrap();
+        restore_handler.force_state_version_for_kv_restore(first_version.checked_sub(1))?;
+
         let mut base_version = first_version;
         let mut offset = 0u64;
         let replay_start = Instant::now();

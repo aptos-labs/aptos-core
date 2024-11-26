@@ -10,6 +10,7 @@ use crate::{
     utils::iterators::ExpectContinuousVersions,
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
+use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{transaction::Version, write_set::WriteSet};
@@ -109,9 +110,8 @@ impl WriteSetDb {
         first_version: Version,
         write_sets: impl IndexedParallelIterator<Item = &'a WriteSet>,
     ) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_write_sets"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_write_sets"]);
+
         let batch = SchemaBatch::new();
         let num_txns = write_sets.len();
 
@@ -123,9 +123,7 @@ impl WriteSetDb {
 
                 Ok(())
             })?;
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_write_sets___commit"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_write_sets___commit"]);
         self.write_schemas(batch)
     }
 

@@ -15,9 +15,18 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_drop_helper::ArcAsyncDrop;
-use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_types::proof::{definition::NodeInProof, SparseMerkleLeafNode, SparseMerkleProofExt};
+use aptos_vm::AptosVM;
+use once_cell::sync::Lazy;
 use std::cmp::Ordering;
+
+static POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(AptosVM::get_num_proof_reading_threads())
+        .thread_name(|index| format!("smt_update_{}", index))
+        .build()
+        .unwrap()
+});
 
 type Result<T> = std::result::Result<T, UpdateError>;
 
@@ -99,19 +108,19 @@ impl<V: Clone + CryptoHash + Send + Sync + 'static> InMemSubTreeInfo<V> {
 }
 
 #[derive(Clone)]
-enum PersistedSubTreeInfo<'a> {
-    ProofPathInternal { proof: &'a SparseMerkleProofExt },
+enum PersistedSubTreeInfo {
+    ProofPathInternal { proof: SparseMerkleProofExt },
     ProofSibling { hash: HashValue },
     Leaf { leaf: SparseMerkleLeafNode },
 }
 
 #[derive(Clone)]
-enum SubTreeInfo<'a, V: ArcAsyncDrop> {
+enum SubTreeInfo<V: ArcAsyncDrop> {
     InMem(InMemSubTreeInfo<V>),
-    Persisted(PersistedSubTreeInfo<'a>),
+    Persisted(PersistedSubTreeInfo),
 }
 
-impl<'a, V: Clone + CryptoHash + Send + Sync + 'static> SubTreeInfo<'a, V> {
+impl<'a, V: Clone + CryptoHash + Send + Sync + 'static> SubTreeInfo<V> {
     fn new_empty() -> Self {
         Self::InMem(InMemSubTreeInfo::Empty)
     }
@@ -133,7 +142,7 @@ impl<'a, V: Clone + CryptoHash + Send + Sync + 'static> SubTreeInfo<'a, V> {
         }
     }
 
-    fn new_on_proof_path(proof: &'a SparseMerkleProofExt, depth: usize) -> Self {
+    fn new_on_proof_path(proof: SparseMerkleProofExt, depth: usize) -> Self {
         match proof.bottom_depth().cmp(&depth) {
             Ordering::Greater => Self::Persisted(PersistedSubTreeInfo::ProofPathInternal { proof }),
             Ordering::Equal => match proof.leaf() {
@@ -150,7 +159,7 @@ impl<'a, V: Clone + CryptoHash + Send + Sync + 'static> SubTreeInfo<'a, V> {
         proof_reader: &'a impl ProofRead,
     ) -> Result<Self> {
         let proof = proof_reader
-            .get_proof(a_descendant_key)
+            .get_proof(a_descendant_key, depth)
             .ok_or(UpdateError::MissingProof)?;
         if depth > proof.bottom_depth() {
             return Err(UpdateError::ShortProof {
@@ -247,7 +256,8 @@ impl<'a, V: Clone + CryptoHash + Send + Sync + 'static> SubTreeInfo<'a, V> {
                 PersistedSubTreeInfo::ProofPathInternal { proof } => {
                     let sibling_child =
                         SubTreeInfo::new_proof_sibling(proof.sibling_at_depth(depth + 1).unwrap());
-                    let on_path_child = SubTreeInfo::new_on_proof_path(proof, depth + 1);
+                    let on_path_child =
+                        SubTreeInfo::new_on_proof_path(myself.expect_into_proof(), depth + 1);
                     swap_if(on_path_child, sibling_child, a_descendent_key.bit(depth))
                 },
                 PersistedSubTreeInfo::ProofSibling { .. } => unreachable!(),
@@ -271,11 +281,18 @@ impl<'a, V: Clone + CryptoHash + Send + Sync + 'static> SubTreeInfo<'a, V> {
             },
         }
     }
+
+    fn expect_into_proof(self) -> SparseMerkleProofExt {
+        match self {
+            SubTreeInfo::Persisted(PersistedSubTreeInfo::ProofPathInternal { proof }) => proof,
+            _ => unreachable!("Known variant."),
+        }
+    }
 }
 
 pub struct SubTreeUpdater<'a, V: ArcAsyncDrop> {
     depth: usize,
-    info: SubTreeInfo<'a, V>,
+    info: SubTreeInfo<V>,
     updates: &'a [(HashValue, Option<&'a V>)],
     generation: u64,
 }
@@ -312,9 +329,7 @@ impl<'a, V: ArcAsyncDrop + Clone + CryptoHash> SubTreeUpdater<'a, V> {
                     && left.updates.len() >= MIN_PARALLELIZABLE_SIZE
                     && right.updates.len() >= MIN_PARALLELIZABLE_SIZE
                 {
-                    THREAD_MANAGER
-                        .get_exe_cpu_pool()
-                        .join(|| left.run(proof_reader), || right.run(proof_reader))
+                    POOL.join(|| left.run(proof_reader), || right.run(proof_reader))
                 } else {
                     (left.run(proof_reader), right.run(proof_reader))
                 };
