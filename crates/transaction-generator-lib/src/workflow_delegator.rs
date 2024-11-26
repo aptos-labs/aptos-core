@@ -4,8 +4,7 @@
 use crate::{
     account_generator::AccountGeneratorCreator,
     accounts_pool_wrapper::{
-        AccountsPoolWrapperCreator, AddHistoryWrapperCreator, MarketMakerPoolWrapperCreator,
-        ReuseAccountsPoolWrapperCreator,
+        AccountsPoolWrapperCreator, AddHistoryWrapperCreator, BucketedAccountsPoolWrapperCreator, MarketMakerPoolWrapperCreator, ReuseAccountsPoolWrapperCreator
     },
     call_custom_modules::CustomModulesDelegationGeneratorCreator,
     econia_order_generator::{
@@ -14,7 +13,7 @@ use crate::{
         EconiaRealOrderTransactionGenerator, EconiaRegisterMarketUserTransactionGenerator,
     },
     entry_points::EntryPointTransactionGenerator,
-    EconiaFlowType, EntryPoints, ObjectPool, ReliableTransactionSubmitter, RootAccountHandle,
+    EconiaFlowType, EntryPoints, ObjectPool, BucketedAccountPool, ReliableTransactionSubmitter, RootAccountHandle,
     TransactionGenerator, TransactionGeneratorCreator, WorkflowKind, WorkflowProgress,
 };
 use aptos_logger::{info, sample, sample::SampleRate};
@@ -393,8 +392,9 @@ impl WorkflowTxnGeneratorCreator {
                 // info!("Create_accounts {:?}", create_accounts);
                 let created_pool = initial_account_pool.unwrap_or(Arc::new(ObjectPool::new()));
                 let register_market_accounts_pool = Arc::new(ObjectPool::new());
-                let deposit_coins_pool = Arc::new(ObjectPool::new());
-                let place_orders_pool = Arc::new(ObjectPool::new());
+                let source_addresses = created_pool.pool.read().iter().map(|a| a.address().clone()).collect();
+                let deposit_coins_pool = Arc::new(BucketedAccountPool::new(Arc::new(source_addresses)));
+                // let place_orders_pool = Arc::new(ObjectPool::new());
 
                 let mut packages = CustomModulesDelegationGeneratorCreator::publish_package(
                     init_txn_factory.clone(),
@@ -509,7 +509,7 @@ impl WorkflowTxnGeneratorCreator {
                     created_pool.clone(),
                 ));
 
-                creators.push(Box::new(AccountsPoolWrapperCreator::new(
+                creators.push(Box::new(BucketedAccountsPoolWrapperCreator::new(
                     Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
                         txn_factory.clone(),
                         packages.clone(),
@@ -522,7 +522,7 @@ impl WorkflowTxnGeneratorCreator {
                     register_market_accounts_pool.clone(),
                 ));
 
-                if reuse_accounts_for_orders {
+                // if reuse_accounts_for_orders {
                     creators.push(Box::new(ReuseAccountsPoolWrapperCreator::new(
                         Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
                             txn_factory.clone(),
@@ -534,20 +534,21 @@ impl WorkflowTxnGeneratorCreator {
                     stage_switch_conditions.push(StageSwitchCondition::MaxTransactions(
                         Arc::new(AtomicUsize::new(2_000_000)),
                     ));
-                } else {
-                    creators.push(Box::new(AccountsPoolWrapperCreator::new(
-                        Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
-                            txn_factory.clone(),
-                            packages.clone(),
-                            econia_place_orders_worker,
-                        )),
-                        deposit_coins_pool.clone(),
-                        Some(place_orders_pool.clone()),
-                    )));
-                    stage_switch_conditions.push(StageSwitchCondition::WhenPoolBecomesEmpty(
-                        deposit_coins_pool.clone(),
-                    ));
-                }
+                // } 
+                // else {
+                //     creators.push(Box::new(AccountsPoolWrapperCreator::new(
+                //         Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
+                //             txn_factory.clone(),
+                //             packages.clone(),
+                //             econia_place_orders_worker,
+                //         )),
+                //         deposit_coins_pool.clone(),
+                //         Some(place_orders_pool.clone()),
+                //     )));
+                //     stage_switch_conditions.push(StageSwitchCondition::WhenPoolBecomesEmpty(
+                //         deposit_coins_pool.clone(),
+                //     ));
+                // }
 
                 Self::new(stage_tracking, creators, stage_switch_conditions)
             },

@@ -473,14 +473,14 @@ impl TransactionGeneratorCreator for MarketMakerPoolWrapperCreator {
 pub struct ReuseAccountsPoolWrapperGenerator {
     rng: StdRng,
     generator: Box<dyn TransactionGenerator>,
-    source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+    source_accounts_pool: Arc<BucketedAccountPool<AccountAddress>>,
 }
 
 impl ReuseAccountsPoolWrapperGenerator {
     pub fn new(
         rng: StdRng,
         generator: Box<dyn TransactionGenerator>,
-        source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+        source_accounts_pool: Arc<BucketedAccountPool<AccountAddress>>,
     ) -> Self {
         Self {
             rng,
@@ -493,14 +493,14 @@ impl ReuseAccountsPoolWrapperGenerator {
 impl TransactionGenerator for ReuseAccountsPoolWrapperGenerator {
     fn generate_transactions(
         &mut self,
-        _account: &LocalAccount,
+        account: &LocalAccount,
         num_to_create: usize,
         _history: &[String],
         _market_maker: bool,
     ) -> Vec<SignedTransaction> {
         let mut accounts_to_use =
             self.source_accounts_pool
-                .take_from_pool(num_to_create, true, &mut self.rng);
+                .take_from_pool(account.address(), num_to_create, true, &mut self.rng);
         if accounts_to_use.is_empty() {
             return Vec::new();
         }
@@ -512,20 +512,20 @@ impl TransactionGenerator for ReuseAccountsPoolWrapperGenerator {
             })
             .collect();
 
-        self.source_accounts_pool.add_to_pool(accounts_to_use);
+        self.source_accounts_pool.add_to_bucket(account.address(), accounts_to_use);
         txns
     }
 }
 
 pub struct ReuseAccountsPoolWrapperCreator {
     creator: Box<dyn TransactionGeneratorCreator>,
-    source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+    source_accounts_pool: Arc<BucketedAccountPool<AccountAddress>>,
 }
 
 impl ReuseAccountsPoolWrapperCreator {
     pub fn new(
         creator: Box<dyn TransactionGeneratorCreator>,
-        source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+        source_accounts_pool: Arc<BucketedAccountPool<AccountAddress>>,
     ) -> Self {
         Self {
             creator,

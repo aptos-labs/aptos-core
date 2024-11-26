@@ -531,7 +531,7 @@ impl<Bucket: Clone + Eq + PartialEq + Hash> BucketedAccountPool<Bucket> {
 /// It's efficient to lock the objects for short time - and replace
 /// in place, but its not a concurrent datastructure.
 pub struct ObjectPool<T> {
-    pool: RwLock<Vec<T>>,
+    pub pool: RwLock<Vec<T>>,
 }
 
 impl<T> ObjectPool<T> {
@@ -632,6 +632,9 @@ impl<T> ObjectPool<T> {
     pub(crate) fn len(&self) -> usize {
         self.pool.read().len()
     }
+
+    // pub(crate) fn addresses(&self) -> Vec<AccountAddress> {
+    // }
 }
 
 impl<T: Clone> ObjectPool<T> {
