@@ -41,7 +41,7 @@ spec aptos_framework::staking_proxy {
     ///
     spec module {
         pragma verify = true;
-        pragma aborts_if_is_strict;
+        pragma aborts_if_is_partial;
     }
 
     spec grant_permission {

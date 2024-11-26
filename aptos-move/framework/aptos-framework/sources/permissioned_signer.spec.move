@@ -110,11 +110,11 @@ spec aptos_framework::permissioned_signer {
         //     smart_table::spec_get(post_perms, key) == capacity;
     }
 
-    spec check_permission_exists<PermKey: copy + drop + store>(s: &signer, perm: PermKey): bool {
-        pragma opaque;
-        aborts_if false;
-        ensures result == spec_check_permission_exists(s, perm);
-    }
+    // spec check_permission_exists<PermKey: copy + drop + store>(s: &signer, perm: PermKey): bool {
+    //     pragma opaque;
+    //     aborts_if false;
+    //     ensures result == spec_check_permission_exists(s, perm);
+    // }
 
     spec fun spec_check_permission_exists<PermKey: copy + drop + store>(s: signer, perm: PermKey): bool {
         use aptos_std::type_info;

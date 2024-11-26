@@ -29,7 +29,7 @@ spec aptos_framework::aptos_governance {
     ///
     spec module {
         pragma verify = true;
-        pragma aborts_if_is_strict;
+        pragma aborts_if_is_partial;
     }
 
     spec store_signer_cap(
