@@ -150,7 +150,7 @@ impl<'a, V: Clone + CryptoHash + Send + Sync + 'static> SubTreeInfo<'a, V> {
         proof_reader: &'a impl ProofRead,
     ) -> Result<Self> {
         let proof = proof_reader
-            .get_proof(a_descendant_key)
+            .get_proof(a_descendant_key, depth)
             .ok_or(UpdateError::MissingProof)?;
         if depth > proof.bottom_depth() {
             return Err(UpdateError::ShortProof {
@@ -313,7 +313,10 @@ impl<'a, V: ArcAsyncDrop + Clone + CryptoHash> SubTreeUpdater<'a, V> {
                     && right.updates.len() >= MIN_PARALLELIZABLE_SIZE
                 {
                     THREAD_MANAGER
-                        .get_exe_cpu_pool()
+                        // TODO(aldenhu):
+                        //     Maybe dedicated pool for reading proofs?
+                        //     Maybe configurable size.
+                        .get_high_pri_io_pool()
                         .join(|| left.run(proof_reader), || right.run(proof_reader))
                 } else {
                     (left.run(proof_reader), right.run(proof_reader))

@@ -6,12 +6,17 @@
 
 use crate::{
     chunk_executor::chunk_result_verifier::ChunkResultVerifier,
+    metrics::CHUNK_OTHER_TIMERS,
     types::{
         executed_chunk::ExecutedChunk, partial_state_compute_result::PartialStateComputeResult,
     },
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_storage_interface::{state_store::state_delta::StateDelta, DbReader, LedgerSummary};
+use aptos_metrics_core::TimerHelper;
+use aptos_storage_interface::{
+    state_store::{state::LedgerState, state_summary::LedgerStateSummary},
+    DbReader, LedgerSummary,
+};
 use aptos_types::{proof::accumulator::InMemoryTransactionAccumulator, transaction::Version};
 use std::{collections::VecDeque, sync::Arc};
 
@@ -29,11 +34,13 @@ pub(crate) struct ChunkToUpdateLedger {
 ///    ... | to_commit | to_update_ledger | ---> (txn version increases)
 ///                     \                \
 ///                      \                latest_state
+///                       latest_state_summary
 ///                       latest_txn_accumulator
 ///
 pub struct ChunkCommitQueue {
     /// Notice that latest_state and latest_txn_accumulator are at different versions.
-    latest_state: Arc<StateDelta>,
+    latest_state: LedgerState,
+    latest_state_summary: LedgerStateSummary,
     latest_txn_accumulator: Arc<InMemoryTransactionAccumulator>,
     to_commit: VecDeque<Option<ExecutedChunk>>,
     to_update_ledger: VecDeque<Option<ChunkToUpdateLedger>>,
@@ -43,18 +50,21 @@ impl ChunkCommitQueue {
     pub(crate) fn new_from_db(db: &Arc<dyn DbReader>) -> Result<Self> {
         let LedgerSummary {
             state,
+            state_summary,
             transaction_accumulator,
         } = db.get_pre_committed_ledger_summary()?;
+
         Ok(Self {
             latest_state: state,
+            latest_state_summary: state_summary,
             latest_txn_accumulator: transaction_accumulator,
             to_commit: VecDeque::new(),
             to_update_ledger: VecDeque::new(),
         })
     }
 
-    pub(crate) fn latest_state(&self) -> Arc<StateDelta> {
-        self.latest_state.clone()
+    pub(crate) fn latest_state(&self) -> &LedgerState {
+        &self.latest_state
     }
 
     pub(crate) fn expecting_version(&self) -> Version {
@@ -65,7 +75,9 @@ impl ChunkCommitQueue {
         &mut self,
         chunk_to_update_ledger: ChunkToUpdateLedger,
     ) -> Result<()> {
-        self.latest_state = chunk_to_update_ledger.output.expect_result_state().clone();
+        let _timer = CHUNK_OTHER_TIMERS.timer_with(&["enqueue_for_ledger_update"]);
+
+        self.latest_state = chunk_to_update_ledger.output.result_state().clone();
         self.to_update_ledger
             .push_back(Some(chunk_to_update_ledger));
         Ok(())
@@ -73,7 +85,11 @@ impl ChunkCommitQueue {
 
     pub(crate) fn next_chunk_to_update_ledger(
         &mut self,
-    ) -> Result<(Arc<InMemoryTransactionAccumulator>, ChunkToUpdateLedger)> {
+    ) -> Result<(
+        LedgerStateSummary,
+        Arc<InMemoryTransactionAccumulator>,
+        ChunkToUpdateLedger,
+    )> {
         let chunk_opt = self
             .to_update_ledger
             .front_mut()
@@ -81,10 +97,16 @@ impl ChunkCommitQueue {
         let chunk = chunk_opt
             .take()
             .ok_or_else(|| anyhow!("Next chunk to update ledger has already been processed."))?;
-        Ok((self.latest_txn_accumulator.clone(), chunk))
+        Ok((
+            self.latest_state_summary.clone(),
+            self.latest_txn_accumulator.clone(),
+            chunk,
+        ))
     }
 
     pub(crate) fn save_ledger_update_output(&mut self, chunk: ExecutedChunk) -> Result<()> {
+        let _timer = CHUNK_OTHER_TIMERS.timer_with(&["save_ledger_update_output"]);
+
         ensure!(
             !self.to_update_ledger.is_empty(),
             "to_update_ledger is empty."
@@ -93,6 +115,11 @@ impl ChunkCommitQueue {
             self.to_update_ledger.front().unwrap().is_none(),
             "Head of to_update_ledger has not been processed."
         );
+        self.latest_state_summary = chunk
+            .output
+            .expect_state_checkpoint_output()
+            .state_summary
+            .clone();
         self.latest_txn_accumulator = chunk
             .output
             .expect_ledger_update_output()

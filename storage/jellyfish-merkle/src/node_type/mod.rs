@@ -718,6 +718,7 @@ where
         }
     }
 
+    // TODO(aldenhu): return ref?
     /// Gets the account key, the hashed account address.
     pub fn account_key(&self) -> HashValue {
         self.account_key

@@ -17,6 +17,7 @@ use aptos_config::config::{RocksdbConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_crypto::hash::CryptoHash;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::info;
+use aptos_metrics_core::TimerHelper;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_storage_interface::{state_store::NUM_STATE_SHARDS, Result};
@@ -115,7 +116,7 @@ impl StateKvDb {
     pub(crate) fn commit(
         &self,
         version: Version,
-        state_kv_metadata_batch: SchemaBatch,
+        state_kv_metadata_batch: Option<SchemaBatch>,
         sharded_state_kv_batches: [SchemaBatch; NUM_STATE_SHARDS],
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
@@ -141,13 +142,9 @@ impl StateKvDb {
                 }
             });
         }
-
-        {
-            let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["state_kv_db__commit_metadata"])
-                .start_timer();
-            self.state_kv_metadata_db
-                .write_schemas(state_kv_metadata_batch)?;
+        if let Some(batch) = state_kv_metadata_batch {
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_kv_db__commit_metadata"]);
+            self.state_kv_metadata_db.write_schemas(batch)?;
         }
 
         self.write_progress(version)
