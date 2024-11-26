@@ -591,6 +591,7 @@ impl Execution {
                         cur_version
                     ));
                 }
+                println!("gas v1:{}, gas v2: {}", gas_used_1, gas_used_2);
                 let (diff, gas2_gt_gas1, gas1_gt_gas_2) =
                     gas_diff(*gas_used_1, *gas_used_2, GAS_DIFF_PERCENTAGE);
                 let greater_version = if gas1_gt_gas_2 { "v1" } else { "v2" };
