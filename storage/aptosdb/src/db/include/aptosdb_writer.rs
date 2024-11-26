@@ -21,7 +21,7 @@ impl DbWriter for AptosDB {
                 .expect("Concurrent committing detected.");
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["pre_commit_ledger"]);
 
-            chunk.latest_in_memory_state.current.log_generation("db_save");
+            chunk.state_auth.global_state.log_generation("db_save");
 
             self.pre_commit_validation(&chunk)?;
             let _new_root_hash = self.calculate_and_commit_ledger_and_state_kv(
@@ -230,12 +230,6 @@ impl AptosDB {
             !chunk.is_empty(),
             "chunk is empty, nothing to save.",
         );
-        ensure!(
-            Some(chunk.expect_last_version()) == chunk.latest_in_memory_state.current_version,
-            "the last_version {:?} to commit doesn't match the current_version {:?} in latest_in_memory_state",
-            chunk.expect_last_version(),
-            chunk.latest_in_memory_state.current_version.expect("Must exist"),
-        );
 
         {
             let current_state_guard = self.state_store.current_state();
@@ -256,6 +250,7 @@ impl AptosDB {
                 current_state.next_version(),
             );
         }
+        // FIXME(aldenhu): check parent accumulator, parent state, and parent auth
 
         Ok(())
     }
@@ -333,17 +328,15 @@ impl AptosDB {
             .start_timer();
 
         let ledger_metadata_batch = SchemaBatch::new();
-        let sharded_state_kv_batches = new_sharded_kv_schema_batch();
         let state_kv_metadata_batch = SchemaBatch::new();
 
-        // TODO(grao): Make state_store take sharded state updates.
         self.state_store.put_value_sets(
             chunk.first_version,
             chunk.state_update_refs,
             chunk.latest_in_memory_state.current.usage(),
+            chunk.state.usage(),
             chunk.sharded_state_cache,
             &ledger_metadata_batch,
-            &sharded_state_kv_batches,
             // Always put in state value index for now.
             // TODO(grao): remove after APIs migrated off the DB to the indexer.
             self.state_store.state_kv_db.enabled_sharding(),

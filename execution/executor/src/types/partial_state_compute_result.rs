@@ -64,7 +64,7 @@ impl PartialStateComputeResult {
     }
 
     pub fn expect_result_state(&self) -> &Arc<StateDelta> {
-        &self.expect_state_checkpoint_output().result_state
+        &self.expect_state_checkpoint_output().state_auth
     }
 
     pub fn set_state_checkpoint_output(&self, state_checkpoint_output: StateCheckpointOutput) {

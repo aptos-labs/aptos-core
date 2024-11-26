@@ -2,14 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    cached_state_view::ShardedStateCache, sharded_state_update_refs::ShardedStateUpdateRefs,
-    state_delta::StateDelta,
+    cached_state_view::ShardedStateCache,
+    sharded_state_update_refs::ShardedStateUpdateRefs,
+    state_authenticator::StateAuthenticator,
+    state_delta::{InMemState},
 };
 use aptos_types::{
-    state_store::ShardedStateUpdates,
     transaction::{Transaction, TransactionInfo, TransactionOutput, Version},
 };
 
+/// FIXME(aldenhu): clean up unused fields
 #[derive(Clone)]
 pub struct ChunkToCommit<'a> {
     pub first_version: Version,
@@ -17,9 +19,13 @@ pub struct ChunkToCommit<'a> {
     pub transaction_outputs: &'a [TransactionOutput],
     pub transaction_infos: &'a [TransactionInfo],
     pub base_state_version: Option<Version>,
-    pub latest_in_memory_state: &'a StateDelta,
     pub state_update_refs: &'a ShardedStateUpdateRefs<'a>,
-    pub state_updates_until_last_checkpoint: Option<&'a ShardedStateUpdates>,
+    pub parent_state: &'a InMemState,
+    pub state: &'a InMemState,
+    pub parent_auth: &'a StateAuthenticator,
+    pub state_auth: &'a StateAuthenticator,
+    pub last_checkpoint_state: Option<&'a InMemState>,
+    pub last_checkpoint_auth: Option<&'a StateAuthenticator>,
     pub sharded_state_cache: Option<&'a ShardedStateCache>,
     pub is_reconfig: bool,
 }

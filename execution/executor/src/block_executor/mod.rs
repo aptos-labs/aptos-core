@@ -20,6 +20,7 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
+    execution_output::ExecutionOutput, state_checkpoint_output,
     state_compute_result::StateComputeResult, BlockExecutorTrait, ExecutorError, ExecutorResult,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
@@ -39,6 +40,7 @@ use aptos_types::{
 };
 use aptos_vm::VMBlockExecutor;
 use block_tree::BlockTree;
+use bytes::Buf;
 use fail::fail_point;
 use std::sync::Arc;
 
@@ -103,7 +105,7 @@ where
             .read()
             .as_ref()
             .expect("BlockExecutor is not reset")
-            .execute_and_state_checkpoint(block, parent_block_id, onchain_config)
+            .execute_block(block, parent_block_id, onchain_config)
     }
 
     fn ledger_update(
@@ -176,7 +178,7 @@ where
         self.block_tree.root_block().id
     }
 
-    fn execute_and_state_checkpoint(
+    fn execute_block(
         &self,
         block: ExecutableBlock,
         parent_block_id: HashValue,
@@ -201,7 +203,7 @@ where
             "execute_block"
         );
         let committed_block_id = self.committed_block_id();
-        let (execution_output, state_checkpoint_output) =
+        let execution_output =
             if parent_block_id != committed_block_id && parent_output.has_reconfiguration() {
                 // ignore reconfiguration suffix, even if the block is non-empty
                 info!(
@@ -220,10 +222,8 @@ where
 
                     CachedStateView::new(
                         StateViewId::BlockExecution { block_id },
-                        Arc::clone(&self.db.reader),
-                        parent_output.execution_output.next_version(),
-                        parent_output.expect_result_state().current.clone(),
-                        Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
+                        parent_output.execution_output.result_state.clone(),
+                        self.db.clone().reader().clone(),
                     )?
                 };
 
@@ -259,7 +259,6 @@ where
                 (execution_output, state_checkpoint_output)
             };
         let output = PartialStateComputeResult::new(execution_output);
-        output.set_state_checkpoint_output(state_checkpoint_output);
 
         let _ = self
             .block_tree
@@ -288,8 +287,7 @@ where
         // At this point of time two things must happen
         // 1. The block tree must also have the current block id with or without the ledger update output.
         // 2. We must have the ledger update output of the parent block.
-        let parent_output = parent_block.output.expect_ledger_update_output();
-        let parent_accumulator = parent_output.txn_accumulator();
+        let parent_output = &parent_block.output;
         let block = block_vec.pop().expect("Must exist").unwrap();
         let output = &block.output;
         parent_block.ensure_has_child(block_id)?;
@@ -297,24 +295,41 @@ where
             return Ok(complete_result);
         }
 
-        let output =
-            if parent_block_id != committed_block_id && parent_block.output.has_reconfiguration() {
-                info!(
-                    LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
-                    "reconfig_descendant_block_received"
-                );
-                parent_output.reconfig_suffix()
-            } else {
-                THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
+        if parent_block_id != committed_block_id && parent_output.has_reconfiguration() {
+            info!(
+                LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+                "reconfig_descendant_block_received"
+            );
+            output.set_state_checkpoint_output(
+                parent_output
+                    .expect_state_checkpoint_output()
+                    .reconfig_suffix(),
+            );
+            output.set_ledger_update_output(
+                parent_output
+                    .expect_ledger_update_output()
+                    .reconfig_suffix(),
+            );
+        } else {
+            output.set_state_checkpoint_output(DoStateCheckpoint::run(
+                &parent_output.execution_output,
+                &parent_output.expect_state_checkpoint_output().state_auth,
+                None, // known_state_checkpoints
+            )?);
+
+            output.set_ledger_update_output(THREAD_MANAGER.get_non_exe_cpu_pool().install(
+                || {
                     DoLedgerUpdate::run(
                         &output.execution_output,
                         output.expect_state_checkpoint_output(),
-                        parent_accumulator.clone(),
+                        parent_output
+                            .expect_ledger_update_output()
+                            .transaction_accumulator
+                            .clone(),
                     )
-                })?
-            };
-
-        block.output.set_ledger_update_output(output);
+                },
+            )?);
+        };
 
         Ok(block.output.expect_complete_result())
     }

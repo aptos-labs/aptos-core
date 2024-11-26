@@ -589,8 +589,9 @@ impl StateStore {
 
             let state_checkpoint_output =
                 InMemoryStateCalculatorV2::calculate_for_write_sets_after_snapshot(
-                    &Arc::new(current_state_cloned),
-                    &latest_snapshot_state_view.into_state_cache(),
+                    // TODO(aldenhu): avoid cloning the HashMap inside.
+                    &Arc::new(buffered_state.current_state().clone()),
+                    &latest_snapshot_state_view.seal(),
                     last_checkpoint_index,
                     &write_sets,
                 )?;
@@ -600,7 +601,7 @@ impl StateStore {
                 state_checkpoint_output
                     .state_updates_before_last_checkpoint
                     .as_ref(),
-                &state_checkpoint_output.result_state,
+                &state_checkpoint_output.state_auth,
                 true, /* sync_commit */
             )?;
         }

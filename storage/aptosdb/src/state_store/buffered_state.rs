@@ -10,7 +10,12 @@ use crate::{
 use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::SmtAncestors;
-use aptos_storage_interface::{db_ensure as ensure, state_delta::StateDelta, AptosDbError, Result};
+use aptos_storage_interface::{
+    db_ensure as ensure,
+    state_authenticator::StateAuthenticator,
+    state_delta::{InMemState, StateDelta},
+    AptosDbError, Result,
+};
 use aptos_types::state_store::{state_value::StateValue, ShardedStateUpdates};
 use std::{
     sync::{
@@ -32,12 +37,17 @@ pub(crate) const TARGET_SNAPSHOT_INTERVAL_IN_VERSION: u64 = 100_000;
 /// state_until_checkpoint.current = state_after_checkpoint.base, same for their versions.
 #[derive(Debug)]
 pub struct BufferedState {
-    /// state until the latest checkpoint. The `base` is the newest persisted state.
-    state_until_checkpoint: Option<Box<StateDelta>>,
     /// state after the latest checkpoint. The `current` is the latest speculative state.
     ///   n.b. this is an `Arc` shared with the StateStore so that merely querying the latest state
     ///        does not require locking the buffered state.
     state_after_checkpoint: CurrentState,
+    committed_state: InMemState,
+    committed_auth: StateAuthenticator,
+    last_checkpoint_state: InMemState,
+    last_checkpoint_auth: StateAuthenticator,
+    latest_state: InMemState,
+    latest_auth: StateAuthenticator,
+
     state_commit_sender: SyncSender<CommitMessage<Arc<StateDelta>>>,
     target_items: usize,
     join_handle: Option<JoinHandle<()>>,
@@ -83,6 +93,14 @@ impl BufferedState {
         };
         myself.report_latest_committed_version();
         (myself, smt_ancestors, current_state)
+    }
+
+    pub fn current_state(&self) -> &StateAuthenticator {
+        &self.state_after_checkpoint
+    }
+
+    pub fn current_checkpoint_version(&self) -> Option<Version> {
+        self.state_after_checkpoint.base_version
     }
 
     /// This method checks whether a commit is needed based on the target_items value and the number of items in state_until_checkpoint.
