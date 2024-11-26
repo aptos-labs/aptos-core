@@ -12,7 +12,9 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::LocalAccount,
 };
-use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
+use aptos_storage_interface::{
+    state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter,
+};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{aptos_test_root_address, AccountResource},

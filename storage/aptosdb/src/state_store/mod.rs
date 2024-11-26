@@ -51,11 +51,16 @@ use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::SchemaBatch;
 use aptos_scratchpad::{SmtAncestors, SparseMerkleTree};
 use aptos_storage_interface::{
-    async_proof_fetcher::AsyncProofFetcher,
-    cached_state_view::{CachedStateView, ShardedStateCache},
     db_ensure as ensure, db_other_bail as bail,
-    sharded_state_update_refs::ShardedStateUpdateRefs,
-    state_delta::StateDelta,
+    state_store::{
+        sharded_state_update_refs::ShardedStateUpdateRefs,
+        state_delta::StateDelta,
+        state_view::{
+            async_proof_fetcher::AsyncProofFetcher,
+            cached_state_view::{CachedStateView, ShardedStateCache},
+        },
+        NUM_STATE_SHARDS,
+    },
     AptosDbError, DbReader, Result, StateSnapshotReceiver,
 };
 use aptos_types::{
@@ -67,7 +72,7 @@ use aptos_types::{
             StaleStateValueByKeyHashIndex, StaleStateValueIndex, StateValue,
             StateValueChunkWithProof,
         },
-        StateViewId, NUM_STATE_SHARDS,
+        StateViewId,
     },
     transaction::Version,
     write_set::WriteSet,

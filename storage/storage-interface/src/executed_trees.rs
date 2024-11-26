@@ -2,18 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView,
-    state_delta::StateDelta, DbReader,
+    state_store::{
+        state_delta::StateDelta,
+        state_view::{async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView},
+    },
+    DbReader,
 };
 use aptos_crypto::HashValue;
 use aptos_types::{
     proof::accumulator::{InMemoryAccumulator, InMemoryTransactionAccumulator},
-    state_store::{errors::StateviewError, state_storage_usage::StateStorageUsage, StateViewId},
+    state_store::{errors::StateViewError, state_storage_usage::StateStorageUsage, StateViewId},
     transaction::Version,
 };
 use std::sync::Arc;
 
-type Result<T, E = StateviewError> = std::result::Result<T, E>;
+type Result<T, E = StateViewError> = std::result::Result<T, E>;
 
 /// A wrapper of the in-memory state sparse merkle tree and the transaction accumulator that
 /// represent a specific state collectively. Usually it is a state after executing a block.

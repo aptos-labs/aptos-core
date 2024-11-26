@@ -12,15 +12,15 @@ use aptos_executor_types::{
 use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::FrozenSparseMerkleTree;
-use aptos_storage_interface::{
-    cached_state_view::{ShardedStateCache, StateCache},
+use aptos_storage_interface::state_store::{
     sharded_state_update_refs::ShardedStateUpdateRefs,
+    sharded_state_updates::ShardedStateUpdates,
     state_delta::StateDelta,
+    state_view::cached_state_view::{ShardedStateCache, StateCache},
 };
 use aptos_types::{
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
-        ShardedStateUpdates,
     },
     transaction::Version,
     write_set::WriteSet,

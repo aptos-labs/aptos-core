@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    async_proof_fetcher::AsyncProofFetcher, metrics::TIMER, state_view::DbStateView, DbReader,
+    metrics::TIMER,
+    state_store::state_view::{async_proof_fetcher::AsyncProofFetcher, db_state_view::DbStateView},
+    DbReader,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
@@ -10,7 +12,7 @@ use aptos_scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatu
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{
-        errors::StateviewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
+        errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
         state_value::StateValue, StateViewId, TStateView,
     },
     transaction::Version,
@@ -35,7 +37,7 @@ static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
         .unwrap()
 });
 
-type Result<T, E = StateviewError> = std::result::Result<T, E>;
+type Result<T, E = StateViewError> = std::result::Result<T, E>;
 type StateCacheShard = DashMap<StateKey, (Option<Version>, Option<StateValue>)>;
 
 // Sharded by StateKey.get_shard_id(). The version in the value indicates there is an entry on that
@@ -163,7 +165,7 @@ impl CachedStateView {
         let speculative_state = speculative_state.freeze(&base_smt);
         let snapshot = reader
             .get_state_snapshot_before(next_version)
-            .map_err(Into::<StateviewError>::into)?;
+            .map_err(Into::<StateViewError>::into)?;
 
         Ok(Self::new_impl(
             id,
