@@ -60,13 +60,6 @@ impl CommitMessage {
             _ => None,
         }
     }
-
-    pub fn author(&self) -> Option<PeerId> {
-        match self {
-            CommitMessage::Vote(vote) => Some(vote.author()),
-            _ => None,
-        }
-    }
 }
 
 impl RBMessage for CommitMessage {}

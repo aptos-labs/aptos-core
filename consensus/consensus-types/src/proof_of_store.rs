@@ -211,12 +211,6 @@ impl SignedBatchInfoMsg {
     pub fn take(self) -> Vec<SignedBatchInfo> {
         self.signed_infos
     }
-
-    pub fn author(&self) -> Option<PeerId> {
-        self.signed_infos
-            .first()
-            .map(|signed_info| signed_info.author())
-    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
