@@ -1,12 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::sharded_state_updates::ShardedStateUpdates;
+use crate::state_store::{sharded_state_updates::ShardedStateUpdates, state_update::StateWrite};
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DropHelper;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_types::{
-    state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
     transaction::Version,
 };
 
@@ -108,6 +110,23 @@ impl StateDelta {
     pub fn replace_with(&mut self, mut rhs: Self) -> Self {
         std::mem::swap(self, &mut rhs);
         rhs
+    }
+
+    pub fn parent_version(&self) -> Option<Version> {
+        // FIXME(aldenhu): update
+        self.base_version
+    }
+
+    /// Get the state update for a given state key.
+    /// `None` indicates the key is not updated in the delta.
+    pub fn get_state_update(&self, _state_key: &StateKey) -> Option<&StateWrite> {
+        // FIXME(aldenhu)
+        todo!()
+    }
+
+    pub fn usage(&self) -> StateStorageUsage {
+        // FIXME(aldenhu):
+        todo!()
     }
 }
 

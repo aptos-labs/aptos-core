@@ -34,7 +34,6 @@ use crate::{
         ShardedStateKvSchemaBatch,
     },
 };
-use anyhow::Context;
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
@@ -57,6 +56,7 @@ use aptos_storage_interface::{
     state_store::{
         sharded_state_update_refs::ShardedStateUpdateRefs,
         state_delta::StateDelta,
+        state_update::StateValueWithVersionOpt,
         state_view::{
             async_proof_fetcher::AsyncProofFetcher,
             cached_state_view::{CachedStateView, ShardedStateCache},
@@ -811,9 +811,6 @@ impl StateStore {
         if let Some(base_version) = base_version {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["put_stats_and_indices__total_get"]);
             if let Some(sharded_state_cache) = sharded_state_cache {
-                // For some entries the base value version is None, here is to fiil those in.
-                // See `ShardedStateCache`.
-                self.prepare_version_in_cache(base_version, sharded_state_cache)?;
                 state_cache_with_version = sharded_state_cache;
             } else {
                 // TODO(aldenhu): get all updates from StateDelta directly
@@ -834,15 +831,14 @@ impl StateStore {
                         s.spawn(move |_| {
                             let _timer = OTHER_TIMERS_SECONDS
                                 .timer_with(&["put_stats_and_indices__get_state_value"]);
-                            let version_and_value = self
+                            let tuple_opt = self
                                 .state_db
                                 .get_state_value_with_version_by_version(key, base_version)
                                 .expect("Must succeed.");
-                            if let Some((version, value)) = version_and_value {
-                                cache.insert((*key).clone(), (Some(version), Some(value)));
-                            } else {
-                                cache.insert((*key).clone(), (Some(base_version), None));
-                            }
+                            cache.insert(
+                                (*key).clone(),
+                                StateValueWithVersionOpt::from_tuple_opt(tuple_opt),
+                            );
                         });
                     }
                 });
@@ -911,6 +907,7 @@ impl StateStore {
         let num_versions = state_update_refs.num_versions;
         // calculate total state size in bytes
         let usage_deltas: Vec<Vec<_>> = sharded_state_cache
+            .shards
             .par_iter()
             .zip_eq(state_update_refs.shards.par_iter())
             .zip_eq(sharded_state_kv_batches.par_iter())
@@ -961,22 +958,24 @@ impl StateStore {
                             }
                         }
 
-                        let old_version_and_value_opt = if let Some((old_version, old_value_opt)) =
-                            cache.insert((*key).clone(), (Some(version), value.cloned()))
-                        {
-                            old_value_opt.map(|value| (old_version, value))
+                        let old_state_value_with_version_opt = if let Some(old) = cache.insert(
+                            (*key).clone(),
+                            StateValueWithVersionOpt::from_state_write_ref(version, *value),
+                        ) {
+                            old
                         } else {
                             // n.b. all updated state items must be read and recorded in the state cache,
                             // otherwise we can't calculate the correct usage. The is_untracked() hack
                             // is to allow some db tests without real execution layer to pass.
                             assert!(ignore_state_cache_miss, "Must cache read.");
-                            None
+                            StateValueWithVersionOpt::NonExistent
                         };
 
-                        if let Some((old_version, old_value)) = old_version_and_value_opt {
-                            let old_version = old_version
-                                .context("Must have old version in cache.")
-                                .unwrap();
+                        if let StateValueWithVersionOpt::Value {
+                            version: old_version,
+                            value: old_value,
+                        } = old_state_value_with_version_opt
+                        {
                             items_delta -= 1;
                             bytes_delta -= (key.size() + old_value.size()) as i64;
                             // stale index of the old value at its version.
@@ -1185,43 +1184,6 @@ impl StateStore {
             }
         }
         Ok(keys)
-    }
-
-    fn prepare_version_in_cache(
-        &self,
-        base_version: Version,
-        sharded_state_cache: &ShardedStateCache,
-    ) -> Result<()> {
-        THREAD_MANAGER.get_high_pri_io_pool().scope(|s| {
-            sharded_state_cache.par_iter().for_each(|shard| {
-                shard.iter_mut().for_each(|mut entry| {
-                    match entry.value() {
-                        (None, Some(_)) => s.spawn(move |_| {
-                            let _timer = OTHER_TIMERS_SECONDS
-                                .with_label_values(&["put_stats_and_indices__get_state_value"])
-                                .start_timer();
-                            let version_and_value = self
-                                .state_db
-                                .get_state_value_with_version_by_version(entry.key(), base_version)
-                                .expect("Must succeed.");
-                            if let Some((version, _)) = version_and_value {
-                                entry.0 = Some(version);
-                            } else {
-                                unreachable!();
-                            }
-                        }),
-                        _ => {
-                            // I just want a counter.
-                            let _timer = OTHER_TIMERS_SECONDS
-                                .with_label_values(&["put_stats_and_indices__skip"])
-                                .start_timer();
-                        },
-                    };
-                })
-            });
-        });
-
-        Ok(())
     }
 }
 

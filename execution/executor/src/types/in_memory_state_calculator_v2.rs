@@ -16,16 +16,14 @@ use aptos_storage_interface::state_store::{
     sharded_state_update_refs::ShardedStateUpdateRefs,
     sharded_state_updates::ShardedStateUpdates,
     state_delta::StateDelta,
-    state_view::cached_state_view::{ShardedStateCache, StateCache},
+    state_view::cached_state_view::{ShardedStateCache, StateCache, StateCacheShard},
 };
 use aptos_types::{
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
-    transaction::Version,
     write_set::WriteSet,
 };
-use dashmap::DashMap;
 use itertools::{zip_eq, Itertools};
 use rayon::prelude::*;
 use std::{ops::Deref, sync::Arc};
@@ -253,12 +251,14 @@ impl InMemoryStateCalculatorV2 {
     }
 
     fn add_to_delta(
-        k: &StateKey,
-        v: &Option<&StateValue>,
-        state_cache: &DashMap<StateKey, (Option<Version>, Option<StateValue>)>,
-        items_delta: &mut i64,
-        bytes_delta: &mut i64,
+        _k: &StateKey,
+        _v: &Option<&StateValue>,
+        _state_cache: &StateCacheShard,
+        _items_delta: &mut i64,
+        _bytes_delta: &mut i64,
     ) {
+        todo!()
+        /* FIXME(aldenhu)
         let key_size = k.size();
         if let Some(value) = v {
             *items_delta += 1;
@@ -272,6 +272,7 @@ impl InMemoryStateCalculatorV2 {
             *items_delta -= 1;
             *bytes_delta -= (key_size + old_v.size()) as i64;
         }
+         */
     }
 
     fn calculate_usage(
@@ -286,6 +287,7 @@ impl InMemoryStateCalculatorV2 {
         }
 
         let (items_delta, bytes_delta) = sharded_state_cache
+            .shards
             .par_iter()
             .zip_eq(updates.shards.par_iter())
             .map(|(cache, updates)| {
