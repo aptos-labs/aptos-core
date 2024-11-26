@@ -200,6 +200,10 @@ impl SparseMerkleProofExt {
         }
     }
 
+    pub fn new_empty() -> Self {
+        Self::new(None, vec![])
+    }
+
     pub fn new_partial(
         leaf: Option<SparseMerkleLeafNode>,
         siblings: Vec<NodeInProof>,

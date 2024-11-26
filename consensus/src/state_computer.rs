@@ -545,7 +545,7 @@ async fn test_commit_sync_race() {
             Ok(StateComputeResult::new_dummy())
         }
 
-        fn execute_and_state_checkpoint(
+        fn execute_and_update_state(
             &self,
             _block: ExecutableBlock,
             _parent_block_id: HashValue,

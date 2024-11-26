@@ -492,8 +492,6 @@ arc-swap = "1.6.0"
 arr_macro = "0.2.1"
 ark-bls12-381 = "0.4.0"
 ark-bn254 = "0.4.0"
-ark-circom = { git = "https://github.com/aptos-labs/circom-compat", rev = "e3d686641a3dd9d66087a74acdc20dc2a3c24f63" }
-ark-crypto-primitives = "0.4.0"
 ark-ec = "0.4.0"
 ark-ff = "0.4.0"
 ark-groth16 = "0.4.0"
@@ -502,20 +500,16 @@ ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
 aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf" }
 assert_approx_eq = "1.1.0"
-assert_unordered = "0.3.5"
 async-channel = "1.7.1"
 async-mutex = "1.4.0"
 async-recursion = "1.0.5"
-async-stream = "0.3"
 async-trait = "0.1.53"
 axum = "0.7.5"
 base64 = "0.13.0"
-base64-url = "2.0.1"
 backoff = { version = "0.4.0", features = ["tokio"] }
 backtrace = "0.3.58"
 bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
 better_any = "0.1.1"
-bellman = { version = "0.13.1", default-features = false }
 bigdecimal = { version = "0.4.0", features = ["serde"] }
 version-compare = "0.1.1"
 bitvec = "1.0.1"
@@ -530,7 +524,6 @@ byteorder = "1.4.3"
 bytes = { version = "1.4.0", features = ["serde"] }
 camino = { version = "1.1.6" }
 chrono = { version = "0.4.19", features = ["clock", "serde"] }
-cfg_block = "0.1.1"
 cfg-if = "1.0.0"
 ciborium = "0.2"
 claims = "0.7"
@@ -551,7 +544,6 @@ codespan-reporting = "0.11.1"
 colored = "2.0.0"
 concurrent-queue = "2.2.0"
 console-subscriber = "0.3.0"
-const_format = "0.2.26"
 core_affinity = "0.8.1"
 coset = "0.3"
 criterion = "0.3.5"
@@ -594,7 +586,6 @@ env_logger = "0.10.0"
 erased-serde = "0.3.13"
 ethabi = "18.0.0"
 ethnum = "1.5.0"
-event-listener = "2.5.3"
 evm = { version = "0.33.1", features = ["tracing"] }
 evm-runtime = { version = "0.33.0", features = ["tracing"] }
 dearbitrary = { version = "1.0.4", features = ["derive"] }
@@ -632,11 +623,9 @@ hostname = "0.3.1"
 http = "0.2.9"
 httpmock = "0.6.8"
 hyper = { version = "0.14.18", features = ["full"] }
-hyper-tls = "0.5.0"
 im = "15.0.0"
 image = "0.24.5"
 indexmap = "1.9.3"
-include_dir = { version = "0.7.2", features = ["glob"] }
 indicatif = "0.15.0"
 indoc = "1.0.6"
 inferno = "0.11.14"
@@ -685,7 +674,6 @@ p256 = { version = "0.13.2" }
 prettydiff = "0.6.2"
 primitive-types = { version = "0.10" }
 signature = "2.1.0"
-sec1 = "0.7.0"
 pairing = "0.23"
 parking_lot = "0.12.0"
 paste = "1.0.7"
@@ -721,8 +709,6 @@ prometheus-parse = "0.2.4"
 proptest = "1.4.0"
 proptest-derive = "0.4.0"
 prost = { version = "0.13.4", features = ["no-recursion-limit"] }
-prost-types = "0.13.4"
-quanta = "0.10.1"
 quick_cache = "0.5.1"
 quick-junit = "0.5.0"
 quote = "1.0.18"
@@ -756,7 +742,6 @@ rstest = "0.15.0"
 rusty-fork = "0.3.0"
 rustversion = "1.0.14"
 scopeguard = "1.2.0"
-sha-1 = "0.10.0"
 sha2 = "0.9.3"
 sha256 = "1.4.0"
 sha2_0_10_6 = { package = "sha2", version = "0.10.6" }
@@ -783,7 +768,6 @@ simplelog = "0.9.0"
 smallbitvec = "2.5.1"
 smallvec = "1.8.0"
 static_assertions = "1.1.0"
-stats_alloc = "0.1.8"
 status-line = "0.2.0"
 strum = "0.24.1"
 strum_macros = "0.24.2"
@@ -799,17 +783,14 @@ textwrap = "0.15.0"
 thiserror = "1.0.37"
 threadpool = "1.8.1"
 thread_local = "1.1.7"
-time = { version = "0.3.24", features = ["serde"] }
 tiny-bip39 = "0.8.2"
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
-toml_edit = "0.14.3"
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }
 trybuild = "1.0.80"
 try_match = "0.4.2"
 tokio = { version = "1.35.1", features = ["full"] }
 tokio-io-timeout = "1.2.0"
-tokio-metrics = "0.3.1"
 tokio-retry = "0.3.0"
 tokio-scoped = { version = "0.2.0" }
 tokio-stream = { version = "0.1.14", features = ["fs"] }
@@ -827,7 +808,6 @@ tonic = { version = "0.12.3", features = [
 tonic-reflection = "0.12.3"
 topological-sort = "0.2.2"
 triomphe = "0.1.9"
-tsify-next = "0.5.4"
 tui = "0.19.0"
 typed-arena = "2.0.2"
 typenum = "1.17.0"

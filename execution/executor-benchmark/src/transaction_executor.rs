@@ -64,7 +64,7 @@ where
         {
             let _timer = TIMER.with_label_values(&["execute"]).start_timer();
             self.executor
-                .execute_and_state_checkpoint(
+                .execute_and_update_state(
                     executable_block,
                     self.parent_block_id,
                     BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,

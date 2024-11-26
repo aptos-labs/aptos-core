@@ -709,13 +709,13 @@ where
         key: HashValue,
         version: Version,
     ) -> Result<(Option<(HashValue, (K, Version))>, SparseMerkleProof)> {
-        self.get_with_proof_ext(key, version, 0)
+        self.get_with_proof_ext(&key, version, 0)
             .map(|(value, proof_ext)| (value, proof_ext.into()))
     }
 
     pub fn get_with_proof_ext(
         &self,
-        key: HashValue,
+        key: &HashValue,
         version: Version,
         target_root_depth: usize,
     ) -> Result<(Option<(HashValue, (K, Version))>, SparseMerkleProofExt)> {
@@ -975,7 +975,7 @@ where
 {
     let existing_leaf_key = existing_leaf_node.account_key();
 
-    if kvs.len() == 1 && kvs[0].0 == existing_leaf_key {
+    if kvs.len() == 1 && &kvs[0].0 == existing_leaf_key {
         if let (key, Some((value_hash, state_key))) = kvs[0] {
             let new_leaf_node = Node::new_leaf(key, *value_hash, (state_key.clone(), version));
             Ok(Some(new_leaf_node))

@@ -1032,7 +1032,7 @@ mod tests {
             let parent_block_id = vm_executor.committed_block_id();
             let block_id = HashValue::random();
             vm_executor
-                .execute_and_state_checkpoint(
+                .execute_and_update_state(
                     (block_id, vec![txn.clone()]).into(),
                     parent_block_id,
                     BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
@@ -1053,7 +1053,7 @@ mod tests {
         let parent_block_id = other_executor.committed_block_id();
         let block_id = HashValue::random();
         other_executor
-            .execute_and_state_checkpoint(
+            .execute_and_update_state(
                 (block_id, vec![txn]).into(),
                 parent_block_id,
                 BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
