@@ -40,6 +40,7 @@ use aptos_types::{
 use futures::StreamExt;
 use futures_channel::mpsc::{Receiver, Sender};
 use std::{sync::Arc, time::Duration};
+use aptos_crypto::bls12381::PrivateKey;
 
 pub enum QuorumStoreBuilder {
     DirectMempool(DirectMempoolInnerBuilder),
@@ -148,6 +149,7 @@ pub struct InnerBuilder {
     batch_store: Option<Arc<BatchStore>>,
     batch_reader: Option<Arc<dyn BatchReader>>,
     broadcast_proofs: bool,
+    consensus_key: Option<Arc<PrivateKey>>,
 }
 
 impl InnerBuilder {
@@ -166,6 +168,7 @@ impl InnerBuilder {
         backend: SecureBackend,
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
         broadcast_proofs: bool,
+        consensus_key: Option<Arc<PrivateKey>>,
     ) -> Self {
         let (coordinator_tx, coordinator_rx) = futures_channel::mpsc::channel(config.channel_size);
         let (batch_generator_cmd_tx, batch_generator_cmd_rx) =
@@ -221,19 +224,12 @@ impl InnerBuilder {
             batch_store: None,
             batch_reader: None,
             broadcast_proofs,
+            consensus_key,
         }
     }
 
     fn create_batch_store(&mut self) -> Arc<BatchReaderImpl<NetworkSender>> {
-        let backend = &self.backend;
-        let storage: Storage = backend.into();
-        if let Err(error) = storage.available() {
-            panic!("Storage is not available: {:?}", error);
-        }
-        let private_key = storage
-            .get(CONSENSUS_KEY)
-            .map(|v| v.value)
-            .expect("Unable to get private key");
+        let private_key = self.consensus_key.clone().expect("Consensus key is not available!");
         let signer = ValidatorSigner::new(self.author, private_key);
 
         let latest_ledger_info_with_sigs = self

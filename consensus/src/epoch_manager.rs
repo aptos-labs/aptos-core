@@ -669,6 +669,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         epoch_state: &EpochState,
         network_sender: NetworkSender,
         consensus_config: &OnChainConsensusConfig,
+        consensus_key: Option<Arc<PrivateKey>>,
     ) -> (
         Arc<dyn TPayloadManager>,
         QuorumStoreClient,
@@ -701,6 +702,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.config.safety_rules.backend.clone(),
                 self.quorum_store_storage.clone(),
                 !consensus_config.is_dag_enabled(),
+                consensus_key,
             ))
         } else {
             info!("Building DirectMempool");
@@ -1199,7 +1201,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         );
 
         let (network_sender, payload_client, payload_manager) = self
-            .initialize_shared_component(&epoch_state, &consensus_config)
+            .initialize_shared_component(&epoch_state, &consensus_config, loaded_consensus_key.clone())
             .await;
 
         let (rand_msg_tx, rand_msg_rx) = aptos_channel::new::<AccountAddress, IncomingRandGenRequest>(
@@ -1249,6 +1251,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &mut self,
         epoch_state: &EpochState,
         consensus_config: &OnChainConsensusConfig,
+        consensus_key: Option<Arc<PrivateKey>>,
     ) -> (
         NetworkSender,
         Arc<dyn PayloadClient>,
@@ -1258,7 +1261,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.quorum_store_enabled = self.enable_quorum_store(consensus_config);
         let network_sender = self.create_network_sender(epoch_state);
         let (payload_manager, quorum_store_client, quorum_store_builder) = self
-            .init_payload_provider(epoch_state, network_sender.clone(), consensus_config)
+            .init_payload_provider(epoch_state, network_sender.clone(), consensus_config, consensus_key)
             .await;
         let effective_vtxn_config = consensus_config.effective_validator_txn_config();
         debug!("effective_vtxn_config={:?}", effective_vtxn_config);
