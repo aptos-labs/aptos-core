@@ -18,7 +18,7 @@ pub(crate) fn get_land_blocking_test(
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" | "realistic_env_max_load" => {
-            pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaReal.materialize_default(), 10000)
+            pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaMarket1MarketReuseAccounts.materialize_default(), 10000)
             // realistic_env_max_load_test(duration, test_cmd, 7, 5)
         },
         "compat" => compat(),
