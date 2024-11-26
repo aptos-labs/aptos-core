@@ -9,6 +9,7 @@ use aptos_sdk::{
     },
     move_types::account_address::AccountAddress,
 };
+use aptos_logger::info;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{
     collections::HashMap,
@@ -46,7 +47,7 @@ impl TransactionGenerator for BucketedAccountsPoolWrapperGenerator {
         history: &[String],
         market_maker: bool,
     ) -> Vec<SignedTransaction> {
-        let accounts_to_use =
+        let mut accounts_to_use =
             self.source_accounts_pool
                 .take_from_pool(num_to_create, true, &mut self.rng);
         if accounts_to_use.is_empty() {
@@ -502,6 +503,7 @@ impl TransactionGenerator for ReuseAccountsPoolWrapperGenerator {
             self.source_accounts_pool
                 .take_from_pool(account.address(), num_to_create, true, &mut self.rng);
         if accounts_to_use.is_empty() {
+            info!("ReuseAccountsPoolWrapperGenerator::generate_transactions: accounts_to_use is empty num_to_create: {}", num_to_create);
             return Vec::new();
         }
         let txns = accounts_to_use
