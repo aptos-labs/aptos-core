@@ -28,10 +28,9 @@ use aptos_config::config::{QuorumStoreConfig, SecureBackend};
 use aptos_consensus_types::{
     common::Author, proof_of_store::ProofCache, request_response::GetPayloadCommand,
 };
-use aptos_global_constants::CONSENSUS_KEY;
+use aptos_crypto::bls12381::PrivateKey;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_secure_storage::{KVStorage, Storage};
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     account_address::AccountAddress, validator_signer::ValidatorSigner,
@@ -40,7 +39,6 @@ use aptos_types::{
 use futures::StreamExt;
 use futures_channel::mpsc::{Receiver, Sender};
 use std::{sync::Arc, time::Duration};
-use aptos_crypto::bls12381::PrivateKey;
 
 pub enum QuorumStoreBuilder {
     DirectMempool(DirectMempoolInnerBuilder),
@@ -153,6 +151,7 @@ pub struct InnerBuilder {
 }
 
 impl InnerBuilder {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         epoch: u64,
         author: Author,
@@ -229,7 +228,10 @@ impl InnerBuilder {
     }
 
     fn create_batch_store(&mut self) -> Arc<BatchReaderImpl<NetworkSender>> {
-        let private_key = self.consensus_key.clone().expect("Consensus key is not available!");
+        let private_key = self
+            .consensus_key
+            .clone()
+            .expect("Consensus key is not available!");
         let signer = ValidatorSigner::new(self.author, private_key);
 
         let latest_ledger_info_with_sigs = self
