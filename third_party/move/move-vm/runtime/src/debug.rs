@@ -102,7 +102,7 @@ impl DebugContext {
         pc: u16,
         instr: &Bytecode,
         resolver: &Resolver,
-        interp: &dyn InterpreterDebugInterface,
+        interpreter: &dyn InterpreterDebugInterface,
     ) {
         let instr_string = format!("{:?}", instr);
         let function_string = function.name_as_pretty_string();
@@ -159,7 +159,9 @@ impl DebugContext {
                                 .for_each(|(i, bp)| println!("[{}] {}", i, bp)),
                             DebugCommand::PrintStack => {
                                 let mut s = String::new();
-                                interp.debug_print_stack_trace(&mut s, resolver).unwrap();
+                                interpreter
+                                    .debug_print_stack_trace(&mut s, resolver)
+                                    .unwrap();
                                 println!("{}", s);
                                 println!("Current frame: {}\n", function_string);
                                 let code = function.code();

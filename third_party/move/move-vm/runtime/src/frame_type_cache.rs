@@ -23,7 +23,8 @@ pub(crate) struct FrameTypeCache {
     struct_variant_instantiation_type:
         BTreeMap<StructVariantInstantiationIndex, (Type, NumTypeNodes)>,
     /// For a given field instantiation, the:
-    ///    ((Type of the field, size of the field type) and (Type of its defining struct, size of its defining struct)
+    ///    ((Type of the field, size of the field type) and (Type of its defining struct,
+    ///    size of its defining struct)
     field_instantiation:
         BTreeMap<FieldInstantiationIndex, ((Type, NumTypeNodes), (Type, NumTypeNodes))>,
     /// Same as above, bot for variant field instantiations

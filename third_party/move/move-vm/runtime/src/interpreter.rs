@@ -1203,7 +1203,7 @@ const OPERAND_STACK_SIZE_LIMIT: usize = 1024;
 const CALL_STACK_SIZE_LIMIT: usize = 1024;
 pub(crate) const ACCESS_STACK_SIZE_LIMIT: usize = 256;
 
-/// The operand stack.
+/// The operand and runtime-type stacks.
 pub(crate) struct Stack {
     value: Vec<Value>,
     types: Vec<Type>,
