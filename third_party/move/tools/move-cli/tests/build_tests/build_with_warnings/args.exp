@@ -1,10 +1,10 @@
 Command `build`:
 BUILDING Test
-warning[W09002]: unused variable
+warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
   ┌─ ./sources/m.move:2:16
   │
 2 │ public fun foo(x: u64): u64 {
-  │                ^ Unused parameter 'x'. Consider removing or prefixing with an underscore: '_x'
+  │                ^
 
 Command `disassemble --package Test --name m`:
 // Move bytecode v7
@@ -17,9 +17,9 @@ B0:
 	1: Ret
 }
 }
-warning[W09002]: unused variable
+warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
   ┌─ ./sources/m.move:2:16
   │
 2 │ public fun foo(x: u64): u64 {
-  │                ^ Unused parameter 'x'. Consider removing or prefixing with an underscore: '_x'
+  │                ^
 
