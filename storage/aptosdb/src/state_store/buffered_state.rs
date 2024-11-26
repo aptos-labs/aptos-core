@@ -10,8 +10,12 @@ use crate::{
 use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::SmtAncestors;
-use aptos_storage_interface::{db_ensure as ensure, state_delta::StateDelta, AptosDbError, Result};
-use aptos_types::state_store::{state_value::StateValue, ShardedStateUpdates};
+use aptos_storage_interface::{
+    db_ensure as ensure,
+    state_store::{sharded_state_updates::ShardedStateUpdates, state_delta::StateDelta},
+    AptosDbError, Result,
+};
+use aptos_types::state_store::state_value::StateValue;
 use std::{
     sync::{
         mpsc,

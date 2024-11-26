@@ -13,7 +13,8 @@ use aptos_executor_types::{
     BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode,
 };
 use aptos_storage_interface::{
-    async_proof_fetcher::AsyncProofFetcher, DbReaderWriter, ExecutedTrees, Result,
+    state_store::state_view::async_proof_fetcher::AsyncProofFetcher, DbReaderWriter, ExecutedTrees,
+    Result,
 };
 use aptos_types::{
     account_address::AccountAddress,

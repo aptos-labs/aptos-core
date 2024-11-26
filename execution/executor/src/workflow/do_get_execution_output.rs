@@ -23,7 +23,9 @@ use aptos_executor_types::{
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
-use aptos_storage_interface::cached_state_view::{CachedStateView, StateCache};
+use aptos_storage_interface::state_store::state_view::cached_state_view::{
+    CachedStateView, StateCache,
+};
 #[cfg(feature = "consensus-only-perf-test")]
 use aptos_types::transaction::ExecutionStatus;
 use aptos_types::{
@@ -486,21 +488,21 @@ impl<'a> TStateView for WriteSetStateView<'a> {
     fn get_state_value(
         &self,
         state_key: &Self::Key,
-    ) -> aptos_types::state_store::Result<Option<StateValue>> {
+    ) -> aptos_types::state_store::StateViewResult<Option<StateValue>> {
         Ok(self
             .write_set
             .get(state_key)
             .and_then(|write_op| write_op.as_state_value()))
     }
 
-    fn get_usage(&self) -> aptos_types::state_store::Result<StateStorageUsage> {
+    fn get_usage(&self) -> aptos_types::state_store::StateViewResult<StateStorageUsage> {
         unreachable!("Not supposed to be called on WriteSetStateView.")
     }
 }
 #[cfg(test)]
 mod tests {
     use super::Parser;
-    use aptos_storage_interface::cached_state_view::StateCache;
+    use aptos_storage_interface::state_store::state_view::cached_state_view::StateCache;
     use aptos_types::{
         contract_event::ContractEvent,
         transaction::{

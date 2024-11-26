@@ -28,7 +28,7 @@ use aptos_logger::prelude::*;
 use aptos_mempool_notifications::CommittedTransaction;
 use aptos_metrics_core::HistogramTimer;
 use aptos_network::application::interface::NetworkClientInterface;
-use aptos_storage_interface::state_view::LatestDbStateCheckpointView;
+use aptos_storage_interface::state_store::state_view::db_state_view::LatestDbStateCheckpointView;
 use aptos_types::{
     account_address::AccountAddress,
     mempool_status::{MempoolStatus, MempoolStatusCode},

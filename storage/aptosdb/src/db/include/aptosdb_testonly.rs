@@ -1,14 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::config::{ BUFFERED_STATE_TARGET_ITEMS_FOR_TEST, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD};
+use aptos_config::config::{BUFFERED_STATE_TARGET_ITEMS_FOR_TEST, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD};
 use std::default::Default;
-use aptos_storage_interface::cached_state_view::ShardedStateCache;
-use aptos_storage_interface::state_delta::StateDelta;
-use aptos_types::state_store::{ShardedStateUpdates};
+use aptos_storage_interface::state_store::state_view::cached_state_view::ShardedStateCache;
+use aptos_storage_interface::state_store::state_delta::StateDelta;
 use aptos_types::transaction::{TransactionStatus, TransactionToCommit};
 use aptos_executor_types::transactions_with_output::TransactionsToKeep;
-use aptos_storage_interface::sharded_state_update_refs::ShardedStateUpdateRefs;
+use aptos_storage_interface::state_store::sharded_state_update_refs::ShardedStateUpdateRefs;
 
 impl AptosDB {
     /// This opens db in non-readonly mode, without the pruner.

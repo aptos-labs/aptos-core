@@ -31,7 +31,9 @@ use aptos_sdk::{
         transaction::SignedTransaction, AccountKey, LocalAccount,
     },
 };
-use aptos_storage_interface::{state_view::DbStateView, DbReaderWriter};
+use aptos_storage_interface::{
+    state_store::state_view::db_state_view::DbStateView, DbReaderWriter,
+};
 use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::{create_multisig_account_address, AccountAddress},
