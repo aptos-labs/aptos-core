@@ -445,7 +445,12 @@ impl<'env> StructTranslator<'env> {
             "", // not inlined!
             &format!("$IsValid'{}'(s: {}): bool", suffix_variant, struct_name),
             || {
-                if struct_env.is_intrinsic() || struct_env.get_field_count() == 0 {
+                if struct_env.is_intrinsic()
+                    || struct_env
+                        .get_fields_of_variant(variant)
+                        .collect_vec()
+                        .is_empty()
+                {
                     emitln!(writer, "true")
                 } else {
                     let mut sep = "";
