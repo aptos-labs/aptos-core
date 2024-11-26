@@ -1446,7 +1446,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 BlockStage::EPOCH_MANAGER_RECEIVED,
             );
         }
-        self.check_author(peer_id, &consensus_msg)?;
         // we can't verify signatures from a different epoch
         let maybe_unverified_event = self.check_epoch(peer_id, consensus_msg).await?;
 
@@ -1510,44 +1509,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 })
                 .await;
         }
-        Ok(())
-    }
-
-    fn check_author(&mut self, peer_id: AccountAddress, msg: &ConsensusMsg) -> anyhow::Result<()> {
-        let author = match msg {
-            ConsensusMsg::CommitMessage(commit) => commit.author(),
-            ConsensusMsg::ProposalMsg(proposal) => proposal.proposal().author(),
-            ConsensusMsg::VoteMsg(vote) => Some(vote.vote().author()),
-            ConsensusMsg::OrderVoteMsg(order_vote) => Some(order_vote.order_vote().author()),
-            ConsensusMsg::CommitVoteMsg(commit_vote) => Some(commit_vote.author()),
-            ConsensusMsg::BatchMsg(batch) => batch.author(),
-            ConsensusMsg::RoundTimeoutMsg(round_timeout) => Some(round_timeout.author()),
-            ConsensusMsg::BatchResponse(batch_response) => Some(batch_response.author()),
-            ConsensusMsg::BatchRequestMsg(batch_request) => Some(batch_request.source()),
-            ConsensusMsg::SignedBatchInfo(sign_batch_info) => sign_batch_info.author(),
-
-            ConsensusMsg::CommitDecisionMsg(_)
-            | ConsensusMsg::DAGMessage(_)
-            | ConsensusMsg::EpochChangeProof(_)
-            | ConsensusMsg::EpochRetrievalRequest(_)
-            | ConsensusMsg::ProofOfStoreMsg(_)
-            | ConsensusMsg::SyncInfo(_)
-            | ConsensusMsg::RandGenMessage(_)
-            | ConsensusMsg::BatchResponseV2(_)
-            | ConsensusMsg::BlockRetrievalRequest(_)
-            | ConsensusMsg::BlockRetrievalResponse(_) => None,
-        };
-
-        if let Some(author) = author {
-            ensure!(
-                author == peer_id,
-                "Received {:?} message from peer {} with different author {}",
-                discriminant(msg),
-                peer_id,
-                author
-            );
-        }
-
         Ok(())
     }
 
