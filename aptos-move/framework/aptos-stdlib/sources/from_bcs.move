@@ -1,6 +1,6 @@
 /// This module provides a number of functions to convert _primitive_ types from their representation in `std::bcs`
 /// to values. This is the opposite of `bcs::to_bytes`. Note that it is not safe to define a generic public `from_bytes`
-/// function because this can violate implicit struct invariants, therefore only primitive types are offerred. If
+/// function because this can violate implicit struct invariants, therefore only primitive types are offered. If
 /// a general conversion back-and-force is needed, consider the `aptos_std::Any` type which preserves invariants.
 ///
 /// Example:

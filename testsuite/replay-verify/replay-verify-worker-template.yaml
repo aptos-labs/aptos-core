@@ -1,0 +1,33 @@
+apiVersion: v1  
+kind: Pod  
+metadata:  
+  name: worker-pod
+  labels:
+    run: some-label
+spec:  
+  serviceAccountName: default  
+  restartPolicy: Never  # Pod restarts only if it fails  
+  containers:  
+    - name: replay-verify-worker  
+      image: us-docker.pkg.dev/aptos-registry/docker/tools:performance_65a65fc719cd40dc989a5832819095aa8f1e384d  
+      volumeMounts:  
+        - mountPath: /mnt/testnet_archive  
+          name: testnet-archive  
+          readOnly: true  # Mount the volume as read-only  
+      command: ["/bin/sh", "-c", "ls -al /mnt/testnet_archive && sleep 3600"]  
+      env:  
+        #- name: PUSH_METRICS_ENDPOINT  
+        #  value: "http://localhost:9091"
+        - name: RUST_LOG  
+          value: "info"
+      resources:  
+        requests:  
+          memory: "110Gi"  
+          cpu: "30"  
+        limits:  
+          memory: "110Gi"  
+          cpu: "30"  
+  volumes:  
+    - name: testnet-archive  
+      persistentVolumeClaim:  
+        claimName: testnet-archive-claim-0  

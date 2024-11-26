@@ -57,6 +57,64 @@ pub struct ProcessorManager {
     prerequisite_health_checkers: HashSet<HealthChecker>,
 }
 
+pub fn get_processor_config(processor_name: &ProcessorName) -> Result<ProcessorConfig> {
+    Ok(match processor_name {
+        ProcessorName::AccountTransactionsProcessor => {
+            ProcessorConfig::AccountTransactionsProcessor
+        },
+        ProcessorName::AnsProcessor => {
+            bail!("ANS processor is not supported in the localnet")
+        },
+        ProcessorName::DefaultProcessor => ProcessorConfig::DefaultProcessor,
+        ProcessorName::EventsProcessor => ProcessorConfig::EventsProcessor,
+        ProcessorName::FungibleAssetProcessor => ProcessorConfig::FungibleAssetProcessor,
+        ProcessorName::MonitoringProcessor => {
+            bail!("Monitoring processor is not supported in the localnet")
+        },
+        ProcessorName::NftMetadataProcessor => {
+            bail!("NFT Metadata processor is not supported in the localnet")
+        },
+        ProcessorName::ObjectsProcessor => {
+            ProcessorConfig::ObjectsProcessor(ObjectsProcessorConfig {
+                query_retries: Default::default(),
+                query_retry_delay_ms: Default::default(),
+            })
+        },
+        ProcessorName::ParquetDefaultProcessor => {
+            bail!("ParquetDefaultProcessor is not supported in the localnet")
+        },
+        ProcessorName::ParquetFungibleAssetProcessor => {
+            bail!("ParquetFungibleAssetProcessor is not supported in the localnet")
+        },
+        ProcessorName::ParquetTransactionMetadataProcessor => {
+            bail!("ParquetTransactionMetadataProcessor is not supported in the localnet")
+        },
+        ProcessorName::ParquetAnsProcessor => {
+            bail!("ParquetAnsProcessor is not supported in the localnet")
+        },
+        ProcessorName::ParquetEventsProcessor => {
+            bail!("ParquetEventsProcessor is not supported in the localnet")
+        },
+        ProcessorName::ParquetTokenV2Processor => {
+            bail!("ParquetTokenV2Processor is not supported in the localnet")
+        },
+        ProcessorName::StakeProcessor => ProcessorConfig::StakeProcessor(StakeProcessorConfig {
+            query_retries: Default::default(),
+            query_retry_delay_ms: Default::default(),
+        }),
+        ProcessorName::TokenV2Processor => {
+            ProcessorConfig::TokenV2Processor(TokenV2ProcessorConfig {
+                query_retries: Default::default(),
+                query_retry_delay_ms: Default::default(),
+            })
+        },
+        ProcessorName::TransactionMetadataProcessor => {
+            ProcessorConfig::TransactionMetadataProcessor
+        },
+        ProcessorName::UserTransactionProcessor => ProcessorConfig::UserTransactionProcessor,
+    })
+}
+
 impl ProcessorManager {
     fn new(
         processor_name: &ProcessorName,
@@ -64,63 +122,7 @@ impl ProcessorManager {
         data_service_url: Url,
         postgres_connection_string: String,
     ) -> Result<Self> {
-        let processor_config = match processor_name {
-            ProcessorName::AccountTransactionsProcessor => {
-                ProcessorConfig::AccountTransactionsProcessor
-            },
-            ProcessorName::AnsProcessor => {
-                bail!("ANS processor is not supported in the localnet")
-            },
-            ProcessorName::DefaultProcessor => ProcessorConfig::DefaultProcessor,
-            ProcessorName::EventsProcessor => ProcessorConfig::EventsProcessor,
-            ProcessorName::FungibleAssetProcessor => ProcessorConfig::FungibleAssetProcessor,
-            ProcessorName::MonitoringProcessor => {
-                bail!("Monitoring processor is not supported in the localnet")
-            },
-            ProcessorName::NftMetadataProcessor => {
-                bail!("NFT Metadata processor is not supported in the localnet")
-            },
-            ProcessorName::ObjectsProcessor => {
-                ProcessorConfig::ObjectsProcessor(ObjectsProcessorConfig {
-                    query_retries: Default::default(),
-                    query_retry_delay_ms: Default::default(),
-                })
-            },
-            ProcessorName::ParquetDefaultProcessor => {
-                bail!("ParquetDefaultProcessor is not supported in the localnet")
-            },
-            ProcessorName::ParquetFungibleAssetProcessor => {
-                bail!("ParquetFungibleAssetProcessor is not supported in the localnet")
-            },
-            ProcessorName::ParquetTransactionMetadataProcessor => {
-                bail!("ParquetTransactionMetadataProcessor is not supported in the localnet")
-            },
-            ProcessorName::ParquetAnsProcessor => {
-                bail!("ParquetAnsProcessor is not supported in the localnet")
-            },
-            ProcessorName::ParquetEventsProcessor => {
-                bail!("ParquetEventsProcessor is not supported in the localnet")
-            },
-            ProcessorName::ParquetTokenV2Processor => {
-                bail!("ParquetTokenV2Processor is not supported in the localnet")
-            },
-            ProcessorName::StakeProcessor => {
-                ProcessorConfig::StakeProcessor(StakeProcessorConfig {
-                    query_retries: Default::default(),
-                    query_retry_delay_ms: Default::default(),
-                })
-            },
-            ProcessorName::TokenV2Processor => {
-                ProcessorConfig::TokenV2Processor(TokenV2ProcessorConfig {
-                    query_retries: Default::default(),
-                    query_retry_delay_ms: Default::default(),
-                })
-            },
-            ProcessorName::TransactionMetadataProcessor => {
-                ProcessorConfig::TransactionMetadataProcessor
-            },
-            ProcessorName::UserTransactionProcessor => ProcessorConfig::UserTransactionProcessor,
-        };
+        let processor_config = get_processor_config(processor_name)?;
         let config = IndexerGrpcProcessorConfig {
             processor_config,
             postgres_connection_string,
@@ -174,6 +176,7 @@ impl ProcessorManager {
     /// Create the necessary tables in the DB for the processors to work.
     async fn run_migrations(&self) -> Result<()> {
         let connection_string = self.config.postgres_connection_string.clone();
+
         tokio::task::spawn_blocking(move || {
             // This lets us use the connection like a normal diesel connection. See more:
             // https://docs.rs/diesel-async/latest/diesel_async/async_connection_wrapper/type.AsyncConnectionWrapper.html

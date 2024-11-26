@@ -25,7 +25,9 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
-use move_vm_types::sha3_256;
+use move_vm_metrics::{Timer, VM_TIMER};
+#[cfg(any(test, feature = "testing"))]
+use move_vm_types::loaded_data::runtime_types::{StructIdentifier, StructNameIndex};
 use std::sync::Arc;
 
 /// [MoveVM] runtime environment encapsulating different configurations. Shared between the VM and
@@ -151,6 +153,10 @@ impl RuntimeEnvironment {
         module_hash: &[u8; 32],
     ) -> VMResult<LocallyVerifiedModule> {
         if !VERIFIED_MODULES_V2.contains(module_hash) {
+            let _timer = VM_TIMER.timer_with_label(
+                "LoaderV2::build_locally_verified_module [verification cache miss]",
+            );
+
             // For regular execution, we cache already verified modules. Note that this even caches
             // verification for the published modules. This should be ok because as long as the
             // hash is the same, the deployed bytecode and any dependencies are the same, and so
@@ -190,21 +196,15 @@ impl RuntimeEnvironment {
         result.map_err(|e| e.finish(Location::Undefined))
     }
 
-    /// Deserializes bytes into a compiled module, also returning its size and hash.
-    pub fn deserialize_into_compiled_module(
-        &self,
-        bytes: &Bytes,
-    ) -> VMResult<(CompiledModule, usize, [u8; 32])> {
-        let compiled_module =
-            CompiledModule::deserialize_with_config(bytes, &self.vm_config().deserializer_config)
-                .map_err(|err| {
+    /// Deserializes bytes into a compiled module.
+    pub fn deserialize_into_compiled_module(&self, bytes: &Bytes) -> VMResult<CompiledModule> {
+        CompiledModule::deserialize_with_config(bytes, &self.vm_config().deserializer_config)
+            .map_err(|err| {
                 let msg = format!("Deserialization error: {:?}", err);
                 PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
                     .with_message(msg)
                     .finish(Location::Undefined)
-            })?;
-
-        Ok((compiled_module, bytes.len(), sha3_256(bytes)))
+            })
     }
 
     /// Deserializes bytes into a compiled script.
@@ -283,6 +283,15 @@ impl RuntimeEnvironment {
     pub fn flush_struct_name_and_info_caches(&self) {
         self.flush_struct_info_cache();
         self.struct_name_index_map.flush();
+    }
+
+    /// Test-only function to be able to populate [StructNameIndexMap] outside of this crate.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn struct_name_to_idx_for_test(
+        &self,
+        struct_name: StructIdentifier,
+    ) -> PartialVMResult<StructNameIndex> {
+        self.struct_name_index_map.struct_name_to_idx(struct_name)
     }
 }
 

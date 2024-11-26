@@ -1,17 +1,17 @@
 {
   "timestamp": {
-    "seconds": "1730491941",
-    "nanos": 163739000
+    "seconds": "1731095950",
+    "nanos": 496779000
   },
-  "version": "61",
+  "version": "67",
   "info": {
-    "hash": "TEQAd3v6GybJKkyAB94YcSKLqcFPcZeOb1d9kHjYOj4=",
-    "stateChangeHash": "uG3uvGHXUVDP16Gchopz0RPSLuuQUUZhiBbBqNnsTAI=",
+    "hash": "6kJvSg6J6/nzJtn+Qg0iqEu+D/LUChmq4pX5FbpJ2yE=",
+    "stateChangeHash": "Ud1ILaQ9/i/UVj2SIebzib9eEt/Eqz4JBYfhOoCgBfQ=",
     "eventRootHash": "J/kCueHhHqJXi8MVudrh82sOQ/pqY9TJ9VjLOdgel6I=",
     "gasUsed": "3",
     "success": true,
     "vmStatus": "Executed successfully",
-    "accumulatorRootHash": "x1VWrIDTdiYw18nlc68Xrr6f1XJprv+wEgcw3P/dwpc=",
+    "accumulatorRootHash": "FxelBtaxPVGCVulc0mkobWhQB4TqjvzFBaH5wvI71jc=",
     "changes": [
       {
         "type": "TYPE_WRITE_RESOURCE",
@@ -68,7 +68,7 @@
     ]
   },
   "epoch": "2",
-  "blockHeight": "28",
+  "blockHeight": "31",
   "type": "TRANSACTION_TYPE_USER",
   "sizeInfo": {
     "transactionBytes": 190,
@@ -99,7 +99,7 @@
       "maxGasAmount": "4",
       "gasUnitPrice": "100",
       "expirationTimestampSecs": {
-        "seconds": "1730491971"
+        "seconds": "1731095980"
       },
       "payload": {
         "type": "TYPE_SCRIPT_PAYLOAD",
@@ -128,7 +128,7 @@
         "type": "TYPE_ED25519",
         "ed25519": {
           "publicKey": "ObSsyF4CbcBWRkpeoAuY+FgmDqrSt03TC4auDU2U3fU=",
-          "signature": "7VvaIVqZZt/kgyMKyDtDZmO8yhrVp5bEJnqFxSO++YDKDKgsbga8bO9jSs5mwqwTuvcIntMMNQOT8BWW7mAeDg=="
+          "signature": "0L++p+Cn6mxmKItu2eTyVMXiZkJY0v+KgxORh5u6GgHG2nprS3cAzw2Wk4PQVEy0RXrVHsbwtdzDi4PngcIJAw=="
         }
       }
     },

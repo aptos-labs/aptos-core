@@ -63,7 +63,7 @@ impl DbReader for AptosDB {
 
     fn get_pre_committed_version(&self) -> Result<Option<Version>> {
         gauged_api("get_pre_committed_version", || {
-            Ok(self.ledger_db.metadata_db().get_pre_committed_version())
+            Ok(self.state_store.current_state().lock().current_version)
         })
     }
 
@@ -529,11 +529,8 @@ impl DbReader for AptosDB {
 
     fn get_latest_executed_trees(&self) -> Result<ExecutedTrees> {
         gauged_api("get_latest_executed_trees", || {
-            let buffered_state = self.state_store.buffered_state().lock();
-            let num_txns = buffered_state
-                .current_state()
-                .current_version
-                .map_or(0, |v| v + 1);
+            let current_state = self.state_store.current_state_cloned();
+            let num_txns = current_state.next_version();
 
             let frozen_subtrees = self
                 .ledger_db
@@ -542,7 +539,7 @@ impl DbReader for AptosDB {
             let transaction_accumulator =
                 Arc::new(InMemoryAccumulator::new(frozen_subtrees, num_txns)?);
             let executed_trees = ExecutedTrees::new(
-                Arc::new(buffered_state.current_state().clone()),
+                Arc::new(current_state),
                 transaction_accumulator,
             );
             Ok(executed_trees)
@@ -643,9 +640,10 @@ impl DbReader for AptosDB {
         gauged_api("get_latest_state_checkpoint_version", || {
             Ok(self
                 .state_store
-                .buffered_state()
+                .current_state()
                 .lock()
-                .current_checkpoint_version())
+                .base_version
+            )
         })
     }
 

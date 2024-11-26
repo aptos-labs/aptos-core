@@ -45,7 +45,7 @@ use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_rest_client::{
     aptos_api_types::{EntryFunctionId, HexEncodedBytes, IdentifierWrapper, MoveModuleId},
     error::RestError,
-    Client,
+    AptosBaseUrl, Client,
 };
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
@@ -206,8 +206,8 @@ impl FrameworkPackageArgs {
         prompt_options: PromptOptions,
     ) -> CliTypedResult<()> {
         const APTOS_FRAMEWORK: &str = "AptosFramework";
-        const APTOS_GIT_PATH: &str = "https://github.com/aptos-labs/aptos-core.git";
-        const SUBDIR_PATH: &str = "aptos-move/framework/aptos-framework";
+        const APTOS_GIT_PATH: &str = "https://github.com/aptos-labs/aptos-framework.git";
+        const SUBDIR_PATH: &str = "aptos-framework";
         const DEFAULT_BRANCH: &str = "mainnet";
 
         let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
@@ -2179,6 +2179,11 @@ pub struct Replay {
     /// If present, skip the comparison against the expected transaction output.
     #[clap(long)]
     pub(crate) skip_comparison: bool,
+
+    /// Key to use for ratelimiting purposes with the node API. This value will be used
+    /// as `Authorization: Bearer <key>`
+    #[clap(long)]
+    pub(crate) node_api_key: Option<String>,
 }
 
 impl FromStr for ReplayNetworkSelection {
@@ -2216,10 +2221,20 @@ impl CliCommand<TransactionSummary> for Replay {
             RestEndpoint(url) => url,
         };
 
-        let debugger = AptosDebugger::rest_client(Client::new(
+        // Build the client
+        let client = Client::builder(AptosBaseUrl::Custom(
             Url::parse(rest_endpoint)
                 .map_err(|_err| CliError::UnableToParse("url", rest_endpoint.to_string()))?,
-        ))?;
+        ));
+
+        // add the node API key if it is provided
+        let client = if let Some(api_key) = self.node_api_key {
+            client.api_key(&api_key).unwrap().build()
+        } else {
+            client.build()
+        };
+
+        let debugger = AptosDebugger::rest_client(client)?;
 
         // Fetch the transaction to replay.
         let (txn, txn_info) = debugger

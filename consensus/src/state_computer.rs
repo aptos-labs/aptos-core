@@ -10,7 +10,7 @@ use crate::{
     execution_pipeline::{ExecutionPipeline, PreCommitHook},
     monitor,
     payload_manager::TPayloadManager,
-    pipeline::pipeline_phase::CountedRequest,
+    pipeline::{pipeline_builder::PipelineBuilder, pipeline_phase::CountedRequest},
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
     transaction_filter::TransactionFilter,
@@ -33,6 +33,7 @@ use aptos_metrics_core::IntGauge;
 use aptos_types::{
     account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, randomness::Randomness,
+    validator_signer::ValidatorSigner,
 };
 use fail::fail_point;
 use futures::{future::BoxFuture, SinkExt, StreamExt};
@@ -130,15 +131,9 @@ impl ExecutionProxy {
         tx
     }
 
-    fn pre_commit_hook(
-        &self,
-        block: &Block,
-        payload_manager: Arc<dyn TPayloadManager>,
-    ) -> PreCommitHook {
+    fn pre_commit_hook(&self) -> PreCommitHook {
         let mut pre_commit_notifier = self.pre_commit_notifier.clone();
         let state_sync_notifier = self.state_sync_notifier.clone();
-        let payload = block.payload().cloned();
-        let timestamp = block.timestamp_usecs();
         Box::new(move |state_compute_result: &StateComputeResult| {
             let state_compute_result = state_compute_result.clone();
             Box::pin(async move {
@@ -157,14 +152,70 @@ impl ExecutionProxy {
                         ) {
                             error!(error = ?e, "Failed to notify state synchronizer");
                         }
-
-                        let payload_vec = payload.into_iter().collect();
-                        payload_manager.notify_commit(timestamp, payload_vec);
                     }))
                     .await
                     .expect("Failed to send pre-commit notification");
             })
         })
+    }
+
+    fn commit_hook(
+        &self,
+        blocks: &[Arc<PipelinedBlock>],
+        callback: StateComputerCommitCallBackType,
+        finality_proof: LedgerInfoWithSignatures,
+    ) -> NotificationType {
+        let payload_manager = self
+            .state
+            .read()
+            .as_ref()
+            .expect("must be set within an epoch")
+            .payload_manager
+            .clone();
+        let blocks = blocks.to_vec();
+        Box::pin(async move {
+            for block in blocks.iter() {
+                let payload = block.payload().cloned();
+                let payload_vec = payload.into_iter().collect();
+                let timestamp = block.timestamp_usecs();
+                payload_manager.notify_commit(timestamp, payload_vec);
+            }
+            callback(&blocks, finality_proof);
+        })
+    }
+
+    pub fn pipeline_builder(&self, commit_signer: Arc<ValidatorSigner>) -> PipelineBuilder {
+        let MutableState {
+            validators,
+            payload_manager,
+            transaction_shuffler,
+            block_executor_onchain_config,
+            transaction_deduper,
+            is_randomness_enabled,
+        } = self
+            .state
+            .read()
+            .as_ref()
+            .cloned()
+            .expect("must be set within an epoch");
+
+        let block_preparer = Arc::new(BlockPreparer::new(
+            payload_manager.clone(),
+            self.transaction_filter.clone(),
+            transaction_deduper.clone(),
+            transaction_shuffler.clone(),
+        ));
+        PipelineBuilder::new(
+            block_preparer,
+            self.executor.clone(),
+            validators,
+            block_executor_onchain_config,
+            is_randomness_enabled,
+            commit_signer,
+            self.state_sync_notifier.clone(),
+            payload_manager,
+            self.txn_notifier.clone(),
+        )
     }
 }
 
@@ -201,7 +252,7 @@ impl StateComputer for ExecutionProxy {
 
         let txn_notifier = self.txn_notifier.clone();
         let transaction_generator = BlockPreparer::new(
-            payload_manager.clone(),
+            payload_manager,
             self.transaction_filter.clone(),
             transaction_deduper.clone(),
             transaction_shuffler.clone(),
@@ -225,7 +276,7 @@ impl StateComputer for ExecutionProxy {
                 parent_block_id,
                 transaction_generator,
                 block_executor_onchain_config,
-                self.pre_commit_hook(block, payload_manager),
+                self.pre_commit_hook(),
                 lifetime_guard,
             )
             .await;
@@ -308,14 +359,9 @@ impl StateComputer for ExecutionProxy {
         )
         .expect("spawn_blocking failed");
 
-        let blocks = blocks.to_vec();
-        let callback_fut = Box::pin(async move {
-            callback(&blocks, finality_proof);
-        });
-
         self.commit_notifier
             .clone()
-            .send(callback_fut)
+            .send(self.commit_hook(blocks, callback, finality_proof))
             .await
             .expect("Failed to send commit notification");
 

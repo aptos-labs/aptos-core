@@ -40,8 +40,9 @@ use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_schemadb::SchemaBatch;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
-    db_ensure as ensure, db_other_bail as bail, AptosDbError, DbReader, DbWriter, ExecutedTrees,
-    Order, Result, StateSnapshotReceiver, MAX_REQUEST_LIMIT,
+    db_ensure as ensure, db_other_bail as bail,
+    state_store::sharded_state_updates::ShardedStateUpdates, AptosDbError, DbReader, DbWriter,
+    ExecutedTrees, Order, Result, StateSnapshotReceiver, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -96,7 +97,9 @@ pub struct AptosDB {
     pub(crate) transaction_store: Arc<TransactionStore>,
     ledger_pruner: LedgerPrunerManager,
     _rocksdb_property_reporter: RocksdbPropertyReporter,
+    /// This is just to detect concurrent calls to `pre_commit_ledger()`
     pre_commit_lock: std::sync::Mutex<()>,
+    /// This is just to detect concurrent calls to `commit_ledger()`
     commit_lock: std::sync::Mutex<()>,
     indexer: Option<Indexer>,
     skip_index_and_usage: bool,

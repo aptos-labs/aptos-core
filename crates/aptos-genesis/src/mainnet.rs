@@ -16,7 +16,7 @@ use aptos_types::{
     transaction::Transaction,
     waypoint::Waypoint,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use aptos_vm_genesis::{AccountBalance, EmployeePool, ValidatorWithCommissionRate};
 
 /// Holder object for all pieces needed to generate a genesis transaction
@@ -143,6 +143,8 @@ impl MainnetGenesisInfo {
                 initial_features_override: self.initial_features_override.clone(),
                 randomness_config_override: self.randomness_config_override.clone(),
                 jwk_consensus_config_override: self.jwk_consensus_config_override.clone(),
+                initial_jwks: vec![],
+                keyless_groth16_vk_override: None,
             },
         )
     }
@@ -161,6 +163,6 @@ impl MainnetGenesisInfo {
             None,
         )?;
         let db_rw = DbReaderWriter::new(aptosdb);
-        aptos_executor::db_bootstrapper::generate_waypoint::<AptosVM>(&db_rw, genesis)
+        aptos_executor::db_bootstrapper::generate_waypoint::<AptosVMBlockExecutor>(&db_rw, genesis)
     }
 }

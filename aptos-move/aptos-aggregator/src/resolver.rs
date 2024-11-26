@@ -86,7 +86,6 @@ pub trait TAggregatorV1View {
             PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
                 .with_message("Cannot convert delta for deleted aggregator".to_string())
         })?;
-
         delta_op
             .apply_to(base)
             .map_err(|e| match &e {

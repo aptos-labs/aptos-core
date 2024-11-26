@@ -6,23 +6,33 @@ use crate::{
     metrics::{EXECUTOR_ERRORS, OTHER_TIMERS},
 };
 use anyhow::{anyhow, Result};
+use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
+#[cfg(feature = "consensus-only-perf-test")]
+use aptos_block_executor::txn_provider::TxnProvider;
 use aptos_crypto::HashValue;
 use aptos_executor_service::{
     local_executor_helper::SHARDED_BLOCK_EXECUTOR,
     remote_executor_client::{get_remote_addresses, REMOTE_SHARDED_BLOCK_EXECUTOR},
 };
 use aptos_executor_types::{
-    execution_output::ExecutionOutput, planned::Planned, should_forward_to_subscription_service,
-    transactions_with_output::TransactionsWithOutput,
+    execution_output::ExecutionOutput,
+    planned::Planned,
+    should_forward_to_subscription_service,
+    transactions_with_output::{TransactionsToKeep, TransactionsWithOutput},
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
-use aptos_storage_interface::cached_state_view::{CachedStateView, StateCache};
+use aptos_storage_interface::state_store::state_view::cached_state_view::{
+    CachedStateView, StateCache,
+};
+#[cfg(feature = "consensus-only-perf-test")]
+use aptos_types::transaction::ExecutionStatus;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain,
         partitioner::{ExecutableTransactions, PartitionedTransactions},
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     contract_event::ContractEvent,
     epoch_state::EpochState,
@@ -37,33 +47,35 @@ use aptos_types::{
     },
     write_set::{TransactionWrite, WriteSet},
 };
-use aptos_vm::VMExecutor;
+use aptos_vm::VMBlockExecutor;
 use itertools::Itertools;
-use std::{iter, sync::Arc};
+use std::sync::Arc;
 
 pub struct DoGetExecutionOutput;
 
 impl DoGetExecutionOutput {
-    pub fn by_transaction_execution<V: VMExecutor>(
+    pub fn by_transaction_execution<V: VMBlockExecutor>(
+        executor: &V,
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-        append_state_checkpoint_to_block: Option<HashValue>,
+        transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<ExecutionOutput> {
         let out = match transactions {
             ExecutableTransactions::Unsharded(txns) => {
                 Self::by_transaction_execution_unsharded::<V>(
+                    executor,
                     txns,
                     state_view,
                     onchain_config,
-                    append_state_checkpoint_to_block,
+                    transaction_slice_metadata,
                 )?
             },
             ExecutableTransactions::Sharded(txns) => Self::by_transaction_execution_sharded::<V>(
                 txns,
                 state_view,
                 onchain_config,
-                append_state_checkpoint_to_block,
+                transaction_slice_metadata.append_state_checkpoint_to_block(),
             )?,
         };
 
@@ -82,18 +94,32 @@ impl DoGetExecutionOutput {
         Ok(ret)
     }
 
-    fn by_transaction_execution_unsharded<V: VMExecutor>(
+    fn by_transaction_execution_unsharded<V: VMBlockExecutor>(
+        executor: &V,
         transactions: Vec<SignatureVerifiedTransaction>,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
-        append_state_checkpoint_to_block: Option<HashValue>,
+        transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<ExecutionOutput> {
-        let block_output = Self::execute_block::<V>(&transactions, &state_view, onchain_config)?;
+        let append_state_checkpoint_to_block =
+            transaction_slice_metadata.append_state_checkpoint_to_block();
+        let txn_provider = DefaultTxnProvider::new(transactions);
+        let block_output = Self::execute_block::<V>(
+            executor,
+            &txn_provider,
+            &state_view,
+            onchain_config,
+            transaction_slice_metadata,
+        )?;
         let (transaction_outputs, block_end_info) = block_output.into_inner();
 
         Parser::parse(
             state_view.next_version(),
-            transactions.into_iter().map(|t| t.into_inner()).collect(),
+            txn_provider
+                .txns
+                .into_iter()
+                .map(|t| t.into_inner())
+                .collect(),
             transaction_outputs,
             state_view.into_state_cache(),
             block_end_info,
@@ -101,7 +127,7 @@ impl DoGetExecutionOutput {
         )
     }
 
-    pub fn by_transaction_execution_sharded<V: VMExecutor>(
+    pub fn by_transaction_execution_sharded<V: VMBlockExecutor>(
         transactions: PartitionedTransactions,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
@@ -168,7 +194,7 @@ impl DoGetExecutionOutput {
         Ok(ret)
     }
 
-    fn execute_block_sharded<V: VMExecutor>(
+    fn execute_block_sharded<V: VMBlockExecutor>(
         partitioned_txns: PartitionedTransactions,
         state_view: Arc<CachedStateView>,
         onchain_config: BlockExecutorConfigFromOnchain,
@@ -190,27 +216,36 @@ impl DoGetExecutionOutput {
         }
     }
 
-    /// Executes the block of [Transaction]s using the [VMExecutor] and returns
+    /// Executes the block of [Transaction]s using the [VMBlockExecutor] and returns
     /// a vector of [TransactionOutput]s.
     #[cfg(not(feature = "consensus-only-perf-test"))]
-    fn execute_block<V: VMExecutor>(
-        transactions: &[SignatureVerifiedTransaction],
+    fn execute_block<V: VMBlockExecutor>(
+        executor: &V,
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
+        transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>> {
         let _timer = OTHER_TIMERS.timer_with(&["vm_execute_block"]);
-        Ok(V::execute_block(transactions, state_view, onchain_config)?)
+        Ok(executor.execute_block(
+            txn_provider,
+            state_view,
+            onchain_config,
+            transaction_slice_metadata,
+        )?)
     }
 
     /// In consensus-only mode, executes the block of [Transaction]s using the
-    /// [VMExecutor] only if its a genesis block. In all other cases, this
+    /// [VMBlockExecutor] only if its a genesis block. In all other cases, this
     /// method returns an [TransactionOutput] with an empty [WriteSet], constant
     /// gas and a [ExecutionStatus::Success] for each of the [Transaction]s.
     #[cfg(feature = "consensus-only-perf-test")]
-    fn execute_block<V: VMExecutor>(
-        transactions: &[SignatureVerifiedTransaction],
+    fn execute_block<V: VMBlockExecutor>(
+        executor: &V,
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
+        transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>> {
         use aptos_types::{
             state_store::{StateViewId, TStateView},
@@ -220,12 +255,14 @@ impl DoGetExecutionOutput {
 
         let transaction_outputs = match state_view.id() {
             // this state view ID implies a genesis block in non-test cases.
-            StateViewId::Miscellaneous => {
-                V::execute_block(transactions, state_view, onchain_config)?
-            },
+            StateViewId::Miscellaneous => executor.execute_block(
+                txn_provider,
+                state_view,
+                onchain_config,
+                transaction_slice_metadata,
+            )?,
             _ => BlockOutput::new(
-                transactions
-                    .iter()
+                (0..txn_provider.num_txns())
                     .map(|_| {
                         TransactionOutput::new(
                             WriteSet::default(),
@@ -236,6 +273,7 @@ impl DoGetExecutionOutput {
                         )
                     })
                     .collect::<Vec<_>>(),
+                None,
             ),
         };
         Ok(transaction_outputs)
@@ -254,56 +292,38 @@ impl Parser {
         append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<ExecutionOutput> {
         let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output"]);
+
         let is_block = append_state_checkpoint_to_block.is_some();
-
-        // Parse all outputs.
-        let mut epoch_ending_flags = {
-            let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__epoch_ending_flags"]);
-            transaction_outputs
-                .iter()
-                .map(TransactionOutput::has_new_epoch_event)
-                .collect_vec()
-        };
-
-        // Isolate retries.
-        let (to_retry, has_reconfig) = {
-            let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__retries"]);
-            Self::extract_retries(
-                &mut transactions,
-                &mut transaction_outputs,
-                &mut epoch_ending_flags,
-            )
-        };
 
         // Collect all statuses.
         let statuses_for_input_txns = {
             let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__all_statuses"]);
-            let keeps_and_discards = transaction_outputs.iter().map(|t| t.status()).cloned();
-            // Forcibly overwriting statuses for retries, since VM can output otherwise.
-            let retries = iter::repeat(TransactionStatus::Retry).take(to_retry.len());
-            keeps_and_discards.chain(retries).collect()
+            transaction_outputs
+                .iter()
+                .map(|t| t.status())
+                .cloned()
+                .collect_vec()
         };
 
+        // Isolate retries.
+        let (to_retry, has_reconfig) =
+            Self::extract_retries(&mut transactions, &mut transaction_outputs);
+
         // Isolate discards.
-        let to_discard = {
-            let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__discards"]);
-            Self::extract_discards(
-                &mut transactions,
-                &mut transaction_outputs,
-                &mut epoch_ending_flags,
-            )
-        };
+        let to_discard = Self::extract_discards(&mut transactions, &mut transaction_outputs);
 
         // The rest is to be committed, attach block epilogue as needed and optionally get next EpochState.
         let to_commit = {
             let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__to_commit"]);
-            let to_commit =
-                TransactionsWithOutput::new(transactions, transaction_outputs, epoch_ending_flags);
-            Self::maybe_add_block_epilogue(
-                to_commit,
+            let to_commit = TransactionsWithOutput::new(transactions, transaction_outputs);
+            TransactionsToKeep::index(
+                Self::maybe_add_block_epilogue(
+                    to_commit,
+                    has_reconfig,
+                    block_end_info.as_ref(),
+                    append_state_checkpoint_to_block,
+                ),
                 has_reconfig,
-                block_end_info.as_ref(),
-                append_state_checkpoint_to_block,
             )
         };
         let next_epoch_state = {
@@ -346,74 +366,53 @@ impl Parser {
     fn extract_retries(
         transactions: &mut Vec<Transaction>,
         transaction_outputs: &mut Vec<TransactionOutput>,
-        epoch_ending_flags: &mut Vec<bool>,
     ) -> (TransactionsWithOutput, bool) {
-        // N.B. off-by-1 intentionally, for exclusive index
-        let new_epoch_marker = epoch_ending_flags
-            .iter()
-            .rposition(|f| *f)
-            .map(|idx| idx + 1);
+        let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__retries"]);
 
-        let block_gas_limit_marker = transaction_outputs
+        let last_non_retry = transaction_outputs
             .iter()
-            .position(|o| matches!(o.status(), TransactionStatus::Retry));
-
-        // Transactions after the epoch ending txn are all to be retried.
-        // Transactions after the txn that exceeded per-block gas limit are also to be retried.
-        if let Some(pos) = new_epoch_marker {
-            (
-                TransactionsWithOutput::new(
-                    transactions.drain(pos..).collect(),
-                    transaction_outputs.drain(pos..).collect(),
-                    epoch_ending_flags.drain(pos..).collect(),
-                ),
-                true,
-            )
-        } else if let Some(pos) = block_gas_limit_marker {
-            (
-                TransactionsWithOutput::new(
-                    transactions.drain(pos..).collect(),
-                    transaction_outputs.drain(pos..).collect(),
-                    epoch_ending_flags.drain(pos..).collect(),
-                ),
-                false,
-            )
+            .rposition(|t| !t.status().is_retry());
+        let is_reconfig = if let Some(idx) = last_non_retry {
+            transaction_outputs[idx].has_new_epoch_event()
         } else {
-            (TransactionsWithOutput::new_empty(), false)
-        }
+            false
+        };
+
+        let first_retry = last_non_retry.map_or(0, |pos| pos + 1);
+        let to_retry = TransactionsWithOutput::new(
+            transactions.drain(first_retry..).collect(),
+            transaction_outputs.drain(first_retry..).collect(),
+        );
+
+        (to_retry, is_reconfig)
     }
 
     fn extract_discards(
         transactions: &mut Vec<Transaction>,
         transaction_outputs: &mut Vec<TransactionOutput>,
-        epoch_ending_flags: &mut Vec<bool>,
     ) -> TransactionsWithOutput {
+        let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__discards"]);
+
         let to_discard = {
             let mut res = TransactionsWithOutput::new_empty();
             for idx in 0..transactions.len() {
                 if transaction_outputs[idx].status().is_discarded() {
-                    res.push(
-                        transactions[idx].clone(),
-                        transaction_outputs[idx].clone(),
-                        epoch_ending_flags[idx],
-                    );
+                    res.push(transactions[idx].clone(), transaction_outputs[idx].clone());
                 } else if !res.is_empty() {
                     transactions[idx - res.len()] = transactions[idx].clone();
                     transaction_outputs[idx - res.len()] = transaction_outputs[idx].clone();
-                    epoch_ending_flags[idx - res.len()] = epoch_ending_flags[idx];
                 }
             }
             if !res.is_empty() {
                 let remaining = transactions.len() - res.len();
                 transactions.truncate(remaining);
                 transaction_outputs.truncate(remaining);
-                epoch_ending_flags.truncate(remaining);
             }
             res
         };
 
         // Sanity check transactions with the Discard status:
-        to_discard.iter().for_each(|(t, o, _flag)| {
+        to_discard.iter().for_each(|(t, o)| {
             // In case a new status other than Retry, Keep and Discard is added:
             if !matches!(o.status(), TransactionStatus::Discard(_)) {
                 error!("Status other than Retry, Keep or Discard; Transaction discarded.");
@@ -449,11 +448,7 @@ impl Parser {
                     },
                 };
 
-                to_commit.push(
-                    state_checkpoint_txn,
-                    TransactionOutput::new_empty_success(),
-                    false,
-                );
+                to_commit.push(state_checkpoint_txn, TransactionOutput::new_empty_success());
             }
         }; // else: not adding block epilogue at epoch ending.
 
@@ -462,7 +457,7 @@ impl Parser {
 
     fn ensure_next_epoch_state(to_commit: &TransactionsWithOutput) -> Result<EpochState> {
         let last_write_set = to_commit
-            .transaction_outputs()
+            .transaction_outputs
             .last()
             .ok_or_else(|| anyhow!("to_commit is empty."))?
             .write_set();
@@ -493,21 +488,21 @@ impl<'a> TStateView for WriteSetStateView<'a> {
     fn get_state_value(
         &self,
         state_key: &Self::Key,
-    ) -> aptos_types::state_store::Result<Option<StateValue>> {
+    ) -> aptos_types::state_store::StateViewResult<Option<StateValue>> {
         Ok(self
             .write_set
             .get(state_key)
             .and_then(|write_op| write_op.as_state_value()))
     }
 
-    fn get_usage(&self) -> aptos_types::state_store::Result<StateStorageUsage> {
+    fn get_usage(&self) -> aptos_types::state_store::StateViewResult<StateStorageUsage> {
         unreachable!("Not supposed to be called on WriteSetStateView.")
     }
 }
 #[cfg(test)]
 mod tests {
     use super::Parser;
-    use aptos_storage_interface::cached_state_view::StateCache;
+    use aptos_storage_interface::state_store::state_view::cached_state_view::StateCache;
     use aptos_types::{
         contract_event::ContractEvent,
         transaction::{

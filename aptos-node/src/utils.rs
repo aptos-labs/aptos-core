@@ -3,7 +3,9 @@
 
 use anyhow::anyhow;
 use aptos_config::config::{NodeConfig, DEFAULT_EXECUTION_CONCURRENCY_LEVEL};
-use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
+use aptos_storage_interface::{
+    state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReaderWriter,
+};
 use aptos_types::{
     account_config::ChainIdResource, chain_id::ChainId, on_chain_config::OnChainConfig,
 };

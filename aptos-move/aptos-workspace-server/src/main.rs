@@ -1,164 +1,178 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Result;
-use aptos::node::local_testnet::HealthChecker;
-use aptos_config::config::{NodeConfig, TableInfoServiceMode};
-use aptos_faucet_core::server::{FunderKeyEnum, RunConfig};
-use aptos_node::{load_node_config, start_and_report_ports};
-use aptos_types::network_address::{NetworkAddress, Protocol};
-use futures::channel::oneshot;
-use rand::{rngs::StdRng, SeedableRng};
-use std::{
-    net::{IpAddr, Ipv4Addr},
-    path::Path,
-    thread,
-    time::Duration,
+//! This binary runs and manages a set of services that makes up a local Aptos network.
+//! - node
+//!     - node API
+//!     - indexer grpc
+//! - faucet
+//! - indexer
+//!     - postgres db
+//!     - processors
+//!     - indexer API
+//!
+//! The services are bound to unique OS-assigned ports to allow for multiple local networks
+//! to operate simultaneously, enabling testing and development in isolated environments.
+//!
+//! ## Key Features:
+//! - Shared Futures
+//!     - The code makes extensive use of shared futures across multiple services,
+//!       ensuring orderly startup while maximizing parallel execution.
+//! - Graceful Shutdown
+//!     - When a `Ctrl-C` signal is received or if any of the services fail to start
+//!       or exit unexpectedly, the system attempts to gracefully shut down all services,
+//!       cleaning up resources like Docker containers, volumes and networks.
+
+mod common;
+mod services;
+
+use anyhow::{Context, Result};
+use common::make_shared;
+use futures::TryFutureExt;
+use services::{
+    docker_common::create_docker_network, indexer_api::start_indexer_api,
+    processors::start_all_processors,
 };
-use url::Url;
+use std::path::Path;
+use tokio_util::sync::CancellationToken;
+use uuid::Uuid;
 
-pub fn zero_all_ports(config: &mut NodeConfig) {
-    // TODO: Double check if all ports are covered.
+async fn run_all_services(test_dir: &Path) -> Result<()> {
+    let instance_id = Uuid::new_v4();
 
-    config.admin_service.port = 0;
-    config.api.address.set_port(0);
-    config.inspection_service.port = 0;
-    config.storage.backup_service_address.set_port(0);
-    config.indexer_grpc.address.set_port(0);
+    // Phase 0: Register the signal handler for ctrl-c.
+    let shutdown = CancellationToken::new();
+    {
+        // TODO: Find a way to register the signal handler in a blocking manner without
+        //       waiting for it to trigger.
+        let shutdown = shutdown.clone();
+        tokio::spawn(async move {
+            tokio::signal::ctrl_c().await.unwrap();
 
-    if let Some(network) = config.validator_network.as_mut() {
-        network.listen_address = NetworkAddress::from_protocols(vec![
-            Protocol::Ip4("0.0.0.0".parse().unwrap()),
-            Protocol::Tcp(0),
-        ])
-        .unwrap();
+            println!("\nCtrl-C received. Shutting down services. This may take a while.\n");
+
+            shutdown.cancel();
+        });
     }
-    for network in config.full_node_networks.iter_mut() {
-        network.listen_address = NetworkAddress::from_protocols(vec![
-            Protocol::Ip4("0.0.0.0".parse().unwrap()),
-            Protocol::Tcp(0),
-        ])
-        .unwrap();
-    }
-}
 
-async fn spawn_node(test_dir: &Path) -> Result<()> {
-    let rng = StdRng::from_entropy();
+    // Phase 1: Start all services.
+    // Node
+    let (fut_node_api, fut_indexer_grpc, fut_node_finish) = services::node::start_node(test_dir)?;
 
-    let mut node_config = load_node_config(
-        &None,
-        &None,
-        test_dir,
-        false,
-        false,
-        false,
-        aptos_cached_packages::head_release_bundle(),
-        rng,
-    )?;
+    let fut_node_api = make_shared(fut_node_api);
+    let fut_indexer_grpc = make_shared(fut_indexer_grpc);
 
-    zero_all_ports(&mut node_config);
-    node_config.indexer_grpc.enabled = true;
-    node_config.indexer_grpc.use_data_service_interface = true;
+    // Faucet
+    let (fut_faucet, fut_faucet_finish) = services::faucet::start_faucet(
+        test_dir.to_owned(),
+        fut_node_api.clone(),
+        fut_indexer_grpc.clone(),
+    );
 
-    node_config.indexer_table_info.table_info_service_mode = TableInfoServiceMode::IndexingOnly;
+    // Docker Network
+    let docker_network_name = format!("aptos-workspace-{}", instance_id);
+    let (fut_docker_network, fut_docker_network_clean_up) =
+        create_docker_network(shutdown.clone(), docker_network_name);
 
-    node_config
-        .api
-        .address
-        .set_ip(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
-    node_config
-        .indexer_grpc
-        .address
-        .set_ip(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
+    // Indexer part 1: postgres db
+    let (fut_postgres, fut_postgres_finish, fut_postgres_clean_up) =
+        services::postgres::start_postgres(
+            shutdown.clone(),
+            fut_docker_network.clone(),
+            instance_id,
+        );
+    let fut_postgres = make_shared(fut_postgres);
 
-    node_config.admin_service.address = "127.0.0.1".to_string();
-    node_config.inspection_service.address = "127.0.0.1".to_string();
+    // Indexer part 2: processors
+    let (fut_all_processors_ready, fut_any_processor_finish) = start_all_processors(
+        fut_node_api.clone(),
+        fut_indexer_grpc.clone(),
+        fut_postgres.clone(),
+    );
+    let fut_all_processors_ready = make_shared(fut_all_processors_ready);
 
-    let (api_port_tx, api_port_rx) = oneshot::channel();
-    let (indexer_grpc_port_tx, indexer_grpc_port_rx) = oneshot::channel();
+    // Indexer part 3: indexer API
+    let (fut_indexer_api, fut_indexer_api_finish, fut_indexer_api_clean_up) = start_indexer_api(
+        instance_id,
+        shutdown.clone(),
+        fut_docker_network.clone(),
+        fut_postgres.clone(),
+        fut_all_processors_ready.clone(),
+    );
 
-    let run_node = {
-        let test_dir = test_dir.to_owned();
-        let node_config = node_config.clone();
-        move || -> Result<()> {
-            start_and_report_ports(
-                node_config,
-                Some(test_dir.join("validator.log")),
-                false,
-                Some(api_port_tx),
-                Some(indexer_grpc_port_tx),
-            )
-        }
+    // Phase 2: Wait for all services to be up.
+    let all_services_up = async move {
+        tokio::try_join!(
+            fut_node_api.map_err(anyhow::Error::msg),
+            fut_indexer_grpc.map_err(anyhow::Error::msg),
+            fut_faucet,
+            fut_postgres.map_err(anyhow::Error::msg),
+            fut_all_processors_ready.map_err(anyhow::Error::msg),
+            fut_indexer_api,
+        )
     };
+    let clean_up_all = async move {
+        eprintln!("Running shutdown steps");
+        fut_indexer_api_clean_up.await;
+        fut_postgres_clean_up.await;
+        fut_docker_network_clean_up.await;
+    };
+    tokio::select! {
+        _ = shutdown.cancelled() => {
+            clean_up_all.await;
 
-    let _node_thread_handle = thread::spawn(move || {
-        let res = run_node();
-
-        if let Err(err) = res {
-            println!("Node stopped unexpectedly {:?}", err);
+            return Ok(())
         }
-    });
+        res = all_services_up => {
+            match res.context("one or more services failed to start") {
+                Ok(_) => println!("ALL SERVICES UP"),
+                Err(err) => {
+                    eprintln!("\nOne or more services failed to start, will run shutdown steps\n");
+                    clean_up_all.await;
 
-    let api_port = api_port_rx.await?;
-    let indexer_grpc_port = indexer_grpc_port_rx.await?;
+                    return Err(err)
+                }
+            }
+        }
+    }
 
-    let api_health_checker = HealthChecker::NodeApi(
-        Url::parse(&format!(
-            "http://{}:{}",
-            node_config.api.address.ip(),
-            api_port
-        ))
-        .unwrap(),
-    );
-    let indexer_grpc_health_checker = HealthChecker::DataServiceGrpc(
-        Url::parse(&format!(
-            "http://{}:{}",
-            node_config.indexer_grpc.address.ip(),
-            indexer_grpc_port
-        ))
-        .unwrap(),
-    );
+    // Phase 3: Wait for services to stop, which should only happen in case of an error, or
+    //          the shutdown signal to be received.
+    tokio::select! {
+        _ = shutdown.cancelled() => (),
+        res = fut_node_finish => {
+            eprintln!("Node exited unexpectedly");
+            if let Err(err) = res {
+                eprintln!("Error: {}", err);
+            }
+        }
+        res = fut_faucet_finish => {
+            eprintln!("Faucet exited unexpectedly");
+            if let Err(err) = res {
+                eprintln!("Error: {}", err);
+            }
+        }
+        res = fut_postgres_finish => {
+            eprintln!("Postgres exited unexpectedly");
+            if let Err(err) = res {
+                eprintln!("Error: {}", err);
+            }
+        }
+        res = fut_any_processor_finish => {
+            eprintln!("One of the processors exited unexpectedly");
+            if let Err(err) = res {
+                eprintln!("Error: {}", err);
+            }
+        }
+        res = fut_indexer_api_finish => {
+            eprintln!("Indexer API exited unexpectedly");
+            if let Err(err) = res {
+                eprintln!("Error: {}", err);
+            }
+        }
+    }
 
-    api_health_checker.wait(None).await?;
-    eprintln!(
-        "Node API is ready. Endpoint: http://127.0.0.1:{}/",
-        api_port
-    );
-
-    indexer_grpc_health_checker.wait(None).await?;
-    eprintln!(
-        "Transaction stream is ready. Endpoint: http://127.0.0.1:{}/",
-        indexer_grpc_port
-    );
-
-    let faucet_run_config = RunConfig::build_for_cli(
-        Url::parse(&format!(
-            "http://{}:{}",
-            node_config.api.address.ip(),
-            api_port
-        ))
-        .unwrap(),
-        "127.0.0.1".to_string(),
-        0,
-        FunderKeyEnum::KeyFile(test_dir.join("mint.key")),
-        false,
-        None,
-    );
-
-    let (faucet_port_tx, faucet_port_rx) = oneshot::channel();
-    tokio::spawn(faucet_run_config.run_and_report_port(faucet_port_tx));
-
-    let faucet_port = faucet_port_rx.await?;
-
-    let faucet_health_checker =
-        HealthChecker::http_checker_from_port(faucet_port, "Faucet".to_string());
-    faucet_health_checker.wait(None).await?;
-    eprintln!(
-        "Faucet is ready. Endpoint: http://127.0.0.1:{}",
-        faucet_port
-    );
-
-    eprintln!("Indexer API is ready. Endpoint: http://127.0.0.1:0/");
+    clean_up_all.await;
 
     Ok(())
 }
@@ -169,9 +183,9 @@ async fn main() -> Result<()> {
 
     println!("Test directory: {}", test_dir.path().display());
 
-    spawn_node(test_dir.path()).await?;
+    run_all_services(test_dir.path()).await?;
 
-    loop {
-        tokio::time::sleep(Duration::from_millis(200)).await;
-    }
+    println!("Finished running all services");
+
+    Ok(())
 }
