@@ -74,6 +74,7 @@ impl IndexerCliArgs {
                 continue;
             }
             let path = entry.path();
+            println!("\nFound path: {:?}\n", path.display());
             if path.extension().unwrap_or_default() == "yaml" {
                 let file_name = path.file_name().unwrap().to_str().unwrap();
                 let script_transactions_raw: String = tokio::fs::read_to_string(&path).await?;
