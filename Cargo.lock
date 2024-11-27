@@ -905,7 +905,6 @@ dependencies = [
  "aptos-executor-types",
  "aptos-experimental-runtimes",
  "aptos-fallible",
- "aptos-global-constants",
  "aptos-infallible",
  "aptos-keygen",
  "aptos-logger",
