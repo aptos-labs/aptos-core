@@ -33,7 +33,7 @@ use std::{
     time::Duration,
 };
 use tokio::sync::{Mutex, Notify};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 use url::Url;
 
 pub mod config;
@@ -64,7 +64,7 @@ struct CloudflareImageUploadResponse {
     result: Option<CloudflareImageUploadResponseResult>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct UploadQueue {
     asset_queue: BTreeSet<AssetUploaderRequestStatuses>,
     in_progress_assets: AHashSet<AssetUploaderRequestStatuses>,
@@ -219,7 +219,14 @@ impl AssetUploaderThrottlerContext {
 
             // Pop the first asset from the queue and add it to the in-progress set
             let mut upload_queue = self.upload_queue.lock().await;
-            let asset = upload_queue.asset_queue.pop_first().unwrap(); // Safe to unwrap because we checked if the queue is empty
+            // Should be safe to unwrap because we checked if the queue is empty, but log in case
+            let Some(asset) = upload_queue.asset_queue.pop_first() else {
+                warn!(
+                    queue = ?upload_queue,
+                    "Asset queue is empty, despite being notified"
+                );
+                continue;
+            };
             upload_queue.in_progress_assets.insert(asset.clone());
             drop(upload_queue);
 
