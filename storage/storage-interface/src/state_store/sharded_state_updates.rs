@@ -31,12 +31,14 @@ impl ShardedStateUpdates {
     }
 
     pub fn merge(&mut self, other: Self) {
-        self.shards
-            .par_iter_mut()
-            .zip_eq(other.shards.into_par_iter())
-            .for_each(|(l, r)| {
-                l.extend(r);
-            })
+        THREAD_MANAGER.get_exe_cpu_pool().install(|| {
+            self.shards
+                .par_iter_mut()
+                .zip_eq(other.shards.into_par_iter())
+                .for_each(|(l, r)| {
+                    l.extend(r);
+                })
+        })
     }
 
     pub fn clone_merge(&mut self, other: &Self) {
