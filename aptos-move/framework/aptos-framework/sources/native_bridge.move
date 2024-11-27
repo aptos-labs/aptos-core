@@ -30,6 +30,10 @@ module aptos_framework::native_bridge {
     const ETRANSFER_ALREADY_PROCESSED: u64 = 1;
     const EINVALID_BRIDGE_TRANSFER_ID: u64 = 2;
     const EEVENT_NOT_FOUND : u64 = 3;
+    const EINVALID_VALUE : u64 = 4;
+
+    
+
 
     #[event]
     /// An event triggered upon initiating a bridge transfer
@@ -97,12 +101,12 @@ module aptos_framework::native_bridge {
         initiator: &signer,  
         recipient: vector<u8>,  
         amount: u64  
-    ) acquires BridgeConfig, BridgeEvents, Nonce {
+    ) acquires BridgeEvents, Nonce {
         let initiator_address = signer::address_of(initiator);  
         let ethereum_address = ethereum::ethereum_address_no_eip55(recipient);  
 
-        // Ensure the amount is enough for the bridge fee
-        let amount = charge_bridge_fee(initiator_address, amount);
+        // Ensure the amount is enough for the bridge fee and charge for it
+        let newAmount = charge_bridge_fee(initiator, amount);
 
         // Increment and retrieve the nonce  
         let nonce = increment_and_get_nonce();  
@@ -111,7 +115,7 @@ module aptos_framework::native_bridge {
         let details = native_bridge_store::create_details(  
             initiator_address,  
             ethereum_address, 
-            amount,  
+            newAmount,  
             nonce  
         );
 
@@ -130,14 +134,14 @@ module aptos_framework::native_bridge {
 
         let bridge_events = borrow_global_mut<BridgeEvents>(@aptos_framework);
 
-        // Emit an event with nonce  
+        // Emit an event with nonce
         event::emit_event(  
              &mut bridge_events.bridge_transfer_initiated_events,
             BridgeTransferInitiatedEvent {  
                 bridge_transfer_id,  
-                initiator: initiator_address,  
+                initiator: initiator_address,
                 recipient,  
-                amount,  
+                amount: newAmount,
                 nonce,  
             }  
         );  
@@ -195,7 +199,22 @@ module aptos_framework::native_bridge {
                 nonce,  
             },  
         );  
-    } 
+    }
+
+    /// Charge bridge fee to the initiate bridge transfer.
+    /// 
+    /// @param initiator The signer representing the initiator.
+    /// @param amount The amount to be charged.
+    /// @return The new amount after deducting the bridge fee.
+    public(friend) fun charge_bridge_fee(initiator: &signer, amount: u64
+    ) : u64 {
+        let bridge_fee = native_bridge_configuration::bridge_fee();
+        let bridge_operator = native_bridge_configuration::bridge_operator();
+        let new_amount = amount - bridge_fee;
+        assert!(new_amount > 0, EINVALID_VALUE);
+        native_bridge_core::mint(bridge_operator, bridge_fee);
+        new_amount
+    }
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
     fun test_initiate_bridge_transfer_happy_path(
@@ -206,8 +225,9 @@ module aptos_framework::native_bridge {
         native_bridge_core::initialize_for_test(aptos_framework);
         initialize(aptos_framework);
         aptos_account::create_account(sender_address);
-        let amount = 1000;
-
+        let amount = 1000000000000;
+        let bridge_fee = 40_000_000_000;
+        assert!(bridge_fee < amount, 0);
         // Mint coins to the sender to ensure they have sufficient balance
         let account_balance = amount + 1;
         // Mint some coins
@@ -228,6 +248,8 @@ module aptos_framework::native_bridge {
             &bridge_events.bridge_transfer_initiated_events
         );
         assert!(vector::length(&initiated_events) == 1, EEVENT_NOT_FOUND);
+        let first_elem = vector::borrow(&initiated_events, 0);
+        assert!(first_elem.amount == amount - bridge_fee, 0);
     }
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
@@ -700,11 +722,14 @@ module aptos_framework::native_bridge_configuration {
     use std::signer;
     use aptos_framework::event;
     use aptos_framework::system_addresses;
+    use aptos_framework::native_bridge_configuration;
+    use aptos_framework::native_bridge_core;
 
     friend aptos_framework::native_bridge;
 
     /// Error code for invalid bridge operator
     const EINVALID_BRIDGE_OPERATOR: u64 = 0x1;
+    const EINVALID_VALUE: u64 = 0x2;
 
     struct BridgeConfig has key {
         bridge_operator: address,
@@ -725,6 +750,8 @@ module aptos_framework::native_bridge_configuration {
         new_bridge_fee: u64,
     }
 
+
+
     /// Initializes the bridge configuration with Aptos framework as the bridge operator.
     ///
     /// @param aptos_framework The signer representing the Aptos framework.
@@ -732,7 +759,7 @@ module aptos_framework::native_bridge_configuration {
         system_addresses::assert_aptos_framework(aptos_framework);
         let bridge_config = BridgeConfig {
             bridge_operator: signer::address_of(aptos_framework),
-            bridge_fee: 20_000_000_000,
+            bridge_fee: 40_000_000_000,
         };
         move_to(aptos_framework, bridge_config);
     }
@@ -766,7 +793,7 @@ module aptos_framework::native_bridge_configuration {
     /// @abort If the new bridge fee is the same as the old bridge fee.
     public fun update_bridge_fee(relayer: &signer, new_bridge_fee: u64
     ) acquires BridgeConfig {
-        system_addresses::assert_is_caller_operator(relayer);
+        native_bridge_configuration::assert_is_caller_operator(relayer);
         let bridge_config = borrow_global_mut<BridgeConfig>(@aptos_framework);
         let old_bridge_fee = bridge_config.bridge_fee;
         assert!(old_bridge_fee != new_bridge_fee, EINVALID_VALUE);
@@ -788,6 +815,14 @@ module aptos_framework::native_bridge_configuration {
         borrow_global_mut<BridgeConfig>(@aptos_framework).bridge_operator
     }
 
+    #[view]
+    /// Retrieves the current bridge fee.
+    /// 
+    /// @return The current bridge fee.
+    public fun bridge_fee(): u64 acquires BridgeConfig {
+        borrow_global_mut<BridgeConfig>(@aptos_framework).bridge_fee
+    }
+
     /// Asserts that the caller is the current bridge operator.
     ///
     /// @param caller The signer whose authority is being checked.
@@ -795,22 +830,6 @@ module aptos_framework::native_bridge_configuration {
     public(friend) fun assert_is_caller_operator(caller: &signer
     ) acquires BridgeConfig {
         assert!(borrow_global<BridgeConfig>(@aptos_framework).bridge_operator == signer::address_of(caller), EINVALID_BRIDGE_OPERATOR);
-    }
-
-    /// Charge bridge fee to the initiate bridge transfer.
-    /// 
-    /// @param initiator The signer representing the initiator.
-    /// @param amount The amount to be charged.
-    /// @return The new amount after deducting the bridge fee.
-    public(friend) fun charge_bridge_fee(initiator: &signer, amount: u64
-    ) acquires BridgeConfig : u64 {
-        let bridge_config = borrow_global<BridgeConfig>(@aptos_framework);
-        let bridge_fee = bridge_config.bridge_fee;
-        let new_amount = amount - bridge_fee;
-        assert!(new_amount > 0, EINVALID_VALUE);
-        let bridge_fee_receiver = borrow_global<BridgeConfig>(@aptos_framework).bridge_operator;
-        coin::transfer_from_sender_to_receiver(initiator_address, bridge_fee_receiver, bridge_fee);
-        new_amount
     }
 
     #[test(aptos_framework = @aptos_framework)]
