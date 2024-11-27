@@ -53,8 +53,8 @@ spec aptos_framework::transaction_validation {
         use aptos_framework::chain_id::{ChainId};
         use aptos_framework::account::{Account};
         use aptos_framework::coin::{CoinStore};
-        sender: signer;
-        gas_payer: address;
+        sender: &signer;
+        gas_payer: &signer;
         txn_sequence_number: u64;
         txn_authentication_key: Option<vector<u8>>;
         txn_gas_price: u64;
@@ -68,11 +68,12 @@ spec aptos_framework::transaction_validation {
         aborts_if !exists<ChainId>(@aptos_framework);
         aborts_if !(chain_id::get() == chain_id);
         let transaction_sender = signer::address_of(sender);
+        let gas_payer_addr = signer::address_of(gas_payer);
 
         aborts_if (
             !features::spec_is_enabled(features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
                 || account::exists_at(transaction_sender)
-                || transaction_sender == gas_payer
+                || transaction_sender == gas_payer_addr
                 || txn_sequence_number > 0
         ) && (
             !(txn_sequence_number >= global<Account>(transaction_sender).sequence_number)
@@ -84,7 +85,7 @@ spec aptos_framework::transaction_validation {
         );
 
         aborts_if features::spec_is_enabled(features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
-            && transaction_sender != gas_payer
+            && transaction_sender != gas_payer_addr
             && txn_sequence_number == 0
             && !account::exists_at(transaction_sender)
             && (option::spec_is_none(txn_authentication_key) || option::spec_borrow(
@@ -95,15 +96,15 @@ spec aptos_framework::transaction_validation {
 
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
         aborts_if max_transaction_fee > MAX_U64;
-        aborts_if !exists<CoinStore<AptosCoin>>(gas_payer);
+        aborts_if !exists<CoinStore<AptosCoin>>(gas_payer_addr);
         // property 1: The sender of a transaction should have sufficient coin balance to pay the transaction fee.
         /// [high-level-req-1]
-        aborts_if !(global<CoinStore<AptosCoin>>(gas_payer).coin.value >= max_transaction_fee);
+        aborts_if !(global<CoinStore<AptosCoin>>(gas_payer_addr).coin.value >= max_transaction_fee);
     }
 
     spec prologue_common(
-        sender: signer,
-        gas_payer: address,
+        sender: &signer,
+        gas_payer: &signer,
         txn_sequence_number: u64,
         txn_authentication_key: Option<vector<u8>>,
         txn_gas_price: u64,
@@ -131,7 +132,7 @@ spec aptos_framework::transaction_validation {
         // TODO(fa_migration)
         pragma verify = false;
         include PrologueCommonAbortsIf {
-            gas_payer: signer::address_of(sender),
+            gas_payer: sender,
             txn_authentication_key: txn_public_key
         };
     }
@@ -212,7 +213,7 @@ spec aptos_framework::transaction_validation {
     is_simulation: bool,
     ) {
         pragma verify_duration_estimate = 120;
-        let gas_payer = signer::address_of(sender);
+        let gas_payer = sender;
         // TODO(fa_migration)
         pragma verify = false;
         include PrologueCommonAbortsIf {
@@ -259,7 +260,7 @@ spec aptos_framework::transaction_validation {
         pragma verify_duration_estimate = 120;
 
         aborts_if !features::spec_is_enabled(features::FEE_PAYER_ENABLED);
-        let gas_payer = fee_payer_address;
+        let gas_payer = create_signer::create_signer(fee_payer_address);
         include PrologueCommonAbortsIf {
             gas_payer,
             txn_sequence_number,
@@ -271,10 +272,10 @@ spec aptos_framework::transaction_validation {
             is_simulation,
         };
 
-        aborts_if !account::exists_at(gas_payer);
+        aborts_if !account::exists_at(fee_payer_address);
         aborts_if !(option::spec_is_none(fee_payer_public_key_hash) || option::spec_borrow(
             fee_payer_public_key_hash
-        ) == account::get_authentication_key(gas_payer));
+        ) == account::get_authentication_key(fee_payer_address));
         aborts_if !features::spec_fee_payer_enabled();
     }
 
