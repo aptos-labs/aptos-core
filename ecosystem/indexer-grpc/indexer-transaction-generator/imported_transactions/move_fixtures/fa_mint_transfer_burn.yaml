@@ -1,0 +1,5 @@
+transactions:
+  - output_name: fa_mint_transfer_burn
+    script_path: fa_mint_transfer_burn
+    sender_address: __ACCOUNT_A__
+    
