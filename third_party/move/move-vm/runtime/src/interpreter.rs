@@ -10,7 +10,7 @@ use crate::{
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
-    runtime_type_checks::{FullRuntimeTypeCheck, NullRuntimeTypeCheck, RuntimeTypeCheck},
+    runtime_type_checks::{FullRuntimeTypeCheck, NoRuntimeTypeCheck, RuntimeTypeCheck},
     trace, LoadedFunction, ModuleStorage,
 };
 use fail::fail_point;
