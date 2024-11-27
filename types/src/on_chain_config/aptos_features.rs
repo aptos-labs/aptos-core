@@ -101,6 +101,7 @@ pub enum FeatureFlag {
     NATIVE_MEMORY_OPERATIONS = 80,
     ENABLE_LOADER_V2 = 81,
     ACCOUNT_ABSTRACTION = 82,
+    PASS_GAS_PAYER_SIGNER_TO_PROLOGUE_AND_EPILOGUE = 83,
 }
 
 impl FeatureFlag {
@@ -181,6 +182,7 @@ impl FeatureFlag {
             FeatureFlag::COLLECTION_OWNER,
             FeatureFlag::ENABLE_LOADER_V2,
             FeatureFlag::ACCOUNT_ABSTRACTION,
+            FeatureFlag::PASS_GAS_PAYER_SIGNER_TO_PROLOGUE_AND_EPILOGUE,
         ]
     }
 }
@@ -327,6 +329,10 @@ impl Features {
 
     pub fn is_transaction_simulation_enhancement_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT)
+    }
+
+    pub fn is_pass_gas_payer_signer_to_prologue_and_epilogue_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::PASS_GAS_PAYER_SIGNER_TO_PROLOGUE_AND_EPILOGUE)
     }
 
     pub fn is_native_memory_operations_enabled(&self) -> bool {

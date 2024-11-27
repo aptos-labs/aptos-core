@@ -77,19 +77,19 @@ module aptos_framework::transaction_fee {
     }
 
     /// Burn transaction fees in epilogue.
-    public(friend) fun burn_fee(account: address, fee: u64) acquires AptosFABurnCapabilities, AptosCoinCapabilities {
+    public(friend) fun burn_fee(account: &signer, fee: u64) acquires AptosFABurnCapabilities, AptosCoinCapabilities {
         if (exists<AptosFABurnCapabilities>(@aptos_framework)) {
             let burn_ref = &borrow_global<AptosFABurnCapabilities>(@aptos_framework).burn_ref;
-            aptos_account::burn_from_fungible_store(burn_ref, account, fee);
+            aptos_account::burn_from_fungible_store(account, burn_ref, fee);
         } else {
             let burn_cap = &borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap;
             if (features::operations_default_to_fa_apt_store_enabled()) {
                 let (burn_ref, burn_receipt) = coin::get_paired_burn_ref(burn_cap);
-                aptos_account::burn_from_fungible_store(&burn_ref, account, fee);
+                aptos_account::burn_from_fungible_store(account, &burn_ref, fee);
                 coin::return_paired_burn_ref(burn_ref, burn_receipt);
             } else {
                 coin::burn_from<AptosCoin>(
-                    account,
+                    signer::address_of(account),
                     fee,
                     burn_cap,
                 );
@@ -98,7 +98,7 @@ module aptos_framework::transaction_fee {
     }
 
     /// Mint refund in epilogue.
-    public(friend) fun mint_and_refund(account: address, refund: u64) acquires AptosCoinMintCapability {
+    public(friend) fun mint_and_refund(account: &signer, refund: u64) acquires AptosCoinMintCapability {
         let mint_cap = &borrow_global<AptosCoinMintCapability>(@aptos_framework).mint_cap;
         let refund_coin = coin::mint(refund, mint_cap);
         coin::force_deposit(account, refund_coin);

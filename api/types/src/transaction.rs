@@ -34,6 +34,7 @@ use aptos_types::{
         Script, SignedTransaction, TransactionOutput, TransactionWithProof,
     },
 };
+use bcs::to_bytes;
 use once_cell::sync::Lazy;
 use poem_openapi::{Object, Union};
 use serde::{Deserialize, Serialize};
@@ -44,7 +45,6 @@ use std::{
     str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
 };
-use bcs::to_bytes;
 
 static DUMMY_GUID: Lazy<EventGuid> = Lazy::new(|| EventGuid {
     creation_number: U64::from(0u64),
@@ -2164,7 +2164,9 @@ impl From<&AccountAuthenticator> for AccountSignature {
                 auth_data,
             } => Self::AbstractionSignature(AbstractionSignature {
                 function_info: function_info.to_string(),
-                auth_data: to_bytes(auth_data).expect("bcs serialization cannot fail").into()
+                auth_data: to_bytes(auth_data)
+                    .expect("bcs serialization cannot fail")
+                    .into(),
             }),
         }
     }

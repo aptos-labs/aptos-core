@@ -19,6 +19,8 @@
 -  [Function `dispatchable_authenticator_internal`](#0x1_lite_account_dispatchable_authenticator_internal)
 -  [Function `authenticate`](#0x1_lite_account_authenticate)
 -  [Function `dispatchable_authenticate`](#0x1_lite_account_dispatchable_authenticate)
+-  [Specification](#@Specification_1)
+    -  [Function `dispatchable_authenticate`](#@Specification_1_dispatchable_authenticate)
 
 
 <pre><code><b>use</b> <a href="create_signer.md#0x1_create_signer">0x1::create_signer</a>;
@@ -515,6 +517,31 @@ The native function to dispatch customized move authentication function.
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_dispatchable_authenticate"></a>
+
+### Function `dispatchable_authenticate`
+
+
+<pre><code><b>fun</b> <a href="lite_account.md#0x1_lite_account_dispatchable_authenticate">dispatchable_authenticate</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="signing_data.md#0x1_signing_data">signing_data</a>: <a href="signing_data.md#0x1_signing_data_SigningData">signing_data::SigningData</a>, function: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

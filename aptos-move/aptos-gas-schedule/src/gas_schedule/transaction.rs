@@ -6,7 +6,9 @@
 
 use crate::{
     gas_schedule::VMGasParameters,
-    ver::gas_feature_versions::{RELEASE_V1_11, RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_15, RELEASE_V1_21},
+    ver::gas_feature_versions::{
+        RELEASE_V1_11, RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_15, RELEASE_V1_21,
+    },
 };
 use aptos_gas_algebra::{
     AbstractValueSize, Fee, FeePerByte, FeePerGasUnit, FeePerSlot, Gas, GasExpression,

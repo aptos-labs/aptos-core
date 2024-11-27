@@ -134,6 +134,7 @@ pub enum FeatureFlag {
     NativeMemoryOperations,
     EnableLoaderV2,
     AccountAbstraction,
+    PassGasPayerSignerToPrologueAndEpilogue,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -353,6 +354,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::NativeMemoryOperations => AptosFeatureFlag::NATIVE_MEMORY_OPERATIONS,
             FeatureFlag::EnableLoaderV2 => AptosFeatureFlag::ENABLE_LOADER_V2,
             FeatureFlag::AccountAbstraction => AptosFeatureFlag::ACCOUNT_ABSTRACTION,
+            FeatureFlag::PassGasPayerSignerToPrologueAndEpilogue => AptosFeatureFlag::PASS_GAS_PAYER_SIGNER_TO_PROLOGUE_AND_EPILOGUE
         }
     }
 }
@@ -499,6 +501,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::NATIVE_MEMORY_OPERATIONS => FeatureFlag::NativeMemoryOperations,
             AptosFeatureFlag::ENABLE_LOADER_V2 => FeatureFlag::EnableLoaderV2,
             AptosFeatureFlag::ACCOUNT_ABSTRACTION => FeatureFlag::AccountAbstraction,
+            AptosFeatureFlag::PASS_GAS_PAYER_SIGNER_TO_PROLOGUE_AND_EPILOGUE => FeatureFlag::PassGasPayerSignerToPrologueAndEpilogue,
         }
     }
 }
