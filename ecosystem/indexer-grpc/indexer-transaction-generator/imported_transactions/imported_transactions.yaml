@@ -22,6 +22,7 @@ mainnet:
   versions_to_import:
     # fungible asset processor
     308783012: 308783012_fa_transfer
+    152449628: 152449628_coin_info_write
 
     # token v2 processor
     1058723093: 1058723093_token_v1_mint_withdraw_deposit_events
