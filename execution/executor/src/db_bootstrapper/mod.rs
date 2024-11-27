@@ -152,7 +152,7 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
         "Genesis txn didn't output reconfig event."
     );
 
-    let output = ApplyExecutionOutput::run(execution_output, &ledger_summary)?;
+    let output = ApplyExecutionOutput::run(execution_output, ledger_summary)?;
     let timestamp_usecs = if genesis_version == 0 {
         // TODO(aldenhu): fix existing tests before using real timestamp and check on-chain epoch.
         GENESIS_TIMESTAMP_USECS
@@ -160,9 +160,7 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
         let state_view = CachedStateView::new(
             StateViewId::Miscellaneous,
             Arc::clone(&db.reader),
-            output.execution_output.next_version(),
-            output.expect_result_state().current.clone(),
-            Arc::new(AsyncProofFetcher::new(db.reader.clone())),
+            output.execution_output.result_state.clone(),
         )?;
         let next_epoch = epoch
             .checked_add(1)

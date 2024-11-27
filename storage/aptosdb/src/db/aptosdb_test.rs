@@ -176,7 +176,7 @@ fn test_get_transaction_auxiliary_data() {
 }
 
 #[test]
-fn test_get_latest_executed_trees() {
+fn test_get_latest_ledger_summary() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
 

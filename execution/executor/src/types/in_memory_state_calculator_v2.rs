@@ -1,16 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::OTHER_TIMERS;
-use anyhow::{ensure, Result};
-use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_drop_helper::DropHelper;
+#![allow(dead_code)]
+
+use anyhow::Result;
+use aptos_crypto::HashValue;
 use aptos_executor_types::{
     execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
     transactions_with_output::TransactionsWithOutput, ProofReader,
 };
-use aptos_logger::info;
-use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::FrozenSparseMerkleTree;
 use aptos_storage_interface::state_store::{
     sharded_state_update_refs::ShardedStateUpdateRefs,
@@ -24,19 +22,19 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-use itertools::{zip_eq, Itertools};
-use rayon::prelude::*;
-use std::{ops::Deref, sync::Arc};
+use std::sync::Arc;
 
 /// Helper class for calculating state changes after a block of transactions are executed.
 pub struct InMemoryStateCalculatorV2 {}
 
 impl InMemoryStateCalculatorV2 {
     pub fn calculate_for_transactions(
-        execution_output: &ExecutionOutput,
-        parent_state: &Arc<StateDelta>,
-        known_state_checkpoints: Option<impl IntoIterator<Item = Option<HashValue>>>,
+        _execution_output: &ExecutionOutput,
+        _parent_state: &Arc<StateDelta>,
+        _known_state_checkpoints: Option<impl IntoIterator<Item = Option<HashValue>>>,
     ) -> Result<StateCheckpointOutput> {
+        todo!()
+        /*
         if execution_output.is_block {
             Self::validate_input_for_block(parent_state, &execution_output.to_commit)?;
         }
@@ -49,6 +47,7 @@ impl InMemoryStateCalculatorV2 {
             execution_output.is_block,
             known_state_checkpoints,
         )
+         */
     }
 
     pub fn calculate_for_write_sets_after_snapshot(
@@ -71,13 +70,14 @@ impl InMemoryStateCalculatorV2 {
     }
 
     fn calculate_impl(
-        parent_state: &Arc<StateDelta>,
-        state_cache: &StateCache,
-        state_update_refs: &ShardedStateUpdateRefs,
-        last_checkpoint_index: Option<usize>,
-        is_block: bool,
-        known_state_checkpoints: Option<impl IntoIterator<Item = Option<HashValue>>>,
+        _parent_state: &Arc<StateDelta>,
+        _state_cache: &StateCache,
+        _state_update_refs: &ShardedStateUpdateRefs,
+        _last_checkpoint_index: Option<usize>,
+        _is_block: bool,
+        _known_state_checkpoints: Option<impl IntoIterator<Item = Option<HashValue>>>,
     ) -> Result<StateCheckpointOutput> {
+        /*
         let StateCache {
             // This makes sure all in-mem nodes seen while proofs were fetched stays in mem during the
             // calculation
@@ -206,12 +206,16 @@ impl InMemoryStateCalculatorV2 {
             last_checkpoint_index.map(|_| updates_before_last_checkpoint),
             state_checkpoint_hashes,
         ))
+        FIXME(aldenhu)
+         */
+        todo!()
     }
 
     fn calculate_updates(
-        state_update_refs: &ShardedStateUpdateRefs,
-        last_checkpoint_index: Option<usize>,
+        _state_update_refs: &ShardedStateUpdateRefs,
+        _last_checkpoint_index: Option<usize>,
     ) -> (ShardedStateUpdates, ShardedStateUpdates) {
+        /*
         let _timer = OTHER_TIMERS.timer_with(&["calculate_updates"]);
 
         let mut shard_iters = state_update_refs
@@ -248,6 +252,9 @@ impl InMemoryStateCalculatorV2 {
         }
 
         (before_last_checkpoint, after_last_checkpoint)
+
+         */
+        todo!()
     }
 
     fn add_to_delta(
@@ -276,10 +283,11 @@ impl InMemoryStateCalculatorV2 {
     }
 
     fn calculate_usage(
-        old_usage: StateStorageUsage,
-        sharded_state_cache: &ShardedStateCache,
-        updates: &ShardedStateUpdates,
+        _old_usage: StateStorageUsage,
+        _sharded_state_cache: &ShardedStateCache,
+        _updates: &ShardedStateUpdates,
     ) -> StateStorageUsage {
+        /*
         let _timer = OTHER_TIMERS.timer_with(&["calculate_usage"]);
 
         if old_usage.is_untracked() {
@@ -310,14 +318,18 @@ impl InMemoryStateCalculatorV2 {
             (old_usage.items() as i64 + items_delta) as usize,
             (old_usage.bytes() as i64 + bytes_delta) as usize,
         )
+
+         */
+        todo!()
     }
 
     fn make_checkpoint(
-        latest_checkpoint: FrozenSparseMerkleTree<StateValue>,
-        updates: &ShardedStateUpdates,
-        usage: StateStorageUsage,
-        proof_reader: &ProofReader,
+        _latest_checkpoint: FrozenSparseMerkleTree<StateValue>,
+        _updates: &ShardedStateUpdates,
+        _usage: StateStorageUsage,
+        _proof_reader: &ProofReader,
     ) -> Result<FrozenSparseMerkleTree<StateValue>> {
+        /*
         let _timer = OTHER_TIMERS.timer_with(&["make_checkpoint"]);
 
         // Update SMT.
@@ -337,12 +349,18 @@ impl InMemoryStateCalculatorV2 {
             latest_checkpoint.batch_update(smt_updates, usage, proof_reader)?
         };
         Ok(new_checkpoint)
+
+         */
+        todo!()
     }
 
     fn validate_input_for_block(
-        base: &StateDelta,
-        to_commit: &TransactionsWithOutput,
+        _base: &StateDelta,
+        _to_commit: &TransactionsWithOutput,
     ) -> Result<()> {
+        // FIXME(aldenhu): check equivalent is done
+        todo!()
+        /*
         let num_txns = to_commit.len();
         ensure!(num_txns != 0, "Empty block is not allowed.");
         ensure!(
@@ -357,5 +375,7 @@ impl InMemoryStateCalculatorV2 {
         );
 
         Ok(())
+
+         */
     }
 }

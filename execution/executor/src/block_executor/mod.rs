@@ -27,10 +27,7 @@ use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeHelper, TimerHelper};
 use aptos_storage_interface::{
-    state_store::state_view::{
-        async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView,
-    },
-    DbReaderWriter,
+    state_store::state_view::cached_state_view::CachedStateView, DbReaderWriter,
 };
 use aptos_types::{
     block_executor::{
@@ -224,9 +221,7 @@ where
                     CachedStateView::new(
                         StateViewId::BlockExecution { block_id },
                         Arc::clone(&self.db.reader),
-                        parent_output.execution_output.next_version(),
-                        parent_output.expect_result_state().current.clone(),
-                        Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
+                        parent_output.execution_output.result_state.clone(),
                     )?
                 };
 
@@ -255,7 +250,7 @@ where
                     });
                     DoStateCheckpoint::run(
                         &execution_output,
-                        parent_output.expect_result_state(),
+                        parent_output.expect_result_state_summary().clone(),
                         Option::<Vec<_>>::None,
                     )
                 })?;

@@ -3,6 +3,11 @@
 
 //! This file defines the state snapshot committer running in background thread within StateStore.
 
+// FIXME(aldenhu)
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
+
 use crate::{
     metrics::OTHER_TIMERS_SECONDS,
     state_store::{
@@ -75,6 +80,7 @@ impl StateSnapshotCommitter {
     }
 
     pub fn run(self) {
+        /*
         while let Ok(msg) = self.state_snapshot_commit_receiver.recv() {
             match msg {
                 CommitMessage::Data(delta_to_commit) => {
@@ -167,6 +173,9 @@ impl StateSnapshotCommitter {
             }
             trace!("State snapshot committing thread exit.")
         }
+        FIXME(aldenhu)
+         */
+        todo!()
     }
 }
 

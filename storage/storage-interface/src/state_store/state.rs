@@ -26,14 +26,20 @@ pub struct State {
 
 impl State {
     pub fn new_empty() -> Self {
-        // FIXME(aldenhu): check call site and implement
-        todo!()
+        Self {
+            next_version: 0,
+            shards: Arc::new(arr_macro::arr![MapLayer::new_family("state"); 16]),
+            usage: StateStorageUsage::zero(),
+        }
     }
 
     pub fn next_version(&self) -> Version {
         self.next_version
     }
 
+    pub fn version(&self) -> Option<Version> {
+        self.next_version.checked_sub(1)
+    }
     pub fn usage(&self) -> StateStorageUsage {
         self.usage
     }
@@ -43,7 +49,12 @@ impl State {
     }
 
     pub fn into_delta(self, _base: State) -> StateDelta {
-        // FIXME(aldnehu)
+        // FIXME(aldenhu)
+        todo!()
+    }
+
+    pub fn is_the_same(&self, _rhs: &Self) -> bool {
+        // FIXME(aldenhu)
         todo!()
     }
 }

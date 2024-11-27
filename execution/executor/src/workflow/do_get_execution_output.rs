@@ -23,8 +23,9 @@ use aptos_executor_types::{
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
-use aptos_storage_interface::state_store::state_view::cached_state_view::{
-    CachedStateView, StateCache,
+use aptos_storage_interface::state_store::{
+    state::State,
+    state_view::cached_state_view::{CachedStateView, ShardedStateCache},
 };
 #[cfg(feature = "consensus-only-perf-test")]
 use aptos_types::transaction::ExecutionStatus;
@@ -121,7 +122,7 @@ impl DoGetExecutionOutput {
                 .map(|t| t.into_inner())
                 .collect(),
             transaction_outputs,
-            state_view.into_state_cache(),
+            state_view,
             block_end_info,
             append_state_checkpoint_to_block,
         )
@@ -152,7 +153,7 @@ impl DoGetExecutionOutput {
                 .map(|t| t.into_txn().into_inner())
                 .collect(),
             transaction_outputs,
-            state_view.into_state_cache(),
+            state_view,
             None, // block end info
             append_state_checkpoint_to_block,
         )
@@ -176,7 +177,7 @@ impl DoGetExecutionOutput {
             state_view.next_version(),
             transactions,
             transaction_outputs,
-            state_view.into_state_cache(),
+            state_view,
             None, // block end info
             None, // append state checkpoint to block
         )?;
@@ -287,7 +288,7 @@ impl Parser {
         first_version: Version,
         mut transactions: Vec<Transaction>,
         mut transaction_outputs: Vec<TransactionOutput>,
-        state_cache: StateCache,
+        base_state_view: CachedStateView,
         block_end_info: Option<BlockEndInfo>,
         append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<ExecutionOutput> {
@@ -333,6 +334,10 @@ impl Parser {
                 .transpose()?
         };
 
+        let (base_state, state_reads) = base_state_view.finish();
+        let (last_checkpoint_state, result_state) =
+            Self::update_state(&to_commit, &base_state, &state_reads);
+
         let out = ExecutionOutput::new(
             is_block,
             first_version,
@@ -340,7 +345,9 @@ impl Parser {
             to_commit,
             to_discard,
             to_retry,
-            state_cache,
+            last_checkpoint_state,
+            result_state,
+            state_reads,
             block_end_info,
             next_epoch_state,
             Planned::place_holder(),
@@ -476,6 +483,15 @@ impl Parser {
             (&validator_set).into(),
         ))
     }
+
+    fn update_state(
+        _to_commit: &TransactionsToKeep,
+        _base_state: &State,
+        _state_cache: &ShardedStateCache,
+    ) -> (Option<State>, State) {
+        // FIXME(aldenhu):
+        todo!()
+    }
 }
 
 struct WriteSetStateView<'a> {
@@ -502,7 +518,7 @@ impl<'a> TStateView for WriteSetStateView<'a> {
 #[cfg(test)]
 mod tests {
     use super::Parser;
-    use aptos_storage_interface::state_store::state_view::cached_state_view::StateCache;
+    use aptos_storage_interface::state_store::state_view::cached_state_view::CachedStateView;
     use aptos_types::{
         contract_event::ContractEvent,
         transaction::{
@@ -541,7 +557,7 @@ mod tests {
             ),
         ];
         let execution_output =
-            Parser::parse(0, txns, txn_outs, StateCache::new_dummy(), None, None).unwrap();
+            Parser::parse(0, txns, txn_outs, CachedStateView::new_dummy(), None, None).unwrap();
         assert_eq!(
             vec![event_0, event_2],
             *execution_output.subscribable_events

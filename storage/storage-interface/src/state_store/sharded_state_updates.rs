@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::state_store::NUM_STATE_SHARDS;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
 use arr_macro::arr;
@@ -10,9 +11,11 @@ use rayon::iter::{
 };
 use std::collections::HashMap;
 
+// FIXME(aldenhu): rename DeduppedStateWrites
+// FIXME(aldenhu): change to [LayeredMap; 16]
 #[derive(Clone, Debug)]
 pub struct ShardedStateUpdates {
-    pub shards: [HashMap<StateKey, Option<StateValue>>; 16],
+    pub shards: [HashMap<StateKey, Option<StateValue>>; NUM_STATE_SHARDS],
 }
 
 impl ShardedStateUpdates {

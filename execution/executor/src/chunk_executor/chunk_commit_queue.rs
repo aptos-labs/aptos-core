@@ -11,7 +11,10 @@ use crate::{
     },
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_storage_interface::{state_store::state_delta::StateDelta, DbReader, LedgerSummary};
+use aptos_storage_interface::{
+    state_store::{state_delta::StateDelta, state_summary::StateSummary},
+    DbReader,
+};
 use aptos_types::{proof::accumulator::InMemoryTransactionAccumulator, transaction::Version};
 use std::{collections::VecDeque, sync::Arc};
 
@@ -40,21 +43,31 @@ pub struct ChunkCommitQueue {
 }
 
 impl ChunkCommitQueue {
-    pub(crate) fn new_from_db(db: &Arc<dyn DbReader>) -> Result<Self> {
+    pub(crate) fn new_from_db(_db: &Arc<dyn DbReader>) -> Result<Self> {
+        todo!()
+        /* FIXME(aldenhu)
         let LedgerSummary {
             state,
+            state_summary,
             transaction_accumulator,
         } = db.get_pre_committed_ledger_summary()?;
+
         Ok(Self {
             latest_state: state,
             latest_txn_accumulator: transaction_accumulator,
             to_commit: VecDeque::new(),
             to_update_ledger: VecDeque::new(),
         })
+         */
     }
 
     pub(crate) fn latest_state(&self) -> Arc<StateDelta> {
         self.latest_state.clone()
+    }
+
+    pub(crate) fn latest_state_summary(&self) -> StateSummary {
+        // FIXME(aldenhu)
+        todo!()
     }
 
     pub(crate) fn expecting_version(&self) -> Version {
@@ -63,12 +76,15 @@ impl ChunkCommitQueue {
 
     pub(crate) fn enqueue_for_ledger_update(
         &mut self,
-        chunk_to_update_ledger: ChunkToUpdateLedger,
+        _chunk_to_update_ledger: ChunkToUpdateLedger,
     ) -> Result<()> {
+        /* FIXME(aldenhu)
         self.latest_state = chunk_to_update_ledger.output.expect_result_state().clone();
         self.to_update_ledger
             .push_back(Some(chunk_to_update_ledger));
         Ok(())
+         */
+        todo!()
     }
 
     pub(crate) fn next_chunk_to_update_ledger(

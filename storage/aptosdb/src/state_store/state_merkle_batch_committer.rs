@@ -3,6 +3,11 @@
 
 //! This file defines the state merkle snapshot committer running in background thread.
 
+// FIXME(aldenhu)
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
+
 use crate::{
     metrics::{LATEST_SNAPSHOT_VERSION, OTHER_TIMERS_SECONDS},
     pruner::PrunerManager,
@@ -46,6 +51,7 @@ impl StateMerkleBatchCommitter {
     }
 
     pub fn run(self) {
+        /*
         while let Ok(msg) = self.state_merkle_batch_receiver.recv() {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["batch_committer_work"]);
             match msg {
@@ -108,9 +114,13 @@ impl StateMerkleBatchCommitter {
             }
         }
         trace!("State merkle batch committing thread exit.")
+           FIXME(aldenhu)
+         */
+        todo!()
     }
 
     fn check_usage_consistency(&self, state_delta: &StateDelta) -> Result<()> {
+        /*
         let version = state_delta
             .current_version
             .ok_or_else(|| anyhow!("Committing without version."))?;
@@ -142,5 +152,8 @@ impl StateMerkleBatchCommitter {
         }
 
         Ok(())
+        FIXME(aldenhu)
+         */
+        todo!()
     }
 }

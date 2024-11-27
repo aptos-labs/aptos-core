@@ -7,10 +7,11 @@ use aptos_executor_types::{
     execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
     state_compute_result::StateComputeResult, LedgerUpdateOutput,
 };
-use aptos_storage_interface::state_store::state_delta::StateDelta;
-use aptos_types::proof::accumulator::InMemoryTransactionAccumulator;
+use aptos_storage_interface::{
+    state_store::{state::State, state_summary::StateSummary},
+    LedgerSummary,
+};
 use once_cell::sync::OnceCell;
-use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 pub struct PartialStateComputeResult {
@@ -28,18 +29,21 @@ impl PartialStateComputeResult {
         }
     }
 
-    pub fn new_empty(
-        state: Arc<StateDelta>,
-        txn_accumulator: Arc<InMemoryTransactionAccumulator>,
-    ) -> Self {
-        let execution_output = ExecutionOutput::new_empty(state.clone());
+    pub fn new_empty(ledger_summary: LedgerSummary) -> Self {
+        // Deliberately not reusing Self::new() here to make sure we don't leave
+        // any OnceCell unset.
+        let execution_output = ExecutionOutput::new_empty(ledger_summary.state);
         let ledger_update_output = OnceCell::new();
         ledger_update_output
-            .set(LedgerUpdateOutput::new_empty(txn_accumulator))
+            .set(LedgerUpdateOutput::new_empty(
+                ledger_summary.transaction_accumulator,
+            ))
             .expect("First set.");
         let state_checkpoint_output = OnceCell::new();
         state_checkpoint_output
-            .set(StateCheckpointOutput::new_empty(state))
+            .set(StateCheckpointOutput::new_empty(
+                ledger_summary.state_summary,
+            ))
             .expect("First set.");
 
         Self {
@@ -63,8 +67,14 @@ impl PartialStateComputeResult {
             .expect("StateCheckpointOutput not set")
     }
 
-    pub fn expect_result_state(&self) -> &Arc<StateDelta> {
-        &self.expect_state_checkpoint_output().result_state
+    pub fn expect_result_state(&self) -> &State {
+        &self.execution_output.result_state
+    }
+
+    pub fn expect_result_state_summary(&self) -> &StateSummary {
+        // FIXME(aldenhu):
+        // &self.expect_state_checkpoint_output().result_state_summary
+        todo!()
     }
 
     pub fn set_state_checkpoint_output(&self, state_checkpoint_output: StateCheckpointOutput) {
@@ -93,6 +103,7 @@ impl PartialStateComputeResult {
         self.ledger_update_output.get().map(|ledger_update_output| {
             StateComputeResult::new(
                 self.execution_output.clone(),
+                // ledger_update_output is set in a later stage, so it's safe to `expect` here.
                 self.expect_state_checkpoint_output().clone(),
                 ledger_update_output.clone(),
             )

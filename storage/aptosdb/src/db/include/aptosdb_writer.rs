@@ -21,7 +21,8 @@ impl DbWriter for AptosDB {
                 .expect("Concurrent committing detected.");
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["pre_commit_ledger"]);
 
-            chunk.latest_in_memory_state.current.log_generation("db_save");
+            // FIXME(aldenhu)
+            // chunk.latest_in_memory_state.current.log_generation("db_save");
 
             self.pre_commit_validation(&chunk)?;
             let _new_root_hash = self.calculate_and_commit_ledger_and_state_kv(
@@ -230,15 +231,17 @@ impl AptosDB {
             !chunk.is_empty(),
             "chunk is empty, nothing to save.",
         );
+        // FIXME(aldenhu): examine the chekc and the message
         ensure!(
-            Some(chunk.expect_last_version()) == chunk.latest_in_memory_state.current_version,
+            chunk.next_version() == chunk.latest_in_memory_state.next_version(),
             "the last_version {:?} to commit doesn't match the current_version {:?} in latest_in_memory_state",
-            chunk.expect_last_version(),
-            chunk.latest_in_memory_state.current_version.expect("Must exist"),
+            chunk.next_version(),
+            chunk.latest_in_memory_state.current.next_version(),
         );
 
         {
             let current_state = self.state_store.current_state();
+            /* FIXME(aldenhu)
             ensure!(
                 chunk.base_state_version == current_state.base_version,
                 "base_state_version {:?} does not equal to the base_version {:?} in buffered state with current version {:?}",
@@ -246,6 +249,7 @@ impl AptosDB {
                 current_state.base_version,
                 current_state.current_version,
             );
+             */
 
             // Ensure the incoming committing requests are always consecutive and the version in
             // buffered state is consistent with that in db.
@@ -549,7 +553,7 @@ impl AptosDB {
         version_to_commit: Version,
     ) -> Result<Option<Version>> {
         let old_committed_ver = self.ledger_db.metadata_db().get_synced_version()?;
-        let pre_committed_ver = self.state_store.current_state().current_version;
+        let pre_committed_ver = self.state_store.current_state().current.version();
         ensure!(
             old_committed_ver.is_none() || version_to_commit >= old_committed_ver.unwrap(),
             "Version too old to commit. Committed: {:?}; Trying to commit with LI: {}",

@@ -4,9 +4,8 @@
 use crate::{
     metrics::TIMER,
     state_store::{
-        state_delta::StateDelta,
-        state_update::StateValueWithVersionOpt,
-        state_view::{async_proof_fetcher::AsyncProofFetcher, db_state_view::DbStateView},
+        state::State, state_delta::StateDelta, state_update::StateValueWithVersionOpt,
+        state_view::db_state_view::DbStateView,
     },
     DbReader,
 };
@@ -30,7 +29,6 @@ use std::{
     fmt::{Debug, Formatter},
     sync::Arc,
 };
-
 /* FIXME(aldenhu): remove
 static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -72,8 +70,9 @@ pub struct CachedStateView {
     /// For logging and debugging purpose, identifies what this view is for.
     id: StateViewId,
 
-    /// The persisted state, readable from the persist storage
-    persisted: Arc<dyn DbReader>,
+    /// The persisted state is readable from the persist storage, at the version of
+    /// `self.speculative.parent_version()`
+    reader: Arc<dyn DbReader>,
 
     /// The in-memory state on top of known persisted state
     speculative: StateDelta,
@@ -95,20 +94,27 @@ impl CachedStateView {
     pub fn new(
         _id: StateViewId,
         _reader: Arc<dyn DbReader>,
-        _next_version: Version,
-        _speculative_state: SparseMerkleTree<StateValue>,
-        _proof_fetcher: Arc<AsyncProofFetcher>,
+        _state: State,
     ) -> StateViewResult<Self> {
+        // FIXME(aldnehu): get persisted state from db and call `new_impl()`
         todo!()
     }
 
     pub fn new_impl(
-        _id: StateViewId,
-        _next_version: Version,
-        _snapshot: Option<(Version, HashValue)>,
-        _speculative_state: FrozenSparseMerkleTree<StateValue>,
-        _proof_fetcher: Arc<AsyncProofFetcher>,
+        id: StateViewId,
+        reader: Arc<dyn DbReader>,
+        persisted_state: State,
+        state: State,
     ) -> Self {
+        Self {
+            id,
+            reader,
+            speculative: StateDelta::new(persisted_state, state),
+            memorized: ShardedStateCache::default(),
+        }
+    }
+
+    pub fn new_dummy() -> Self {
         // FIXME(aldenhu)
         todo!()
     }
@@ -142,6 +148,21 @@ impl CachedStateView {
         todo!()
     }
 
+    /// Consumes `Self` and returns the state and all the memorized state reads.
+    pub fn finish(self) -> (State, ShardedStateCache) {
+        todo!()
+        /* FIXME(aldenhu)
+        let Self {
+            id: _,
+            persisted: _,
+            speculative,
+            memorized,
+        } = self;
+
+        (speculative.current, memorized)
+         */
+    }
+
     fn parent_version(&self) -> Option<Version> {
         self.speculative.parent_version()
     }
@@ -152,7 +173,7 @@ impl CachedStateView {
             update.to_state_value_with_version()
         } else if let Some(parent_version) = self.parent_version() {
             StateValueWithVersionOpt::from_tuple_opt(
-                self.persisted
+                self.reader
                     .get_state_value_with_version_by_version(state_key, parent_version)?,
             )
         } else {
@@ -167,7 +188,7 @@ impl CachedStateView {
     }
 }
 
-// FIXME(aldenhu): remove unnecessary fields
+// FIXME(aldenhu): remove unnecessary fields, probably remove entirely and use ShardedStateCache directly
 #[derive(Debug)]
 pub struct StateCache {
     pub frozen_base: FrozenSparseMerkleTree<StateValue>,
@@ -217,7 +238,7 @@ impl TStateView for CachedStateView {
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
-        Ok(self.speculative.usage())
+        Ok(self.speculative.current.usage())
     }
 }
 

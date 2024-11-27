@@ -24,10 +24,7 @@ use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeHelper, TimerHelper};
 use aptos_storage_interface::{
-    state_store::{
-        state_delta::StateDelta,
-        state_view::{async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView},
-    },
+    state_store::{state_delta::StateDelta, state_view::cached_state_view::CachedStateView},
     DbReaderWriter,
 };
 use aptos_types::{
@@ -244,13 +241,12 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
     }
 
     fn latest_state_view(&self, latest_state: &StateDelta) -> Result<CachedStateView> {
+        // FIXME(aldenhu): check
         let first_version = latest_state.next_version();
         Ok(CachedStateView::new(
             StateViewId::ChunkExecution { first_version },
             self.db.reader.clone(),
-            first_version,
             latest_state.current.clone(),
-            Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
         )?)
     }
 
@@ -312,7 +308,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         // Calculate state snapshot
         let state_checkpoint_output = DoStateCheckpoint::run(
             &execution_output,
-            &self.commit_queue.lock().latest_state(),
+            self.commit_queue.lock().latest_state_summary(),
             Some(
                 chunk_verifier
                     .transaction_infos()

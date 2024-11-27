@@ -7,6 +7,7 @@ use aptos_crypto::HashValue;
 use aptos_drop_helper::DropHelper;
 use aptos_storage_interface::state_store::{
     sharded_state_updates::ShardedStateUpdates, state_delta::StateDelta,
+    state_summary::StateSummary,
 };
 use derive_more::Deref;
 use std::sync::Arc;
@@ -32,17 +33,20 @@ impl StateCheckpointOutput {
         })
     }
 
-    pub fn new_empty(state: Arc<StateDelta>) -> Self {
+    pub fn new_empty(_state_summary: StateSummary) -> Self {
+        todo!()
+        /* FIXME(aldenhu)
         Self::new_impl(Inner {
             parent_state: state.clone(),
             result_state: state,
             state_updates_before_last_checkpoint: None,
             state_checkpoint_hashes: vec![],
         })
+         */
     }
 
     pub fn new_dummy() -> Self {
-        Self::new_empty(Arc::new(StateDelta::new_empty()))
+        Self::new_empty(StateSummary::new_empty())
     }
 
     fn new_impl(inner: Inner) -> Self {
@@ -52,7 +56,10 @@ impl StateCheckpointOutput {
     }
 
     pub fn reconfig_suffix(&self) -> Self {
+        /* FIXME(aldenhu)
         Self::new_empty(self.result_state.clone())
+         */
+        todo!()
     }
 }
 

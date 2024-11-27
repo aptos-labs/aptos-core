@@ -4,6 +4,11 @@
 
 //! This file defines state store APIs that are related account state Merkle tree.
 
+// FIXME(aldenhu)
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
+
 use crate::{
     ledger_db::LedgerDb,
     metrics::{OTHER_TIMERS_SECONDS, STATE_ITEMS, TOTAL_STATE_BYTES},
@@ -463,6 +468,7 @@ impl StateStore {
         state_merkle_db: Arc<StateMerkleDb>,
         state_kv_db: Arc<StateKvDb>,
     ) -> Result<Option<Version>> {
+        /*
         use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
 
         let state_merkle_pruner = StateMerklePrunerManager::new(
@@ -498,6 +504,9 @@ impl StateStore {
         )?;
         let base_version = current_state.lock().base_version;
         Ok(base_version)
+        FIXME(aldenhu)
+         */
+        todo!()
     }
 
     fn create_buffered_state_from_latest_snapshot(
@@ -508,6 +517,7 @@ impl StateStore {
         current_state: Arc<Mutex<CurrentState>>,
         persisted_state: Arc<Mutex<PersistedState>>,
     ) -> Result<BufferedState> {
+        /*
         let num_transactions = state_db
             .ledger_db
             .metadata_db()
@@ -631,6 +641,9 @@ impl StateStore {
             );
         }
         Ok(buffered_state)
+        FIXME(aldenhu)
+         */
+        todo!()
     }
 
     pub fn reset(&self) {

@@ -156,6 +156,9 @@ impl StateComputeResult {
     }
 
     pub fn as_chunk_to_commit(&self) -> ChunkToCommit {
+        todo!()
+
+        /* FIXME(aldenhu): sharded_state_cache
         ChunkToCommit {
             first_version: self.ledger_update_output.first_version(),
             transactions: &self.execution_output.to_commit.transactions,
@@ -168,8 +171,9 @@ impl StateComputeResult {
                 .state_checkpoint_output
                 .state_updates_before_last_checkpoint
                 .as_ref(),
-            sharded_state_cache: Some(&self.execution_output.state_cache.sharded_state_cache),
+            sharded_state_cache,
             is_reconfig: self.execution_output.next_epoch_state.is_some(),
         }
+         */
     }
 }

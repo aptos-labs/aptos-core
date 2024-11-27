@@ -8,6 +8,7 @@ use aptos_types::{state_store::state_value::StateValue, transaction::Version};
 
 /// The data structure through which the entire state at a given
 /// version can be summarized to a concise digest (the root hash).
+#[derive(Clone, Debug)]
 pub struct StateSummary {
     /// The next version. If this is 0, the state is the "pre-genesis" empty state.
     next_version: Version,
@@ -19,6 +20,13 @@ impl StateSummary {
         Self {
             next_version,
             global_state_summary,
+        }
+    }
+
+    pub fn new_empty() -> Self {
+        Self {
+            next_version: 0,
+            global_state_summary: SparseMerkleTree::new_empty(),
         }
     }
 

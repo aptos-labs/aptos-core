@@ -1,14 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::{sharded_state_updates::ShardedStateUpdates, state_update::StateWrite};
+use crate::state_store::{
+    sharded_state_updates::ShardedStateUpdates, state::State, state_update::StateWrite,
+};
 use aptos_crypto::HashValue;
-use aptos_drop_helper::DropHelper;
-use aptos_scratchpad::SparseMerkleTree;
 use aptos_types::{
-    state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
-    },
+    state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
     transaction::Version,
 };
 
@@ -21,21 +19,15 @@ use aptos_types::{
 ///  when the next checkpoint is calculated.
 #[derive(Clone, Debug)]
 pub struct StateDelta {
-    pub base: SparseMerkleTree<StateValue>,
-    pub base_version: Option<Version>,
-    pub current: SparseMerkleTree<StateValue>,
-    pub current_version: Option<Version>,
-    pub updates_since_base: DropHelper<ShardedStateUpdates>,
+    pub base: State,
+    pub current: State,
+    pub updates: ShardedStateUpdates,
 }
 
 impl StateDelta {
-    pub fn new(
-        base: SparseMerkleTree<StateValue>,
-        base_version: Option<Version>,
-        current: SparseMerkleTree<StateValue>,
-        current_version: Option<Version>,
-        updates_since_base: ShardedStateUpdates,
-    ) -> Self {
+    pub fn new(_base: State, _current: State) -> Self {
+        todo!()
+        /* FIXME(aldenhu):
         assert!(base.is_family(&current));
         assert!(base_version.map_or(0, |v| v + 1) <= current_version.map_or(0, |v| v + 1));
         Self {
@@ -45,9 +37,11 @@ impl StateDelta {
             current_version,
             updates_since_base: DropHelper::new(updates_since_base),
         }
+         */
     }
 
-    pub fn new_empty_with_version(version: Option<u64>) -> StateDelta {
+    pub fn new_empty_with_version(_version: Option<u64>) -> StateDelta {
+        /* FIXME(aldenhu):
         let smt = SparseMerkleTree::new_empty();
         Self::new(
             smt.clone(),
@@ -56,6 +50,8 @@ impl StateDelta {
             version,
             ShardedStateUpdates::new_empty(),
         )
+         */
+        todo!()
     }
 
     pub fn new_empty() -> Self {
@@ -63,10 +59,11 @@ impl StateDelta {
     }
 
     pub fn new_at_checkpoint(
-        root_hash: HashValue,
-        usage: StateStorageUsage,
-        checkpoint_version: Option<Version>,
+        _root_hash: HashValue,
+        _usage: StateStorageUsage,
+        _checkpoint_version: Option<Version>,
     ) -> Self {
+        /* FIXME(aldenhu):
         let smt = SparseMerkleTree::new(root_hash, usage);
         Self::new(
             smt.clone(),
@@ -75,57 +72,51 @@ impl StateDelta {
             checkpoint_version,
             ShardedStateUpdates::new_empty(),
         )
+
+         */
+        todo!()
     }
 
-    pub fn merge(&mut self, other: StateDelta) {
+    pub fn merge(&mut self, _other: StateDelta) {
+        /* FIXME(aldenhu):
         assert!(other.follow(self));
 
         self.current = other.current;
         self.current_version = other.current_version;
         self.updates_since_base
             .merge(other.updates_since_base.into_inner());
+
+         */
+        todo!()
     }
 
-    pub fn follow(&self, other: &StateDelta) -> bool {
+    pub fn follow(&self, _other: &StateDelta) -> bool {
+        /* FIXME(aldenhu):
         self.base_version == other.current_version && other.current.has_same_root_hash(&self.base)
+         */
+        todo!()
     }
 
-    pub fn has_same_current_state(&self, other: &StateDelta) -> bool {
+    pub fn has_same_current_state(&self, _other: &StateDelta) -> bool {
+        /* FIXME(aldenhu):
         self.current_version == other.current_version
             && self.current.has_same_root_hash(&other.current)
-    }
-
-    pub fn base_root_hash(&self) -> HashValue {
-        self.base.root_hash()
-    }
-
-    pub fn root_hash(&self) -> HashValue {
-        self.current.root_hash()
+         */
+        todo!()
     }
 
     pub fn next_version(&self) -> Version {
-        self.current_version.map_or(0, |v| v + 1)
-    }
-
-    pub fn replace_with(&mut self, mut rhs: Self) -> Self {
-        std::mem::swap(self, &mut rhs);
-        rhs
+        self.current.next_version()
     }
 
     pub fn parent_version(&self) -> Option<Version> {
-        // FIXME(aldenhu): update
-        self.base_version
+        self.base.next_version().checked_sub(1)
     }
 
     /// Get the state update for a given state key.
     /// `None` indicates the key is not updated in the delta.
     pub fn get_state_update(&self, _state_key: &StateKey) -> Option<&StateWrite> {
         // FIXME(aldenhu)
-        todo!()
-    }
-
-    pub fn usage(&self) -> StateStorageUsage {
-        // FIXME(aldenhu):
         todo!()
     }
 }

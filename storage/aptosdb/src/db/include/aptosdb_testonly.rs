@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+
 use aptos_config::config::{BUFFERED_STATE_TARGET_ITEMS_FOR_TEST, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD};
 use std::default::Default;
 use aptos_storage_interface::state_store::state_view::cached_state_view::ShardedStateCache;
@@ -203,11 +204,12 @@ impl ChunkToCommitOwned {
     }
 
     pub fn gather_state_updates_until_last_checkpoint(
-        first_version: Version,
-        latest_in_memory_state: &StateDelta,
-        state_update_refs: &ShardedStateUpdateRefs,
-        transaction_infos: &[TransactionInfo],
+        _first_version: Version,
+        _latest_in_memory_state: &StateDelta,
+        _state_update_refs: &ShardedStateUpdateRefs,
+        _transaction_infos: &[TransactionInfo],
     ) -> Option<ShardedStateUpdates> {
+        /*
         if let Some(latest_checkpoint_version) = latest_in_memory_state.base_version {
             if latest_checkpoint_version >= first_version {
                 let idx = (latest_checkpoint_version - first_version) as usize;
@@ -236,5 +238,7 @@ impl ChunkToCommitOwned {
         }
 
         None
+         */
+        todo!()
     }
 }
