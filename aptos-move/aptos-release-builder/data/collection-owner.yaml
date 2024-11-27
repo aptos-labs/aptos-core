@@ -1,0 +1,13 @@
+---
+remote_endpoint: ~
+name: "v1.23.1"
+proposals:
+  - name: feature_flags
+    metadata:
+      title: "Collection Owner feature flag"
+      description: "Enable creating collections with permissions as the owner of the collection"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - collection_owner
