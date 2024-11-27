@@ -37,8 +37,15 @@ use ed25519_dalek_bip32::{DerivationPath, ExtendedSecretKey};
 use keyless::FederatedKeylessPublicKey;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::{fmt, str::FromStr, sync::atomic::{AtomicU64, Ordering}, time::{Duration, SystemTime, UNIX_EPOCH}};
-use std::sync::Arc;
+use std::{
+    fmt,
+    str::FromStr,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 #[derive(Debug)]
 enum LocalAccountAuthenticator {
@@ -67,7 +74,7 @@ impl LocalAccountAuthenticator {
                     sig,
                 )
             },
-            LocalAccountAuthenticator::Abstraction(..) => unreachable!()
+            LocalAccountAuthenticator::Abstraction(..) => unreachable!(),
         }
     }
 
@@ -424,11 +431,17 @@ impl LocalAccount {
             LocalAccountAuthenticator::PrivateKey(key) => Auth::Ed25519(key.private_key()),
             LocalAccountAuthenticator::Keyless(_) => todo!(),
             LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
-            LocalAccountAuthenticator::Abstraction(aa) => Auth::Abstraction(aa.function_info.clone(), aa.sign_func.clone()),
+            LocalAccountAuthenticator::Abstraction(aa) => {
+                Auth::Abstraction(aa.function_info.clone(), aa.sign_func.clone())
+            },
         }
     }
 
-    pub fn set_abstraction_auth(&mut self, function_info: FunctionInfo, sign_func: Arc<dyn Fn(&[u8]) -> Vec<u8> + Send + Sync>) {
+    pub fn set_abstraction_auth(
+        &mut self,
+        function_info: FunctionInfo,
+        sign_func: Arc<dyn Fn(&[u8]) -> Vec<u8> + Send + Sync>,
+    ) {
         self.auth = LocalAccountAuthenticator::Abstraction(AbstractedAccount {
             function_info,
             sign_func,
