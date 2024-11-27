@@ -3,6 +3,7 @@ module aptos_framework::native_bridge {
     use aptos_framework::account;
     use aptos_framework::native_bridge_core;
     use aptos_framework::native_bridge_configuration;
+    use aptos_framework::native_bridge_configuration::update_bridge_fee;
     // use aptos_framework::native_bridge_configuration::assert_is_caller_relayer;
     use aptos_framework::native_bridge_store;
     use aptos_framework::ethereum;
@@ -102,7 +103,7 @@ module aptos_framework::native_bridge {
         let ethereum_address = ethereum::ethereum_address_no_eip55(recipient);  
 
         // Ensure the amount is enough for the bridge fee and charge for it
-        let new_amount = charge_bridge_fee(initiator, amount);
+        let new_amount = charge_bridge_fee(amount);
 
         // Increment and retrieve the nonce  
         let nonce = increment_and_get_nonce();  
@@ -254,8 +255,7 @@ module aptos_framework::native_bridge {
     /// @param initiator The signer representing the initiator.
     /// @param amount The amount to be charged.
     /// @return The new amount after deducting the bridge fee.
-    public(friend) fun charge_bridge_fee(initiator: &signer, amount: u64
-    ) : u64 {
+    fun charge_bridge_fee(amount: u64) : u64 {
         let bridge_fee = native_bridge_configuration::bridge_fee();
         let bridge_relayer = native_bridge_configuration::bridge_relayer();
         assert!(amount > bridge_fee, EINVALID_VALUE);
@@ -264,18 +264,26 @@ module aptos_framework::native_bridge {
         new_amount
     }
 
-    #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
+    #[test(aptos_framework = @aptos_framework, sender = @0xdaff, relayer = @0xcafe)]
     fun test_initiate_bridge_transfer_happy_path(
         sender: &signer,
         aptos_framework: &signer,
+        relayer: &signer
     ) acquires BridgeEvents, Nonce {
         let sender_address = signer::address_of(sender);
+        let relayer_address = signer::address_of(relayer);
         native_bridge_core::initialize_for_test(aptos_framework);
         initialize(aptos_framework);
         aptos_account::create_account(sender_address);
-        let amount = 10000000000000;
-        let bridge_fee = 40_000_000_000;
-        assert!(bridge_fee < amount, 0);
+        let amount = 1000;
+        let bridge_fee = 40;
+        update_bridge_fee(aptos_framework, bridge_fee);
+        
+        // Update the bridge relayer so it can receive the bridge fee
+        native_bridge_configuration::update_bridge_relayer(aptos_framework, relayer_address);
+        let bridge_relayer = native_bridge_configuration::bridge_relayer();
+        aptos_account::create_account(bridge_relayer);
+
         // Mint coins to the sender to ensure they have sufficient balance
         let account_balance = amount + 1;
         // Mint some coins
@@ -300,19 +308,29 @@ module aptos_framework::native_bridge {
         assert!(first_elem.amount == amount - bridge_fee, 0);
     }
 
-    #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
+    #[test(aptos_framework = @aptos_framework, sender = @0xdaff, relayer = @0xcafe)]
     #[expected_failure(abort_code = 0x10006, location = 0x1::coin)] //EINSUFFICIENT_BALANCE
     fun test_initiate_bridge_transfer_insufficient_balance(
         sender: &signer,
         aptos_framework: &signer,
+        relayer: &signer
     ) acquires BridgeEvents, Nonce {
         let sender_address = signer::address_of(sender);
+        let relayer_address = signer::address_of(relayer);
         native_bridge_core::initialize_for_test(aptos_framework);
         initialize(aptos_framework);
         aptos_account::create_account(sender_address);
+        let bridge_relayer = native_bridge_configuration::bridge_relayer();
 
         let recipient = valid_eip55();
-        let amount = 10000000000000;
+        let amount = 1000;
+        let bridge_fee = 40;
+        update_bridge_fee(aptos_framework, bridge_fee);
+
+        // Update the bridge relayer so it can receive the bridge fee
+        native_bridge_configuration::update_bridge_relayer(aptos_framework, relayer_address);
+        let bridge_relayer = native_bridge_configuration::bridge_relayer();
+        aptos_account::create_account(bridge_relayer);
 
         initiate_bridge_transfer(
             sender,
@@ -585,7 +603,6 @@ module aptos_framework::native_bridge_configuration {
     use aptos_framework::event;
     use aptos_framework::system_addresses;
     use aptos_framework::native_bridge_configuration;
-    use aptos_framework::native_bridge_core;
 
     friend aptos_framework::native_bridge;
 
@@ -717,6 +734,26 @@ module aptos_framework::native_bridge_configuration {
             ), 0);
 
         assert!(bridge_relayer() == new_relayer, 0);
+    }
+
+    #[test(aptos_framework = @aptos_framework)]
+    /// Tests updating the bridge relayer and emitting the corresponding event.
+    fun test_update_bridge_fee(aptos_framework: &signer
+    ) acquires BridgeConfig {
+        let new_fee = 100;
+        initialize(aptos_framework);
+        let old_bridge_fee = bridge_fee();
+        update_bridge_fee(aptos_framework, new_fee);
+
+        assert!(
+            event::was_event_emitted<BridgeFeeChangedEvent>(
+                &BridgeFeeChangedEvent {
+                    old_bridge_fee: old_bridge_fee,
+                    new_bridge_fee: new_fee,
+                }
+            ), 0);
+
+        assert!(bridge_fee() == new_fee, 0);
     }
 
     #[test(aptos_framework = @aptos_framework, bad = @0xbad, new_relayer = @0xcafe)]
