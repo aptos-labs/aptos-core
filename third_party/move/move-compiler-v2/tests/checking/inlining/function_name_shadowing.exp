@@ -1,34 +1,64 @@
 
 Diagnostics:
 warning: Unused parameter `f`. Consider removing or prefixing with an underscore: `_f`
-  ┌─ tests/checking/inlining/function_name_shadowing.move:8:28
-  │
-8 │     public inline fun quux(f:|u64, u64|u64, a: u64, b: u64): u64 {
-  │                            ^
+   ┌─ tests/checking/inlining/function_name_shadowing.move:20:28
+   │
+20 │     public inline fun quux(f:|u64, u64|u64, g:|u64|u64, i:|u8|u8, a: u64, b: u64): u64 {
+   │                            ^
+
+warning: Unused parameter `g`. Consider removing or prefixing with an underscore: `_g`
+   ┌─ tests/checking/inlining/function_name_shadowing.move:20:45
+   │
+20 │     public inline fun quux(f:|u64, u64|u64, g:|u64|u64, i:|u8|u8, a: u64, b: u64): u64 {
+   │                                             ^
+
+warning: Unused parameter `i`. Consider removing or prefixing with an underscore: `_i`
+   ┌─ tests/checking/inlining/function_name_shadowing.move:20:57
+   │
+20 │     public inline fun quux(f:|u64, u64|u64, g:|u64|u64, i:|u8|u8, a: u64, b: u64): u64 {
+   │                                                         ^
 
 // -- Model dump before bytecode pipeline
+module 0x42::OtherModule {
+    public fun g(a: u64,b: u64): u64 {
+        Add<u64>(a, b)
+    }
+    public fun h(a: u64,b: u64): u64 {
+        Add<u64>(Mul<u64>(2, a), b)
+    }
+} // end 0x42::OtherModule
 module 0x42::Test {
+    use 0x42::OtherModule::{g}; // resolved as: 0x42::OtherModule
     public fun f(a: u64,b: u64): u64 {
         Mul<u64>(a, b)
     }
-    public inline fun quux(f: |(u64, u64)|u64,a: u64,b: u64): u64 {
-        Test::f(a, b)
+    public inline fun quux(f: |(u64, u64)|u64,g: |u64|u64,i: |u8|u8,a: u64,b: u64): u64 {
+        Mul<u64>(Mul<u64>(Test::f(a, b), OtherModule::g(a, b)), OtherModule::h(a, b))
     }
     public fun test_shadowing(): u64 {
-        Test::f(10, 2)
+        Mul<u64>(Mul<u64>(Test::f(10, 2), OtherModule::g(10, 2)), OtherModule::h(10, 2))
     }
 } // end 0x42::Test
 
 // -- Sourcified model before bytecode pipeline
+module 0x42::OtherModule {
+    public fun g(a: u64, b: u64): u64 {
+        a + b
+    }
+    public fun h(a: u64, b: u64): u64 {
+        2 * a + b
+    }
+}
 module 0x42::Test {
+    use 0x42::OtherModule;
     public fun f(a: u64, b: u64): u64 {
         a * b
     }
-    public inline fun quux(f: |(u64, u64)|u64, a: u64, b: u64): u64 {
-        f(a, b)
+    public inline fun quux(f: |(u64, u64)|u64, g: |u64|u64, i: |u8|u8, a: u64, b: u64): u64 {
+        f(a, b) * OtherModule::g(a, b) * OtherModule::h(a, b)
     }
     public fun test_shadowing(): u64 {
-        f(10, 2)
+        f(10, 2) * OtherModule::g(10, 2) * OtherModule::h(10, 2)
     }
 }
 

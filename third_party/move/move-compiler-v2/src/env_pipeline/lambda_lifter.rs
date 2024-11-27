@@ -748,7 +748,7 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
             env.error(
                 &loc,
                 // TODO(LAMBDA)
-                "Lambdas expressions with `store` ability currently may only be a simple call to an existing `public` function (see release notes for details).  This lambda expression requires the compiler to generate a `public` helper function, which might affect module upgradeability and is not yet supported."
+                "The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call."
             );
             return None;
         };
