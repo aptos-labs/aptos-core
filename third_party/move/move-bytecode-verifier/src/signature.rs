@@ -260,7 +260,10 @@ impl<'a> SignatureChecker<'a> {
                 },
 
                 // Closure operations not supported by legacy signature checker
-                LdFunction(..) | LdFunctionGeneric(..) | Invoke(_) | EarlyBind(..) => {
+                LdFunction(..)
+                | LdFunctionGeneric(..)
+                | InvokeFunction(_)
+                | EarlyBindFunction(..) => {
                     return Err(PartialVMError::new(StatusCode::UNEXPECTED_VERIFIER_ERROR)
                         .with_message("closure operations not supported".to_owned()))
                 },

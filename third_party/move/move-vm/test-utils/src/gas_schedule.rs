@@ -708,8 +708,11 @@ pub fn zero_cost_instruction_table() -> Vec<(Bytecode, GasCost)> {
             LdFunctionGeneric(FunctionInstantiationIndex::new(0)),
             GasCost::new(0, 0),
         ),
-        (Invoke(SignatureIndex::new(0)), GasCost::new(0, 0)),
-        (EarlyBind(SignatureIndex::new(0), 0u8), GasCost::new(0, 0)),
+        (InvokeFunction(SignatureIndex::new(0)), GasCost::new(0, 0)),
+        (
+            EarlyBindFunction(SignatureIndex::new(0), 0u8),
+            GasCost::new(0, 0),
+        ),
     ]
 }
 
@@ -891,9 +894,12 @@ pub fn bytecode_instruction_costs() -> Vec<(Bytecode, GasCost)> {
             LdFunctionGeneric(FunctionInstantiationIndex::new(0)),
             GasCost::new(1132, 1),
         ),
-        (Invoke(SignatureIndex::new(0)), GasCost::new(1132, 1)),
         (
-            EarlyBind(SignatureIndex::new(0), 0u8),
+            InvokeFunction(SignatureIndex::new(0)),
+            GasCost::new(1132, 1),
+        ),
+        (
+            EarlyBindFunction(SignatureIndex::new(0), 0u8),
             GasCost::new(1132, 1),
         ),
     ]

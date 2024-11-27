@@ -107,8 +107,8 @@ impl<'a> AcquiresVerifier<'a> {
                 let fi = self.module.function_instantiation_at(*idx);
                 self.ld_function_acquire(fi.handle, offset)
             },
-            Bytecode::EarlyBind(_sig_idx, _count) => Ok(()),
-            Bytecode::Invoke(_sig_idx) => self.invoke_acquire(offset),
+            Bytecode::EarlyBindFunction(_sig_idx, _count) => Ok(()),
+            Bytecode::InvokeFunction(_sig_idx) => self.invoke_acquire(offset),
 
             Bytecode::Pop
             | Bytecode::BrTrue(_)
@@ -216,7 +216,7 @@ impl<'a> AcquiresVerifier<'a> {
         offset: CodeOffset,
     ) -> PartialVMResult<()> {
         // Currenty we are disallowing acquires for any function value which
-        // is created, so Invoke does nothing with acquires.
+        // is created, so InvokeFunction does nothing with acquires.
         // TODO(LAMBDA) In the future this may change.
         let function_handle = self.module.function_handle_at(fh_idx);
         let function_acquired_resources = self.function_acquired_resources(function_handle, fh_idx);
@@ -228,7 +228,7 @@ impl<'a> AcquiresVerifier<'a> {
 
     fn invoke_acquire(&mut self, _offset: CodeOffset) -> PartialVMResult<()> {
         // Currenty we are disallowing acquires for any function value which
-        // is created, so Invoke does nothing with acquires.
+        // is created, so InvokeFunction does nothing with acquires.
         // TODO(LAMBDA) In the future this may change.
         Ok(())
     }

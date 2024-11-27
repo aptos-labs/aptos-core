@@ -292,8 +292,8 @@ impl<'a> BinaryComplexityMeter<'a> {
                 | VecPopBack(idx)
                 | VecUnpack(idx, _)
                 | VecSwap(idx)
-                | Invoke(idx)
-                | EarlyBind(idx, _) => {
+                | InvokeFunction(idx)
+                | EarlyBindFunction(idx, _) => {
                     self.meter_signature(*idx)?;
                 },
 

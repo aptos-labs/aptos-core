@@ -732,13 +732,13 @@ impl<'a> Disassembler<'a> {
                     Self::format_ret_type(&type_rets)
                 ))
             },
-            Bytecode::Invoke(idx) => {
+            Bytecode::InvokeFunction(idx) => {
                 let _signature = self.source_mapper.bytecode.signature_at(*idx);
-                Ok(format!("Invoke({})", idx))
+                Ok(format!("InvokeFunction({})", idx))
             },
-            Bytecode::EarlyBind(idx, count) => {
+            Bytecode::EarlyBindFunction(idx, count) => {
                 let _signature = self.source_mapper.bytecode.signature_at(*idx);
-                Ok(format!("EarlyBind({}, {})", idx, count))
+                Ok(format!("EarlyBindFunction({}, {})", idx, count))
             },
 
             Bytecode::LdConst(idx) => {

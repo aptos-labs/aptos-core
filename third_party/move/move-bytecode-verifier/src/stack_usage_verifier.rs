@@ -239,9 +239,9 @@ impl<'a> StackUsageVerifier<'a> {
                 (0, 1)
             },
 
-            // Invoke pops a function and the number of arguments and pushes the results of the
+            // InvokeFunction pops a function and the number of arguments and pushes the results of the
             // given function type
-            Bytecode::Invoke(idx) => {
+            Bytecode::InvokeFunction(idx) => {
                 if let Some(SignatureToken::Function(args, results, _)) =
                     self.resolver.signature_at(*idx).0.first()
                 {
@@ -253,8 +253,8 @@ impl<'a> StackUsageVerifier<'a> {
                 }
             },
 
-            // EarlyBind pops a function value and the captured arguments and returns 1 value
-            Bytecode::EarlyBind(idx, arg_count) => {
+            // EarlyBindFunction pops a function value and the captured arguments and returns 1 value
+            Bytecode::EarlyBindFunction(idx, arg_count) => {
                 if let Some(SignatureToken::Function(args, _results, _)) =
                     self.resolver.signature_at(*idx).0.first()
                 {

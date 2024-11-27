@@ -658,8 +658,8 @@ impl<'a> BoundsChecker<'a> {
                 | VecPopBack(idx)
                 | VecUnpack(idx, _)
                 | VecSwap(idx)
-                | Invoke(idx)
-                | EarlyBind(idx, _) => {
+                | InvokeFunction(idx)
+                | EarlyBindFunction(idx, _) => {
                     self.check_code_unit_bounds_impl(
                         self.view.signatures(),
                         *idx,

@@ -104,11 +104,11 @@ impl<'a> InstructionConsistency<'a> {
                     let func_inst = self.resolver.function_instantiation_at(*idx);
                     self.check_ld_function_op(offset, func_inst.handle, /* generic */ true)?;
                 },
-                Invoke(sig_idx) => {
+                InvokeFunction(sig_idx) => {
                     // reuse code to check for signature issues.
                     self.check_bind_count(offset, *sig_idx, 0)?;
                 },
-                EarlyBind(sig_idx, count) => {
+                EarlyBindFunction(sig_idx, count) => {
                     self.check_bind_count(offset, *sig_idx, *count)?;
                 },
                 Pack(idx) | Unpack(idx) => {

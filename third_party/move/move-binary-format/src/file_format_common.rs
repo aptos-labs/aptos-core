@@ -302,8 +302,8 @@ pub enum Opcodes {
     // Closures
     LD_FUNCTION                 = 0x58,
     LD_FUNCTION_GENERIC         = 0x59,
-    INVOKE                      = 0x5A,
-    EARLY_BIND                  = 0x5B,
+    INVOKE_FUNCTION             = 0x5A,
+    EARLY_BIND_FUNCTION         = 0x5B,
 }
 
 /// Upper limit on the binary size
@@ -797,8 +797,8 @@ pub fn instruction_key(instruction: &Bytecode) -> u8 {
         // Since bytecode version 8
         LdFunction(_) => Opcodes::LD_FUNCTION,
         LdFunctionGeneric(_) => Opcodes::LD_FUNCTION_GENERIC,
-        Invoke(_) => Opcodes::INVOKE,
-        EarlyBind(..) => Opcodes::EARLY_BIND,
+        InvokeFunction(_) => Opcodes::INVOKE_FUNCTION,
+        EarlyBindFunction(..) => Opcodes::EARLY_BIND_FUNCTION,
     };
     opcode as u8
 }

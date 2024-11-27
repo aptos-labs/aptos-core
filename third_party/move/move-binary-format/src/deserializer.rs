@@ -1825,10 +1825,11 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
             Opcodes::LD_FUNCTION_GENERIC => {
                 Bytecode::LdFunctionGeneric(load_function_inst_index(cursor)?)
             },
-            Opcodes::INVOKE => Bytecode::Invoke(load_signature_index(cursor)?),
-            Opcodes::EARLY_BIND => {
-                Bytecode::EarlyBind(load_signature_index(cursor)?, read_u8_internal(cursor)?)
-            },
+            Opcodes::INVOKE_FUNCTION => Bytecode::InvokeFunction(load_signature_index(cursor)?),
+            Opcodes::EARLY_BIND_FUNCTION => Bytecode::EarlyBindFunction(
+                load_signature_index(cursor)?,
+                read_u8_internal(cursor)?,
+            ),
         };
         code.push(bytecode);
     }

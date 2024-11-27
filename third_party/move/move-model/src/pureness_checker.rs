@@ -56,7 +56,7 @@ impl<F> FunctionPurenessChecker<F>
 where
     F: FnMut(NodeId, &str, &[(QualifiedId<FunId>, NodeId)]),
 {
-    /// Creates a new checker. The given function is invoke with diagnostic information
+    /// Creates a new checker. The given function is invoked with diagnostic information
     /// if impurity is detected. It is up to this function whether an actual error is
     /// reported.
     pub fn new(mode: FunctionPurenessCheckerMode, impure_action: F) -> Self {

@@ -686,8 +686,11 @@ impl<'env> SpecTranslator<'env> {
                 self.set_writer_location(*node_id);
                 self.translate_call(*node_id, oper, args);
             },
-            ExpData::Invoke(node_id, ..) => {
-                self.error(&self.env.get_node_loc(*node_id), "Invoke not yet supported");
+            ExpData::InvokeFunction(node_id, ..) => {
+                self.error(
+                    &self.env.get_node_loc(*node_id),
+                    "InvokeFunction not yet supported",
+                );
                 // TODO(LAMBDA)
             },
             ExpData::Lambda(node_id, ..) => self.error(
@@ -1020,7 +1023,7 @@ impl<'env> SpecTranslator<'env> {
             | Operation::Deref
             | Operation::MoveTo
             | Operation::MoveFrom
-            | Operation::EarlyBind
+            | Operation::EarlyBindFunction
             | Operation::Old => {
                 self.env.error(
                     &self.env.get_node_loc(node_id),
