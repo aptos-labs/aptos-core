@@ -18,7 +18,7 @@ error: cannot use `()` with an operator which expects a value of type `u64`
 56 │             i = i + action(XVector::borrow(v, i)); // expected to have wrong result type
    │                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: cannot return `u64` from a function with result type `|integer| with copy+drop+store`
+error: cannot return `u64` from a function with result type `|integer| with copy+store`
    ┌─ tests/checking/typing/lambda_typed.move:61:9
    │
 61 │         x(1) // expected to be not a function
@@ -30,7 +30,7 @@ error: cannot use `&u64` with an operator which expects a value of type `integer
 67 │         foreach(&v, |e: &u64| sum = sum + e) // expected to cannot infer type
    │                                           ^
 
-error: cannot pass `|&u64|u64 with copy+drop+store` to a function which expects argument of type `|&u64|`
+error: cannot pass `|&u64|u64 with copy+store` to a function which expects argument of type `|&u64|`
    ┌─ tests/checking/typing/lambda_typed.move:73:21
    │
 73 │         foreach(&v, |e: &u64| { sum = sum + *e; *e }) // expected to have wrong result type of lambda

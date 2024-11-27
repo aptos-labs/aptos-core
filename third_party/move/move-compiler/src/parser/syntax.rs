@@ -1951,7 +1951,8 @@ fn parse_lambda(
     } else {
         // token is Tok::PipePipe, i.e., empty bind list in this context.
         consume_token(context.tokens, Tok::PipePipe)?;
-        spanned(context.tokens.file_hash(), start_loc, start_loc + 1, vec![])
+        let end_loc = context.tokens.previous_end_loc();
+        spanned(context.tokens.file_hash(), start_loc, end_loc, vec![])
     };
     let body = Box::new(parse_exp(context)?);
     let abilities_start = context.tokens.start_loc();

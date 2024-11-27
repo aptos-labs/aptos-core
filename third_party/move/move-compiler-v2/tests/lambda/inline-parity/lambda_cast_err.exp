@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: cannot pass `|(u64, integer)|u64 with copy+drop+store` to a function which expects argument of type `|(u64, vector<u8>)|u64`
+error: cannot pass `|(u64, integer)|u64 with copy+store` to a function which expects argument of type `|(u64, vector<u8>)|u64`
    ┌─ tests/lambda/inline-parity/lambda_cast_err.move:26:52
    │
 26 │         vector_fold(gas_schedule_blob, (0 as u64), |sum, addend| sum + (addend as u64))

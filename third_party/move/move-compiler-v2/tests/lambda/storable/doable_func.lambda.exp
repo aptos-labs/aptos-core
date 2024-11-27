@@ -29,7 +29,7 @@ module 0x42::test {
     }
     private fun choose_function1(key: u64,x: u64): u64 {
         {
-          let f: |u64|u64 with copy+drop = if Eq<u64>(key, 0) {
+          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
             mod2::double
           } else {
             if Eq<u64>(key, 1) {
@@ -79,24 +79,24 @@ module 0x42::test {
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                    let g: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
                                      move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 with copy+drop+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
+                                      let h: |u64|u64 with copy+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
                                        move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 with copy+drop+store =  move|x: u64| test::multiply3(2, x, 2);
+                                        let i: |u64|u64 with copy+store =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| {
+                                        let i: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };
@@ -196,7 +196,7 @@ module 0x42::test {
     }
     private fun choose_function1(key: u64,x: u64): u64 {
         {
-          let f: |u64|u64 with copy+drop = if Eq<u64>(key, 0) {
+          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
             mod2::double
           } else {
             if Eq<u64>(key, 1) {
@@ -246,24 +246,24 @@ module 0x42::test {
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                    let g: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
                                      move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 with copy+drop+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
+                                      let h: |u64|u64 with copy+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
                                        move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 with copy+drop+store =  move|x: u64| test::multiply3(2, x, 2);
+                                        let i: |u64|u64 with copy+store =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| {
+                                        let i: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };
@@ -363,7 +363,7 @@ module 0x42::test {
     }
     private fun choose_function1(key: u64,x: u64): u64 {
         {
-          let f: |u64|u64 with copy+drop = if Eq<u64>(key, 0) {
+          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
             mod2::double
           } else {
             if Eq<u64>(key, 1) {
@@ -413,24 +413,24 @@ module 0x42::test {
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                    let g: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
                                      move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 with copy+drop+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
+                                      let h: |u64|u64 with copy+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
                                        move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 with copy+drop+store =  move|x: u64| test::multiply3(2, x, 2);
+                                        let i: |u64|u64 with copy+store =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| {
+                                        let i: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };
@@ -530,7 +530,7 @@ module 0x42::test {
     }
     private fun choose_function1(key: u64,x: u64): u64 {
         {
-          let f: |u64|u64 with copy+drop = if Eq<u64>(key, 0) {
+          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
             mod2::double
           } else {
             if Eq<u64>(key, 1) {
@@ -580,24 +580,24 @@ module 0x42::test {
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                    let g: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
                                      move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 with copy+drop+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
+                                      let h: |u64|u64 with copy+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
                                        move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 with copy+drop+store =  move|x: u64| test::multiply3(2, x, 2);
+                                        let i: |u64|u64 with copy+store =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| {
+                                        let i: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };
@@ -697,7 +697,7 @@ module 0x42::test {
     }
     private fun choose_function1(key: u64,x: u64): u64 {
         {
-          let f: |u64|u64 with copy+drop = if Eq<u64>(key, 0) {
+          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
             mod2::double
           } else {
             if Eq<u64>(key, 1) {
@@ -747,24 +747,24 @@ module 0x42::test {
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                    let g: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
                                      move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 with copy+drop+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
+                                      let h: |u64|u64 with copy+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
                                        move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 with copy+drop+store =  move|x: u64| test::multiply3(2, x, 2);
+                                        let i: |u64|u64 with copy+store =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| {
+                                        let i: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };
@@ -864,7 +864,7 @@ module 0x42::test {
     }
     private fun choose_function1(key: u64,x: u64): u64 {
         {
-          let f: |u64|u64 with copy+drop = if Eq<u64>(key, 0) {
+          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
             mod2::double
           } else {
             if Eq<u64>(key, 1) {
@@ -914,24 +914,24 @@ module 0x42::test {
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                    let g: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
                                      move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 with copy+drop+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
+                                      let h: |u64|u64 with copy+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
                                        move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 with copy+drop+store =  move|x: u64| test::multiply3(2, x, 2);
+                                        let i: |u64|u64 with copy+store =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| {
+                                        let i: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };
@@ -1031,7 +1031,7 @@ module 0x42::test {
     }
     private fun choose_function1(key: u64,x: u64): u64 {
         {
-          let f: |u64|u64 with copy+drop = if Eq<u64>(key, 0) {
+          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
             mod2::double
           } else {
             if Eq<u64>(key, 1) {
@@ -1081,24 +1081,24 @@ module 0x42::test {
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                    let g: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
                                      move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 with copy+drop+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
+                                      let h: |u64|u64 with copy+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
                                        move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 with copy+drop+store =  move|x: u64| test::multiply3(2, x, 2);
+                                        let i: |u64|u64 with copy+store =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| {
+                                        let i: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };
@@ -1198,7 +1198,7 @@ module 0x42::test {
     }
     private fun choose_function1(key: u64,x: u64): u64 {
         {
-          let f: |u64|u64 with copy+drop = if Eq<u64>(key, 0) {
+          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
             mod2::double
           } else {
             if Eq<u64>(key, 1) {
@@ -1248,24 +1248,24 @@ module 0x42::test {
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                    let g: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
                                      move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 with copy+drop+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
+                                      let h: |u64|u64 with copy+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
                                        move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 with copy+drop+store =  move|x: u64| test::multiply3(2, x, 2);
+                                        let i: |u64|u64 with copy+store =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| {
+                                        let i: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };
@@ -1365,7 +1365,7 @@ module 0x42::test {
     }
     private fun choose_function1(key: u64,x: u64): u64 {
         {
-          let f: |u64|u64 with copy+drop = if Eq<u64>(key, 0) {
+          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
             mod2::double
           } else {
             if Eq<u64>(key, 1) {
@@ -1415,24 +1415,24 @@ module 0x42::test {
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                    let g: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
                                      move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 with copy+drop+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
+                                      let h: |u64|u64 with copy+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
                                        move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 with copy+drop+store =  move|x: u64| test::multiply3(2, x, 2);
+                                        let i: |u64|u64 with copy+store =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| {
+                                        let i: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };
@@ -1532,7 +1532,7 @@ module 0x42::test {
     }
     private fun choose_function1(key: u64,x: u64): u64 {
         {
-          let f: |u64|u64 with copy+drop = if Eq<u64>(key, 0) {
+          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
             mod2::double
           } else {
             if Eq<u64>(key, 1) {
@@ -1582,24 +1582,24 @@ module 0x42::test {
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                    let g: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
                                      move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 with copy+drop+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
+                                      let h: |u64|u64 with copy+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
                                        move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 with copy+drop+store =  move|x: u64| test::multiply3(2, x, 2);
+                                        let i: |u64|u64 with copy+store =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| {
+                                        let i: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };
@@ -1699,7 +1699,7 @@ module 0x42::test {
     }
     private fun choose_function1(key: u64,x: u64): u64 {
         {
-          let f: |u64|u64 with copy+drop = if Eq<u64>(key, 0) {
+          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
             mod2::double
           } else {
             if Eq<u64>(key, 1) {
@@ -1734,24 +1734,24 @@ module 0x42::test {
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
+                                    let g: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
                                      move|x: u64| (g)(x, 11)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 with copy+drop+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
+                                      let h: |u64|u64 with copy+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
                                        move|x: u64| (h)(x) with copy, drop
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 with copy+drop+store =  move|x: u64| test::multiply3(2, x, 2);
+                                        let i: |u64|u64 with copy+store =  move|x: u64| test::multiply3(2, x, 2);
                                          move|z: u64| (i)(z)
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| {
+                                        let i: |(u64, u64)|u64 with copy+store =  move|(x: u64, y: u64): (u64, u64)| {
                                           let q: u64 = Sub<u64>(y, 1);
                                           mod3::multiply(x, Add<u64>(q, 1))
                                         };
@@ -1845,7 +1845,7 @@ module 0x42::test {
     }
     private fun choose_function1(key: u64,x: u64): u64 {
         {
-          let f: |u64|u64 with copy+drop = if Eq<u64>(key, 0) {
+          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
             mod2::double
           } else {
             if Eq<u64>(key, 1) {
@@ -1880,24 +1880,24 @@ module 0x42::test {
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64 with copy+drop+store = mod3::multiply;
+                                    let g: |(u64, u64)|u64 with copy+store = mod3::multiply;
                                     earlybind(test::choose_function1$lambda$6, g)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 with copy+drop+store = test::choose_function1$lambda$7;
+                                      let h: |u64|u64 with copy+store = test::choose_function1$lambda$7;
                                       h
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 with copy+drop+store = test::choose_function1$lambda$8;
+                                        let i: |u64|u64 with copy+store = test::choose_function1$lambda$8;
                                         i
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+drop+store = test::choose_function1$lambda$9;
+                                        let i: |(u64, u64)|u64 with copy+store = test::choose_function1$lambda$9;
                                         earlybind(test::choose_function1$lambda$10, i)
                                       }
                                     }
@@ -1969,7 +1969,7 @@ module 0x42::test {
     private fun choose_function1$lambda$5(x: u64): u64 {
         mod4::alt_multiply(x, 11)
     }
-    private fun choose_function1$lambda$6(g: |(u64, u64)|u64 with copy+drop+store,x: u64): u64 {
+    private fun choose_function1$lambda$6(g: |(u64, u64)|u64 with copy+store,x: u64): u64 {
         (g)(x, 11)
     }
     private fun choose_function1$lambda$7(x: u64): u64 {
@@ -1984,7 +1984,7 @@ module 0x42::test {
           mod3::multiply(x, Add<u64>(q, 1))
         }
     }
-    private fun choose_function1$lambda$10(i: |(u64, u64)|u64 with copy+drop+store,x: u64): u64 {
+    private fun choose_function1$lambda$10(i: |(u64, u64)|u64 with copy+store,x: u64): u64 {
         (i)(x, 15)
     }
 } // end 0x42::test
@@ -2021,7 +2021,7 @@ module 0x42::test {
     }
     private fun choose_function1(key: u64,x: u64): u64 {
         {
-          let f: |u64|u64 with copy+drop = if Eq<u64>(key, 0) {
+          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
             mod2::double
           } else {
             if Eq<u64>(key, 1) {
@@ -2056,24 +2056,24 @@ module 0x42::test {
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64 with copy+drop+store = mod3::multiply;
+                                    let g: |(u64, u64)|u64 with copy+store = mod3::multiply;
                                     earlybind(test::choose_function1$lambda$6, g)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 with copy+drop+store = test::choose_function1$lambda$7;
+                                      let h: |u64|u64 with copy+store = test::choose_function1$lambda$7;
                                       h
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 with copy+drop+store = test::choose_function1$lambda$8;
+                                        let i: |u64|u64 with copy+store = test::choose_function1$lambda$8;
                                         i
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+drop+store = test::choose_function1$lambda$9;
+                                        let i: |(u64, u64)|u64 with copy+store = test::choose_function1$lambda$9;
                                         earlybind(test::choose_function1$lambda$10, i)
                                       }
                                     }
@@ -2145,7 +2145,7 @@ module 0x42::test {
     private fun choose_function1$lambda$5(x: u64): u64 {
         mod4::alt_multiply(x, 11)
     }
-    private fun choose_function1$lambda$6(g: |(u64, u64)|u64 with copy+drop+store,x: u64): u64 {
+    private fun choose_function1$lambda$6(g: |(u64, u64)|u64 with copy+store,x: u64): u64 {
         (g)(x, 11)
     }
     private fun choose_function1$lambda$7(x: u64): u64 {
@@ -2160,7 +2160,7 @@ module 0x42::test {
           mod3::multiply(x, Add<u64>(q, 1))
         }
     }
-    private fun choose_function1$lambda$10(i: |(u64, u64)|u64 with copy+drop+store,x: u64): u64 {
+    private fun choose_function1$lambda$10(i: |(u64, u64)|u64 with copy+store,x: u64): u64 {
         (i)(x, 15)
     }
 } // end 0x42::test
@@ -2197,7 +2197,7 @@ module 0x42::test {
     }
     private fun choose_function1(key: u64,x: u64): u64 {
         {
-          let f: |u64|u64 with copy+drop = if Eq<u64>(key, 0) {
+          let f: |u64|u64 with copy = if Eq<u64>(key, 0) {
             mod2::double
           } else {
             if Eq<u64>(key, 1) {
@@ -2232,24 +2232,24 @@ module 0x42::test {
                               } else {
                                 if Eq<u64>(key, 11) {
                                   {
-                                    let g: |(u64, u64)|u64 with copy+drop+store = mod3::multiply;
+                                    let g: |(u64, u64)|u64 with copy+store = mod3::multiply;
                                     earlybind(test::choose_function1$lambda$6, g)
                                   }
                                 } else {
                                   if Eq<u64>(key, 12) {
                                     {
-                                      let h: |u64|u64 with copy+drop+store = test::choose_function1$lambda$7;
+                                      let h: |u64|u64 with copy+store = test::choose_function1$lambda$7;
                                       h
                                     }
                                   } else {
                                     if Eq<u64>(key, 14) {
                                       {
-                                        let i: |u64|u64 with copy+drop+store = test::choose_function1$lambda$8;
+                                        let i: |u64|u64 with copy+store = test::choose_function1$lambda$8;
                                         i
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+drop+store = test::choose_function1$lambda$9;
+                                        let i: |(u64, u64)|u64 with copy+store = test::choose_function1$lambda$9;
                                         earlybind(test::choose_function1$lambda$10, i)
                                       }
                                     }
@@ -2321,7 +2321,7 @@ module 0x42::test {
     private fun choose_function1$lambda$5(x: u64): u64 {
         mod4::alt_multiply(x, 11)
     }
-    private fun choose_function1$lambda$6(g: |(u64, u64)|u64 with copy+drop+store,x: u64): u64 {
+    private fun choose_function1$lambda$6(g: |(u64, u64)|u64 with copy+store,x: u64): u64 {
         (g)(x, 11)
     }
     private fun choose_function1$lambda$7(x: u64): u64 {
@@ -2336,7 +2336,7 @@ module 0x42::test {
           mod3::multiply(x, Add<u64>(q, 1))
         }
     }
-    private fun choose_function1$lambda$10(i: |(u64, u64)|u64 with copy+drop+store,x: u64): u64 {
+    private fun choose_function1$lambda$10(i: |(u64, u64)|u64 with copy+store,x: u64): u64 {
         (i)(x, 15)
     }
 } // end 0x42::test

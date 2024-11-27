@@ -24,7 +24,7 @@ comparison between v1 and v2 failed:
 = 
 - error[E01013]: unsupported language construct
 -    ┌─ TEMPFILE:24:73
-+ error: cannot pass `|(u64, u64)|integer with copy+drop+store` to a function which expects argument of type `|(&integer, &mut integer)|u64`
++ error: cannot pass `|(u64, u64)|integer with copy+store` to a function which expects argument of type `|(&integer, &mut integer)|u64`
 +    ┌─ TEMPFILE:24:64
 =    │
 = 24 │         assert!(elem_for_each_ref(&mut vector[Elem{k:1, v:2}], |x: u64, y: u64| *x + *y) == 3, 0)

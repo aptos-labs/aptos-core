@@ -2,7 +2,7 @@
 module 0x8675309::M {
     public fun lambda_not_allowed() {
         {
-          let _x: |u64|u64 with copy+drop+store = |i: u64| Add<u64>(i, 1);
+          let _x: |u64|u64 with copy+store = |i: u64| Add<u64>(i, 1);
           Tuple()
         }
     }
@@ -13,7 +13,7 @@ module 0x8675309::M {
 module 0x8675309::M {
     public fun lambda_not_allowed() {
         {
-          let _x: |u64|u64 with copy+drop+store = |i: u64| Add<u64>(i, 1);
+          let _x: |u64|u64 with copy+store = |i: u64| Add<u64>(i, 1);
           Tuple()
         }
     }
@@ -24,7 +24,7 @@ module 0x8675309::M {
 module 0x8675309::M {
     public fun lambda_not_allowed() {
         {
-          let _x: |u64|u64 with copy+drop+store = |i: u64| Add<u64>(i, 1);
+          let _x: |u64|u64 with copy+store = |i: u64| Add<u64>(i, 1);
           Tuple()
         }
     }
@@ -35,7 +35,7 @@ module 0x8675309::M {
 module 0x8675309::M {
     public fun lambda_not_allowed() {
         {
-          let _x: |u64|u64 with copy+drop+store = |i: u64| Add<u64>(i, 1);
+          let _x: |u64|u64 with copy+store = |i: u64| Add<u64>(i, 1);
           Tuple()
         }
     }
@@ -46,7 +46,7 @@ module 0x8675309::M {
 module 0x8675309::M {
     public fun lambda_not_allowed() {
         {
-          let _x: |u64|u64 with copy+drop+store = |i: u64| Add<u64>(i, 1);
+          let _x: |u64|u64 with copy+store = |i: u64| Add<u64>(i, 1);
           Tuple()
         }
     }
@@ -57,7 +57,7 @@ module 0x8675309::M {
 module 0x8675309::M {
     public fun lambda_not_allowed() {
         {
-          let _x: |u64|u64 with copy+drop+store = |i: u64| Add<u64>(i, 1);
+          let _x: |u64|u64 with copy+store = |i: u64| Add<u64>(i, 1);
           Tuple()
         }
     }
@@ -68,7 +68,7 @@ module 0x8675309::M {
 module 0x8675309::M {
     public fun lambda_not_allowed() {
         {
-          let _x: |u64|u64 with copy+drop+store = |i: u64| Add<u64>(i, 1);
+          let _x: |u64|u64 with copy+store = |i: u64| Add<u64>(i, 1);
           Tuple()
         }
     }
@@ -79,7 +79,7 @@ module 0x8675309::M {
 module 0x8675309::M {
     public fun lambda_not_allowed() {
         {
-          let _x: |u64|u64 with copy+drop+store = |i: u64| Add<u64>(i, 1);
+          let _x: |u64|u64 with copy+store = |i: u64| Add<u64>(i, 1);
           Tuple()
         }
     }
@@ -90,7 +90,7 @@ module 0x8675309::M {
 module 0x8675309::M {
     public fun lambda_not_allowed() {
         {
-          let _x: |u64|u64 with copy+drop+store = |i: u64| Add<u64>(i, 1);
+          let _x: |u64|u64 with copy+store = |i: u64| Add<u64>(i, 1);
           Tuple()
         }
     }
@@ -101,7 +101,7 @@ module 0x8675309::M {
 module 0x8675309::M {
     public fun lambda_not_allowed() {
         {
-          let _x: |u64|u64 with copy+drop+store = |i: u64| Add<u64>(i, 1);
+          let _x: |u64|u64 with copy+store = |i: u64| Add<u64>(i, 1);
           Tuple()
         }
     }
@@ -112,7 +112,7 @@ module 0x8675309::M {
 module 0x8675309::M {
     public fun lambda_not_allowed() {
         {
-          let _x: |u64|u64 with copy+drop+store = |i: u64| Add<u64>(i, 1);
+          let _x: |u64|u64 with copy+store = |i: u64| Add<u64>(i, 1);
           Tuple()
         }
     }

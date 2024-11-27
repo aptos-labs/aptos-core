@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: function type `|u64|u64 with copy+drop+store` is not allowed as a field type
+error: function type `|u64|u64 with copy+store` is not allowed as a field type
    ┌─ tests/lambda/storable/registry_ok.move:10:12
    │
 10 │         f: |u64| u64 with store+copy,
@@ -8,7 +8,7 @@ error: function type `|u64|u64 with copy+drop+store` is not allowed as a field t
    │
    = required by declaration of field `f`
 
-error: function type `|u64|u64 with copy+drop+store` is not allowed as a type argument (type was inferred)
+error: function type `|u64|u64 with copy+store` is not allowed as a type argument (type was inferred)
    ┌─ tests/lambda/storable/registry_ok.move:23:21
    │
 14 │     enum Option<T> {
@@ -19,7 +19,7 @@ error: function type `|u64|u64 with copy+drop+store` is not allowed as a type ar
    │
    = required by instantiating type parameter `T` of struct `Option`
 
-error: function type `|u64|u64 with copy+drop+store` is not allowed as a type argument
+error: function type `|u64|u64 with copy+store` is not allowed as a type argument
    ┌─ tests/lambda/storable/registry_ok.move:29:109
    │
 14 │     enum Option<T> {
@@ -30,7 +30,7 @@ error: function type `|u64|u64 with copy+drop+store` is not allowed as a type ar
    │
    = required by instantiating type parameter `T` of struct `Option`
 
-error: function type `|u64|u64 with copy+drop+store` is not allowed as a type argument (type was inferred)
+error: function type `|u64|u64 with copy+store` is not allowed as a type argument (type was inferred)
    ┌─ tests/lambda/storable/registry_ok.move:33:26
    │
 14 │     enum Option<T> {

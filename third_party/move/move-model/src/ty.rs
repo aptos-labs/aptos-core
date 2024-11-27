@@ -3624,6 +3624,7 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                 if !abilities.is_subset(AbilitySet::FUNCTIONS) {
                     // Default formatter for Abilities is not compact, manually convert here.
                     let abilities_as_str = abilities
+                        .setminus(AbilitySet::FUNCTIONS)
                         .iter()
                         .map(|a| a.to_string())
                         .reduce(|l, r| format!("{}+{}", l, r))
