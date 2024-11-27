@@ -8,7 +8,7 @@ use crate::{
     chain_id::ChainId,
     function_info::FunctionInfo,
     transaction::{
-        authenticator::{AccountAuthenticator, TransactionAuthenticator},
+        authenticator::{AbstractionAuthData, AccountAuthenticator, TransactionAuthenticator},
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
@@ -17,7 +17,6 @@ use crate::{
     },
 };
 use aptos_crypto::{ed25519::*, traits::*};
-use crate::transaction::authenticator::AbstractionAuthData;
 
 const MAX_GAS_AMOUNT: u64 = 1_000_000;
 const TEST_GAS_PRICE: u64 = 100;
@@ -277,7 +276,7 @@ pub fn get_test_signed_aa_transaction(
             auth_data: AbstractionAuthData::V1 {
                 signing_message_digest: vec![],
                 authenticator: vec![],
-            }
+            },
         });
     SignedTransaction::new_signed_transaction(raw_txn, authenticator)
 }

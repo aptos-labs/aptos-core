@@ -14,7 +14,14 @@ use crate::{
     },
 };
 use anyhow::{bail, ensure, Error, Result};
-use aptos_crypto::{ed25519::{Ed25519PublicKey, Ed25519Signature}, hash::CryptoHash, multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature}, secp256k1_ecdsa, secp256r1_ecdsa, traits::Signature, CryptoMaterialError, HashValue, ValidCryptoMaterial, ValidCryptoMaterialStringExt, signing_message};
+use aptos_crypto::{
+    ed25519::{Ed25519PublicKey, Ed25519Signature},
+    hash::CryptoHash,
+    multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
+    secp256k1_ecdsa, secp256r1_ecdsa, signing_message,
+    traits::Signature,
+    CryptoMaterialError, HashValue, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
+};
 use aptos_crypto_derive::{CryptoHasher, DeserializeKey, SerializeKey};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -38,13 +45,16 @@ pub enum AuthenticationError {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AuthenticationProof {
     Key(Vec<u8>),
-    Abstraction { function_info: FunctionInfo, auth_data: AbstractionAuthData },
+    Abstraction {
+        function_info: FunctionInfo,
+        auth_data: AbstractionAuthData,
+    },
     None,
 }
 
 impl AuthenticationProof {
     pub fn is_abstracted(&self) -> bool {
-        matches!(self, Self::Abstraction{..})
+        matches!(self, Self::Abstraction { .. })
     }
 
     pub fn optional_auth_key(&self) -> Option<Vec<u8>> {
@@ -537,13 +547,19 @@ pub enum AccountAuthenticator {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub enum AbstractionAuthData {
-    V1 { signing_message_digest: Vec<u8>, authenticator: Vec<u8> }
+    V1 {
+        signing_message_digest: Vec<u8>,
+        authenticator: Vec<u8>,
+    },
 }
 
 impl AbstractionAuthData {
     pub fn signing_message_digest(&self) -> &Vec<u8> {
         match self {
-            Self::V1 { signing_message_digest, .. } => signing_message_digest
+            Self::V1 {
+                signing_message_digest,
+                ..
+            } => signing_message_digest,
         }
     }
 }
@@ -591,14 +607,17 @@ impl AccountAuthenticator {
     }
 
     /// Create a abstracted authenticator
-    pub fn abstraction(function_info: FunctionInfo, signing_message_digest: Vec<u8>, authenticator: Vec<u8>) -> Self {
+    pub fn abstraction(
+        function_info: FunctionInfo,
+        signing_message_digest: Vec<u8>,
+        authenticator: Vec<u8>,
+    ) -> Self {
         Self::Abstraction {
             function_info,
             auth_data: AbstractionAuthData::V1 {
                 signing_message_digest,
                 authenticator,
-            }
-
+            },
         }
     }
 
@@ -624,7 +643,7 @@ impl AccountAuthenticator {
             Self::Abstraction { auth_data, .. } => {
                 ensure!(auth_data.signing_message_digest() == &HashValue::sha3_256_of(signing_message(message)?.as_slice()).to_vec(), "The signing message digest provided in Abstraction Authenticator is not expected");
                 Ok(())
-            }
+            },
         }
     }
 
@@ -658,7 +677,7 @@ impl AccountAuthenticator {
             Self::NoAccountAuthenticator => AuthenticationProof::None,
             Self::Abstraction {
                 function_info,
-                auth_data
+                auth_data,
             } => AuthenticationProof::Abstraction {
                 function_info: function_info.clone(),
                 auth_data: auth_data.clone(),

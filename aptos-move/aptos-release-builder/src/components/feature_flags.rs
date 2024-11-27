@@ -137,6 +137,7 @@ pub enum FeatureFlag {
     EnableCallTreeAndInstructionVMCache,
     PermissionedSigner,
     AccountAbstraction,
+    PassGasPayerSignerToPrologueAndEpilogue,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -365,6 +366,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::PermissionedSigner => AptosFeatureFlag::PERMISSIONED_SIGNER,
             FeatureFlag::AccountAbstraction => AptosFeatureFlag::ACCOUNT_ABSTRACTION,
+            FeatureFlag::PassGasPayerSignerToPrologueAndEpilogue => AptosFeatureFlag::PASS_GAS_PAYER_SIGNER_TO_PROLOGUE_AND_EPILOGUE
         }
     }
 }
@@ -520,6 +522,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::PERMISSIONED_SIGNER => FeatureFlag::PermissionedSigner,
             AptosFeatureFlag::ACCOUNT_ABSTRACTION => FeatureFlag::AccountAbstraction,
+            AptosFeatureFlag::PASS_GAS_PAYER_SIGNER_TO_PROLOGUE_AND_EPILOGUE => FeatureFlag::PassGasPayerSignerToPrologueAndEpilogue,
         }
     }
 }

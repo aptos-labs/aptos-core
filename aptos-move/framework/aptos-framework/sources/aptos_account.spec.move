@@ -283,8 +283,8 @@ spec aptos_framework::aptos_account {
     }
 
     spec burn_from_fungible_store_for_gas(
+        account: &signer,
         ref: &BurnRef,
-        account: address,
         amount: u64,
     ) {
         // TODO: temporary mockup.
