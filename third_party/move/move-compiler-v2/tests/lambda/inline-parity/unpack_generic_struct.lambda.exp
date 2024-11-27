@@ -506,7 +506,7 @@ module 0x42::m {
 
 
 Diagnostics:
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda/inline-parity/unpack_generic_struct.move:33:25
    │
 33 │           let f = h(data, |e| {
@@ -515,7 +515,7 @@ error: Currently, lambda expressions must explicitly declare `move` capture of f
 35 │ │         });
    │ ╰─────────^
 
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda/inline-parity/unpack_generic_struct.move:36:14
    │
 36 │           g(f, |e| {

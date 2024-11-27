@@ -187,7 +187,7 @@ module 0xcafe::m {
 
 
 Diagnostics:
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda-lifting/pattern.move:15:23
    │
 15 │         consume(s, x, |S{x}, _y| { let y = x; x + y})

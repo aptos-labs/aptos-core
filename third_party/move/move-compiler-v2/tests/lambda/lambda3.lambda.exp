@@ -121,7 +121,7 @@ module 0x8675309::M {
 
 
 Diagnostics:
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda/lambda3.move:77:18
    │
 77 │         let _x = |i| i + 1; // expected lambda not allowed

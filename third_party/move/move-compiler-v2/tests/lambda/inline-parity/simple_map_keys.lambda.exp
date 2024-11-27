@@ -682,7 +682,7 @@ module 0x42::simple_map {
 
 
 Diagnostics:
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda/inline-parity/simple_map_keys.move:17:28
    │
 17 │           map_ref(&map.data, |e| {
@@ -692,7 +692,7 @@ error: Currently, lambda expressions must explicitly declare `move` capture of f
 20 │ │         })
    │ ╰─────────^
 
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda/inline-parity/simple_map_keys.move:28:25
    │
 28 │         for_each_ref(v, |elem| vector::push_back(&mut result, f(elem)));

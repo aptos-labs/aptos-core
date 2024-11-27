@@ -573,12 +573,8 @@ impl<'a> ExpSourcifier<'a> {
                     emit!(self.wr(), "| ");
                     self.print_exp(Prio::General, true, body);
                     if !abilities.is_subset(AbilitySet::FUNCTIONS) {
-                        let abilities_as_str = abilities
-                            .iter()
-                            .map(|a| a.to_string())
-                            .reduce(|l, r| format!("{}, {}", l, r))
-                            .unwrap_or_default();
-                        emit!(self.wr(), " has {}", abilities_as_str);
+                        let abilities_as_str = abilities.iter().map(|a| a.to_string()).join("+");
+                        emit!(self.wr(), " with {}", abilities_as_str);
                     }
                 });
             },

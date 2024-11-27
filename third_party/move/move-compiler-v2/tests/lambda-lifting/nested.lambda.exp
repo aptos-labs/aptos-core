@@ -154,13 +154,13 @@ module 0xcafe::m {
 
 
 Diagnostics:
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda-lifting/nested.move:15:42
    │
 15 │         map1(x, |y| (map2((y - c as u8), |y| y + (c as u8)) as u64))
    │                                          ^^^^^^^^^^^^^^^^^
 
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda-lifting/nested.move:15:17
    │
 15 │         map1(x, |y| (map2((y - c as u8), |y| y + (c as u8)) as u64))

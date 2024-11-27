@@ -2646,10 +2646,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     ) {
         // Type check and translate lhs and rhs. They must have the same type.
         let mut et = self.exp_translator_for_context(loc, context, &ConditionKind::Requires);
-        let (expected_ty, lhs2) = et.translate_exp_free(lhs);
-        let rhs2 = et.translate_exp(rhs, &expected_ty);
+        let (expected_ty, translated_lhs) = et.translate_exp_free(lhs);
+        let translated_rhs = et.translate_exp(rhs, &expected_ty);
         et.finalize_types();
-        if lhs2.extract_ghost_mem_access(self.parent.env).is_some() {
+        if translated_lhs
+            .extract_ghost_mem_access(self.parent.env)
+            .is_some()
+        {
             // Add as a condition to the context.
             self.add_conditions_to_context(
                 context,
@@ -2658,15 +2661,15 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     loc: loc.clone(),
                     kind: ConditionKind::Update,
                     properties: Default::default(),
-                    exp: rhs2.into_exp(),
-                    additional_exps: vec![lhs2.into_exp()],
+                    exp: translated_rhs.into_exp(),
+                    additional_exps: vec![translated_lhs.into_exp()],
                 }],
                 PropertyBag::default(),
                 "",
             );
         } else {
             self.parent.error(
-                &self.parent.env.get_node_loc(lhs2.node_id()),
+                &self.parent.env.get_node_loc(translated_lhs.node_id()),
                 "target of `update` restricted to specification variables",
             )
         }

@@ -209,13 +209,13 @@ module 0xdecafbad::m {
 
 
 Diagnostics:
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
   ┌─ tests/lambda/inline-parity/lambda_no_param.move:7:13
   │
 7 │         foo(|| {});
   │             ^^^^^
 
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda/inline-parity/lambda_no_param.move:15:13
    │
 15 │         bar(||x)

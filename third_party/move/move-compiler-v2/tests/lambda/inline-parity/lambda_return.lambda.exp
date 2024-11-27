@@ -209,7 +209,7 @@ module 0x42::LambdaReturn {
 
 
 Diagnostics:
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
   ┌─ tests/lambda/inline-parity/lambda_return.move:7:24
   │
 7 │     let a = inline_apply2(|x| { x }, 3);

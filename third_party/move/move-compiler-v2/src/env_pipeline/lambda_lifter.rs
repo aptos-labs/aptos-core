@@ -15,7 +15,7 @@
 //! Lambda lifting rewrites lambda expressions into construction
 //! of *closures*. A closure refers to a function and contains a partial list
 //! of arguments for that function, essentially currying it.  We use the
-//! `EarlyBind` operation to construct a closure from a function and set of arguemnts,
+//! `EarlyBind` operation to construct a closure from a function and set of arguments,
 //! which must be the first `k` arguments to the function argument list.
 //!
 //! ```ignore
@@ -284,7 +284,7 @@ impl<'a> LambdaLifter<'a> {
     // If final `args` match `lambda_params`, and all other args are simple, then returns
     // the simple prefix of `args`.
     fn get_args_if_simple<'b>(
-        lambda_params: &Vec<Parameter>,
+        lambda_params: &[Parameter],
         args: &'b [Exp],
     ) -> Option<Vec<&'b Exp>> {
         if lambda_params.len() <= args.len() {
@@ -313,13 +313,14 @@ impl<'a> LambdaLifter<'a> {
         None
     }
 
-    // Only allow simple expressions which cannot vary or abort
-    fn exp_is_simple(fn_exp: &Exp) -> bool {
+    // Only allow simple expressions which are not too expensive for now.
+    // TODO(LAMBDA): see if more compelx expresisons would be useful.
+    fn exp_is_simple(exp: &Exp) -> bool {
         use ExpData::*;
-        match fn_exp.as_ref() {
-            Call(_, Operation::EarlyBind, args) => args.iter().all(|exp| Self::exp_is_simple(exp)),
+        match exp.as_ref() {
+            Call(_, Operation::EarlyBind, args) => args.iter().all(Self::exp_is_simple),
             Call(_, op, args) => {
-                op.is_ok_to_remove_from_code() && args.iter().all(|exp| Self::exp_is_simple(exp))
+                op.is_ok_to_remove_from_code() && args.iter().all(Self::exp_is_simple)
             },
             Sequence(_, exp_vec) => {
                 if let [exp] = &exp_vec[..] {
@@ -658,7 +659,7 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
                 env.error(
                     &loc,
                     // TODO(LAMBDA)
-                    "Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall."
+                    "Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call."
                 );
                 return None;
             },

@@ -83,7 +83,6 @@ module 0x42::test {
     }
 
     public fun test_functions() {
-        // let sum = vector[];
         let x = 3;
 
         for (i in 0..15) {

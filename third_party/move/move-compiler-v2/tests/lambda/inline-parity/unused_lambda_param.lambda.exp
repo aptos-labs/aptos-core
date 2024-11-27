@@ -226,19 +226,19 @@ warning: Unused anonymous function parameter `x`. Consider removing or prefixing
 7 │         test(0, |x| 1);
   │                  ^
 
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
   ┌─ tests/lambda/inline-parity/unused_lambda_param.move:7:17
   │
 7 │         test(0, |x| 1);
   │                 ^^^^^
 
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda/inline-parity/unused_lambda_param.move:11:17
    │
 11 │         test(0, |_x| 1);
    │                 ^^^^^^
 
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda/inline-parity/unused_lambda_param.move:15:17
    │
 15 │         test(0, |_| 1);

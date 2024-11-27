@@ -511,13 +511,13 @@ warning: Unused parameter `z`. Consider removing or prefixing with an underscore
 6 │     public fun quux(f:|u64, u64|, z: u64) {
   │                                   ^
 
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda/inline-parity/shadowing_unused_nodecl.move:13:14
    │
 13 │         quux(|a, b| f(a, b), z);
    │              ^^^^^^^^^^^^^^
 
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda/inline-parity/shadowing_unused_nodecl.move:19:13
    │
 19 │           foo(|y, _q| {
@@ -527,7 +527,7 @@ error: Currently, lambda expressions must explicitly declare `move` capture of f
 22 │ │         }, z);
    │ ╰─────────^
 
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda/inline-parity/shadowing_unused_nodecl.move:29:14
    │
 29 │           quux(|y, _q| {

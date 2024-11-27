@@ -1815,8 +1815,10 @@ impl ExpRewriterFunctions for LoopNestRewriter {
 pub enum Operation {
     MoveFunction(ModuleId, FunId),
     /// Build a closure by binding 1 or more leading arguments to a function value.
-    /// First argument to the operation must be a function; the reamining
-    /// arguments will be bound to corresponding parameters of that function.
+    /// First argument to the operation must be a function; the remaining
+    /// arguments will be bound, in order, to the leading parameters of that function,
+    /// generating a function which takes the remaining parameters and then calls
+    /// the function with the complete set of parameters.
     ///     (move |x, y| f(z, x, y)) === ExpData::Call(_, EarlyBind, vec![f, z])
     ///     (move || f(z, x, y)) === ExpData::Call(_, EarlyBind, vec![f, z, x, y])
     EarlyBind,

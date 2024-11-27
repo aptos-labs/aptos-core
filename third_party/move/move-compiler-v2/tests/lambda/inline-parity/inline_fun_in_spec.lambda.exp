@@ -485,7 +485,7 @@ module 0x42::m {
 
 
 Diagnostics:
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda/inline-parity/inline_fun_in_spec.move:19:28
    │
 19 │         spec { assert exec(|y| y > 0, x); };

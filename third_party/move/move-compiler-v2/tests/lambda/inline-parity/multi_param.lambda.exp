@@ -451,7 +451,7 @@ module 0x42::Test {
 
 
 Diagnostics:
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda/inline-parity/multi_param.move:19:29
    │
 19 │           for_each_ref_mut(v, |elem| {
@@ -461,7 +461,7 @@ error: Currently, lambda expressions must explicitly declare `move` capture of f
 22 │ │         });
    │ ╰─────────^
 
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda/inline-parity/multi_param.move:27:64
    │
 27 │         assert!(elem_for_each_ref(&mut vector[Elem{k:1, v:2}], |x,y| *x + *y) == 3, 0)

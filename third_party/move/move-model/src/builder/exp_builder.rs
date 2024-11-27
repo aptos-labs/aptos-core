@@ -189,7 +189,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         self.parent.test_language_version(loc, feature, version_min)
     }
 
-    /// Returns `Ok(())` if language version checks out.  Otherwise,
+    /// Returns `Some(())` if language version checks out.  Otherwise,
     /// issues an error message and returns `None`.
     pub fn check_language_version(
         &self,
@@ -197,11 +197,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         feature: &str,
         version_min: LanguageVersion,
     ) -> Option<()> {
-        if self.parent.test_language_version(loc, feature, version_min) {
-            Some(())
-        } else {
-            None
-        }
+        self.parent
+            .test_language_version(loc, feature, version_min)
+            .then_some(())
     }
 
     pub fn set_spec_block_map(&mut self, map: BTreeMap<EA::SpecId, EA::SpecBlock>) {

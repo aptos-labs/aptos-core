@@ -149,7 +149,7 @@ warning: Unused parameter `f`. Consider removing or prefixing with an underscore
 3 │     fun foo(f: |&u64|) {
   │             ^
 
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
   ┌─ tests/lambda/inline-parity/eq_inline.move:7:13
   │
 7 │           foo(|v| {

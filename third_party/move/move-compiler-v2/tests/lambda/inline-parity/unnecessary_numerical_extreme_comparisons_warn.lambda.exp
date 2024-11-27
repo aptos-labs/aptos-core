@@ -1397,7 +1397,7 @@ module 0xc0ffee::no_warn {
 
 
 Diagnostics:
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda/inline-parity/unnecessary_numerical_extreme_comparisons_warn.move:54:15
    │
 54 │         apply(|x| x > U8_MAX, x)

@@ -503,7 +503,7 @@ module 0xcafe::m {
 
 
 Diagnostics:
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda-lifting/modify.move:13:16
    │
 13 │           map(x, |y| {
@@ -513,7 +513,7 @@ error: Currently, lambda expressions must explicitly declare `move` capture of f
 16 │ │         })
    │ ╰─────────^
 
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda-lifting/modify.move:20:16
    │
 20 │           map(x, |y| {
@@ -523,7 +523,7 @@ error: Currently, lambda expressions must explicitly declare `move` capture of f
 23 │ │         })
    │ ╰─────────^
 
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda-lifting/modify.move:28:16
    │
 28 │           map(x, |y| {
@@ -533,7 +533,7 @@ error: Currently, lambda expressions must explicitly declare `move` capture of f
 31 │ │         })
    │ ╰─────────^
 
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda-lifting/modify.move:36:16
    │
 36 │           map(x, |y| {
@@ -543,7 +543,7 @@ error: Currently, lambda expressions must explicitly declare `move` capture of f
 39 │ │         })
    │ ╰─────────^
 
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda-lifting/modify.move:44:16
    │
 44 │           map(x, |y| {

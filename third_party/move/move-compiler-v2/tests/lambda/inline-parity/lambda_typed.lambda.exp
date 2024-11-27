@@ -1287,13 +1287,13 @@ module 0x42::LambdaTest {
 
 
 Diagnostics:
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda/inline-parity/lambda_typed.move:40:29
    │
 40 │         LambdaTest1::inline_apply(|y: u64|y, x)
    │                                   ^^^^^^^^^
 
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda/inline-parity/lambda_typed.move:39:59
    │
 39 │           LambdaTest1::inline_mul(c, LambdaTest1::inline_apply(|x:u64| {

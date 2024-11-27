@@ -1045,19 +1045,19 @@ module 0xc0ffee::m {
 
 
 Diagnostics:
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda/inline-parity/break_continue_in_lambda.move:40:22
    │
 40 │                 brk2(| | break);
    │                      ^^^^^^^^^
 
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda/inline-parity/break_continue_in_lambda.move:41:8
    │
 41 │         brk2(| | while (true) { break });
    │              ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda/inline-parity/break_continue_in_lambda.move:42:8
    │
 42 │         brk2(| | while (true) { continue });

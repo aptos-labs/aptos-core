@@ -363,7 +363,7 @@ module 0x42::c {
 
 
 Diagnostics:
-error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline functioncall.
+error: Currently, lambda expressions must explicitly declare `move` capture of free variables, except when appearing as an argument to an inline function call.
    ┌─ tests/lambda/inline-parity/same_names.move:30:13
    │
 30 │         foo(|x, y| { assert!(x.len() + y.len() == 1, 1) }, x, y)
