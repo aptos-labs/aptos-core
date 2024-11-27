@@ -53,10 +53,15 @@ pub mod webauthn;
 
 pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload};
 use crate::{
-    block_metadata_ext::BlockMetadataExt, contract_event::TransactionEvent, executable::ModulePath,
-    fee_statement::FeeStatement, keyless::FederatedKeylessPublicKey, function_info::FunctionInfo,
-    proof::accumulator::InMemoryEventAccumulator, validator_txn::ValidatorTransaction,
+    block_metadata_ext::BlockMetadataExt,
+    contract_event::TransactionEvent,
+    executable::ModulePath,
+    fee_statement::FeeStatement,
+    function_info::FunctionInfo,
+    keyless::FederatedKeylessPublicKey,
+    proof::accumulator::InMemoryEventAccumulator,
     state_store::{state_key::StateKey, state_value::StateValue},
+    validator_txn::ValidatorTransaction,
     write_set::TransactionWrite,
 };
 pub use block_output::BlockOutput;
@@ -71,8 +76,12 @@ pub use script::{
     TypeArgumentABI,
 };
 use serde::de::DeserializeOwned;
-use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
-use std::sync::Arc;
+use std::{
+    collections::BTreeSet,
+    hash::Hash,
+    ops::Deref,
+    sync::{atomic::AtomicU64, Arc},
+};
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
@@ -346,8 +355,14 @@ impl RawTransaction {
                 )
             },
             Auth::Abstraction(function_info, sign_function) => {
-                let digest = HashValue::sha3_256_of(signing_message(&user_signed_message)?.as_slice()).to_vec();
-                AccountAuthenticator::abstraction(function_info.clone(), digest.clone(), sign_function(digest.as_ref()))
+                let digest =
+                    HashValue::sha3_256_of(signing_message(&user_signed_message)?.as_slice())
+                        .to_vec();
+                AccountAuthenticator::abstraction(
+                    function_info.clone(),
+                    digest.clone(),
+                    sign_function(digest.as_ref()),
+                )
             },
         };
 
@@ -364,20 +379,25 @@ impl RawTransaction {
                     AccountAuthenticator::ed25519(Ed25519PublicKey::from(private_key), signature)
                 },
                 Auth::Abstraction(function_info, sign_function) => {
-                    let digest = HashValue::sha3_256_of(signing_message(&user_signed_message)?.as_slice()).to_vec();
-                    AccountAuthenticator::abstraction(function_info.clone(), digest.clone(), sign_function(digest.as_ref()))
+                    let digest =
+                        HashValue::sha3_256_of(signing_message(&user_signed_message)?.as_slice())
+                            .to_vec();
+                    AccountAuthenticator::abstraction(
+                        function_info.clone(),
+                        digest.clone(),
+                        sign_function(digest.as_ref()),
+                    )
                 },
             };
             secondary_authenticators.push(secondary_authenticator);
         }
 
         if let Some((fee_payer_address, fee_payer_auth)) = fee_payer {
-            let user_signed_message =
-                RawTransactionWithData::new_fee_payer(
-                    self.clone(),
-                    secondary_signers.clone(),
-                    fee_payer_address,
-                );
+            let user_signed_message = RawTransactionWithData::new_fee_payer(
+                self.clone(),
+                secondary_signers.clone(),
+                fee_payer_address,
+            );
             let fee_payer_authenticator = match fee_payer_auth {
                 Auth::Ed25519(fee_payer_private_key) => {
                     let sender_signature = fee_payer_private_key.sign(&user_signed_message)?;
@@ -387,8 +407,14 @@ impl RawTransaction {
                     )
                 },
                 Auth::Abstraction(function_info, sign_function) => {
-                    let digest = HashValue::sha3_256_of(signing_message(&user_signed_message)?.as_slice()).to_vec();
-                    AccountAuthenticator::abstraction(function_info.clone(), digest.clone(), sign_function(digest.as_ref()))
+                    let digest =
+                        HashValue::sha3_256_of(signing_message(&user_signed_message)?.as_slice())
+                            .to_vec();
+                    AccountAuthenticator::abstraction(
+                        function_info.clone(),
+                        digest.clone(),
+                        sign_function(digest.as_ref()),
+                    )
                 },
             };
             Ok(SignatureCheckedTransaction(
@@ -1113,7 +1139,7 @@ impl VMValidatorResult {
                     status.status_type() == StatusType::Unknown
                         || status.status_type() == StatusType::Validation
                         || status.status_type() == StatusType::InvariantViolation
-                        || status.status_type() == StatusType::Execution
+                        || status.status_type() == StatusType::Execution,
             },
             "Unexpected discarded status: {:?}",
             vm_status

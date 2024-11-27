@@ -42,8 +42,8 @@ use aptos_types::{
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
-    indexer::indexer_db_reader::IndexerReader,
     function_info::FunctionInfo,
+    indexer::indexer_db_reader::IndexerReader,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::{
         signature_verified_transaction::into_signature_verified_block, Transaction,
