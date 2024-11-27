@@ -159,7 +159,7 @@ impl InterpreterImpl {
                 args,
             )
         } else {
-            interpreter.execute_main::<NullRuntimeTypeCheck>(
+            interpreter.execute_main::<NoRuntimeTypeCheck>(
                 loader,
                 data_store,
                 module_store,
