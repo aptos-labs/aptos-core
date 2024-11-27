@@ -1,0 +1,35 @@
+---
+remote_endpoint: ~
+proposals:
+  - name: framework
+    metadata:
+      title: ""
+      description: ""
+      source_code_url: ""
+      discussion_url: ""
+    execution_mode: MultiStep
+    update_sequence:
+      - Framework:
+          bytecode_version: 6
+          git_hash: ~
+  - name: gas
+    metadata:
+      title: ""
+      description: ""
+      source_code_url: ""
+      discussion_url: ""
+    execution_mode: MultiStep
+    update_sequence:
+      - DefaultGas
+  - name: feature_flags
+    metadata:
+      title: ""
+      description: ""
+      source_code_url: ""
+      discussion_url: ""
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - collection_owner
+          disabled: []
