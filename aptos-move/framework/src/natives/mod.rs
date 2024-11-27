@@ -93,10 +93,7 @@ pub fn all_natives(
         "dispatchable_fungible_asset",
         dispatchable_fungible_asset::make_all(builder)
     );
-    add_natives_from_module!(
-        "lite_account",
-        lite_account::make_all(builder)
-    );
+    add_natives_from_module!("lite_account", lite_account::make_all(builder));
 
     if inject_create_signer_for_gov_sim {
         add_natives_from_module!(

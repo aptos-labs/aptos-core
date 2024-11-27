@@ -502,7 +502,7 @@ Aborts if <code>i</code> is out of bounds.
     <b>if</b> (self.end_index == i) {
         <b>return</b> last_val
     };
-    // because the lack of mem::swap, here we swap remove the requested value from the bucket
+    // because the lack of <a href="../../move-stdlib/doc/mem.md#0x1_mem_swap">mem::swap</a>, here we swap remove the requested value from the bucket
     // and append the last_val <b>to</b> the bucket then swap the last bucket val back
     <b>let</b> bucket = <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> self.buckets, i / self.bucket_size);
     <b>let</b> bucket_len = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(bucket);

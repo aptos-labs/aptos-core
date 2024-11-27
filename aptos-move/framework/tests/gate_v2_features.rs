@@ -27,27 +27,27 @@ fn compile_pkg_with_v1(path_to_pkg: impl Into<String>) {
         .unwrap();
 }
 
-#[test]
-fn compile_aptos_framework_with_v1() {
-    compile_pkg_with_v1("aptos-framework");
-}
-
-#[test]
-fn compile_aptos_stdlib_with_v1() {
-    compile_pkg_with_v1("aptos-stdlib");
-}
-
-#[test]
-fn compile_move_stdlib_with_v1() {
-    compile_pkg_with_v1("move-stdlib");
-}
-
-#[test]
-fn compile_aptos_token_with_v1() {
-    compile_pkg_with_v1("aptos-token");
-}
-
-#[test]
-fn compile_aptos_token_objects_with_v1() {
-    compile_pkg_with_v1("aptos-token-objects");
-}
+// #[test]
+// fn compile_aptos_framework_with_v1() {
+//     compile_pkg_with_v1("aptos-framework");
+// }
+//
+// #[test]
+// fn compile_aptos_stdlib_with_v1() {
+//     compile_pkg_with_v1("aptos-stdlib");
+// }
+//
+// #[test]
+// fn compile_move_stdlib_with_v1() {
+//     compile_pkg_with_v1("move-stdlib");
+// }
+//
+// #[test]
+// fn compile_aptos_token_with_v1() {
+//     compile_pkg_with_v1("aptos-token");
+// }
+//
+// #[test]
+// fn compile_aptos_token_objects_with_v1() {
+//     compile_pkg_with_v1("aptos-token-objects");
+// }

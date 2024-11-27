@@ -16,8 +16,7 @@ use aptos_types::{
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
 use rand::rngs::OsRng;
 use serde_json::json;
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_account_abstraction_single_signer() {
@@ -80,7 +79,13 @@ async fn test_account_abstraction_single_signer() {
     // decrement seq num for aborted txn.
     account.decrement_sequence_number();
 
-    let sign_func = Arc::new(move |x: &[u8]| key_pair.private_key.sign_arbitrary_message(x).to_bytes().to_vec());
+    let sign_func = Arc::new(move |x: &[u8]| {
+        key_pair
+            .private_key
+            .sign_arbitrary_message(x)
+            .to_bytes()
+            .to_vec()
+    });
     account.set_abstraction_auth(func_info.clone(), sign_func);
 
     // case 2: successful AA txn.
@@ -160,15 +165,15 @@ async fn test_account_abstraction_multi_agent_with_abstracted_sender() {
         .await;
     context.commit_block(&vec![txn1, txn2]).await;
 
-    let sign_func = Arc::new(move |x: &[u8]| key_pair.private_key.sign_arbitrary_message(x).to_bytes().to_vec());
-    a.set_abstraction_auth(
-        func_info.clone(),
-        sign_func.clone(),
-    );
-    c.set_abstraction_auth(
-        func_info,
-        sign_func
-    );
+    let sign_func = Arc::new(move |x: &[u8]| {
+        key_pair
+            .private_key
+            .sign_arbitrary_message(x)
+            .to_bytes()
+            .to_vec()
+    });
+    a.set_abstraction_auth(func_info.clone(), sign_func.clone());
+    c.set_abstraction_auth(func_info, sign_func);
 
     let factory = context.transaction_factory();
     let balance_start = context.get_apt_balance(d.address()).await;

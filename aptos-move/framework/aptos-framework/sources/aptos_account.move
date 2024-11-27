@@ -257,13 +257,14 @@ module aptos_framework::aptos_account {
 
     /// Burn from APT Primary FungibleStore
     public(friend) fun burn_from_fungible_store(
+        account: &signer,
         ref: &BurnRef,
-        account: address,
         amount: u64,
     ) {
+        let account_addr = signer::address_of(account);
         // Skip burning if amount is zero. This shouldn't error out as it's called as part of transaction fee burning.
         if (amount != 0) {
-            let store_addr = primary_fungible_store_address(account);
+            let store_addr = primary_fungible_store_address(account_addr);
             fungible_asset::address_burn_from(ref, store_addr, amount);
         };
     }
