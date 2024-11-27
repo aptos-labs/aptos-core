@@ -206,14 +206,13 @@ impl AssetUploaderThrottlerContext {
         let self_arc = Arc::new(self.clone());
         loop {
             // Wait until notified if rate limited
-            if self.is_rate_limited.load(Ordering::Relaxed) {
+            while self.is_rate_limited.load(Ordering::Relaxed) {
                 self.rate_limit_over_notify.notified().await;
                 self.is_rate_limited.store(false, Ordering::Relaxed);
             }
 
             // Wait until notified if queue is empty
-            let is_empty = self.upload_queue.lock().await.asset_queue.is_empty();
-            if is_empty {
+            while self.upload_queue.lock().await.asset_queue.is_empty() {
                 self.inserted_notify.notified().await;
             }
 
@@ -330,18 +329,12 @@ impl AssetUploaderThrottlerContext {
         Ok(num_queued)
     }
 
-    async fn start_update_loop(&self) {
+    async fn start_update_loop(&self) -> anyhow::Result<()> {
         let poll_interval_seconds = Duration::from_secs(self.config.poll_interval_seconds);
         loop {
-            match self.update_queue().await {
-                Ok(num_queued) => {
-                    if num_queued > 0 {
-                        self.inserted_notify.notify_one();
-                    }
-                },
-                Err(e) => {
-                    error!(error = ?e, "[Asset Uploader Throttler] Error updating queue");
-                },
+            let num_queued = self.update_queue().await?;
+            if num_queued > 0 {
+                self.inserted_notify.notify_one();
             }
 
             tokio::time::sleep(poll_interval_seconds).await;
@@ -391,7 +384,8 @@ impl Server for AssetUploaderThrottlerContext {
 
         let self_arc_clone = self_arc.clone();
         tokio::spawn(async move {
-            self_arc_clone.start_update_loop().await;
+            self_arc_clone.start_update_loop().await?;
+            anyhow::Ok(())
         });
 
         axum::Router::new()
