@@ -900,12 +900,12 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                         entry.insert(());
                     }
                 },
-                Invoke(idx) => map_err(self.verify_fun_sig_idx(
+                InvokeFunction(idx) => map_err(self.verify_fun_sig_idx(
                     *idx,
                     &mut checked_fun_insts,
                     &ability_context,
                 ))?,
-                EarlyBind(idx, count) => {
+                EarlyBindFunction(idx, count) => {
                     map_err(self.verify_fun_sig_idx(
                         *idx,
                         &mut checked_fun_insts,
@@ -922,7 +922,7 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                                 return map_err(Err(PartialVMError::new(
                                     StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH,
                                 )
-                                .with_message("in EarlyBind".to_string())));
+                                .with_message("in EarlyBindFunction".to_string())));
                             };
                         };
                         entry.insert(());
@@ -1142,7 +1142,7 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
         Ok(())
     }
 
-    // Checks that a `sig_idx` parameter to `Invoke` or `EarlyBind` is well-formed.
+    // Checks that a `sig_idx` parameter to `InvokeFunction` or `EarlyBindFunction` is well-formed.
     fn verify_fun_sig_idx(
         &self,
         idx: SignatureIndex,

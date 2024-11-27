@@ -244,8 +244,9 @@ pub fn run_bytecode_gen(env: &GlobalEnv) -> FunctionTargetsHolder {
         if module.is_target() {
             for fun in module.get_functions() {
                 let id = fun.get_qualified_id();
-                // Skip inline functions because invoke and lambda are not supported in the current code generator
+                // Skip inline functions because invoke_function and lambda are not supported in the current code generator
                 if !fun.is_inline() {
+                    // TODO(LAMBDA)
                     todo.insert(id);
                 }
             }

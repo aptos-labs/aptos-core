@@ -301,7 +301,7 @@ fn call(
     Ok(())
 }
 
-fn invoke(
+fn invoke_function(
     verifier: &mut TypeSafetyChecker,
     meter: &mut impl Meter,
     offset: CodeOffset,
@@ -391,7 +391,7 @@ fn ld_function(
     )
 }
 
-fn early_bind(
+fn early_bind_function(
     verifier: &mut TypeSafetyChecker,
     meter: &mut impl Meter,
     offset: CodeOffset,
@@ -881,16 +881,16 @@ fn verify_instr(
             ld_function(verifier, meter, offset, &func_inst.handle, type_args)?
         },
 
-        Bytecode::EarlyBind(idx, count) => {
+        Bytecode::EarlyBindFunction(idx, count) => {
             // The signature checker has verified this is a function type.
             let expected_ty = safe_unwrap!(verifier.resolver.signature_at(*idx).0.first());
-            early_bind(verifier, meter, offset, expected_ty, *count)?
+            early_bind_function(verifier, meter, offset, expected_ty, *count)?
         },
 
-        Bytecode::Invoke(idx) => {
+        Bytecode::InvokeFunction(idx) => {
             // The signature checker has verified this is a function type.
             let expected_ty = safe_unwrap!(verifier.resolver.signature_at(*idx).0.first());
-            invoke(verifier, meter, offset, expected_ty)?
+            invoke_function(verifier, meter, offset, expected_ty)?
         },
 
         Bytecode::Pack(idx) => {

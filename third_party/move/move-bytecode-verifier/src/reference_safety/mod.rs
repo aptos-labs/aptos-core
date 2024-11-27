@@ -125,7 +125,7 @@ fn ld_function(
     Ok(())
 }
 
-fn early_bind(
+fn early_bind_function(
     verifier: &mut ReferenceSafetyAnalysis,
     _arg_tys: Vec<SignatureToken>,
     k: u8,
@@ -140,7 +140,7 @@ fn early_bind(
     Ok(())
 }
 
-fn invoke(
+fn invoke_function(
     verifier: &mut ReferenceSafetyAnalysis,
     state: &mut AbstractState,
     offset: CodeOffset,
@@ -153,7 +153,7 @@ fn invoke(
         .map(|_| verifier.stack.pop().unwrap())
         .rev()
         .collect();
-    let values = state.invoke(offset, arguments, &result_tys, meter)?;
+    let values = state.invoke_function(offset, arguments, &result_tys, meter)?;
     for value in values {
         verifier.stack.push(value)
     }
@@ -578,13 +578,13 @@ fn execute_inner(
             let function_handle = verifier.resolver.function_handle_at(func_inst.handle);
             ld_function(verifier, state, offset, function_handle, meter)?
         },
-        Bytecode::EarlyBind(sig_idx, k) => {
+        Bytecode::EarlyBindFunction(sig_idx, k) => {
             let (arg_tys, _result_tys) = fun_type(verifier, *sig_idx)?;
-            early_bind(verifier, arg_tys, *k)?
+            early_bind_function(verifier, arg_tys, *k)?
         },
-        Bytecode::Invoke(sig_idx) => {
+        Bytecode::InvokeFunction(sig_idx) => {
             let (arg_tys, result_tys) = fun_type(verifier, *sig_idx)?;
-            invoke(verifier, state, offset, arg_tys, result_tys, meter)?
+            invoke_function(verifier, state, offset, arg_tys, result_tys, meter)?
         },
 
         Bytecode::VecPack(idx, num) => {

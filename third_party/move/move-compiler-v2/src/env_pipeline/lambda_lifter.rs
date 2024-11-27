@@ -13,9 +13,9 @@
 //! not modify free variables.
 //!
 //! Lambda lifting rewrites lambda expressions into construction
-//! of *closures* using the `EarlyBind` operation. A closure refers to a function and contains a list
+//! of *closures* using the `EarlyBindFunction` operation. A closure refers to a function and contains a list
 //! of "early bound" leading arguments for that function, essentially currying it.  We use the
-//! `EarlyBind` operation to construct a closure from a function and set of arguments,
+//! `EarlyBindFunction` operation to construct a closure from a function and set of arguments,
 //! which must be the first `k` arguments to the function argument list.
 //!
 //! ```ignore
@@ -23,7 +23,7 @@
 //! vec.any(|x| x > c)
 //! ==>
 //! let c = 1;
-//! vec.any(EarlyBind(lifted, c))
+//! vec.any(EarlyBindFunction(lifted, c))
 //! where
 //!   fun lifted(c: u64, x: u64): bool { x > c }
 //! ```
@@ -36,7 +36,7 @@
 //! vec.any(|S{x}| x > c)
 //! ==>
 //! let c = 1;
-//! vec.any(EarlyBind(lifted, c))
+//! vec.any(EarlyBindFunction(lifted, c))
 //! where
 //!   fun lifted(c: u64, arg$2: S): bool { let S{x} = arg$2; x > y }
 //! ```
@@ -322,7 +322,7 @@ impl<'a> LambdaLifter<'a> {
     fn exp_is_simple(exp: &Exp) -> bool {
         use ExpData::*;
         match exp.as_ref() {
-            Call(_, Operation::EarlyBind, args) => args.iter().all(Self::exp_is_simple),
+            Call(_, Operation::EarlyBindFunction, args) => args.iter().all(Self::exp_is_simple),
             Call(_, op, args) => {
                 op.is_ok_to_remove_from_code() && args.iter().all(Self::exp_is_simple)
             },
@@ -342,7 +342,7 @@ impl<'a> LambdaLifter<'a> {
                 false
             },
             LocalVar(..) | Temporary(..) | Value(..) => true,
-            Invalid(..) | Invoke(..) | Quant(..) | Block(..) | Match(..) | Return(..)
+            Invalid(..) | InvokeFunction(..) | Quant(..) | Block(..) | Match(..) | Return(..)
             | Loop(..) | LoopCont(..) | Assign(..) | Mutate(..) | SpecBlock(..) => false,
         }
     }
@@ -398,7 +398,7 @@ impl<'a> LambdaLifter<'a> {
         match body.as_ref() {
             Call(id, oper, args) => {
                 match oper {
-                    Operation::EarlyBind => {
+                    Operation::EarlyBindFunction => {
                         // TODO(LAMBDA): We might be able to to do something with this,
                         // but skip for now because it will be complicated.
                         None
@@ -420,7 +420,7 @@ impl<'a> LambdaLifter<'a> {
                     _ => None,
                 }
             },
-            Invoke(_id, fn_exp, args) => {
+            InvokeFunction(_id, fn_exp, args) => {
                 Self::get_args_if_simple(lambda_params, args).and_then(|args| {
                     // Function expression may not contain lambda params
                     let free_vars = fn_exp.as_ref().free_vars();
@@ -476,7 +476,7 @@ impl<'a> LambdaLifter<'a> {
             let fn_id = fn_exp.node_id();
             let fn_type = env.get_node_type(fn_id);
             if let Type::Fun(_fn_param_type, _fn_result_type, fun_abilities) = &fn_type {
-                // First param to EarlyBind is the function expr
+                // First param to EarlyBindFunction is the function expr
                 new_args.insert(0, fn_exp);
                 let ty_params = self.fun_env.get_type_parameters_ref();
                 // Check bound value abilities
@@ -535,7 +535,9 @@ impl<'a> LambdaLifter<'a> {
                     // We have no parameters, just use the function directly.
                     return Some(new_args.pop().unwrap());
                 } else {
-                    return Some(ExpData::Call(id, Operation::EarlyBind, new_args).into_exp());
+                    return Some(
+                        ExpData::Call(id, Operation::EarlyBindFunction, new_args).into_exp(),
+                    );
                 }
             }
         }
@@ -777,7 +779,7 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
                 env.set_node_instantiation(id, inst);
             }
             closure_args.insert(0, fn_exp);
-            Some(ExpData::Call(id, Operation::EarlyBind, closure_args).into_exp())
+            Some(ExpData::Call(id, Operation::EarlyBindFunction, closure_args).into_exp())
         }
     }
 }

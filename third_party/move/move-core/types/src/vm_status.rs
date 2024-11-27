@@ -734,7 +734,7 @@ pub enum StatusCode {
     ZERO_VARIANTS_ERROR = 1130,
     // A feature is not enabled.
     FEATURE_NOT_ENABLED = 1131,
-    // Invoke or EarlyBind parameter type is not a function
+    // InvokeFunction or EarlyBindFunction parameter type is not a function
     REQUIRES_FUNCTION = 1132,
 
     // Reserved error code for future use

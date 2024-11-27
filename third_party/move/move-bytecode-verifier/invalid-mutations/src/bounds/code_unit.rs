@@ -514,7 +514,7 @@ impl<'a> ApplyCodeUnitBoundsContext<'a> {
                         FunctionInstantiationIndex,
                         LdFunctionGeneric
                     ),
-                    Invoke(..) | EarlyBind(..) => {
+                    InvokeFunction(..) | EarlyBindFunction(..) => {
                         panic!("Closure bytecode NYI: {:?}", code[bytecode_idx])
                     },
                 };
@@ -576,7 +576,7 @@ fn is_interesting(bytecode: &Bytecode) -> bool {
         | LdFalse | ReadRef | WriteRef | Add | Sub | Mul | Mod | Div | BitOr | BitAnd | Xor
         | Shl | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | Abort | Nop => false,
 
-        LdFunction(_) | LdFunctionGeneric(_) | Invoke(_) | EarlyBind(..) => {
+        LdFunction(_) | LdFunctionGeneric(_) | InvokeFunction(_) | EarlyBindFunction(..) => {
             // TODO(LAMBDA): implement
             false
         },

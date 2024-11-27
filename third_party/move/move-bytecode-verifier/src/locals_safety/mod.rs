@@ -127,8 +127,8 @@ fn execute_inner(
         | Bytecode::TestVariantGeneric(_)
         | Bytecode::LdFunction(_)
         | Bytecode::LdFunctionGeneric(_)
-        | Bytecode::Invoke(_)
-        | Bytecode::EarlyBind(..)
+        | Bytecode::InvokeFunction(_)
+        | Bytecode::EarlyBindFunction(..)
         | Bytecode::ReadRef
         | Bytecode::WriteRef
         | Bytecode::CastU8

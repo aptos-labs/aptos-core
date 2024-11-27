@@ -2988,7 +2988,7 @@ pub enum Bytecode {
 
     #[group = "closure"]
     #[description = r#"
-        `EarlyBind(|t1..tn|r with a, count)` creates new function value based
+        `EarlyBindFunction(|t1..tn|r with a, count)` creates new function value based
         on the function value at top of stack by adding `count` arguments
         popped from the stack to the closure found on top of stack.
 
@@ -3024,11 +3024,11 @@ pub enum Bytecode {
         func param types match provided parameter types
     "#]
     #[gas_type_creation_tier_0 = "closure_ty"]
-    EarlyBind(SignatureIndex, u8),
+    EarlyBindFunction(SignatureIndex, u8),
 
     #[group = "closure"]
     #[description = r#"
-        `Invoke(|t1..tn|r with a)` calls a function value of the specified type,
+        `InvokeFunction(|t1..tn|r with a)` calls a function value of the specified type,
         with `n` argument values from the stack.
 
         On top of the stack is the closure being evaluated, underneath the arguments:
@@ -3095,7 +3095,7 @@ pub enum Bytecode {
             assert ty == locals[#args -  i - 1]
     "#]
     #[gas_type_creation_tier_1 = "closure_ty"]
-    Invoke(SignatureIndex),
+    InvokeFunction(SignatureIndex),
 
     #[group = "stack_and_local"]
     #[description = "Push a u16 constant onto the stack."]
@@ -3209,8 +3209,10 @@ impl ::std::fmt::Debug for Bytecode {
             Bytecode::UnpackVariantGeneric(a) => write!(f, "UnpackVariantGeneric({})", a),
             Bytecode::LdFunction(a) => write!(f, "LdFunction({})", a),
             Bytecode::LdFunctionGeneric(a) => write!(f, "LdFunctionGeneric({})", a),
-            Bytecode::EarlyBind(sig_idx, a) => write!(f, "EarlyBind({}, {})", sig_idx, a),
-            Bytecode::Invoke(sig_idx) => write!(f, "Invoke({})", sig_idx),
+            Bytecode::EarlyBindFunction(sig_idx, a) => {
+                write!(f, "EarlyBindFunction({}, {})", sig_idx, a)
+            },
+            Bytecode::InvokeFunction(sig_idx) => write!(f, "InvokeFunction({})", sig_idx),
             Bytecode::ReadRef => write!(f, "ReadRef"),
             Bytecode::WriteRef => write!(f, "WriteRef"),
             Bytecode::FreezeRef => write!(f, "FreezeRef"),

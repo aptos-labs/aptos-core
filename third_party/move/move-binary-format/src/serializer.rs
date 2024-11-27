@@ -1104,12 +1104,12 @@ fn serialize_instruction_inner(
             binary.push(Opcodes::LD_FUNCTION_GENERIC as u8)?;
             serialize_function_inst_index(binary, method_idx)
         },
-        Bytecode::Invoke(sig_idx) => {
-            binary.push(Opcodes::INVOKE as u8)?;
+        Bytecode::InvokeFunction(sig_idx) => {
+            binary.push(Opcodes::INVOKE_FUNCTION as u8)?;
             serialize_signature_index(binary, sig_idx)
         },
-        Bytecode::EarlyBind(sig_idx, value) => {
-            binary.push(Opcodes::EARLY_BIND as u8)?;
+        Bytecode::EarlyBindFunction(sig_idx, value) => {
+            binary.push(Opcodes::EARLY_BIND_FUNCTION as u8)?;
             serialize_signature_index(binary, sig_idx)?;
             binary.push(*value)
         },

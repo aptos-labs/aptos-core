@@ -499,7 +499,7 @@ impl<'env> Generator<'env> {
                 }
             ),
             // TODO(LAMBDA)
-            ExpData::Invoke(id, _exp, _) => self.error(
+            ExpData::InvokeFunction(id, _exp, _) => self.error(
                 *id,
                 if self.check_if_lambdas_enabled() {
                     "Calls to function values other than inline function parameters not yet implemented"
@@ -816,7 +816,7 @@ impl<'env> Generator<'env> {
                 self.gen_function_call(targets, id, m.qualified(*f), args)
             },
             // TODO(LAMBDA)
-            Operation::EarlyBind => self.error(
+            Operation::EarlyBindFunction => self.error(
                 id,
                 if self.check_if_lambdas_enabled() {
                     "Function-typed values not yet implemented except as parameters to calls to inline functions"
