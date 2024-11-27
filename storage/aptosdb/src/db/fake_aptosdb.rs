@@ -16,7 +16,11 @@ use aptos_infallible::Mutex;
 use aptos_logger::debug;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
-    cached_state_view::ShardedStateCache, db_ensure as ensure, state_delta::StateDelta,
+    db_ensure as ensure,
+    state_store::{
+        sharded_state_updates::ShardedStateUpdates, state_delta::StateDelta,
+        state_view::cached_state_view::ShardedStateCache,
+    },
     AptosDbError, DbReader, DbWriter, ExecutedTrees, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
@@ -40,7 +44,7 @@ use aptos_types::{
         state_key::{prefix::StateKeyPrefix, StateKey},
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
-        table, ShardedStateUpdates,
+        table,
     },
     transaction::{
         Transaction, TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof,
@@ -118,10 +122,9 @@ impl FakeBufferedState {
                 new_state_after_checkpoint.base_version > self.state_after_checkpoint.base_version,
                 "Diff between base and latest checkpoints provided, while they are the same.",
             );
-            combine_sharded_state_updates(
-                &mut self.state_after_checkpoint.updates_since_base,
-                updates_until_next_checkpoint_since_current,
-            );
+            self.state_after_checkpoint
+                .updates_since_base
+                .clone_merge(updates_until_next_checkpoint_since_current);
             self.state_after_checkpoint.current = new_state_after_checkpoint.base.clone();
             self.state_after_checkpoint.current_version = new_state_after_checkpoint.base_version;
             let state_after_checkpoint = self
@@ -972,7 +975,9 @@ mod tests {
     };
     use anyhow::{anyhow, ensure, Result};
     use aptos_crypto::{hash::CryptoHash, HashValue};
-    use aptos_storage_interface::{cached_state_view::ShardedStateCache, DbReader, DbWriter};
+    use aptos_storage_interface::{
+        state_store::state_view::cached_state_view::ShardedStateCache, DbReader, DbWriter,
+    };
     use aptos_temppath::TempPath;
     use aptos_types::{
         account_address::AccountAddress,

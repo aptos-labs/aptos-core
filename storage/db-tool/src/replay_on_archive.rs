@@ -11,7 +11,9 @@ use aptos_config::config::{
 };
 use aptos_db::{backup::backup_handler::BackupHandler, AptosDB};
 use aptos_logger::{error, info};
-use aptos_storage_interface::{state_view::DbStateViewAtVersion, AptosDbError, DbReader};
+use aptos_storage_interface::{
+    state_store::state_view::db_state_view::DbStateViewAtVersion, AptosDbError, DbReader,
+};
 use aptos_types::{
     contract_event::ContractEvent,
     transaction::{
@@ -30,6 +32,7 @@ use std::{
     sync::{atomic::AtomicU64, Arc},
     time::Instant,
 };
+
 // Replay Verify controller is responsible for providing legit range with start and end versions.
 #[derive(Parser)]
 pub struct Opt {

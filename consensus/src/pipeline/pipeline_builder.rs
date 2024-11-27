@@ -325,7 +325,6 @@ impl PipelineBuilder {
                 pre_commit_fut.clone(),
                 parent.post_pre_commit_fut.clone(),
                 self.state_sync_notifier.clone(),
-                self.payload_manager.clone(),
                 block.clone(),
             ),
             &mut abort_handles,
@@ -335,6 +334,7 @@ impl PipelineBuilder {
                 pre_commit_fut.clone(),
                 commit_ledger_fut.clone(),
                 parent.post_commit_fut.clone(),
+                self.payload_manager.clone(),
                 block_store_callback,
                 block.clone(),
             ),
@@ -618,15 +618,12 @@ impl PipelineBuilder {
         pre_commit: TaskFuture<PreCommitResult>,
         parent_post_pre_commit: TaskFuture<PostCommitResult>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
-        payload_manager: Arc<dyn TPayloadManager>,
         block: Arc<Block>,
     ) -> TaskResult<PostPreCommitResult> {
         let compute_result = pre_commit.await?;
         parent_post_pre_commit.await?;
 
         let _tracker = Tracker::new("post_pre_commit", &block);
-        let payload = block.payload().cloned();
-        let timestamp = block.timestamp_usecs();
         let _timer = counters::OP_COUNTERS.timer("pre_commit_notify");
 
         let txns = compute_result.transactions_to_commit().to_vec();
@@ -640,8 +637,6 @@ impl PipelineBuilder {
             error!(error = ?e, "Failed to notify state synchronizer");
         }
 
-        let payload_vec = payload.into_iter().collect();
-        payload_manager.notify_commit(timestamp, payload_vec);
         Ok(())
     }
 
@@ -684,6 +679,7 @@ impl PipelineBuilder {
         pre_commit_fut: TaskFuture<PreCommitResult>,
         commit_ledger_fut: TaskFuture<CommitLedgerResult>,
         parent_post_commit: TaskFuture<PostCommitResult>,
+        payload_manager: Arc<dyn TPayloadManager>,
         block_store_callback: Box<dyn FnOnce(LedgerInfoWithSignatures) + Send + Sync>,
         block: Arc<Block>,
     ) -> TaskResult<PostCommitResult> {
@@ -694,6 +690,11 @@ impl PipelineBuilder {
         let _tracker = Tracker::new("post_commit_ledger", &block);
         update_counters_for_block(&block);
         update_counters_for_compute_result(&compute_result);
+
+        let payload = block.payload().cloned();
+        let timestamp = block.timestamp_usecs();
+        let payload_vec = payload.into_iter().collect();
+        payload_manager.notify_commit(timestamp, payload_vec);
 
         if let Some(ledger_info_with_sigs) = maybe_ledger_info_with_sigs {
             block_store_callback(ledger_info_with_sigs);

@@ -239,7 +239,6 @@ members = [
     "third_party/move/move-vm/transactional-tests",
     "third_party/move/move-vm/types",
     "third_party/move/testing-infra/module-generation",
-    "third_party/move/testing-infra/test-generation",
     "third_party/move/testing-infra/transactional-test-runner",
     "third_party/move/tools/move-bytecode-utils",
     "third_party/move/tools/move-bytecode-viewer",

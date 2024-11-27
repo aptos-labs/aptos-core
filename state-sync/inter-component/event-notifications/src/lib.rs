@@ -7,7 +7,9 @@ use anyhow::{anyhow, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
-use aptos_storage_interface::{state_view::DbStateViewAtVersion, DbReader, DbReaderWriter};
+use aptos_storage_interface::{
+    state_store::state_view::db_state_view::DbStateViewAtVersion, DbReader, DbReaderWriter,
+};
 use aptos_types::{
     contract_event::ContractEvent,
     event::EventKey,
