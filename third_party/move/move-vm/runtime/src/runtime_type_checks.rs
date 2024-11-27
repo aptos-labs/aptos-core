@@ -10,15 +10,17 @@ use move_core_types::vm_status::StatusCode;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Locals};
 
 pub(crate) trait RuntimeTypeCheck {
+    /// Paranoid type checks to perform before instruction execution.
     fn pre_execution_type_stack_transition(
         local_tys: &[Type],
         locals: &Locals,
-        _ty_args: &[Type],
-        _resolver: &Resolver,
+        ty_args: &[Type],
+        resolver: &Resolver,
         operand_stack: &mut Stack,
         instruction: &Bytecode,
     ) -> PartialVMResult<()>;
 
+    /// Paranoid type checks to perform after instruction execution.
     fn post_execution_type_stack_transition(
         local_tys: &[Type],
         ty_args: &[Type],
@@ -29,9 +31,6 @@ pub(crate) trait RuntimeTypeCheck {
     ) -> PartialVMResult<()>;
 }
 
-/// Paranoid type checks to perform before instruction execution.
-///
-
 fn verify_pack<'a>(
     operand_stack: &mut Stack,
     field_count: u16,
@@ -40,7 +39,8 @@ fn verify_pack<'a>(
 ) -> PartialVMResult<()> {
     let ability = output_ty.abilities()?;
 
-    // If the struct has a key ability, we expect all of its field to have store ability but not key ability.
+    // If the struct has a key ability, we expect all of its field to
+    // have store ability but not key ability.
     let field_expected_abilities = if ability.has_key() {
         ability
             .remove(Ability::Key)
@@ -53,8 +53,12 @@ fn verify_pack<'a>(
         .into_iter()
         .zip(field_tys)
     {
-        // Fields ability should be a subset of the struct ability because abilities can be weakened but not the other direction.
-        // For example, it is ok to have a struct that doesn't have a copy capability where its field is a struct that has copy capability but not vice versa.
+        // Fields ability should be a subset of the struct ability
+        // because abilities can be weakened but not the other
+        // direction.
+        // For example, it is ok to have a struct that doesn't have a
+        // copy capability where its field is a struct that has copy
+        // capability but not vice versa.
         ty.paranoid_check_abilities(field_expected_abilities)?;
         ty.paranoid_check_eq(expected_ty)?;
     }
@@ -62,10 +66,10 @@ fn verify_pack<'a>(
     operand_stack.push_ty(output_ty)
 }
 
-pub(crate) struct NullRuntimeTypeCheck;
+pub(crate) struct NoRuntimeTypeCheck;
 pub(crate) struct FullRuntimeTypeCheck;
 
-impl RuntimeTypeCheck for NullRuntimeTypeCheck {
+impl RuntimeTypeCheck for NoRuntimeTypeCheck {
     fn pre_execution_type_stack_transition(
         _local_tys: &[Type],
         _locals: &Locals,
@@ -214,7 +218,9 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
 
     /// Paranoid type checks to perform after instruction execution.
     ///
-    /// This function and `pre_execution_type_stack_transition` should constitute the full type stack transition for the paranoid mode.
+    /// This function and `pre_execution_type_stack_transition` should
+    /// constitute the full type stack transition for the paranoid
+    /// mode.
     fn post_execution_type_stack_transition(
         local_tys: &[Type],
         ty_args: &[Type],
@@ -232,7 +238,9 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             | Bytecode::Call(_)
             | Bytecode::CallGeneric(_)
             | Bytecode::Abort => {
-                // Invariants hold because all of the instructions above will force VM to break from the interpreter loop and thus not hit this code path.
+                // Invariants hold because all of the instructions
+                // above will force VM to break from the interpreter
+                // loop and thus not hit this code path.
                 unreachable!("control flow instruction encountered during type check")
             },
             Bytecode::Pop => {
