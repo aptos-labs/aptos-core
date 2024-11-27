@@ -1,332 +1,127 @@
-// -- Model dump before bytecode pipeline
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod4
-module 0x42::mod3 {
-    public fun multiply(x: u64,y: u64): u64 {
-        Mul<u64>(x, y)
-    }
-} // end 0x42::mod3
-module 0x42::mod2 {
-    friend fun double(x: u64): u64 {
-        Mul<u64>(x, 2)
-    }
-} // end 0x42::mod2
-module 0x42::mod1 {
-    friend fun triple(x: u64): u64 {
-        Mul<u64>(x, 3)
-    }
-} // end 0x42::mod1
-module 0x42::test {
-    use 0x42::mod1; // resolved as: 0x42::mod1
-    use 0x42::mod2; // resolved as: 0x42::mod2
-    use 0x42::mod3; // resolved as: 0x42::mod3
-    use 0x42::mod4::{alt_multiply}; // resolved as: 0x42::mod4
-    private fun add_mul(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(z, Add<u64>(x, y))
-    }
-    private fun choose_function1(key: u64,x: u64): u64 {
-        {
-          let f: |u64|u64 with copy+drop = if Eq<u64>(key, 0) {
-            mod2::double
-          } else {
-            if Eq<u64>(key, 1) {
-              mod1::triple
-            } else {
-              if Eq<u64>(key, 2) {
-                 move|x: u64| mod3::multiply(4, x)
-              } else {
-                if Eq<u64>(key, 3) {
-                   move|y: u64| mod4::alt_multiply(5, y)
-                } else {
-                  if Eq<u64>(key, 4) {
-                     move|y: u64| mod3::multiply(y, 6)
-                  } else {
-                    if Eq<u64>(key, 5) {
-                       move|x: u64| test::multiply3(x, 3, 2)
-                    } else {
-                      if Eq<u64>(key, 6) {
-                         move|x: u64| mod3::multiply(x, 7)
-                      } else {
-                        if Eq<u64>(key, 7) {
-                           move|x: u64| test::multiply3(4, x, 2)
-                        } else {
-                          if Eq<u64>(key, 8) {
-                             move|x: u64| test::multiply3(3, 3, x)
-                          } else {
-                            if Eq<u64>(key, 9) {
-                               move|z: u64| test::multiply3(2, 5, z)
-                            } else {
-                              if Eq<u64>(key, 10) {
-                                 move|x: u64| mod4::alt_multiply(x, 11) with copy, drop
-                              } else {
-                                if Eq<u64>(key, 11) {
-                                  {
-                                    let g: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| mod3::multiply(x, y) with copy, drop;
-                                     move|x: u64| (g)(x, 11)
-                                  }
-                                } else {
-                                  if Eq<u64>(key, 12) {
-                                    {
-                                      let h: |u64|u64 with copy+drop+store =  move|x: u64| mod3::multiply(x, 12) with copy, drop;
-                                       move|x: u64| (h)(x) with copy, drop
-                                    }
-                                  } else {
-                                    if Eq<u64>(key, 14) {
-                                      {
-                                        let i: |u64|u64 with copy+drop+store =  move|x: u64| test::multiply3(2, x, 2);
-                                         move|z: u64| (i)(z)
-                                      }
-                                    } else {
-                                      {
-                                        let i: |(u64, u64)|u64 with copy+drop+store =  move|(x: u64, y: u64): (u64, u64)| {
-                                          let q: u64 = Sub<u64>(y, 1);
-                                          mod3::multiply(x, Add<u64>(q, 1))
-                                        };
-                                         move|x: u64| (i)(x, 15)
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          };
-          (f)(x)
-        }
-    }
-    private fun multiply3(x: u64,y: u64,z: u64): u64 {
-        Mul<u64>(Mul<u64>(x, y), z)
-    }
-    public fun test_functions() {
-        {
-          let i: u64 = 0;
-          {
-            let __update_iter_flag: bool = false;
-            loop {
-              if true {
-                if __update_iter_flag {
-                  i: u64 = Add<u64>(i, 1)
-                } else {
-                  __update_iter_flag: bool = true
-                };
-                if Lt<u64>(i, 15) {
-                  {
-                    let y: u64 = test::choose_function1(i, 3);
-                    if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), 3)) {
-                      Tuple()
-                    } else {
-                      Abort(i)
-                    };
-                    Tuple()
-                  }
-                } else {
-                  break
-                };
-                Tuple()
-              } else {
-                break
-              }
-            };
-            Tuple()
-          }
-        }
-    }
-} // end 0x42::test
-
-// -- Sourcified model before bytecode pipeline
-module 0x42::mod4 {
-    public fun alt_multiply(x: u64, y: u64): u64 {
-        x * y
-    }
-}
-module 0x42::mod3 {
-    public fun multiply(x: u64, y: u64): u64 {
-        x * y
-    }
-}
-module 0x42::mod2 {
-    friend 0x42::test;
-    friend fun double(x: u64): u64 {
-        x * 2
-    }
-}
-module 0x42::mod1 {
-    friend 0x42::test;
-    friend fun triple(x: u64): u64 {
-        x * 3
-    }
-}
-module 0x42::test {
-    use 0x42::mod4;
-    use 0x42::mod3;
-    use 0x42::mod2;
-    use 0x42::mod1;
-    fun add_mul(x: u64, y: u64, z: u64): u64 {
-        z * (x + y)
-    }
-    fun choose_function1(key: u64, x: u64): u64 {
-        let f = if (key == 0) mod2::double else if (key == 1) mod1::triple else if (key == 2) move |x| mod3::multiply(4, x) else if (key == 3) move |y| mod4::alt_multiply(5, y) else if (key == 4) move |y| mod3::multiply(y, 6) else if (key == 5) move |x| multiply3(x, 3, 2) else if (key == 6) move |x| mod3::multiply(x, 7) else if (key == 7) move |x| multiply3(4, x, 2) else if (key == 8) move |x| multiply3(3, 3, x) else if (key == 9) move |z| multiply3(2, 5, z) else if (key == 10) move |x| mod4::alt_multiply(x, 11) has copy, drop else if (key == 11) {
-            let g = move |(x,y)| mod3::multiply(x, y) has copy, drop;
-            move |x| g(x, 11)
-        } else if (key == 12) {
-            let h = move |x| mod3::multiply(x, 12) has copy, drop;
-            move |x| h(x) has copy, drop
-        } else if (key == 14) {
-            let i = move |x| multiply3(2, x, 2);
-            move |z| i(z)
-        } else {
-            let i = move |(x,y)| {
-                let q = y - 1;
-                mod3::multiply(x, q + 1)
-            };
-            move |x| i(x, 15)
-        };
-        f(x)
-    }
-    fun multiply3(x: u64, y: u64, z: u64): u64 {
-        x * y * z
-    }
-    public fun test_functions() {
-        let i = 0;
-        let __update_iter_flag = false;
-        while (true) {
-            if (__update_iter_flag) i = i + 1 else __update_iter_flag = true;
-            if (i < 15) {
-                let y = choose_function1(i, 3);
-                if (y == (i + 2) * 3) () else abort i;
-            } else break;
-        };
-    }
-}
-
 
 Diagnostics:
-error: Function-typed values not yet supported except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:39:17
-   │
-39 │                 mod2::double
-   │                 ^^^^^^^^^^^^
-
-error: Function-typed values not yet supported except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:41:17
-   │
-41 │                 mod1::triple
-   │                 ^^^^^^^^^^^^
-
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:43:17
    │
 43 │                 move |x| mod3::multiply(4, x)
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:46:17
    │
 46 │                 move |y| alt_multiply(x, y)
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:49:17
    │
 49 │                 move |y| mod3::multiply(y, x)
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:51:17
    │
 51 │                 move |x| multiply3(x, 3, 2)
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:53:17
    │
 53 │                 move |x| mod3::multiply(x, 7)
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:55:17
    │
 55 │                 move |x| multiply3(4, x, 2)
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:57:17
    │
 57 │                 move |x| multiply3(3, 3, x)
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:61:17
    │
 61 │                 move |z| multiply3(x, y, z)
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:64:17
    │
 64 │                 move |x| alt_multiply(x, z) with copy
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: unsupported language construct
+   ┌─ tests/lambda/storable/doable_func.move:64:45
+   │
+64 │                 move |x| alt_multiply(x, z) with copy
+   │                                             ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:66:25
    │
 66 │                 let g = move |x, y| mod3::multiply(x, y) with copy+drop;
-   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                         ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: unsupported language construct
+   ┌─ tests/lambda/storable/doable_func.move:66:58
+   │
+66 │                 let g = move |x, y| mod3::multiply(x, y) with copy+drop;
+   │                                                          ^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:67:17
    │
 67 │                 move |x| g(x, 11)
-   │                 ^^^^^^^^^^^^^^^^^
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:69:25
    │
 69 │                 let h = move |x| mod3::multiply(x, 12) with copy;
-   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                         ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: unsupported language construct
+   ┌─ tests/lambda/storable/doable_func.move:69:56
+   │
+69 │                 let h = move |x| mod3::multiply(x, 12) with copy;
+   │                                                        ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:70:17
    │
 70 │                 move |x| { h(x) } with copy + drop
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: unsupported language construct
+   ┌─ tests/lambda/storable/doable_func.move:70:35
+   │
+70 │                 move |x| { h(x) } with copy + drop
+   │                                   ^^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:72:25
    │
 72 │                 let i = move |x| multiply3(2, x, 2);
-   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                         ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:73:17
    │
 73 │                 move |z| i(z)
-   │                 ^^^^^^^^^^^^^
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:75:25
    │
 75 │                 let i = move |x, y| { let q = y - 1; 0x42::mod3::multiply(x, q + 1)  };
-   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                         ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:76:17
    │
 76 │                 move |x| i(x, 15)
-   │                 ^^^^^^^^^^^^^^^^^
-
-error: Calls to function values other than inline function parameters not yet supported
-   ┌─ tests/lambda/storable/doable_func.move:78:9
-   │
-78 │         f(x)
-   │         ^^^^
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression

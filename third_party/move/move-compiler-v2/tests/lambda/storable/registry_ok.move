@@ -1,12 +1,13 @@
 module 0x42::test {
     use std::vector;
+    use std::signer;
 
     struct Registry has key {
         functions: vector<Function>
     }
 
     struct Function has store {
-        f: |u64| u64 with store,
+        f: |u64| u64 with store+copy,
         key: u64
     }
 
@@ -25,27 +26,37 @@ module 0x42::test {
         x
     }
 
-    fun replace_or_add_function(v: &mut vector<Function>, k: u64, f: |u64| u64 with store): Option<Function> {
-        let done = false;
+    fun replace_or_add_function(v: &mut vector<Function>, k: u64, new_f: |u64| u64 with store+copy): Option<|u64| u64 with store+copy> {
+        let result = Option::None;
         vector::for_each_mut(v, |f: &mut Function| {
             if (f.key == k) {
-                f.f = f;
-                done = true;
+                result = Option::Some(f.f);
+                f.f = new_f;
             }
         });
-        if (!done) {
-            let new_record = Function { f: f, key: k };
-            v.append(new_record);
-        }
+        if (result == Option::None) {
+            let new_record = Function { f: new_f, key: k };
+            vector::push_back(v, new_record);
+        };
+        result
     }
 
-    fun register(owner: &signer, f: |u64| u64 with store, k: u64) acquires Registry {
-        let addr = owner.address;
+    public fun alt_call_selected_function(v: &vector<Function>, k: u64, x: u64): Option<u64> {
+        for (i in 0..(vector::length(v))) {
+            if (v[i].key == k) {
+                return Option::Some((v[i].f)(x))
+            }
+        };
+        None
+    }
+
+    fun register(owner: &signer, f: |u64| u64 with store+copy, k: u64) acquires Registry {
+        let addr = signer::address_of(owner);
         if (!exists<Registry>(addr)) {
             let new_registry = Registry {
                 functions: vector[]
             };
-            move_to<Registry>(owner, registry);
+            move_to<Registry>(owner, new_registry);
         };
         let registry = borrow_global_mut<Registry>(addr);
         replace_or_add_function(&mut registry.functions, k, f);
@@ -56,15 +67,28 @@ module 0x42::test {
             return Option::None
         };
         let registry = borrow_global<Registry>(addr);
-        match (get_function(registry.functions, k)) {
+        match (get_function(&registry.functions, k)) {
             Some(func) => {
                 let Function { f: f, key: key } = func;
-                Some(f(x))
+                Option::Some(f(x))
             },
             _ => {
                 Option::None
             }
         }
+    }
+
+    fun invoke2(addr: address, k: u64, x: u64): Option<u64> acquires Registry {
+        if (!exists<Registry>(addr)) {
+            return Option::None
+        };
+        let registry = borrow_global<Registry>(addr);
+        for (i in 0..(vector::length(&registry.functions))) {
+            if (registry.functions[i].key == k) {
+                return Option::Some((registry.functions[i].f)(x))
+            }
+        };
+        None
     }
 
     fun double(x: u64):u64 {
@@ -96,24 +120,63 @@ module 0x42::test {
         register(a, multiply_by_x2(6), 6);
 
         match (invoke(a, 2, 10)) {
-            Some(x) => { assert!(x == 20); }
+            Option::Some(x) => { assert!(x == 20); }
             _ => assert!(false)
         };
         match (invoke(a, 3, 11)) {
-            Some(x) => { assert!(x == 33); }
+            Option::Some(x) => { assert!(x == 33); }
             _ => assert!(false)
         };
         match (invoke(a, 4, 2)) {
-            Some(x) => { assert!(x == 8); }
+            Option::Some(x) => { assert!(x == 8); }
             _ => assert!(false)
         };
         match (invoke(a, 5, 3)) {
-            Some(x) => { assert!(x == 15); }
+            Option::Some(x) => { assert!(x == 15); }
             _ => assert!(false)
         };
         match (invoke(a, 6, 3)) {
+            Option::Some(x) => { assert!(x == 18); }
+            _ => assert!(false)
+        };
+    }
+
+    #[test(a = @0x42)]
+    fun test_registry2(a: signer) {
+        register(a, double, 2);
+        register(a, negate, 3);
+        register(a, multiply_by_x(4), 4);
+        register(a, multiply_by_x(5), 5);
+        register(a, multiply_by_x2(6), 6);
+
+        match (invoke2(a, 2, 10)) {
+            Some(x) => { assert!(x == 20); }
+            _ => assert!(false)
+        };
+        match (invoke2(a, 3, 11)) {
+            Some(x) => { assert!(x == 33); }
+            _ => assert!(false)
+        };
+        match (invoke2(a, 4, 2)) {
+            Some(x) => { assert!(x == 8); }
+            _ => assert!(false)
+        };
+        match (invoke2(a, 5, 3)) {
+            Some(x) => { assert!(x == 15); }
+            _ => assert!(false)
+        };
+        match (invoke2(a, 6, 3)) {
             Some(x) => { assert!(x == 18); }
             _ => assert!(false)
         };
+    }
+
+
+    #[test(a = @0x42)]
+    fun test_registry3(a: signer) {
+        register(a, double, 2);
+        let registry = borrow_global<Registry>(a);
+        assert!(registry.functions[0].key == 2);
+        assert!((registry.functions[0].func)(3) == 6);
     }
 }

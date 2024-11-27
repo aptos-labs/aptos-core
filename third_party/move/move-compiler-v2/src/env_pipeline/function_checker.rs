@@ -5,7 +5,6 @@
 
 use crate::{experiments::Experiment, Options};
 use codespan_reporting::diagnostic::Severity;
-use log::debug;
 use move_binary_format::file_format::Visibility;
 use move_model::{
     ast::{ExpData, Operation, Pattern},
@@ -216,10 +215,6 @@ fn check_privileged_operations_on_structs(env: &GlobalEnv, fun_env: &FunctionEnv
                     | Operation::MoveFrom
                     | Operation::MoveTo => {
                         let inst = env.get_node_instantiation(*id);
-                        if inst.is_empty() {
-                            debug!("no instantiation on call node `{}`", exp.display(env));
-                            debug!("id is {:?}", id);
-                        }
                         debug_assert!(!inst.is_empty());
                         if let Some((struct_env, _)) = inst[0].get_struct(env) {
                             let mid = struct_env.module_env.get_id();

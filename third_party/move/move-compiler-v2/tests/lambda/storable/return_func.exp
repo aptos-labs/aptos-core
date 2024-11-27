@@ -1,47 +1,187 @@
 
 Diagnostics:
-error: type `|u64|u64 with copy+drop` is missing required ability `store`
-   ┌─ tests/lambda/storable/return_func.move:26:13
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:20:41
    │
-26 │             double
-   │             ^^^^^^
+20 │     fun multiply_by_x(x: u64): |u64|u64 with store {
+   │                                         ^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
 
-error: type `|u64|u64 with copy+drop` is missing required ability `store`
-   ┌─ tests/lambda/storable/return_func.move:28:13
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:21:9
    │
-28 │             triple
-   │             ^^^^^^
+21 │         move |y| multiply(x, y) with store
+   │         ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
-error: expected `|integer|_ with copy+drop+store` but found a value of type `u64`
-   ┌─ tests/lambda/storable/return_func.move:85:37
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:21:33
    │
-85 │         vector::push_back(&mut sum, f(5));
-   │                                     ^^^^
+21 │         move |y| multiply(x, y) with store
+   │                                 ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
 
-error: expected `|integer|_ with copy+drop+store` but found a value of type `u64`
-   ┌─ tests/lambda/storable/return_func.move:86:37
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:24:46
    │
-86 │         vector::push_back(&mut sum, g(7));
-   │                                     ^^^^
+24 │     fun choose_function(key: u64) : |u64|u64 with store {
+   │                                              ^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
 
-error: expected `|integer|_ with copy+drop+store` but found a value of type `u64`
-   ┌─ tests/lambda/storable/return_func.move:87:37
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:34:46
    │
-87 │         vector::push_back(&mut sum, h(6));
-   │                                     ^^^^
+34 │     fun choose_function2(key: u64): |u64|u64 with store {
+   │                                              ^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
 
-error: function type `|integer|_` is not allowed as a type argument (type was inferred)
-   ┌─ tests/lambda/storable/return_func.move:89:21
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:36:13
    │
-89 │         let funcs = vector[choose_function(0), choose_function(1), choose_function(2)];
-   │                     ^^^^^^
-   │
-   = required by instantiating vector type parameter
+36 │             move |x| double(x) with store
+   │             ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
-error: function type `|u64|u64 with drop+store` is not allowed as a type argument (type was inferred)
-   ┌─ tests/lambda/storable/return_func.move:89:21
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:36:32
    │
-89 │         let funcs = vector[choose_function(0), choose_function(1), choose_function(2)];
-   │                     ^^^^^^
+36 │             move |x| double(x) with store
+   │                                ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:38:13
    │
-   = required by instantiating vector type parameter
+38 │             move |x| triple(x) with store
+   │             ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:38:32
+   │
+38 │             move |x| triple(x) with store
+   │                                ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:41:13
+   │
+41 │             move |x| f(x) with store
+   │             ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:41:27
+   │
+41 │             move |x| f(x) with store
+   │                           ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:44:13
+   │
+44 │             move |x| f(x) with store
+   │             ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:44:27
+   │
+44 │             move |x| f(x) with store
+   │                           ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:46:21
+   │
+46 │             let f = move |y| multiply(6, y) with store;
+   │                     ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:46:45
+   │
+46 │             let f = move |y| multiply(6, y) with store;
+   │                                             ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:49:13
+   │
+49 │             move |y| multiply(y, 7) with store
+   │             ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:49:37
+   │
+49 │             move |y| multiply(y, 7) with store
+   │                                     ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:51:21
+   │
+51 │             let f = move |y| multiply(6, y) with store;
+   │                     ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:51:45
+   │
+51 │             let f = move |y| multiply(6, y) with store;
+   │                                             ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:52:13
+   │
+52 │             move |x| f(x) with store
+   │             ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:52:27
+   │
+52 │             move |x| f(x) with store
+   │                           ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:55:13
+   │
+55 │             move |x| f(x) with store
+   │             ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:55:27
+   │
+55 │             move |x| f(x) with store
+   │                           ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:57:13
+   │
+57 │             move |y| multiply3(y, 3, 4) with store
+   │             ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:57:41
+   │
+57 │             move |y| multiply3(y, 3, 4) with store
+   │                                         ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:61:47
+   │
+61 │     fun choose_function3(key: u64) : |u64|u64 with store {
+   │                                               ^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:63:21
+   │
+63 │             let f = move |x| double(x) with store;
+   │                     ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:63:40
+   │
+63 │             let f = move |x| double(x) with store;
+   │                                        ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:66:21
+   │
+66 │             let g = move |x| triple(x) with store;
+   │                     ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:66:40
+   │
+66 │             let g = move |x| triple(x) with store;
+   │                                        ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/return_func.move:74:63
+   │
+74 │     public fun test_functions(choose_function: |u64|(|u64|u64 with store)) {
+   │                                                               ^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types

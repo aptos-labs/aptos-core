@@ -1,83 +1,37 @@
 
 Diagnostics:
-error: function type `|u64|u64 with drop+store` is not allowed as a field type
-  ┌─ tests/lambda/storable/registry_errors.move:9:12
+error: unsupported language construct
+  ┌─ tests/lambda/storable/registry_errors.move:9:22
   │
 9 │         f: |u64| u64 with store,
-  │            ^^^^^^^^^^^^^^^^^^^^
-  │
-  = required by declaration of field `f`
+  │                      ^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
 
-error: function type `|u64|u64 with drop+store` is not allowed as a type argument (type was inferred)
-   ┌─ tests/lambda/storable/registry_errors.move:22:21
+error: unsupported language construct
+   ┌─ tests/lambda/storable/registry_errors.move:28:80
    │
-13 │     enum Option<T> {
-   │                 - declaration of type parameter `T`
-   ·
-22 │                 x = Option::Some(f.f)
-   │                     ^^^^^^^^^^^^
-   │
-   = required by instantiating type parameter `T` of struct `Option`
+28 │     fun replace_or_add_function(v: &mut vector<Function>, k: u64, f: |u64| u64 with store): Option<Function> {
+   │                                                                                ^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
 
-error: expected `&mut Function` but found a value of type `|u64|u64 with drop+store`
-   ┌─ tests/lambda/storable/registry_errors.move:32:17
+error: unsupported language construct
+   ┌─ tests/lambda/storable/registry_errors.move:42:47
    │
-32 │                 f.f = f;
-   │                 ^^^
+42 │     fun register(owner: &signer, f: |u64| u64 with store, k: u64) acquires Registry {
+   │                                               ^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
 
-error: undeclared receiver function `append` for type `vector<Function>`
-   ┌─ tests/lambda/storable/registry_errors.move:38:13
+error: unsupported language construct
+   ┌─ tests/lambda/storable/registry_errors.move:91:41
    │
-38 │             v.append(new_record);
-   │             ^^^^^^^^^^^^^^^^^^^^
+91 │     fun multiply_by_x(x: u64): |u64|u64 with store {
+   │                                         ^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
 
-error: cannot return nothing from a function with result type `Option<Function>`
-   ┌─ tests/lambda/storable/registry_errors.move:38:33
+error: unsupported language construct
+   ┌─ tests/lambda/storable/registry_errors.move:95:42
    │
-38 │             v.append(new_record);
-   │                                 ^
+95 │     fun multiply_by_x2(x: u64): |u64|u64 with store {
+   │                                          ^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
 
-error: cannot return nothing from a function with result type `Option<Function>`
-   ┌─ tests/lambda/storable/registry_errors.move:36:9
+error: unsupported language construct
+   ┌─ tests/lambda/storable/registry_errors.move:96:9
    │
-36 │ ╭         if (!done) {
-37 │ │             let new_record = Function { f: f, key: k };
-38 │ │             v.append(new_record);
-39 │ │         }
-   │ ╰─────────^
-
-error: expected a struct with field `address` but found `signer`
-   ┌─ tests/lambda/storable/registry_errors.move:43:20
-   │
-43 │         let addr = owner.address;
-   │                    ^^^^^
-
-error: undeclared `registry`
-   ┌─ tests/lambda/storable/registry_errors.move:48:38
-   │
-48 │             move_to<Registry>(owner, registry);
-   │                                      ^^^^^^^^
-
-error: cannot pass `vector<Function>` to a function which expects argument of type `&vector<Function>`
-   ┌─ tests/lambda/storable/registry_errors.move:68:29
-   │
-68 │         match (get_function(registry.functions, k)) {
-   │                             ^^^^^^^^^^^^^^^^^^
-
-error: undeclared struct `test::Some`
-   ┌─ tests/lambda/storable/registry_errors.move:69:13
-   │
-69 │             Some(func) => {
-   │             ^^^^
-
-error: undeclared `func`
-   ┌─ tests/lambda/storable/registry_errors.move:70:52
-   │
-70 │                 let Function { f: f, key: key } = &func;
-   │                                                    ^^^^
-
-error: expected `|u64|u64 with copy+drop+store` but found a value of type `&|u64|u64 with drop+store`
-   ┌─ tests/lambda/storable/registry_errors.move:71:22
-   │
-71 │                 Some(f(x))
-   │                      ^^^^
+96 │         move |y| multiply(x, y)
+   │         ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression

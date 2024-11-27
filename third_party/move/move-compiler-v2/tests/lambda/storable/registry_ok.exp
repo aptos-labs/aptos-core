@@ -1,77 +1,43 @@
 
 Diagnostics:
-error: function type `|u64|u64 with drop+store` is not allowed as a field type
-  ┌─ tests/lambda/storable/registry_ok.move:9:12
-  │
-9 │         f: |u64| u64 with store,
-  │            ^^^^^^^^^^^^^^^^^^^^
-  │
-  = required by declaration of field `f`
+error: unsupported language construct
+   ┌─ tests/lambda/storable/registry_ok.move:10:22
+   │
+10 │         f: |u64| u64 with store+copy,
+   │                      ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
 
-error: function type `|u64|u64 with drop+store` is not allowed as a type argument (type was inferred)
-   ┌─ tests/lambda/storable/registry_ok.move:22:21
+error: unsupported language construct
+   ┌─ tests/lambda/storable/registry_ok.move:29:84
    │
-13 │     enum Option<T> {
-   │                 - declaration of type parameter `T`
-   ·
-22 │                 x = Option::Some(f.f)
-   │                     ^^^^^^^^^^^^
-   │
-   = required by instantiating type parameter `T` of struct `Option`
+29 │     fun replace_or_add_function(v: &mut vector<Function>, k: u64, new_f: |u64| u64 with store+copy): Option<|u64| u64 with store+copy> {
+   │                                                                                    ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
 
-error: expected `&mut Function` but found a value of type `|u64|u64 with drop+store`
-   ┌─ tests/lambda/storable/registry_ok.move:32:17
+error: unsupported language construct
+   ┌─ tests/lambda/storable/registry_ok.move:29:119
    │
-32 │                 f.f = f;
-   │                 ^^^
+29 │     fun replace_or_add_function(v: &mut vector<Function>, k: u64, new_f: |u64| u64 with store+copy): Option<|u64| u64 with store+copy> {
+   │                                                                                                                       ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
 
-error: undeclared receiver function `append` for type `vector<Function>`
-   ┌─ tests/lambda/storable/registry_ok.move:38:13
+error: unsupported language construct
+   ┌─ tests/lambda/storable/registry_ok.move:53:47
    │
-38 │             v.append(new_record);
-   │             ^^^^^^^^^^^^^^^^^^^^
+53 │     fun register(owner: &signer, f: |u64| u64 with store+copy, k: u64) acquires Registry {
+   │                                               ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
 
-error: cannot return nothing from a function with result type `Option<Function>`
-   ┌─ tests/lambda/storable/registry_ok.move:38:33
-   │
-38 │             v.append(new_record);
-   │                                 ^
+error: unsupported language construct
+    ┌─ tests/lambda/storable/registry_ok.move:106:41
+    │
+106 │     fun multiply_by_x(x: u64): |u64|u64 with store {
+    │                                         ^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
 
-error: cannot return nothing from a function with result type `Option<Function>`
-   ┌─ tests/lambda/storable/registry_ok.move:36:9
-   │
-36 │ ╭         if (!done) {
-37 │ │             let new_record = Function { f: f, key: k };
-38 │ │             v.append(new_record);
-39 │ │         }
-   │ ╰─────────^
+error: unsupported language construct
+    ┌─ tests/lambda/storable/registry_ok.move:110:42
+    │
+110 │     fun multiply_by_x2(x: u64): |u64|u64 with store {
+    │                                          ^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
 
-error: expected a struct with field `address` but found `signer`
-   ┌─ tests/lambda/storable/registry_ok.move:43:20
-   │
-43 │         let addr = owner.address;
-   │                    ^^^^^
-
-error: undeclared `registry`
-   ┌─ tests/lambda/storable/registry_ok.move:48:38
-   │
-48 │             move_to<Registry>(owner, registry);
-   │                                      ^^^^^^^^
-
-error: cannot pass `vector<Function>` to a function which expects argument of type `&vector<Function>`
-   ┌─ tests/lambda/storable/registry_ok.move:59:29
-   │
-59 │         match (get_function(registry.functions, k)) {
-   │                             ^^^^^^^^^^^^^^^^^^
-
-error: undeclared struct `test::Some`
-   ┌─ tests/lambda/storable/registry_ok.move:60:13
-   │
-60 │             Some(func) => {
-   │             ^^^^
-
-error: undeclared `func`
-   ┌─ tests/lambda/storable/registry_ok.move:61:51
-   │
-61 │                 let Function { f: f, key: key } = func;
-   │                                                   ^^^^
+error: unsupported language construct
+    ┌─ tests/lambda/storable/registry_ok.move:111:9
+    │
+111 │         move |y| multiply(x, y)
+    │         ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression

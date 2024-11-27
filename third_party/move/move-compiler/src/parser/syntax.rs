@@ -90,6 +90,23 @@ fn require_move_2(context: &mut Context, loc: Loc, description: &str) -> bool {
     )
 }
 
+fn require_move_version(
+    min_language_version: LanguageVersion,
+    context: &mut Context,
+    loc: Loc,
+    description: &str,
+) -> bool {
+    require_language_version_msg(
+        context,
+        loc,
+        min_language_version,
+        &format!(
+            "Move {} language construct is not enabled: {}",
+            min_language_version, description
+        ),
+    )
+}
+
 fn require_language_version(
     context: &mut Context,
     loc: Loc,
@@ -130,6 +147,21 @@ fn require_move_2_and_advance(
     let loc = current_token_loc(context.tokens);
     context.tokens.advance()?;
     Ok(require_move_2(context, loc, description))
+}
+
+fn require_move_version_and_advance(
+    min_language_version: LanguageVersion,
+    context: &mut Context,
+    description: &str,
+) -> Result<bool, Box<Diagnostic>> {
+    let loc = current_token_loc(context.tokens);
+    context.tokens.advance()?;
+    Ok(require_move_version(
+        min_language_version,
+        context,
+        loc,
+        description,
+    ))
 }
 
 pub fn make_loc(file_hash: FileHash, start: usize, end: usize) -> Loc {
@@ -1131,6 +1163,7 @@ fn parse_sequence(context: &mut Context) -> Result<Sequence, Box<Diagnostic>> {
 //          | "abort" <Exp>
 //          | "for" "(" <Exp> "in" <Exp> ".." <Exp> ")" "{" <Exp> "}"
 //          | <NameExp>
+//          | <Term> <CallArgs>              // --> ExpCall
 fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     const VECTOR_IDENT: &str = "vector";
     const FOR_IDENT: &str = "for";
@@ -1286,12 +1319,14 @@ fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
         },
     };
     let end_loc = context.tokens.previous_end_loc();
-    Ok(spanned(
-        context.tokens.file_hash(),
-        start_loc,
-        end_loc,
-        term,
-    ))
+    let mut result_term = spanned(context.tokens.file_hash(), start_loc, end_loc, term);
+    while matches!(context.tokens.peek(), Tok::LParen) {
+        let args = parse_call_args(context)?;
+        let term = Exp_::ExpCall(Box::new(result_term), args);
+        let end_loc = context.tokens.previous_end_loc();
+        result_term = spanned(context.tokens.file_hash(), start_loc, end_loc, term);
+    }
+    Ok(result_term)
 }
 
 fn parse_cast_or_test_exp(
@@ -1903,6 +1938,8 @@ fn at_start_of_exp(context: &mut Context) -> bool {
 }
 
 // Parse the rest of a lambda expression, after already processing any capture designator (move/copy).
+//       LambdaRest =
+//                      <LambdaBindList> <Exp> <WithAbilities>
 fn parse_lambda(
     context: &mut Context,
     start_loc: usize,
@@ -1922,7 +1959,12 @@ fn parse_lambda(
     if !abilities.is_empty() {
         let abilities_end = context.tokens.previous_end_loc();
         let loc = make_loc(context.tokens.file_hash(), abilities_start, abilities_end);
-        require_move_2(context, loc, "Abilities on function expressions");
+        require_move_version(
+            LanguageVersion::V2_2,
+            context,
+            loc,
+            "Abilities on function expressions",
+        );
     }
 
     Ok(Exp_::Lambda(bindings, body, capture_kind, abilities))
@@ -1940,13 +1982,17 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     let token = context.tokens.peek();
     let exp = match token {
-        Tok::Move | Tok::Copy | Tok::Amp
+        Tok::Move | Tok::Copy
             if matches!(
                 context.tokens.lookahead_with_start_loc(),
                 Ok((Tok::Pipe | Tok::PipePipe, _))
             ) =>
         {
-            let _ = require_move_2_and_advance(context, "Modifier on lambda expression"); // consume the Move/Copy
+            let _ = require_move_version_and_advance(
+                LanguageVersion::V2_2,
+                context,
+                "Modifier on lambda expression",
+            ); // consume the Move/Copy
             let capture_kind = match token {
                 Tok::Move => LambdaCaptureKind::Move,
                 Tok::Copy => LambdaCaptureKind::Copy,
@@ -2158,7 +2204,7 @@ fn parse_binop_exp(context: &mut Context, lhs: Exp, min_prec: u32) -> Result<Exp
 //          | "*" <UnaryExp>
 //          | "move" <Var>
 //          | "copy" <Var>
-//          | <DotOrIndexChain>
+//          | <DotOrIndexOrCallChain>
 fn parse_unary_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
     let exp = match context.tokens.peek() {
@@ -2205,11 +2251,11 @@ fn parse_unary_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     Ok(spanned(context.tokens.file_hash(), start_loc, end_loc, exp))
 }
 
-// Parse an expression term optionally followed by a chain of dot or index accesses:
+// Parse an expression term optionally followed by a chain of dot accesses and/or index accesses
+// and/or calls of function values.
 //      DotOrIndexChain =
 //          <DotOrIndexChain> "." <Identifier> [ ["::" "<" Comma<Type> ">"]? <CallArgs> ]?
 //          | <DotOrIndexChain> "[" <Exp> "]"
-//          | <Term> <CallArgs>              // --> ExpCall
 //          | <Term>
 fn parse_dot_or_index_chain(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
@@ -2249,10 +2295,6 @@ fn parse_dot_or_index_chain(context: &mut Context) -> Result<Exp, Box<Diagnostic
                 let exp = Exp_::Index(Box::new(lhs), Box::new(index));
                 consume_token(context.tokens, Tok::RBracket)?;
                 exp
-            },
-            Tok::LParen => {
-                let args = parse_call_args(context)?;
-                Exp_::ExpCall(Box::new(lhs), args)
             },
             _ => break,
         };
@@ -2443,10 +2485,10 @@ fn make_builtin_call(loc: Loc, name: Symbol, type_args: Option<Vec<Type>>, args:
 
 // Parse a Type:
 //      Type =
-//          <NameAccessChain> ('<' Comma<Type> ">")?
+//          <NameAccessChain> ("<" Comma<Type> ">")?
 //          | "&" <Type>
 //          | "&mut" <Type>
-//          | "|" Comma<Type> "|" <Type>?
+//          | "|" Comma<Type> "|" <Type>? <WithAbilities>
 //          | "(" Comma<Type> ")"
 fn parse_type(context: &mut Context) -> Result<Type, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
@@ -2493,7 +2535,12 @@ fn parse_type(context: &mut Context) -> Result<Type, Box<Diagnostic>> {
             if !abilities.is_empty() {
                 let abilities_end = context.tokens.previous_end_loc();
                 let loc = make_loc(context.tokens.file_hash(), abilities_start, abilities_end);
-                require_move_2(context, loc, "Ability constraints on function types");
+                require_move_version(
+                    LanguageVersion::V2_2,
+                    context,
+                    loc,
+                    "Ability constraints on function types",
+                );
             }
             return Ok(spanned(
                 context.tokens.file_hash(),

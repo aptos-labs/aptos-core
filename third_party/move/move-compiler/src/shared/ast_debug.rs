@@ -12,17 +12,17 @@
 /// (without the use of `..`) when implementing `AstDebug`. For example,
 ///
 /// ```rust,ignore
-///     impl AstDebug for StructDefinition {
-///         fn ast_debug(&self, w: &mut AstWriter) {
-///             let StructDefinition {
-///                 resource_opt,
-///                 name,
-///                 type_parameters,
-///                 fields,
-///             } = self;
-///             ...
-///         }
+/// impl AstDebug for StructDefinition {
+///     fn ast_debug(&self, w: &mut AstWriter) {
+///         let StructDefinition {
+///             resource_opt,
+///             name,
+///             type_parameters,
+///             fields,
+///         } = self;
+///         ...
 ///     }
+/// }
 /// ```
 
 pub trait AstDebug {

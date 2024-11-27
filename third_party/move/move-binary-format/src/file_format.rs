@@ -849,10 +849,11 @@ impl AbilitySet {
             | (Ability::Store as u8)
             | (Ability::Key as u8),
     );
+    /// The empty ability set
     pub const EMPTY: Self = Self(0);
     /// Minimal abilities for all `Functions`
     pub const FUNCTIONS: AbilitySet = Self(Ability::Drop as u8);
-    /// Maximal abilities for all `Functions`.  This is used for UB when joining types.
+    /// Maximal abilities for all `Functions`.  This is used for identity when unifying function types.
     pub const MAXIMAL_FUNCTIONS: AbilitySet = Self::PUBLIC_FUNCTIONS;
     /// Abilities for `Bool`, `U8`, `U64`, `U128`, and `Address`
     pub const PRIMITIVES: AbilitySet =
@@ -870,8 +871,6 @@ impl AbilitySet {
     /// Abilities for `Vector`, note they are predicated on the type argument
     pub const VECTOR: AbilitySet =
         Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));
-
-    /// The empty ability set
 
     pub fn singleton(ability: Ability) -> Self {
         Self(ability as u8)
