@@ -28,7 +28,7 @@ use move_model::metadata::CompilerVersion;
 use std::{cmp, collections::HashMap, env, path::PathBuf, sync::Arc};
 // use std::cmp::min;
 
-const GAS_DIFF_PERCENTAGE: u64 = 5;
+const GAS_DIFF_PERCENTAGE: u64 = 3;
 
 fn add_packages_to_data_store(
     data_store: &mut FakeDataStore,
@@ -591,7 +591,7 @@ impl Execution {
                         cur_version
                     ));
                 }
-                println!("gas v1:{}, gas v2: {}", gas_used_1, gas_used_2);
+                // println!("gas v1:{}, gas v2: {}", gas_used_1, gas_used_2);
                 let (diff, gas2_gt_gas1, gas1_gt_gas_2) =
                     gas_diff(*gas_used_1, *gas_used_2, GAS_DIFF_PERCENTAGE);
                 let greater_version = if gas1_gt_gas_2 { "v1" } else { "v2" };
