@@ -21,7 +21,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.BRANCH || 'add_replay_verify_workflow' }}      
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
       
       # Authenticate to Google Cloud the project is aptos-ci
       - name: Authenticate to Google Cloud
