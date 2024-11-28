@@ -30,7 +30,7 @@ use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
 use aptos_types::block_executor::config::BlockExecutorConfigFromOnchain;
 // use std::cmp::min;
 
-const GAS_DIFF_PERCENTAGE: u64 = 5;
+const GAS_DIFF_PERCENTAGE: u64 = 3;
 const TXNS_NUMBER: u64 = 1000;
 
 fn add_packages_to_data_store(
@@ -186,143 +186,207 @@ impl Execution {
         }
         let mut cur_version = ver.unwrap();
         let mut i = 0;
-        if !self.execution_mode.is_compare() {
-            while i < num_txns_to_execute {
-                let res: std::result::Result<(), anyhow::Error> = self.execute_one_txn(cur_version, &data_manager, &mut compiled_cache);
-                if res.is_err() {
-                    self.output_result_str(format!(
-                        "execution at version:{} failed, skip to the next txn",
-                        cur_version
-                    ));
-                }
-                let mut ver_res = index_reader.get_next_version();
-                while ver_res.is_err() {
-                    ver_res = index_reader.get_next_version();
-                }
-                if ver_res.is_ok() {
-                    if let Some(ver) = ver_res.unwrap() {
-                        cur_version = ver;
-                    } else {
-                        break;
-                    }
-                }
-                i += 1;
+        while i < num_txns_to_execute {
+            let res = self.execute_one_txn(cur_version, &data_manager, &mut compiled_cache);
+            if res.is_err() {
+                self.output_result_str(format!(
+                    "execution at version:{} failed, skip to the next txn",
+                    cur_version
+                ));
             }
-        } else {
-            // prepare_data_state
-            let mut data_state = vec![];
-            let mut versions = vec![];
-            let cache_arc: Arc<Mutex<CompilationCache>> = Arc::new(Mutex::new(compiled_cache));
-            while i < num_txns_to_execute {
-                let mut j = 0;
-                let mut finish_early: bool = false;
-                while j < std::cmp::min(num_txns_to_execute - i, TXNS_NUMBER) {
-                    Self::prepare_data_state(cur_version, &data_manager, &mut cache_arc.lock().unwrap(), self.input_path.clone(), &mut versions, &mut data_state, self.skip_ref_packages.clone(),
-                    &self.execution_mode);
-                    let mut ver_res = index_reader.get_next_version();
-                    while ver_res.is_err() {
-                        ver_res = index_reader.get_next_version();
-                    }
-                    if let Some(ver) = ver_res.unwrap() {
-                        cur_version = ver;
-                    } else {
-                        finish_early = true;
-                        break;
-                    }
-                    i += 1;
-                    j += 1;
-                }
-                let data_state_copy: Arc<Vec<(u64, TxnIndex, FakeDataStore)>> = Arc::new(data_state);
-                // let cache_copy= cache_arc.clone();
-                let cache_copy_v1: HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>= cache_arc.clone().lock().unwrap().compiled_package_cache_v1.clone();
-                let cache_copy_v2: HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>= cache_arc.clone().lock().unwrap().compiled_package_cache_v2.clone();
-                let data_state_c: Arc<Vec<(u64, TxnIndex, FakeDataStore)>>= data_state_copy.clone();
-                let res_1: Arc<Mutex<Vec<(u64, std::result::Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>)>>> = Arc::new(Mutex::new(vec![]));
-                let res_1_copy: Arc<Mutex<Vec<(u64, std::result::Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>)>>> = res_1.clone();
-
-                // let handle_v1 = std::thread::spawn(move || {
-                //     for (v, txn_index, state) in data_state_c.iter() {
-                //         let res = Self::execute_one_txn_with_result_alternative(*v, state, txn_index, &cache_copy_v1);
-                //         res_1_copy.lock().unwrap().push((*v, res));
-                //     }
-                // });
-
-                for (v, txn_index, state) in data_state_c.iter() {
-                    let res = Self::execute_one_txn_with_result_alternative(*v, state, txn_index, &cache_copy_v1);
-                    println!("res:{:?} at version:{}", res, v);
-                    res_1_copy.lock().unwrap().push((*v, res));
-                }
-
-                // let res_2: Arc<Mutex<Vec<(u64, std::result::Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>)>>> = Arc::new(Mutex::new(vec![]));
-                // let res_2_copy: Arc<Mutex<Vec<(u64, std::result::Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>)>>> = res_2.clone();
-                // let handle_v2 = std::thread::spawn(move || {
-                //     for (v, txn_index, state) in data_state_copy.iter() {
-                //         //let res = Self::execute_one_txn_with_result_alternative(*v, state, txn_index, &cache_copy_v2);
-                //         //res_2_copy.lock().unwrap().push((*v, res));
-                //     }
-                // });
-                // handle_v1.join().unwrap();
-                // handle_v2.join().unwrap();
-                // for ((v_1, r_1), (v_2, r_2)) in res_1.lock().unwrap().iter().zip(res_2.lock().unwrap().iter()) {
-                //     if v_1 == v_2 {
-                //         self.print_mismatches(*v_1, r_1, r_2, None);
-                //     } else {
-                //         eprint!("v1:{}, v2:{}", v_1, v_2);
-                //     }
-                // }
-                data_state = vec![];
-                versions = vec![];
-                if finish_early {
+            let mut ver_res = index_reader.get_next_version();
+            while ver_res.is_err() {
+                ver_res = index_reader.get_next_version();
+            }
+            if ver_res.is_ok() {
+                if let Some(ver) = ver_res.unwrap() {
+                    cur_version = ver;
+                } else {
                     break;
                 }
-                // let mut ver_res = index_reader.get_next_version();
-                // while ver_res.is_err() {
-                //     ver_res = index_reader.get_next_version();
-                // }
-                // if ver_res.is_ok() {
-                //     if let Some(ver) = ver_res.unwrap() {
-                //         cur_version = ver;
-                //     } else {
-                //         break;
-                //     }
-                // }
-                // i += 1;
             }
-            // let cache_copy: Arc<CompilationCache> = Arc::new(compiled_cache);
-            // let cache_copy_c: Arc<CompilationCache> = cache_copy.clone();
-            // let data_state_copy: Arc<Vec<(u64, TxnIndex, FakeDataStore)>> = Arc::new(data_state);
-            // let data_state_c= data_state_copy.clone();
-            // let res_1: Arc<Mutex<Vec<(u64, std::result::Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>)>>> = Arc::new(Mutex::new(vec![]));
-            // let res_1_copy: Arc<Mutex<Vec<(u64, std::result::Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>)>>> = res_1.clone();
-            // let handle_v1 = std::thread::spawn(move || {
-            //     for (v, txn_index, state) in data_state_c.iter() {
-            //         let res = Self::execute_one_txn_with_result_alternative(*v, state, txn_index, &cache_copy_c.compiled_package_cache_v1);
-            //         res_1_copy.lock().unwrap().push((*v, res));
-            //         //println!("v1 version:{}", v);
-            //     }
-            // });
-
-            // let res_2: Arc<Mutex<Vec<(u64, std::result::Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>)>>> = Arc::new(Mutex::new(vec![]));
-            // let res_2_copy: Arc<Mutex<Vec<(u64, std::result::Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>)>>> = res_2.clone();
-            // let handle_v2 = std::thread::spawn(move || {
-            //     for (v, txn_index, state) in data_state_copy.iter() {
-            //         let res = Self::execute_one_txn_with_result_alternative(*v, state, txn_index, &cache_copy.compiled_package_cache_v2);
-            //         res_2_copy.lock().unwrap().push((*v, res));
-            //         //println!("v2 version:{}", v);
-            //     }
-            // });
-            // handle_v1.join().unwrap();
-            // handle_v2.join().unwrap();
-            // for ((v_1, r_1), (v_2, r_2)) in res_1.lock().unwrap().iter().zip(res_2.lock().unwrap().iter()) {
-            //     if v_1 == v_2 {
-            //         self.print_mismatches(*v_1, r_1, r_2, None);
-            //     } else {
-            //         eprint!("v1:{}, v2:{}", v_1, v_2);
-            //     }
-            // }
+            i += 1;
         }
         Ok(())
     }
+    // pub async fn execute_txns(&self, begin: Version, num_txns_to_execute: u64) -> Result<()> {
+    //     let aptos_commons_path = self.input_path.join(APTOS_COMMONS);
+    //     if !check_aptos_packages_availability(aptos_commons_path.clone()) {
+    //         return Err(anyhow::Error::msg("aptos packages are missing"));
+    //     }
+
+    //     let mut compiled_cache = CompilationCache::default();
+    //     if self.execution_mode.is_v1_or_compare() {
+    //         compile_aptos_packages(
+    //             &aptos_commons_path,
+    //             &mut compiled_cache.compiled_package_cache_v1,
+    //             false,
+    //         )?;
+    //     }
+    //     if self.execution_mode.is_v2_or_compare() {
+    //         compile_aptos_packages(
+    //             &aptos_commons_path,
+    //             &mut compiled_cache.compiled_package_cache_v2,
+    //             true,
+    //         )?;
+    //     }
+
+    //     // prepare data
+    //     let data_manager = DataManager::new(&self.input_path);
+    //     if !data_manager.check_dir_availability() {
+    //         return Err(anyhow::Error::msg("data is missing"));
+    //     }
+    //     if !IndexReader::check_availability(&self.input_path) {
+    //         return Err(anyhow::Error::msg("index file is missing"));
+    //     }
+    //     let mut index_reader = IndexReader::new(&self.input_path);
+
+    //     // get the first idx from the version_index file
+    //     let ver = index_reader.get_next_version_ge(begin);
+    //     if ver.is_none() {
+    //         return Err(anyhow::Error::msg(
+    //             "cannot find a version greater than or equal to the specified begin version",
+    //         ));
+    //     }
+    //     let mut cur_version = ver.unwrap();
+    //     let mut i = 0;
+    //     if !self.execution_mode.is_compare() {
+    //         while i < num_txns_to_execute {
+    //             let res: std::result::Result<(), anyhow::Error> = self.execute_one_txn(cur_version, &data_manager, &mut compiled_cache);
+    //             if res.is_err() {
+    //                 self.output_result_str(format!(
+    //                     "execution at version:{} failed, skip to the next txn",
+    //                     cur_version
+    //                 ));
+    //             }
+    //             let mut ver_res = index_reader.get_next_version();
+    //             while ver_res.is_err() {
+    //                 ver_res = index_reader.get_next_version();
+    //             }
+    //             if ver_res.is_ok() {
+    //                 if let Some(ver) = ver_res.unwrap() {
+    //                     cur_version = ver;
+    //                 } else {
+    //                     break;
+    //                 }
+    //             }
+    //             i += 1;
+    //         }
+    //     } else {
+    //         // prepare_data_state
+    //         let mut data_state = vec![];
+    //         let mut versions = vec![];
+    //         let cache_arc: Arc<Mutex<CompilationCache>> = Arc::new(Mutex::new(compiled_cache));
+    //         while i < num_txns_to_execute {
+    //             let mut j = 0;
+    //             let mut finish_early: bool = false;
+    //             while j < std::cmp::min(num_txns_to_execute - i, TXNS_NUMBER) {
+    //                 Self::prepare_data_state(cur_version, &data_manager, &mut cache_arc.lock().unwrap(), self.input_path.clone(), &mut versions, &mut data_state, self.skip_ref_packages.clone(),
+    //                 &self.execution_mode);
+    //                 let mut ver_res = index_reader.get_next_version();
+    //                 while ver_res.is_err() {
+    //                     ver_res = index_reader.get_next_version();
+    //                 }
+    //                 if let Some(ver) = ver_res.unwrap() {
+    //                     cur_version = ver;
+    //                 } else {
+    //                     finish_early = true;
+    //                     break;
+    //                 }
+    //                 i += 1;
+    //                 j += 1;
+    //             }
+    //             let data_state_copy: Arc<Vec<(u64, TxnIndex, FakeDataStore)>> = Arc::new(data_state);
+    //             // let cache_copy= cache_arc.clone();
+    //             let cache_copy_v1: HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>= cache_arc.clone().lock().unwrap().compiled_package_cache_v1.clone();
+    //             let cache_copy_v2: HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>= cache_arc.clone().lock().unwrap().compiled_package_cache_v2.clone();
+    //             let data_state_c: Arc<Vec<(u64, TxnIndex, FakeDataStore)>>= data_state_copy.clone();
+    //             let res_1: Arc<Mutex<Vec<(u64, std::result::Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>)>>> = Arc::new(Mutex::new(vec![]));
+    //             let res_1_copy: Arc<Mutex<Vec<(u64, std::result::Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>)>>> = res_1.clone();
+
+    //             // let handle_v1 = std::thread::spawn(move || {
+    //             //     for (v, txn_index, state) in data_state_c.iter() {
+    //             //         let res = Self::execute_one_txn_with_result_alternative(*v, state, txn_index, &cache_copy_v1);
+    //             //         res_1_copy.lock().unwrap().push((*v, res));
+    //             //     }
+    //             // });
+
+    //             for (v, txn_index, state) in data_state_c.iter() {
+    //                 let res = Self::execute_one_txn_with_result_alternative(*v, state, txn_index, &cache_copy_v1);
+    //                 println!("res:{:?} at version:{}", res, v);
+    //                 res_1_copy.lock().unwrap().push((*v, res));
+    //             }
+
+    //             // let res_2: Arc<Mutex<Vec<(u64, std::result::Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>)>>> = Arc::new(Mutex::new(vec![]));
+    //             // let res_2_copy: Arc<Mutex<Vec<(u64, std::result::Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>)>>> = res_2.clone();
+    //             // let handle_v2 = std::thread::spawn(move || {
+    //             //     for (v, txn_index, state) in data_state_copy.iter() {
+    //             //         //let res = Self::execute_one_txn_with_result_alternative(*v, state, txn_index, &cache_copy_v2);
+    //             //         //res_2_copy.lock().unwrap().push((*v, res));
+    //             //     }
+    //             // });
+    //             // handle_v1.join().unwrap();
+    //             // handle_v2.join().unwrap();
+    //             // for ((v_1, r_1), (v_2, r_2)) in res_1.lock().unwrap().iter().zip(res_2.lock().unwrap().iter()) {
+    //             //     if v_1 == v_2 {
+    //             //         self.print_mismatches(*v_1, r_1, r_2, None);
+    //             //     } else {
+    //             //         eprint!("v1:{}, v2:{}", v_1, v_2);
+    //             //     }
+    //             // }
+    //             data_state = vec![];
+    //             versions = vec![];
+    //             if finish_early {
+    //                 break;
+    //             }
+    //             // let mut ver_res = index_reader.get_next_version();
+    //             // while ver_res.is_err() {
+    //             //     ver_res = index_reader.get_next_version();
+    //             // }
+    //             // if ver_res.is_ok() {
+    //             //     if let Some(ver) = ver_res.unwrap() {
+    //             //         cur_version = ver;
+    //             //     } else {
+    //             //         break;
+    //             //     }
+    //             // }
+    //             // i += 1;
+    //         }
+    //         // let cache_copy: Arc<CompilationCache> = Arc::new(compiled_cache);
+    //         // let cache_copy_c: Arc<CompilationCache> = cache_copy.clone();
+    //         // let data_state_copy: Arc<Vec<(u64, TxnIndex, FakeDataStore)>> = Arc::new(data_state);
+    //         // let data_state_c= data_state_copy.clone();
+    //         // let res_1: Arc<Mutex<Vec<(u64, std::result::Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>)>>> = Arc::new(Mutex::new(vec![]));
+    //         // let res_1_copy: Arc<Mutex<Vec<(u64, std::result::Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>)>>> = res_1.clone();
+    //         // let handle_v1 = std::thread::spawn(move || {
+    //         //     for (v, txn_index, state) in data_state_c.iter() {
+    //         //         let res = Self::execute_one_txn_with_result_alternative(*v, state, txn_index, &cache_copy_c.compiled_package_cache_v1);
+    //         //         res_1_copy.lock().unwrap().push((*v, res));
+    //         //         //println!("v1 version:{}", v);
+    //         //     }
+    //         // });
+
+    //         // let res_2: Arc<Mutex<Vec<(u64, std::result::Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>)>>> = Arc::new(Mutex::new(vec![]));
+    //         // let res_2_copy: Arc<Mutex<Vec<(u64, std::result::Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>)>>> = res_2.clone();
+    //         // let handle_v2 = std::thread::spawn(move || {
+    //         //     for (v, txn_index, state) in data_state_copy.iter() {
+    //         //         let res = Self::execute_one_txn_with_result_alternative(*v, state, txn_index, &cache_copy.compiled_package_cache_v2);
+    //         //         res_2_copy.lock().unwrap().push((*v, res));
+    //         //         //println!("v2 version:{}", v);
+    //         //     }
+    //         // });
+    //         // handle_v1.join().unwrap();
+    //         // handle_v2.join().unwrap();
+    //         // for ((v_1, r_1), (v_2, r_2)) in res_1.lock().unwrap().iter().zip(res_2.lock().unwrap().iter()) {
+    //         //     if v_1 == v_2 {
+    //         //         self.print_mismatches(*v_1, r_1, r_2, None);
+    //         //     } else {
+    //         //         eprint!("v1:{}, v2:{}", v_1, v_2);
+    //         //     }
+    //         // }
+    //     }
+    //     Ok(())
+    // }
 
     fn compile_code_alternative(
         input_path: PathBuf,
@@ -653,6 +717,7 @@ impl Execution {
             &mut txn_idx.txn,
             package_cache_main,
             debugger.clone(),
+            v2_flag,
         );
         if self.execution_mode.is_compare() {
             let res_other = self.execute_code(
@@ -662,6 +727,7 @@ impl Execution {
                 &mut txn_idx.txn,
                 package_cache_other,
                 debugger.clone(),
+                true,
             );
             self.print_mismatches(
                 cur_version,
@@ -803,6 +869,7 @@ impl Execution {
         txn: &mut Transaction,
         compiled_package_cache: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
         debugger_opt: Option<Arc<dyn AptosValidatorInterface + Send>>,
+        v2_flag: bool
     ) -> Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus> {
         // Always add Aptos (0x1) packages.
         add_aptos_packages_to_data_store(&mut state, compiled_package_cache);
@@ -815,10 +882,10 @@ impl Execution {
         // Update features if needed to the correct binary format used by V2 compiler.
         let mut features = Features::fetch_config(&state).unwrap_or_default();
         features.enable(FeatureFlag::VM_BINARY_FORMAT_V7);
-        features.enable(FeatureFlag::ENABLE_LOADER_V2);
-        // if v2_flag {
-        //     features.enable(FeatureFlag::FAKE_FEATURE_FOR_COMPARISON_TESTING);
-        // }
+        // features.enable(FeatureFlag::ENABLE_LOADER_V2);
+        if v2_flag {
+            features.enable(FeatureFlag::FAKE_FEATURE_FOR_COMPARISON_TESTING);
+        }
         state.set_features(features);
 
         // We use executor only to get access to block executor and avoid some of

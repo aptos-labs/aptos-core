@@ -137,7 +137,7 @@ impl WarmVmId {
             natives,
             vm_config: Self::vm_config_bytes(env.vm_config()),
             core_packages_registry: Self::core_packages_id_bytes(resolver)?,
-            bin_v7_enabled: env.features().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7),
+            bin_v7_enabled: env.features().is_enabled(FeatureFlag::FAKE_FEATURE_FOR_COMPARISON_TESTING),
             inject_create_signer_for_gov_sim,
         })
     }
