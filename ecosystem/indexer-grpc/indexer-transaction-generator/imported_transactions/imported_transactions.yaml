@@ -15,6 +15,10 @@ testnet:
     5992795934: 5992795934_fa_activities
     5523474016: 5523474016_validator_txn
 
+    # fungible asset processor
+    4462417704: 4462417704_secondary_store_burnt
+    646928741: 646928741_no_events
+
 
 mainnet:
   transaction_stream_endpoint: https://grpc.mainnet.aptoslabs.com:443
