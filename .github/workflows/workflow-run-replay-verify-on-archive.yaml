@@ -46,7 +46,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.BRANCH || 'add_replay_verify_workflow' }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
 
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         id: docker-setup
@@ -113,6 +113,7 @@ jobs:
         run: |
           cd testsuite/replay-verify
           poetry run python main.py  --network ${{ inputs.NETWORK }} --cleanup
+          echo "Cleanup completed"
 
           
           

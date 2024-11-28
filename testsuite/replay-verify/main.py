@@ -561,6 +561,9 @@ if __name__ == "__main__":
             (failed_logs, txn_mismatch_logs) = scheduler.collect_all_failed_logs()
             scheduler.print_stats()
             print_logs(failed_logs, txn_mismatch_logs)
+            if txn_mismatch_logs:  
+                logger.error("Transaction mismatch logs found.")  
+                exit(1)  
 
         finally:
             scheduler.cleanup()
