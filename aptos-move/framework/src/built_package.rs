@@ -35,9 +35,7 @@ use move_package::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{BTreeMap, BTreeSet},
-    io::{stderr, Write},
-    path::{Path, PathBuf},
+    collections::{BTreeMap, BTreeSet}, io::{stderr, Write}, option, path::{Path, PathBuf}
 };
 
 pub const METADATA_FILE_NAME: &str = "package-metadata.bcs";
@@ -222,7 +220,11 @@ impl BuiltPackage {
     /// This function currently reports all Move compilation errors and warnings to stdout,
     /// and is not `Ok` if there was an error among those.
     pub fn build(package_path: PathBuf, options: BuildOptions) -> anyhow::Result<Self> {
-        let bytecode_version = Some(options.inferred_bytecode_version());
+        let bytecode_version = if options.bytecode_version.is_none() {
+            Some(options.inferred_bytecode_version())
+        } else {
+            options.bytecode_version
+        };
         let compiler_version = options.compiler_version;
         let language_version = options.language_version;
         Self::check_versions(&compiler_version, &language_version)?;

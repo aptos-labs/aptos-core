@@ -443,6 +443,7 @@ fn compile_package(
 ) -> anyhow::Result<CompiledPackage> {
     let mut build_options = aptos_framework::BuildOptions {
         compiler_version,
+        bytecode_version: Some(6),
         ..Default::default()
     };
     build_options
