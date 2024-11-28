@@ -12,7 +12,7 @@ use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_framework::APTOS_PACKAGES;
 use aptos_language_e2e_tests::{data_store::FakeDataStore, executor::FakeExecutor};
 use aptos_types::{
-    access_path::Path, block_executor::execution_state::TransactionSliceMetadata, contract_event::ContractEvent, on_chain_config::{FeatureFlag, Features, OnChainConfig}, state_store::state_key::{inner::StateKeyInner, StateKey}, transaction::{signature_verified_transaction::{
+    access_path::Path, block_executor::transaction_slice_metadata::TransactionSliceMetadata, contract_event::ContractEvent, on_chain_config::{FeatureFlag, Features, OnChainConfig}, state_store::state_key::{inner::StateKeyInner, StateKey}, transaction::{signature_verified_transaction::{
         into_signature_verified_block, SignatureVerifiedTransaction,
     }, Transaction, TransactionOutput, TransactionStatus, Version}, vm_status::VMStatus, write_set::{WriteSet, TOTAL_SUPPLY_STATE_KEY}
 };
