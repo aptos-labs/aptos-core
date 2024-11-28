@@ -16,7 +16,7 @@ use aptos_data_streaming_service::{
 };
 use aptos_executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
 use aptos_storage_interface::{
-    chunk_to_commit::ChunkToCommit, DbReader, DbReaderWriter, DbWriter, ExecutedTrees, Order,
+    chunk_to_commit::ChunkToCommit, DbReader, DbReaderWriter, DbWriter, LedgerSummary, Order,
     Result, StateSnapshotReceiver,
 };
 use aptos_types::{
@@ -276,7 +276,7 @@ mock! {
             version: Version,
         ) -> Result<(Option<StateValue>, SparseMerkleProof)>;
 
-        fn get_latest_executed_trees(&self) -> Result<ExecutedTrees>;
+        fn get_pre_committed_ledger_summary(&self) -> Result<LedgerSummary>;
 
         fn get_epoch_ending_ledger_info(&self, known_version: u64) -> Result<LedgerInfoWithSignatures>;
 

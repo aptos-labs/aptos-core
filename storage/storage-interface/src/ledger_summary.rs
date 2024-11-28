@@ -8,20 +8,19 @@ use crate::{
     },
     DbReader,
 };
+use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_types::{
     proof::accumulator::{InMemoryAccumulator, InMemoryTransactionAccumulator},
-    state_store::{errors::StateViewError, state_storage_usage::StateStorageUsage, StateViewId},
+    state_store::{state_storage_usage::StateStorageUsage, StateViewId},
     transaction::Version,
 };
 use std::sync::Arc;
 
-type Result<T, E = StateViewError> = std::result::Result<T, E>;
-
 /// A wrapper of the in-memory state sparse merkle tree and the transaction accumulator that
 /// represent a specific state collectively. Usually it is a state after executing a block.
 #[derive(Clone, Debug)]
-pub struct ExecutedTrees {
+pub struct LedgerSummary {
     /// The in-memory representation of state after execution.
     pub state: Arc<StateDelta>,
 
@@ -30,7 +29,7 @@ pub struct ExecutedTrees {
     pub transaction_accumulator: Arc<InMemoryTransactionAccumulator>,
 }
 
-impl ExecutedTrees {
+impl LedgerSummary {
     pub fn state(&self) -> &Arc<StateDelta> {
         &self.state
     }
@@ -102,17 +101,17 @@ impl ExecutedTrees {
         reader: Arc<dyn DbReader>,
         proof_fetcher: Arc<AsyncProofFetcher>,
     ) -> Result<CachedStateView> {
-        CachedStateView::new(
+        Ok(CachedStateView::new(
             id,
             reader,
             self.transaction_accumulator.num_leaves(),
             self.state.current.clone(),
             proof_fetcher,
-        )
+        )?)
     }
 }
 
-impl Default for ExecutedTrees {
+impl Default for LedgerSummary {
     fn default() -> Self {
         Self::new_empty()
     }
