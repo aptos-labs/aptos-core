@@ -85,6 +85,8 @@ pub struct ApiConfig {
     pub periodic_function_stats_sec: Option<u64>,
     /// The time wait_by_hash will wait before returning 404.
     pub wait_by_hash_timeout_ms: u64,
+    /// The time wait_by_hash will wait while the transaction is unseen (before returning 404).
+    pub wait_by_hash_unseen_timeout_ms: u64,
     /// The interval at which wait_by_hash will poll the storage for the transaction.
     pub wait_by_hash_poll_interval_ms: u64,
     /// The number of active wait_by_hash requests that can be active at any given time.
@@ -138,7 +140,8 @@ impl Default for ApiConfig {
             simulation_filter: Filter::default(),
             view_filter: ViewFilter::default(),
             periodic_function_stats_sec: Some(60),
-            wait_by_hash_timeout_ms: 1_000,
+            wait_by_hash_timeout_ms: 1_500,
+            wait_by_hash_unseen_timeout_ms: 1_000,
             wait_by_hash_poll_interval_ms: 20,
             wait_by_hash_max_active_connections: 100,
         }
