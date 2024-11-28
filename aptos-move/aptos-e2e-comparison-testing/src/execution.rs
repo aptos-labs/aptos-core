@@ -30,7 +30,7 @@ use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
 use aptos_types::block_executor::config::BlockExecutorConfigFromOnchain;
 // use std::cmp::min;
 
-const GAS_DIFF_PERCENTAGE: u64 = 5;
+const GAS_DIFF_PERCENTAGE: u64 = 3;
 const TXNS_NUMBER: u64 = 1000;
 
 fn add_packages_to_data_store(
