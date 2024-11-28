@@ -10,8 +10,8 @@ spec:
     spec:  
       containers:  
       - name: self-deleting-container  
-        image: busybox  
-        command: ["sh", "-c", "ls /mnt/* && sleep 30"]  
+        image: gcr.io/google.com/cloudsdktool/google-cloud-cli:latest  
+        command: ["sh", "-c", "ls /mnt/* && sleep 10"]  
         volumeMounts:  
         - name: my-volume
           mountPath: /mnt  

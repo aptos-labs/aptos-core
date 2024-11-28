@@ -1,0 +1,119 @@
+name: "*run replay-verify on archive reusable workflow"
+
+on:
+  # This allows the workflow to be triggered from another workflow
+  workflow_call:
+    inputs:
+      NETWORK:
+        required: true
+        type: string
+        description: The network to run replay verify on.
+      IMAGE_TAG:
+        required: false
+        type: string
+        description: The image tag of the feature branch to test, if not specified, it will use the latest commit on current branch.
+      START_VERSION:
+        required: false
+        type: string
+        description: Optional version to start replaying. If not specified, replay-verify will determines start version itself.
+      END_VERSION:
+        required: false
+        type: string
+        description: Optional version to end replaying. If not specified, replay-verify will determines end version itself.
+    
+  workflow_dispatch:
+    inputs:
+      NETWORK:
+        required: true
+        type: string
+        description: The network to run replay verify on.
+      IMAGE_TAG:
+        required: false
+        type: string
+        description: The image tag of the feature branch to test, if not specified, it will use the latest commit on current branch.
+      START_VERSION:
+        required: false
+        type: string
+        description: The history start to use for the backup. If not specified, it will use the default history start.
+      END_VERSION:
+        required: false
+        type: string
+        description: The end version to use for the backup. If not specified, it will use the latest version.
+jobs:
+  run-replay-verify:
+    runs-on: ubuntu-latest-32-core
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.BRANCH || 'add_replay_verify_workflow' }}
+
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+        id: docker-setup
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          EXPORT_GCP_PROJECT_VARIABLES: "false"
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      # Authenticate to Google Cloud the project is aptos-ci with credentails files generated
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: "google-github-actions/auth@v2"
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          export_environment_variables: false
+          create_credentials_file: true
+
+      # This is required since we need to switch from aptos-ci to aptos-devinfra-0
+      - name: Setup credentials  
+        run: |
+          echo "GOOGLE_APPLICATION_CREDENTIALS=${{ steps.auth.outputs.credentials_file_path }}" >> $GITHUB_ENV
+          echo "CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE=${{ steps.auth.outputs.credentials_file_path }}" >> $GITHUB_ENV 
+          echo "GOOGLE_GHA_CREDS_PATH=${{ steps.auth.outputs.credentials_file_path }}" >> $GITHUB_ENV
+          echo "CLOUDSDK_AUTH_ACCESS_TOKEN=${{ steps.auth.outputs.access_token }}" >> $GITHUB_ENV
+
+      - name: Set up Cloud SDK
+        uses: "google-github-actions/setup-gcloud@v2"
+        with:
+          install_components: "kubectl, gke-gcloud-auth-plugin"
+
+      - name: "Setup GCloud project"
+        shell: bash
+        run: gcloud config set project aptos-devinfra-0
+      
+      - uses: ./.github/actions/python-setup
+        with:
+          pyproject_directory: testsuite/replay-verify
+
+      - name: Schedule replay verify
+        env:
+          GOOGLE_CLOUD_PROJECT: aptos-devinfra-0
+        run: | 
+          cd testsuite/replay-verify  
+          CMD="poetry run python main.py --network ${{ inputs.NETWORK }}"  
+          if [ -n "${{ inputs.START_VERSION }}" ]; then  
+            CMD="$CMD --start ${{ inputs.START_VERSION }}"  
+          fi  
+          if [ -n "${{ inputs.END_VERSION }}" ]; then  
+            CMD="$CMD --end ${{ inputs.END_VERSION }}"  
+          fi
+
+           if [ -n "${{ inputs.IMAGE_TAG }}" ]; then  
+            CMD="$CMD --end ${{ inputs.IMAGE_TAG }}"  
+          fi
+
+          eval $CMD
+      # This is in case user manually cancel the step above, we still want to cleanup the resources
+      - name: Post-run cleanup
+        env:
+          GOOGLE_CLOUD_PROJECT: aptos-devinfra-0
+        if: ${{ always() }}  
+        run: |
+          cd testsuite/replay-verify
+          poetry run python main.py  --network ${{ inputs.NETWORK }} --cleanup
+
+          
+          
+          
