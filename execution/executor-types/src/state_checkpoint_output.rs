@@ -5,14 +5,11 @@
 
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DropHelper;
-use aptos_storage_interface::state_store::{
-    sharded_state_updates::ShardedStateUpdates, state_delta::StateDelta,
-    state_summary::StateSummary,
-};
+use aptos_storage_interface::state_store::state_summary::StateSummary;
 use derive_more::Deref;
 use std::sync::Arc;
 
-#[derive(Clone, Debug, Default, Deref)]
+#[derive(Clone, Debug, Deref)]
 pub struct StateCheckpointOutput {
     #[deref]
     inner: Arc<DropHelper<Inner>>,
@@ -20,29 +17,23 @@ pub struct StateCheckpointOutput {
 
 impl StateCheckpointOutput {
     pub fn new(
-        parent_state: Arc<StateDelta>,
-        result_state: Arc<StateDelta>,
-        state_updates_before_last_checkpoint: Option<ShardedStateUpdates>,
+        last_state_checkpoint_summary: Option<StateSummary>,
+        result_state_summary: StateSummary,
         state_checkpoint_hashes: Vec<Option<HashValue>>,
     ) -> Self {
         Self::new_impl(Inner {
-            parent_state,
-            result_state,
-            state_updates_before_last_checkpoint,
+            last_state_checkpoint_summary,
+            result_state_summary,
             state_checkpoint_hashes,
         })
     }
 
-    pub fn new_empty(_state_summary: StateSummary) -> Self {
-        todo!()
-        /* FIXME(aldenhu)
+    pub fn new_empty(parent_state_summary: StateSummary) -> Self {
         Self::new_impl(Inner {
-            parent_state: state.clone(),
-            result_state: state,
-            state_updates_before_last_checkpoint: None,
+            last_state_checkpoint_summary: None,
+            result_state_summary: parent_state_summary,
             state_checkpoint_hashes: vec![],
         })
-         */
     }
 
     pub fn new_dummy() -> Self {
@@ -56,17 +47,13 @@ impl StateCheckpointOutput {
     }
 
     pub fn reconfig_suffix(&self) -> Self {
-        /* FIXME(aldenhu)
-        Self::new_empty(self.result_state.clone())
-         */
-        todo!()
+        Self::new_empty(self.result_state_summary.clone())
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Inner {
-    pub parent_state: Arc<StateDelta>,
-    pub result_state: Arc<StateDelta>,
-    pub state_updates_before_last_checkpoint: Option<ShardedStateUpdates>,
+    pub last_state_checkpoint_summary: Option<StateSummary>,
+    pub result_state_summary: StateSummary,
     pub state_checkpoint_hashes: Vec<Option<HashValue>>,
 }
