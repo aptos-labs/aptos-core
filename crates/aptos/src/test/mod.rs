@@ -53,7 +53,7 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     x25519, PrivateKey,
 };
-use aptos_framework::chunked_publish::LARGE_PACKAGES_MODULE_ADDRESS;
+use aptos_framework::chunked_publish::{CHUNK_SIZE_IN_BYTES, LARGE_PACKAGES_MODULE_ADDRESS};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_logger::warn;
@@ -900,6 +900,7 @@ impl CliTestFramework {
                     LARGE_PACKAGES_MODULE_ADDRESS,
                 )
                 .unwrap(),
+                chunk_size: CHUNK_SIZE_IN_BYTES.parse().unwrap(),
             },
         }
         .execute()
