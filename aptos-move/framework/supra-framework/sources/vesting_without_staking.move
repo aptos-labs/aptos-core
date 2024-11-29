@@ -185,7 +185,7 @@ module supra_framework::vesting_without_staking {
     }
 
     #[view]
-    //Return the vesting record of the shareholder
+    //Return the vesting record of the shareholder as a tuple `(init_amount, left_amount, last_vested_period)`
     public fun get_vesting_record(vesting_contract_address:address, shareholder_address:address) : (u64,u64,u64)
     acquires VestingContract {
         assert_vesting_contract_exists(vesting_contract_address);
