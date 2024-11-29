@@ -185,6 +185,14 @@ module supra_framework::vesting_without_staking {
     }
 
     #[view]
+    //Return the vesting record of the shareholder
+    public fun get_vesting_record(vesting_contract_address:address, shareholder_address:address) : VestingRecord
+    acquires VestingContract {
+        assert_vesting_contract_exists(vesting_contract_address);
+        *simple_map::borrow(&borrow_global<VestingContract>(vesting_contract_address).shareholders,
+        &shareholder_address)
+    }
+    #[view]
     /// Return the remaining grant of shareholder
     public fun remaining_grant(vesting_contract_address: address, shareholder_address: address)
         : u64 acquires VestingContract {
