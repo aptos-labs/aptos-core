@@ -145,7 +145,7 @@ impl LargePackageTestContext {
             publish_type,
             Some(self.object_address),
             AccountAddress::from_str(LARGE_PACKAGES_MODULE_ADDRESS).unwrap(),
-            CHUNK_SIZE_IN_BYTES.parse().unwrap(),
+            CHUNK_SIZE_IN_BYTES,
         )
     }
 }

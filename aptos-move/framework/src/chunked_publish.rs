@@ -10,7 +10,7 @@ pub const LARGE_PACKAGES_MODULE_ADDRESS: &str =
     "0x0e1ca3011bdd07246d4d16d909dbb2d6953a86c4735d5acf5865d962c630cce7";
 
 /// The default chunk size for splitting code and metadata to fit within the transaction size limits.
-pub const CHUNK_SIZE_IN_BYTES: &str = "55000";
+pub const CHUNK_SIZE_IN_BYTES: usize = 55_000;
 
 pub enum PublishType {
     AccountDeploy,

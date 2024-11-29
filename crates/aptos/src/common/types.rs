@@ -2380,6 +2380,6 @@ pub struct ChunkedPublishOption {
     /// By default, the chunk size is set to `CHUNK_SIZE_IN_BYTES`. A smaller chunk size will result
     /// in more transactions required to publish a package, while a larger chunk size might cause
     /// transaction to fail due to exceeding the execution gas limit.
-    #[clap(long, default_value = CHUNK_SIZE_IN_BYTES, value_parser = clap::value_parser!(usize))]
+    #[clap(long, default_value_t = CHUNK_SIZE_IN_BYTES)]
     pub(crate) chunk_size: usize,
 }

@@ -900,7 +900,7 @@ impl CliTestFramework {
                     LARGE_PACKAGES_MODULE_ADDRESS,
                 )
                 .unwrap(),
-                chunk_size: CHUNK_SIZE_IN_BYTES.parse().unwrap(),
+                chunk_size: CHUNK_SIZE_IN_BYTES,
             },
         }
         .execute()
