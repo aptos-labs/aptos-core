@@ -186,11 +186,12 @@ module supra_framework::vesting_without_staking {
 
     #[view]
     //Return the vesting record of the shareholder
-    public fun get_vesting_record(vesting_contract_address:address, shareholder_address:address) : VestingRecord
+    public fun get_vesting_record(vesting_contract_address:address, shareholder_address:address) : (u64,u64,u64)
     acquires VestingContract {
         assert_vesting_contract_exists(vesting_contract_address);
-        *simple_map::borrow(&borrow_global<VestingContract>(vesting_contract_address).shareholders,
-        &shareholder_address)
+        let vesting_record = simple_map::borrow(&borrow_global<VestingContract>(vesting_contract_address).shareholders,
+        &shareholder_address);
+        (vesting_record.init_amount,vesting_record.left_amount,vesting_record.last_vested_period)
     }
     #[view]
     /// Return the remaining grant of shareholder
@@ -1531,11 +1532,15 @@ module supra_framework::vesting_without_staking {
                 contract_address
             ));
         vest(contract_address);
+        let (init_amount,left_amount,last_vested_period) = get_vesting_record(contract_address,@11);
+        assert!(init_amount==GRANT_AMOUNT,init_amount);
+        let vested_amount = fraction(GRANT_AMOUNT, 2, 10);
+        assert!(left_amount==init_amount-vested_amount,left_amount);
+        assert!(last_vested_period==1,last_vested_period);
 
         // Reset the beneficiary.
         reset_beneficiary(admin, contract_address, @11);
 
-        let vested_amount = fraction(GRANT_AMOUNT, 2, 10);
         assert!(coin::balance<SupraCoin>(@12) == vested_amount, 0);
         assert!(coin::balance<SupraCoin>(@11) == 0, 1);
     }
