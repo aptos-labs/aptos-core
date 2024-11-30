@@ -67,7 +67,7 @@ impl PartialStateComputeResult {
             .expect("StateCheckpointOutput not set")
     }
 
-    pub fn expect_result_state(&self) -> &State {
+    pub fn result_state(&self) -> &State {
         &self.execution_output.result_state
     }
 
