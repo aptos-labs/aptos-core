@@ -1,6 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// FIXME(aldenhu)
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
+
 //! This file contains utilities that are helpful for performing
 //! database restore operations, as required by restore and
 //! state sync v2.
@@ -124,6 +129,8 @@ pub(crate) fn save_transactions(
     )>,
     kv_replay: bool,
 ) -> Result<()> {
+    todo!()
+    /*
     if let Some((ledger_db_batch, state_kv_batches, _state_kv_metadata_batch)) = existing_batch {
         save_transactions_impl(
             state_store,
@@ -164,12 +171,20 @@ pub(crate) fn save_transactions(
 
         ledger_db.write_schemas(ledger_db_batch)?;
 
+<<<<<<< HEAD
         state_store
             .current_state()
             .set(StateDelta::new_empty_with_version(Some(last_version)));
+=======
+        *state_store.current_state().store(
+            // FIXME(aldenhu)
+            StateDelta::new_empty_with_version(Some(last_version))
+        );
+>>>>>>> 4f5660e3ec (DB: kv write path)
     }
 
     Ok(())
+     */
 }
 
 /// A helper function that saves the ledger infos to the given change set

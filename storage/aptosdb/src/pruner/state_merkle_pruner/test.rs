@@ -1,6 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// FIXME(aldenhu)
+#![allow(unused_imports)]
+
 use crate::{
     db::{
         test_helper::{arb_state_kv_sets, update_store},
@@ -42,6 +45,7 @@ fn put_value_set(
     value_set: Vec<(StateKey, StateValue)>,
     version: Version,
 ) -> HashValue {
+    /*
     let mut sharded_value_set = arr![HashMap::new(); 16];
     let value_set: HashMap<_, _> = value_set
         .iter()
@@ -87,6 +91,9 @@ fn put_value_set(
         .unwrap();
 
     root
+    FIXME(aldenhu)
+     */
+    todo!()
 }
 
 fn verify_state_in_store(

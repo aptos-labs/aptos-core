@@ -5,6 +5,8 @@
 #![forbid(unsafe_code)]
 // FIXME(aldenhu)
 #![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 
 //! This crate provides [`AptosDB`] which represents physical storage of the core Aptos data
 //! structures.

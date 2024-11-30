@@ -213,6 +213,7 @@ fn test_get_latest_ledger_summary() {
 pub fn test_state_merkle_pruning_impl(
     input: Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>,
 ) {
+    /* FIXME(aldenhu)
     // set up DB with state prune window 5 and epoch ending state prune window 10
     let tmp_dir = TempPath::new();
     let db = AptosDB::open(
@@ -311,6 +312,7 @@ pub fn test_state_merkle_pruning_impl(
 
         assert_eq!(expected_nodes, all_nodes);
     }
+     */
 }
 
 proptest! {

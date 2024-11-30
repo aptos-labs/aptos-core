@@ -20,7 +20,9 @@ use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{
     db_ensure as ensure,
-    state_store::{sharded_state_updates::ShardedStateUpdates, state_delta::StateDelta},
+    state_store::{
+        sharded_state_updates::ShardedStateUpdates, state::State, state_delta::StateDelta,
+    },
     AptosDbError, Result,
 };
 use std::{
@@ -176,11 +178,12 @@ impl BufferedState {
     /// This method updates the buffered state with new data.
     pub fn update(
         &mut self,
-        updates_until_next_checkpoint_since_current_option: Option<&ShardedStateUpdates>,
-        new_state_after_checkpoint: &StateDelta,
+        latest_state_checkpoint: Option<&State>,
+        state: &State,
         sync_commit: bool,
     ) -> Result<()> {
         /*
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___update"]);
         {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["update_current_state"]);
             let mut state_after_checkpoint = self.state_after_checkpoint.lock();

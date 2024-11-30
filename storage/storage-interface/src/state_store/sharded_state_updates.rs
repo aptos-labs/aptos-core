@@ -2,37 +2,41 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::state_store::NUM_STATE_SHARDS;
-use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
+use aptos_experimental_layered_map::LayeredMap;
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
-use arr_macro::arr;
-use rayon::iter::{
-    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator,
-    IntoParallelRefMutIterator, ParallelIterator,
-};
-use std::collections::HashMap;
 
-// FIXME(aldenhu): rename DeduppedStateWrites
-// FIXME(aldenhu): change to [LayeredMap; 16]
+// FIXME(aldenhu): rename DeduppedStateWrites?
+// FIXME(aldenhu): shall we inline this type into StateDelta?
 #[derive(Clone, Debug)]
 pub struct ShardedStateUpdates {
-    pub shards: [HashMap<StateKey, Option<StateValue>>; NUM_STATE_SHARDS],
+    pub shards: [LayeredMap<StateKey, Option<StateValue>>; NUM_STATE_SHARDS],
 }
 
 impl ShardedStateUpdates {
     pub fn new_empty() -> Self {
+        /* FIXME(aldenhu)
         Self {
             shards: arr![HashMap::new(); 16],
         }
+         */
+        todo!()
     }
 
     pub fn all_shards_empty(&self) -> bool {
+        /* FIXME(aldenhu)
         self.shards.iter().all(|shard| shard.is_empty())
+         */
+        todo!()
     }
 
     pub fn total_len(&self) -> usize {
+        /* FIXME(aldenhu)
         self.shards.iter().map(|shard| shard.len()).sum()
+         */
+        todo!()
     }
 
+    /* FIXME(aldenhu): remove
     pub fn merge(&mut self, other: Self) {
         THREAD_MANAGER.get_exe_cpu_pool().install(|| {
             self.shards
@@ -54,12 +58,5 @@ impl ShardedStateUpdates {
                 })
         })
     }
-
-    pub fn insert(
-        &mut self,
-        key: StateKey,
-        value: Option<StateValue>,
-    ) -> Option<Option<StateValue>> {
-        self.shards[key.get_shard_id() as usize].insert(key, value)
-    }
+     */
 }

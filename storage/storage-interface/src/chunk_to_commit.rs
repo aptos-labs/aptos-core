@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::state_store::{
-    sharded_state_update_refs::ShardedStateUpdateRefs, sharded_state_updates::ShardedStateUpdates,
-    state_delta::StateDelta, state_view::cached_state_view::ShardedStateCache,
+    sharded_state_update_refs::ShardedStateUpdateRefs, state::State, state_summary::StateSummary,
+    state_view::cached_state_view::ShardedStateCache,
 };
 use aptos_types::transaction::{Transaction, TransactionInfo, TransactionOutput, Version};
 
@@ -13,11 +13,12 @@ pub struct ChunkToCommit<'a> {
     pub transactions: &'a [Transaction],
     pub transaction_outputs: &'a [TransactionOutput],
     pub transaction_infos: &'a [TransactionInfo],
-    pub base_state_version: Option<Version>,
-    pub latest_in_memory_state: &'a StateDelta,
+    pub last_state_checkpoint: Option<&'a State>,
+    pub state: &'a State,
+    pub last_state_checkpoint_summary: Option<&'a StateSummary>,
+    pub state_summary: &'a StateSummary,
     pub state_update_refs: &'a ShardedStateUpdateRefs<'a>,
-    pub state_updates_until_last_checkpoint: Option<&'a ShardedStateUpdates>,
-    pub sharded_state_cache: Option<&'a ShardedStateCache>,
+    pub state_reads: Option<&'a ShardedStateCache>,
     pub is_reconfig: bool,
 }
 

@@ -126,7 +126,6 @@ pub struct ChunkToCommitOwned {
     transactions_to_keep: TransactionsToKeep,
     transaction_infos: Vec<TransactionInfo>,
     base_state_version: Option<Version>,
-    latest_in_memory_state: Arc<StateDelta>,
     state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
     sharded_state_cache: Option<ShardedStateCache>,
     is_reconfig: bool,
@@ -139,6 +138,7 @@ impl ChunkToCommitOwned {
         base_state_version: Option<Version>,
         latest_in_memory_state: &StateDelta,
     ) -> Self {
+        /*
         let (transactions, transaction_outputs, transaction_infos) = Self::disassemble_txns_to_commit(txns_to_commit);
 
         let is_reconfig = transaction_outputs
@@ -166,9 +166,13 @@ impl ChunkToCommitOwned {
             sharded_state_cache: None,
             is_reconfig,
         }
+        FIXME(aldenhu)
+         */
+        todo!()
     }
 
     pub fn as_ref(&self) -> ChunkToCommit {
+        /*
         ChunkToCommit {
             first_version: self.first_version,
             transactions: &self.transactions_to_keep.transactions,
@@ -178,9 +182,12 @@ impl ChunkToCommitOwned {
             latest_in_memory_state: &self.latest_in_memory_state,
             state_update_refs: self.transactions_to_keep.state_update_refs(),
             state_updates_until_last_checkpoint: self.state_updates_until_last_checkpoint.as_ref(),
-            sharded_state_cache: self.sharded_state_cache.as_ref(),
+            state_reads: self.sharded_state_cache.as_ref(),
             is_reconfig: self.is_reconfig,
         }
+        FIXME(aldenhu)
+         */
+        todo!()
     }
 
     fn disassemble_txns_to_commit(txns_to_commit: &[TransactionToCommit]) -> (

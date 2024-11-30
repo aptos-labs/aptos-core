@@ -40,6 +40,7 @@ impl State {
     pub fn version(&self) -> Option<Version> {
         self.next_version.checked_sub(1)
     }
+
     pub fn usage(&self) -> StateStorageUsage {
         self.usage
     }

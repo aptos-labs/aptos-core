@@ -73,6 +73,7 @@ pub(crate) fn update_store(
     first_version: Version,
     enable_sharding: bool,
 ) -> HashValue {
+    /*
     use aptos_storage_interface::{
         jmt_update_refs, jmt_updates,
         state_store::sharded_state_update_refs::ShardedStateUpdateRefs,
@@ -116,6 +117,9 @@ pub(crate) fn update_store(
             .unwrap();
     }
     root_hash
+    FIXME(aldenhu)
+     */
+    todo!()
 }
 
 pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[TransactionToCommit]) {
@@ -364,6 +368,7 @@ pub fn test_save_blocks_impl(
     input: Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>,
     snapshot_size_threshold: usize,
 ) {
+    /*
     let tmp_dir = TempPath::new();
     let db =
         AptosDB::new_for_test_with_buffered_state_target_items(&tmp_dir, snapshot_size_threshold);
@@ -449,6 +454,9 @@ pub fn test_save_blocks_impl(
             .flat_map(|(txns_to_commit, _)| txns_to_commit.iter())
             .collect(),
     );
+    FIXME(aldenhu)
+     */
+    todo!()
 }
 
 fn verify_snapshots(
