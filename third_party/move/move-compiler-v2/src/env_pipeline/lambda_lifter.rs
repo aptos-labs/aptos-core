@@ -293,16 +293,8 @@ impl<'a> LambdaLifter<'a> {
         args: &'b [Exp],
     ) -> Option<Vec<&'b Exp>> {
         if lambda_params.len() <= args.len() {
-            let mut simple_args: Vec<&Exp> = args
-                .iter()
-                .filter_map(|arg| {
-                    if Self::exp_is_simple(arg) {
-                        Some(arg)
-                    } else {
-                        None
-                    }
-                })
-                .collect();
+            let mut simple_args: Vec<&Exp> =
+                args.iter().filter(|arg| Self::exp_is_simple(arg)).collect();
             if simple_args.len() == args.len()
                 && lambda_params
                     .iter()
@@ -434,15 +426,12 @@ impl<'a> LambdaLifter<'a> {
                     let free_vars = fn_exp.as_ref().free_vars();
                     if lambda_params
                         .iter()
-                        .any(|param| free_vars.contains(&param.get_name()))
+                        .all(|param| !free_vars.contains(&param.get_name()))
+                        && Self::exp_is_simple(fn_exp)
                     {
-                        None
+                        Some((fn_exp.clone(), args))
                     } else {
-                        if Self::exp_is_simple(fn_exp) {
-                            Some((fn_exp.clone(), args))
-                        } else {
-                            None
-                        }
+                        None
                     }
                 })
             },
@@ -682,11 +671,7 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         // param_index_mapping = for each free var which is a Parameter from the enclosing function,
         //      a mapping from index there to index in the params list; other free vars are
         //      substituted automatically by using the same symbol for the param
-        let Some((mut params, mut closure_args, param_index_mapping)) =
-            self.get_params_for_freevars()
-        else {
-            return None;
-        };
+        let (mut params, mut closure_args, param_index_mapping) = self.get_params_for_freevars()?;
 
         // Some(ExpData::Invalid(env.clone_node(id)).into_exp());
         // Add lambda args. For dealing with patterns in lambdas (`|S{..}|e`) we need
