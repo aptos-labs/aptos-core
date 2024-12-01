@@ -9,6 +9,7 @@
 -  [Constants](#@Constants_0)
 -  [Function `ethereum_address`](#0x1_ethereum_ethereum_address)
 -  [Function `ethereum_address_no_eip55`](#0x1_ethereum_ethereum_address_no_eip55)
+-  [Function `get_inner_ethereum_address`](#0x1_ethereum_get_inner_ethereum_address)
 -  [Function `to_lowercase`](#0x1_ethereum_to_lowercase)
 -  [Function `to_eip55_checksumed_address`](#0x1_ethereum_to_eip55_checksumed_address)
 -  [Function `get_inner`](#0x1_ethereum_get_inner)
@@ -145,6 +146,34 @@ Returns a new <code><a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">Ethe
 <pre><code><b>public</b> <b>fun</b> <a href="atomic_bridge.md#0x1_ethereum_ethereum_address_no_eip55">ethereum_address_no_eip55</a>(ethereum_address: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">EthereumAddress</a> {
     <a href="atomic_bridge.md#0x1_ethereum_assert_40_char_hex">assert_40_char_hex</a>(&ethereum_address);
     <a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">EthereumAddress</a> { inner: ethereum_address }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_ethereum_get_inner_ethereum_address"></a>
+
+## Function `get_inner_ethereum_address`
+
+Gets the inner vector of an <code><a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">EthereumAddress</a></code>.
+
+@param ethereum_address A 40-byte vector of unsigned 8-bit integers (hexadecimal format).
+@return The vector<u8> inner value of the EthereumAddress
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="atomic_bridge.md#0x1_ethereum_get_inner_ethereum_address">get_inner_ethereum_address</a>(ethereum_address: <a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">ethereum::EthereumAddress</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="atomic_bridge.md#0x1_ethereum_get_inner_ethereum_address">get_inner_ethereum_address</a>(ethereum_address: <a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">EthereumAddress</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    ethereum_address.inner
 }
 </code></pre>
 

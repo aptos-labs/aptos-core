@@ -219,6 +219,15 @@ struct NativeBridgeTransferInitiatedEvent {
     nonce: u64,
 }
 
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+struct NativeBridgeTransferCompletedEvent {
+    bridge_transfer_id: Vec<u8>,
+    initiator: Vec<u8>,
+    recipient: AccountAddress,
+    amount: u64,
+    nonce: u64,
+}
+
 #[test]
 // A bridge is initiated with said amount to recipient on the destination chain
 // A relayer confirms that the initiate bridge transfer is successful and validates the details
@@ -260,7 +269,7 @@ fn test_native_bridge_initiate() {
 
     // Append serialized values to `combined_bytes`
     combined_bytes.extend(bcs::to_bytes(&initiator).expect("Failed to serialize initiator"));
-    combined_bytes.extend(bcs::to_bytes(&recipient).expect("Failed to serialize recipient"));
+    combined_bytes.extend(recipient);
     combined_bytes.extend(bcs::to_bytes(&amount).expect("Failed to serialize amount"));
     combined_bytes.extend(bcs::to_bytes(&nonce).expect("Failed to serialize nonce"));
 
@@ -284,39 +293,18 @@ fn test_native_bridge_complete() {
     native_bridge_feature(&mut harness);
     run_mint_burn_caps_native(&mut harness);
 
-    let initiator = harness.new_account_at(AccountAddress::from_hex_literal("0xCAFE").unwrap());
-    let recipient = b"32Be343B94f860124dC4fEe278FDCBD38C102D88".to_vec();
+    let relayer = harness.new_account_at(AccountAddress::from_hex_literal("0x1").unwrap());
+
+    let initiator = b"32Be343B94f860124dC4fEe278FDCBD38C102D88".to_vec();
+    let recipient = harness.new_account_at(AccountAddress::from_hex_literal("0xCAFE").unwrap());
     let amount = 1_000_000; // 0.1
-
-    let original_balance = harness.read_aptos_balance(initiator.address());
-    let gas_used = harness.evaluate_entry_function_gas(&initiator,
-                                str::parse("0x1::native_bridge::initiate_bridge_transfer").unwrap(),
-                                vec![],
-                                vec![
-                                    MoveValue::vector_u8(recipient.clone()).simple_serialize().unwrap(),
-                                    MoveValue::U64(amount).simple_serialize().unwrap(),
-                                ],);
-
-    let gas_used = gas_used * harness.default_gas_unit_price;
-    let new_balance = harness.read_aptos_balance(initiator.address());
-    assert_eq!(original_balance - amount - gas_used, new_balance);
-
-    let events = harness.get_events();
-    let bridge_transfer_initiated_event_tag = TypeTag::from_str("0x1::native_bridge::BridgeTransferInitiatedEvent").unwrap();
-    let bridge_transfer_initiated_event = events.iter().find(|element| element.type_tag() == &bridge_transfer_initiated_event_tag).unwrap();
-    let bridge_transfer_initiated_event = bcs::from_bytes::<NativeBridgeTransferInitiatedEvent>(bridge_transfer_initiated_event.event_data()).unwrap();
-
-    let bridge_transfer_id = bridge_transfer_initiated_event.bridge_transfer_id;
-    let initiator = bridge_transfer_initiated_event.initiator;
-    let recipient = bridge_transfer_initiated_event.recipient;
-    let amount = bridge_transfer_initiated_event.amount;
-    let nonce = bridge_transfer_initiated_event.nonce;
+    let nonce = 5;
 
     let mut combined_bytes = Vec::new();
 
     // Append serialized values to `combined_bytes`
-    combined_bytes.extend(bcs::to_bytes(&initiator).expect("Failed to serialize initiator"));
-    combined_bytes.extend(bcs::to_bytes(&recipient).expect("Failed to serialize recipient"));
+    combined_bytes.extend(initiator.clone());
+    combined_bytes.extend(bcs::to_bytes(&recipient.address()).expect("Failed to serialize recipient"));
     combined_bytes.extend(bcs::to_bytes(&amount).expect("Failed to serialize amount"));
     combined_bytes.extend(bcs::to_bytes(&nonce).expect("Failed to serialize nonce"));
 
@@ -328,7 +316,33 @@ fn test_native_bridge_complete() {
     hasher.finalize(&mut hash);
 
     // Compare the computed hash to `bridge_transfer_id`
-    assert!(bridge_transfer_id == hash.to_vec());
+    println!("Expected bridge transfer ID: {:?}", hash.to_vec());
+
+    let original_balance = harness.read_aptos_balance(relayer.address());
+    let gas_used = harness.evaluate_entry_function_gas(&relayer,
+                                str::parse("0x1::native_bridge::complete_bridge_transfer").unwrap(),
+                                vec![],
+                                vec![
+                                    MoveValue::vector_u8(hash.to_vec()).simple_serialize().unwrap(),
+                                    MoveValue::vector_u8(initiator.clone()).simple_serialize().unwrap(),
+                                    MoveValue::Address(*recipient.address()).simple_serialize().unwrap(),
+                                    MoveValue::U64(amount).simple_serialize().unwrap(),
+                                    MoveValue::U64(nonce).simple_serialize().unwrap(),
+                                ],);
+
+    let gas_used = gas_used * harness.default_gas_unit_price;
+    let new_balance = harness.read_aptos_balance(relayer.address());
+    assert_eq!(original_balance - gas_used, new_balance);
+
+    let events = harness.get_events();
+    let bridge_transfer_completed_event_tag = TypeTag::from_str("0x1::native_bridge::BridgeTransferCompletedEvent").unwrap();
+    let bridge_transfer_completed_event = events.iter().find(|element| element.type_tag() == &bridge_transfer_completed_event_tag).unwrap();
+    let bridge_transfer_completed_event = bcs::from_bytes::<NativeBridgeTransferCompletedEvent>(bridge_transfer_completed_event.event_data()).unwrap();
+ 
+    let bridge_transfer_id = bridge_transfer_completed_event.bridge_transfer_id;
+ 
+    assert_eq!(bridge_transfer_id, hash.to_vec());
+
 }
 
 #[test]

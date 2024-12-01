@@ -731,7 +731,7 @@ pub enum EntryFunctionCall {
         nonce: u64,
     },
 
-    /// Initiate a bridge transfer of MOVE from Movement to the base layer  
+    /// Initiate a bridge transfer of MOVE from Movement to Ethereum
     /// Anyone can initiate a bridge transfer from the source chain  
     /// The amount is burnt from the initiator and the module-level nonce is incremented  
     /// @param initiator The initiator's Ethereum address as a vector of bytes.  
@@ -3734,7 +3734,7 @@ pub fn native_bridge_complete_bridge_transfer(
     ))
 }
 
-/// Initiate a bridge transfer of MOVE from Movement to the base layer  
+/// Initiate a bridge transfer of MOVE from Movement to Ethereum
 /// Anyone can initiate a bridge transfer from the source chain  
 /// The amount is burnt from the initiator and the module-level nonce is incremented  
 /// @param initiator The initiator's Ethereum address as a vector of bytes.  

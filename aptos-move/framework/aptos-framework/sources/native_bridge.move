@@ -352,6 +352,7 @@ module aptos_framework::native_bridge_store {
     use aptos_std::aptos_hash::keccak256;
     use aptos_std::smart_table;
     use aptos_std::smart_table::SmartTable;
+    use aptos_framework::ethereum;
     use aptos_framework::ethereum::EthereumAddress;
     use aptos_framework::system_addresses;
     use std::signer;
@@ -474,7 +475,7 @@ module aptos_framework::native_bridge_store {
     public(friend) fun bridge_transfer_id(initiator: address, recipient: EthereumAddress, amount: u64, nonce: u64) : vector<u8> {
         let combined_bytes = vector::empty<u8>();
         vector::append(&mut combined_bytes, bcs::to_bytes(&initiator));
-        vector::append(&mut combined_bytes, bcs::to_bytes(&recipient));
+        vector::append(&mut combined_bytes, ethereum::get_inner_ethereum_address(recipient));
         vector::append(&mut combined_bytes, bcs::to_bytes(&amount));
         vector::append(&mut combined_bytes, bcs::to_bytes(&nonce));
         keccak256(combined_bytes)
