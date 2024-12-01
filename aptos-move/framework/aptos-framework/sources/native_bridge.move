@@ -15,8 +15,6 @@ module aptos_framework::native_bridge {
     use std::bcs;
     use std::vector;
     use aptos_std::aptos_hash::keccak256;
-    #[test_only]
-    use aptos_std::debug;
 
     const ETRANSFER_ALREADY_PROCESSED: u64 = 1;
     const EINVALID_BRIDGE_TRANSFER_ID: u64 = 2;
@@ -257,17 +255,6 @@ module aptos_framework::native_bridge {
         vector::append(&mut combined_bytes, bcs::to_bytes(&amount));
         vector::append(&mut combined_bytes, bcs::to_bytes(&nonce));
         let bridge_transfer_id = keccak256(combined_bytes);
-
-        debug::print(&initiator);
-        debug::print(&recipient);
-        debug::print(&amount);
-        debug::print(&nonce);
-
-        debug::print(&bcs::to_bytes(&recipient));
-        debug::print(&bcs::to_bytes(&amount));
-        debug::print(&bcs::to_bytes(&nonce));
-
-        debug::print(&bridge_transfer_id);
 
         // Create an account for our recipient
         aptos_account::create_account(recipient);
