@@ -4218,10 +4218,10 @@ pub struct FunctionData {
     /// A cache for the transitive closure of the called functions.
     pub(crate) transitive_closure_of_called_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
 
-    /// A cache for the used functions.
+    /// A cache for the used functions.  Used functions are those called or with values taken here.
     pub(crate) used_funs: Option<BTreeSet<QualifiedId<FunId>>>,
 
-    /// A cache for the using functions.
+    /// A cache for the using functions.  Using functions are those which call or take value of this.
     pub(crate) using_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
 
     /// A cache for the transitive closure of the used functions.
