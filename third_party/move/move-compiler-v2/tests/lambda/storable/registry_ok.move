@@ -1,24 +1,27 @@
 module 0x42::test {
+    use std::signer;
     use std::vector;
     use std::signer;
 
+    struct FunctionValue(|u64| u64 with store+copy) has store, copy, drop;
+
     struct Registry has key {
-        functions: vector<Function>
+        functions: vector<FunctionEntry>
     }
 
-    struct Function has store {
-        f: |u64| u64 with store+copy,
+    struct FunctionEntry has store, copy {
+        f: FunctionValue,
         key: u64
     }
 
-    enum Option<T> {
+    enum Option<T> has store, copy {
         None(),
         Some(T)
     }
 
-    fun get_function(v: &vector<Function>, k: u64): Option<Function> {
+    fun get_function(v: &vector<FunctionEntry>, k: u64): Option<FunctionValue> {
         let x = Option::None;
-        vector::for_each_ref(v, |f: &Function| {
+        vector::for_each_ref(v, |f: &FunctionEntry| {
             if (f.key == k) {
                 x = Option::Some(f.f)
             }
@@ -70,7 +73,7 @@ module 0x42::test {
         match (get_function(&registry.functions, k)) {
             Some(func) => {
                 let Function { f: f, key: key } = func;
-                Option::Some(f(x))
+                Option::Some((f.0)(x))
             },
             _ => {
                 Option::None
@@ -103,12 +106,12 @@ module 0x42::test {
         x * y
     }
 
-    fun multiply_by_x(x: u64): |u64|u64 with store {
-        |y| multiply(x, y)
+    fun multiply_by_x(x: u64): FunctionValue {
+        FunctionValue(move |y| multiply(x, y))
     }
 
-    fun multiply_by_x2(x: u64): |u64|u64 with store {
-        move |y| multiply(x, y)
+    fun multiply_by_x2(x: u64): FunctionValue {
+        FunctionValue(move |y| multiply(x, y))
     }
 
     #[test(a = @0x42)]

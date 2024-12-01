@@ -608,10 +608,13 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
 
     fn rewrite_assign(&mut self, _node_id: NodeId, lhs: &Pattern, _rhs: &Exp) -> Option<Exp> {
         for (node_id, name) in lhs.vars() {
-            self.free_locals.insert(name, VarInfo {
-                node_id,
-                modified: true,
-            });
+            self.free_locals.insert(
+                name,
+                VarInfo {
+                    node_id,
+                    modified: true,
+                },
+            );
         }
         None
     }
@@ -620,16 +623,22 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         if matches!(oper, Operation::Borrow(ReferenceKind::Mutable)) {
             match args[0].as_ref() {
                 ExpData::LocalVar(node_id, name) => {
-                    self.free_locals.insert(*name, VarInfo {
-                        node_id: *node_id,
-                        modified: true,
-                    });
+                    self.free_locals.insert(
+                        *name,
+                        VarInfo {
+                            node_id: *node_id,
+                            modified: true,
+                        },
+                    );
                 },
                 ExpData::Temporary(node_id, param) => {
-                    self.free_params.insert(*param, VarInfo {
-                        node_id: *node_id,
-                        modified: true,
-                    });
+                    self.free_params.insert(
+                        *param,
+                        VarInfo {
+                            node_id: *node_id,
+                            modified: true,
+                        },
+                    );
                 },
                 _ => {},
             }
@@ -739,7 +748,7 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
             env.error(
                 &loc,
                 // TODO(LAMBDA)
-                "Lambdas expressions with `store` ability currently may only be a simple call to an existing `public` function.  This lambda expression requires defining a `public` helper function, which is not yet supported."
+                "Lambdas expressions with `store` ability currently may only be a simple call to an existing `public` function (see release notes for details).  This lambda expression requires the compiler to generate a `public` helper function, which might affect module upgradeability and is not yet supported."
             );
             return None;
         };
