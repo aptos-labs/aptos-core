@@ -60,7 +60,7 @@ fn used_type_parameters_in_ty(ty: &Type) -> BTreeSet<u16> {
         },
         Type::TypeParameter(i) => BTreeSet::from([*i]),
         Type::Vector(ty) => used_type_parameters_in_ty(ty),
-        Type::Fun(t1, t2) => [t1, t2]
+        Type::Fun(t1, t2, _) => [t1, t2]
             .iter()
             .flat_map(|t| used_type_parameters_in_ty(t))
             .collect(),

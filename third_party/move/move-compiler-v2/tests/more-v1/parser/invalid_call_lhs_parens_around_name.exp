@@ -1,10 +1,7 @@
 
 Diagnostics:
-error: unexpected token
-  ┌─ tests/more-v1/parser/invalid_call_lhs_parens_around_name.move:3:14
+error: Calls to function values other than inline function parameters not yet supported
+  ┌─ tests/more-v1/parser/invalid_call_lhs_parens_around_name.move:3:9
   │
 3 │         (foo)()
-  │              ^
-  │              │
-  │              Unexpected '('
-  │              Expected ';'
+  │         ^^^^^^^
