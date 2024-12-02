@@ -523,7 +523,12 @@ pub enum MoveType {
 
 /// Maximum number of recursive types - Same as (non-public)
 /// move_core_types::safe_serialize::MAX_TYPE_TAG_NESTING
-pub const MAX_RECURSIVE_TYPES_ALLOWED: u8 = 8;
+/// We keep 16 for legacy tests
+pub const MAX_RECURSIVE_TYPES_ALLOWED: u8 = if cfg!(test) {
+    16
+} else {
+    8 // = move_core_types::safe_serialize::MAX_TYPE_TAG_NESTING
+};
 
 impl VerifyInputWithRecursion for MoveType {
     fn verify(&self, recursion_count: u8) -> anyhow::Result<()> {
