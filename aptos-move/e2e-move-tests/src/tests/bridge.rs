@@ -254,9 +254,29 @@ fn ascii_hex_to_u8(ch: u8) -> u8 {
 }
 
 fn normalize_to_32_bytes(value: Vec<u8>) -> Vec<u8> {
-    let mut padded = vec![0u8; 32 - value.len()]; // Left-padding
-    padded.extend(value);
-    padded
+    let mut meaningful = Vec::new();
+    let mut i = 0;
+
+    // Remove trailing zeroes
+    while i < value.len() {
+        if value[i] != 0 {
+            meaningful.push(value[i]);
+        }
+        i += 1;
+    }
+
+    let mut result = Vec::with_capacity(32);
+    let padding_length = 32 - meaningful.len();
+
+    // Pad with zeros on the left
+    for _ in 0..padding_length {
+        result.push(0);
+    }
+
+    // Append the meaningful bytes
+    result.extend_from_slice(&meaningful);
+
+    result
 }
 
 #[test]
@@ -349,11 +369,11 @@ fn test_native_bridge_complete() {
     let mut combined_bytes = Vec::new();
 
     // Append serialized values to `combined_bytes`
-    combined_bytes.extend(initiator.clone());
+    combined_bytes.extend_from_slice(&hex::decode(&format!("0x{}", String::from_utf8_lossy(&initiator)).to_string()).unwrap());
     combined_bytes.extend(bcs::to_bytes(&recipient.address()).expect("Failed to serialize recipient"));
     combined_bytes.extend(normalize_to_32_bytes(bcs::to_bytes(&amount).expect("Failed to serialize amount")));
     combined_bytes.extend(normalize_to_32_bytes(bcs::to_bytes(&nonce).expect("Failed to serialize nonce")));
-
+    println!("Combined bytes: {:?}", hex::encode(&combined_bytes));
     // Compute keccak256 hash using tiny-keccak
     let mut hasher = Keccak::v256();
     hasher.update(&combined_bytes);
@@ -362,7 +382,7 @@ fn test_native_bridge_complete() {
     hasher.finalize(&mut hash);
 
     // Compare the computed hash to `bridge_transfer_id`
-    println!("Expected bridge transfer ID: {:?}", hex::decode(hash.to_vec()));
+    println!("Expected bridge transfer ID: {:?}", hex::encode(hash));
 
     let original_balance = harness.read_aptos_balance(relayer.address());
     let gas_used = harness.evaluate_entry_function_gas(&relayer,
