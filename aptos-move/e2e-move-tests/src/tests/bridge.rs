@@ -311,15 +311,10 @@ fn test_native_bridge_initiate() {
     let bridge_transfer_initiated_event = bcs::from_bytes::<NativeBridgeTransferInitiatedEvent>(bridge_transfer_initiated_event.event_data()).unwrap();
 
     let bridge_transfer_id = bridge_transfer_initiated_event.bridge_transfer_id;
-    println!("Bridge transfer ID: {:?}", hex::encode(&bridge_transfer_id));
     let initiator = bridge_transfer_initiated_event.initiator;
-    println!("Initiator: {:?}", hex::encode(&initiator));
     let recipient = bridge_transfer_initiated_event.recipient;
-    println!("Recipient: {:?}", hex::encode(&recipient));
     let amount = bridge_transfer_initiated_event.amount;
-    println!("Amount: {:?}", &amount);
     let nonce = bridge_transfer_initiated_event.nonce;
-    println!("Nonce: {:?}", &nonce);
 
     let mut combined_bytes = Vec::new();
 
@@ -330,7 +325,6 @@ fn test_native_bridge_initiate() {
     // Convert recipient from hex to bytes
     let recipient_bytes = hex::decode(String::from_utf8(recipient).expect("Invalid UTF-8 recipient"))
     .expect("Failed to decode recipient hex");
-    println!("Recipient bytes: {:?}", recipient_bytes); 
     combined_bytes.extend(recipient_bytes);
 
     // Pad amount and nonce to 32 bytes
@@ -373,12 +367,10 @@ fn test_native_bridge_complete() {
     // Convert recipient from hex to bytes
     let initiator_bytes = hex::decode(String::from_utf8(initiator.clone()).expect("Invalid UTF-8 recipient"))
     .expect("Failed to decode recipient hex");
-    println!("Recipient bytes: {:?}", initiator_bytes); 
     combined_bytes.extend(initiator_bytes);
     combined_bytes.extend(bcs::to_bytes(&recipient.address()).expect("Failed to serialize recipient"));
     combined_bytes.extend(normalize_to_32_bytes(bcs::to_bytes(&amount).expect("Failed to serialize amount")));
     combined_bytes.extend(normalize_to_32_bytes(bcs::to_bytes(&nonce).expect("Failed to serialize nonce")));
-    println!("Combined bytes: {:?}", hex::encode(&combined_bytes));
     // Compute keccak256 hash using tiny-keccak
     let mut hasher = Keccak::v256();
     hasher.update(&combined_bytes);
@@ -387,8 +379,6 @@ fn test_native_bridge_complete() {
     hasher.finalize(&mut hash);
 
     // Compare the computed hash to `bridge_transfer_id`
-    println!("Expected bridge transfer ID: {:?}", hex::encode(hash));
-
     let original_balance = harness.read_aptos_balance(relayer.address());
     let gas_used = harness.evaluate_entry_function_gas(&relayer,
                                 str::parse("0x1::native_bridge::complete_bridge_transfer").unwrap(),
