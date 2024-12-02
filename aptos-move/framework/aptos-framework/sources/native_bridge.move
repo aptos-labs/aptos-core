@@ -13,6 +13,8 @@ module aptos_framework::native_bridge {
     #[test_only]
     use aptos_framework::ethereum::valid_eip55;
     use std::bcs;
+    #[test_only]
+    use aptos_std::debug;
     use std::vector;
     use aptos_std::aptos_hash::keccak256;
 
@@ -211,7 +213,7 @@ module aptos_framework::native_bridge {
     }
 
 
-    #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
+    #[test(aptos_framework = @aptos_framework, sender = @0x726563697069656e740000000000000000000000000000000000000000000000)]
     fun test_initiate_bridge_transfer_happy_path(
         sender: &signer,
         aptos_framework: &signer,
@@ -220,7 +222,7 @@ module aptos_framework::native_bridge {
         native_bridge_core::initialize_for_test(aptos_framework);
         initialize(aptos_framework);
         aptos_account::create_account(sender_address);
-        let amount = 1000;
+        let amount = 100;
 
         // Mint coins to the sender to ensure they have sufficient balance
         let account_balance = amount + 1;
@@ -228,7 +230,7 @@ module aptos_framework::native_bridge {
         native_bridge_core::mint(sender_address, account_balance);
 
         // Specify the recipient and transfer amount
-        let recipient = valid_eip55();
+        let recipient = b"5B38Da6a701c568545dCfcB03FcB875f56beddC4";
 
         // Perform the bridge transfer
         initiate_bridge_transfer(
@@ -241,6 +243,7 @@ module aptos_framework::native_bridge {
         let initiated_events = event::emitted_events_by_handle(
             &bridge_events.bridge_transfer_initiated_events
         );
+        debug::print(&initiated_events);
         assert!(vector::length(&initiated_events) == 1, EEVENT_NOT_FOUND);
     }
 
@@ -272,7 +275,7 @@ module aptos_framework::native_bridge {
         let initiator = b"5B38Da6a701c568545dCfcB03FcB875f56beddC4";
         let recipient = @0x726563697069656e740000000000000000000000000000000000000000000000;
         let amount = 100;
-        let nonce = 5;
+        let nonce = 1;
 
         // Create a bridge transfer ID algorithmically
         let combined_bytes = vector::empty<u8>();
@@ -281,6 +284,7 @@ module aptos_framework::native_bridge {
         vector::append(&mut combined_bytes, native_bridge_store::normalize_to_32_bytes(bcs::to_bytes(&amount)));
         vector::append(&mut combined_bytes, native_bridge_store::normalize_to_32_bytes(bcs::to_bytes(&nonce)));
         let bridge_transfer_id = keccak256(combined_bytes);
+        debug::print(&bridge_transfer_id);
 
         // Create an account for our recipient
         aptos_account::create_account(recipient);
@@ -305,8 +309,9 @@ module aptos_framework::native_bridge {
             amount,
             nonce,
         };
-
+        debug::print(&expected_event.bridge_transfer_id);
         assert!(std::vector::contains(&complete_events, &expected_event), 0);
+        assert!(bridge_transfer_id == expected_event.bridge_transfer_id, 0)
     }
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
