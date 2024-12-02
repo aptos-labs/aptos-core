@@ -25,7 +25,7 @@ use rand::{prelude::StdRng, thread_rng, SeedableRng};
 use std::{sync::Arc, time::Duration};
 use aptos_event_notifications::EventNotification;
 use aptos_storage_interface::DbReader;
-use aptos_storage_interface::state_view::DbStateViewAtVersion;
+use aptos_storage_interface::state_store::state_view::db_state_view::DbStateViewAtVersion;
 use aptos_types::on_chain_config::OnChainConfig;
 
 #[derive(Clone, Debug)]
