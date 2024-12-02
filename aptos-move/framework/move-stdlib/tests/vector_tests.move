@@ -284,6 +284,52 @@ module std::vector_tests {
         V::remove(&mut v, 1);
     }
 
+    fun remove_more_cases() {
+        let v :vector<u64> = vector[1];
+        assert!(V::remove(&mut v, 0) == 1, 1);
+        assert!(&v == &vector[], 1);
+
+        let v :vector<u64> = vector[2, 1];
+        assert!(V::remove(&mut v, 0) == 2, 1);
+        assert!(&v == &vector[1], 1);
+
+        let v :vector<u64> = vector[1, 2];
+        assert!(V::remove(&mut v, 1) == 2, 1);
+        assert!(&v == &vector[1], 1);
+
+        let v :vector<u64> = vector[3, 1, 2];
+        assert!(V::remove(&mut v, 0) == 3, 1);
+        assert!(&v == &vector[1, 2], 1);
+
+        let v :vector<u64> = vector[1, 3, 2];
+        assert!(V::remove(&mut v, 1) == 3, 1);
+        assert!(&v == &vector[1, 2], 1);
+
+        let v :vector<u64> = vector[1, 2, 3];
+        assert!(V::remove(&mut v, 2) == 3, 1);
+        assert!(&v == &vector[1, 2], 1);
+
+        let v :vector<u64> = vector[4, 1, 2, 3];
+        assert!(V::remove(&mut v, 0) == 4, 1);
+        assert!(&v == &vector[1, 2, 3], 1);
+
+        let v :vector<u64> = vector[5, 1, 2, 3, 4];
+        assert!(V::remove(&mut v, 0) == 5, 1);
+        assert!(&v == &vector[1, 2, 3, 4], 1);
+
+        let v :vector<u64> = vector[1, 5, 2, 3, 4];
+        assert!(V::remove(&mut v, 1) == 5, 1);
+        assert!(&v == &vector[1, 2, 3, 4], 1);
+
+        let v :vector<u64> = vector[1, 2, 5, 3, 4];
+        assert!(V::remove(&mut v, 2) == 5, 1);
+        assert!(&v == &vector[1, 2, 3, 4], 1);
+
+        let v :vector<u64> = vector[1, 2, 3, 4, 5];
+        assert!(V::remove(&mut v, 4) == 5, 1);
+        assert!(&v == &vector[1, 2, 3, 4], 1);
+    }
+
     #[test]
     fun remove_value_singleton_vector() {
         let v = V::empty();
@@ -891,11 +937,55 @@ module std::vector_tests {
     fun test_insert() {
         let v:vector<u64> = vector[1, 2, 3, 4, 5];
 
-        vector::insert(&mut v,2, 6);
+        V::insert(&mut v,2, 6);
         assert!(&v == &vector[1, 2, 6, 3, 4, 5], 1);
 
-        vector::insert(&mut v,6, 7);
+        V::insert(&mut v,6, 7);
         assert!(&v == &vector[1, 2, 6, 3, 4, 5, 7], 1);
+
+        let v :vector<u64> = vector[];
+        V::insert(&mut v, 0, 1);
+        assert!(&v == &vector[1], 1);
+
+        let v :vector<u64> = vector[1];
+        V::insert(&mut v, 0, 2);
+        assert!(&v == &vector[2, 1], 1);
+
+        let v :vector<u64> = vector[1];
+        V::insert(&mut v, 1, 2);
+        assert!(&v == &vector[1, 2], 1);
+
+        let v :vector<u64> = vector[1, 2];
+        V::insert(&mut v, 0, 3);
+        assert!(&v == &vector[3, 1, 2], 1);
+
+        let v :vector<u64> = vector[1, 2];
+        V::insert(&mut v, 1, 3);
+        assert!(&v == &vector[1, 3, 2], 1);
+
+        let v :vector<u64> = vector[1, 2];
+        V::insert(&mut v, 2, 3);
+        assert!(&v == &vector[1, 2, 3], 1);
+
+        let v :vector<u64> = vector[1, 2, 3];
+        V::insert(&mut v, 0, 4);
+        assert!(&v == &vector[4, 1, 2, 3], 1);
+
+        let v :vector<u64> = vector[1, 2, 3, 4];
+        V::insert(&mut v, 0, 5);
+        assert!(&v == &vector[5, 1, 2, 3, 4], 1);
+
+        let v :vector<u64> = vector[1, 2, 3, 4];
+        V::insert(&mut v, 1, 5);
+        assert!(&v == &vector[1, 5, 2, 3, 4], 1);
+
+        let v :vector<u64> = vector[1, 2, 3, 4];
+        V::insert(&mut v, 2, 5);
+        assert!(&v == &vector[1, 2, 5, 3, 4], 1);
+
+        let v :vector<u64> = vector[1, 2, 3, 4];
+        V::insert(&mut v, 4, 5);
+        assert!(&v == &vector[1, 2, 3, 4, 5], 1);
     }
 
     #[test]
