@@ -146,6 +146,8 @@ impl InterpreterImpl {
             active_modules: HashSet::new(),
         };
 
+        let function = std::rc::Rc::new(function);
+
         if loader.vm_config().paranoid_type_checks {
             interpreter.execute_main::<FullRuntimeTypeCheck>(
                 loader,
@@ -173,6 +175,44 @@ impl InterpreterImpl {
         }
     }
 
+    fn load_generic_function(
+        &mut self,
+        resolver: &Resolver,
+        current_frame: &Frame,
+        gas_meter: &mut impl GasMeter,
+        idx: FunctionInstantiationIndex,
+    ) -> VMResult<LoadedFunction> {
+        let ty_args = resolver
+            .instantiate_generic_function(Some(gas_meter), idx, current_frame.function.ty_args())
+            .map_err(|e| set_err_info!(current_frame, e))?;
+        let function = resolver
+            .build_loaded_function_from_instantiation_and_ty_args(idx, ty_args)
+            .map_err(|e| self.set_location(e))?;
+
+        if self.paranoid_type_checks {
+            self.check_friend_or_private_call(&current_frame.function, &function)?;
+        }
+
+        Ok(function)
+    }
+
+    fn load_function(
+        &mut self,
+        resolver: &Resolver,
+        current_frame: &Frame,
+        fh_idx: FunctionHandleIndex,
+    ) -> VMResult<LoadedFunction> {
+        let function = resolver
+            .build_loaded_function_from_handle_and_ty_args(fh_idx, vec![])
+            .map_err(|e| self.set_location(e))?;
+
+        if self.paranoid_type_checks {
+            self.check_friend_or_private_call(&current_frame.function, &function)?;
+        }
+
+        Ok(function)
+    }
+
     /// Main loop for the execution of a function.
     ///
     /// This function sets up a `Frame` and calls `execute_code_unit` to execute code of the
@@ -188,7 +228,7 @@ impl InterpreterImpl {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
-        function: LoadedFunction,
+        function: std::rc::Rc<LoadedFunction>,
         args: Vec<Value>,
     ) -> VMResult<Vec<Value>> {
         let mut locals = Locals::new(function.local_tys().len());
@@ -202,8 +242,10 @@ impl InterpreterImpl {
             self.active_modules.insert(module_id.clone());
         }
 
+        let frame_cache = std::rc::Rc::new(std::cell::RefCell::new(Default::default()));
+
         let mut current_frame = self
-            .make_new_frame(gas_meter, loader, function, locals)
+            .make_new_frame(gas_meter, loader, function, locals, frame_cache)
             .map_err(|err| self.set_location(err))?;
 
         // Access control for the new frame.
@@ -253,13 +295,51 @@ impl InterpreterImpl {
                     }
                 },
                 ExitCode::Call(fh_idx) => {
-                    let function = resolver
-                        .build_loaded_function_from_handle_and_ty_args(fh_idx, vec![])
-                        .map_err(|e| self.set_location(e))?;
+                    let (function, frame_cache) = {
+                        match self.call_stack.top() {
+                            Some(top_frame) => {
+                                let top_frame_cache = std::rc::Rc::clone(&top_frame.ty_cache);
+                                let top_frame_cache = &mut *top_frame_cache.borrow_mut();
 
-                    if self.paranoid_type_checks {
-                        self.check_friend_or_private_call(&current_frame.function, &function)?;
-                    }
+                                match top_frame_cache.sub_frame_cache.entry(fh_idx) {
+                                    std::collections::btree_map::Entry::Occupied(entry) => {
+                                        let entry = entry.get();
+                                        let function = std::rc::Rc::<LoadedFunction>::new(
+                                            self.load_function(&resolver, &current_frame, fh_idx)?,
+                                        );
+
+                                        // Doesn't work:
+                                        // (std::rc::Rc::clone(&entry.0), std::rc::Rc::clone(&entry.1))
+
+                                        // Works:
+                                        (function, std::rc::Rc::clone(&entry.1))
+                                    },
+                                    std::collections::btree_map::Entry::Vacant(entry) => {
+                                        let function = std::rc::Rc::<LoadedFunction>::new(
+                                            self.load_function(&resolver, &current_frame, fh_idx)?,
+                                        );
+                                        let frame_cache = std::rc::Rc::new(
+                                            std::cell::RefCell::new(Default::default()),
+                                        );
+
+                                        entry.insert((
+                                            std::rc::Rc::clone(&function),
+                                            std::rc::Rc::clone(&frame_cache),
+                                        ));
+                                        (function, frame_cache)
+                                    },
+                                }
+                            },
+                            None => {
+                                let function = std::rc::Rc::<LoadedFunction>::new(
+                                    self.load_function(&resolver, &current_frame, fh_idx)?,
+                                );
+                                let frame_cache = std::rc::Rc::new(Default::default());
+
+                                (function, frame_cache)
+                            },
+                        }
+                    };
 
                     // Charge gas
                     let module_id = function.module_id().ok_or_else(|| {
@@ -293,23 +373,93 @@ impl InterpreterImpl {
                         )?;
                         continue;
                     }
-                    self.set_new_call_frame(&mut current_frame, gas_meter, loader, function)?;
+
+                    self.set_new_call_frame(
+                        &mut current_frame,
+                        gas_meter,
+                        loader,
+                        function,
+                        frame_cache,
+                    )?;
                 },
                 ExitCode::CallGeneric(idx) => {
-                    let ty_args = resolver
-                        .instantiate_generic_function(
-                            Some(gas_meter),
-                            idx,
-                            current_frame.function.ty_args(),
-                        )
-                        .map_err(|e| set_err_info!(current_frame, e))?;
-                    let function = resolver
-                        .build_loaded_function_from_instantiation_and_ty_args(idx, ty_args)
-                        .map_err(|e| self.set_location(e))?;
+                    let (function, frame_cache) = {
+                        match self.call_stack.top() {
+                            Some(top_frame) => {
+                                let top_frame_cache = std::rc::Rc::clone(&top_frame.ty_cache);
+                                let top_frame_cache = &mut *top_frame_cache.borrow_mut();
 
-                    if self.paranoid_type_checks {
-                        self.check_friend_or_private_call(&current_frame.function, &function)?;
-                    }
+                                match top_frame_cache.generic_sub_frame_cache.entry(idx) {
+                                    std::collections::btree_map::Entry::Occupied(entry) => {
+                                        let entry = entry.get();
+                                        let function = std::rc::Rc::<LoadedFunction>::new(
+                                            self.load_generic_function(
+                                                &resolver,
+                                                &current_frame,
+                                                gas_meter,
+                                                idx,
+                                            )?,
+                                        );
+
+                                        // Works:
+                                        let frame_cache = std::rc::Rc::new(
+                                            std::cell::RefCell::new(Default::default()),
+                                        );
+                                        (function, frame_cache)
+
+                                        // Doesn't work:
+                                        // (function, std::rc::Rc::clone(&entry.1))
+                                    },
+                                    std::collections::btree_map::Entry::Vacant(entry) => {
+                                        let function = std::rc::Rc::<LoadedFunction>::new(
+                                            self.load_generic_function(
+                                                &resolver,
+                                                &current_frame,
+                                                gas_meter,
+                                                idx,
+                                            )?,
+                                        );
+                                        let frame_cache = std::rc::Rc::new(
+                                            std::cell::RefCell::new(Default::default()),
+                                        );
+
+                                        entry.insert((
+                                            std::rc::Rc::clone(&function),
+                                            std::rc::Rc::clone(&frame_cache),
+                                        ));
+                                        (function, frame_cache)
+                                    },
+                                }
+                                //     },
+                                // let function = std::rc::Rc::<LoadedFunction>::new(
+                                //     self.load_generic_function(
+                                //         &resolver,
+                                //         &current_frame,
+                                //         gas_meter,
+                                //         idx,
+                                //     )?,
+                                // );
+                                // let frame_cache = std::rc::Rc::new(Default::default());
+
+                                // (function, frame_cache)
+                            },
+                            None => {
+                                let function = std::rc::Rc::<LoadedFunction>::new(
+                                    self.load_generic_function(
+                                        &resolver,
+                                        &current_frame,
+                                        gas_meter,
+                                        idx,
+                                    )?,
+                                );
+                                let frame_cache = std::rc::Rc::new(Default::default());
+
+                                (function, frame_cache)
+                            },
+                        }
+                    };
+
+                    // let (function, frame_cache) =
 
                     // Charge gas
                     let module_id = function
@@ -346,7 +496,14 @@ impl InterpreterImpl {
                         )?;
                         continue;
                     }
-                    self.set_new_call_frame(&mut current_frame, gas_meter, loader, function)?;
+
+                    self.set_new_call_frame(
+                        &mut current_frame,
+                        gas_meter,
+                        loader,
+                        function,
+                        frame_cache,
+                    )?;
                 },
             }
         }
@@ -357,7 +514,8 @@ impl InterpreterImpl {
         current_frame: &mut Frame,
         gas_meter: &mut impl GasMeter,
         loader: &Loader,
-        function: LoadedFunction,
+        function: std::rc::Rc<LoadedFunction>,
+        frame_cache: std::rc::Rc<std::cell::RefCell<FrameTypeCache>>,
     ) -> VMResult<()> {
         match (function.module_id(), current_frame.function.module_id()) {
             (Some(module_id), Some(current_module_id)) if module_id != current_module_id => {
@@ -380,7 +538,7 @@ impl InterpreterImpl {
         }
 
         let mut frame = self
-            .make_call_frame(gas_meter, loader, function)
+            .make_call_frame(gas_meter, loader, function, frame_cache)
             .map_err(|err| {
                 self.attach_state_if_invariant_violation(self.set_location(err), current_frame)
             })?;
@@ -408,7 +566,8 @@ impl InterpreterImpl {
         &mut self,
         gas_meter: &mut impl GasMeter,
         loader: &Loader,
-        function: LoadedFunction,
+        function: std::rc::Rc<LoadedFunction>,
+        frame_cache: std::rc::Rc<std::cell::RefCell<FrameTypeCache>>,
     ) -> PartialVMResult<Frame> {
         let mut locals = Locals::new(function.local_tys().len());
         let num_param_tys = function.param_tys().len();
@@ -435,7 +594,7 @@ impl InterpreterImpl {
                 }
             }
         }
-        self.make_new_frame(gas_meter, loader, function, locals)
+        self.make_new_frame(gas_meter, loader, function, locals, frame_cache)
     }
 
     /// Create a new `Frame` given a function and its locals.
@@ -445,8 +604,9 @@ impl InterpreterImpl {
         &self,
         gas_meter: &mut impl GasMeter,
         loader: &Loader,
-        function: LoadedFunction,
+        function: std::rc::Rc<LoadedFunction>,
         locals: Locals,
+        frame_cache: std::rc::Rc<std::cell::RefCell<FrameTypeCache>>,
     ) -> PartialVMResult<Frame> {
         let ty_args = function.ty_args();
         for ty in function.local_tys() {
@@ -472,9 +632,9 @@ impl InterpreterImpl {
         Ok(Frame {
             pc: 0,
             locals,
-            function, //: std::rc::Rc::new(std::cell::RefCell::new(function)),
+            function,
             local_tys,
-            ty_cache: std::rc::Rc::new(std::cell::RefCell::new(FrameTypeCache::default())),
+            ty_cache: frame_cache, // std::rc::Rc::new(std::cell::RefCell::new(FrameTypeCache::default())),
         })
     }
 
@@ -696,8 +856,16 @@ impl InterpreterImpl {
                     }
                 }
 
-                self.set_new_call_frame(current_frame, gas_meter, resolver.loader(), target_func)
-                    .map_err(|err| err.to_partial())
+                let frame_cache = std::rc::Rc::new(Default::default());
+
+                self.set_new_call_frame(
+                    current_frame,
+                    gas_meter,
+                    resolver.loader(),
+                    std::rc::Rc::new(target_func),
+                    frame_cache,
+                )
+                .map_err(|err| err.to_partial())
             },
             NativeResult::LoadModule { module_name } => {
                 let arena_id = traversal_context
@@ -1330,6 +1498,11 @@ impl CallStack {
         self.0.pop()
     }
 
+    /// Retunrs a reference to the top `Frame`
+    fn top(&mut self) -> Option<&mut Frame> {
+        self.0.last_mut()
+    }
+
     fn current_location(&self) -> Location {
         let location_opt = self.0.last().map(|frame| frame.location());
         location_opt.unwrap_or(Location::Undefined)
@@ -1421,13 +1594,13 @@ fn check_depth_of_type_impl(
 struct Frame {
     pc: u16,
     // Currently being executed function.
-    function: std::rc::Rc<std::cell::Cell<LoadedFunction>>,
+    function: std::rc::Rc<LoadedFunction>,
     // Locals for this execution context and their instantiated types.
     locals: Locals,
     local_tys: Vec<Type>,
     // Cache of types accessed in this frame, to improve performance when accessing
     // and constructing types.
-    ty_cache: std::rc::Rc<std::cell::RefCell<FrameTypeCache>>,
+    pub(crate) ty_cache: std::rc::Rc<std::cell::RefCell<FrameTypeCache>>,
 }
 
 /// An `ExitCode` from `execute_code_unit`.
