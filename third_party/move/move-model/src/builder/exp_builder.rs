@@ -3641,8 +3641,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             let fun_type = self.check_type(loc, &fun_type, expected_type, context);
 
             let id = self.env().new_node(loc.clone(), fun_type);
-            self.env().set_node_instantiation(id, instantiation);
-            let fn_exp = ExpData::Value(id, Value::Function(module_id, fun_id));
+            self.env().set_node_instantiation(id, instantiation.clone());
+            let fn_exp = ExpData::Value(id, Value::Function(module_id, fun_id, instantiation));
             return fn_exp;
         }
 

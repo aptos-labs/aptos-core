@@ -17,7 +17,7 @@ module 0x8675309::M {
 
 
 Diagnostics:
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: Function-typed values not yet supported except as arguments to inline function calls.
    ┌─ tests/lambda/lambda3.move:77:18
    │
 77 │         let _x = |i| i + 1; // expected lambda not allowed

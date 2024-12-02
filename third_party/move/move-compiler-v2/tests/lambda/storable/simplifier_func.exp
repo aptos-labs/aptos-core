@@ -44,7 +44,7 @@ module 0x42::mod1 {
 
 
 Diagnostics:
-error: Function-typed values not yet supported except as parameters to calls to inline functions
+error: Function-typed values not yet supported except as arguments to inline function calls.
   ┌─ tests/lambda/storable/simplifier_func.move:7:17
   │
 7 │         let f = |x: u64| { let t = S { x: 3 }; x };

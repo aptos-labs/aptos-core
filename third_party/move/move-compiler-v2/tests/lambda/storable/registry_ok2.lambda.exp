@@ -1888,22 +1888,696 @@ module 0x42::test {
 } // end 0x42::test
 
 
+============ initial bytecode ================
+
+[variant baseline]
+fun test::double($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+  0: $t2 := 2
+  1: $t1 := *($t0, $t2)
+  2: return $t1
+}
+
+
+[variant baseline]
+fun test::get_function($t0: &vector<0x42::test::FunctionEntry>, $t1: u64): 0x42::test::Option<|u64|u64 with copy+store> {
+     var $t2: 0x42::test::Option<|u64|u64 with copy+store>
+     var $t3: 0x42::test::Option<|u64|u64 with copy+store>
+     var $t4: &vector<0x42::test::FunctionEntry>
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: u64
+     var $t9: &0x42::test::FunctionEntry
+     var $t10: &0x42::test::FunctionEntry
+     var $t11: bool
+     var $t12: u64
+     var $t13: &u64
+     var $t14: 0x42::test::Option<|u64|u64 with copy+store>
+     var $t15: |u64|u64 with copy+store
+     var $t16: &|u64|u64 with copy+store
+     var $t17: u64
+     var $t18: u64
+  0: $t3 := pack_variant 0x42::test::Option<|u64|u64 with copy+store>::None()
+  1: $t4 := infer($t0)
+  2: $t5 := 0
+  3: label L0
+  4: $t7 := infer($t5)
+  5: $t8 := vector::length<0x42::test::FunctionEntry>($t4)
+  6: $t6 := <($t7, $t8)
+  7: if ($t6) goto 8 else goto 27
+  8: label L2
+  9: $t10 := vector::borrow<0x42::test::FunctionEntry>($t4, $t5)
+ 10: $t9 := infer($t10)
+ 11: $t13 := borrow_field<0x42::test::FunctionEntry>.key($t9)
+ 12: $t12 := read_ref($t13)
+ 13: $t11 := ==($t12, $t1)
+ 14: if ($t11) goto 15 else goto 21
+ 15: label L5
+ 16: $t16 := borrow_field<0x42::test::FunctionEntry>.f($t9)
+ 17: $t15 := read_ref($t16)
+ 18: $t14 := pack_variant 0x42::test::Option<|u64|u64 with copy+store>::Some($t15)
+ 19: $t3 := infer($t14)
+ 20: goto 22
+ 21: label L6
+ 22: label L7
+ 23: $t18 := 1
+ 24: $t17 := +($t5, $t18)
+ 25: $t5 := infer($t17)
+ 26: goto 29
+ 27: label L3
+ 28: goto 31
+ 29: label L4
+ 30: goto 3
+ 31: label L1
+ 32: $t2 := infer($t3)
+ 33: return $t2
+}
+
+
+[variant baseline]
+fun test::invoke($t0: address, $t1: u64, $t2: u64): 0x42::test::Option<u64> {
+     var $t3: 0x42::test::Option<u64>
+     var $t4: bool
+     var $t5: bool
+     var $t6: &0x42::test::Registry
+     var $t7: 0x42::test::Option<|u64|u64 with copy+store>
+     var $t8: &vector<0x42::test::FunctionEntry>
+     var $t9: &0x42::test::Option<|u64|u64 with copy+store>
+     var $t10: bool
+     var $t11: |u64|u64 with copy+store
+     var $t12: u64
+     var $t13: 0x42::test::Option<|u64|u64 with copy+store>
+     var $t14: u64
+  0: $t5 := exists<0x42::test::Registry>($t0)
+  1: $t4 := !($t5)
+  2: if ($t4) goto 3 else goto 7
+  3: label L0
+  4: $t3 := pack_variant 0x42::test::Option<u64>::None()
+  5: return $t3
+  6: goto 8
+  7: label L1
+  8: label L2
+  9: $t6 := borrow_global<0x42::test::Registry>($t0)
+ 10: $t8 := borrow_field<0x42::test::Registry>.functions($t6)
+ 11: $t7 := test::get_function($t8, $t1)
+ 12: $t9 := borrow_local($t7)
+ 13: $t10 := test_variant 0x42::test::Option<|u64|u64 with copy+store>::Some($t9)
+ 14: if ($t10) goto 15 else goto 20
+ 15: label L5
+ 16: $t11 := unpack_variant 0x42::test::Option<|u64|u64 with copy+store>::Some($t7)
+ 17: $t12 := invoke($t11, $t2)
+ 18: $t3 := pack_variant 0x42::test::Option<u64>::Some($t12)
+ 19: goto 27
+ 20: label L4
+ 21: $t13 := infer($t7)
+ 22: $t3 := pack_variant 0x42::test::Option<u64>::None()
+ 23: goto 27
+ 24: label L6
+ 25: $t14 := 14566554180833181697
+ 26: abort($t14)
+ 27: label L3
+ 28: return $t3
+}
+
+
+[variant baseline]
+public fun test::multiply($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := *($t0, $t1)
+  1: return $t2
+}
+
+
+[variant baseline]
+fun test::multiply_by_x($t0: u64): |u64|u64 with copy+store {
+     var $t1: |u64|u64 with copy+store
+     var $t2: |(u64, u64)|u64 with copy+store
+  0: $t2 := test::multiply
+  1: $t1 := earlybind($t2, $t0)
+  2: return $t1
+}
+
+
+[variant baseline]
+fun test::multiply_by_x2($t0: u64): |u64|u64 with copy+store {
+     var $t1: |u64|u64 with copy+store
+     var $t2: |(u64, u64)|u64 with copy+store
+  0: $t2 := test::multiply
+  1: $t1 := earlybind($t2, $t0)
+  2: return $t1
+}
+
+
+[variant baseline]
+fun test::register($t0: &signer, $t1: |u64|u64 with copy+store, $t2: u64) {
+     var $t3: address
+     var $t4: bool
+     var $t5: bool
+     var $t6: 0x42::test::Registry
+     var $t7: vector<0x42::test::FunctionEntry>
+     var $t8: &mut 0x42::test::Registry
+     var $t9: 0x42::test::Option<|u64|u64 with copy+store>
+     var $t10: &mut vector<0x42::test::FunctionEntry>
+  0: $t3 := signer::address_of($t0)
+  1: $t5 := exists<0x42::test::Registry>($t3)
+  2: $t4 := !($t5)
+  3: if ($t4) goto 4 else goto 9
+  4: label L0
+  5: $t7 := vector()
+  6: $t6 := pack 0x42::test::Registry($t7)
+  7: move_to<0x42::test::Registry>($t0, $t6)
+  8: goto 10
+  9: label L1
+ 10: label L2
+ 11: $t8 := borrow_global<0x42::test::Registry>($t3)
+ 12: $t10 := borrow_field<0x42::test::Registry>.functions($t8)
+ 13: $t9 := test::replace_or_add_function($t10, $t2, $t1)
+ 14: return ()
+}
+
+
+[variant baseline]
+fun test::replace_or_add_function($t0: &mut vector<0x42::test::FunctionEntry>, $t1: u64, $t2: |u64|u64 with copy+store): 0x42::test::Option<|u64|u64 with copy+store> {
+     var $t3: 0x42::test::Option<|u64|u64 with copy+store>
+     var $t4: 0x42::test::Option<|u64|u64 with copy+store>
+     var $t5: &mut vector<0x42::test::FunctionEntry>
+     var $t6: u64
+     var $t7: bool
+     var $t8: u64
+     var $t9: u64
+     var $t10: &vector<0x42::test::FunctionEntry>
+     var $t11: &mut 0x42::test::FunctionEntry
+     var $t12: &mut 0x42::test::FunctionEntry
+     var $t13: bool
+     var $t14: u64
+     var $t15: &u64
+     var $t16: |u64|u64 with copy+store
+     var $t17: &|u64|u64 with copy+store
+     var $t18: &mut |u64|u64 with copy+store
+     var $t19: 0x42::test::Option<|u64|u64 with copy+store>
+     var $t20: u64
+     var $t21: u64
+     var $t22: &0x42::test::Option<|u64|u64 with copy+store>
+     var $t23: bool
+     var $t24: 0x42::test::FunctionEntry
+     var $t25: |u64|u64 with copy+store
+     var $t26: u64
+  0: $t4 := pack_variant 0x42::test::Option<|u64|u64 with copy+store>::None()
+  1: $t5 := infer($t0)
+  2: $t6 := 0
+  3: label L0
+  4: $t8 := infer($t6)
+  5: $t10 := freeze_ref(implicit)($t5)
+  6: $t9 := vector::length<0x42::test::FunctionEntry>($t10)
+  7: $t7 := <($t8, $t9)
+  8: if ($t7) goto 9 else goto 30
+  9: label L2
+ 10: $t12 := vector::borrow_mut<0x42::test::FunctionEntry>($t5, $t6)
+ 11: $t11 := infer($t12)
+ 12: $t15 := borrow_field<0x42::test::FunctionEntry>.key($t11)
+ 13: $t14 := read_ref($t15)
+ 14: $t13 := ==($t14, $t1)
+ 15: if ($t13) goto 16 else goto 24
+ 16: label L5
+ 17: $t17 := borrow_field<0x42::test::FunctionEntry>.f($t11)
+ 18: $t16 := read_ref($t17)
+ 19: $t18 := borrow_field<0x42::test::FunctionEntry>.f($t11)
+ 20: write_ref($t18, $t2)
+ 21: $t19 := pack_variant 0x42::test::Option<|u64|u64 with copy+store>::Some($t16)
+ 22: $t4 := infer($t19)
+ 23: goto 25
+ 24: label L6
+ 25: label L7
+ 26: $t21 := 1
+ 27: $t20 := +($t6, $t21)
+ 28: $t6 := infer($t20)
+ 29: goto 32
+ 30: label L3
+ 31: goto 34
+ 32: label L4
+ 33: goto 3
+ 34: label L1
+ 35: $t22 := borrow_local($t4)
+ 36: $t23 := test_variant 0x42::test::Option<|u64|u64 with copy+store>::None($t22)
+ 37: if ($t23) goto 38 else goto 44
+ 38: label L10
+ 39: unpack_variant 0x42::test::Option<|u64|u64 with copy+store>::None($t4)
+ 40: $t24 := pack 0x42::test::FunctionEntry($t2, $t1)
+ 41: vector::push_back<0x42::test::FunctionEntry>($t0, $t24)
+ 42: $t3 := pack_variant 0x42::test::Option<|u64|u64 with copy+store>::None()
+ 43: goto 54
+ 44: label L9
+ 45: $t23 := test_variant 0x42::test::Option<|u64|u64 with copy+store>::Some($t22)
+ 46: if ($t23) goto 47 else goto 51
+ 47: label L12
+ 48: $t25 := unpack_variant 0x42::test::Option<|u64|u64 with copy+store>::Some($t4)
+ 49: $t3 := infer($t4)
+ 50: goto 54
+ 51: label L11
+ 52: $t26 := 14566554180833181697
+ 53: abort($t26)
+ 54: label L8
+ 55: return $t3
+}
+
+
+[variant baseline]
+fun test::triple($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+  0: $t2 := 3
+  1: $t1 := *($t0, $t2)
+  2: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun test::double($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 2
+     # live vars: $t0, $t2
+  1: $t0 := *($t0, $t2)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun test::get_function($t0: &vector<0x42::test::FunctionEntry>, $t1: u64): 0x42::test::Option<|u64|u64 with copy+store> {
+     var $t2: 0x42::test::Option<|u64|u64 with copy+store> [unused]
+     var $t3: 0x42::test::Option<|u64|u64 with copy+store>
+     var $t4: &vector<0x42::test::FunctionEntry> [unused]
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: u64
+     var $t9: &0x42::test::FunctionEntry [unused]
+     var $t10: &0x42::test::FunctionEntry
+     var $t11: bool [unused]
+     var $t12: u64 [unused]
+     var $t13: &u64
+     var $t14: 0x42::test::Option<|u64|u64 with copy+store>
+     var $t15: |u64|u64 with copy+store
+     var $t16: &|u64|u64 with copy+store
+     var $t17: u64 [unused]
+     var $t18: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t3 := pack_variant 0x42::test::Option<|u64|u64 with copy+store>::None()
+     # live vars: $t0, $t1, $t3
+  1: $t5 := 0
+     # live vars: $t0, $t1, $t3, $t5
+  2: label L0
+     # live vars: $t0, $t1, $t3, $t5
+  3: $t7 := copy($t5)
+     # live vars: $t0, $t1, $t3, $t5, $t7
+  4: $t8 := vector::length<0x42::test::FunctionEntry>($t0)
+     # live vars: $t0, $t1, $t3, $t5, $t7, $t8
+  5: $t6 := <($t7, $t8)
+     # live vars: $t0, $t1, $t3, $t5, $t6
+  6: if ($t6) goto 7 else goto 26
+     # live vars: $t0, $t1, $t3, $t5
+  7: label L2
+     # live vars: $t0, $t1, $t3, $t5
+  8: $t10 := vector::borrow<0x42::test::FunctionEntry>($t0, $t5)
+     # live vars: $t0, $t1, $t3, $t5, $t10
+  9: $t13 := borrow_field<0x42::test::FunctionEntry>.key($t10)
+     # live vars: $t0, $t1, $t3, $t5, $t10, $t13
+ 10: $t7 := read_ref($t13)
+     # live vars: $t0, $t1, $t3, $t5, $t7, $t10
+ 11: $t6 := ==($t7, $t1)
+     # live vars: $t0, $t1, $t3, $t5, $t6, $t10
+ 12: if ($t6) goto 13 else goto 23
+     # live vars: $t0, $t1, $t3, $t5, $t10
+ 13: label L5
+     # live vars: $t0, $t1, $t5, $t10
+ 14: $t16 := borrow_field<0x42::test::FunctionEntry>.f($t10)
+     # live vars: $t0, $t1, $t5, $t16
+ 15: $t15 := read_ref($t16)
+     # live vars: $t0, $t1, $t5, $t15
+ 16: $t14 := pack_variant 0x42::test::Option<|u64|u64 with copy+store>::Some($t15)
+     # live vars: $t0, $t1, $t5, $t14
+ 17: $t3 := move($t14)
+     # live vars: $t0, $t1, $t3, $t5
+ 18: label L7
+     # live vars: $t0, $t1, $t3, $t5
+ 19: $t7 := 1
+     # live vars: $t0, $t1, $t3, $t5, $t7
+ 20: $t7 := +($t5, $t7)
+     # live vars: $t0, $t1, $t3, $t7
+ 21: $t5 := move($t7)
+     # live vars: $t0, $t1, $t3, $t5
+ 22: goto 2
+     # live vars: $t0, $t1, $t3, $t5, $t10
+ 23: label L6
+     # live vars: $t0, $t1, $t3, $t5, $t10
+ 24: drop($t10)
+     # live vars: $t0, $t1, $t3, $t5
+ 25: goto 18
+     # live vars: $t0, $t1, $t3, $t5
+ 26: label L3
+     # live vars: $t0, $t3
+ 27: drop($t0)
+     # live vars: $t3
+ 28: return $t3
+}
+
+
+[variant baseline]
+fun test::invoke($t0: address, $t1: u64, $t2: u64): 0x42::test::Option<u64> {
+     var $t3: 0x42::test::Option<u64>
+     var $t4: bool [unused]
+     var $t5: bool
+     var $t6: &0x42::test::Registry
+     var $t7: 0x42::test::Option<|u64|u64 with copy+store>
+     var $t8: &vector<0x42::test::FunctionEntry>
+     var $t9: &0x42::test::Option<|u64|u64 with copy+store>
+     var $t10: bool [unused]
+     var $t11: |u64|u64 with copy+store
+     var $t12: u64 [unused]
+     var $t13: 0x42::test::Option<|u64|u64 with copy+store> [unused]
+     var $t14: u64 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t5 := exists<0x42::test::Registry>($t0)
+     # live vars: $t0, $t1, $t2, $t5
+  1: $t5 := !($t5)
+     # live vars: $t0, $t1, $t2, $t5
+  2: if ($t5) goto 3 else goto 6
+     # live vars: $t0, $t1, $t2
+  3: label L0
+     # live vars:
+  4: $t3 := pack_variant 0x42::test::Option<u64>::None()
+     # live vars: $t3
+  5: return $t3
+     # live vars: $t0, $t1, $t2
+  6: label L2
+     # live vars: $t0, $t1, $t2
+  7: $t6 := borrow_global<0x42::test::Registry>($t0)
+     # live vars: $t1, $t2, $t6
+  8: $t8 := borrow_field<0x42::test::Registry>.functions($t6)
+     # live vars: $t1, $t2, $t8
+  9: $t7 := test::get_function($t8, $t1)
+     # live vars: $t2, $t7
+ 10: $t9 := borrow_local($t7)
+     # live vars: $t2, $t7, $t9
+ 11: $t5 := test_variant 0x42::test::Option<|u64|u64 with copy+store>::Some($t9)
+     # live vars: $t2, $t5, $t7
+ 12: if ($t5) goto 13 else goto 19
+     # live vars: $t2, $t7
+ 13: label L5
+     # live vars: $t2, $t7
+ 14: $t11 := unpack_variant 0x42::test::Option<|u64|u64 with copy+store>::Some($t7)
+     # live vars: $t2, $t11
+ 15: $t1 := invoke($t11, $t2)
+     # live vars: $t1
+ 16: $t3 := pack_variant 0x42::test::Option<u64>::Some($t1)
+     # live vars: $t3
+ 17: label L3
+     # live vars: $t3
+ 18: return $t3
+     # live vars: $t2, $t7
+ 19: label L4
+     # live vars:
+ 20: $t3 := pack_variant 0x42::test::Option<u64>::None()
+     # live vars: $t3
+ 21: goto 17
+}
+
+
+[variant baseline]
+public fun test::multiply($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t0 := *($t0, $t1)
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+fun test::multiply_by_x($t0: u64): |u64|u64 with copy+store {
+     var $t1: |u64|u64 with copy+store
+     var $t2: |(u64, u64)|u64 with copy+store
+     # live vars: $t0
+  0: $t2 := test::multiply
+     # live vars: $t0, $t2
+  1: $t1 := earlybind($t2, $t0)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+fun test::multiply_by_x2($t0: u64): |u64|u64 with copy+store {
+     var $t1: |u64|u64 with copy+store
+     var $t2: |(u64, u64)|u64 with copy+store
+     # live vars: $t0
+  0: $t2 := test::multiply
+     # live vars: $t0, $t2
+  1: $t1 := earlybind($t2, $t0)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+fun test::register($t0: &signer, $t1: |u64|u64 with copy+store, $t2: u64) {
+     var $t3: address
+     var $t4: bool [unused]
+     var $t5: bool
+     var $t6: 0x42::test::Registry
+     var $t7: vector<0x42::test::FunctionEntry>
+     var $t8: &mut 0x42::test::Registry
+     var $t9: 0x42::test::Option<|u64|u64 with copy+store>
+     var $t10: &mut vector<0x42::test::FunctionEntry>
+     # live vars: $t0, $t1, $t2
+  0: $t3 := signer::address_of($t0)
+     # live vars: $t0, $t1, $t2, $t3
+  1: $t5 := exists<0x42::test::Registry>($t3)
+     # live vars: $t0, $t1, $t2, $t3, $t5
+  2: $t5 := !($t5)
+     # live vars: $t0, $t1, $t2, $t3, $t5
+  3: if ($t5) goto 4 else goto 13
+     # live vars: $t0, $t1, $t2, $t3
+  4: label L0
+     # live vars: $t0, $t1, $t2, $t3
+  5: $t7 := vector()
+     # live vars: $t0, $t1, $t2, $t3, $t7
+  6: $t6 := pack 0x42::test::Registry($t7)
+     # live vars: $t0, $t1, $t2, $t3, $t6
+  7: move_to<0x42::test::Registry>($t0, $t6)
+     # live vars: $t1, $t2, $t3
+  8: label L2
+     # live vars: $t1, $t2, $t3
+  9: $t8 := borrow_global<0x42::test::Registry>($t3)
+     # live vars: $t1, $t2, $t8
+ 10: $t10 := borrow_field<0x42::test::Registry>.functions($t8)
+     # live vars: $t1, $t2, $t10
+ 11: $t9 := test::replace_or_add_function($t10, $t2, $t1)
+     # live vars:
+ 12: return ()
+     # live vars: $t0, $t1, $t2, $t3
+ 13: label L1
+     # live vars: $t0, $t1, $t2, $t3
+ 14: drop($t0)
+     # live vars: $t1, $t2, $t3
+ 15: goto 8
+}
+
+
+[variant baseline]
+fun test::replace_or_add_function($t0: &mut vector<0x42::test::FunctionEntry>, $t1: u64, $t2: |u64|u64 with copy+store): 0x42::test::Option<|u64|u64 with copy+store> {
+     var $t3: 0x42::test::Option<|u64|u64 with copy+store> [unused]
+     var $t4: 0x42::test::Option<|u64|u64 with copy+store>
+     var $t5: &mut vector<0x42::test::FunctionEntry>
+     var $t6: u64
+     var $t7: bool
+     var $t8: u64
+     var $t9: u64
+     var $t10: &vector<0x42::test::FunctionEntry>
+     var $t11: &mut 0x42::test::FunctionEntry [unused]
+     var $t12: &mut 0x42::test::FunctionEntry
+     var $t13: bool [unused]
+     var $t14: u64 [unused]
+     var $t15: &u64
+     var $t16: |u64|u64 with copy+store
+     var $t17: &|u64|u64 with copy+store
+     var $t18: &mut |u64|u64 with copy+store
+     var $t19: 0x42::test::Option<|u64|u64 with copy+store>
+     var $t20: u64 [unused]
+     var $t21: u64 [unused]
+     var $t22: &0x42::test::Option<|u64|u64 with copy+store>
+     var $t23: bool [unused]
+     var $t24: 0x42::test::FunctionEntry
+     var $t25: |u64|u64 with copy+store [unused]
+     var $t26: u64 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t4 := pack_variant 0x42::test::Option<|u64|u64 with copy+store>::None()
+     # live vars: $t0, $t1, $t2, $t4
+  1: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t2, $t4, $t5
+  2: $t6 := 0
+     # live vars: $t0, $t1, $t2, $t4, $t5, $t6
+  3: label L0
+     # live vars: $t0, $t1, $t2, $t4, $t5, $t6
+  4: $t8 := copy($t6)
+     # live vars: $t0, $t1, $t2, $t4, $t5, $t6, $t8
+  5: $t10 := freeze_ref(implicit)($t5)
+     # live vars: $t0, $t1, $t2, $t4, $t5, $t6, $t8, $t10
+  6: $t9 := vector::length<0x42::test::FunctionEntry>($t10)
+     # live vars: $t0, $t1, $t2, $t4, $t5, $t6, $t8, $t9
+  7: $t7 := <($t8, $t9)
+     # live vars: $t0, $t1, $t2, $t4, $t5, $t6, $t7
+  8: if ($t7) goto 9 else goto 30
+     # live vars: $t0, $t1, $t2, $t4, $t5, $t6
+  9: label L2
+     # live vars: $t0, $t1, $t2, $t4, $t5, $t6
+ 10: $t12 := vector::borrow_mut<0x42::test::FunctionEntry>($t5, $t6)
+     # live vars: $t0, $t1, $t2, $t4, $t5, $t6, $t12
+ 11: $t15 := borrow_field<0x42::test::FunctionEntry>.key($t12)
+     # live vars: $t0, $t1, $t2, $t4, $t5, $t6, $t12, $t15
+ 12: $t8 := read_ref($t15)
+     # live vars: $t0, $t1, $t2, $t4, $t5, $t6, $t8, $t12
+ 13: $t7 := ==($t8, $t1)
+     # live vars: $t0, $t1, $t2, $t4, $t5, $t6, $t7, $t12
+ 14: if ($t7) goto 15 else goto 27
+     # live vars: $t0, $t1, $t2, $t4, $t5, $t6, $t12
+ 15: label L5
+     # live vars: $t0, $t1, $t2, $t5, $t6, $t12
+ 16: $t17 := borrow_field<0x42::test::FunctionEntry>.f($t12)
+     # live vars: $t0, $t1, $t2, $t5, $t6, $t12, $t17
+ 17: $t16 := read_ref($t17)
+     # live vars: $t0, $t1, $t2, $t5, $t6, $t12, $t16
+ 18: $t18 := borrow_field<0x42::test::FunctionEntry>.f($t12)
+     # live vars: $t0, $t1, $t2, $t5, $t6, $t16, $t18
+ 19: write_ref($t18, $t2)
+     # live vars: $t0, $t1, $t2, $t5, $t6, $t16
+ 20: $t19 := pack_variant 0x42::test::Option<|u64|u64 with copy+store>::Some($t16)
+     # live vars: $t0, $t1, $t2, $t5, $t6, $t19
+ 21: $t4 := move($t19)
+     # live vars: $t0, $t1, $t2, $t4, $t5, $t6
+ 22: label L7
+     # live vars: $t0, $t1, $t2, $t4, $t5, $t6
+ 23: $t8 := 1
+     # live vars: $t0, $t1, $t2, $t4, $t5, $t6, $t8
+ 24: $t8 := +($t6, $t8)
+     # live vars: $t0, $t1, $t2, $t4, $t5, $t8
+ 25: $t6 := move($t8)
+     # live vars: $t0, $t1, $t2, $t4, $t5, $t6
+ 26: goto 3
+     # live vars: $t0, $t1, $t2, $t4, $t5, $t6, $t12
+ 27: label L6
+     # live vars: $t0, $t1, $t2, $t4, $t5, $t6, $t12
+ 28: drop($t12)
+     # live vars: $t0, $t1, $t2, $t4, $t5, $t6
+ 29: goto 22
+     # live vars: $t0, $t1, $t2, $t4, $t5, $t6
+ 30: label L3
+     # live vars: $t0, $t1, $t2, $t4, $t5
+ 31: drop($t5)
+     # live vars: $t0, $t1, $t2, $t4
+ 32: $t22 := borrow_local($t4)
+     # live vars: $t0, $t1, $t2, $t4, $t22
+ 33: $t7 := test_variant 0x42::test::Option<|u64|u64 with copy+store>::None($t22)
+     # live vars: $t0, $t1, $t2, $t4, $t7, $t22
+ 34: if ($t7) goto 35 else goto 43
+     # live vars: $t0, $t1, $t2, $t4, $t22
+ 35: label L10
+     # live vars: $t0, $t1, $t2, $t4, $t22
+ 36: drop($t22)
+     # live vars: $t0, $t1, $t2, $t4
+ 37: unpack_variant 0x42::test::Option<|u64|u64 with copy+store>::None($t4)
+     # live vars: $t0, $t1, $t2
+ 38: $t24 := pack 0x42::test::FunctionEntry($t2, $t1)
+     # live vars: $t0, $t24
+ 39: vector::push_back<0x42::test::FunctionEntry>($t0, $t24)
+     # live vars:
+ 40: $t19 := pack_variant 0x42::test::Option<|u64|u64 with copy+store>::None()
+     # live vars: $t19
+ 41: label L8
+     # live vars: $t19
+ 42: return $t19
+     # live vars: $t0, $t1, $t2, $t4, $t22
+ 43: label L9
+     # live vars: $t0, $t4, $t22
+ 44: drop($t0)
+     # live vars: $t4, $t22
+ 45: $t7 := test_variant 0x42::test::Option<|u64|u64 with copy+store>::Some($t22)
+     # live vars: $t4, $t7
+ 46: if ($t7) goto 47 else goto 51
+     # live vars: $t4
+ 47: label L12
+     # live vars: $t4
+ 48: $t2 := unpack_variant 0x42::test::Option<|u64|u64 with copy+store>::Some($t4)
+     # live vars: $t4
+ 49: $t19 := move($t4)
+     # live vars: $t19
+ 50: goto 41
+     # live vars: $t4
+ 51: label L11
+     # live vars:
+ 52: $t1 := 14566554180833181697
+     # live vars: $t1
+ 53: abort($t1)
+}
+
+
+[variant baseline]
+fun test::triple($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 3
+     # live vars: $t0, $t2
+  1: $t0 := *($t0, $t2)
+     # live vars: $t0
+  2: return $t0
+}
+
 
 Diagnostics:
-error: Calls to function values other than inline function parameters not yet implemented
-   ┌─ tests/lambda/storable/registry_ok2.move:71:30
-   │
-71 │                 Option::Some(f(x))
-   │                              ^^^^
+error: Unimplemented type: |u64|u64 with copy+store
+  ┌─ tests/lambda/storable/registry_ok2.move:5:26
+  │
+5 │     struct FunctionValue(|u64| u64 with store+copy) has store, copy, drop;
+  │                          ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/registry_ok2.move:92:9
+error: Unimplemented type: |u64|u64 with copy+store
+   ┌─ tests/lambda/storable/registry_ok2.move:12:9
    │
-92 │         move |y| multiply(x, y)
+12 │         f: |u64| u64 with store+copy,
+   │         ^
+
+error: Unimplemented type: |u64|u64 with copy+store
+   ┌─ tests/lambda/storable/registry_ok2.move:21:9
+   │
+21 │     fun get_function(v: &vector<FunctionEntry>, k: u64): Option<|u64| u64 with store+copy> {
+   │         ^^^^^^^^^^^^
+
+error: Unimplemented type: |u64|u64 with copy+store
+   ┌─ tests/lambda/storable/registry_ok2.move:31:9
+   │
+31 │     fun replace_or_add_function(v: &mut vector<FunctionEntry>, k: u64, f: |u64| u64 with store+copy): Option<|u64| u64 with store+copy> {
    │         ^^^^^^^^^^^^^^^^^^^^^^^
 
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/registry_ok2.move:96:9
+error: Unimplemented type: |u64|u64 with copy+store
+   ┌─ tests/lambda/storable/registry_ok2.move:52:9
    │
-96 │         move |y| multiply(x, y)
-   │         ^^^^^^^^^^^^^^^^^^^^^^^
+52 │     fun register(owner: &signer, f: |u64| u64 with store+copy, k: u64) acquires Registry {
+   │         ^^^^^^^^
+
+error: Unimplemented type: |u64|u64 with copy+store
+   ┌─ tests/lambda/storable/registry_ok2.move:64:9
+   │
+64 │     fun invoke(addr: address, k: u64, x: u64): Option<u64> acquires Registry {
+   │         ^^^^^^
+
+error: Unimplemented type: |(u64, u64)|u64 with copy+store
+   ┌─ tests/lambda/storable/registry_ok2.move:91:9
+   │
+91 │     fun multiply_by_x(x: u64): |u64| u64 with store+copy {
+   │         ^^^^^^^^^^^^^

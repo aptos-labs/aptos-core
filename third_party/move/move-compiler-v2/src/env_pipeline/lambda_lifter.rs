@@ -42,6 +42,7 @@
 //! ```
 
 use itertools::Itertools;
+use log::debug;
 use move_binary_format::file_format::{AbilitySet, Visibility};
 use move_model::{
     ast::{self, Exp, ExpData, LambdaCaptureKind, Operation, Pattern, TempIndex},
@@ -357,10 +358,13 @@ impl<'a> LambdaLifter<'a> {
     ) -> Exp {
         let env = self.fun_env.module_env.env;
         let id = env.new_node(loc, fn_type);
-        if let Some(inst) = instantiation {
-            env.set_node_instantiation(id, inst);
-        }
-        let fn_exp = ExpData::Value(id, ast::Value::Function(module_id, fun_id));
+        let inst = if let Some(inst) = instantiation {
+            env.set_node_instantiation(id, inst.clone());
+            inst
+        } else {
+            vec![]
+        };
+        let fn_exp = ExpData::Value(id, ast::Value::Function(module_id, fun_id, inst));
         fn_exp.into_exp()
     }
 
@@ -535,9 +539,14 @@ impl<'a> LambdaLifter<'a> {
                     // We have no parameters, just use the function directly.
                     return Some(new_args.pop().unwrap());
                 } else {
-                    return Some(
-                        ExpData::Call(id, Operation::EarlyBindFunction, new_args).into_exp(),
+                    let res = ExpData::Call(id, Operation::EarlyBindFunction, new_args).into_exp();
+                    debug!(
+                        "Creating earlybind 1 `{}` with type `{}`",
+                        res.display_verbose(env),
+                        env.get_node_type(res.node_id())
+                            .display(&env.get_type_display_ctx())
                     );
+                    return Some(res);
                 }
             }
         }
@@ -779,7 +788,14 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
                 env.set_node_instantiation(id, inst);
             }
             closure_args.insert(0, fn_exp);
-            Some(ExpData::Call(id, Operation::EarlyBindFunction, closure_args).into_exp())
+            let res = ExpData::Call(id, Operation::EarlyBindFunction, closure_args).into_exp();
+            debug!(
+                "Creating earlybind 2 `{}` with type `{}`",
+                res.display_verbose(env),
+                env.get_node_type(res.node_id())
+                    .display(&env.get_type_display_ctx())
+            );
+            Some(res)
         }
     }
 }

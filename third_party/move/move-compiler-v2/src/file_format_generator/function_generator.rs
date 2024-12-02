@@ -548,6 +548,14 @@ impl<'a> FunctionGenerator<'a> {
                     source,
                 );
             },
+
+            Operation::EarlyBindFunction => {
+                self.gen_early_bind(ctx, dest, source);
+            },
+            Operation::InvokeFunction => {
+                self.gen_invoke(ctx, dest, source);
+            },
+
             Operation::BorrowGlobal(mid, sid, inst) => {
                 let is_mut = fun_ctx.fun.get_local_type(dest[0]).is_mutable_reference();
                 self.gen_struct_oper(
@@ -689,6 +697,51 @@ impl<'a> FunctionGenerator<'a> {
             );
             self.emit(FF::Bytecode::CallGeneric(idx))
         }
+        self.abstract_pop_n(ctx, source.len());
+        self.abstract_push_result(ctx, dest);
+    }
+
+    /// Generates code to add args to a closure
+    fn gen_early_bind(&mut self, ctx: &BytecodeContext, dest: &[TempIndex], source: &[TempIndex]) {
+        let fun_ctx = ctx.fun_ctx;
+        let arg_count = source.len();
+        if arg_count < 2 || arg_count > 256 {
+            fun_ctx.internal_error(
+                "EarlyBind needs at least 2 args (a function value and at least one param).",
+            );
+            return;
+        };
+        let bind_args = (arg_count - 1) as u8;
+
+        let fun_expr = source[0];
+        let fun_type = fun_ctx.fun.get_local_type(fun_expr);
+        let fun_sign = self
+            .gen
+            .signature(&fun_ctx.module, &fun_ctx.loc, vec![fun_type.clone()]);
+
+        self.abstract_push_args(ctx, source, None);
+        self.emit(FF::Bytecode::EarlyBindFunction(fun_sign, bind_args));
+        self.abstract_pop_n(ctx, arg_count);
+        self.abstract_push_result(ctx, dest);
+    }
+
+    /// Generates code to call a closure with args.
+    fn gen_invoke(&mut self, ctx: &BytecodeContext, dest: &[TempIndex], source: &[TempIndex]) {
+        let fun_ctx = ctx.fun_ctx;
+        let arg_count = source.len();
+        if arg_count < 1 {
+            fun_ctx.internal_error("InvokeFunction needs at least 1 args (a function value).");
+            return;
+        };
+
+        let fun_expr = source[0];
+        let fun_type = fun_ctx.fun.get_local_type(fun_expr);
+        let fun_sign = self
+            .gen
+            .signature(&fun_ctx.module, &fun_ctx.loc, vec![fun_type.clone()]);
+
+        self.abstract_push_args(ctx, source, None);
+        self.emit(FF::Bytecode::InvokeFunction(fun_sign));
         self.abstract_pop_n(ctx, source.len());
         self.abstract_push_result(ctx, dest);
     }
@@ -874,6 +927,9 @@ impl<'a> FunctionGenerator<'a> {
             Vector(vec) if vec.is_empty() => {
                 self.gen_vector_load_push(ctx, vec, dest_type);
             },
+            Function(mid, fid, inst) => {
+                self.gen_ld_function(ctx, mid.qualified(*fid), inst);
+            },
             _ => {
                 let cons =
                     self.gen
@@ -898,6 +954,26 @@ impl<'a> FunctionGenerator<'a> {
             .gen
             .signature(&fun_ctx.module, &fun_ctx.loc, vec![elem_type]);
         self.emit(FF::Bytecode::VecPack(sign, vec.len() as u64));
+    }
+
+    fn gen_ld_function(&mut self, ctx: &BytecodeContext, id: QualifiedId<FunId>, inst: &[Type]) {
+        let fun_ctx = ctx.fun_ctx;
+        if inst.is_empty() {
+            let idx = self.gen.function_index(
+                &fun_ctx.module,
+                &fun_ctx.loc,
+                &fun_ctx.module.env.get_function(id),
+            );
+            self.emit(FF::Bytecode::LdFunction(idx));
+        } else {
+            let idx = self.gen.function_instantiation_index(
+                &fun_ctx.module,
+                &fun_ctx.loc,
+                &fun_ctx.module.env.get_function(id),
+                inst.to_vec(),
+            );
+            self.emit(FF::Bytecode::LdFunctionGeneric(idx));
+        }
     }
 
     /// Generates code for an inline spec block. The spec block needs

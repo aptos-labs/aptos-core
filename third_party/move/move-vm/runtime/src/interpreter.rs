@@ -1543,7 +1543,7 @@ impl Frame {
                     | Bytecode::InvokeFunction(..)
                     | Bytecode::EarlyBindFunction(..) => {
                         return Err(PartialVMError::new(StatusCode::UNIMPLEMENTED_FEATURE)
-                            .with_message("closure opcodes in interpreter".to_owned()))
+                            .with_message("closure opcodes in interpreter".to_owned()));
                     },
 
                     Bytecode::Pop => {

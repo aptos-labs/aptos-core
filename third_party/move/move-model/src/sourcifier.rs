@@ -4,8 +4,8 @@
 
 use crate::{
     ast::{
-        self, AddressSpecifier, Exp, ExpData, LambdaCaptureKind, Operation, Pattern,
-        ResourceSpecifier, TempIndex, Value,
+        AddressSpecifier, Exp, ExpData, LambdaCaptureKind, Operation, Pattern, ResourceSpecifier,
+        TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -285,7 +285,7 @@ impl<'a> Sourcifier<'a> {
                     emit!(self.writer, "{}", self.env().display(address))
                 })
             },
-            Value::Function(mid, fid) => {
+            Value::Function(mid, fid, type_inst) => {
                 emit!(
                     self.writer,
                     "{}",
@@ -293,6 +293,14 @@ impl<'a> Sourcifier<'a> {
                         .get_function(mid.qualified(*fid))
                         .get_full_name_str()
                 );
+                if !type_inst.is_empty() {
+                    let tctx = TypeDisplayContext::new(self.env());
+                    emit!(
+                        self.writer,
+                        "<{}>",
+                        type_inst.iter().map(|ty| ty.display(&tctx)).join(", ")
+                    );
+                };
             },
         }
     }
@@ -536,21 +544,8 @@ impl<'a> ExpSourcifier<'a> {
             // Following forms are all atomic and do not require parenthesis
             Invalid(_) => emit!(self.wr(), "*invalid*"),
             Value(id, v) => {
-                let ty = self.env().get_node_type(exp.node_id());
+                let ty = self.env().get_node_type(*id);
                 self.parent.print_value(v, Some(&ty));
-                if let ast::Value::Function(..) = v {
-                    let type_inst = self.env().get_node_instantiation(*id);
-                    if !type_inst.is_empty() {
-                        emit!(
-                            self.wr(),
-                            "<{}>",
-                            type_inst
-                                .iter()
-                                .map(|ty| ty.display(&self.type_display_context))
-                                .join(", ")
-                        );
-                    }
-                }
             },
             LocalVar(_, name) => {
                 emit!(self.wr(), "{}", self.sym(*name))

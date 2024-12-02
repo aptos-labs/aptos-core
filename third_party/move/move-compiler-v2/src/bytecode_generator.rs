@@ -415,12 +415,9 @@ impl<'env> Generator<'env> {
                         ),
                     );
                 }
-                self.emit_call(
-                    *id,
-                    targets,
-                    BytecodeOperation::WriteRef,
-                    vec![lhs_temp, rhs_temp],
-                )
+                self.emit_call(*id, targets, BytecodeOperation::WriteRef, vec![
+                    lhs_temp, rhs_temp,
+                ])
             },
             ExpData::Assign(id, lhs, rhs) => self.gen_assign(*id, lhs, rhs, None),
             ExpData::Return(id, exp) => {
@@ -488,25 +485,26 @@ impl<'env> Generator<'env> {
                     .rewrite_spec_descent(&SpecBlockTarget::Inline, spec);
                 self.emit_with(*id, |attr| Bytecode::SpecBlock(attr, spec));
             },
-            // TODO(LAMBDA)
-            ExpData::Lambda(id, _, _, _, _) =>
-                self.error(
-                *id,
+            ExpData::Lambda(id, _, _, _, _) => {
                 if self.check_if_lambdas_enabled() {
-                    "Function-typed values not yet implemented except as parameters to calls to inline functions"
+                    // TODO(LAMBDA)
+                    // We might still end up here if we have a lambda that can't be lowered.
+                    self.error(
+                        *id,
+                        "Complex lambda expressions not yet supported expcept as arguments to inline function calls..");
                 } else {
-                    "Function-typed values not yet supported except as parameters to calls to inline functions"
+                    self.error(
+                        *id,
+                        "Function-typed values not yet supported except as arguments to inline function calls.");
                 }
-            ),
-            // TODO(LAMBDA)
-            ExpData::InvokeFunction(id, _exp, _) => self.error(
-                *id,
-                if self.check_if_lambdas_enabled() {
-                    "Calls to function values other than inline function parameters not yet implemented"
+            },
+            ExpData::InvokeFunction(id, fun_exp, args) => {
+                if !self.check_if_lambdas_enabled() {
+                    self.error(*id, "Calls to function values other than inline function parameters not yet supported");
                 } else {
-                    "Calls to function values other than inline function parameters not yet supported"
+                    self.gen_invoke(targets, *id, fun_exp, args);
                 }
-            ),
+            },
             ExpData::Quant(id, _, _, _, _, _) => {
                 self.internal_error(*id, "unsupported specification construct")
             },
@@ -582,17 +580,16 @@ impl<'env> Generator<'env> {
                     Constant::Bool(false)
                 }
             },
-            // TODO(LAMBDA)
-            Value::Function(_mid, _fid) => {
-                self.error(
-                    id,
-                    if self.check_if_lambdas_enabled() {
-                        "Function-typed values not yet implemented except as parameters to calls to inline functions"
-                    } else {
+            Value::Function(mid, fid, inst) => {
+                if self.check_if_lambdas_enabled() {
+                    Constant::Function(*mid, *fid, inst.to_vec())
+                } else {
+                    self.error(
+                        id,
                         "Function-typed values not yet supported except as parameters to calls to inline functions"
-                    }
-                );
-                Constant::Bool(false)
+                    );
+                    Constant::Bool(false)
+                }
             },
         }
     }
@@ -816,14 +813,16 @@ impl<'env> Generator<'env> {
                 self.gen_function_call(targets, id, m.qualified(*f), args)
             },
             // TODO(LAMBDA)
-            Operation::EarlyBindFunction => self.error(
-                id,
+            Operation::EarlyBindFunction => {
                 if self.check_if_lambdas_enabled() {
-                    "Function-typed values not yet implemented except as parameters to calls to inline functions"
+                    self.gen_early_bind(targets, id, args)
                 } else {
-                    "Function-typed values not yet supported except as parameters to calls to inline functions"
-                },
-            ),
+                    self.error(
+                        id,
+                        "Function-typed values not yet supported except as parameters to calls to inline functions"
+                    );
+                }
+            },
             Operation::TestVariants(mid, sid, variants) => {
                 self.gen_test_variants(targets, id, mid.qualified(*sid), variants, args)
             },
@@ -1075,6 +1074,121 @@ impl<'env> Generator<'env> {
                 attr,
                 actual_targets,
                 BytecodeOperation::Function(fun.module_id, fun.id, type_args),
+                args,
+                None,
+            )
+        });
+        for (target, oper, new_target) in conversion_ops {
+            self.emit_call(id, vec![target], oper, vec![new_target])
+        }
+    }
+
+    fn gen_early_bind(&mut self, targets: Vec<TempIndex>, id: NodeId, args: &[Exp]) {
+        if args.is_empty() {
+            self.internal_error(id, "EarlyBind needs at least 1 parameter");
+            return;
+        }
+        let fun_arg = &args[0];
+        let args = &args[1..];
+        let fun_arg_type = self.env().get_node_type(fun_arg.node_id());
+        let Type::Fun(ref param_type, ref _result_type, _abilities) = fun_arg_type else {
+            self.internal_error(
+                fun_arg.node_id(),
+                "EarlyBind first parameter is not a function.",
+            );
+            return;
+        };
+        let bind_result_type = self.env().get_node_type(id);
+        if !matches!(bind_result_type, Type::Fun(..)) {
+            self.internal_error(
+                id,
+                format!(
+                    "EarlyBind result should be a function, found `{}`.",
+                    bind_result_type.display(&self.env().get_type_display_ctx())
+                ),
+            );
+            return;
+        };
+        if targets.len() != 1 {
+            self.internal_error(
+                fun_arg.node_id(),
+                "EarlyBind target should be a single temp.",
+            );
+            return;
+        };
+        let param_types: Vec<Type> = param_type.clone().flatten();
+        if args.len() > param_types.len() {
+            self.internal_error(id, "inconsistent type arity");
+            return;
+        }
+        // Copy logic of `gen_function_call`, above.
+        // TODO: Though why is this not done earlier in compilation?
+        // Function calls can have implicit conversion of &mut to &, need to compute implicit
+        // conversions.
+        let mut args = args
+            .iter()
+            .zip(param_types)
+            .map(|(e, t)| self.maybe_convert(e, &t))
+            .collect::<Vec<_>>();
+        args.insert(0, fun_arg.clone()); // Add the function expr to the argument list.
+        let args = self.gen_arg_list(&args);
+
+        self.emit_with(id, |attr| {
+            Bytecode::Call(
+                attr,
+                targets,
+                BytecodeOperation::EarlyBindFunction,
+                args,
+                None,
+            )
+        });
+    }
+
+    fn gen_invoke(&mut self, targets: Vec<TempIndex>, id: NodeId, fun_arg: &Exp, args: &[Exp]) {
+        let fun_arg_type = self.env().get_node_type(fun_arg.node_id());
+        let Type::Fun(param_type, result_type, _abilities) = fun_arg_type else {
+            self.internal_error(
+                fun_arg.node_id(),
+                "Invoke first parameter is not a function.",
+            );
+            return;
+        };
+        let param_types: Vec<Type> = param_type.flatten();
+        if args.len() != param_types.len() {
+            self.internal_error(id, "inconsistent type arity");
+            return;
+        }
+        // Copy logic of `gen_function_call`, above.
+        // TODO: Though why is this not done earlier in compilation?
+        // Function calls can have implicit conversion of &mut to &, need to compute implicit
+        // conversions.
+        let mut args = args
+            .iter()
+            .zip(param_types)
+            .map(|(e, t)| self.maybe_convert(e, &t))
+            .collect::<Vec<_>>();
+        args.insert(0, fun_arg.clone()); // Add the function expr to the argument list.
+        let args = self.gen_arg_list(&args);
+
+        // Targets may need conversion as well.
+        let mut actual_targets = vec![];
+        let mut conversion_ops = vec![];
+        for (target, actual_type) in targets.iter().zip(result_type.flatten()) {
+            let target_ty = self.temp_type(*target).clone();
+            if let Some((new_target, oper)) = self.get_conversion(&target_ty, &actual_type) {
+                // Conversion required
+                actual_targets.push(new_target);
+                conversion_ops.push((*target, oper, new_target))
+            } else {
+                actual_targets.push(*target)
+            }
+        }
+
+        self.emit_with(id, |attr| {
+            Bytecode::Call(
+                attr,
+                actual_targets,
+                BytecodeOperation::InvokeFunction,
                 args,
                 None,
             )
