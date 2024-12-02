@@ -276,9 +276,14 @@ impl OnChainConsensusConfig {
         }
     }
 
-    // TODO: actually add to onchain config
+    /// Window Size was not introduced until OnChainConsensusConfig V4
     pub fn window_size(&self) -> usize {
-        3
+        match &self {
+            OnChainConsensusConfig::V1(_) => DEFAULT_WINDOW_SIZE,
+            OnChainConsensusConfig::V2(_) => DEFAULT_WINDOW_SIZE,
+            OnChainConsensusConfig::V3 { .. } => DEFAULT_WINDOW_SIZE,
+            OnChainConsensusConfig::V4 { window_size, .. } => window_size.to_owned(),
+        }
     }
 
     pub fn is_dag_enabled(&self) -> bool {
