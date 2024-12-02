@@ -53,6 +53,7 @@ impl<'a> PrefixedStateValueIterator<'a> {
         }
         while let Some((state_key, _)) = iter.next().transpose()? {
             if !self.key_prefix.is_prefix(&state_key)? {
+                println!("state key {:?} is not prefix of {:?}", self.key_prefix, state_key);
                 self.is_finished = true;
                 return Ok(None);
             }
