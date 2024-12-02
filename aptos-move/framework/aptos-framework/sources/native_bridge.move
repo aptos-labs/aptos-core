@@ -13,8 +13,6 @@ module aptos_framework::native_bridge {
     #[test_only]
     use aptos_framework::ethereum::valid_eip55;
     use std::bcs;
-    #[test_only]
-    use aptos_std::debug;
     use std::vector;
     use aptos_std::aptos_hash::keccak256;
 
@@ -224,7 +222,6 @@ module aptos_framework::native_bridge {
         let initiated_events = event::emitted_events_by_handle(
             &bridge_events.bridge_transfer_initiated_events
         );
-        debug::print(&initiated_events);
         assert!(vector::length(&initiated_events) == 1, EEVENT_NOT_FOUND);
     }
 
@@ -265,7 +262,6 @@ module aptos_framework::native_bridge {
         vector::append(&mut combined_bytes, native_bridge_store::normalize_to_32_bytes(bcs::to_bytes(&amount)));
         vector::append(&mut combined_bytes, native_bridge_store::normalize_to_32_bytes(bcs::to_bytes(&nonce)));
         let bridge_transfer_id = keccak256(combined_bytes);
-        debug::print(&bridge_transfer_id);
 
         // Create an account for our recipient
         aptos_account::create_account(recipient);
@@ -290,7 +286,6 @@ module aptos_framework::native_bridge {
             amount,
             nonce,
         };
-        debug::print(&expected_event.bridge_transfer_id);
         assert!(std::vector::contains(&complete_events, &expected_event), 0);
         assert!(bridge_transfer_id == expected_event.bridge_transfer_id, 0)
     }

@@ -1479,8 +1479,6 @@ Burns a specified amount of AptosCoin from an address.
 -  [Function `increment_and_get_nonce`](#0x1_native_bridge_increment_and_get_nonce)
 -  [Function `initialize`](#0x1_native_bridge_initialize)
 -  [Function `initiate_bridge_transfer`](#0x1_native_bridge_initiate_bridge_transfer)
--  [Function `pad_to_32_bytes`](#0x1_native_bridge_pad_to_32_bytes)
--  [Function `truncate_to_20_bytes`](#0x1_native_bridge_truncate_to_20_bytes)
 -  [Function `complete_bridge_transfer`](#0x1_native_bridge_complete_bridge_transfer)
 -  [Specification](#@Specification_1)
     -  [Function `increment_and_get_nonce`](#@Specification_1_increment_and_get_nonce)
@@ -1846,65 +1844,6 @@ The amount is burnt from the initiator and the module-level nonce is incremented
             nonce,
         }
     );
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_native_bridge_pad_to_32_bytes"></a>
-
-## Function `pad_to_32_bytes`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_pad_to_32_bytes">pad_to_32_bytes</a>(input: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_pad_to_32_bytes">pad_to_32_bytes</a>(input: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <b>let</b> result = input;
-    <b>while</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&result) &lt; 32) {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> result, 0); // Add padding
-    };
-    result
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_native_bridge_truncate_to_20_bytes"></a>
-
-## Function `truncate_to_20_bytes`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_truncate_to_20_bytes">truncate_to_20_bytes</a>(input: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_truncate_to_20_bytes">truncate_to_20_bytes</a>(input: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <b>let</b> result = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
-    <b>let</b> length = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&input);
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; 20 && i &lt; length) {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> result, *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&input, i));
-        i = i + 1;
-    };
-    result
 }
 </code></pre>
 
