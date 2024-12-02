@@ -1,5 +1,5 @@
-/// Unsigned big number representations and operations.
-module aptos_std::unsigned_bignum {
+/// Types and functions for unsigned arbitrary precision numbers.
+module aptos_std::arbitrary_precision {
     use std::vector;
     use aptos_std::fixed_point64;
     use aptos_std::fixed_point64::FixedPoint64;
@@ -8,7 +8,7 @@ module aptos_std::unsigned_bignum {
 
     const ANCHOR: u64 = 1 << 63;
 
-    /// With `n` chunks, it represent the number:
+    /// With `n` chunks, it represents the number:
     /// `chunks[0]*R^(exp_plus_anchor-ANCHOR+0) + ... + chunks[n-1]*R^(exp_plus_anchor-ANCHOR+n-1)`,
     /// where `R = 2^64`.
     struct Number has copy, drop {

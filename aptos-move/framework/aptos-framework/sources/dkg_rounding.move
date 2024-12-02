@@ -4,7 +4,7 @@ module aptos_framework::dkg_rounding {
     use std::vector;
     use aptos_std::fixed_point64;
     use aptos_std::fixed_point64::FixedPoint64;
-    use aptos_std::unsigned_bignum;
+    use aptos_std::arbitrary_precision;
     #[test_only]
     use std::string::utf8;
     #[test_only]
@@ -100,35 +100,36 @@ module aptos_framework::dkg_rounding {
             fixed_point64::add(secrecy_threshold_in_stake_ratio, epsilon)
         );
 
-        let secrecy_threshold_in_stake_ratio = unsigned_bignum::from_fixed_point64(secrecy_threshold_in_stake_ratio);
-        let reconstruct_threshold_in_stake_ratio = unsigned_bignum::from_fixed_point64(reconstruct_threshold_in_stake_ratio);
+        let secrecy_threshold_in_stake_ratio = arbitrary_precision::from_fixed_point64(secrecy_threshold_in_stake_ratio);
+        let reconstruct_threshold_in_stake_ratio = arbitrary_precision::from_fixed_point64(reconstruct_threshold_in_stake_ratio);
 
-        let total_weight_max = unsigned_bignum::div_ceil(
-            unsigned_bignum::sum(vector[unsigned_bignum::from_u64(n), unsigned_bignum::from_u64(4)]),
-            unsigned_bignum::product(vector[
-                unsigned_bignum::sub(reconstruct_threshold_in_stake_ratio, secrecy_threshold_in_stake_ratio),
-                unsigned_bignum::from_u64(2),
+        let total_weight_max = arbitrary_precision::div_ceil(
+            arbitrary_precision::sum(vector[arbitrary_precision::from_u64(n), arbitrary_precision::from_u64(4)]),
+            arbitrary_precision::product(vector[
+                arbitrary_precision::sub(reconstruct_threshold_in_stake_ratio, secrecy_threshold_in_stake_ratio),
+                arbitrary_precision::from_u64(2),
             ]),
         );
         let stakes_total = 0;
         vector::for_each(stakes, |stake|{
             stakes_total = stakes_total + (stake as u128);
         });
-        let stakes_total = unsigned_bignum::from_u128(stakes_total);
+        let stakes_total = arbitrary_precision::from_u128(stakes_total);
 
-        let bar = unsigned_bignum::as_u128(
-            unsigned_bignum::ceil(unsigned_bignum::product(vector[stakes_total, reconstruct_threshold_in_stake_ratio])));
-        let fast_secrecy_threshold_in_stake_ratio = option::map(fast_secrecy_threshold_in_stake_ratio, |v|unsigned_bignum::from_fixed_point64(v));
+        let bar = arbitrary_precision::as_u128(
+            arbitrary_precision::ceil(
+                arbitrary_precision::product(vector[stakes_total, reconstruct_threshold_in_stake_ratio])));
+        let fast_secrecy_threshold_in_stake_ratio = option::map(fast_secrecy_threshold_in_stake_ratio, |v|arbitrary_precision::from_fixed_point64(v));
 
         let profile = default_profile();
         let lo = 0;
-        let hi = unsigned_bignum::as_u128(total_weight_max) * 2;
+        let hi = arbitrary_precision::as_u128(total_weight_max) * 2;
         // while (lo + 1 < hi) {
         while (true) {
             let md = lo + 1;
-            let weight_per_stake = unsigned_bignum::shift_down_by_bit(
-                unsigned_bignum::div_ceil(
-                    unsigned_bignum::shift_up_by_bit(unsigned_bignum::from_u128(md), 64),
+            let weight_per_stake = arbitrary_precision::shift_down_by_bit(
+                arbitrary_precision::div_ceil(
+                    arbitrary_precision::shift_up_by_bit(arbitrary_precision::from_u128(md), 64),
                     stakes_total,
                 ),
                 64,
@@ -187,19 +188,19 @@ module aptos_framework::dkg_rounding {
     /// Further, when `weight_per_stake >= (n + 2) / (2 * stake_total * (reconstruct_threshold_in_stake_ratio - secrecy_threshold_in_stake_ratio))`,
     /// it is guaranteed that `stake_ratio_required_for_liveness <= reconstruct_threshold_in_stake_ratio`.
     fun compute_profile(
-        secrecy_threshold_in_stake_ratio: unsigned_bignum::Number,
-        secrecy_threshold_in_stake_ratio_fast_path: Option<unsigned_bignum::Number>,
+        secrecy_threshold_in_stake_ratio: arbitrary_precision::Number,
+        secrecy_threshold_in_stake_ratio_fast_path: Option<arbitrary_precision::Number>,
         stakes: vector<u64>,
         ideal_total_weight: u64,
-        weight_per_stake: unsigned_bignum::Number,
+        weight_per_stake: arbitrary_precision::Number,
     ): Profile {
-        let one = unsigned_bignum::from_u64(1);
-        unsigned_bignum::min_assign(&mut weight_per_stake, one);
+        let one = arbitrary_precision::from_u64(1);
+        arbitrary_precision::min_assign(&mut weight_per_stake, one);
 
         // Initialize accumulators.
         let validator_weights = vector[];
-        let delta_down = unsigned_bignum::from_u64(0);
-        let delta_up = unsigned_bignum::from_u64(0);
+        let delta_down = arbitrary_precision::from_u64(0);
+        let delta_up = arbitrary_precision::from_u64(0);
         let weight_total = 0;
         let stake_total = 0;
 
@@ -208,15 +209,15 @@ module aptos_framework::dkg_rounding {
             let stake: u64 = stake;
             stake_total = stake_total + (stake as u128);
             let ideal_weight = weight_per_stake;
-            unsigned_bignum::mul_u64_assign(&mut ideal_weight, stake);
-            let rounded_weight = unsigned_bignum::round(ideal_weight, one);
-            let rounded_weight_u64 = unsigned_bignum::as_u64(rounded_weight);
+            arbitrary_precision::mul_u64_assign(&mut ideal_weight, stake);
+            let rounded_weight = arbitrary_precision::round(ideal_weight, one);
+            let rounded_weight_u64 = arbitrary_precision::as_u64(rounded_weight);
             vector::push_back(&mut validator_weights, rounded_weight_u64);
             weight_total = weight_total + (rounded_weight_u64 as u128);
-            if (unsigned_bignum::greater_than(&ideal_weight, &rounded_weight)) {
-                unsigned_bignum::add_assign(&mut delta_down, unsigned_bignum::sub(ideal_weight, rounded_weight));
+            if (arbitrary_precision::greater_than(&ideal_weight, &rounded_weight)) {
+                arbitrary_precision::add_assign(&mut delta_down, arbitrary_precision::sub(ideal_weight, rounded_weight));
             } else {
-                unsigned_bignum::add_assign(&mut delta_up, unsigned_bignum::sub(rounded_weight, ideal_weight));
+                arbitrary_precision::add_assign(&mut delta_up, arbitrary_precision::sub(rounded_weight, ideal_weight));
             };
         });
 
@@ -231,7 +232,7 @@ module aptos_framework::dkg_rounding {
         );
 
         let threshold_fast_path = option::map(secrecy_threshold_in_stake_ratio_fast_path, |t|{
-            let t: unsigned_bignum::Number = t;
+            let t: arbitrary_precision::Number = t;
             compute_threshold(
                 t,
                 weight_per_stake,
@@ -253,33 +254,33 @@ module aptos_framework::dkg_rounding {
     /// Once a **weight assignment** with `weight_per_stake` is done and `(weight_total, delta_up, delta_down)` are available,
     /// return the minimum reconstruct threshold that satisfies a `secrecy_threshold_in_stake_ratio`.
     fun compute_threshold(
-        secrecy_threshold_in_stake_ratio: unsigned_bignum::Number,
-        weight_per_stake: unsigned_bignum::Number,
+        secrecy_threshold_in_stake_ratio: arbitrary_precision::Number,
+        weight_per_stake: arbitrary_precision::Number,
         stake_total: u128,
         weight_total: u128,
-        delta_up: unsigned_bignum::Number,
-        delta_down: unsigned_bignum::Number,
+        delta_up: arbitrary_precision::Number,
+        delta_down: arbitrary_precision::Number,
     ): ReconstructThresholdInfo {
-        let reconstruct_threshold_in_weights = unsigned_bignum::sum(vector[
-            unsigned_bignum::product(vector[
+        let reconstruct_threshold_in_weights = arbitrary_precision::sum(vector[
+            arbitrary_precision::product(vector[
                 secrecy_threshold_in_stake_ratio,
-                unsigned_bignum::from_u128(stake_total),
+                arbitrary_precision::from_u128(stake_total),
                 weight_per_stake,
             ]),
             delta_up
         ]);
-        unsigned_bignum::floor_assign(&mut reconstruct_threshold_in_weights);
-        unsigned_bignum::add_assign(&mut reconstruct_threshold_in_weights, unsigned_bignum::from_u64(1));
-        unsigned_bignum::min_assign(&mut reconstruct_threshold_in_weights, unsigned_bignum::from_u128(weight_total));
+        arbitrary_precision::floor_assign(&mut reconstruct_threshold_in_weights);
+        arbitrary_precision::add_assign(&mut reconstruct_threshold_in_weights, arbitrary_precision::from_u64(1));
+        arbitrary_precision::min_assign(&mut reconstruct_threshold_in_weights, arbitrary_precision::from_u128(weight_total));
 
-        let reconstruct_threshold_in_stakes = unsigned_bignum::div_ceil(
-            unsigned_bignum::sum(vector[reconstruct_threshold_in_weights, delta_down]),
+        let reconstruct_threshold_in_stakes = arbitrary_precision::div_ceil(
+            arbitrary_precision::sum(vector[reconstruct_threshold_in_weights, delta_down]),
             weight_per_stake,
         );
 
         ReconstructThresholdInfo {
-            in_stakes: unsigned_bignum::as_u128(reconstruct_threshold_in_stakes),
-            in_weights: unsigned_bignum::as_u128(reconstruct_threshold_in_weights),
+            in_stakes: arbitrary_precision::as_u128(reconstruct_threshold_in_stakes),
+            in_weights: arbitrary_precision::as_u128(reconstruct_threshold_in_weights),
         }
     }
 

@@ -25,9 +25,9 @@
 -  [Function `get_total_weight`](#0x1_dkg_rounding_get_total_weight)
 
 
-<pre><code><b>use</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64">0x1::fixed_point64</a>;
+<pre><code><b>use</b> <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision">0x1::arbitrary_precision</a>;
+<b>use</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64">0x1::fixed_point64</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
-<b>use</b> <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum">0x1::unsigned_bignum</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
 
@@ -520,35 +520,36 @@ Given a stake distribution, compute a weight distribution.
         <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_add">fixed_point64::add</a>(secrecy_threshold_in_stake_ratio, epsilon)
     );
 
-    <b>let</b> secrecy_threshold_in_stake_ratio = <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_from_fixed_point64">unsigned_bignum::from_fixed_point64</a>(secrecy_threshold_in_stake_ratio);
-    <b>let</b> reconstruct_threshold_in_stake_ratio = <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_from_fixed_point64">unsigned_bignum::from_fixed_point64</a>(reconstruct_threshold_in_stake_ratio);
+    <b>let</b> secrecy_threshold_in_stake_ratio = <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_from_fixed_point64">arbitrary_precision::from_fixed_point64</a>(secrecy_threshold_in_stake_ratio);
+    <b>let</b> reconstruct_threshold_in_stake_ratio = <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_from_fixed_point64">arbitrary_precision::from_fixed_point64</a>(reconstruct_threshold_in_stake_ratio);
 
-    <b>let</b> total_weight_max = <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_div_ceil">unsigned_bignum::div_ceil</a>(
-        <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_sum">unsigned_bignum::sum</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[<a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_from_u64">unsigned_bignum::from_u64</a>(n), <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_from_u64">unsigned_bignum::from_u64</a>(4)]),
-        <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_product">unsigned_bignum::product</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[
-            <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_sub">unsigned_bignum::sub</a>(reconstruct_threshold_in_stake_ratio, secrecy_threshold_in_stake_ratio),
-            <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_from_u64">unsigned_bignum::from_u64</a>(2),
+    <b>let</b> total_weight_max = <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_div_ceil">arbitrary_precision::div_ceil</a>(
+        <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_sum">arbitrary_precision::sum</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[<a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_from_u64">arbitrary_precision::from_u64</a>(n), <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_from_u64">arbitrary_precision::from_u64</a>(4)]),
+        <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_product">arbitrary_precision::product</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[
+            <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_sub">arbitrary_precision::sub</a>(reconstruct_threshold_in_stake_ratio, secrecy_threshold_in_stake_ratio),
+            <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_from_u64">arbitrary_precision::from_u64</a>(2),
         ]),
     );
     <b>let</b> stakes_total = 0;
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each">vector::for_each</a>(stakes, |<a href="stake.md#0x1_stake">stake</a>|{
         stakes_total = stakes_total + (<a href="stake.md#0x1_stake">stake</a> <b>as</b> u128);
     });
-    <b>let</b> stakes_total = <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_from_u128">unsigned_bignum::from_u128</a>(stakes_total);
+    <b>let</b> stakes_total = <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_from_u128">arbitrary_precision::from_u128</a>(stakes_total);
 
-    <b>let</b> bar = <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_as_u128">unsigned_bignum::as_u128</a>(
-        <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_ceil">unsigned_bignum::ceil</a>(<a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_product">unsigned_bignum::product</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[stakes_total, reconstruct_threshold_in_stake_ratio])));
-    <b>let</b> fast_secrecy_threshold_in_stake_ratio = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_map">option::map</a>(fast_secrecy_threshold_in_stake_ratio, |v|<a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_from_fixed_point64">unsigned_bignum::from_fixed_point64</a>(v));
+    <b>let</b> bar = <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_as_u128">arbitrary_precision::as_u128</a>(
+        <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_ceil">arbitrary_precision::ceil</a>(
+            <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_product">arbitrary_precision::product</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[stakes_total, reconstruct_threshold_in_stake_ratio])));
+    <b>let</b> fast_secrecy_threshold_in_stake_ratio = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_map">option::map</a>(fast_secrecy_threshold_in_stake_ratio, |v|<a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_from_fixed_point64">arbitrary_precision::from_fixed_point64</a>(v));
 
     <b>let</b> profile = <a href="dkg_rounding.md#0x1_dkg_rounding_default_profile">default_profile</a>();
     <b>let</b> lo = 0;
-    <b>let</b> hi = <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_as_u128">unsigned_bignum::as_u128</a>(total_weight_max) * 2;
+    <b>let</b> hi = <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_as_u128">arbitrary_precision::as_u128</a>(total_weight_max) * 2;
     // <b>while</b> (lo + 1 &lt; hi) {
     <b>while</b> (<b>true</b>) {
         <b>let</b> md = lo + 1;
-        <b>let</b> weight_per_stake = <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_shift_down_by_bit">unsigned_bignum::shift_down_by_bit</a>(
-            <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_div_ceil">unsigned_bignum::div_ceil</a>(
-                <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_shift_up_by_bit">unsigned_bignum::shift_up_by_bit</a>(<a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_from_u128">unsigned_bignum::from_u128</a>(md), 64),
+        <b>let</b> weight_per_stake = <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_shift_down_by_bit">arbitrary_precision::shift_down_by_bit</a>(
+            <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_div_ceil">arbitrary_precision::div_ceil</a>(
+                <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_shift_up_by_bit">arbitrary_precision::shift_up_by_bit</a>(<a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_from_u128">arbitrary_precision::from_u128</a>(md), 64),
                 stakes_total,
             ),
             64,
@@ -598,7 +599,7 @@ Further, when <code>weight_per_stake &gt;= (n + 2) / (2 * stake_total * (reconst
 it is guaranteed that <code>stake_ratio_required_for_liveness &lt;= reconstruct_threshold_in_stake_ratio</code>.
 
 
-<pre><code><b>fun</b> <a href="dkg_rounding.md#0x1_dkg_rounding_compute_profile">compute_profile</a>(secrecy_threshold_in_stake_ratio: <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_Number">unsigned_bignum::Number</a>, secrecy_threshold_in_stake_ratio_fast_path: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_Number">unsigned_bignum::Number</a>&gt;, stakes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ideal_total_weight: u64, weight_per_stake: <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_Number">unsigned_bignum::Number</a>): <a href="dkg_rounding.md#0x1_dkg_rounding_Profile">dkg_rounding::Profile</a>
+<pre><code><b>fun</b> <a href="dkg_rounding.md#0x1_dkg_rounding_compute_profile">compute_profile</a>(secrecy_threshold_in_stake_ratio: <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_Number">arbitrary_precision::Number</a>, secrecy_threshold_in_stake_ratio_fast_path: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_Number">arbitrary_precision::Number</a>&gt;, stakes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ideal_total_weight: u64, weight_per_stake: <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_Number">arbitrary_precision::Number</a>): <a href="dkg_rounding.md#0x1_dkg_rounding_Profile">dkg_rounding::Profile</a>
 </code></pre>
 
 
@@ -608,19 +609,19 @@ it is guaranteed that <code>stake_ratio_required_for_liveness &lt;= reconstruct_
 
 
 <pre><code><b>fun</b> <a href="dkg_rounding.md#0x1_dkg_rounding_compute_profile">compute_profile</a>(
-    secrecy_threshold_in_stake_ratio: <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_Number">unsigned_bignum::Number</a>,
-    secrecy_threshold_in_stake_ratio_fast_path: Option&lt;<a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_Number">unsigned_bignum::Number</a>&gt;,
+    secrecy_threshold_in_stake_ratio: <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_Number">arbitrary_precision::Number</a>,
+    secrecy_threshold_in_stake_ratio_fast_path: Option&lt;<a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_Number">arbitrary_precision::Number</a>&gt;,
     stakes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     ideal_total_weight: u64,
-    weight_per_stake: <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_Number">unsigned_bignum::Number</a>,
+    weight_per_stake: <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_Number">arbitrary_precision::Number</a>,
 ): <a href="dkg_rounding.md#0x1_dkg_rounding_Profile">Profile</a> {
-    <b>let</b> one = <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_from_u64">unsigned_bignum::from_u64</a>(1);
-    <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_min_assign">unsigned_bignum::min_assign</a>(&<b>mut</b> weight_per_stake, one);
+    <b>let</b> one = <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_from_u64">arbitrary_precision::from_u64</a>(1);
+    <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_min_assign">arbitrary_precision::min_assign</a>(&<b>mut</b> weight_per_stake, one);
 
     // Initialize accumulators.
     <b>let</b> validator_weights = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-    <b>let</b> delta_down = <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_from_u64">unsigned_bignum::from_u64</a>(0);
-    <b>let</b> delta_up = <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_from_u64">unsigned_bignum::from_u64</a>(0);
+    <b>let</b> delta_down = <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_from_u64">arbitrary_precision::from_u64</a>(0);
+    <b>let</b> delta_up = <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_from_u64">arbitrary_precision::from_u64</a>(0);
     <b>let</b> weight_total = 0;
     <b>let</b> stake_total = 0;
 
@@ -629,15 +630,15 @@ it is guaranteed that <code>stake_ratio_required_for_liveness &lt;= reconstruct_
         <b>let</b> <a href="stake.md#0x1_stake">stake</a>: u64 = <a href="stake.md#0x1_stake">stake</a>;
         stake_total = stake_total + (<a href="stake.md#0x1_stake">stake</a> <b>as</b> u128);
         <b>let</b> ideal_weight = weight_per_stake;
-        <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_mul_u64_assign">unsigned_bignum::mul_u64_assign</a>(&<b>mut</b> ideal_weight, <a href="stake.md#0x1_stake">stake</a>);
-        <b>let</b> rounded_weight = <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_round">unsigned_bignum::round</a>(ideal_weight, one);
-        <b>let</b> rounded_weight_u64 = <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_as_u64">unsigned_bignum::as_u64</a>(rounded_weight);
+        <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_mul_u64_assign">arbitrary_precision::mul_u64_assign</a>(&<b>mut</b> ideal_weight, <a href="stake.md#0x1_stake">stake</a>);
+        <b>let</b> rounded_weight = <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_round">arbitrary_precision::round</a>(ideal_weight, one);
+        <b>let</b> rounded_weight_u64 = <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_as_u64">arbitrary_precision::as_u64</a>(rounded_weight);
         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> validator_weights, rounded_weight_u64);
         weight_total = weight_total + (rounded_weight_u64 <b>as</b> u128);
-        <b>if</b> (<a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_greater_than">unsigned_bignum::greater_than</a>(&ideal_weight, &rounded_weight)) {
-            <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_add_assign">unsigned_bignum::add_assign</a>(&<b>mut</b> delta_down, <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_sub">unsigned_bignum::sub</a>(ideal_weight, rounded_weight));
+        <b>if</b> (<a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_greater_than">arbitrary_precision::greater_than</a>(&ideal_weight, &rounded_weight)) {
+            <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_add_assign">arbitrary_precision::add_assign</a>(&<b>mut</b> delta_down, <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_sub">arbitrary_precision::sub</a>(ideal_weight, rounded_weight));
         } <b>else</b> {
-            <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_add_assign">unsigned_bignum::add_assign</a>(&<b>mut</b> delta_up, <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_sub">unsigned_bignum::sub</a>(rounded_weight, ideal_weight));
+            <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_add_assign">arbitrary_precision::add_assign</a>(&<b>mut</b> delta_up, <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_sub">arbitrary_precision::sub</a>(rounded_weight, ideal_weight));
         };
     });
 
@@ -652,7 +653,7 @@ it is guaranteed that <code>stake_ratio_required_for_liveness &lt;= reconstruct_
     );
 
     <b>let</b> threshold_fast_path = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_map">option::map</a>(secrecy_threshold_in_stake_ratio_fast_path, |t|{
-        <b>let</b> t: <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_Number">unsigned_bignum::Number</a> = t;
+        <b>let</b> t: <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_Number">arbitrary_precision::Number</a> = t;
         <a href="dkg_rounding.md#0x1_dkg_rounding_compute_threshold">compute_threshold</a>(
             t,
             weight_per_stake,
@@ -684,7 +685,7 @@ Once a **weight assignment** with <code>weight_per_stake</code> is done and <cod
 return the minimum reconstruct threshold that satisfies a <code>secrecy_threshold_in_stake_ratio</code>.
 
 
-<pre><code><b>fun</b> <a href="dkg_rounding.md#0x1_dkg_rounding_compute_threshold">compute_threshold</a>(secrecy_threshold_in_stake_ratio: <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_Number">unsigned_bignum::Number</a>, weight_per_stake: <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_Number">unsigned_bignum::Number</a>, stake_total: u128, weight_total: u128, delta_up: <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_Number">unsigned_bignum::Number</a>, delta_down: <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_Number">unsigned_bignum::Number</a>): <a href="dkg_rounding.md#0x1_dkg_rounding_ReconstructThresholdInfo">dkg_rounding::ReconstructThresholdInfo</a>
+<pre><code><b>fun</b> <a href="dkg_rounding.md#0x1_dkg_rounding_compute_threshold">compute_threshold</a>(secrecy_threshold_in_stake_ratio: <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_Number">arbitrary_precision::Number</a>, weight_per_stake: <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_Number">arbitrary_precision::Number</a>, stake_total: u128, weight_total: u128, delta_up: <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_Number">arbitrary_precision::Number</a>, delta_down: <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_Number">arbitrary_precision::Number</a>): <a href="dkg_rounding.md#0x1_dkg_rounding_ReconstructThresholdInfo">dkg_rounding::ReconstructThresholdInfo</a>
 </code></pre>
 
 
@@ -694,33 +695,33 @@ return the minimum reconstruct threshold that satisfies a <code>secrecy_threshol
 
 
 <pre><code><b>fun</b> <a href="dkg_rounding.md#0x1_dkg_rounding_compute_threshold">compute_threshold</a>(
-    secrecy_threshold_in_stake_ratio: <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_Number">unsigned_bignum::Number</a>,
-    weight_per_stake: <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_Number">unsigned_bignum::Number</a>,
+    secrecy_threshold_in_stake_ratio: <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_Number">arbitrary_precision::Number</a>,
+    weight_per_stake: <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_Number">arbitrary_precision::Number</a>,
     stake_total: u128,
     weight_total: u128,
-    delta_up: <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_Number">unsigned_bignum::Number</a>,
-    delta_down: <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_Number">unsigned_bignum::Number</a>,
+    delta_up: <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_Number">arbitrary_precision::Number</a>,
+    delta_down: <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_Number">arbitrary_precision::Number</a>,
 ): <a href="dkg_rounding.md#0x1_dkg_rounding_ReconstructThresholdInfo">ReconstructThresholdInfo</a> {
-    <b>let</b> reconstruct_threshold_in_weights = <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_sum">unsigned_bignum::sum</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[
-        <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_product">unsigned_bignum::product</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[
+    <b>let</b> reconstruct_threshold_in_weights = <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_sum">arbitrary_precision::sum</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[
+        <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_product">arbitrary_precision::product</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[
             secrecy_threshold_in_stake_ratio,
-            <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_from_u128">unsigned_bignum::from_u128</a>(stake_total),
+            <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_from_u128">arbitrary_precision::from_u128</a>(stake_total),
             weight_per_stake,
         ]),
         delta_up
     ]);
-    <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_floor_assign">unsigned_bignum::floor_assign</a>(&<b>mut</b> reconstruct_threshold_in_weights);
-    <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_add_assign">unsigned_bignum::add_assign</a>(&<b>mut</b> reconstruct_threshold_in_weights, <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_from_u64">unsigned_bignum::from_u64</a>(1));
-    <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_min_assign">unsigned_bignum::min_assign</a>(&<b>mut</b> reconstruct_threshold_in_weights, <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_from_u128">unsigned_bignum::from_u128</a>(weight_total));
+    <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_floor_assign">arbitrary_precision::floor_assign</a>(&<b>mut</b> reconstruct_threshold_in_weights);
+    <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_add_assign">arbitrary_precision::add_assign</a>(&<b>mut</b> reconstruct_threshold_in_weights, <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_from_u64">arbitrary_precision::from_u64</a>(1));
+    <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_min_assign">arbitrary_precision::min_assign</a>(&<b>mut</b> reconstruct_threshold_in_weights, <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_from_u128">arbitrary_precision::from_u128</a>(weight_total));
 
-    <b>let</b> reconstruct_threshold_in_stakes = <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_div_ceil">unsigned_bignum::div_ceil</a>(
-        <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_sum">unsigned_bignum::sum</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[reconstruct_threshold_in_weights, delta_down]),
+    <b>let</b> reconstruct_threshold_in_stakes = <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_div_ceil">arbitrary_precision::div_ceil</a>(
+        <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_sum">arbitrary_precision::sum</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[reconstruct_threshold_in_weights, delta_down]),
         weight_per_stake,
     );
 
     <a href="dkg_rounding.md#0x1_dkg_rounding_ReconstructThresholdInfo">ReconstructThresholdInfo</a> {
-        in_stakes: <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_as_u128">unsigned_bignum::as_u128</a>(reconstruct_threshold_in_stakes),
-        in_weights: <a href="../../aptos-stdlib/doc/unsigned_bignum.md#0x1_unsigned_bignum_as_u128">unsigned_bignum::as_u128</a>(reconstruct_threshold_in_weights),
+        in_stakes: <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_as_u128">arbitrary_precision::as_u128</a>(reconstruct_threshold_in_stakes),
+        in_weights: <a href="../../aptos-stdlib/doc/arbitrary_precision.md#0x1_arbitrary_precision_as_u128">arbitrary_precision::as_u128</a>(reconstruct_threshold_in_weights),
     }
 }
 </code></pre>
