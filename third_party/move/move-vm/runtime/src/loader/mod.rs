@@ -1748,6 +1748,12 @@ impl Loader {
             Type::StructInstantiation { idx, ty_args, .. } => TypeTag::Struct(Box::new(
                 self.struct_name_to_type_tag(*idx, ty_args, gas_context, module_storage)?,
             )),
+
+            // Do we want type tags to be function types? It seems weird if we allow this?
+            Type::Function(_) => {
+                todo!("LAMBDA")
+            },
+
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -1976,6 +1982,9 @@ impl Loader {
                     has_identifier_mappings,
                 )
             },
+            Type::Function(..) => {
+                todo!("LAMBDA")
+            },
             Type::Struct { idx, .. } => {
                 *count += 1;
                 let (layout, has_identifier_mappings) = self.struct_name_to_type_layout(
@@ -2129,6 +2138,9 @@ impl Loader {
                     depth + 1,
                 )?))
             },
+            Type::Function(..) => {
+                todo!("LAMBDA")
+            },
             Type::Struct { idx, .. } => self.struct_name_to_fully_annotated_layout(
                 *idx,
                 module_store,
@@ -2242,6 +2254,9 @@ impl Loader {
                 let mut subst_struct_formula = struct_formula.subst(ty_arg_map)?;
                 subst_struct_formula.scale(1);
                 subst_struct_formula
+            },
+            Type::Function(..) => {
+                todo!("LAMBDA")
             },
         })
     }
@@ -2383,6 +2398,11 @@ fn match_return_type<'a>(
                     .zip(expected_fields.iter())
                     .all(|types| match_return_type(types.0, types.1, map))
         },
+
+        (Type::Function(..), Type::Function(..)) => {
+            todo!("LAMBDA")
+        },
+
         // For primitive types we need to assure the types match
         (Type::U8, Type::U8)
         | (Type::U16, Type::U16)
@@ -2393,6 +2413,7 @@ fn match_return_type<'a>(
         | (Type::Bool, Type::Bool)
         | (Type::Address, Type::Address)
         | (Type::Signer, Type::Signer) => true,
+
         // Otherwise the types do not match and we can't match return type to the expected type.
         // Note we don't use the _ pattern but spell out all cases, so that the compiler will
         // bark when a case is missed upon future updates to the types.
@@ -2408,6 +2429,7 @@ fn match_return_type<'a>(
         | (Type::Struct { .. }, _)
         | (Type::StructInstantiation { .. }, _)
         | (Type::Vector(_), _)
+        | (Type::Function(_), _)
         | (Type::MutableReference(_), _)
         | (Type::Reference(_), _) => false,
     }

@@ -212,7 +212,7 @@ pub(crate) fn is_valid_txn_arg(
                 let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
                 allowed_structs.contains_key(&full_name)
             }),
-        Signer | Reference(_) | MutableReference(_) | TyParam(_) => false,
+        Signer | Reference(_) | MutableReference(_) | Function(_) | TyParam(_) => false,
     }
 }
 
@@ -304,7 +304,7 @@ fn construct_arg(
                 Err(invalid_signature())
             }
         },
-        Reference(_) | MutableReference(_) | TyParam(_) => Err(invalid_signature()),
+        Reference(_) | MutableReference(_) | Function(_) | TyParam(_) => Err(invalid_signature()),
     }
 }
 
@@ -373,7 +373,9 @@ pub(crate) fn recursively_construct_arg(
         U64 => read_n_bytes(8, cursor, arg)?,
         U128 => read_n_bytes(16, cursor, arg)?,
         U256 | Address => read_n_bytes(32, cursor, arg)?,
-        Signer | Reference(_) | MutableReference(_) | TyParam(_) => return Err(invalid_signature()),
+        Signer | Reference(_) | MutableReference(_) | Function(_) | TyParam(_) => {
+            return Err(invalid_signature())
+        },
     };
     Ok(())
 }

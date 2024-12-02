@@ -2497,10 +2497,10 @@ fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
         | (Type::Address, Container::VecAddress(_))
         | (Type::Signer, Container::Struct(_)) => Ok(()),
 
-        (Type::Vector(_), Container::Vec(_)) => Ok(()),
-
-        (Type::Struct { .. }, Container::Vec(_))
+        (Type::Vector(_), Container::Vec(_))
+        | (Type::Struct { .. }, Container::Vec(_))
         | (Type::Signer, Container::Vec(_))
+        | (Type::Function(_), Container::Vec(_))
         | (Type::StructInstantiation { .. }, Container::Vec(_)) => Ok(()),
 
         (Type::Reference(_), _) | (Type::MutableReference(_), _) | (Type::TyParam(_), _) => Err(
@@ -2518,6 +2518,7 @@ fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
         | (Type::Address, _)
         | (Type::Signer, _)
         | (Type::Vector(_), _)
+        | (Type::Function(_), _)
         | (Type::Struct { .. }, _)
         | (Type::StructInstantiation { .. }, _) => Err(PartialVMError::new(
             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -2754,8 +2755,8 @@ impl VectorRef {
 }
 
 impl Vector {
-    pub fn pack(type_param: &Type, elements: Vec<Value>) -> PartialVMResult<Value> {
-        let container = match type_param {
+    pub fn pack(elem_ty: &Type, elements: Vec<Value>) -> PartialVMResult<Value> {
+        let container = match elem_ty {
             Type::U8 => Value::vector_u8(
                 elements
                     .into_iter()
@@ -2807,6 +2808,7 @@ impl Vector {
 
             Type::Signer
             | Type::Vector(_)
+            | Type::Function(_)
             | Type::Struct { .. }
             | Type::StructInstantiation {
                 idx: _, ty_args: _, ..
@@ -2817,7 +2819,7 @@ impl Vector {
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(format!("invalid type param for vector: {:?}", type_param)),
+                        .with_message(format!("invalid type param for vector: {:?}", elem_ty)),
                 )
             },
         };
@@ -2825,8 +2827,8 @@ impl Vector {
         Ok(container)
     }
 
-    pub fn empty(type_param: &Type) -> PartialVMResult<Value> {
-        Self::pack(type_param, vec![])
+    pub fn empty(elem_ty: &Type) -> PartialVMResult<Value> {
+        Self::pack(elem_ty, vec![])
     }
 
     pub fn unpack_unchecked(self) -> PartialVMResult<Vec<Value>> {
@@ -2869,8 +2871,8 @@ impl Vector {
         Ok(elements)
     }
 
-    pub fn unpack(self, type_param: &Type, expected_num: u64) -> PartialVMResult<Vec<Value>> {
-        check_elem_layout(type_param, &self.0)?;
+    pub fn unpack(self, elem_ty: &Type, expected_num: u64) -> PartialVMResult<Vec<Value>> {
+        check_elem_layout(elem_ty, &self.0)?;
         let elements = self.unpack_unchecked()?;
         if expected_num as usize == elements.len() {
             Ok(elements)
@@ -2880,8 +2882,8 @@ impl Vector {
         }
     }
 
-    pub fn destroy_empty(self, type_param: &Type) -> PartialVMResult<()> {
-        self.unpack(type_param, 0)?;
+    pub fn destroy_empty(self, elem_ty: &Type) -> PartialVMResult<()> {
+        self.unpack(elem_ty, 0)?;
         Ok(())
     }
 

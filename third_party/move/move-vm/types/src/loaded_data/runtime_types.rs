@@ -4,6 +4,7 @@
 
 #![allow(clippy::non_canonical_partial_ord_impl)]
 
+use crate::loaded_data::function_types::FunctionType;
 use derivative::Derivative;
 use itertools::Itertools;
 use move_binary_format::{
@@ -293,6 +294,7 @@ pub enum Type {
     U16,
     U32,
     U256,
+    Function(TriompheArc<FunctionType>),
 }
 
 pub struct TypePreorderTraversalIter<'a> {
@@ -326,6 +328,11 @@ impl<'a> Iterator for TypePreorderTraversalIter<'a> {
 
                     Vector(ty) => {
                         self.stack.push(ty);
+                    },
+
+                    Function(function_ty) => {
+                        self.stack.extend(function_ty.arg_tys().iter().rev());
+                        self.stack.extend(function_ty.return_tys().iter().rev());
                     },
 
                     StructInstantiation { ty_args, .. } => self.stack.extend(ty_args.iter().rev()),
@@ -646,6 +653,10 @@ impl Type {
                     type_argument_abilities,
                 )
             },
+
+            Type::Function(..) => {
+                todo!("LAMBDA")
+            },
         }
     }
 
@@ -709,6 +720,7 @@ impl Type {
                     | U128
                     | U256
                     | Vector(..)
+                    | Function(..)
                     | Struct { .. }
                     | Reference(..)
                     | MutableReference(..)
@@ -757,6 +769,7 @@ impl fmt::Display for Type {
                 idx.0,
                 ty_args.iter().map(|t| t.to_string()).join(",")
             ),
+            Function(function_ty) => write!(f, "{}", function_ty),
             Reference(t) => write!(f, "&{}", t),
             MutableReference(t) => write!(f, "&mut {}", t),
             TyParam(no) => write!(f, "_{}", no),
@@ -1127,6 +1140,25 @@ impl TypeBuilder {
                     ty_args: TriompheArc::new(instantiated_tys),
                     ability: ability.clone(),
                 }
+            },
+            Function(function_ty) => {
+                let mut instantiated_arg_tys = vec![];
+                for arg_ty in function_ty.arg_tys() {
+                    let arg_ty = Self::apply_subst(arg_ty, subst, count, depth + 1, check)?;
+                    instantiated_arg_tys.push(arg_ty);
+                }
+
+                let mut instantiated_return_tys = vec![];
+                for return_ty in function_ty.return_tys() {
+                    let return_ty = Self::apply_subst(return_ty, subst, count, depth + 1, check)?;
+                    instantiated_return_tys.push(return_ty);
+                }
+
+                Function(TriompheArc::new(FunctionType::new(
+                    instantiated_arg_tys,
+                    instantiated_return_tys,
+                    function_ty.ability().clone(),
+                )))
             },
         })
     }

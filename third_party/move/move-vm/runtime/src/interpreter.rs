@@ -1405,6 +1405,20 @@ fn check_depth_of_type_impl(
             )?;
             check_depth!(formula.solve(&ty_arg_depths))
         },
+        Type::Function(function_ty) => {
+            // Similarly to struct instantiation, we assume that the function type is fully
+            // instantiated at this point.
+            let mut ty_depth = 1;
+            for ty in function_ty.arg_tys().iter().chain(function_ty.return_tys()) {
+                ty_depth = ty_depth.max(check_depth_of_type_impl(
+                    resolver,
+                    ty,
+                    max_depth,
+                    check_depth!(1),
+                )?);
+            }
+            ty_depth
+        },
         Type::TyParam(_) => {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)

@@ -5,6 +5,7 @@
 //!
 //! This module contains the loaded definition of code data used in runtime.
 
+pub mod function_types;
 pub mod runtime_access_specifier;
 #[cfg(test)]
 mod runtime_access_specifiers_prop_tests;
