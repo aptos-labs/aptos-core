@@ -369,7 +369,12 @@ fn test_native_bridge_complete() {
     let mut combined_bytes = Vec::new();
 
     // Append serialized values to `combined_bytes`
-    combined_bytes.extend_from_slice(&hex::decode(&format!("0x{}", String::from_utf8_lossy(&initiator)).to_string()).unwrap());
+    
+    // Convert recipient from hex to bytes
+    let initiator_bytes = hex::decode(String::from_utf8(initiator.clone()).expect("Invalid UTF-8 recipient"))
+    .expect("Failed to decode recipient hex");
+    println!("Recipient bytes: {:?}", initiator_bytes); 
+    combined_bytes.extend(initiator_bytes);
     combined_bytes.extend(bcs::to_bytes(&recipient.address()).expect("Failed to serialize recipient"));
     combined_bytes.extend(normalize_to_32_bytes(bcs::to_bytes(&amount).expect("Failed to serialize amount")));
     combined_bytes.extend(normalize_to_32_bytes(bcs::to_bytes(&nonce).expect("Failed to serialize nonce")));
