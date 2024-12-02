@@ -238,6 +238,10 @@ impl ForgeConfig {
                 ["enable_storage_sharding"] = true.into();
             helm_values["validator"]["config"]["indexer_db_config"]["enable_event"] = true.into();
             helm_values["fullnode"]["config"]["indexer_db_config"]["enable_event"] = true.into();
+            helm_values["validator"]["config"]["indexer_db_config"]
+                ["enable_event_v2_translation"] = false.into();
+            helm_values["fullnode"]["config"]["indexer_db_config"]["enable_event_v2_translation"] =
+                false.into();
         }))
     }
 
