@@ -5,17 +5,19 @@
 
 use crate::{
     metrics::{LATEST_CHECKPOINT_VERSION, OTHER_TIMERS_SECONDS},
-    state_store::{state_snapshot_committer::StateSnapshotCommitter, CurrentState, StateDb},
+    state_store::{
+        persisted_state::PersistedState, state_snapshot_committer::StateSnapshotCommitter,
+        CurrentState, StateDb,
+    },
 };
+use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
-use aptos_scratchpad::SmtAncestors;
 use aptos_storage_interface::{
     db_ensure as ensure,
     state_store::{sharded_state_updates::ShardedStateUpdates, state_delta::StateDelta},
     AptosDbError, Result,
 };
-use aptos_types::state_store::state_value::StateValue;
 use std::{
     sync::{
         mpsc,
@@ -41,7 +43,7 @@ pub struct BufferedState {
     /// state after the latest checkpoint. The `current` is the latest speculative state.
     ///   n.b. this is an `Arc` shared with the StateStore so that merely querying the latest state
     ///        does not require locking the buffered state.
-    state_after_checkpoint: CurrentState,
+    state_after_checkpoint: Arc<Mutex<CurrentState>>,
     state_commit_sender: SyncSender<CommitMessage<Arc<StateDelta>>>,
     target_items: usize,
     join_handle: Option<JoinHandle<()>>,
@@ -58,12 +60,16 @@ impl BufferedState {
         state_db: &Arc<StateDb>,
         state_after_checkpoint: StateDelta,
         target_items: usize,
-    ) -> (Self, SmtAncestors<StateValue>, CurrentState) {
+        current_state: Arc<Mutex<CurrentState>>,
+        persisted_state: Arc<Mutex<PersistedState>>,
+    ) -> Self {
         let (state_commit_sender, state_commit_receiver) =
             mpsc::sync_channel(ASYNC_COMMIT_CHANNEL_BUFFER_SIZE as usize);
         let arc_state_db = Arc::clone(state_db);
-        let smt_ancestors = SmtAncestors::new(state_after_checkpoint.base.clone());
-        let smt_ancestors_clone = smt_ancestors.clone();
+        persisted_state
+            .lock()
+            .set(state_after_checkpoint.base.clone());
+        let persisted_state_clone = persisted_state.clone();
         // Create a new thread with receiver subscribing to state commit changes
         let join_handle = std::thread::Builder::new()
             .name("state-committer".to_string())
@@ -71,12 +77,12 @@ impl BufferedState {
                 let committer = StateSnapshotCommitter::new(
                     arc_state_db,
                     state_commit_receiver,
-                    smt_ancestors_clone,
+                    persisted_state_clone,
                 );
                 committer.run();
             })
             .expect("Failed to spawn state committer thread.");
-        let current_state = CurrentState::new(state_after_checkpoint.clone());
+        current_state.lock().set(state_after_checkpoint.clone());
         let myself = Self {
             state_until_checkpoint: None,
             state_after_checkpoint: current_state.clone(),
@@ -86,7 +92,7 @@ impl BufferedState {
             join_handle: Some(join_handle),
         };
         myself.report_latest_committed_version();
-        (myself, smt_ancestors, current_state)
+        myself
     }
 
     /// This method checks whether a commit is needed based on the target_items value and the number of items in state_until_checkpoint.
@@ -194,7 +200,7 @@ impl BufferedState {
                     new_state_after_checkpoint.base_version == state_after_checkpoint.base_version,
                     "Diff between base and latest checkpoints not provided.",
                 );
-                *state_after_checkpoint = new_state_after_checkpoint.clone();
+                state_after_checkpoint.set(new_state_after_checkpoint.clone());
             }
         }
 
@@ -205,16 +211,20 @@ impl BufferedState {
         self.report_latest_committed_version();
         Ok(())
     }
+
+    pub(crate) fn drain(&mut self) {
+        if let Some(handle) = self.join_handle.take() {
+            self.sync_commit();
+            self.state_commit_sender.send(CommitMessage::Exit).unwrap();
+            handle
+                .join()
+                .expect("snapshot commit thread should join peacefully.");
+        }
+    }
 }
 
 impl Drop for BufferedState {
     fn drop(&mut self) {
-        self.sync_commit();
-        self.state_commit_sender.send(CommitMessage::Exit).unwrap();
-        self.join_handle
-            .take()
-            .expect("snapshot commit thread must exist.")
-            .join()
-            .expect("snapshot commit thread should join peacefully.");
+        self.drain()
     }
 }
