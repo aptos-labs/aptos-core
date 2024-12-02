@@ -527,8 +527,8 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_latest_executed_trees(&self) -> Result<ExecutedTrees> {
-        gauged_api("get_latest_executed_trees", || {
+    fn get_pre_committed_ledger_summary(&self) -> Result<LedgerSummary> {
+        gauged_api("get_pre_committed_ledger_summary", || {
             let current_state = self.state_store.current_state_cloned();
             let num_txns = current_state.next_version();
 
@@ -538,11 +538,11 @@ impl DbReader for AptosDB {
                 .get_frozen_subtree_hashes(num_txns)?;
             let transaction_accumulator =
                 Arc::new(InMemoryAccumulator::new(frozen_subtrees, num_txns)?);
-            let executed_trees = ExecutedTrees::new(
+            let ledger_summary = LedgerSummary::new(
                 Arc::new(current_state),
                 transaction_accumulator,
             );
-            Ok(executed_trees)
+            Ok(ledger_summary)
         })
     }
 

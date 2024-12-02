@@ -7,7 +7,7 @@
 use crate::types::partial_state_compute_result::PartialStateComputeResult;
 use anyhow::Result;
 use aptos_executor_types::execution_output::ExecutionOutput;
-use aptos_storage_interface::ExecutedTrees;
+use aptos_storage_interface::LedgerSummary;
 use do_ledger_update::DoLedgerUpdate;
 use do_state_checkpoint::DoStateCheckpoint;
 
@@ -20,7 +20,7 @@ pub struct ApplyExecutionOutput;
 impl ApplyExecutionOutput {
     pub fn run(
         execution_output: ExecutionOutput,
-        base_view: &ExecutedTrees,
+        base_view: &LedgerSummary,
     ) -> Result<PartialStateComputeResult> {
         let state_checkpoint_output = DoStateCheckpoint::run(
             &execution_output,
