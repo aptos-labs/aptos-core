@@ -75,7 +75,9 @@ impl StatelessPipeline for PersistingPhase {
         {
             for b in &blocks {
                 if let Some(tx) = b.pipeline_tx().lock().as_mut() {
-                    let _ = tx.commit_proof_tx.send(commit_ledger_info.clone());
+                    tx.commit_proof_tx
+                        .take()
+                        .map(|tx| tx.send(commit_ledger_info.clone()));
                 }
                 b.wait_for_commit_ledger().await;
             }
