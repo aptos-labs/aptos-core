@@ -15,6 +15,8 @@ module aptos_framework::native_bridge {
     use std::bcs;
     use std::vector;
     use aptos_std::aptos_hash::keccak256;
+    #[test_only]
+    use aptos_std::debug;
 
     const ETRANSFER_ALREADY_PROCESSED: u64 = 1;
     const EINVALID_BRIDGE_TRANSFER_ID: u64 = 2;
@@ -132,7 +134,26 @@ module aptos_framework::native_bridge {
         );  
     }
 
-    /// Completes a bridge transfer by the initiator.
+    public fun pad_to_32_bytes(input: vector<u8>): vector<u8> {
+        let result = input;
+        while (vector::length(&result) < 32) {
+            vector::push_back(&mut result, 0); // Add padding
+        };
+        result
+    }
+
+    public fun truncate_to_20_bytes(input: vector<u8>): vector<u8> {
+        let result = vector::empty<u8>();
+        let length = vector::length(&input);
+        let i = 0;
+        while (i < 20 && i < length) {
+            vector::push_back(&mut result, *vector::borrow(&input, i));
+            i = i + 1;
+        };
+        result
+    }
+
+    /// Completes a bridge transfer on the destination chain.
     ///  
     /// @param caller The signer representing the bridge relayer.  
     /// @param initiator The initiator's Ethereum address as a vector of bytes.  
@@ -141,28 +162,34 @@ module aptos_framework::native_bridge {
     /// @param amount The amount of assets to be locked.  
     /// @param nonce The unique nonce for the transfer.    
     /// @abort If the caller is not the bridge relayer or the transfer has already been processed.  
-    public entry fun complete_bridge_transfer(  
-        caller: &signer,  
+    public entry fun complete_bridge_transfer(
+        caller: &signer,
         bridge_transfer_id: vector<u8>,
-        initiator: vector<u8>,  
-        recipient: address,  
-        amount: u64,  
-        nonce: u64  
-    ) acquires BridgeEvents {  
+        initiator: vector<u8>,
+        recipient: address,
+        amount: u64,
+        nonce: u64
+    ) acquires BridgeEvents {
         // Ensure the caller is the bridge relayer
-        native_bridge_configuration::assert_is_caller_relayer(caller);  
+        native_bridge_configuration::assert_is_caller_relayer(caller);
 
         // Check if the bridge transfer ID is already associated with an inbound nonce
         let inbound_nonce_exists = native_bridge_store::is_inbound_nonce_set(bridge_transfer_id);
-        assert!(!inbound_nonce_exists, ETRANSFER_ALREADY_PROCESSED); // Abort if the transfer is already processed
-        assert!(nonce > 0, EINVALID_NONCE); 
+        assert!(!inbound_nonce_exists, ETRANSFER_ALREADY_PROCESSED);
+        assert!(nonce > 0, EINVALID_NONCE);
 
         // Validate the bridge_transfer_id by reconstructing the hash
+        let initiator_bytes = hex_to_bytes(initiator);
+        let recipient_bytes = bcs::to_bytes(&recipient);
+        let amount_bytes = normalize_to_32_bytes(bcs::to_bytes<u64>(&amount));
+        let nonce_bytes = normalize_to_32_bytes(bcs::to_bytes<u64>(&nonce));
+
         let combined_bytes = vector::empty<u8>();
-        vector::append(&mut combined_bytes, initiator);
-        vector::append(&mut combined_bytes, bcs::to_bytes(&recipient));
-        vector::append(&mut combined_bytes, bcs::to_bytes(&amount));
-        vector::append(&mut combined_bytes, bcs::to_bytes(&nonce));
+        vector::append(&mut combined_bytes, initiator_bytes);
+        vector::append(&mut combined_bytes, recipient_bytes);
+        vector::append(&mut combined_bytes, amount_bytes);
+        vector::append(&mut combined_bytes, nonce_bytes);
+
         assert!(keccak256(combined_bytes) == bridge_transfer_id, EINVALID_BRIDGE_TRANSFER_ID);
 
         // Record the transfer as completed by associating the bridge_transfer_id with the inbound nonce
@@ -173,17 +200,18 @@ module aptos_framework::native_bridge {
 
         // Emit the event
         let bridge_events = borrow_global_mut<BridgeEvents>(@aptos_framework);
-        event::emit_event(  
+        event::emit_event(
             &mut bridge_events.bridge_transfer_completed_events,
-            BridgeTransferCompletedEvent {  
-                bridge_transfer_id,  
-                initiator,  
-                recipient,  
-                amount,  
-                nonce,  
-            },  
-        );  
-    } 
+            BridgeTransferCompletedEvent {
+                bridge_transfer_id,
+                initiator,
+                recipient,
+                amount,
+                nonce,
+            },
+        );
+    }
+
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff)]
     fun test_initiate_bridge_transfer_happy_path(
@@ -239,22 +267,93 @@ module aptos_framework::native_bridge {
         );
     }
 
+    public fun hex_to_bytes(input: vector<u8>): vector<u8> {
+        let result = vector::empty<u8>();
+        let i = 0;
+
+        // Ensure the input length is valid (2 characters per byte)
+        assert!(vector::length(&input) % 2 == 0, 1); 
+
+        while (i < vector::length(&input)) {
+            let high_nibble = ascii_hex_to_u8(*vector::borrow(&input, i));
+            let low_nibble = ascii_hex_to_u8(*vector::borrow(&input, i + 1));
+            let byte = (high_nibble << 4) | low_nibble;
+            vector::push_back(&mut result, byte);
+            i = i + 2;
+        };
+
+        result
+    }
+
+    fun ascii_hex_to_u8(ch: u8): u8 {
+        if (ch >= 0x30 && ch <= 0x39) { // '0'-'9'
+            ch - 0x30
+        } else if (ch >= 0x41 && ch <= 0x46) { // 'A'-'F'
+            ch - 0x41 + 10
+        } else if (ch >= 0x61 && ch <= 0x66) { // 'a'-'f'
+            ch - 0x61 + 10
+        } else {
+            assert!(false, 2); // Abort with error code 2
+            0 // This is unreachable, but ensures type consistency
+        }
+    }
+
+    public fun normalize_to_32_bytes(value: vector<u8>): vector<u8> {
+        let meaningful = vector::empty<u8>();
+        let i = 0;
+
+        // Remove trailing zeroes
+        while (i < vector::length(&value)) {
+            if (*vector::borrow(&value, i) != 0x00) {
+                vector::push_back(&mut meaningful, *vector::borrow(&value, i));
+            };
+            i = i + 1;
+        };
+
+        let result = vector::empty<u8>();
+
+        // Pad with zeros on the left
+        let padding_length = 32 - vector::length(&meaningful);
+        let j = 0;
+        while (j < padding_length) {
+            vector::push_back(&mut result, 0x00);
+            j = j + 1;
+        };
+
+        // Append the meaningful bytes
+        vector::append(&mut result, meaningful);
+
+        result
+    }
+
     #[test(aptos_framework = @aptos_framework)]
     fun test_complete_bridge_transfer(aptos_framework: &signer) acquires BridgeEvents {
         native_bridge_core::initialize_for_test(aptos_framework);
         initialize(aptos_framework);
-        let initiator = valid_eip55();
-        let recipient = @0xcafe;
-        let amount = 1;
+        let initiator = b"5B38Da6a701c568545dCfcB03FcB875f56beddC4";
+        let recipient = @0x726563697069656e740000000000000000000000000000000000000000000000;
+        let amount = 100;
         let nonce = 5;
+
+        debug::print(&initiator);
+        debug::print(&recipient);
+        debug::print(&amount);
+        debug::print(&nonce);
+
+        debug::print(&bcs::to_bytes(&initiator));
+        debug::print(&bcs::to_bytes(&recipient));
+        debug::print(&normalize_to_32_bytes(bcs::to_bytes(&amount)));
+        debug::print(&normalize_to_32_bytes(bcs::to_bytes(&nonce)));
 
         // Create a bridge transfer ID algorithmically
         let combined_bytes = vector::empty<u8>();
-        vector::append(&mut combined_bytes, initiator);
+        vector::append(&mut combined_bytes, hex_to_bytes(initiator));
         vector::append(&mut combined_bytes, bcs::to_bytes(&recipient));
-        vector::append(&mut combined_bytes, bcs::to_bytes(&amount));
-        vector::append(&mut combined_bytes, bcs::to_bytes(&nonce));
+        vector::append(&mut combined_bytes, normalize_to_32_bytes(bcs::to_bytes(&amount)));
+        vector::append(&mut combined_bytes, normalize_to_32_bytes(bcs::to_bytes(&nonce)));
         let bridge_transfer_id = keccak256(combined_bytes);
+        debug::print(&combined_bytes);
+        debug::print(&bridge_transfer_id);
 
         // Create an account for our recipient
         aptos_account::create_account(recipient);
