@@ -1436,7 +1436,7 @@ impl ModelValue {
             },
             Type::Tuple(_)
             | Type::Primitive(_)
-            | Type::Fun(_, _)
+            | Type::Fun(..)
             | Type::TypeDomain(_)
             | Type::ResourceDomain(_, _, _)
             | Type::Error

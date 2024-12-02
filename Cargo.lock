@@ -11452,6 +11452,7 @@ dependencies = [
  "codespan",
  "codespan-reporting",
  "datatest-stable",
+ "either",
  "internment",
  "itertools 0.13.0",
  "log",

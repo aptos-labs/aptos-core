@@ -528,7 +528,7 @@ impl<'env> SpecTranslator<'env> {
                 | Type::Struct(_, _, _)
                 | Type::TypeParameter(_)
                 | Type::Reference(_, _)
-                | Type::Fun(_, _)
+                | Type::Fun(..)
                 | Type::TypeDomain(_)
                 | Type::ResourceDomain(_, _, _)
                 | Type::Error
@@ -774,6 +774,10 @@ impl<'env> SpecTranslator<'env> {
                 let loc = self.env.get_node_loc(node_id);
                 self.error(&loc, &format!("tuple value not yet supported: {:#?}", val))
             },
+            Value::Function(_mid, _fid) => {
+                let loc = self.env.get_node_loc(node_id);
+                self.error(&loc, "Function values not yet supported") // TODO(LAMBDA)
+            },
         }
     }
 
@@ -836,7 +840,6 @@ impl<'env> SpecTranslator<'env> {
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
         match oper {
-            Operation::Closure(..) => unimplemented!("closures in specs"),
             // Operators we introduced in the top level public entry `SpecTranslator::translate`,
             // mapping between Boogies single value domain and our typed world.
             Operation::BoxValue | Operation::UnboxValue => panic!("unexpected box/unbox"),
@@ -1012,6 +1015,7 @@ impl<'env> SpecTranslator<'env> {
             | Operation::Deref
             | Operation::MoveTo
             | Operation::MoveFrom
+            | Operation::EarlyBind
             | Operation::Old => {
                 self.env.error(
                     &self.env.get_node_loc(node_id),
@@ -1464,7 +1468,7 @@ impl<'env> SpecTranslator<'env> {
                 | Type::Tuple(_)
                 | Type::TypeParameter(_)
                 | Type::Reference(_, _)
-                | Type::Fun(_, _)
+                | Type::Fun(..)
                 | Type::TypeDomain(_)
                 | Type::ResourceDomain(_, _, _)
                 | Type::Error
@@ -1627,7 +1631,7 @@ impl<'env> SpecTranslator<'env> {
                 | Type::Tuple(_)
                 | Type::TypeParameter(_)
                 | Type::Reference(_, _)
-                | Type::Fun(_, _)
+                | Type::Fun(..)
                 | Type::Error
                 | Type::Var(_) => panic!("unexpected type"),
             }
