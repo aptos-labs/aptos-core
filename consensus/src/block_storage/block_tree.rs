@@ -470,14 +470,6 @@ impl BlockTree {
             return VecDeque::new();
         }
 
-        // TODO revisit potentially...
-        // Given the commit root and the window root, use the root with the min round
-        // let min_root = if self.commit_root().round() < self.window_root().round() {
-        //     self.linkable_root()
-        // } else {
-        //     self.linkable_window_root()
-        // };
-
         let mut blocks_pruned = VecDeque::new();
         let mut blocks_to_be_pruned = vec![self.linkable_window_root()];
 
