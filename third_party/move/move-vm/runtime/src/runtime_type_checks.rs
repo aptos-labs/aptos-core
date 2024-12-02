@@ -30,7 +30,7 @@ pub(crate) trait RuntimeTypeCheck {
         instruction: &Bytecode,
     ) -> PartialVMResult<()>;
 
-    /// Pranoid check that operand and type stacks have the same size
+    /// Paranoid check that operand and type stacks have the same size
     fn check_operand_stack_balance(operand_stack: &Stack) -> PartialVMResult<()>;
 
     /// For any other checks are performed externally
