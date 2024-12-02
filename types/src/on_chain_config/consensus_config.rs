@@ -8,6 +8,9 @@ use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Default Window Size for Execution Pool
+pub const DEFAULT_WINDOW_SIZE: usize = 1usize;
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum ConsensusAlgorithmConfig {
     Jolteon {
@@ -203,9 +206,10 @@ pub enum OnChainConsensusConfig {
 /// The public interface that exposes all values with safe fallback.
 impl OnChainConsensusConfig {
     pub fn default_for_genesis() -> Self {
-        OnChainConsensusConfig::V3 {
+        OnChainConsensusConfig::V4 {
             alg: ConsensusAlgorithmConfig::default_for_genesis(),
             vtxn: ValidatorTxnConfig::default_for_genesis(),
+            window_size: DEFAULT_WINDOW_SIZE,
         }
     }
 
@@ -271,9 +275,14 @@ impl OnChainConsensusConfig {
         }
     }
 
-    // TODO: actually add to onchain config
+    /// Window Size was not introduced until OnChainConsensusConfig V4
     pub fn window_size(&self) -> usize {
-        3
+        match &self {
+            OnChainConsensusConfig::V1(_) => DEFAULT_WINDOW_SIZE,
+            OnChainConsensusConfig::V2(_) => DEFAULT_WINDOW_SIZE,
+            OnChainConsensusConfig::V3 { .. } => DEFAULT_WINDOW_SIZE,
+            OnChainConsensusConfig::V4 { window_size, .. } => window_size.to_owned(),
+        }
     }
 
     pub fn is_dag_enabled(&self) -> bool {
