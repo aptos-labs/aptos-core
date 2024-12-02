@@ -37,7 +37,7 @@ use aptos_types::{
     error::{code_invariant_error, expect_ok, PanicError, PanicOr},
     executable::{Executable, ModulePath},
     state_store::{
-        errors::StateviewError,
+        errors::StateViewError,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
         StateViewId, TStateView,
@@ -1628,12 +1628,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorag
         self.base_view.id()
     }
 
-    fn read_state_value(&self, state_key: &Self::Key) -> Result<(), StateviewError> {
+    fn read_state_value(&self, state_key: &Self::Key) -> Result<(), StateViewError> {
         self.base_view.get_state_value(state_key)?;
         Ok(())
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
+    fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
         self.base_view.get_usage()
     }
 }

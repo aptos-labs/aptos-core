@@ -20,7 +20,9 @@ use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_schemadb::SchemaBatch;
 use aptos_storage_interface::{
-    jmt_update_refs, jmt_updates, sharded_state_update_refs::ShardedStateUpdateRefs, DbReader,
+    jmt_update_refs, jmt_updates,
+    state_store::{sharded_state_update_refs::ShardedStateUpdateRefs, NUM_STATE_SHARDS},
+    DbReader,
 };
 use aptos_temppath::TempPath;
 use aptos_types::{
@@ -28,7 +30,6 @@ use aptos_types::{
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StaleStateValueByKeyHashIndex, StaleStateValueIndex, StateValue},
-        NUM_STATE_SHARDS,
     },
     transaction::Version,
 };

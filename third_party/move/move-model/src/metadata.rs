@@ -207,6 +207,11 @@ pub enum LanguageVersion {
     V2_2,
 }
 
+impl LanguageVersion {
+    /// Leave this symbolic for now in case of more versions.
+    pub const V2_LAMBDA: Self = Self::V2_2;
+}
+
 impl Default for LanguageVersion {
     fn default() -> Self {
         static MOVE_LANGUAGE_V2: Lazy<bool> = Lazy::new(|| read_bool_env_var("MOVE_LANGUAGE_V2"));

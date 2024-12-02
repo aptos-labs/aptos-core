@@ -19,9 +19,9 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
-use aptos_storage_interface::Result;
+use aptos_storage_interface::{state_store::NUM_STATE_SHARDS, Result};
 use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValue, NUM_STATE_SHARDS},
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
 use arr_macro::arr;

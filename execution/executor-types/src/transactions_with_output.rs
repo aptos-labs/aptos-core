@@ -3,7 +3,7 @@
 
 use crate::metrics::TIMER;
 use aptos_metrics_core::TimerHelper;
-use aptos_storage_interface::sharded_state_update_refs::ShardedStateUpdateRefs;
+use aptos_storage_interface::state_store::sharded_state_update_refs::ShardedStateUpdateRefs;
 use aptos_types::transaction::{Transaction, TransactionOutput};
 use itertools::izip;
 use std::{

@@ -17,7 +17,7 @@ use aptos_types::{
     error::{PanicError, PanicOr},
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{
-        errors::StateviewError,
+        errors::StateViewError,
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
@@ -318,11 +318,11 @@ impl<'e, E: ExecutorView> StateStorageView for StorageAdapter<'e, E> {
         self.executor_view.id()
     }
 
-    fn read_state_value(&self, state_key: &Self::Key) -> Result<(), StateviewError> {
+    fn read_state_value(&self, state_key: &Self::Key) -> Result<(), StateViewError> {
         self.executor_view.read_state_value(state_key)
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
+    fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
         self.executor_view.get_usage()
     }
 }

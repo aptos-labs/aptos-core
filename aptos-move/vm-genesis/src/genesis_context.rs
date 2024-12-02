@@ -7,7 +7,7 @@
 use aptos_types::{
     executable::ModulePath,
     state_store::{
-        errors::StateviewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
+        errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
         state_value::StateValue, TStateView,
     },
     write_set::WriteOp,
@@ -18,7 +18,7 @@ use claims::assert_some;
 use move_core_types::language_storage::ModuleId;
 use std::collections::{BTreeMap, HashMap};
 
-type Result<T, E = StateviewError> = std::result::Result<T, E>;
+type Result<T, E = StateViewError> = std::result::Result<T, E>;
 
 // `StateView` has no data given we are creating the genesis
 pub(crate) struct GenesisStateView {

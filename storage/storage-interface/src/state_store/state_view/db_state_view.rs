@@ -1,5 +1,4 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::DbReader;
@@ -7,14 +6,12 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
     ledger_info::LedgerInfo,
     state_store::{
-        errors::StateviewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
-        state_value::StateValue, TStateView,
+        errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
+        state_value::StateValue, StateViewResult, TStateView,
     },
     transaction::Version,
 };
 use std::sync::Arc;
-
-type Result<T, E = StateviewError> = std::result::Result<T, E>;
 
 #[derive(Clone)]
 pub struct DbStateView {
@@ -26,7 +23,7 @@ pub struct DbStateView {
 }
 
 impl DbStateView {
-    fn get(&self, key: &StateKey) -> Result<Option<StateValue>> {
+    fn get(&self, key: &StateKey) -> StateViewResult<Option<StateValue>> {
         if let Some(version) = self.version {
             if let Some(root_hash) = self.maybe_verify_against_state_root_hash {
                 // DB doesn't support returning proofs for buffered state, so only optionally
@@ -49,11 +46,11 @@ impl DbStateView {
 impl TStateView for DbStateView {
     type Key = StateKey;
 
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
+    fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
         self.get(state_key).map_err(Into::into)
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage> {
+    fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
         self.db
             .get_state_storage_usage(self.version)
             .map_err(Into::into)
@@ -61,27 +58,27 @@ impl TStateView for DbStateView {
 }
 
 pub trait LatestDbStateCheckpointView {
-    fn latest_state_checkpoint_view(&self) -> Result<DbStateView>;
+    fn latest_state_checkpoint_view(&self) -> StateViewResult<DbStateView>;
 }
 
 impl LatestDbStateCheckpointView for Arc<dyn DbReader> {
-    fn latest_state_checkpoint_view(&self) -> Result<DbStateView> {
+    fn latest_state_checkpoint_view(&self) -> StateViewResult<DbStateView> {
         Ok(DbStateView {
             db: self.clone(),
             version: self
                 .get_latest_state_checkpoint_version()
-                .map_err(Into::<StateviewError>::into)?,
+                .map_err(Into::<StateViewError>::into)?,
             maybe_verify_against_state_root_hash: None,
         })
     }
 }
 
 pub trait DbStateViewAtVersion {
-    fn state_view_at_version(&self, version: Option<Version>) -> Result<DbStateView>;
+    fn state_view_at_version(&self, version: Option<Version>) -> StateViewResult<DbStateView>;
 }
 
 impl DbStateViewAtVersion for Arc<dyn DbReader> {
-    fn state_view_at_version(&self, version: Option<Version>) -> Result<DbStateView> {
+    fn state_view_at_version(&self, version: Option<Version>) -> StateViewResult<DbStateView> {
         Ok(DbStateView {
             db: self.clone(),
             version,
@@ -95,7 +92,7 @@ pub trait VerifiedStateViewAtVersion {
         &self,
         version: Option<Version>,
         ledger_info: &LedgerInfo,
-    ) -> Result<DbStateView>;
+    ) -> StateViewResult<DbStateView>;
 }
 
 impl VerifiedStateViewAtVersion for Arc<dyn DbReader> {
@@ -103,7 +100,7 @@ impl VerifiedStateViewAtVersion for Arc<dyn DbReader> {
         &self,
         version: Option<Version>,
         ledger_info: &LedgerInfo,
-    ) -> Result<DbStateView> {
+    ) -> StateViewResult<DbStateView> {
         let db = self.clone();
 
         if let Some(version) = version {
@@ -115,7 +112,7 @@ impl VerifiedStateViewAtVersion for Arc<dyn DbReader> {
                 .proof
                 .transaction_info
                 .state_checkpoint_hash()
-                .ok_or_else(|| StateviewError::NotFound("state_checkpoint_hash".to_string()))?;
+                .ok_or_else(|| StateViewError::NotFound("state_checkpoint_hash".to_string()))?;
 
             Ok(DbStateView {
                 db,
