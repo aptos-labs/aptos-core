@@ -23,6 +23,7 @@ use aptos_consensus_types::{
         PipelineInputRx, PipelineInputTx, PipelinedBlock, PostCommitResult, PostLedgerUpdateResult,
         PostPreCommitResult, PreCommitResult, PrepareResult, TaskError, TaskFuture, TaskResult,
     },
+    quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
@@ -273,6 +274,7 @@ impl PipelineBuilder {
         let (futs, tx, abort_handles) = self.build_internal(
             parent_futs,
             Arc::new(pipelined_block.block().clone()),
+            pipelined_block.qc(),
             block_store_callback,
         );
         pipelined_block.set_pipeline_futs(futs);
@@ -284,6 +286,7 @@ impl PipelineBuilder {
         &self,
         parent: PipelineFutures,
         block: Arc<Block>,
+        qc: Option<Arc<QuorumCert>>,
         block_store_callback: Box<dyn FnOnce(LedgerInfoWithSignatures) + Send + Sync>,
     ) -> (PipelineFutures, PipelineInputTx, Vec<AbortHandle>) {
         let mut abort_handles = vec![];
@@ -296,7 +299,7 @@ impl PipelineBuilder {
         } = rx;
 
         let prepare_fut = spawn_shared_fut(
-            Self::prepare(self.block_preparer.clone(), block.clone()),
+            Self::prepare(self.block_preparer.clone(), block.clone(), qc),
             &mut abort_handles,
         );
         let execute_fut = spawn_shared_fut(
@@ -411,7 +414,7 @@ impl PipelineBuilder {
         tracker.start_working();
         // the loop can only be abort by the caller
         let input_txns = loop {
-            match preparer.prepare_block(&block).await {
+            match preparer.prepare_block(&block, qc.clone()).await {
                 Ok(input_txns) => break input_txns,
                 Err(e) => {
                     warn!(

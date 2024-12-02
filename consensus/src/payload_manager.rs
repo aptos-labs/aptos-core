@@ -56,6 +56,7 @@ pub trait TPayloadManager: Send + Sync {
     async fn get_transactions(
         &self,
         block: &Block,
+        block_signers: Option<BitVec>,
     ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)>;
 }
 
@@ -81,6 +82,7 @@ impl TPayloadManager for DirectMempoolPayloadManager {
     async fn get_transactions(
         &self,
         block: &Block,
+        _block_signers: Option<BitVec>,
     ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
         let Some(payload) = block.payload() else {
             return Ok((Vec::new(), None));
@@ -381,6 +383,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
     async fn get_transactions(
         &self,
         block: &Block,
+        block_signers: Option<BitVec>,
     ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
         let Some(payload) = block.payload() else {
             return Ok((Vec::new(), None));
@@ -453,6 +456,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                     self.batch_reader.clone(),
                     block,
                     &self.ordered_authors,
+                    block_signers.as_ref(),
                 )
                 .await?;
                 let proof_batch_txns = process_payload_helper(
@@ -460,6 +464,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                     self.batch_reader.clone(),
                     block,
                     &self.ordered_authors,
+                    None,
                 )
                 .await?;
                 let inline_batch_txns = opt_qs_payload.inline_batches().transactions();
@@ -586,6 +591,7 @@ async fn process_payload_helper<T: TDataInfo>(
     batch_reader: Arc<dyn BatchReader>,
     block: &Block,
     ordered_authors: &[PeerId],
+    additional_peers_to_request: Option<&BitVec>,
 ) -> ExecutorResult<Vec<SignedTransaction>> {
     let (iteration, fut) = {
         let data_fut_guard = data_ptr.data_fut.lock();
@@ -593,6 +599,8 @@ async fn process_payload_helper<T: TDataInfo>(
         (data_fut.iteration, data_fut.fut.clone())
     };
 
+    // TODO(ibalajiarun): provide a way to update requesting peers instead of waiting for
+    // current request to complete and re-schedule another one.
     let result = fut.await;
     // If error, reschedule before returning the result
     if result.is_err() {
@@ -607,6 +615,13 @@ async fn process_payload_helper<T: TDataInfo>(
                     let mut signers = proof.signers(ordered_authors);
                     if let Some(author) = block.author() {
                         signers.push(author);
+                    }
+                    if let Some(peers) = additional_peers_to_request {
+                        for i in peers.iter_ones() {
+                            if let Some(author) = ordered_authors.get(i) {
+                                signers.push(*author);
+                            }
+                        }
                     }
                     (proof.info().clone(), signers)
                 })
@@ -753,6 +768,7 @@ impl TPayloadManager for ConsensusObserverPayloadManager {
     async fn get_transactions(
         &self,
         block: &Block,
+        _block_signers: Option<BitVec>,
     ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
         return get_transactions_for_observer(block, &self.txns_pool, &self.consensus_publisher)
             .await;

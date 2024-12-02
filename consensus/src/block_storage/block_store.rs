@@ -275,6 +275,12 @@ impl BlockStore {
 
         assert!(!blocks_to_commit.is_empty());
 
+        for block in &blocks_to_commit {
+            // Given the block is ready to commit, then it certainly must have a QC.
+            // However, we keep it an Option to be safe.
+            block.set_qc(self.get_quorum_cert_for_block(block.id()));
+        }
+
         let block_tree = self.inner.clone();
         let storage = self.storage.clone();
         let finality_proof_clone = finality_proof.clone();
@@ -524,7 +530,8 @@ impl BlockStore {
 
     pub async fn wait_for_payload(&self, block: &Block, deadline: Duration) -> anyhow::Result<()> {
         let duration = deadline.saturating_sub(self.time_service.get_current_timestamp());
-        tokio::time::timeout(duration, self.payload_manager.get_transactions(block)).await??;
+        tokio::time::timeout(duration, self.payload_manager.get_transactions(block, None))
+            .await??;
         Ok(())
     }
 
