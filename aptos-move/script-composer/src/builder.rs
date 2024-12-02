@@ -317,14 +317,35 @@ impl TransactionComposer {
                 .collect::<Vec<_>>()
         };
 
-        for return_ty in expected_returns_ty {
+        let mut returned_arguments = vec![];
+        let num_of_calls = self.calls.len() as u16;
+
+        for (idx, return_ty) in expected_returns_ty.into_iter().enumerate() {
+            let ability = BinaryIndexedView::Script(self.builder.as_script())
+                .abilities(&return_ty, &[])
+                .map_err(|_| anyhow!("Failed to calculate ability for type"))?;
+
             let local_idx = self.locals_ty.len() as u16;
             self.locals_ty.push(return_ty);
             self.locals_availability.push(true);
             returns.push(local_idx);
+
+            // For values that has drop and copy ability, use copy by default to avoid calling copy manually
+            // on the client side.
+            returned_arguments.push(CallArgument::PreviousResult(PreviousResult {
+                operation_type: if ability.has_drop() && ability.has_copy() {
+                    ArgumentOperation::Copy
+                } else {
+                    ArgumentOperation::Move
+                },
+                call_idx: num_of_calls,
+                return_idx: idx as u16,
+            }));
         }
 
-        let num_of_calls = self.calls.len() as u16;
+        if self.parameters.len() + self.locals_ty.len() > u8::MAX as usize {
+            bail!("Too many locals being allocated, please truncate the transaction");
+        }
 
         self.calls.push(BuilderCall {
             type_args: type_arguments,
@@ -335,15 +356,7 @@ impl TransactionComposer {
             type_tags: ty_args,
         });
 
-        Ok((0..returns.len())
-            .map(|idx| {
-                CallArgument::PreviousResult(PreviousResult {
-                    operation_type: ArgumentOperation::Move,
-                    call_idx: num_of_calls,
-                    return_idx: idx as u16,
-                })
-            })
-            .collect())
+        Ok(returned_arguments)
     }
 
     fn check_drop_at_end(&self) -> anyhow::Result<()> {
@@ -390,11 +403,11 @@ impl TransactionComposer {
             }
 
             // Storing return values
-            for arg in call.returns {
+            for arg in call.returns.iter().rev() {
                 script
                     .code
                     .code
-                    .push(Bytecode::StLoc((arg + parameters_count) as u8));
+                    .push(Bytecode::StLoc((*arg + parameters_count) as u8));
             }
         }
         script.code.code.push(Bytecode::Ret);
