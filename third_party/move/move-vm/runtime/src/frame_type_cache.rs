@@ -5,8 +5,9 @@ use crate::loader::Resolver;
 use move_binary_format::{
     errors::*,
     file_format::{
-        FieldInstantiationIndex, SignatureIndex, StructDefInstantiationIndex,
-        StructVariantInstantiationIndex, VariantFieldInstantiationIndex,
+        FieldInstantiationIndex, FunctionInstantiationIndex, SignatureIndex,
+        StructDefInstantiationIndex, StructVariantInstantiationIndex,
+        VariantFieldInstantiationIndex,
     },
 };
 use move_core_types::gas_algebra::NumTypeNodes;
@@ -31,6 +32,8 @@ pub(crate) struct FrameTypeCache {
     variant_field_instantiation:
         BTreeMap<VariantFieldInstantiationIndex, ((Type, NumTypeNodes), (Type, NumTypeNodes))>,
     single_sig_token_type: BTreeMap<SignatureIndex, (Type, NumTypeNodes)>,
+    _sub_frame_cache:
+        BTreeMap<FunctionInstantiationIndex, std::rc::Rc<std::cell::RefCell<FrameTypeCache>>>,
 }
 
 impl FrameTypeCache {
