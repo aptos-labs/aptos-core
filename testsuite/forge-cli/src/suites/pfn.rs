@@ -20,13 +20,16 @@ pub fn get_pfn_test(test_name: &str, duration: Duration) -> Option<ForgeConfig> 
         "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true, false, TransactionType::default(), 10000),
 
         "pfn_const_tps_with_realistic_env_econia_basic_1market" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaBasic1MarketReuseAccounts.materialize_default(), 10000),
+        
         "pfn_const_tps_with_realistic_env_econia_mixed_1market" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaMixed1MarketReuseAccounts.materialize_default(), 10000),
+        "pfn_const_tps_with_realistic_env_econia_mixed_5market" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaMixed5MarketReuseAccounts.materialize_default(), 10000),
         "pfn_const_tps_with_realistic_env_econia_mixed_10market" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaMixed10MarketReuseAccounts.materialize_default(), 10000),
-        "pfn_const_tps_with_realistic_env_econia_mixed_100market" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaMixed100MarketReuseAccounts.materialize_default(), 10000),
+        "pfn_const_tps_with_realistic_env_econia_mixed_15market" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaMixed15MarketReuseAccounts.materialize_default(), 10000),
         
         "pfn_const_tps_with_realistic_env_econia_market_1market" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaMarket1MarketReuseAccounts.materialize_default(), 10000),
+        "pfn_const_tps_with_realistic_env_econia_market_5market" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaMarket5MarketReuseAccounts.materialize_default(), 10000),
         "pfn_const_tps_with_realistic_env_econia_market_10market" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaMarket10MarketReuseAccounts.materialize_default(), 10000),
-        "pfn_const_tps_with_realistic_env_econia_market_100market" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaMarket100MarketReuseAccounts.materialize_default(), 10000),
+        "pfn_const_tps_with_realistic_env_econia_market_15market" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaMarket15MarketReuseAccounts.materialize_default(), 10000),
         "pfn_const_tps_with_realistic_env_econia_real" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaReal.materialize_default(), 10000),
         
         "pfn_performance" => pfn_performance(duration, false, false, true, 7, 1, false),

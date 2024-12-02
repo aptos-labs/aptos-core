@@ -390,7 +390,7 @@ pub async fn create_txn_generator_creator(
                 },
                 TransactionType::Workflow {
                     num_modules,
-                    use_account_pool,
+                    use_account_pool: _,
                     workflow_kind,
                     progress_type,
                 } => Box::new(
@@ -401,7 +401,11 @@ pub async fn create_txn_generator_creator(
                         &root_account,
                         txn_executor,
                         *num_modules,
-                        Some(accounts_pool.clone()),
+                        Some(Arc::new(source_accounts
+                            .iter()
+                            .map(|d| d.address())
+                            .collect()
+                        )),
                         cur_phase.clone(),
                         *progress_type,
                     )

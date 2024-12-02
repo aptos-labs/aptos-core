@@ -20,6 +20,7 @@ use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
+    move_types::account_address::AccountAddress,
 };
 use std::{
     fmt::Debug,
@@ -278,7 +279,7 @@ impl WorkflowTxnGeneratorCreator {
         root_account: &dyn RootAccountHandle,
         txn_executor: &dyn ReliableTransactionSubmitter,
         num_modules: usize,
-        initial_account_pool: Option<Arc<ObjectPool<LocalAccount>>>,
+        initial_account_pool: Option<Arc<Vec<AccountAddress>>>,
         cur_phase: Arc<AtomicUsize>,
         progress_type: WorkflowProgress,
     ) -> Self {
@@ -384,17 +385,13 @@ impl WorkflowTxnGeneratorCreator {
                 num_users,
                 flow_type,
                 num_markets,
-                reuse_accounts_for_orders,
+                reuse_accounts_for_orders: _,
                 publish_packages,
             } => {
-                // let create_accounts = initial_account_pool.is_none();
-                let create_accounts = true;
-                // info!("Create_accounts {:?}", create_accounts);
-                let created_pool = initial_account_pool.unwrap_or(Arc::new(ObjectPool::new()));
+                let created_pool = Arc::new(ObjectPool::new());
                 let register_market_accounts_pool = Arc::new(ObjectPool::new());
-                let source_addresses: Vec<_> = created_pool.pool.read().iter().map(|a| a.address().clone()).collect();
-                info!("Source addresses length: {}", source_addresses.len());
-                let deposit_coins_pool = Arc::new(BucketedAccountPool::new(Arc::new(source_addresses.clone())));
+                let deposit_coins_pool = Arc::new(BucketedAccountPool::new(initial_account_pool.map_or(Arc::new(vec![]), |pool| pool.clone())));
+                // info!("Source addresses length: {}", initial_account_pool.map_or(0, |pool| pool.len()));
                 // let place_orders_pool = Arc::new(ObjectPool::new());
 
                 let mut packages = CustomModulesDelegationGeneratorCreator::publish_package(
@@ -484,19 +481,16 @@ impl WorkflowTxnGeneratorCreator {
 
                 let mut creators: Vec<Box<dyn TransactionGeneratorCreator>> = vec![];
                 let mut stage_switch_conditions = vec![];
-                if create_accounts {
-                    info!("Creating {} accounts", num_users);
-                    creators.push(Box::new(AccountGeneratorCreator::new(
-                        txn_factory.clone(),
-                        None,
-                        Some(created_pool.clone()),
-                        num_users,
-                        400_000_000,
-                    )));
-                    stage_switch_conditions.push(StageSwitchCondition::MaxTransactions(
-                        Arc::new(AtomicUsize::new(num_users)),
-                    ));
-                }
+                creators.push(Box::new(AccountGeneratorCreator::new(
+                    txn_factory.clone(),
+                    None,
+                    Some(created_pool.clone()),
+                    num_users,
+                    400_000_000,
+                )));
+                stage_switch_conditions.push(StageSwitchCondition::MaxTransactions(
+                    Arc::new(AtomicUsize::new(num_users)),
+                ));
 
                 creators.push(Box::new(AccountsPoolWrapperCreator::new(
                     Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
@@ -558,10 +552,7 @@ impl WorkflowTxnGeneratorCreator {
                 num_users,
                 publish_packages,
             } => {
-                // let create_accounts = initial_account_pool.is_none();
-                let create_accounts = true;
-                // info!("Create_accounts {:?}", create_accounts);
-                let created_pool = initial_account_pool.unwrap_or(Arc::new(ObjectPool::new()));
+                let created_pool = Arc::new(ObjectPool::new());
                 let register_market_accounts_pool = Arc::new(ObjectPool::new());
                 let deposit_coins_pool = Arc::new(ObjectPool::new());
                 let deposit_coins_pool_with_added_history = Arc::new(ObjectPool::new());
@@ -622,18 +613,16 @@ impl WorkflowTxnGeneratorCreator {
 
                 let mut creators: Vec<Box<dyn TransactionGeneratorCreator>> = vec![];
                 let mut stage_switch_conditions = vec![];
-                if create_accounts {
-                    creators.push(Box::new(AccountGeneratorCreator::new(
-                        txn_factory.clone(),
-                        None,
-                        Some(created_pool.clone()),
-                        num_users,
-                        400_000_000,
-                    )));
-                    stage_switch_conditions.push(StageSwitchCondition::MaxTransactions(
-                        Arc::new(AtomicUsize::new(num_users)),
-                    ));
-                }
+                creators.push(Box::new(AccountGeneratorCreator::new(
+                    txn_factory.clone(),
+                    None,
+                    Some(created_pool.clone()),
+                    num_users,
+                    400_000_000,
+                )));
+                stage_switch_conditions.push(StageSwitchCondition::MaxTransactions(
+                    Arc::new(AtomicUsize::new(num_users)),
+                ));
 
                 creators.push(Box::new(AccountsPoolWrapperCreator::new(
                     Box::new(CustomModulesDelegationGeneratorCreator::new_raw(

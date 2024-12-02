@@ -69,27 +69,38 @@ pub enum TransactionTypeArg {
     VectorPicture40,
     VectorPictureRead40,
     SmartTablePicture30KWith200Change,
+
     EconiaBasic1Market,
+
     EconiaMixed1Market,
     EconiaMixed10Market,
     EconiaMixed100Market,
+
     EconiaMarket1Market,
     EconiaMarket10Market,
     EconiaMarket100Market,
+
+    EconiaBasic1MarketReuseAccounts,
+
+    EconiaMixed1MarketReuseAccounts,
+    EconiaMixed5MarketReuseAccounts,
+    EconiaMixed10MarketReuseAccounts,
+    EconiaMixed15MarketReuseAccounts,
+
+    EconiaMarket1MarketReuseAccounts,
+    EconiaMarket5MarketReuseAccounts,
+    EconiaMarket10MarketReuseAccounts,
+    EconiaMarket15MarketReuseAccounts,
+
     EconiaBasic1MarketNoPublish,
     EconiaMixed1MarketNoPublish,
     EconiaMixed10MarketNoPublish,
     EconiaMixed100MarketNoPublish,
-    EconiaBasic1MarketReuseAccounts,
-    EconiaMixed1MarketReuseAccounts,
-    EconiaMixed10MarketReuseAccounts,
-    EconiaMixed100MarketReuseAccounts,
-    EconiaMarket1MarketReuseAccounts,
-    EconiaMarket10MarketReuseAccounts,
-    EconiaMarket100MarketReuseAccounts,
+
     EconiaMarket1MarketReuseAccountsNoPublish,
     EconiaMarket10MarketReuseAccountsNoPublish,
     EconiaMarket100MarketReuseAccountsNoPublish,
+
     EconiaReal,
     EconiaRealNoPublish,
     SmartTablePicture1MWith256Change,
@@ -542,6 +553,21 @@ progress_type: WorkflowProgress::WhenDone {
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
+            TransactionTypeArg::EconiaMixed5MarketReuseAccounts => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Econia {
+                    num_users: 600000,
+                    flow_type: crate::EconiaFlowType::Mixed,
+                    num_markets: 5,
+                    reuse_accounts_for_orders: true,
+                    publish_packages: true,
+                },
+                // progress_type: WorkflowProgress::MoveByPhases,
+progress_type: WorkflowProgress::WhenDone {
+                   delay_between_stages_s: 60,
+               },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
             TransactionTypeArg::EconiaMixed10MarketReuseAccounts => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
                     num_users: 600000,
@@ -557,11 +583,11 @@ progress_type: WorkflowProgress::WhenDone {
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
-            TransactionTypeArg::EconiaMixed100MarketReuseAccounts => TransactionType::Workflow {
+            TransactionTypeArg::EconiaMixed15MarketReuseAccounts => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
                     num_users: 600000,
                     flow_type: crate::EconiaFlowType::Mixed,
-                    num_markets: 100,
+                    num_markets: 15,
                     reuse_accounts_for_orders: true,
                     publish_packages: true,
                 },
@@ -611,6 +637,21 @@ progress_type: WorkflowProgress::WhenDone {
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
+            TransactionTypeArg::EconiaMarket5MarketReuseAccounts => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Econia {
+                    num_users: 600000,
+                    flow_type: crate::EconiaFlowType::Market,
+                    num_markets: 5,
+                    reuse_accounts_for_orders: true,
+                    publish_packages: true,
+                },
+                // progress_type: WorkflowProgress::MoveByPhases,
+progress_type: WorkflowProgress::WhenDone {
+                   delay_between_stages_s: 60,
+               },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
             TransactionTypeArg::EconiaMarket10MarketReuseAccounts => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
                     num_users: 600000,
@@ -626,11 +667,11 @@ progress_type: WorkflowProgress::WhenDone {
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
-            TransactionTypeArg::EconiaMarket100MarketReuseAccounts => TransactionType::Workflow {
+            TransactionTypeArg::EconiaMarket15MarketReuseAccounts => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
                     num_users: 600000,
                     flow_type: crate::EconiaFlowType::Market,
-                    num_markets: 100,
+                    num_markets: 15,
                     reuse_accounts_for_orders: true,
                     publish_packages: true,
                 },
