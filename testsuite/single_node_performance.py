@@ -189,7 +189,7 @@ TESTS = [
     RunGroupConfig(key=RunGroupKey("mix_publish_transfer"), key_extra=RunGroupKeyExtra(
         transaction_type_override="publish-package apt-fa-transfer",
         transaction_weights_override="1 100",
-    ), included_in=LAND_BLOCKING_AND_C, waived=True),
+    ), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("batch100-transfer"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("batch100-transfer", executor_type="NativeVM"), included_in=Flow.CONTINUOUS),
 
@@ -251,7 +251,7 @@ TESTS = [
     # fee payer sequentializes transactions today. in these tests module publisher is the fee payer, so larger number of modules tests throughput with multiple fee payers
     RunGroupConfig(key=RunGroupKey("no-op-fee-payer"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("no-op-fee-payer", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(key=RunGroupKey("simple-script"), included_in=LAND_BLOCKING_AND_C, waived=True),
+    RunGroupConfig(key=RunGroupKey("simple-script"), included_in=LAND_BLOCKING_AND_C),
 
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
@@ -1024,16 +1024,24 @@ if errors:
         """If you expect your PR to change the performance, you need to recalibrate the values.
 To do so, you should run the test on your branch 6 times
 (https://github.com/aptos-labs/aptos-core/actions/workflows/workflow-run-execution-performance.yaml ; remember to select CONTINUOUS).
-Then go to Humio calibration link (https://gist.github.com/igor-aptos/7b12ca28de03894cddda8e415f37889e),
-update it to your branch, and export values as CSV, and then open and copy values inside
-testsuite/single_node_performance.py testsuite), and add Blockchain oncall as the reviewer.
+Then run the script locally `./testsuite/single_node_performance_calibration.py --branch=YOUR_BRANCH` to update calibration values
+and add Blockchain oncall as the reviewer.
 """
     )
     exit(1)
 
 if move_e2e_benchmark_failed:
     print(
-        "Move e2e benchmark failed, failing the job. See logs at the beginning for more details."
+        """
+Move e2e benchmark failed, failing the job. See logs at the beginning for more details.
+
+If you expect your PR to change the performance, you need to recalibrate the values.
+To do so, you should run the test on your branch 6 times
+(https://github.com/aptos-labs/aptos-core/actions/workflows/workflow-run-execution-performance.yaml ; remember to select CONTINUOUS,
+and don't select to skip move-only e2e tests).
+Then run the script locally `./testsuite/single_node_performance_calibration.py --branch=YOUR_BRANCH --move-e2e` to update calibration values
+and add Blockchain oncall as the reviewer.
+"""
     )
     exit(1)
 

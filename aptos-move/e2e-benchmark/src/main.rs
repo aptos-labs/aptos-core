@@ -91,7 +91,9 @@ struct CalibrationInfo {
 }
 
 fn get_parsed_calibration_values() -> HashMap<String, CalibrationInfo> {
-    let calibration_values = fs::read_to_string("aptos-move/e2e-benchmark/data/calibration_values.tsv").expect("Unable to read file");
+    let calibration_values =
+        fs::read_to_string("aptos-move/e2e-benchmark/data/calibration_values.tsv")
+            .expect("Unable to read file");
     calibration_values
         .trim()
         .split('\n')

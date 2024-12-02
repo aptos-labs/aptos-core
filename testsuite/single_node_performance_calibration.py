@@ -3,32 +3,54 @@
 import argparse
 import requests
 
+
 def humio_secret():
+    print(
+        "trying to get a humio secret from gcloud. if it asks for a password, abort and run `gcloud auth login --update-adc` first"
+    )
     import subprocess
-    return subprocess.run(["gcloud", "secrets", "versions", "access", "--secret=ci_humio_read_token", "--project=aptos-shared-secrets", "latest"], capture_output=True).stdout.decode("utf-8")
+
+    return subprocess.run(
+        [
+            "gcloud",
+            "secrets",
+            "versions",
+            "access",
+            "--secret=ci_humio_read_token",
+            "--project=aptos-shared-secrets",
+            "latest",
+        ],
+        capture_output=True,
+    ).stdout.decode("utf-8")
 
 
 def humio_url():
     return "https://cloud.us.humio.com/api/v1/repositories/github/query"
 
+
 def parse_args():
-    parser = argparse.ArgumentParser(description='Benchmark calibration tools')
+    parser = argparse.ArgumentParser(description="Benchmark calibration tools")
 
     parser.add_argument(
-        '--branch', 
+        "--branch",
         type=str,
-        help='Optional branch, if passed - only looks at results run on that branch through adhoc runs',
+        help="Optional branch, if passed - only looks at results run on that branch through adhoc runs",
     )
 
     parser.add_argument(
-        '--move-e2e', 
-        action='store_true',
-        help='Calibrate move e2e test',
+        "--move-e2e",
+        action="store_true",
+        help="Calibrate move e2e test",
+    )
+
+    parser.add_argument(
+        "--time-interval", default="5d", help="Time interval to look at humio for"
     )
 
     return parser.parse_args()
 
-def query_humio(query_string, time_interval="5d"):
+
+def query_humio(query_string, time_interval):
     query = {
         "queryString": query_string,
         "start": time_interval,
@@ -47,6 +69,7 @@ def query_humio(query_string, time_interval="5d"):
 
     return resp.text.strip()
 
+
 def main():
     args = parse_args()
 
@@ -57,6 +80,7 @@ def main():
         | github.workflow.head_branch = "{branch}"
         | "grep_json_aptos_move_vm_perf"
         | parseJson(message)
+        | code_perf_version = "v1"
         """.format(
                 branch=args.branch
             )
@@ -98,6 +122,7 @@ def main():
                 return res
             else:
                 return line.split(", ")
+
         output_file_name = "aptos-move/e2e-benchmark/data/calibration_values.tsv"
 
     else:
@@ -155,10 +180,13 @@ def main():
 
         output_file_name = "testsuite/single_node_performance_values.tsv"
 
-    response_text = query_humio(query_string)
+    response_text = query_humio(query_string, time_interval=args.time_interval)
 
     parsed = [
-        {(parts := key_value.split("->"))[0]: parts[1] for key_value in split_line(line)}
+        {
+            (parts := key_value.split("->"))[0]: parts[1]
+            for key_value in split_line(line)
+        }
         for line in response_text.split("\n")
     ]
 
@@ -169,5 +197,6 @@ def main():
 
     print(f"Written to {output_file_name}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
