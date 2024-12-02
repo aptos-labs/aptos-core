@@ -134,25 +134,6 @@ module aptos_framework::native_bridge {
         );  
     }
 
-    public fun pad_to_32_bytes(input: vector<u8>): vector<u8> {
-        let result = input;
-        while (vector::length(&result) < 32) {
-            vector::push_back(&mut result, 0); // Add padding
-        };
-        result
-    }
-
-    public fun truncate_to_20_bytes(input: vector<u8>): vector<u8> {
-        let result = vector::empty<u8>();
-        let length = vector::length(&input);
-        let i = 0;
-        while (i < 20 && i < length) {
-            vector::push_back(&mut result, *vector::borrow(&input, i));
-            i = i + 1;
-        };
-        result
-    }
-
     /// Completes a bridge transfer on the destination chain.
     ///  
     /// @param caller The signer representing the bridge relayer.  
