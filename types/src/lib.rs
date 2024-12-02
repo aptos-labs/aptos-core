@@ -56,9 +56,9 @@ pub mod vm_status;
 pub mod waypoint;
 pub mod write_set;
 
+use crate::on_chain_config::OnChainConfig;
 pub use account_address::AccountAddress as PeerId;
 pub use utility_coin::*;
-use crate::on_chain_config::OnChainConfig;
 
 pub mod aggregate_signature;
 pub mod block_executor;

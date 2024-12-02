@@ -16,20 +16,26 @@ use aptos_event_notifications::{
     EventNotification, EventNotificationListener, ReconfigNotification,
     ReconfigNotificationListener,
 };
-use aptos_logger::{debug, error, info, warn};
+use aptos_logger::{error, info, warn};
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_safety_rules::{safety_rules_manager::storage, PersistentSafetyStorage};
-use aptos_types::{account_address::AccountAddress, dkg::{DKGStartEvent, DKGState, DefaultDKG}, epoch_state::EpochState, NextEpochRounding, on_chain_config::{
-    OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
-    OnChainRandomnessConfig, RandomnessConfigMoveStruct, RandomnessConfigSeqNum, ValidatorSet,
-}};
+use aptos_storage_interface::DbReader;
+use aptos_types::{
+    account_address::AccountAddress,
+    dkg::{DKGState, DefaultDKG},
+    epoch_state::EpochState,
+    on_chain_config::{
+        OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
+        OnChainRandomnessConfig, RandomnessConfigMoveStruct, RandomnessConfigSeqNum, ValidatorSet,
+    },
+    NextEpochRounding,
+};
 use aptos_validator_transaction_pool::VTxnPoolState;
 use futures::StreamExt;
 use futures_channel::oneshot;
 use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
-use aptos_storage_interface::DbReader;
 
 pub struct EpochManager<P: OnChainConfigProvider> {
     // Some useful metadata

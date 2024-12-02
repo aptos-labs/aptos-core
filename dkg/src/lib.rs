@@ -10,7 +10,6 @@ pub mod network_interface;
 pub mod transcript_aggregation;
 pub mod types;
 
-use std::sync::Arc;
 use crate::{
     epoch_manager::EpochManager, network::NetworkTask, network_interface::DKGNetworkClient,
 };
@@ -19,10 +18,11 @@ use aptos_event_notifications::{
     DbBackedOnChainConfig, EventNotificationListener, ReconfigNotificationListener,
 };
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
+use aptos_storage_interface::DbReader;
 use aptos_validator_transaction_pool::VTxnPoolState;
 use move_core_types::account_address::AccountAddress;
+use std::sync::Arc;
 use tokio::runtime::Runtime;
-use aptos_storage_interface::DbReader;
 pub use types::DKGMessage;
 
 pub fn start_dkg_runtime(

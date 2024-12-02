@@ -352,6 +352,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::CollectionOwner => AptosFeatureFlag::COLLECTION_OWNER,
             FeatureFlag::NativeMemoryOperations => AptosFeatureFlag::NATIVE_MEMORY_OPERATIONS,
             FeatureFlag::EnableLoaderV2 => AptosFeatureFlag::ENABLE_LOADER_V2,
+            FeatureFlag::NewFlag => AptosFeatureFlag::NEW_FLAG,
         }
     }
 }

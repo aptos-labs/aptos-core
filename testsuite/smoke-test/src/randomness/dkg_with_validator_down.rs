@@ -31,7 +31,7 @@ async fn dkg_with_validator_down() {
 
     let client = swarm.validators().last().unwrap().rest_client();
     println!("Wait for an epoch start.");
-    let dkg_session_1 = wait_for_dkg_finish(&client, None, time_limit_secs).await;
+    let (dkg_session_1, _rounding_1) = wait_for_dkg_finish(&client, None, time_limit_secs).await;
 
     println!("Current epoch is {}.", dkg_session_1.target_epoch());
 
@@ -45,12 +45,12 @@ async fn dkg_with_validator_down() {
         dkg_session_1.target_epoch() + 1
     );
 
-    let dkg_session_2 = wait_for_dkg_finish(
+    let (dkg_session_2, rounding_2) = wait_for_dkg_finish(
         &client,
         Some(dkg_session_1.target_epoch() + 1),
         time_limit_secs,
     )
     .await;
 
-    assert!(verify_dkg_transcript(&dkg_session_2, &decrypt_key_map).is_ok());
+    assert!(verify_dkg_transcript(&dkg_session_2, rounding_2, &decrypt_key_map).is_ok());
 }

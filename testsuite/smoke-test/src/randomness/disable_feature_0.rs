@@ -2,14 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    randomness::{decrypt_key_map, script_to_disable_main_logic, verify_dkg_transcript},
+    randomness::{
+        decrypt_key_map, get_on_chain_resource_at_version, script_to_disable_main_logic,
+        verify_dkg_transcript,
+    },
     smoke_test_environment::SwarmBuilder,
-    utils::get_on_chain_resource,
+    utils::{get_current_version, get_on_chain_resource},
 };
 use aptos_forge::{Node, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_types::{
     dkg::DKGState, on_chain_config::OnChainRandomnessConfig, randomness::PerBlockRandomness,
+    CurEpochRounding,
 };
 use std::{sync::Arc, time::Duration};
 
@@ -58,12 +62,21 @@ async fn disable_feature_0() {
         .expect("Waited too long for epoch 4.");
 
     info!("Now in epoch 4. DKG transcript should still be available. Randomness seed should be unavailable.");
-    let dkg_session = get_on_chain_resource::<DKGState>(&client)
-        .await
+    let cur_txn_version = get_current_version(&client).await;
+    let (dkg_state, cur_epoch_rounding) = tokio::join!(
+        get_on_chain_resource_at_version::<DKGState>(&client, cur_txn_version),
+        get_on_chain_resource_at_version::<CurEpochRounding>(&client, cur_txn_version),
+    );
+
+    let dkg_session = dkg_state
+        .unwrap()
         .last_completed
         .expect("dkg result for epoch 4 should be present");
+    let rounding_result = cur_epoch_rounding
+        .ok()
+        .map(|CurEpochRounding { rounding }| rounding);
     assert_eq!(4, dkg_session.target_epoch());
-    assert!(verify_dkg_transcript(&dkg_session, &decrypt_key_map).is_ok());
+    assert!(verify_dkg_transcript(&dkg_session, rounding_result, &decrypt_key_map).is_ok());
 
     let randomness_seed = get_on_chain_resource::<PerBlockRandomness>(&client).await;
     assert!(randomness_seed.seed.is_none());

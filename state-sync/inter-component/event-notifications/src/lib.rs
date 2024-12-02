@@ -420,7 +420,7 @@ impl fmt::Debug for DbBackedOnChainConfig {
 }
 
 /// A notification for events.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct EventNotification {
     pub version: Version,
     pub subscribed_events: Vec<ContractEvent>,

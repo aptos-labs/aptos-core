@@ -30,8 +30,10 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
         ..Default::default()
     };
 
-    let mut ut_config = UnitTestingConfig::default();
-    ut_config.filter = std::env::var("MOVE_TEST_FILTER").ok();
+    let ut_config = UnitTestingConfig {
+        filter: std::env::var("MOVE_TEST_FILTER").ok(),
+        ..Default::default()
+    };
     let mut ok = run_move_unit_tests(
         &pkg_path,
         build_config.clone(),

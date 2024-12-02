@@ -12,7 +12,9 @@ use aptos_crypto::{
     bls12381::{PrivateKey, PublicKey},
     Uniform,
 };
+use aptos_event_notifications::EventNotification;
 use aptos_infallible::RwLock;
+use aptos_storage_interface::mock::MockDbReaderWriter;
 use aptos_types::{
     dkg::{
         dummy_dkg::DummyDKG, DKGSessionMetadata, DKGStartEvent, DKGTrait, DKGTranscript,
@@ -58,7 +60,9 @@ async fn test_dkg_state_transition() {
         verifier: Arc::new(ValidatorVerifier::new(validator_consensus_infos.clone())),
     };
     let agg_node_producer = DummyAggTranscriptProducer {};
+    let mock_db = Arc::new(MockDbReaderWriter {});
     let mut dkg_manager: DKGManager<DummyDKG> = DKGManager::new(
+        mock_db,
         private_keys[0].clone(),
         0,
         addrs[0],
@@ -83,23 +87,30 @@ async fn test_dkg_state_transition() {
     // In state `NotStarted`, DKGManager should accept `DKGStartEvent`:
     // it should record start time, compute its own node, and enter state `InProgress`.
     let start_time_1 = Duration::from_secs(1700000000);
-    let event = DKGStartEvent {
-        session_metadata: DKGSessionMetadata {
-            dealer_epoch: 999,
-            randomness_config: OnChainRandomnessConfig::default_enabled().into(),
-            dealer_validator_set: validator_consensus_info_move_structs.clone(),
-            target_validator_set: validator_consensus_info_move_structs.clone(),
-        },
-        start_time_us: start_time_1.as_micros() as u64,
+    let notification = EventNotification {
+        version: 999001,
+        subscribed_events: vec![DKGStartEvent {
+            session_metadata: DKGSessionMetadata {
+                dealer_epoch: 999,
+                randomness_config: OnChainRandomnessConfig::default_enabled().into(),
+                dealer_validator_set: validator_consensus_info_move_structs.clone(),
+                target_validator_set: validator_consensus_info_move_structs.clone(),
+            },
+            start_time_us: start_time_1.as_micros() as u64,
+        }
+        .to_contract_event()
+        .unwrap()],
     };
-    let handle_result = dkg_manager.process_dkg_start_event(event.clone()).await;
+    let handle_result = dkg_manager
+        .process_dkg_start_event(notification.clone())
+        .await;
     assert!(handle_result.is_ok());
     assert!(
         matches!(&dkg_manager.state, InnerState::InProgress { start_time, my_transcript, .. } if *start_time == start_time_1 && my_transcript.metadata == DKGTranscriptMetadata{ epoch: 999, author: addrs[0]})
     );
 
     // 2nd `DKGStartEvent` should be rejected.
-    let handle_result = dkg_manager.process_dkg_start_event(event).await;
+    let handle_result = dkg_manager.process_dkg_start_event(notification).await;
     println!("{:?}", handle_result);
     assert!(handle_result.is_err());
 

@@ -92,8 +92,8 @@ use aptos_types::{
     randomness::{RandKeys, WvufPP, WVUF},
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
+    CurEpochRounding, RoundingResult,
 };
-use aptos_types::{CurEpochRounding, RoundingResult};
 use aptos_validator_transaction_pool::VTxnPoolState;
 use fail::fail_point;
 use futures::{
@@ -1116,7 +1116,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             payload.get();
         let onchain_jwk_consensus_config: anyhow::Result<OnChainJWKConsensusConfig> = payload.get();
         let dkg_state = payload.get::<DKGState>();
-        let rounding_result = payload.get::<CurEpochRounding>().ok().map(|CurEpochRounding { rounding }| rounding );
+        let rounding_result = payload
+            .get::<CurEpochRounding>()
+            .ok()
+            .map(|CurEpochRounding { rounding }| rounding);
 
         if let Err(error) = &onchain_consensus_config {
             warn!("Failed to read on-chain consensus config {}", error);

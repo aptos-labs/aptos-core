@@ -1,27 +1,33 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{dkg::{
-    real_dkg::rounding::DKGRounding, DKGSessionMetadata, DKGTrait, MayHaveRoundingSummary,
-    RoundingSummary,
-}, on_chain_config::OnChainRandomnessConfig, RoundingResult, validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier}};
+use crate::{
+    dkg::{
+        real_dkg::rounding::{DKGRounding, DKGRoundingProfile},
+        DKGSessionMetadata, DKGTrait, MayHaveRoundingSummary, RoundingSummary,
+    },
+    on_chain_config::OnChainRandomnessConfig,
+    validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
+    RoundingResult,
+};
 use anyhow::{anyhow, ensure};
 use aptos_crypto::{bls12381, bls12381::PrivateKey};
 use aptos_dkg::{
     pvss,
     pvss::{
         traits::{Convert, Reconstructable, Transcript},
-        Player,
+        Player, WeightedConfig,
     },
 };
 use fixed::types::U64F64;
 use num_traits::Zero;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeSet, sync::Arc, time::Instant};
-use std::time::Duration;
-use aptos_dkg::pvss::WeightedConfig;
-use crate::dkg::real_dkg::rounding::DKGRoundingProfile;
+use std::{
+    collections::BTreeSet,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 pub mod rounding;
 
@@ -94,13 +100,19 @@ pub fn build_dkg_pvss_config(
 ) -> DKGPvssConfig {
     let validator_stakes: Vec<u64> = next_validators.iter().map(|vi| vi.voting_power).collect();
     let (wconfig, fast_wconfig, rounding_summary) = if let Some(rounding_result) = rounding_result {
-        let weights_u64 = rounding_result.weights.iter().map(|w|*w as usize).collect::<Vec<_>>();
-        let wconfig = WeightedConfig::new(rounding_result.reconstruct_threshold_default_path as usize, weights_u64.clone()).unwrap();
-        let fast_wconfig = if let Some(t) = rounding_result.reconstruct_threshold_fast_path {
-            Some(WeightedConfig::new(t as usize, weights_u64).unwrap())
-        } else {
-            None
-        };
+        let weights_u64 = rounding_result
+            .weights
+            .iter()
+            .map(|w| *w as usize)
+            .collect::<Vec<_>>();
+        let wconfig = WeightedConfig::new(
+            rounding_result.reconstruct_threshold_default_path as usize,
+            weights_u64.clone(),
+        )
+        .unwrap();
+        let fast_wconfig = rounding_result
+            .reconstruct_threshold_fast_path
+            .map(|t| WeightedConfig::new(t as usize, weights_u64).unwrap());
 
         let rounding_summary = RoundingSummary {
             method: "binary_search, framework".to_string(),
@@ -204,7 +216,10 @@ impl DKGTrait for RealDKG {
     type PublicParams = RealDKGPublicParams;
     type Transcript = Transcripts;
 
-    fn new_public_params(dkg_session_metadata: &DKGSessionMetadata, rounding_result: Option<RoundingResult>) -> RealDKGPublicParams {
+    fn new_public_params(
+        dkg_session_metadata: &DKGSessionMetadata,
+        rounding_result: Option<RoundingResult>,
+    ) -> RealDKGPublicParams {
         let randomness_config = dkg_session_metadata
             .randomness_config_derived()
             .unwrap_or_else(OnChainRandomnessConfig::default_enabled);

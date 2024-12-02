@@ -12,7 +12,13 @@ use crate::{
     },
     AptosVM,
 };
-use aptos_types::{dkg::{DKGState, DKGTrait, DKGTranscript, DefaultDKG}, move_utils::as_move_value::AsMoveValue, NextEpochRounding, on_chain_config::{ConfigurationResource, OnChainConfig}, RoundingResult, transaction::TransactionStatus};
+use aptos_types::{
+    dkg::{DKGState, DKGTrait, DKGTranscript, DefaultDKG},
+    move_utils::as_move_value::AsMoveValue,
+    on_chain_config::{ConfigurationResource, OnChainConfig},
+    transaction::TransactionStatus,
+    NextEpochRounding,
+};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
     module_and_script_storage::module_storage::AptosModuleStorage, output::VMOutput,
@@ -92,9 +98,11 @@ impl AptosVM {
             return Err(Expected(EpochNotCurrent));
         }
 
-        let rounding_result = NextEpochRounding::fetch_config(resolver).map(|NextEpochRounding { rounding }| rounding);
+        let rounding_result = NextEpochRounding::fetch_config(resolver)
+            .map(|NextEpochRounding { rounding }| rounding);
         // Deserialize transcript and verify it.
-        let pub_params = DefaultDKG::new_public_params(&in_progress_session_state.metadata, rounding_result);
+        let pub_params =
+            DefaultDKG::new_public_params(&in_progress_session_state.metadata, rounding_result);
         let transcript = bcs::from_bytes::<<DefaultDKG as DKGTrait>::Transcript>(
             dkg_node.transcript_bytes.as_slice(),
         )

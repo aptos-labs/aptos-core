@@ -349,7 +349,9 @@ fn compute_profile_fixed_point(
     );
     let stake_gap_fixed = stake_per_weight * delta_total_fixed / stake_sum_fixed;
     // let reconstruct_threshold_in_stake_ratio = secrecy_threshold_in_stake_ratio + stake_gap_fixed;
-    let reconstruct_threshold_in_stake_ratio = (reconstruct_threshold_in_weights_fixed + delta_down_fixed) * stake_per_weight / stake_sum_fixed;
+    let reconstruct_threshold_in_stake_ratio =
+        (reconstruct_threshold_in_weights_fixed + delta_down_fixed) * stake_per_weight
+            / stake_sum_fixed;
     let (fast_reconstruct_threshold_in_stake_ratio, fast_reconstruct_threshold_in_weights) =
         if let Some(fast_secrecy_threshold_in_stake_ratio) =
             maybe_fast_secrecy_threshold_in_stake_ratio

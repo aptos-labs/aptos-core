@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    randomness::{decrypt_key_map, verify_dkg_transcript},
+    randomness::{decrypt_key_map, verify_dkg_transcript, wait_for_dkg_finish},
     smoke_test_environment::SwarmBuilder,
     utils::{get_current_consensus_config, get_on_chain_resource},
 };
@@ -101,10 +101,8 @@ script {{
         .await
         .expect("Waited too long for epoch 5.");
 
-    let dkg_session = get_on_chain_resource::<DKGState>(&client)
-        .await
-        .last_completed
-        .expect("dkg result for epoch 5 should be present");
+    let (dkg_session, rounding) = wait_for_dkg_finish(&client, Some(5), 30).await;
+
     assert_eq!(5, dkg_session.target_epoch());
-    assert!(verify_dkg_transcript(&dkg_session, &decrypt_key_map).is_ok());
+    assert!(verify_dkg_transcript(&dkg_session, rounding, &decrypt_key_map).is_ok());
 }

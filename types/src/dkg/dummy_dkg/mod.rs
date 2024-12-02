@@ -1,13 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::dkg::{DKGSessionMetadata, DKGTrait};
+use crate::{
+    dkg::{DKGSessionMetadata, DKGTrait},
+    RoundingResult,
+};
 use anyhow::{anyhow, ensure};
 use aptos_crypto::{bls12381, Uniform};
 use rand::{CryptoRng, Rng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
-use crate::RoundingResult;
 
 /// TODO: either make a separate RealDKG and make this test-only,
 /// or rename it and replace its implementation with the real one.
@@ -24,7 +26,10 @@ impl DKGTrait for DummyDKG {
     type PublicParams = DKGSessionMetadata;
     type Transcript = DummyDKGTranscript;
 
-    fn new_public_params(dkg_session_metadata: &DKGSessionMetadata, _rounding_result: Option<RoundingResult>) -> Self::PublicParams {
+    fn new_public_params(
+        dkg_session_metadata: &DKGSessionMetadata,
+        _rounding_result: Option<RoundingResult>,
+    ) -> Self::PublicParams {
         dkg_session_metadata.clone()
     }
 
