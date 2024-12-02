@@ -3782,6 +3782,11 @@ impl<'c, 'l, 'v, C: CustomSerializer> serde::Serialize
                 }
             },
 
+            // Function values.
+            (L::Function(..), _) => {
+                todo!("LAMBDA")
+            },
+
             // All other cases should not be possible.
             (layout, value) => Err(invariant_violation::<S>(format!(
                 "cannot serialize value {:?} as {:?}",
@@ -3944,6 +3949,11 @@ impl<'d, 'c, C: CustomDeserializer> serde::de::DeserializeSeed<'d>
                         ))
                     },
                 }
+            },
+
+            // Function values.
+            L::Function(..) => {
+                todo!("LAMBDA")
             },
         }
     }
@@ -4548,6 +4558,10 @@ pub mod prop {
             // TODO[agg_v2](cleanup): double check what we should do here (i.e. if we should
             //  even skip these kinds of layouts, or if need to construct a delayed value)?
             L::Native(_, layout) => value_strategy_with_layout(layout.as_ref()),
+
+            L::Function(..) => {
+                todo!("LAMBDA")
+            },
         }
     }
 
@@ -4665,6 +4679,13 @@ impl ValueImpl {
                     ValueImpl::Address(a) => MoveValue::Signer(*a),
                     v => panic!("Unexpected non-address while converting signer: {:?}", v),
                 }
+            },
+
+            (L::Function(..), _) => {
+                // Note: we do not support function values in Move values. Why should we support it
+                //       here? It seems that this function is used by 0x1::debug::print native that
+                //       we need to change.
+                todo!("LAMBDA")
             },
 
             (layout, val) => panic!("Cannot convert value {:?} as {:?}", val, layout),

@@ -82,6 +82,11 @@ pub(crate) fn is_valid_layout(layout: &MoveTypeLayout) -> bool {
             }
             fields.iter().all(is_valid_layout)
         },
+        L::Function(function_layout) => {
+            function_layout.arg_layouts.iter().all(is_valid_layout)
+                && function_layout.return_layouts.iter().all(is_valid_layout)
+        },
+
         L::Struct(_) => {
             // decorated layouts not supported
             false

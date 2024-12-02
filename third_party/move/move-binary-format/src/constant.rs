@@ -5,7 +5,7 @@
 use crate::file_format::{Constant, SignatureToken};
 use move_core_types::value::{MoveTypeLayout, MoveValue};
 
-fn sig_to_ty(sig: &SignatureToken) -> Option<MoveTypeLayout> {
+fn constant_sig_tok_to_ty_layout(sig: &SignatureToken) -> Option<MoveTypeLayout> {
     match sig {
         SignatureToken::Signer => Some(MoveTypeLayout::Signer),
         SignatureToken::Address => Some(MoveTypeLayout::Address),
@@ -16,23 +16,25 @@ fn sig_to_ty(sig: &SignatureToken) -> Option<MoveTypeLayout> {
         SignatureToken::U64 => Some(MoveTypeLayout::U64),
         SignatureToken::U128 => Some(MoveTypeLayout::U128),
         SignatureToken::U256 => Some(MoveTypeLayout::U256),
-        SignatureToken::Vector(v) => Some(MoveTypeLayout::Vector(Box::new(sig_to_ty(v.as_ref())?))),
-        SignatureToken::Function(..) => {
-            // TODO(LAMBDA): do we need representation in MoveTypeLayout?
-            None
-        },
+        SignatureToken::Vector(v) => Some(MoveTypeLayout::Vector(Box::new(
+            constant_sig_tok_to_ty_layout(v.as_ref())?,
+        ))),
+
+        // Types below cannot be constants.
         SignatureToken::Reference(_)
         | SignatureToken::MutableReference(_)
-        | SignatureToken::Struct(_)
+        | SignatureToken::Function(..)
         | SignatureToken::TypeParameter(_)
+        | SignatureToken::Struct(_)
         | SignatureToken::StructInstantiation(_, _) => None,
     }
 }
 
-fn construct_ty_for_constant(layout: &MoveTypeLayout) -> Option<SignatureToken> {
+fn constant_ty_layout_to_sig_tok(layout: &MoveTypeLayout) -> Option<SignatureToken> {
     match layout {
         MoveTypeLayout::Address => Some(SignatureToken::Address),
         MoveTypeLayout::Signer => Some(SignatureToken::Signer),
+        MoveTypeLayout::Bool => Some(SignatureToken::Bool),
         MoveTypeLayout::U8 => Some(SignatureToken::U8),
         MoveTypeLayout::U16 => Some(SignatureToken::U16),
         MoveTypeLayout::U32 => Some(SignatureToken::U32),
@@ -40,26 +42,26 @@ fn construct_ty_for_constant(layout: &MoveTypeLayout) -> Option<SignatureToken> 
         MoveTypeLayout::U128 => Some(SignatureToken::U128),
         MoveTypeLayout::U256 => Some(SignatureToken::U256),
         MoveTypeLayout::Vector(l) => Some(SignatureToken::Vector(Box::new(
-            construct_ty_for_constant(l.as_ref())?,
+            constant_ty_layout_to_sig_tok(l.as_ref())?,
         ))),
-        MoveTypeLayout::Struct(_) => None,
-        MoveTypeLayout::Bool => Some(SignatureToken::Bool),
 
-        // It is not possible to have native layout for constant values.
-        MoveTypeLayout::Native(_, _layout) => None,
+        // Types below cannot be constants.
+        MoveTypeLayout::Struct(_) | MoveTypeLayout::Native(..) | MoveTypeLayout::Function(_) => {
+            None
+        },
     }
 }
 
 impl Constant {
     pub fn serialize_constant(layout: &MoveTypeLayout, v: &MoveValue) -> Option<Self> {
         Some(Self {
-            type_: construct_ty_for_constant(layout)?,
+            type_: constant_ty_layout_to_sig_tok(layout)?,
             data: v.simple_serialize()?,
         })
     }
 
     pub fn deserialize_constant(&self) -> Option<MoveValue> {
-        let ty = sig_to_ty(&self.type_)?;
+        let ty = constant_sig_tok_to_ty_layout(&self.type_)?;
         MoveValue::simple_deserialize(&self.data, &ty).ok()
     }
 }

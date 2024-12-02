@@ -348,6 +348,12 @@ fn native_format_impl(
             out.push('}');
         },
 
+        MoveTypeLayout::Function(..) => {
+            // We can not allow prints for now, but ideally we should map to a function name here,
+            // if public.
+            todo!("LAMBDA")
+        },
+
         // This is unreachable because we check layout at the start. Still, return
         // an error to be safe.
         MoveTypeLayout::Native(..) => {

@@ -156,7 +156,15 @@ pub enum MoveStructLayout {
     WithVariants(Vec<MoveVariantLayout>),
 }
 
-/// Used to distinguish between aggregators ans snapshots.
+/// Layout of a Move function value.
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+pub struct MoveFunctionLayout {
+    pub arg_layouts: Vec<MoveTypeLayout>,
+    pub return_layouts: Vec<MoveTypeLayout>,
+}
+
+/// Used to distinguish between aggregators and snapshots.
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
 pub enum IdentifierMappingKind {
@@ -201,6 +209,8 @@ pub enum MoveTypeLayout {
     // TODO[agg_v2](?): Do we need a layout here if we have custom serde
     //                  implementations available?
     Native(IdentifierMappingKind, Box<MoveTypeLayout>),
+
+    Function(Box<MoveFunctionLayout>),
 }
 
 impl MoveValue {
@@ -495,6 +505,11 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
 
             // This layout is only used by MoveVM, so we do not expect to see it here.
             MoveTypeLayout::Native(..) => {
+                Err(D::Error::custom("Unsupported layout for Move value"))
+            },
+
+            // Move value has no functions, so we should return an error???
+            MoveTypeLayout::Function(..) => {
                 Err(D::Error::custom("Unsupported layout for Move value"))
             },
         }
@@ -805,6 +820,7 @@ impl fmt::Display for MoveTypeLayout {
             Signer => write!(f, "signer"),
             // TODO[agg_v2](cleanup): consider printing the tag as well.
             Native(_, typ) => write!(f, "native<{}>", typ),
+            Function(function_layout) => write!(f, "{}", function_layout),
         }
     }
 }
@@ -853,6 +869,24 @@ impl fmt::Display for MoveStructLayout {
     }
 }
 
+impl fmt::Display for MoveFunctionLayout {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
+        let arg_tys = self
+            .arg_layouts
+            .iter()
+            .map(|a| a.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let return_tys = self
+            .return_layouts
+            .iter()
+            .map(|a| a.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        write!(f, "({}) -> ({})", arg_tys, return_tys)
+    }
+}
+
 impl TryInto<TypeTag> for &MoveTypeLayout {
     type Error = anyhow::Error;
 
@@ -873,6 +907,10 @@ impl TryInto<TypeTag> for &MoveTypeLayout {
             // Native layout variant is only used by MoveVM, and is irrelevant
             // for type tags which are used to key resources in the global state.
             MoveTypeLayout::Native(..) => bail!("Unsupported layout for type tag"),
+
+            MoveTypeLayout::Function(..) => {
+                bail!("Function layouts cannot be converted to type tags")
+            },
         })
     }
 }

@@ -892,10 +892,14 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             MoveTypeLayout::Struct(struct_layout) => {
                 self.try_into_vm_value_struct(struct_layout, val)?
             },
+            // Note: what do we do here? If function value is a public function, it makes sense to
+            //       have a name + arguments which are bound. For other functions, not sure.
+            MoveTypeLayout::Function(..) => {
+                todo!("LAMBDA")
+            },
 
-            // Some values, e.g., signer or ones with custom serialization
-            // (native), are not stored to storage and so we do not expect
-            // to see them here.
+            // Some values, e.g., signer or ones with custom serialization (native), are not stored
+            // to storage, and so we do not expect to see them here.
             MoveTypeLayout::Signer | MoveTypeLayout::Native(..) => {
                 bail!("unexpected move type {:?} for value {:?}", layout, val)
             },

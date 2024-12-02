@@ -223,6 +223,8 @@ fn constant_serialized_size(ty_layout: &MoveTypeLayout) -> (u64, PartialVMResult
                 Ok(v) => Ok(v),
             }
         },
+        // Function values do not have constant serialized size.
+        MoveTypeLayout::Function(..) => Ok(None),
     };
     (
         visited_count,
