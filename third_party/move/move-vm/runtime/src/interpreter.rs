@@ -146,7 +146,7 @@ impl InterpreterImpl {
             active_modules: HashSet::new(),
         };
 
-        if loader.vm_config().paranoid_type_checks {
+        if interpreter.paranoid_type_checks {
             interpreter.execute_main::<FullRuntimeTypeCheck>(
                 loader,
                 data_store,
@@ -257,7 +257,7 @@ impl InterpreterImpl {
                         .build_loaded_function_from_handle_and_ty_args(fh_idx, vec![])
                         .map_err(|e| self.set_location(e))?;
 
-                    if self.paranoid_type_checks {
+                    if RTTCheck::should_perform_checks() {
                         self.check_friend_or_private_call(&current_frame.function, &function)?;
                     }
 
@@ -282,7 +282,7 @@ impl InterpreterImpl {
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
                     if function.is_native() {
-                        self.call_native(
+                        self.call_native::<RTTCheck>(
                             &mut current_frame,
                             &resolver,
                             data_store,
@@ -293,7 +293,12 @@ impl InterpreterImpl {
                         )?;
                         continue;
                     }
-                    self.set_new_call_frame(&mut current_frame, gas_meter, loader, function)?;
+                    self.set_new_call_frame::<RTTCheck>(
+                        &mut current_frame,
+                        gas_meter,
+                        loader,
+                        function,
+                    )?;
                 },
                 ExitCode::CallGeneric(idx) => {
                     let ty_args = resolver
@@ -307,7 +312,7 @@ impl InterpreterImpl {
                         .build_loaded_function_from_instantiation_and_ty_args(idx, ty_args)
                         .map_err(|e| self.set_location(e))?;
 
-                    if self.paranoid_type_checks {
+                    if RTTCheck::should_perform_checks() {
                         self.check_friend_or_private_call(&current_frame.function, &function)?;
                     }
 
@@ -335,7 +340,7 @@ impl InterpreterImpl {
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
                     if function.is_native() {
-                        self.call_native(
+                        self.call_native::<RTTCheck>(
                             &mut current_frame,
                             &resolver,
                             data_store,
@@ -346,13 +351,18 @@ impl InterpreterImpl {
                         )?;
                         continue;
                     }
-                    self.set_new_call_frame(&mut current_frame, gas_meter, loader, function)?;
+                    self.set_new_call_frame::<RTTCheck>(
+                        &mut current_frame,
+                        gas_meter,
+                        loader,
+                        function,
+                    )?;
                 },
             }
         }
     }
 
-    fn set_new_call_frame(
+    fn set_new_call_frame<RTTCheck: RuntimeTypeCheck>(
         &mut self,
         current_frame: &mut Frame,
         gas_meter: &mut impl GasMeter,
@@ -380,7 +390,7 @@ impl InterpreterImpl {
         }
 
         let mut frame = self
-            .make_call_frame(gas_meter, loader, function)
+            .make_call_frame::<RTTCheck>(gas_meter, loader, function)
             .map_err(|err| {
                 self.attach_state_if_invariant_violation(self.set_location(err), current_frame)
             })?;
@@ -404,7 +414,7 @@ impl InterpreterImpl {
     ///
     /// Native functions do not push a frame at the moment and as such errors from a native
     /// function are incorrectly attributed to the caller.
-    fn make_call_frame(
+    fn make_call_frame<RTTCheck: RuntimeTypeCheck>(
         &mut self,
         gas_meter: &mut impl GasMeter,
         loader: &Loader,
@@ -421,7 +431,7 @@ impl InterpreterImpl {
             )?;
 
             let ty_args = function.ty_args();
-            if self.paranoid_type_checks {
+            if RTTCheck::should_perform_checks() {
                 let ty = self.operand_stack.pop_ty()?;
                 let expected_ty = &function.local_tys()[num_param_tys - i - 1];
                 if !ty_args.is_empty() {
@@ -479,7 +489,7 @@ impl InterpreterImpl {
     }
 
     /// Call a native functions.
-    fn call_native(
+    fn call_native<RTTCheck: RuntimeTypeCheck>(
         &mut self,
         current_frame: &mut Frame,
         resolver: &Resolver,
@@ -490,7 +500,7 @@ impl InterpreterImpl {
         function: &LoadedFunction,
     ) -> VMResult<()> {
         // Note: refactor if native functions push a frame on the stack
-        self.call_native_impl(
+        self.call_native_impl::<RTTCheck>(
             current_frame,
             resolver,
             data_store,
@@ -517,7 +527,7 @@ impl InterpreterImpl {
         })
     }
 
-    fn call_native_impl(
+    fn call_native_impl<RTTCheck: RuntimeTypeCheck>(
         &mut self,
         current_frame: &mut Frame,
         resolver: &Resolver,
@@ -537,7 +547,7 @@ impl InterpreterImpl {
         let mut arg_tys = VecDeque::new();
 
         let ty_args = function.ty_args();
-        if self.paranoid_type_checks {
+        if RTTCheck::should_perform_checks() {
             for i in 0..num_param_tys {
                 let ty = self.operand_stack.pop_ty()?;
                 let expected_ty = &function.param_tys()[num_param_tys - i - 1];
@@ -594,7 +604,7 @@ impl InterpreterImpl {
                     self.operand_stack.push(value)?;
                 }
 
-                if self.paranoid_type_checks {
+                if RTTCheck::should_perform_checks() {
                     for ty in function.return_tys() {
                         let ty = ty_builder.create_ty_with_subst(ty, ty_args)?;
                         self.operand_stack.push_ty(ty)?;
@@ -689,15 +699,20 @@ impl InterpreterImpl {
                 }
 
                 // Maintaining the type stack for the paranoid mode using calling convention mentioned above.
-                if self.paranoid_type_checks {
+                if RTTCheck::should_perform_checks() {
                     arg_tys.pop_back();
                     for ty in arg_tys {
                         self.operand_stack.push_ty(ty)?;
                     }
                 }
 
-                self.set_new_call_frame(current_frame, gas_meter, resolver.loader(), target_func)
-                    .map_err(|err| err.to_partial())
+                self.set_new_call_frame::<RTTCheck>(
+                    current_frame,
+                    gas_meter,
+                    resolver.loader(),
+                    target_func,
+                )
+                .map_err(|err| err.to_partial())
             },
             NativeResult::LoadModule { module_name } => {
                 let arena_id = traversal_context
@@ -1293,7 +1308,7 @@ impl Stack {
         Ok(args)
     }
 
-    fn check_balance(&self) -> PartialVMResult<()> {
+    pub(crate) fn check_balance(&self) -> PartialVMResult<()> {
         if self.types.len() != self.value.len() {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
@@ -1511,17 +1526,15 @@ impl Frame {
                 // The reason for this design is we charge gas during instruction execution and we want to perform checks only after
                 // proper gas has been charged for each instruction.
 
-                if interpreter.paranoid_type_checks {
-                    interpreter.operand_stack.check_balance()?;
-                    RTTCheck::pre_execution_type_stack_transition(
-                        &self.local_tys,
-                        &self.locals,
-                        self.function.ty_args(),
-                        resolver,
-                        &mut interpreter.operand_stack,
-                        instruction,
-                    )?;
-                }
+                RTTCheck::check_operand_stack_balance(&interpreter.operand_stack)?;
+                RTTCheck::pre_execution_type_stack_transition(
+                    &self.local_tys,
+                    &self.locals,
+                    self.function.ty_args(),
+                    resolver,
+                    &mut interpreter.operand_stack,
+                    instruction,
+                )?;
 
                 match instruction {
                     Bytecode::Pop => {
@@ -2300,18 +2313,15 @@ impl Frame {
                         vec_ref.swap(idx1, idx2, ty)?;
                     },
                 }
-                if interpreter.paranoid_type_checks {
-                    RTTCheck::post_execution_type_stack_transition(
-                        &self.local_tys,
-                        self.function.ty_args(),
-                        resolver,
-                        &mut interpreter.operand_stack,
-                        &mut self.ty_cache,
-                        instruction,
-                    )?;
-
-                    interpreter.operand_stack.check_balance()?;
-                }
+                RTTCheck::post_execution_type_stack_transition(
+                    &self.local_tys,
+                    self.function.ty_args(),
+                    resolver,
+                    &mut interpreter.operand_stack,
+                    &mut self.ty_cache,
+                    instruction,
+                )?;
+                RTTCheck::check_operand_stack_balance(&interpreter.operand_stack)?;
 
                 // invariant: advance to pc +1 is iff instruction at pc executed without aborting
                 self.pc += 1;
