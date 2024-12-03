@@ -157,7 +157,7 @@ impl BatchStore {
             last_certified_time
         );
         for (digest, value) in db_content {
-            let expiration = value.expiration();
+            let expiration = value.expiration().saturating_sub(expiration_buffer_usecs);
 
             trace!(
                 "QS: Batchreader recovery content exp {:?}, digest {}",
