@@ -8,14 +8,14 @@ use aptos_executor_types::{
     execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
 };
 use aptos_metrics_core::TimerHelper;
-use aptos_storage_interface::state_store::state_summary::StateSummary;
+use aptos_storage_interface::state_store::state_summary::LedgerStateSummary;
 
 pub struct DoStateCheckpoint;
 
 impl DoStateCheckpoint {
     pub fn run(
         _execution_output: &ExecutionOutput,
-        _parent_state_summary: StateSummary,
+        _parent_state_summary: &LedgerStateSummary,
         _known_state_checkpoints: Option<impl IntoIterator<Item = Option<HashValue>>>,
     ) -> Result<StateCheckpointOutput> {
         let _timer = OTHER_TIMERS.timer_with(&["do_state_checkpoint"]);

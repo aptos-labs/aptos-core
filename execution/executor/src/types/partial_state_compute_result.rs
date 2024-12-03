@@ -8,7 +8,7 @@ use aptos_executor_types::{
     state_compute_result::StateComputeResult, LedgerUpdateOutput,
 };
 use aptos_storage_interface::{
-    state_store::{state::State, state_summary::StateSummary},
+    state_store::{state::LedgerState, state_summary::LedgerStateSummary},
     LedgerSummary,
 };
 use once_cell::sync::OnceCell;
@@ -67,11 +67,11 @@ impl PartialStateComputeResult {
             .expect("StateCheckpointOutput not set")
     }
 
-    pub fn result_state(&self) -> &State {
+    pub fn result_state(&self) -> &LedgerState {
         &self.execution_output.result_state
     }
 
-    pub fn expect_result_state_summary(&self) -> &StateSummary {
+    pub fn expect_result_state_summary(&self) -> &LedgerStateSummary {
         // FIXME(aldenhu):
         // &self.expect_state_checkpoint_output().result_state_summary
         todo!()

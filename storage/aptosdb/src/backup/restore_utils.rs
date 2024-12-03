@@ -131,60 +131,60 @@ pub(crate) fn save_transactions(
 ) -> Result<()> {
     todo!()
     /*
-    if let Some((ledger_db_batch, state_kv_batches, _state_kv_metadata_batch)) = existing_batch {
-        save_transactions_impl(
-            state_store,
-            ledger_db,
-            first_version,
-            txns,
-            txn_infos,
-            events,
-            write_sets.as_ref(),
-            ledger_db_batch,
-            state_kv_batches,
-            kv_replay,
-        )?;
-    } else {
-        let mut ledger_db_batch = LedgerDbSchemaBatches::new();
-        let mut sharded_kv_schema_batch = new_sharded_kv_schema_batch();
-        let state_kv_metadata_batch = SchemaBatch::new();
-        save_transactions_impl(
-            Arc::clone(&state_store),
-            Arc::clone(&ledger_db),
-            first_version,
-            txns,
-            txn_infos,
-            events,
-            write_sets.as_ref(),
-            &mut ledger_db_batch,
-            &mut sharded_kv_schema_batch,
-            kv_replay,
-        )?;
-        // get the last version and commit to the state kv db
-        // commit the state kv before ledger in case of failure happens
-        let last_version = first_version + txns.len() as u64 - 1;
-        state_store.state_db.state_kv_db.commit(
-            last_version,
-            state_kv_metadata_batch,
-            sharded_kv_schema_batch,
-        )?;
+        if let Some((ledger_db_batch, state_kv_batches, _state_kv_metadata_batch)) = existing_batch {
+            save_transactions_impl(
+                state_store,
+                ledger_db,
+                first_version,
+                txns,
+                txn_infos,
+                events,
+                write_sets.as_ref(),
+                ledger_db_batch,
+                state_kv_batches,
+                kv_replay,
+            )?;
+        } else {
+            let mut ledger_db_batch = LedgerDbSchemaBatches::new();
+            let mut sharded_kv_schema_batch = new_sharded_kv_schema_batch();
+            let state_kv_metadata_batch = SchemaBatch::new();
+            save_transactions_impl(
+                Arc::clone(&state_store),
+                Arc::clone(&ledger_db),
+                first_version,
+                txns,
+                txn_infos,
+                events,
+                write_sets.as_ref(),
+                &mut ledger_db_batch,
+                &mut sharded_kv_schema_batch,
+                kv_replay,
+            )?;
+            // get the last version and commit to the state kv db
+            // commit the state kv before ledger in case of failure happens
+            let last_version = first_version + txns.len() as u64 - 1;
+            state_store.state_db.state_kv_db.commit(
+                last_version,
+                state_kv_metadata_batch,
+                sharded_kv_schema_batch,
+            )?;
 
-        ledger_db.write_schemas(ledger_db_batch)?;
+            ledger_db.write_schemas(ledger_db_batch)?;
 
-<<<<<<< HEAD
-        state_store
-            .current_state()
-            .set(StateDelta::new_empty_with_version(Some(last_version)));
-=======
-        *state_store.current_state().store(
-            // FIXME(aldenhu)
-            StateDelta::new_empty_with_version(Some(last_version))
-        );
->>>>>>> 4f5660e3ec (DB: kv write path)
-    }
+    <<<<<<< HEAD
+            state_store
+                .current_state()
+                .set(StateDelta::new_empty_with_version(Some(last_version)));
+    =======
+            *state_store.current_state().store(
+                // FIXME(aldenhu)
+                StateDelta::new_empty_with_version(Some(last_version))
+            );
+    >>>>>>> 4f5660e3ec (DB: kv write path)
+        }
 
-    Ok(())
-     */
+        Ok(())
+         */
 }
 
 /// A helper function that saves the ledger infos to the given change set

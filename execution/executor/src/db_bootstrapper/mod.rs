@@ -139,6 +139,7 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
     let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
         &V::new(),
         vec![genesis_txn.clone().into()].into(),
+        &ledger_summary.state,
         base_state_view,
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         TransactionSliceMetadata::unknown(),
@@ -160,7 +161,7 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
         let state_view = CachedStateView::new(
             StateViewId::Miscellaneous,
             Arc::clone(&db.reader),
-            output.execution_output.result_state.clone(),
+            output.execution_output.result_state.state().clone(),
         )?;
         let next_epoch = epoch
             .checked_add(1)

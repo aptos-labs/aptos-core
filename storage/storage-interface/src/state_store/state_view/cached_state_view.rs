@@ -149,7 +149,7 @@ impl CachedStateView {
     }
 
     /// Consumes `Self` and returns the state and all the memorized state reads.
-    pub fn finish(self) -> (State, ShardedStateCache) {
+    pub fn finish(self) -> ShardedStateCache {
         todo!()
         /* FIXME(aldenhu)
         let Self {

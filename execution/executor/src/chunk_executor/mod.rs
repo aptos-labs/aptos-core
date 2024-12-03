@@ -301,8 +301,8 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
 
         let num_txns = chunk.len();
 
-        let state_view = self.state_view(&parent_state)?;
-        let execution_output = chunk.into_output::<V>(state_view)?;
+        let state_view = self.state_view(parent_state.state())?;
+        let execution_output = chunk.into_output::<V>(&parent_state, state_view)?;
         let output = PartialStateComputeResult::new(execution_output);
 
         // Enqueue for next stage.
@@ -336,7 +336,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
 
         output.set_state_checkpoint_output(DoStateCheckpoint::run(
             &output.execution_output,
-            parent_state_summary,
+            &parent_state_summary,
             Some(
                 chunk_verifier
                     .transaction_infos()
@@ -580,7 +580,8 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         verify_execution_mode: &VerifyExecutionMode,
     ) -> Result<Version> {
         // Execute transactions.
-        let state_view = self.state_view(self.commit_queue.lock().latest_state())?;
+        let parent_state = self.commit_queue.lock().latest_state().clone();
+        let state_view = self.state_view(parent_state.state())?;
         let txns = transactions
             .iter()
             .take((end_version - begin_version) as usize)
@@ -592,6 +593,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
             &V::new(),
             txns.into(),
+            &parent_state,
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
             TransactionSliceMetadata::chunk(begin_version, end_version),

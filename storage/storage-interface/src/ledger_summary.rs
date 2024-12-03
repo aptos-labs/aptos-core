@@ -3,8 +3,8 @@
 
 use crate::{
     state_store::{
-        state::State,
-        state_summary::StateSummary,
+        state::LedgerState,
+        state_summary::LedgerStateSummary,
         state_view::{async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView},
     },
     DbReader,
@@ -20,19 +20,19 @@ use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 pub struct LedgerSummary {
-    pub state: State,
-    pub state_summary: StateSummary,
+    pub state: LedgerState,
+    pub state_summary: LedgerStateSummary,
     pub transaction_accumulator: Arc<InMemoryTransactionAccumulator>,
 }
 
 impl LedgerSummary {
     pub fn new(
-        state: State,
-        state_summary: StateSummary,
+        state: LedgerState,
+        state_summary: LedgerStateSummary,
         transaction_accumulator: Arc<InMemoryTransactionAccumulator>,
     ) -> Self {
-        assert_eq!(state.next_version(), state_summary.next_version());
-        assert_eq!(state.next_version(), transaction_accumulator.num_leaves());
+        state_summary.assert_versions_match(&state);
+
         Self {
             state,
             state_summary,
@@ -41,7 +41,7 @@ impl LedgerSummary {
     }
 
     pub fn next_version(&self) -> Version {
-        self.state.next_version()
+        self.transaction_accumulator.num_leaves()
     }
 
     pub fn version(&self) -> Option<Version> {
@@ -71,9 +71,11 @@ impl LedgerSummary {
     }
 
     pub fn new_empty() -> Self {
+        let state = LedgerState::new_empty();
+        let state_summary = LedgerStateSummary::new_empty();
         Self::new(
-            State::new_empty(),
-            StateSummary::new_empty(),
+            state,
+            state_summary,
             Arc::new(InMemoryAccumulator::new_empty()),
         )
     }

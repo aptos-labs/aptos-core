@@ -10,7 +10,7 @@ use crate::{
 };
 use aptos_drop_helper::DropHelper;
 use aptos_storage_interface::state_store::{
-    state::State, state_view::cached_state_view::ShardedStateCache,
+    state::LedgerState, state_view::cached_state_view::ShardedStateCache,
 };
 use aptos_types::{
     contract_event::ContractEvent,
@@ -36,23 +36,18 @@ impl ExecutionOutput {
         to_commit: TransactionsToKeep,
         to_discard: TransactionsWithOutput,
         to_retry: TransactionsWithOutput,
-        last_checkpoint_state: Option<State>,
-        result_state: State,
+        result_state: LedgerState,
         state_reads: ShardedStateCache,
         block_end_info: Option<BlockEndInfo>,
         next_epoch_state: Option<EpochState>,
         subscribable_events: Planned<Vec<ContractEvent>>,
     ) -> Self {
         let next_version = first_version + to_commit.len() as Version;
-        assert_eq!(next_version, result_state.next_version());
+        assert_eq!(next_version, result_state.state().next_version());
         if is_block {
             // If it's a block, ensure it ends with state checkpoint.
             assert!(to_commit.is_empty() || to_commit.ends_with_sole_checkpoint());
-            assert!(last_checkpoint_state.is_some());
-            assert!(last_checkpoint_state
-                .as_ref()
-                .unwrap()
-                .is_the_same(&result_state));
+            assert!(result_state.is_checkpoint());
         } else {
             // If it's not, there shouldn't be any transaction to be discarded or retried.
             assert!(to_discard.is_empty() && to_retry.is_empty());
@@ -65,7 +60,6 @@ impl ExecutionOutput {
             to_commit,
             to_discard,
             to_retry,
-            last_checkpoint_state,
             result_state,
             state_reads,
             block_end_info,
@@ -74,16 +68,15 @@ impl ExecutionOutput {
         })
     }
 
-    pub fn new_empty(parent_state: State) -> Self {
+    pub fn new_empty(state: LedgerState) -> Self {
         Self::new_impl(Inner {
             is_block: false,
-            first_version: parent_state.next_version(),
+            first_version: state.next_version(),
             statuses_for_input_txns: vec![],
             to_commit: TransactionsToKeep::new_empty(),
             to_discard: TransactionsWithOutput::new_empty(),
             to_retry: TransactionsWithOutput::new_empty(),
-            last_checkpoint_state: None,
-            result_state: parent_state,
+            result_state: state,
             state_reads: ShardedStateCache::default(),
             block_end_info: None,
             next_epoch_state: None,
@@ -101,8 +94,7 @@ impl ExecutionOutput {
             to_commit: TransactionsToKeep::new_dummy_success(txns),
             to_discard: TransactionsWithOutput::new_empty(),
             to_retry: TransactionsWithOutput::new_empty(),
-            last_checkpoint_state: None,
-            result_state: State::new_empty(),
+            result_state: LedgerState::new_empty(),
             state_reads: ShardedStateCache::default(),
             block_end_info: None,
             next_epoch_state: None,
@@ -122,7 +114,6 @@ impl ExecutionOutput {
             to_commit: TransactionsToKeep::new_empty(),
             to_discard: TransactionsWithOutput::new_empty(),
             to_retry: TransactionsWithOutput::new_empty(),
-            last_checkpoint_state: None,
             result_state: self.result_state.clone(),
             state_reads: ShardedStateCache::default(),
             block_end_info: None,
@@ -163,8 +154,7 @@ pub struct Inner {
     pub to_discard: TransactionsWithOutput,
     pub to_retry: TransactionsWithOutput,
 
-    pub last_checkpoint_state: Option<State>,
-    pub result_state: State,
+    pub result_state: LedgerState,
     /// State items read during execution, useful for calculating the state storge usage and
     /// indices used by the db pruner.
     pub state_reads: ShardedStateCache,

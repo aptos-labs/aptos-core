@@ -60,7 +60,7 @@ use aptos_storage_interface::{
     db_ensure as ensure, db_other_bail as bail,
     state_store::{
         sharded_state_update_refs::{ShardedStateUpdateRefs, StateUpdateRefWithOffset},
-        state::State,
+        state::{LedgerState, State},
         state_delta::StateDelta,
         state_update::StateValueWithVersionOpt,
         state_view::{
@@ -665,13 +665,8 @@ impl StateStore {
         &self.buffered_state
     }
 
-    // FIXME(aldenhu): make current_state_cloned() this
     pub fn current_state(&self) -> MutexGuard<CurrentState> {
         self.current_state.lock()
-    }
-
-    pub fn current_state_cloned(&self) -> State {
-        self.current_state().get().current.clone()
     }
 
     pub fn persisted_state(&self) -> MutexGuard<PersistedState> {
@@ -734,27 +729,23 @@ impl StateStore {
     /// Put the `value_state_sets` into its own CF.
     pub fn put_value_sets(
         &self,
-        last_checkpoint_state: Option<&State>,
-        state: &State,
+        state: &LedgerState,
         state_update_refs: &ShardedStateUpdateRefs,
         sharded_state_cache: Option<&ShardedStateCache>,
         ledger_batch: &SchemaBatch,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
         enable_sharding: bool,
-        last_checkpoint_index: Option<usize>,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["put_value_sets"]);
-        let current_state = self.current_state().current.clone();
+        let current_state = self.current_state().state().clone();
 
         self.put_stats_and_indices(
             &current_state,
-            last_checkpoint_state,
             state,
             state_update_refs,
             sharded_state_cache,
             ledger_batch,
             sharded_state_kv_batches,
-            last_checkpoint_index,
             enable_sharding,
         )?;
 
@@ -813,15 +804,13 @@ impl StateStore {
     pub fn put_stats_and_indices(
         &self,
         current_state: &State,
-        last_checkpoint_state: Option<&State>,
-        state: &State,
+        latest_state: &LedgerState,
         state_update_refs: &ShardedStateUpdateRefs,
         // If not None, it must contains all keys in the value_state_sets.
         // TODO(grao): Restructure this function.
         sharded_state_cache: Option<&ShardedStateCache>,
         batch: &SchemaBatch,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
-        last_checkpoint_index: Option<usize>,
         enable_sharding: bool,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["put_stats_and_indices"]);
@@ -832,7 +821,7 @@ impl StateStore {
         } else {
             // If no cache is provided, we load the old values of all keys inline.
             _state_cache = ShardedStateCache::default();
-            self.prime_state_cache(current_state, state, &_state_cache);
+            self.prime_state_cache(current_state, latest_state, &_state_cache);
             &_state_cache
         };
 
@@ -842,17 +831,19 @@ impl StateStore {
             sharded_state_kv_batches,
             enable_sharding,
             primed_state_cache,
-            state.usage().is_untracked() || current_state.version().is_none(), // ignore_state_cache_miss
+            latest_state.usage().is_untracked() || current_state.version().is_none(), // ignore_state_cache_miss
         );
 
         {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["put_stats_and_indices__put_usage"]);
-            if let Some(last_checkpoint_state) = last_checkpoint_state {
-                if !last_checkpoint_state.is_the_same(state) {
-                    Self::put_usage(last_checkpoint_state, batch)?;
-                }
+            if !latest_state.is_checkpoint()
+                && latest_state.last_checkpoint_state().next_version()
+                    > current_state.next_version()
+            {
+                // a state checkpoint in the middle of the chunk
+                Self::put_usage(latest_state.last_checkpoint_state(), batch)?;
             }
-            Self::put_usage(state, batch)?;
+            Self::put_usage(latest_state, batch)?;
         }
 
         Ok(())
@@ -861,14 +852,14 @@ impl StateStore {
     fn prime_state_cache(
         &self,
         current_state: &State,
-        state: &State,
+        latest_state: &State,
         state_cache: &ShardedStateCache,
     ) {
         if let Some(base_version) = current_state.version() {
             let _timer =
                 OTHER_TIMERS_SECONDS.timer_with(&["put_stats_and_indices__prime_state_cache"]);
 
-            state
+            latest_state
                 .clone()
                 .into_delta(current_state.clone())
                 .updates

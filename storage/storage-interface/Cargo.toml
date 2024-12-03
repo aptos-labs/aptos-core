@@ -28,6 +28,7 @@ arr_macro = { workspace = true }
 bcs = { workspace = true }
 crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }
+derive_more = { workspace = true }
 once_cell = { workspace = true }
 parking_lot = { workspace = true }
 proptest = { workspace = true }

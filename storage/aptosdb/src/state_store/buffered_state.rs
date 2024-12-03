@@ -22,6 +22,7 @@ use aptos_storage_interface::{
     db_ensure as ensure,
     state_store::{
         sharded_state_updates::ShardedStateUpdates, state::State, state_delta::StateDelta,
+        state_summary::LedgerStateSummary,
     },
     AptosDbError, Result,
 };
@@ -45,12 +46,7 @@ pub(crate) const TARGET_SNAPSHOT_INTERVAL_IN_VERSION: u64 = 100_000;
 /// state_until_checkpoint.current = state_after_checkpoint.base, same for their versions.
 #[derive(Debug)]
 pub struct BufferedState {
-    /// state until the latest checkpoint. The `base` is the newest persisted state.
-    state_until_checkpoint: Option<Box<StateDelta>>,
-    /// state after the latest checkpoint. The `current` is the latest speculative state.
-    ///   n.b. this is an `Arc` shared with the StateStore so that merely querying the latest state
-    ///        does not require locking the buffered state.
-    state_after_checkpoint: Arc<Mutex<CurrentState>>,
+    current_state: Arc<Mutex<CurrentState>>,
     state_commit_sender: SyncSender<CommitMessage<Arc<StateDelta>>>,
     target_items: usize,
     join_handle: Option<JoinHandle<()>>,
@@ -163,66 +159,48 @@ impl BufferedState {
     }
 
     fn report_latest_committed_version(&self) {
-        /*
-        LATEST_CHECKPOINT_VERSION.set(
-            self.state_after_checkpoint
-                .lock()
-                .base_version
-                .map_or(-1, |v| v as i64),
-        );
-        FIXME(aldenhu)
-         */
-        todo!()
+        LATEST_CHECKPOINT_VERSION.set(self.current_state.lock().version().map_or(-1, |v| v as i64));
     }
 
     /// This method updates the buffered state with new data.
-    pub fn update(
-        &mut self,
-        latest_state_checkpoint: Option<&State>,
-        state: &State,
-        sync_commit: bool,
-    ) -> Result<()> {
-        /*
+    pub fn update(&mut self, state_summary: &LedgerStateSummary, sync_commit: bool) -> Result<()> {
+        /* FIXME(aldenhu)
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___update"]);
+
+        assert!(new_state_after_checkpoint
+            .current
+            .is_family(&state_after_checkpoint.current));
+        ensure!(
+            new_state_after_checkpoint.base_version >= state_after_checkpoint.base_version,
+            "new state base version smaller than state after checkpoint base version",
+        );
+        if let Some(updates_until_next_checkpoint_since_current) =
+            updates_until_next_checkpoint_since_current_option
         {
-            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["update_current_state"]);
-            let mut state_after_checkpoint = self.state_after_checkpoint.lock();
-
-            assert!(new_state_after_checkpoint
-                .current
-                .is_family(&state_after_checkpoint.current));
             ensure!(
-                new_state_after_checkpoint.base_version >= state_after_checkpoint.base_version,
-                "new state base version smaller than state after checkpoint base version",
+                new_state_after_checkpoint.base_version > state_after_checkpoint.base_version,
+                "Diff between base and latest checkpoints provided, while they are the same.",
             );
-            if let Some(updates_until_next_checkpoint_since_current) =
-                updates_until_next_checkpoint_since_current_option
-            {
-                ensure!(
-                    new_state_after_checkpoint.base_version > state_after_checkpoint.base_version,
-                    "Diff between base and latest checkpoints provided, while they are the same.",
-                );
-                state_after_checkpoint
-                    .updates_since_base
-                    .clone_merge(updates_until_next_checkpoint_since_current);
+            state_after_checkpoint
+                .updates_since_base
+                .clone_merge(updates_until_next_checkpoint_since_current);
 
-                let mut old_state =
-                    state_after_checkpoint.replace_with(new_state_after_checkpoint.clone());
-                old_state.current = state_after_checkpoint.base.clone();
-                old_state.current_version = state_after_checkpoint.base_version;
+            let mut old_state =
+                state_after_checkpoint.replace_with(new_state_after_checkpoint.clone());
+            old_state.current = state_after_checkpoint.base.clone();
+            old_state.current_version = state_after_checkpoint.base_version;
 
-                if let Some(ref mut delta) = self.state_until_checkpoint {
-                    delta.merge(old_state);
-                } else {
-                    self.state_until_checkpoint = Some(Box::new(old_state));
-                }
+            if let Some(ref mut delta) = self.state_until_checkpoint {
+                delta.merge(old_state);
             } else {
-                ensure!(
-                    new_state_after_checkpoint.base_version == state_after_checkpoint.base_version,
-                    "Diff between base and latest checkpoints not provided.",
-                );
-                state_after_checkpoint.set(new_state_after_checkpoint.clone());
+                self.state_until_checkpoint = Some(Box::new(old_state));
             }
+        } else {
+            ensure!(
+                new_state_after_checkpoint.base_version == state_after_checkpoint.base_version,
+                "Diff between base and latest checkpoints not provided.",
+            );
+            state_after_checkpoint.set(new_state_after_checkpoint.clone());
         }
 
         // n.b. make sure these are called after self.state_after_checkpoint is unlocked.
@@ -231,7 +209,7 @@ impl BufferedState {
         self.maybe_commit(sync_commit);
         self.report_latest_committed_version();
         Ok(())
-        FIXME(aldenhu)
+
          */
         todo!()
     }

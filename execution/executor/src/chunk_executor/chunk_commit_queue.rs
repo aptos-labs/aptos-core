@@ -14,7 +14,7 @@ use crate::{
 use anyhow::{anyhow, ensure, Result};
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{
-    state_store::{state::State, state_summary::StateSummary},
+    state_store::{state::LedgerState, state_summary::LedgerStateSummary},
     DbReader, LedgerSummary,
 };
 use aptos_types::{proof::accumulator::InMemoryTransactionAccumulator, transaction::Version};
@@ -39,8 +39,8 @@ pub(crate) struct ChunkToUpdateLedger {
 ///
 pub struct ChunkCommitQueue {
     /// Notice that latest_state and latest_txn_accumulator are at different versions.
-    latest_state: State,
-    latest_state_summary: StateSummary,
+    latest_state: LedgerState,
+    latest_state_summary: LedgerStateSummary,
     latest_txn_accumulator: Arc<InMemoryTransactionAccumulator>,
     to_commit: VecDeque<Option<ExecutedChunk>>,
     to_update_ledger: VecDeque<Option<ChunkToUpdateLedger>>,
@@ -63,7 +63,7 @@ impl ChunkCommitQueue {
         })
     }
 
-    pub(crate) fn latest_state(&self) -> &State {
+    pub(crate) fn latest_state(&self) -> &LedgerState {
         &self.latest_state
     }
 
@@ -91,7 +91,7 @@ impl ChunkCommitQueue {
     pub(crate) fn next_chunk_to_update_ledger(
         &mut self,
     ) -> Result<(
-        StateSummary,
+        LedgerStateSummary,
         Arc<InMemoryTransactionAccumulator>,
         ChunkToUpdateLedger,
     )> {
@@ -125,7 +125,7 @@ impl ChunkCommitQueue {
         self.latest_state_summary = chunk
             .output
             .expect_state_checkpoint_output()
-            .result_state_summary
+            .state_summary
             .clone();
         self.latest_txn_accumulator = chunk
             .output

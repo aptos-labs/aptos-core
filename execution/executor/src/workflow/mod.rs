@@ -24,7 +24,7 @@ impl ApplyExecutionOutput {
     ) -> Result<PartialStateComputeResult> {
         let state_checkpoint_output = DoStateCheckpoint::run(
             &execution_output,
-            base_view.state_summary,
+            &base_view.state_summary,
             Option::<Vec<_>>::None, // known_state_checkpoint_hashes
         )?;
         let ledger_update_output = DoLedgerUpdate::run(

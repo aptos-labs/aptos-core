@@ -21,7 +21,7 @@ impl DbWriter for AptosDB {
                 .expect("Concurrent committing detected.");
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["pre_commit_ledger"]);
 
-            chunk.state_summary.global_state_summary.log_generation("db_save");
+            chunk.state_summary.state_summary().global_state_summary.log_generation("db_save");
 
             self.pre_commit_validation(&chunk)?;
             let _new_root_hash = self.calculate_and_commit_ledger_and_state_kv(
@@ -34,8 +34,7 @@ impl DbWriter for AptosDB {
             // n.b make sure buffered_state.update() is called after all other commits are done, since
             // internally it updates state_store.current_state which indicates the "pre-committed version"
             self.state_store.buffered_state().lock().update(
-                chunk.last_state_checkpoint,
-                chunk.state,
+                chunk.state_summary,
                 sync_commit || chunk.is_reconfig,
             )?;
 
@@ -222,13 +221,14 @@ impl AptosDB {
 
         ensure!(!chunk.is_empty(), "chunk is empty, nothing to save.");
 
-        let current_state = self.state_store.current_state().current.clone();
+        let next_version = self.state_store.current_state().next_version();
         // Ensure the incoming committing requests are always consecutive and the version in
         // buffered state is consistent with that in db.
-        ensure!(chunk.first_version == current_state.next_version(),
+        ensure!(
+            chunk.first_version == next_version,
             "The first version passed in ({}), and the next version expected by db ({}) are inconsistent.",
             chunk.first_version,
-            current_state.next_version(),
+            next_version,
         );
 
         Ok(())
@@ -299,7 +299,6 @@ impl AptosDB {
         let state_kv_metadata_batch = SchemaBatch::new();
 
         self.state_store.put_value_sets(
-            chunk.last_state_checkpoint,
             chunk.state,
             chunk.state_update_refs,
             chunk.state_reads,
@@ -307,10 +306,6 @@ impl AptosDB {
             &sharded_state_kv_batches,
             // TODO(grao): remove after APIs migrated off the DB to the indexer.
             self.state_store.state_kv_db.enabled_sharding(),
-            // FIXME(aldenhu): remove or implement differently
-            chunk.transaction_infos
-                .iter()
-                .rposition(|t| t.state_checkpoint_hash().is_some()),
         )?;
 
         // Write block index if event index is skipped.
@@ -504,7 +499,7 @@ impl AptosDB {
         version_to_commit: Version,
     ) -> Result<Option<Version>> {
         let old_committed_ver = self.ledger_db.metadata_db().get_synced_version()?;
-        let pre_committed_ver = self.state_store.current_state().current.version();
+        let pre_committed_ver = self.state_store.current_state().version();
         ensure!(
             old_committed_ver.is_none() || version_to_commit >= old_committed_ver.unwrap(),
             "Version too old to commit. Committed: {:?}; Trying to commit with LI: {}",

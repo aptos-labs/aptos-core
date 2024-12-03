@@ -215,7 +215,7 @@ where
                     CachedStateView::new(
                         StateViewId::BlockExecution { block_id },
                         Arc::clone(&self.db.reader),
-                        parent_output.execution_output.result_state.clone(),
+                        parent_output.execution_output.result_state.state().clone(),
                     )?
                 };
 
@@ -229,6 +229,7 @@ where
                 DoGetExecutionOutput::by_transaction_execution(
                     &self.block_executor,
                     transactions,
+                    &parent_output.execution_output.result_state,
                     state_view,
                     onchain_config.clone(),
                     TransactionSliceMetadata::block(parent_block_id, block_id),
@@ -293,7 +294,7 @@ where
                 });
                 output.set_state_checkpoint_output(DoStateCheckpoint::run(
                     &output.execution_output,
-                    parent_block.output.expect_result_state_summary().clone(),
+                    parent_block.output.expect_result_state_summary(),
                     Option::<Vec<_>>::None,
                 )?);
                 output.set_ledger_update_output(DoLedgerUpdate::run(
