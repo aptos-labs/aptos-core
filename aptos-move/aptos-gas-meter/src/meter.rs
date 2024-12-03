@@ -22,7 +22,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::{GasMeter as MoveGasMeter, SimpleInstruction},
+    gas::{GasMeter as MoveGasMeter, InterpreterView, SimpleInstruction},
     views::{TypeView, ValueView},
 };
 
@@ -71,7 +71,7 @@ where
     }
 
     #[inline]
-    fn charge_simple_instr(&mut self, instr: SimpleInstruction) -> PartialVMResult<()> {
+    fn charge_simple_instr(&mut self, instr: SimpleInstruction, _interpreter: impl InterpreterView) -> PartialVMResult<()> {
         macro_rules! dispatch {
             ($($name: ident => $cost: expr),* $(,)?) => {
                 match instr {
@@ -178,7 +178,7 @@ where
     }
 
     #[inline]
-    fn charge_pop(&mut self, _popped_val: impl ValueView) -> PartialVMResult<()> {
+    fn charge_pop(&mut self, _popped_val: impl ValueView + std::fmt::Display) -> PartialVMResult<()> {
         self.algebra.charge_execution(POP)
     }
 
@@ -254,7 +254,7 @@ where
     }
 
     #[inline]
-    fn charge_store_loc(&mut self, _val: impl ValueView) -> PartialVMResult<()> {
+    fn charge_store_loc(&mut self, _val: impl ValueView, _interpreter_view: impl InterpreterView) -> PartialVMResult<()> {
         self.algebra.charge_execution(ST_LOC_BASE)
     }
 

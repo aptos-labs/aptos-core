@@ -29,7 +29,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::{GasMeter, SimpleInstruction},
+    gas::{GasMeter, InterpreterView, SimpleInstruction},
     views::{TypeView, ValueView},
 };
 use once_cell::sync::Lazy;
@@ -203,7 +203,7 @@ impl GasMeter for GasStatus {
     }
 
     /// Charge an instruction and fail if not enough gas units are left.
-    fn charge_simple_instr(&mut self, instr: SimpleInstruction) -> PartialVMResult<()> {
+    fn charge_simple_instr(&mut self, instr: SimpleInstruction, _interpreter: impl InterpreterView) -> PartialVMResult<()> {
         self.charge_instr(instr.to_opcode())
     }
 
@@ -219,7 +219,7 @@ impl GasMeter for GasStatus {
         self.charge_instr(Opcodes::BRANCH)
     }
 
-    fn charge_pop(&mut self, _popped_val: impl ValueView) -> PartialVMResult<()> {
+    fn charge_pop(&mut self, _popped_val: impl ValueView + std::fmt::Display) -> PartialVMResult<()> {
         self.charge_instr(Opcodes::POP)
     }
 
@@ -282,7 +282,7 @@ impl GasMeter for GasStatus {
         self.charge_instr_with_size(Opcodes::MOVE_LOC, val.legacy_abstract_memory_size())
     }
 
-    fn charge_store_loc(&mut self, val: impl ValueView) -> PartialVMResult<()> {
+    fn charge_store_loc(&mut self, val: impl ValueView, _interpreter_view: impl InterpreterView) -> PartialVMResult<()> {
         self.charge_instr_with_size(Opcodes::ST_LOC, val.legacy_abstract_memory_size())
     }
 

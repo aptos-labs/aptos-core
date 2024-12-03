@@ -27,3 +27,5 @@ aptos-vm-types = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-vm-types = { workspace = true }
+move-ir-types = { workspace = true }
+move-bytecode-source-map = { workspace = true }

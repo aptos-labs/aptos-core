@@ -1647,6 +1647,11 @@ pub struct TransactionOptions {
     /// flamegraphs that reflect the gas usage.
     #[clap(long)]
     pub(crate) profile_gas: bool,
+
+    /// If this option is set, trace the transaction locally using the debugger and generate
+    /// execution traces.
+    #[clap(long)]
+    pub(crate) trace_txn: bool,
 }
 
 impl TransactionOptions {
@@ -2015,6 +2020,13 @@ impl TransactionOptions {
             local_simulation::profile_transaction_using_debugger,
         )
         .await
+    }
+
+    pub async fn trace_transaction(
+        &self,
+        payload: TransactionPayload,
+    ) -> CliTypedResult<TransactionSummary> {
+        self.simulate_using_debugger(payload, local_simulation::trace_transaction_using_debugger).await
     }
 
     pub async fn estimate_gas_price(&self) -> CliTypedResult<u64> {

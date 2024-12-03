@@ -4365,7 +4365,7 @@ impl ValueView for SignerRef {
 // Note: We may want to add more helpers to retrieve value views behind references here.
 
 impl Struct {
-    pub fn field_views(&self) -> impl ExactSizeIterator<Item = impl ValueView + '_> + Clone {
+    pub fn field_views(&self) -> impl ExactSizeIterator<Item = impl ValueView + Display + '_> + Clone {
         self.fields.iter()
     }
 }

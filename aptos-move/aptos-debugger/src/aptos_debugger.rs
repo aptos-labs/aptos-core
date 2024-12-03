@@ -7,7 +7,7 @@ use aptos_block_executor::{
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::{default::DefaultTxnProvider, TxnProvider},
 };
-use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
+use aptos_gas_profiling::{ExecutionTrace, ExecutionTracer, GasProfiler, TransactionGasLog};
 use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
@@ -157,6 +157,55 @@ impl AptosDebugger {
         )?;
 
         Ok((status, output, gas_profiler.finish()))
+    }
+
+    pub fn execute_transaction_at_version_with_execution_tracer(
+        &self,
+        version: Version,
+        txn: SignedTransaction,
+    ) -> Result<(VMStatus, VMOutput, ExecutionTrace<String>)> {
+        let state_view = DebuggerStateView::new(self.debugger.clone(), version);
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let txn = txn
+            .check_signature()
+            .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
+
+        // Module bundle is deprecated!
+        if let TransactionPayload::ModuleBundle(_) = txn.payload() {
+            bail!("Module bundle payload has been removed")
+        }
+
+        let env = AptosEnvironment::new(&state_view);
+        let vm = AptosVM::new(env.clone(), &state_view);
+        let resolver = state_view.as_move_resolver();
+        let code_storage = state_view.as_aptos_code_storage(env);
+
+        let (status, output, execution_tracer) = vm.execute_user_transaction_with_modified_gas_meter(
+            &resolver,
+            &code_storage,
+            &txn,
+            &log_context,
+            |gas_meter| {
+                let execution_tracer = match txn.payload() {
+                    TransactionPayload::Script(_) => ExecutionTracer::from_script(gas_meter),
+                    TransactionPayload::EntryFunction(entry_func) => ExecutionTracer::from_entry_fun(
+                        gas_meter,
+                        entry_func.module().clone(),
+                        entry_func.function().to_owned(),
+                        entry_func.ty_args().to_vec(),
+                    ),
+                    TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
+
+                    // Deprecated.
+                    TransactionPayload::ModuleBundle(..) => {
+                        unreachable!("Module bundle payload has already been checked because before this function is called")
+                    },
+                };
+                execution_tracer
+            },
+        )?;
+
+        Ok((status, output, execution_tracer.dump_trace()))
     }
 
     pub async fn execute_past_transactions(
