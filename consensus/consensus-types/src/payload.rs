@@ -147,25 +147,39 @@ impl<T> IntoIterator for BatchPointer<T> {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum PayloadExecutionLimit {
     None,
-    MaxTransactionsToExecute(u64),
+    Limits(Option<u64>, Option<u64>),
 }
 
 impl PayloadExecutionLimit {
+    pub(crate) fn new(max_txns_to_execute: Option<u64>, block_gas_limit: Option<u64>) -> Self {
+        if max_txns_to_execute.is_none() && block_gas_limit.is_none() {
+            Self::None
+        } else {
+            Self::Limits(max_txns_to_execute, block_gas_limit)
+        }
+    }
+
+    fn extend_options(o1: Option<u64>, o2: Option<u64>) -> Option<u64> {
+        match (o1, o2) {
+            (Some(v1), Some(v2)) => Some(v1 + v2),
+            (Some(v), None) => Some(v),
+            (None, Some(v)) => Some(v),
+            _ => None,
+        }
+    }
+
     pub(crate) fn extend(&mut self, other: PayloadExecutionLimit) {
         *self = match (&self, &other) {
             (PayloadExecutionLimit::None, _) => other,
             (_, PayloadExecutionLimit::None) => return,
             (
-                PayloadExecutionLimit::MaxTransactionsToExecute(limit1),
-                PayloadExecutionLimit::MaxTransactionsToExecute(limit2),
-            ) => PayloadExecutionLimit::MaxTransactionsToExecute(*limit1 + *limit2),
+                PayloadExecutionLimit::Limits(max_txns_to_execute1, block_gas_limit1),
+                PayloadExecutionLimit::Limits(max_txns_to_execute2, block_gas_limit2),
+            ) => PayloadExecutionLimit::Limits(
+                Self::extend_options(*max_txns_to_execute1, *max_txns_to_execute2),
+                Self::extend_options(*block_gas_limit1, *block_gas_limit2),
+            ),
         };
-    }
-
-    pub(crate) fn max_txns_to_execute(limit: Option<u64>) -> Self {
-        limit.map_or(PayloadExecutionLimit::None, |val| {
-            PayloadExecutionLimit::MaxTransactionsToExecute(val)
-        })
     }
 }
 
@@ -288,7 +302,14 @@ impl OptQuorumStorePayloadV1 {
     pub fn max_txns_to_execute(&self) -> Option<u64> {
         match self.execution_limits {
             PayloadExecutionLimit::None => None,
-            PayloadExecutionLimit::MaxTransactionsToExecute(max) => Some(max),
+            PayloadExecutionLimit::Limits(max_txns_to_execute, _) => max_txns_to_execute,
+        }
+    }
+
+    pub fn block_gas_limit(&self) -> Option<u64> {
+        match self.execution_limits {
+            PayloadExecutionLimit::None => None,
+            PayloadExecutionLimit::Limits(_, block_gas_limit) => block_gas_limit,
         }
     }
 }

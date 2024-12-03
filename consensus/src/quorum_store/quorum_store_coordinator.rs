@@ -10,7 +10,9 @@ use crate::{
     round_manager::VerifiedEvent,
 };
 use aptos_channels::aptos_channel;
-use aptos_consensus_types::{common::Author, proof_of_store::BatchInfo};
+use aptos_consensus_types::{
+    common::Author, pipelined_block::PipelinedBlock, proof_of_store::BatchInfo,
+};
 use aptos_logger::prelude::*;
 use aptos_types::{account_address::AccountAddress, PeerId};
 use futures::StreamExt;
@@ -18,6 +20,7 @@ use tokio::sync::{mpsc, oneshot};
 
 pub enum CoordinatorCommand {
     CommitNotification(u64, Vec<BatchInfo>),
+    OrderedNotification(PipelinedBlock),
     Shutdown(futures_channel::oneshot::Sender<()>),
 }
 
@@ -78,6 +81,12 @@ impl QuorumStoreCoordinator {
                             ))
                             .await
                             .expect("Failed to send to BatchGenerator");
+                    },
+                    CoordinatorCommand::OrderedNotification(block) => {
+                        self.proof_manager_cmd_tx
+                            .send(ProofManagerCommand::OrderedNotification(block))
+                            .await
+                            .expect("Failed to send to ProofManager");
                     },
                     CoordinatorCommand::Shutdown(ack_tx) => {
                         counters::QUORUM_STORE_MSG_COUNT

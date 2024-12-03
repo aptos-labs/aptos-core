@@ -267,6 +267,11 @@ impl PipelinedBlock {
         }
 
         let execution_summary = ExecutionSummary {
+            gas_used: self
+                .state_compute_result
+                .execution_output
+                .block_end_info()
+                .map(|info| info.block_effective_gas_units()),
             payload_len: self
                 .block
                 .payload()
@@ -716,6 +721,8 @@ impl PipelinedBlock {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ExecutionSummary {
+    // TODO: would it ever be None?
+    pub gas_used: Option<u64>,
     pub payload_len: u64,
     pub to_commit: u64,
     pub to_retry: u64,
