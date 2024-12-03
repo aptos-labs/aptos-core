@@ -24,8 +24,11 @@
 //! cannot use it without a subsequent store.
 //! So, skipping the store to `u` is safe.
 
-use crate::file_format_generator::peephole_optimizer::optimizers::WindowOptimizer;
-use move_binary_format::file_format::Bytecode;
+use crate::file_format_generator::peephole_optimizer::optimizers::{
+    TransformedCodeChunk, WindowOptimizer,
+};
+use move_binary_format::file_format::{Bytecode, CodeOffset};
+use std::iter;
 
 /// An optimizer for inefficient loads.
 pub struct InefficientLoads;
@@ -37,7 +40,7 @@ impl InefficientLoads {
 }
 
 impl WindowOptimizer for InefficientLoads {
-    fn optimize_window(&self, window: &[Bytecode]) -> Option<(Vec<Bytecode>, usize)> {
+    fn optimize_window(&self, window: &[Bytecode]) -> Option<(TransformedCodeChunk, usize)> {
         use Bytecode::*;
         if window.len() < Self::MIN_WINDOW_SIZE {
             return None;
@@ -61,8 +64,14 @@ impl WindowOptimizer for InefficientLoads {
                     // We have reached the end of the pattern (point 4 in the module documentation).
                     let sequence = &window[2..index + 2];
                     let load_constant = &window[0..1];
+                    let transformed_code = [sequence, load_constant].concat();
+                    // original_offsets are 2..index+2 (representing `sequence`),
+                    // followed by 0 (representing `load_constant`).
+                    let original_offsets = (2..(index + 2) as CodeOffset)
+                        .chain(iter::once(0))
+                        .collect::<Vec<_>>();
                     return Some((
-                        [sequence, load_constant].concat(),
+                        TransformedCodeChunk::new(transformed_code, original_offsets),
                         index + Self::MIN_WINDOW_SIZE,
                     ));
                 },

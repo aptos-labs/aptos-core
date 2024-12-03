@@ -22,7 +22,9 @@ use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_logger::{error, info, Schema};
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_storage_interface::{
-    state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
+    state_store::state_view::db_state_view::{
+        DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView,
+    },
     AptosDbError, DbReader, Order, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{

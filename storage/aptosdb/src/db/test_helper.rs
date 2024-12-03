@@ -18,7 +18,7 @@ use aptos_executor_types::ProofReader;
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
 #[cfg(test)]
 use aptos_schemadb::SchemaBatch;
-use aptos_storage_interface::{state_delta::StateDelta, DbReader, Order, Result};
+use aptos_storage_interface::{state_store::state_delta::StateDelta, DbReader, Order, Result};
 use aptos_temppath::TempPath;
 #[cfg(test)]
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
@@ -68,7 +68,8 @@ pub(crate) fn update_store(
     enable_sharding: bool,
 ) -> HashValue {
     use aptos_storage_interface::{
-        jmt_update_refs, jmt_updates, sharded_state_update_refs::ShardedStateUpdateRefs,
+        jmt_update_refs, jmt_updates,
+        state_store::sharded_state_update_refs::ShardedStateUpdateRefs,
     };
 
     let mut root_hash = *aptos_crypto::hash::SPARSE_MERKLE_PLACEHOLDER_HASH;

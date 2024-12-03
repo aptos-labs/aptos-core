@@ -4,9 +4,9 @@
 
 use crate::{
     ast::{
-        AccessSpecifier, Address, AddressSpecifier, Exp, ExpData, MatchArm, ModuleName, Operation,
-        Pattern, QualifiedSymbol, QuantKind, ResourceSpecifier, RewriteResult, Spec, TempIndex,
-        Value,
+        AccessSpecifier, Address, AddressSpecifier, Exp, ExpData, LambdaCaptureKind, MatchArm,
+        ModuleName, Operation, Pattern, QualifiedSymbol, QuantKind, ResourceSpecifier,
+        RewriteResult, Spec, TempIndex, Value,
     },
     builder::{
         model_builder::{
@@ -178,9 +178,28 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         et
     }
 
-    pub fn check_language_version(&self, loc: &Loc, feature: &str, version_min: LanguageVersion) {
+    /// Returns `true` if language version is ok. Otherwise,
+    /// issues an error message and returns `false`.
+    pub fn test_language_version(
+        &self,
+        loc: &Loc,
+        feature: &str,
+        version_min: LanguageVersion,
+    ) -> bool {
+        self.parent.test_language_version(loc, feature, version_min)
+    }
+
+    /// Returns `Some(())` if language version checks out.  Otherwise,
+    /// issues an error message and returns `None`.
+    pub fn check_language_version(
+        &self,
+        loc: &Loc,
+        feature: &str,
+        version_min: LanguageVersion,
+    ) -> Option<()> {
         self.parent
-            .check_language_version(loc, feature, version_min);
+            .test_language_version(loc, feature, version_min)
+            .then_some(())
     }
 
     pub fn set_spec_block_map(&mut self, map: BTreeMap<EA::SpecId, EA::SpecBlock>) {
@@ -891,6 +910,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                 self.translate_hlir_base_types(&args[0..args.len() - 1]),
                             )),
                             Box::new(self.translate_hlir_base_type(&args[args.len() - 1])),
+                            AbilitySet::FUNCTIONS,
                         ),
                     },
                     ModuleType(m, n) => {
@@ -1061,9 +1081,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 ReferenceKind::from_is_mut(*is_mut),
                 Box::new(self.translate_type(ty)),
             ),
-            Fun(args, result) => Type::Fun(
+            Fun(args, result, abilities) => Type::Fun(
                 Box::new(Type::tuple(self.translate_types(args.as_ref()))),
                 Box::new(self.translate_type(result)),
+                AbilitySet::FUNCTIONS | self.parent.translate_abilities(abilities),
             ),
             Unit => Type::Tuple(vec![]),
             Multiple(vst) => Type::Tuple(self.translate_types(vst.as_ref())),
@@ -1147,16 +1168,16 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 &loc,
                 "read/write access specifiers. Try `acquires` instead.",
                 LanguageVersion::V2_0,
-            )
+            )?;
         } else if *negated {
-            self.check_language_version(&loc, "access specifier negation", LanguageVersion::V2_0)
+            self.check_language_version(&loc, "access specifier negation", LanguageVersion::V2_0)?;
         } else if type_args.is_some() && !type_args.as_ref().unwrap().is_empty() {
             self.check_language_version(
                 &loc,
                 "access specifier type instantiation. Try removing the type instantiation.",
                 LanguageVersion::V2_0,
-            )
-        }
+            )?;
+        };
         let resource = match (module_address, module_name, resource_name) {
             (None, None, None) => {
                 // This stems from a  specifier of the form `acquires *(0x1)`
@@ -1248,8 +1269,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 &loc,
                 "address and wildcard access specifiers. Only resource type names can be provided.",
                 LanguageVersion::V2_0,
-            );
-        }
+            )?;
+        };
         let address = self.translate_address_specifier(address)?;
         Some(AccessSpecifier {
             loc: loc.clone(),
@@ -1272,7 +1293,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     &loc,
                     "wildcard address specifiers",
                     LanguageVersion::V2_0,
-                );
+                )?;
                 (loc, AddressSpecifier::Any)
             },
             EA::AddressSpecifier_::Literal(addr) => {
@@ -1280,7 +1301,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     &loc,
                     "literal address specifiers",
                     LanguageVersion::V2_0,
-                );
+                )?;
                 (
                     loc,
                     AddressSpecifier::Address(Address::Numerical(addr.into_inner())),
@@ -1291,7 +1312,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     &loc,
                     "named address specifiers",
                     LanguageVersion::V2_0,
-                );
+                )?;
                 // Construct an expansion name exp for regular type check
                 let maccess = sp(name.loc, EA::ModuleAccess_::Name(*name));
                 self.translate_name(
@@ -1311,7 +1332,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     &loc,
                     "derived address specifiers",
                     LanguageVersion::V2_0,
-                );
+                )?;
                 // Construct an expansion function call for regular type check
                 let name_exp = sp(
                     name.loc,
@@ -1378,6 +1399,15 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     /// Translates an expression, with given expected type, which might be a type variable.
     pub fn translate_exp(&mut self, exp: &EA::Exp, expected_type: &Type) -> ExpData {
         self.translate_exp_in_context(exp, expected_type, &ErrorMessageContext::General)
+    }
+
+    /// Translates LambdaCaptureKind
+    pub fn translate_lambda_capture_kind(kind: PA::LambdaCaptureKind) -> LambdaCaptureKind {
+        match kind {
+            PA::LambdaCaptureKind::Default => LambdaCaptureKind::Default,
+            PA::LambdaCaptureKind::Copy => LambdaCaptureKind::Copy,
+            PA::LambdaCaptureKind::Move => LambdaCaptureKind::Move,
+        }
     }
 
     /// Translates an expression in a specific error message context.
@@ -1511,6 +1541,19 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     )
                 }
             },
+            EA::Exp_::ExpCall(efexp, args) => {
+                let args_ref: Vec<_> = args.value.iter().collect();
+                let (arg_types, args) = self.translate_exp_list(&args_ref);
+
+                let fun_t = Type::Fun(
+                    Box::new(Type::tuple(arg_types)),
+                    Box::new(expected_type.clone()),
+                    AbilitySet::FUNCTIONS,
+                );
+                let fexp = self.translate_exp(efexp, &fun_t);
+                let id = self.new_node_id_with_type_loc(expected_type, &loc);
+                ExpData::Invoke(id, fexp.into_exp(), args)
+            },
             EA::Exp_::Pack(maccess, generics, fields) => self
                 .translate_pack(
                     &loc,
@@ -1608,9 +1651,15 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 ExpData::LoopCont(id, nest, true)
             },
             EA::Exp_::Block(seq) => self.translate_seq(&loc, seq, expected_type, context),
-            EA::Exp_::Lambda(bindings, exp) => {
-                self.translate_lambda(&loc, bindings, exp, expected_type, context)
-            },
+            EA::Exp_::Lambda(bindings, exp, capture_kind, abilities) => self.translate_lambda(
+                &loc,
+                bindings,
+                exp,
+                expected_type,
+                context,
+                Self::translate_lambda_capture_kind(*capture_kind),
+                AbilitySet::FUNCTIONS | self.parent.translate_abilities(abilities),
+            ),
             EA::Exp_::Quant(kind, ranges, triggers, condition, body) => self.translate_quant(
                 &loc,
                 *kind,
@@ -2089,7 +2138,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 Pattern::Struct(sid, std, variant, patterns) => {
                     let mut new_inst = vec![];
                     for ty in &std.inst {
-                        let nty = subs.specialize(ty);
+                        // use `specialize_with_defaults` to get type info from constraints
+                        let nty: Type = subs.specialize_with_defaults(ty);
                         new_inst.push(nty);
                     }
                     let mut new_std = std.clone();
@@ -3142,7 +3192,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         // handles call of struct/variant with positional fields
         let expected_type = &self.subs.specialize(expected_type);
         if self.can_resolve_to_struct(expected_type, maccess) {
-            self.check_language_version(loc, "positional fields", LanguageVersion::V2_0);
+            self.check_language_version(loc, "positional fields", LanguageVersion::V2_0)?;
             // translates StructName(e0, e1, ...) to pack<StructName> { 0: e0, 1: e1, ... }
             let fields: EA::Fields<_> =
                 EA::Fields::maybe_from_iter(args.iter().enumerate().map(|(i, &arg)| {
@@ -3184,8 +3234,15 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let fun_t = Type::Fun(
                     Box::new(Type::tuple(arg_types)),
                     Box::new(expected_type.clone()),
+                    if let Type::Fun(.., abilities) = &sym_ty {
+                        *abilities
+                    } else {
+                        // Don't constraint Abilities of sym_ty.
+                        AbilitySet::MAXIMAL_FUNCTIONS
+                    },
                 );
                 let sym_ty = self.check_type(loc, &sym_ty, &fun_t, context);
+
                 let local_id = self.new_node_id_with_type_loc(&sym_ty, &self.to_loc(&n.loc));
                 let local_var = ExpData::LocalVar(local_id, sym);
                 let id = self.new_node_id_with_type_loc(expected_type, loc);
@@ -3288,8 +3345,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     /// translated expression.
     pub fn translate_exp_free(&mut self, exp: &EA::Exp) -> (Type, ExpData) {
         let tvar = self.fresh_type_var();
-        let exp = self.translate_exp(exp, &tvar);
-        (self.subs.specialize(&tvar), exp)
+        let exp_out = self.translate_exp(exp, &tvar);
+        let tsub = self.subs.specialize(&tvar);
+        (tsub, exp_out)
     }
 
     /// Translates a sequence expression.
@@ -3519,6 +3577,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             let instantiation = self.translate_types(type_args.as_slice());
             let ty = ty.instantiate(&instantiation);
             let ty = self.check_type(loc, &ty, expected_type, context);
+
             // Create expression global<GhostMem>(@0).v which backs up the ghost variable.
             let ghost_mem_id = StructId::new(
                 self.parent
@@ -3548,6 +3607,45 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 vec![global_access.into_exp()],
             );
         }
+
+        if let Some(entry) = self.parent.parent.fun_table.get(&global_var_sym) {
+            let module_id = entry.module_id;
+            let fun_id = entry.fun_id;
+            let fun_abilities = if entry.visibility.is_public() {
+                AbilitySet::PUBLIC_FUNCTIONS
+            } else {
+                AbilitySet::PRIVATE_FUNCTIONS
+            };
+            let result_type = entry.result_type.clone();
+            let type_params = entry.type_params.clone();
+            let param_types = entry
+                .params
+                .iter()
+                .map(|param| param.get_type())
+                .collect_vec();
+            let Some(instantiation) = self.make_instantiation_or_report(
+                loc,
+                false,
+                global_var_sym.symbol,
+                &type_params,
+                type_args,
+            ) else {
+                return self.new_error_exp();
+            };
+            let fun_type = Type::Fun(
+                Box::new(Type::tuple(param_types)),
+                Box::new(result_type),
+                fun_abilities,
+            );
+            let fun_type = fun_type.instantiate(&instantiation);
+            let fun_type = self.check_type(loc, &fun_type, expected_type, context);
+
+            let id = self.env().new_node(loc.clone(), fun_type);
+            self.env().set_node_instantiation(id, instantiation);
+            let fn_exp = ExpData::Value(id, Value::Function(module_id, fun_id));
+            return fn_exp;
+        }
+
         // If a qualified name is not explicitly specified, do not print it out
         let qualified_display = if let EA::ModuleAccess_::ModuleAccess(..) = maccess.value {
             global_var_sym.display(self.env())
@@ -3767,7 +3865,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 .struct_table
                 .contains_key(&global_var_sym)
             {
-                self.check_language_version(loc, "resource indexing", LanguageVersion::V2_0);
+                self.check_language_version(loc, "resource indexing", LanguageVersion::V2_0)?;
                 if self
                     .parent
                     .parent
@@ -3797,7 +3895,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             }
         }
         if !self.is_spec_mode() {
-            self.check_language_version(loc, "vector indexing", LanguageVersion::V2_0);
+            self.check_language_version(loc, "vector indexing", LanguageVersion::V2_0)?;
             // Translate to vector indexing in impl mode if the target is not a resource or a spec schema
             // spec mode is handled in `translate_index`
             if call.is_none() {
@@ -4124,7 +4222,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         expected_type: &Type,
         context: &ErrorMessageContext,
     ) -> ExpData {
-        // Translate arguments.
+        // Translate arguments: arg_types is needed to do candidate matching.
         let (mut arg_types, mut translated_args) = self.translate_exp_list(args);
 
         // Special handling of receiver call functions
@@ -4223,6 +4321,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             self.error(loc, &format!("no function named `{}` found", display));
             return self.new_error_exp();
         }
+
         // Partition candidates in those which matched and which have been outruled.
         let mut outruled = vec![];
         let mut matching = vec![];
@@ -4282,6 +4381,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     continue;
                 }
             }
+
             // Process arguments
             let mut success = true;
             for (i, arg_ty) in arg_types.iter().enumerate() {
@@ -4368,6 +4468,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let (cand, subs, instantiation) = matching.remove(0);
                 let (_, _, result_type) = cand.get_signature();
                 let result_type = result_type.instantiate(&instantiation);
+
                 // Commit the candidate substitution to this expression translator.
                 self.subs = subs;
 
@@ -4408,8 +4509,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         .add_used_spec_fun(module_id.qualified(spec_fun_id));
                     self.called_spec_funs.insert((module_id, spec_fun_id));
                 }
+
                 let translated_args = self.add_conversions(cand, &instantiation, translated_args);
                 let specialized_expected_type = self.subs.specialize(expected_type);
+
                 let call_exp = ExpData::Call(id, oper, translated_args).into_exp();
                 // Insert freeze for the return value
                 let call_exp = if let (Type::Tuple(ref result_tys), Type::Tuple(expected_tys)) =
@@ -4552,7 +4655,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         args: Vec<Exp>,
         expected_type: &Type,
     ) -> ExpData {
-        self.check_language_version(loc, "receiver style function calls", LanguageVersion::V2_0);
+        if !self.test_language_version(loc, "receiver style function calls", LanguageVersion::V2_0)
+        {
+            let id = self.new_node_id_with_type_loc(&Type::Error, loc);
+            return ExpData::Invalid(id);
+        }
         let generics = generics
             .as_ref()
             .map(|tys| self.translate_types_with_loc(tys));
@@ -4585,16 +4692,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
     /// Translate a list of expressions and deliver them together with their types.
     fn translate_exp_list(&mut self, exps: &[&EA::Exp]) -> (Vec<Type>, Vec<Exp>) {
-        let mut types = vec![];
-        let exps = exps
-            .iter()
+        exps.iter()
             .map(|e| {
                 let (t, e) = self.translate_exp_free(e);
-                types.push(t);
-                e.into_exp()
+                (t, e.into_exp())
             })
-            .collect_vec();
-        (types, exps)
+            .unzip()
     }
 
     /// Creates a type instantiation using optionally provided type arguments.
@@ -5134,6 +5237,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         body: &EA::Exp,
         expected_type: &Type,
         context: &ErrorMessageContext,
+        capture_kind: LambdaCaptureKind,
+        abilities: AbilitySet,
     ) -> ExpData {
         // Translate the argument list
         let arg_type = self.fresh_type_var();
@@ -5154,14 +5259,18 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let ty = self.fresh_type_var();
         let rty = self.check_type(
             loc,
-            &Type::Fun(Box::new(arg_type), Box::new(ty.clone())),
+            &Type::Fun(
+                Box::new(arg_type.clone()),
+                Box::new(ty.clone()),
+                abilities.union(AbilitySet::MAXIMAL_FUNCTIONS),
+            ),
             expected_type,
             context,
         );
         let rbody = self.translate_exp(body, &ty);
         self.exit_scope();
         let id = self.new_node_id_with_type_loc(&rty, loc);
-        ExpData::Lambda(id, pat, rbody.into_exp())
+        ExpData::Lambda(id, pat, rbody.into_exp(), capture_kind, abilities)
     }
 
     fn translate_quant(
@@ -5256,6 +5365,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         ExpData::Quant(id, rkind, rranges, rtriggers, rcondition, rbody.into_exp())
     }
 
+    /// Unify types with order `LeftToRight` and shallow variance
     pub fn check_type(
         &mut self,
         loc: &Loc,
@@ -5266,6 +5376,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         self.check_type_with_order(WideningOrder::LeftToRight, loc, ty, expected, context)
     }
 
+    /// Unify types with order `Join` and shallow variance, and specified error message override
     pub fn join_type(
         &mut self,
         loc: &Loc,
@@ -5276,6 +5387,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         self.check_type_with_order(WideningOrder::Join, loc, ty1, ty2, context)
     }
 
+    /// Unify types with shallow variance, and specified error message override
     fn check_type_with_order(
         &mut self,
         order: WideningOrder,
@@ -5292,6 +5404,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             })
     }
 
+    /// Unify types with specified variance and order
     fn unify_types(
         &mut self,
         variance: Variance,
@@ -5378,8 +5491,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             | (Type::TypeParameter(_), MoveValue::Struct(_))
             | (Type::Reference(_, _), MoveValue::Vector(_))
             | (Type::Reference(_, _), MoveValue::Struct(_))
-            | (Type::Fun(_, _), MoveValue::Vector(_))
-            | (Type::Fun(_, _), MoveValue::Struct(_))
+            | (Type::Fun(..), MoveValue::Vector(_))
+            | (Type::Fun(..), MoveValue::Struct(_))
             | (Type::TypeDomain(_), MoveValue::Vector(_))
             | (Type::TypeDomain(_), MoveValue::Struct(_))
             | (Type::ResourceDomain(_, _, _), MoveValue::Vector(_))

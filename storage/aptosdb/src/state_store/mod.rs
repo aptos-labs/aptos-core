@@ -21,7 +21,9 @@ use crate::{
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
     state_restore::{StateSnapshotRestore, StateSnapshotRestoreMode, StateValueWriter},
-    state_store::buffered_state::BufferedState,
+    state_store::{
+        buffered_state::BufferedState, current_state::CurrentState, persisted_state::PersistedState,
+    },
     utils::{
         iterators::PrefixedStateValueIterator,
         new_sharded_kv_schema_batch,
@@ -49,13 +51,18 @@ use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::SchemaBatch;
-use aptos_scratchpad::{SmtAncestors, SparseMerkleTree};
+use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
-    async_proof_fetcher::AsyncProofFetcher,
-    cached_state_view::{CachedStateView, ShardedStateCache},
     db_ensure as ensure, db_other_bail as bail,
-    sharded_state_update_refs::ShardedStateUpdateRefs,
-    state_delta::StateDelta,
+    state_store::{
+        sharded_state_update_refs::ShardedStateUpdateRefs,
+        state_delta::StateDelta,
+        state_view::{
+            async_proof_fetcher::AsyncProofFetcher,
+            cached_state_view::{CachedStateView, ShardedStateCache},
+        },
+        NUM_STATE_SHARDS,
+    },
     AptosDbError, DbReader, Result, StateSnapshotReceiver,
 };
 use aptos_types::{
@@ -67,13 +74,12 @@ use aptos_types::{
             StaleStateValueByKeyHashIndex, StaleStateValueIndex, StateValue,
             StateValueChunkWithProof,
         },
-        StateViewId, NUM_STATE_SHARDS,
+        StateViewId,
     },
     transaction::Version,
     write_set::WriteSet,
 };
 use claims::{assert_ge, assert_le};
-use derive_more::Deref;
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::{
@@ -86,6 +92,8 @@ pub(crate) mod buffered_state;
 mod state_merkle_batch_committer;
 mod state_snapshot_committer;
 
+mod current_state;
+mod persisted_state;
 #[cfg(test)]
 mod state_store_test;
 
@@ -97,15 +105,6 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
     * 2;
 
 pub const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 1_000_000;
-
-#[derive(Clone, Debug, Deref)]
-pub(crate) struct CurrentState(#[deref] Arc<Mutex<StateDelta>>);
-
-impl CurrentState {
-    pub fn new(from_latest_checkpoint_to_current: StateDelta) -> Self {
-        Self(Arc::new(Mutex::new(from_latest_checkpoint_to_current)))
-    }
-}
 
 pub(crate) struct StateDb {
     pub ledger_db: Arc<LedgerDb>,
@@ -125,9 +124,9 @@ pub(crate) struct StateStore {
     buffered_state: Mutex<BufferedState>,
     /// CurrentState is shared between this and the buffered_state.
     /// On read, we don't need to lock the `buffered_state` to get the latest state.
-    current_state: Mutex<CurrentState>,
+    current_state: Arc<Mutex<CurrentState>>,
     /// Tracks a persisted smt, any state older than that is guaranteed to be found in RocksDB
-    smt_ancestors: Mutex<SmtAncestors<StateValue>>,
+    persisted_state: Arc<Mutex<PersistedState>>,
     buffered_state_target_items: usize,
     internal_indexer_db: Option<InternalIndexerDB>,
 }
@@ -227,7 +226,7 @@ impl DbReader for StateDb {
 
 impl DbReader for StateStore {
     fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>> {
-        Ok(self.smt_ancestors.lock().get_youngest())
+        Ok(self.persisted_state().clone())
     }
 
     /// Returns the latest state snapshot strictly before `next_version` if any.
@@ -332,11 +331,15 @@ impl StateStore {
             state_kv_pruner,
             skip_usage,
         });
-        let (buffered_state, smt_ancestors, current_state) = if empty_buffered_state_for_restore {
+        let current_state = Arc::new(Mutex::new(CurrentState::new_dummy()));
+        let persisted_state = Arc::new(Mutex::new(PersistedState::new_dummy()));
+        let buffered_state = if empty_buffered_state_for_restore {
             BufferedState::new(
                 &state_db,
                 StateDelta::new_empty(),
                 buffered_state_target_items,
+                current_state.clone(),
+                persisted_state.clone(),
             )
         } else {
             Self::create_buffered_state_from_latest_snapshot(
@@ -344,6 +347,8 @@ impl StateStore {
                 buffered_state_target_items,
                 hack_for_tests,
                 /*check_max_versions_after_snapshot=*/ true,
+                current_state.clone(),
+                persisted_state.clone(),
             )
             .expect("buffered state creation failed.")
         };
@@ -352,8 +357,8 @@ impl StateStore {
             state_db,
             buffered_state: Mutex::new(buffered_state),
             buffered_state_target_items,
-            current_state: Mutex::new(current_state),
-            smt_ancestors: Mutex::new(smt_ancestors),
+            current_state,
+            persisted_state,
             internal_indexer_db,
         }
     }
@@ -481,9 +486,15 @@ impl StateStore {
             state_kv_pruner,
             skip_usage: false,
         });
-        let (_, _, current_state) = Self::create_buffered_state_from_latest_snapshot(
-            &state_db, 0, /*hack_for_tests=*/ false,
+        let current_state = Arc::new(Mutex::new(CurrentState::new_dummy()));
+        let persisted_state = Arc::new(Mutex::new(PersistedState::new_dummy()));
+        let _ = Self::create_buffered_state_from_latest_snapshot(
+            &state_db,
+            0,
+            /*hack_for_tests=*/ false,
             /*check_max_versions_after_snapshot=*/ false,
+            current_state.clone(),
+            persisted_state,
         )?;
         let base_version = current_state.lock().base_version;
         Ok(base_version)
@@ -494,7 +505,9 @@ impl StateStore {
         buffered_state_target_items: usize,
         hack_for_tests: bool,
         check_max_versions_after_snapshot: bool,
-    ) -> Result<(BufferedState, SmtAncestors<StateValue>, CurrentState)> {
+        current_state: Arc<Mutex<CurrentState>>,
+        persisted_state: Arc<Mutex<PersistedState>>,
+    ) -> Result<BufferedState> {
         let num_transactions = state_db
             .ledger_db
             .metadata_db()
@@ -520,7 +533,7 @@ impl StateStore {
             *SPARSE_MERKLE_PLACEHOLDER_HASH
         };
         let usage = state_db.get_state_storage_usage(latest_snapshot_version)?;
-        let (mut buffered_state, smt_ancestors, current_state) = BufferedState::new(
+        let mut buffered_state = BufferedState::new(
             state_db,
             StateDelta::new_at_checkpoint(
                 latest_snapshot_root_hash,
@@ -528,11 +541,13 @@ impl StateStore {
                 latest_snapshot_version,
             ),
             buffered_state_target_items,
+            current_state.clone(),
+            persisted_state,
         );
 
         // In some backup-restore tests we hope to open the db without consistency check.
         if hack_for_tests {
-            return Ok((buffered_state, smt_ancestors, current_state));
+            return Ok(buffered_state);
         }
 
         // Make sure the committed transactions is ahead of the latest snapshot.
@@ -558,7 +573,7 @@ impl StateStore {
                 );
             }
             let snapshot = state_db.get_state_snapshot_before(num_transactions)?;
-            let current_state_cloned = current_state.lock().clone();
+            let current_state_cloned = current_state.lock().get().clone();
             let speculative_state = current_state_cloned
                 .current
                 .freeze(&current_state_cloned.base);
@@ -615,21 +630,20 @@ impl StateStore {
                 "StateStore initialization finished.",
             );
         }
-        Ok((buffered_state, smt_ancestors, current_state))
+        Ok(buffered_state)
     }
 
     pub fn reset(&self) {
-        let (buffered_state, smt_ancestors, current_state) =
-            Self::create_buffered_state_from_latest_snapshot(
-                &self.state_db,
-                self.buffered_state_target_items,
-                false,
-                true,
-            )
-            .expect("buffered state creation failed.");
-        *self.current_state.lock() = current_state;
-        *self.buffered_state.lock() = buffered_state;
-        *self.smt_ancestors.lock() = smt_ancestors;
+        self.buffered_state.lock().drain();
+        *self.buffered_state.lock() = Self::create_buffered_state_from_latest_snapshot(
+            &self.state_db,
+            self.buffered_state_target_items,
+            false,
+            true,
+            self.current_state.clone(),
+            self.persisted_state.clone(),
+        )
+        .expect("buffered state creation failed.");
     }
 
     pub fn buffered_state(&self) -> &Mutex<BufferedState> {
@@ -640,8 +654,12 @@ impl StateStore {
         self.current_state.lock()
     }
 
+    pub fn persisted_state(&self) -> MutexGuard<PersistedState> {
+        self.persisted_state.lock()
+    }
+
     pub fn current_state_cloned(&self) -> StateDelta {
-        self.current_state().lock().clone()
+        self.current_state().get().clone()
     }
 
     /// Returns the key, value pairs for a particular state key prefix at at desired version. This

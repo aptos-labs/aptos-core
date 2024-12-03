@@ -1,13 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::state_store::sharded_state_updates::ShardedStateUpdates;
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DropHelper;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_types::{
-    state_store::{
-        state_storage_usage::StateStorageUsage, state_value::StateValue, ShardedStateUpdates,
-    },
+    state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     transaction::Version,
 };
 

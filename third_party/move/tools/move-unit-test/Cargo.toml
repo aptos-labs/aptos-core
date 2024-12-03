@@ -25,8 +25,11 @@ regex = { workspace = true }
 
 move-command-line-common = { path = "../../move-command-line-common" }
 move-compiler = { path = "../../move-compiler" }
+move-compiler-v2 = { path = "../../move-compiler-v2" }
 move-core-types = { path = "../../move-core/types" }
 move-ir-types = { path = "../../move-ir/types" }
+move-model = { path = "../../move-model" }
+move-package = { path = "../move-package" }
 move-resource-viewer = { path = "../move-resource-viewer" }
 move-stdlib = { path = "../../move-stdlib", features = ["testing"] }
 move-symbol-pool = { path = "../../move-symbol-pool" }

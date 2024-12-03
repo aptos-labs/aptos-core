@@ -11,7 +11,7 @@ use move_model::{
     model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, NodeId, Parameter, QualifiedId},
     ty::Type,
 };
-use std::{collections::BTreeSet, iter::Iterator, ops::Deref, vec::Vec};
+use std::{collections::BTreeSet, iter::Iterator, vec::Vec};
 
 type QualifiedFunId = QualifiedId<FunId>;
 
@@ -20,8 +20,8 @@ fn identify_function_types_with_functions_in_args(func_types: Vec<Type>) -> Vec<
     func_types
         .into_iter()
         .filter_map(|ty| {
-            if let Type::Fun(argt, _) = &ty {
-                if argt.deref().has_function() {
+            if let Type::Fun(args, _, _) = &ty {
+                if args.as_ref().has_function() {
                     Some(ty)
                 } else {
                     None
@@ -41,8 +41,8 @@ fn identify_function_typed_params_with_functions_in_rets(
     func_types
         .iter()
         .filter_map(|param| {
-            if let Type::Fun(_argt, rest) = &param.1 {
-                let rest_unboxed = rest.deref();
+            if let Type::Fun(_args, result, _) = &param.1 {
+                let rest_unboxed = result.as_ref();
                 if rest_unboxed.has_function() {
                     Some((*param, rest_unboxed))
                 } else {
@@ -270,7 +270,7 @@ fn check_privileged_operations_on_structs(env: &GlobalEnv, fun_env: &FunctionEnv
                 },
                 ExpData::Assign(_, pat, _)
                 | ExpData::Block(_, pat, _, _)
-                | ExpData::Lambda(_, pat, _) => {
+                | ExpData::Lambda(_, pat, _, _, _) => {
                     pat.visit_pre_post(&mut |_, pat| {
                         if let Pattern::Struct(id, str, _, _) = pat {
                             let module_id = str.module_id;
@@ -344,7 +344,7 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
 
                 // Check that functions being called are accessible.
                 if let Some(def) = caller_func.get_def() {
-                    let callees_with_sites = def.called_funs_with_callsites();
+                    let callees_with_sites = def.used_funs_with_uses();
                     for (callee, sites) in &callees_with_sites {
                         let callee_func = env.get_function(*callee);
                         // Check visibility.
