@@ -12,10 +12,10 @@ edition = "2021"
 [dependencies]
 anyhow = { workspace = true }
 codespan-reporting = { workspace = true, features = ["serde", "serialization"] }
-move-command-line-common = { path = "../../move-command-line-common" }
-move-compiler = { path = "../../move-compiler" }
-move-compiler-v2 = { path = "../../move-compiler-v2" }
-move-model = { path = ".." }
+move-command-line-common = { workspace = true }
+move-compiler = { workspace = true }
+move-compiler-v2 = { workspace = true }
+move-model = { workspace = true }
 move-prover-test-utils = { path = "../../move-prover/test-utils" }
-move-stackless-bytecode = { path = "../bytecode" }
+move-stackless-bytecode = { workspace = true }
 move-stdlib = { path = "../../move-stdlib" }

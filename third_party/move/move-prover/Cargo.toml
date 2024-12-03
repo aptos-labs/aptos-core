@@ -8,24 +8,21 @@ license = "Apache-2.0"
 
 [dependencies]
 anyhow = { workspace = true }
-move-abigen = { path = "move-abigen" }
-move-command-line-common = { path = "../move-command-line-common" }
-move-compiler = { path = "../move-compiler" }
-move-compiler-v2 = { path = "../move-compiler-v2" }
-move-docgen = { path = "move-docgen" }
-move-errmapgen = { path = "move-errmapgen" }
-move-model = { path = "../move-model" }
-# move dependencies
-move-prover-boogie-backend = { path = "boogie-backend" }
-move-prover-bytecode-pipeline = { path = "bytecode-pipeline" }
-move-stackless-bytecode = { path = "../move-model/bytecode" }
-
-# external dependencies
 atty = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 codespan-reporting = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true, features = ["serde"] }
+move-abigen = { workspace = true }
+move-command-line-common = { workspace = true }
+move-compiler = { workspace = true }
+move-compiler-v2 = { workspace = true }
+move-docgen = { workspace = true }
+move-errmapgen = { workspace = true }
+move-model = { workspace = true }
+move-prover-boogie-backend = { workspace = true }
+move-prover-bytecode-pipeline = { workspace = true }
+move-stackless-bytecode  = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 simplelog = { workspace = true }

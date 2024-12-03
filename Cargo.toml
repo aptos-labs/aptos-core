@@ -623,6 +623,7 @@ http = "0.2.9"
 httpmock = "0.6.8"
 hyper = { version = "0.14.18", features = ["full"] }
 hyper-tls = "0.5.0"
+im = "15.0.0"
 image = "0.24.5"
 indexmap = "1.9.3"
 include_dir = { version = "0.7.2", features = ["glob"] }
@@ -854,8 +855,12 @@ move-docgen = { path = "third_party/move/move-prover/move-docgen" }
 move-disassembler = { path = "third_party/move/tools/move-disassembler" }
 move-ir-types = { path = "third_party/move/move-ir/types" }
 move-ir-compiler = { path = "third_party/move/move-ir-compiler" }
+move-ir-to-bytecode = { path = "third_party/move/move-ir-compiler/move-ir-to-bytecode" }
 move-linter = { path = "third_party/move/tools/move-linter" }
+move-borrow-graph = { path = "third_party/move/move-borrow-graph" }
 move-bytecode-source-map = { path = "third_party/move/move-ir-compiler/move-bytecode-source-map" }
+move-bytecode-viewer = { path = "third_party/move/tools/move-bytecode-viewer" }
+move-errmapgen = { path = "third_party/move/move-prover/move-errmapgen" }
 move-model = { path = "third_party/move/move-model" }
 move-package = { path = "third_party/move/tools/move-package" }
 move-prover = { path = "third_party/move/move-prover" }
@@ -870,14 +875,10 @@ move-resource-viewer = { path = "third_party/move/tools/move-resource-viewer" }
 move-symbol-pool = { path = "third_party/move/move-symbol-pool" }
 move-table-extension = { path = "third_party/move/extensions/move-table-extension" }
 move-transactional-test-runner = { path = "third_party/move/testing-infra/transactional-test-runner" }
-move-unit-test = { path = "third_party/move/tools/move-unit-test", features = [
-    "table-extension",
-] }
+move-unit-test = { path = "third_party/move/tools/move-unit-test", features = ["table-extension"] }
 move-vm-metrics = { path = "third_party/move/move-vm/metrics" }
 move-vm-runtime = { path = "third_party/move/move-vm/runtime" }
-move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = [
-    "table-extension",
-] }
+move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = ["table-extension"] }
 move-vm-types = { path = "third_party/move/move-vm/types" }
 
 [profile.release]

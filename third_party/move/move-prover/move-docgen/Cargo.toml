@@ -8,24 +8,21 @@ license = "Apache-2.0"
 
 [dependencies]
 anyhow = { workspace = true }
-# diem dependencies
-move-compiler = { path = "../../move-compiler" }
-move-core-types = { path = "../../move-core/types" }
-move-model = { path = "../../move-model" }
-
-# external dependencies
 clap = { workspace = true }
 codespan = { workspace = true }
 codespan-reporting = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
+move-compiler = { workspace = true }
+move-core-types = { workspace = true }
+move-model = { workspace = true }
 once_cell = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
 datatest-stable = { workspace = true }
-move-prover = { path = ".." }
+move-prover = { workspace = true }
 move-prover-test-utils = { path = "../test-utils" }
 tempfile = { workspace = true }
 

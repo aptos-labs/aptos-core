@@ -8,24 +8,20 @@ license = "Apache-2.0"
 
 [dependencies]
 anyhow = { workspace = true }
-move-binary-format = { path = "../../move-binary-format" }
-move-bytecode-verifier = { path = "../../move-bytecode-verifier" }
-move-command-line-common = { path = "../../move-command-line-common" }
-move-core-types = { path = "../../move-core/types" }
-# Move dependencies
-move-model = { path = "../../move-model" }
-
 bcs = { workspace = true }
 heck = { workspace = true }
-
-# external dependencies
 log = { workspace = true }
+move-binary-format = { workspace = true }
+move-bytecode-verifier = { workspace = true }
+move-command-line-common = { workspace = true }
+move-core-types = { workspace = true }
+move-model = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
 codespan-reporting = { workspace = true }
 datatest-stable = { workspace = true }
-move-prover = { path = ".." }
+move-prover = { workspace = true }
 move-prover-test-utils = { path = "../test-utils" }
 tempfile = { workspace = true }
 

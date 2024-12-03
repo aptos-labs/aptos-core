@@ -13,9 +13,9 @@ edition = "2021"
 fail = { workspace = true, features = ['failpoints'] }
 hex = { workspace = true }
 invalid-mutations = { path = "../invalid-mutations" }
-move-binary-format = { path = "../../move-binary-format", features = ["fuzzing"] }
-move-bytecode-verifier = { path = "../" }
-move-core-types = { path = "../../move-core/types" }
+move-binary-format = { workspace = true, features = ["fuzzing"] }
+move-bytecode-verifier = { workspace = true }
+move-core-types = { workspace = true }
 petgraph = { workspace = true }
 proptest = { workspace = true }
 

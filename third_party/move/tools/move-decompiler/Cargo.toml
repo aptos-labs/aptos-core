@@ -11,11 +11,10 @@ edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
+bcs = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 codespan = { workspace = true }
 codespan-reporting = { workspace = true, features = ["serde", "serialization"] }
-
-bcs = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-source-map = { workspace = true }
 move-bytecode-verifier = { workspace = true }
