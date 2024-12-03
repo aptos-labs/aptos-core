@@ -846,6 +846,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_consensus_config.order_vote_enabled(),
             self.pending_blocks.clone(),
             maybe_pipeline_builder,
+            self.consensus_publisher.clone(),
         ));
 
         let failures_tracker = Arc::new(Mutex::new(ExponentialWindowFailureTracker::new(

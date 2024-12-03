@@ -45,7 +45,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::{select, sync::oneshot, task::AbortHandle};
+use tokio::{join, select, sync::oneshot, task::AbortHandle};
 
 /// The pipeline builder is responsible for constructing the pipeline structure for a block.
 /// Each phase is represented as a shared future, takes in other futures as pre-condition.
@@ -95,7 +95,7 @@ fn spawn_ready_fut<T: Send + Clone + 'static>(f: T) -> TaskFuture<T> {
 
 async fn wait_and_log_error<T, F: Future<Output = TaskResult<T>>>(f: F, msg: String) {
     if let Err(TaskError::InternalError(e)) = f.await {
-        warn!("{} failed: {}", msg, e);
+        warn!("[Pipeline] error {} failed: {}", msg, e);
     }
 }
 
@@ -168,8 +168,8 @@ impl PipelineBuilder {
     fn channel() -> (PipelineInputTx, PipelineInputRx) {
         let (rand_tx, rand_rx) = oneshot::channel();
         let (order_vote_tx, order_vote_rx) = oneshot::channel();
-        let (order_proof_tx, order_proof_rx) = tokio::sync::broadcast::channel(1);
-        let (commit_proof_tx, commit_proof_rx) = tokio::sync::broadcast::channel(1);
+        let (order_proof_tx, order_proof_rx) = tokio::sync::broadcast::channel(100);
+        let (commit_proof_tx, commit_proof_rx) = tokio::sync::broadcast::channel(100);
         (
             PipelineInputTx {
                 rand_tx: Some(rand_tx),
@@ -253,7 +253,11 @@ impl PipelineBuilder {
         let mut abort_handles = vec![];
 
         let prepare_fut = spawn_shared_fut(
-            Self::prepare(self.block_preparer.clone(), block.clone()),
+            Self::prepare(
+                parent.prepare_fut.clone(),
+                self.block_preparer.clone(),
+                block.clone(),
+            ),
             &mut abort_handles,
         );
         let execute_fut = spawn_shared_fut(
@@ -362,19 +366,25 @@ impl PipelineBuilder {
 
     /// Precondition: Block is inserted into block tree (all ancestors are available)
     /// What it does: Wait for all data becomes available and verify transaction signatures
-    async fn prepare(preparer: Arc<BlockPreparer>, block: Arc<Block>) -> TaskResult<PrepareResult> {
+    async fn prepare(
+        parent_prepare: TaskFuture<PrepareResult>,
+        preparer: Arc<BlockPreparer>,
+        block: Arc<Block>,
+    ) -> TaskResult<PrepareResult> {
+        parent_prepare.await?;
+
         let _tracker = Tracker::new("prepare", &block);
         // the loop can only be abort by the caller
         let input_txns = loop {
             match preparer.prepare_block(&block).await {
                 Ok(input_txns) => break input_txns,
                 Err(e) => {
-                    warn!(
-                        "[BlockPreparer] failed to prepare block {}, retrying: {}",
-                        block.id(),
-                        e
-                    );
-                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    // warn!(
+                    //     "[BlockPreparer] failed to prepare block {}, retrying: {}",
+                    //     block.id(),
+                    //     e
+                    // );
+                    tokio::time::sleep(Duration::from_millis(5)).await;
                 },
             }
         };
@@ -621,8 +631,8 @@ impl PipelineBuilder {
         payload_manager: Arc<dyn TPayloadManager>,
         block: Arc<Block>,
     ) -> TaskResult<PostPreCommitResult> {
-        let compute_result = pre_commit.await?;
-        parent_post_pre_commit.await?;
+        let (pre_commit_result, _) = join!(pre_commit, parent_post_pre_commit);
+        let compute_result = pre_commit_result?;
 
         let _tracker = Tracker::new("post_pre_commit", &block);
         let payload = block.payload().cloned();
@@ -709,7 +719,7 @@ impl PipelineBuilder {
             post_ledger_update_fut: _,
             commit_vote_fut: _,
             pre_commit_fut,
-            post_pre_commit_fut: _,
+            post_pre_commit_fut,
             commit_ledger_fut,
             post_commit_fut: _,
         } = all_futs;
@@ -723,6 +733,11 @@ impl PipelineBuilder {
         wait_and_log_error(
             pre_commit_fut,
             format!("{epoch} {round} {block_id} pre commit"),
+        )
+        .await;
+        wait_and_log_error(
+            post_pre_commit_fut,
+            format!("{epoch} {round} {block_id} post pre commit"),
         )
         .await;
         wait_and_log_error(
