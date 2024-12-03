@@ -17,8 +17,8 @@ use std::{
 };
 
 const UNSTABLE_MARKER: &str = "-unstable";
-pub const LATEST_STABLE_LANGUAGE_VERSION: &str = "2.1";
-pub const LATEST_STABLE_COMPILER_VERSION: &str = "2.0";
+pub const LATEST_STABLE_LANGUAGE_VERSION: LanguageVersion = LanguageVersion::V2_1;
+pub const LATEST_STABLE_COMPILER_VERSION: CompilerVersion = CompilerVersion::V2_0;
 
 pub static COMPILATION_METADATA_KEY: &[u8] = "compilation_metadata".as_bytes();
 
@@ -153,8 +153,8 @@ impl CompilerVersion {
     }
 
     /// The latest stable compiler version.
-    pub fn latest_stable() -> Self {
-        CompilerVersion::from_str(LATEST_STABLE_COMPILER_VERSION).expect("valid version")
+    pub const fn latest_stable() -> Self {
+        LATEST_STABLE_COMPILER_VERSION
     }
 
     /// Check whether the compiler version supports the given language version,
@@ -271,8 +271,8 @@ impl LanguageVersion {
     }
 
     /// The latest stable language version.
-    pub fn latest_stable() -> Self {
-        LanguageVersion::from_str(LATEST_STABLE_LANGUAGE_VERSION).expect("valid version")
+    pub const fn latest_stable() -> Self {
+        LATEST_STABLE_LANGUAGE_VERSION
     }
 
     /// Whether the language version is equal to greater than `ver`
