@@ -73,38 +73,6 @@ spec aptos_framework::native_bridge {
     //             global<BridgeEvents>(@aptos_framework).bridge_transfer_completed_events.counter
     //         ) + 1;
     // }
-
-    spec complete_bridge_transfer_v2 {
-        pragma aborts_if_is_partial = true;
-
-        // req 0 : Ensure the bridge configuration exists
-        aborts_if !exists<native_bridge_configuration::BridgeConfig>(@aptos_framework);
-        // req 1: Ensure the caller is the relayer
-        aborts_if global<native_bridge_configuration::BridgeConfig>(@aptos_framework).bridge_relayer
-            != signer::address_of(caller);
-        // req 2: Ensure the bridge transfer ID is not already associated with an incoming nonce
-        aborts_if smart_table::spec_contains(borrow_global<TransferStatuses>(@aptos_framework).inner, nonce);
-        // req 3: Ensure the native bridge is enabled
-        // Todo: fix std::features that has ATOMIC_BRIDGE flag
-        aborts_if !features::spec_is_enabled(features::NATIVE_BRIDGE);
-        // req 4: Ensutre we have a mintable coin
-        aborts_if !exists<native_bridge_core::AptosCoinMintCapability>(@aptos_framework);
-        // req 5: if insufficient balance in the bridge
-        // let account_addr = signer::address_of(caller); // shopuld be relayer heer
-        // let coin_store = global<native_bridge_core::AptosCoinMintCapability>(account_addr);
-        // let balance = coin_store.coin.value;
-        // let bal == global<CoinStore<CoinType>>(@aptos_framework).coin.value;
-        // let balance_post = global<Balance<native_bridge_core::AptosCoinMintCapability>>(@aptos_framework).coin.value;
-        // aborts_if [abstract] balance_of<native_bridge_core::AptosCoinMintCapability>(@aptos_framework) < amount;
-        // aborts_if global<native_bridge_core::AptosCoinMintCapability>(@aptos_framework).balance(
-        //     signer::address_of(caller)
-        // ) < amount;
-
-        // req 6: recipient has received the coins 
-        // ensures coin::balance<native_bridge_core::AptosCoinMintCapability>(recipient) == old(
-        //     coin::balance<native_bridge_core::AptosCoinMintCapability>(recipient)
-        // ) + amount;
-    }
 }
 
 spec aptos_framework::native_bridge_core {
