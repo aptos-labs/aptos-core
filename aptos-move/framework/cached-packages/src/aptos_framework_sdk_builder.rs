@@ -714,7 +714,7 @@ pub enum EntryFunctionCall {
         approved: bool,
     },
 
-    /// Completes a bridge transfer by the initiator.
+    /// Completes a bridge transfer on the destination chain.
 
     /// @param caller The signer representing the bridge relayer.  
     /// @param initiator The initiator's Ethereum address as a vector of bytes.  
@@ -3698,7 +3698,7 @@ pub fn multisig_account_vote_transanction(
     ))
 }
 
-/// Completes a bridge transfer by the initiator.
+/// Completes a bridge transfer on the destination chain.
 ///
 /// @param caller The signer representing the bridge relayer.  
 /// @param initiator The initiator's Ethereum address as a vector of bytes.  

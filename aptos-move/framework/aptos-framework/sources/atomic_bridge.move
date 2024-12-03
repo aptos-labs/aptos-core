@@ -34,6 +34,14 @@ module aptos_framework::ethereum {
         EthereumAddress { inner: ethereum_address }
     }
 
+    /// Gets the inner vector of an `EthereumAddress`.
+    ///
+    /// @param ethereum_address A 40-byte vector of unsigned 8-bit integers (hexadecimal format).
+    /// @return The vector<u8> inner value of the EthereumAddress
+    public fun get_inner_ethereum_address(ethereum_address: EthereumAddress): vector<u8> {
+        ethereum_address.inner
+    }
+
     /// Converts uppercase ASCII characters in a vector to their lowercase equivalents.
     ///
     /// @param input A reference to a vector of ASCII characters.
