@@ -82,10 +82,19 @@ impl ProposalMsg {
 
     pub fn verify(
         &self,
+        sender: Author,
         validator: &ValidatorVerifier,
         proof_cache: &ProofCache,
         quorum_store_enabled: bool,
     ) -> Result<()> {
+        if let Some(proposal_author) = self.proposal.author() {
+            ensure!(
+                proposal_author == sender,
+                "Proposal author {:?} doesn't match sender {:?}",
+                proposal_author,
+                sender
+            );
+        }
         self.proposal().payload().map_or(Ok(()), |p| {
             p.verify(validator, proof_cache, quorum_store_enabled)
         })?;
