@@ -229,6 +229,7 @@ impl BatchStore {
                     .expect("Storage limit exceeded upon BatchReader construction");
             }
         }
+
         info!(
             "QS: Batch store bootstrap expired keys len {}",
             expired_keys.len()

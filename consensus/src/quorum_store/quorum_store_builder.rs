@@ -5,6 +5,7 @@ use super::quorum_store_db::QuorumStoreStorage;
 use crate::{
     consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
     error::error_kind,
+    monitor,
     network::{IncomingBatchRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
     payload_manager::{DirectMempoolPayloadManager, QuorumStorePayloadManager, TPayloadManager},
@@ -436,7 +437,7 @@ impl InnerBuilder {
         Arc<dyn TPayloadManager>,
         Option<aptos_channel::Sender<AccountAddress, (Author, VerifiedEvent)>>,
     ) {
-        let batch_reader = self.create_batch_store();
+        let batch_reader = monitor!("qs_create_batch_store", self.create_batch_store());
 
         (
             Arc::from(QuorumStorePayloadManager::new(
