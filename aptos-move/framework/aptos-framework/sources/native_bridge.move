@@ -54,10 +54,6 @@ module aptos_framework::native_bridge {
         value: u64
     }
 
-    struct TransferStatuses has key, store {
-        inner: smart_table::SmartTable<u64, bool>
-    }
-
     /// Increment and get the current nonce  
     fun increment_and_get_nonce(): u64 acquires Nonce {  
         let nonce_ref = borrow_global_mut<Nonce>(@aptos_framework);  
