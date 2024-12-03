@@ -296,7 +296,7 @@ async fn download_aptos_packages(path: &Path) -> anyhow::Result<()> {
     let git_url = "https://github.com/aptos-labs/aptos-core";
     let tmp_dir = TempDir::new()?;
     Command::new("git")
-        .args(["clone", git_url, tmp_dir.path().to_str().unwrap()])
+        .args(["clone", "--branch", "igor/use_native_vector_move_range", git_url, tmp_dir.path().to_str().unwrap(), "--depth", "1"])
         .output()
         .map_err(|_| anyhow::anyhow!("Failed to clone Git repository"))?;
     let source_framework_path = PathBuf::from(tmp_dir.path()).join("aptos-move/framework");
