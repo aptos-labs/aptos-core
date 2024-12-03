@@ -3,17 +3,17 @@
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 const FAUCET_URL: &str = "http://localhost:8081";
 const REST_URL: &str = "http://localhost:8080";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AccountManager {
-    pub accounts: Vec<Account>,
+    pub accounts: HashMap<String, Account>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Account {
     pub public_key: String,
     pub private_key: String,
@@ -66,15 +66,17 @@ impl AccountManager {
             ))?;
         let account_manager: AccountManager = serde_yaml::from_str(&file)
             .context("[Account Manager] Failed to parse account list file")?;
+
         Ok(account_manager)
     }
 
-    pub fn allocate_account(&mut self) -> anyhow::Result<Account> {
-        match self.accounts.pop() {
-            Some(account) => Ok(account),
-            None => {
-                anyhow::bail!("[Account Manager] No more account to allocate; please add more.")
-            },
+    pub fn get_account(&mut self, account_address: &str) -> anyhow::Result<Account> {
+        match self.accounts.get(account_address) {
+            Some(account) => Ok(account.clone()),
+            None => anyhow::bail!(
+                "[Account Manager] Account not found for address: {}",
+                account_address
+            ),
         }
     }
 }
