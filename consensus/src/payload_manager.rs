@@ -128,7 +128,7 @@ impl QuorumStorePayloadManager {
     }
 
     fn request_transactions(
-        batches: Vec<(BatchInfo, Vec<PeerId>)>,
+        batches: Vec<(BatchInfo, Arc<Mutex<Vec<PeerId>>>)>,
         block_timestamp: u64,
         batch_reader: Arc<dyn BatchReader>,
     ) -> Vec<(
@@ -148,7 +148,7 @@ impl QuorumStorePayloadManager {
                     batch_reader.get_batch(
                         *batch_info.digest(),
                         batch_info.expiration(),
-                        responders,
+                        responders.clone(),
                     ),
                 ));
             } else {
@@ -228,7 +228,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                         .map(|proof| {
                             (
                                 proof.info().clone(),
-                                proof.shuffled_signers(&self.ordered_authors),
+                                Arc::new(Mutex::new(proof.shuffled_signers(&self.ordered_authors))),
                             )
                         })
                         .collect(),
@@ -252,20 +252,25 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 return;
             }
 
-            let batches_and_responders = data_pointer
+            let (batches_and_responders, responders) = data_pointer
                 .batch_summary
                 .iter()
                 .map(|proof| {
                     let signers = proof.signers(ordered_authors);
+                    let responders = Arc::new(Mutex::new(signers));
                     // TODO(ibalajiarun): Add block author to signers
-                    (proof.info().clone(), signers)
+                    ((proof.info().clone(), responders.clone()), responders)
                 })
-                .collect();
+                .unzip();
             let fut =
                 request_txns_from_quorum_store(batches_and_responders, timestamp, batch_reader)
                     .boxed()
                     .shared();
-            *data_fut = Some(DataFetchFut { fut, iteration: 0 })
+            *data_fut = Some(DataFetchFut {
+                fut,
+                iteration: 0,
+                responders,
+            })
         }
 
         match payload {
@@ -554,7 +559,7 @@ async fn get_transactions_for_observer(
 }
 
 async fn request_txns_from_quorum_store(
-    batches_and_responders: Vec<(BatchInfo, Vec<PeerId>)>,
+    batches_and_responders: Vec<(BatchInfo, Arc<Mutex<Vec<PeerId>>>)>,
     timestamp: u64,
     batch_reader: Arc<dyn BatchReader>,
 ) -> ExecutorResult<Vec<SignedTransaction>> {
@@ -593,15 +598,41 @@ async fn process_payload_helper<T: TDataInfo>(
     ordered_authors: &[PeerId],
     additional_peers_to_request: Option<&BitVec>,
 ) -> ExecutorResult<Vec<SignedTransaction>> {
-    let (iteration, fut) = {
+    let (iteration, fut, existing_responders) = {
         let data_fut_guard = data_ptr.data_fut.lock();
         let data_fut = data_fut_guard.as_ref().expect("must be initialized");
-        (data_fut.iteration, data_fut.fut.clone())
+        (
+            data_fut.iteration,
+            data_fut.fut.clone(),
+            data_fut.responders.clone(),
+        )
     };
 
-    // TODO(ibalajiarun): provide a way to update requesting peers instead of waiting for
-    // current request to complete and re-schedule another one.
-    let result = fut.await;
+    let mut signers = Vec::new();
+    if let Some(peers) = additional_peers_to_request {
+        for i in peers.iter_ones() {
+            if let Some(author) = ordered_authors.get(i) {
+                signers.push(*author);
+            }
+        }
+    }
+
+    let result = {
+        // If the future is completed then use the result.
+        if let Some(result) = fut.clone().now_or_never() {
+            result
+        } else {
+            // Otherwise, append the additional peers to existing responders list
+            // NB: this might append the same signers multiple times, but this
+            // should be very rare and has no negative effects.
+            for responders in existing_responders {
+                responders.lock().append(&mut signers.clone());
+            }
+
+            fut.await
+        }
+    };
+
     // If error, reschedule before returning the result
     if result.is_err() {
         let mut data_fut_guard = data_ptr.data_fut.lock();
@@ -612,18 +643,13 @@ async fn process_payload_helper<T: TDataInfo>(
                 .batch_summary
                 .iter()
                 .map(|proof| {
-                    let mut signers = proof.signers(ordered_authors);
+                    let mut signers = signers.clone();
+                    signers.append(&mut proof.signers(ordered_authors));
                     if let Some(author) = block.author() {
                         signers.push(author);
                     }
-                    if let Some(peers) = additional_peers_to_request {
-                        for i in peers.iter_ones() {
-                            if let Some(author) = ordered_authors.get(i) {
-                                signers.push(*author);
-                            }
-                        }
-                    }
-                    (proof.info().clone(), signers)
+
+                    (proof.info().clone(), Arc::new(Mutex::new(signers)))
                 })
                 .collect();
             data_fut.fut = request_txns_from_quorum_store(
@@ -682,7 +708,9 @@ async fn process_payload(
                                 .map(|proof| {
                                     (
                                         proof.info().clone(),
-                                        proof.shuffled_signers(ordered_authors),
+                                        Arc::new(Mutex::new(
+                                            proof.shuffled_signers(ordered_authors),
+                                        )),
                                     )
                                 })
                                 .collect(),
@@ -707,7 +735,9 @@ async fn process_payload(
                                 .map(|proof| {
                                     (
                                         proof.info().clone(),
-                                        proof.shuffled_signers(ordered_authors),
+                                        Arc::new(Mutex::new(
+                                            proof.shuffled_signers(ordered_authors),
+                                        )),
                                     )
                                 })
                                 .collect(),

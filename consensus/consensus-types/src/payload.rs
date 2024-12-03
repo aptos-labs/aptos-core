@@ -33,6 +33,7 @@ pub trait TDataInfo {
 
 pub struct DataFetchFut {
     pub iteration: u32,
+    pub responders: Vec<Arc<Mutex<Vec<PeerId>>>>,
     pub fut: Shared<BoxFuture<'static, ExecutorResult<Vec<SignedTransaction>>>>,
 }
 
