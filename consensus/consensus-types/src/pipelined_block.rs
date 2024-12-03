@@ -60,6 +60,16 @@ impl Display for TaskError {
     }
 }
 
+pub struct NotificationGuard {
+    pub callback: Mutex<Option<Box<dyn FnOnce() -> () + Send + Sync>>>,
+}
+
+impl Drop for NotificationGuard {
+    fn drop(&mut self) {
+        self.callback.lock().take().map(|c| c());
+    }
+}
+
 impl From<Error> for TaskError {
     fn from(value: Error) -> Self {
         Self::InternalError(Arc::new(value))
@@ -74,9 +84,8 @@ pub type LedgerUpdateResult = (StateComputeResult, Duration, Option<u64>);
 pub type PostLedgerUpdateResult = ();
 pub type CommitVoteResult = CommitVote;
 pub type PreCommitResult = StateComputeResult;
-pub type PostPreCommitResult = ();
 pub type CommitLedgerResult = Option<LedgerInfoWithSignatures>;
-pub type PostCommitResult = ();
+pub type PostCommitResult = Vec<Arc<NotificationGuard>>;
 
 #[derive(Clone)]
 pub struct PipelineFutures {
@@ -86,7 +95,6 @@ pub struct PipelineFutures {
     pub post_ledger_update_fut: TaskFuture<PostLedgerUpdateResult>,
     pub commit_vote_fut: TaskFuture<CommitVoteResult>,
     pub pre_commit_fut: TaskFuture<PreCommitResult>,
-    pub post_pre_commit_fut: TaskFuture<PostPreCommitResult>,
     pub commit_ledger_fut: TaskFuture<CommitLedgerResult>,
     pub post_commit_fut: TaskFuture<PostCommitResult>,
 }

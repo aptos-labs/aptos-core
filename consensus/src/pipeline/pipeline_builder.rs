@@ -19,14 +19,15 @@ use aptos_consensus_types::{
     common::Round,
     pipeline::commit_vote::CommitVote,
     pipelined_block::{
-        CommitLedgerResult, CommitVoteResult, ExecuteResult, LedgerUpdateResult, PipelineFutures,
-        PipelineInputRx, PipelineInputTx, PipelinedBlock, PostCommitResult, PostLedgerUpdateResult,
-        PostPreCommitResult, PreCommitResult, PrepareResult, TaskError, TaskFuture, TaskResult,
+        CommitLedgerResult, CommitVoteResult, ExecuteResult, LedgerUpdateResult, NotificationGuard,
+        PipelineFutures, PipelineInputRx, PipelineInputTx, PipelinedBlock, PostCommitResult,
+        PostLedgerUpdateResult, PreCommitResult, PrepareResult, TaskError, TaskFuture, TaskResult,
     },
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
+use aptos_infallible::Mutex;
 use aptos_logger::{error, info, warn};
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain,
@@ -38,7 +39,7 @@ use aptos_types::{
     },
     validator_signer::ValidatorSigner,
 };
-use futures::FutureExt;
+use futures::{executor::block_on, FutureExt};
 use move_core_types::account_address::AccountAddress;
 use rayon::prelude::*;
 use std::{
@@ -46,7 +47,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::{join, select, sync::oneshot, task::AbortHandle};
+use tokio::{select, sync::oneshot, task::AbortHandle};
 
 /// The pipeline builder is responsible for constructing the pipeline structure for a block.
 /// Each phase is represented as a shared future, takes in other futures as pre-condition.
@@ -249,8 +250,7 @@ impl PipelineBuilder {
         let pre_commit_fut = spawn_ready_fut(compute_result);
         let commit_ledger_fut = spawn_ready_fut(Some(commit_proof));
         let post_ledger_update_fut = spawn_ready_fut(());
-        let post_pre_commit_fut = spawn_ready_fut(());
-        let post_commit_fut = spawn_ready_fut(());
+        let post_commit_fut = spawn_ready_fut(vec![]);
         PipelineFutures {
             prepare_fut,
             execute_fut,
@@ -258,7 +258,6 @@ impl PipelineBuilder {
             post_ledger_update_fut,
             commit_vote_fut,
             pre_commit_fut,
-            post_pre_commit_fut,
             commit_ledger_fut,
             post_commit_fut,
         }
@@ -367,23 +366,14 @@ impl PipelineBuilder {
             ),
             &mut abort_handles,
         );
-        let post_pre_commit_fut = spawn_shared_fut(
-            Self::post_pre_commit(
-                pre_commit_fut.clone(),
-                parent.post_pre_commit_fut.clone(),
-                self.state_sync_notifier.clone(),
-                block.clone(),
-            ),
-            &mut abort_handles,
-        );
         let post_commit_fut = spawn_shared_fut(
             Self::post_commit_ledger(
                 pre_commit_fut.clone(),
                 commit_ledger_fut.clone(),
-                post_pre_commit_fut.clone(),
                 parent.post_commit_fut.clone(),
                 self.payload_manager.clone(),
                 block_store_callback,
+                self.state_sync_notifier.clone(),
                 block.clone(),
             ),
             &mut abort_handles,
@@ -395,7 +385,6 @@ impl PipelineBuilder {
             post_ledger_update_fut,
             commit_vote_fut,
             pre_commit_fut,
-            post_pre_commit_fut,
             commit_ledger_fut,
             post_commit_fut,
         };
@@ -419,7 +408,6 @@ impl PipelineBuilder {
         tracker.start();
         parent_prepare.await?;
 
-        let _tracker = Tracker::new("prepare", &block);
         // the loop can only be abort by the caller
         let input_txns = loop {
             match preparer.prepare_block(&block).await {
@@ -667,34 +655,6 @@ impl PipelineBuilder {
         Ok(compute_result)
     }
 
-    /// Precondition: 1. pre-commit finishes, 2. parent block's phase finishes
-    /// What it does: Notify state synchronizer and payload manager about committed transactions
-    /// This is off critical path
-    async fn post_pre_commit(
-        pre_commit: TaskFuture<PreCommitResult>,
-        parent_post_pre_commit: TaskFuture<PostCommitResult>,
-        state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
-        block: Arc<Block>,
-    ) -> TaskResult<PostPreCommitResult> {
-        let mut tracker = Tracker::new("post_pre_commit", &block);
-        let compute_result = pre_commit.await?;
-        parent_post_pre_commit.await?;
-
-        tracker.start();
-        let txns = compute_result.transactions_to_commit().to_vec();
-        let subscribable_events = compute_result.subscribable_events().to_vec();
-        if let Err(e) = monitor!(
-            "notify_state_sync",
-            state_sync_notifier
-                .notify_new_commit(txns, subscribable_events)
-                .await
-        ) {
-            error!(error = ?e, "Failed to notify state synchronizer");
-        }
-
-        Ok(())
-    }
-
     /// Precondition: 1. pre-commit finishes, 2. parent block's phase finishes 3. commit proof is available
     /// What it does: Commit the ledger info to storage, this makes the data visible for clients
     async fn commit_ledger(
@@ -731,31 +691,49 @@ impl PipelineBuilder {
     async fn post_commit_ledger(
         pre_commit_fut: TaskFuture<PreCommitResult>,
         commit_ledger_fut: TaskFuture<CommitLedgerResult>,
-        post_pre_commit_fut: TaskFuture<PostPreCommitResult>,
         parent_post_commit: TaskFuture<PostCommitResult>,
         payload_manager: Arc<dyn TPayloadManager>,
         block_store_callback: Box<dyn FnOnce(LedgerInfoWithSignatures) + Send + Sync>,
+        state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         block: Arc<Block>,
     ) -> TaskResult<PostCommitResult> {
         let mut tracker = Tracker::new("post_commit_ledger", &block);
-        parent_post_commit.await?;
+        let mut previous_post_commit = parent_post_commit.await?;
         let maybe_ledger_info_with_sigs = commit_ledger_fut.await?;
         let compute_result = pre_commit_fut.await?;
-        post_pre_commit_fut.await?;
-
         tracker.start();
-        update_counters_for_block(&block);
-        update_counters_for_compute_result(&compute_result);
 
-        let payload = block.payload().cloned();
-        let timestamp = block.timestamp_usecs();
-        let payload_vec = payload.into_iter().collect();
-        payload_manager.notify_commit(timestamp, payload_vec);
-
-        if let Some(ledger_info_with_sigs) = maybe_ledger_info_with_sigs {
-            block_store_callback(ledger_info_with_sigs);
+        let notification_closure = move || {
+            update_counters_for_block(&block);
+            update_counters_for_compute_result(&compute_result);
+            let payload = block.payload().cloned();
+            let txns = compute_result.transactions_to_commit().to_vec();
+            let subscribable_events = compute_result.subscribable_events().to_vec();
+            block_on(async move {
+                if let Err(e) = monitor!(
+                    "notify_state_sync",
+                    state_sync_notifier
+                        .notify_new_commit(txns, subscribable_events)
+                        .await
+                ) {
+                    error!(error = ?e, "Failed to notify state synchronizer");
+                }
+            });
+            let timestamp = block.timestamp_usecs();
+            let payload_vec = payload.into_iter().collect();
+            payload_manager.notify_commit(timestamp, payload_vec);
+        };
+        previous_post_commit.push(Arc::new(NotificationGuard {
+            callback: Mutex::new(Some(Box::new(notification_closure))),
+        }));
+        if let Some(maybe_ledger_info_with_sigs) = maybe_ledger_info_with_sigs {
+            for guard in previous_post_commit.drain(..) {
+                guard.callback.lock().take().map(|c| c());
+            }
+            block_store_callback(maybe_ledger_info_with_sigs.clone());
         }
-        Ok(())
+
+        Ok(previous_post_commit)
     }
 
     async fn monitor(epoch: u64, round: Round, block_id: HashValue, all_futs: PipelineFutures) {
@@ -766,7 +744,6 @@ impl PipelineBuilder {
             post_ledger_update_fut: _,
             commit_vote_fut: _,
             pre_commit_fut,
-            post_pre_commit_fut,
             commit_ledger_fut,
             post_commit_fut: _,
         } = all_futs;
@@ -780,11 +757,6 @@ impl PipelineBuilder {
         wait_and_log_error(
             pre_commit_fut,
             format!("{epoch} {round} {block_id} pre commit"),
-        )
-        .await;
-        wait_and_log_error(
-            post_pre_commit_fut,
-            format!("{epoch} {round} {block_id} post pre commit"),
         )
         .await;
         wait_and_log_error(
