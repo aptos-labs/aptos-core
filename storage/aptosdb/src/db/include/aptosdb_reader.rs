@@ -63,7 +63,7 @@ impl DbReader for AptosDB {
 
     fn get_pre_committed_version(&self) -> Result<Option<Version>> {
         gauged_api("get_pre_committed_version", || {
-            Ok(self.state_store.current_state().lock().current_version)
+            Ok(self.state_store.current_state().current_version)
         })
     }
 
@@ -641,7 +641,6 @@ impl DbReader for AptosDB {
             Ok(self
                 .state_store
                 .current_state()
-                .lock()
                 .base_version
             )
         })
