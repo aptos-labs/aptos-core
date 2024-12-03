@@ -845,25 +845,25 @@ impl StateStore {
                     .flat_map(|sharded_states| sharded_states.iter().flatten())
                     .map(|(key, _)| key)
                     .collect::<HashSet<_>>();
-                THREAD_MANAGER.get_high_pri_io_pool().scope(|s| {
-                    for key in key_set {
-                        let cache = state_cache_with_version.shard(key.get_shard_id());
-                        s.spawn(move |_| {
-                            let _timer = OTHER_TIMERS_SECONDS
-                                .with_label_values(&["put_stats_and_indices__get_state_value"])
-                                .start_timer();
-                            let version_and_value = self
-                                .state_db
-                                .get_state_value_with_version_by_version(key, base_version)
-                                .expect("Must succeed.");
-                            if let Some((version, value)) = version_and_value {
-                                cache.insert(key.clone(), (Some(version), Some(value)));
-                            } else {
-                                cache.insert(key.clone(), (Some(base_version), None));
-                            }
-                        });
-                    }
-                });
+                // THREAD_MANAGER.get_high_pri_io_pool().scope(|s| {
+                //     for key in key_set {
+                //         let cache = state_cache_with_version.shard(key.get_shard_id());
+                //         s.spawn(move |_| {
+                //             let _timer = OTHER_TIMERS_SECONDS
+                //                 .with_label_values(&["put_stats_and_indices__get_state_value"])
+                //                 .start_timer();
+                //             let version_and_value = self
+                //                 .state_db
+                //                 .get_state_value_with_version_by_version(key, base_version)
+                //                 .expect("Must succeed.");
+                //             if let Some((version, value)) = version_and_value {
+                //                 cache.insert(key.clone(), (Some(version), Some(value)));
+                //             } else {
+                //                 cache.insert(key.clone(), (Some(base_version), None));
+                //             }
+                //         });
+                //     }
+                // });
             }
         }
 
@@ -934,35 +934,35 @@ impl StateStore {
                         };
 
                         if let Some((old_version, old_value)) = old_version_and_value_opt {
-                            let old_version = old_version
-                                .context("Must have old version in cache.")
-                                .unwrap();
+                            // let old_version = old_version
+                            //     .context("Must have old version in cache.")
+                            //     .unwrap();
                             items_delta -= 1;
                             bytes_delta -= (key.size() + old_value.size()) as i64;
                             // stale index of the old value at its version.
-                            if enable_sharding {
-                                sharded_state_kv_batches[shard_id]
-                                    .put::<StaleStateValueIndexByKeyHashSchema>(
-                                        &StaleStateValueByKeyHashIndex {
-                                            stale_since_version: version,
-                                            version: old_version,
-                                            state_key_hash: key.hash(),
-                                        },
-                                        &(),
-                                    )
-                                    .unwrap();
-                            } else {
-                                sharded_state_kv_batches[shard_id]
-                                    .put::<StaleStateValueIndexSchema>(
-                                        &StaleStateValueIndex {
-                                            stale_since_version: version,
-                                            version: old_version,
-                                            state_key: key.clone(),
-                                        },
-                                        &(),
-                                    )
-                                    .unwrap();
-                            }
+                            // if enable_sharding {
+                            //     sharded_state_kv_batches[shard_id]
+                            //         .put::<StaleStateValueIndexByKeyHashSchema>(
+                            //             &StaleStateValueByKeyHashIndex {
+                            //                 stale_since_version: version,
+                            //                 version: old_version,
+                            //                 state_key_hash: key.hash(),
+                            //             },
+                            //             &(),
+                            //         )
+                            //         .unwrap();
+                            // } else {
+                            //     sharded_state_kv_batches[shard_id]
+                            //         .put::<StaleStateValueIndexSchema>(
+                            //             &StaleStateValueIndex {
+                            //                 stale_since_version: version,
+                            //                 version: old_version,
+                            //                 state_key: key.clone(),
+                            //             },
+                            //             &(),
+                            //         )
+                            //         .unwrap();
+                            // }
                         }
                     }
                     usage_delta.push((items_delta, bytes_delta));
