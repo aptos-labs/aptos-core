@@ -215,7 +215,7 @@ module aptos_framework::native_bridge {
         new_amount
     }
 
-    #[test(aptos_framework = @aptos_framework, sender = @0x726563697069656e740000000000000000000000000000000000000000000000)]
+    #[test(aptos_framework = @aptos_framework, relayer = @0xcafe, sender = @0x726563697069656e740000000000000000000000000000000000000000000000)]
     fun test_initiate_bridge_transfer_happy_path(
         sender: &signer,
         aptos_framework: &signer,
