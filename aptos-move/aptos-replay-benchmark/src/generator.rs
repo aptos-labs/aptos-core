@@ -87,13 +87,6 @@ impl BenchmarkGeneratorContext {
         end_version: Version,
         override_config: OverrideConfig,
     ) -> Self {
-        assert!(
-            begin_version <= end_version,
-            "Transaction versions are not a valid closed interval: [{}, {}].",
-            begin_version,
-            end_version,
-        );
-
         Self {
             debugger,
             begin_version,

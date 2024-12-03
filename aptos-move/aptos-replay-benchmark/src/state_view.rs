@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::state_store::{
-    errors::StateviewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
-    state_value::StateValue, StateView, TStateView,
+    state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    StateView, StateViewResult, TStateView,
 };
 use parking_lot::Mutex;
 use std::collections::HashMap;
@@ -16,11 +16,11 @@ pub(crate) struct ReadSet {
 impl TStateView for ReadSet {
     type Key = StateKey;
 
-    fn get_state_value(&self, state_key: &Self::Key) -> Result<Option<StateValue>, StateviewError> {
+    fn get_state_value(&self, state_key: &Self::Key) -> StateViewResult<Option<StateValue>> {
         Ok(self.data.get(state_key).cloned())
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
+    fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
         unreachable!("Should not be called when benchmarking")
     }
 }
@@ -50,7 +50,7 @@ impl<'s, S: StateView> ReadSetCapturingStateView<'s, S> {
 impl<'s, S: StateView> TStateView for ReadSetCapturingStateView<'s, S> {
     type Key = StateKey;
 
-    fn get_state_value(&self, state_key: &Self::Key) -> Result<Option<StateValue>, StateviewError> {
+    fn get_state_value(&self, state_key: &Self::Key) -> StateViewResult<Option<StateValue>> {
         // Check the read-set first.
         if let Some(state_value) = self.captured_reads.lock().get(state_key) {
             return Ok(Some(state_value.clone()));
@@ -76,7 +76,7 @@ impl<'s, S: StateView> TStateView for ReadSetCapturingStateView<'s, S> {
         Ok(maybe_state_value)
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
+    fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
         unreachable!("Should not be called when benchmarking")
     }
 }

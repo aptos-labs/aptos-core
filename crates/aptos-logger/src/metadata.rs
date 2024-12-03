@@ -3,8 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use serde::{Deserialize, Serialize};
-use std::fmt;
-use strum_macros::{EnumString, FromRepr};
+use strum_macros::{Display, EnumString, FromRepr};
 
 /// Associated metadata with every log to identify what kind of log and where it came from
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -76,6 +75,7 @@ impl Metadata {
     Deserialize,
     FromRepr,
     EnumString,
+    Display,
 )]
 #[serde(rename_all = "UPPERCASE")]
 pub enum Level {
@@ -83,38 +83,55 @@ pub enum Level {
     ///
     /// Designates very serious errors.
     #[strum(ascii_case_insensitive)]
+    #[strum(to_string = "ERROR")]
     Error = 0,
     /// The "warn" level.
     ///
     /// Designates hazardous situations.
     #[strum(ascii_case_insensitive)]
+    #[strum(to_string = "WARN")]
     Warn = 1,
     /// The "info" level.
     ///
     /// Designates useful information.
     #[strum(ascii_case_insensitive)]
+    #[strum(to_string = "INFO")]
     Info = 2,
     /// The "debug" level.
     ///
     /// Designates lower priority information.
     #[strum(ascii_case_insensitive)]
+    #[strum(to_string = "DEBUG")]
     Debug = 3,
     /// The "trace" level.
     ///
     /// Designates very low priority, often extremely verbose, information.
     #[strum(ascii_case_insensitive)]
+    #[strum(to_string = "TRACE")]
     Trace = 4,
 }
 
-impl fmt::Display for Level {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        let level_str = match self {
-            Level::Error => "ERROR",
-            Level::Warn => "WARN",
-            Level::Info => "INFO",
-            Level::Debug => "DEBUG",
-            Level::Trace => "TRACE",
-        };
-        fmt.pad(level_str)
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::str::FromStr;
+
+    #[test]
+    fn test_log_level_from_string() {
+        assert_eq!(Level::Error, Level::from_str("ERROR").unwrap());
+        assert_eq!(Level::Error, Level::from_str("Error").unwrap());
+        assert_eq!(Level::Error, Level::from_str("error").unwrap());
+
+        assert!(Level::from_str("ERR").is_err());
+        assert!(Level::from_str("err_or").is_err());
+    }
+
+    #[test]
+    fn test_log_level_to_string() {
+        assert_eq!(String::from("ERROR"), Level::Error.to_string());
+        assert_eq!(String::from("WARN"), Level::Warn.to_string());
+        assert_eq!(String::from("INFO"), Level::Info.to_string());
+        assert_eq!(String::from("DEBUG"), Level::Debug.to_string());
+        assert_eq!(String::from("TRACE"), Level::Trace.to_string());
     }
 }

@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_logger::warn;
 use aptos_types::{
     on_chain_config::{FeatureFlag, Features, OnChainConfig},
     state_store::{state_key::StateKey, state_value::StateValue, StateView},
@@ -15,13 +16,6 @@ pub struct OverrideConfig {
 
 impl OverrideConfig {
     pub fn new(enable_features: Vec<FeatureFlag>, disable_features: Vec<FeatureFlag>) -> Self {
-        assert!(
-            enable_features
-                .iter()
-                .all(|f| !disable_features.contains(f)),
-            "Enable and disable feature flags cannot overlap"
-        );
-
         Self {
             enable_features,
             disable_features,
@@ -39,13 +33,13 @@ impl OverrideConfig {
             config_override::<Features, _>(state_view, |features| {
                 for feature in &self.enable_features {
                     if features.is_enabled(*feature) {
-                        println!("[WARN] Feature {:?} is already enabled", feature)
+                        warn!("Feature {:?} is already enabled", feature);
                     }
                     features.enable(*feature);
                 }
                 for feature in &self.disable_features {
                     if !features.is_enabled(*feature) {
-                        println!("[WARN] Feature {:?} is already disabled", feature)
+                        warn!("Feature {:?} is already disabled", feature);
                     }
                     features.disable(*feature);
                 }

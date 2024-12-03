@@ -15,7 +15,10 @@ use aptos_types::{
 /// A workload to benchmark. Contains signature verified transactions, and metadata specifying the
 /// start and end versions of these transactions.
 pub(crate) struct Workload {
+    /// Stores a block of transactions for execution. Always has at least one transaction.
     txn_provider: DefaultTxnProvider<SignatureVerifiedTransaction>,
+    /// Stores metadata for the version range of a block. It is always set to
+    /// [TransactionSliceMetadata::Chunk].
     transaction_slice_metadata: TransactionSliceMetadata,
 }
 
@@ -44,22 +47,5 @@ impl Workload {
     /// Returns transaction metadata corresponding to [begin, end) versions of the workload.
     pub(crate) fn transaction_slice_metadata(&self) -> TransactionSliceMetadata {
         self.transaction_slice_metadata
-    }
-
-    /// Returns the first transaction version in the workload.
-    pub(crate) fn first_version(&self) -> Version {
-        match &self.transaction_slice_metadata {
-            TransactionSliceMetadata::Chunk { begin, .. } => *begin,
-            _ => unreachable!("Transaction slice metadata is always a chunk"),
-        }
-    }
-
-    /// Returns the last transaction version in the workload.
-    #[allow(dead_code)]
-    pub(crate) fn last_version(&self) -> Version {
-        match &self.transaction_slice_metadata {
-            TransactionSliceMetadata::Chunk { end, .. } => *end - 1,
-            _ => unreachable!("Transaction slice metadata is always a chunk"),
-        }
     }
 }

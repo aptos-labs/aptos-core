@@ -15,28 +15,9 @@ pub struct BenchmarkRunner {
 impl BenchmarkRunner {
     pub fn new(
         concurrency_levels: Vec<usize>,
-        num_repeats: Option<usize>,
+        num_repeats: usize,
         measure_block_time: bool,
     ) -> Self {
-        assert!(
-            !concurrency_levels.is_empty(),
-            "At least one concurrency level must be provided"
-        );
-
-        let default_num_repeats = 3;
-        let num_repeats = num_repeats.unwrap_or_else(|| {
-            println!(
-                "[WARN] Using default number of repeats: {}",
-                default_num_repeats
-            );
-            default_num_repeats
-        });
-        assert!(
-            num_repeats >= default_num_repeats,
-            "Number of times to repeat the benchmark should be at least the default value {}",
-            default_num_repeats
-        );
-
         Self {
             concurrency_levels,
             num_repeats,

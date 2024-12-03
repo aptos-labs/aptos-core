@@ -2781,6 +2781,8 @@ pub struct AptosVMBlockExecutor {
 }
 
 impl AptosVMBlockExecutor {
+    /// Executes transactions with the specified [BlockExecutorConfig] and returns output for each
+    /// one of them.
     pub fn execute_block_with_config(
         &self,
         txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,

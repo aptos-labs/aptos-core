@@ -22,9 +22,9 @@ aptos-rest-client = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }
-clap = { workspace = true }
 claims = { workspace = true }
-serde = { workspace = true }
+clap = { workspace = true }
 parking_lot = { workspace = true }
+serde = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
