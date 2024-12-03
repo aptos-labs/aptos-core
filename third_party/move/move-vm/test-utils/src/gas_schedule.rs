@@ -290,6 +290,7 @@ impl GasMeter for GasStatus {
         &mut self,
         is_generic: bool,
         args: impl ExactSizeIterator<Item = impl ValueView>,
+        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         let field_count = AbstractMemorySize::new(args.len() as u64);
         self.charge_instr_with_size(

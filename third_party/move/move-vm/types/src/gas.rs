@@ -205,16 +205,18 @@ pub trait GasMeter {
     fn charge_pack(
         &mut self,
         is_generic: bool,
-        args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+        interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()>;
 
     fn charge_pack_variant(
         &mut self,
         is_generic: bool,
-        args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+        interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         // Currently mapped to pack, can be specialized if needed
-        self.charge_pack(is_generic, args)
+        self.charge_pack(is_generic, args, interpreter_view)
     }
 
     fn charge_unpack(
@@ -436,7 +438,8 @@ impl GasMeter for UnmeteredGasMeter {
     fn charge_pack(
         &mut self,
         _is_generic: bool,
-        _args: impl ExactSizeIterator<Item = impl ValueView + Display>,
+        _args: impl ExactSizeIterator<Item = impl ValueView>,
+        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         Ok(())
     }

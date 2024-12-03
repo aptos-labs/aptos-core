@@ -202,7 +202,8 @@ where
         fn charge_pack(
             &mut self,
             is_generic: bool,
-            args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
+            args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+            interpreter_view: impl InterpreterView,
         ) -> PartialVMResult<()>;
 
         [UNPACK]

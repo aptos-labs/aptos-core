@@ -161,7 +161,7 @@ pub fn trace_transaction_using_debugger(
 
 
     let mut w = std::io::BufWriter::new(std::io::stdout());
-    execution_trace.simple_debug(&mut w);
+    execution_trace.debug_with_loc(&mut w);
 
     Ok((vm_status, vm_output))
 }

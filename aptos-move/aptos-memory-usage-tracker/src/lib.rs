@@ -302,7 +302,8 @@ where
     fn charge_pack(
         &mut self,
         is_generic: bool,
-        args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+        interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         self.use_heap_memory(args.clone().fold(AbstractValueSize::zero(), |acc, val| {
             acc + self
@@ -312,7 +313,7 @@ where
                 .abstract_stack_size(val, self.feature_version())
         }))?;
 
-        self.base.charge_pack(is_generic, args)
+        self.base.charge_pack(is_generic, args, interpreter_view)
     }
 
     #[inline]

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{fmt::Display, io::Write};
+use std::{env, fmt::Display, io::Write, path::Path};
 
 use crate::FrameName;
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
@@ -18,11 +18,21 @@ use move_vm_types::{
     values::Value,
     views::{TypeView, ValueView, ValueVisitor},
 };
-
+use move_package::{BuildConfig, ModelConfig};
+use move_model::model::GlobalEnv;
 #[derive(Debug)]
 pub struct ExecutionTrace<Value>(CallFrame<Value>);
 
 impl<Value: Display> ExecutionTrace<Value> {
+    pub fn debug_with_loc(&self, w: &mut impl Write) -> Result<(), std::io::Error> {
+        let path_str = env::var("PKG_PATH").expect("PKG_PATH must be set");
+        let path = Path::new(&path_str);
+        let build_config = BuildConfig::default();
+        let model = build_config.move_model_for_package(path, ModelConfig::default()).unwrap();
+
+        self.0.simple_debug1(w, 0, &model)
+    }
+
     pub fn simple_debug(&self, w: &mut impl Write) -> Result<(), std::io::Error> {
         self.0.simple_debug(w, 0)
     }
@@ -204,6 +214,31 @@ impl<Value: Display> CallFrame<Value> {
         }
         Ok(())
     }
+
+    pub fn simple_debug1(&self, w: &mut impl Write, depth: usize, env: &GlobalEnv) -> Result<(), std::io::Error> {
+        writeln!(w, "{}{}", " ".repeat(depth * 4), self.name)?;
+        for event in &self.events {
+            match event {
+                Event::Instruction(instr) => {
+                    write!(w, "{}", " ".repeat(depth * 4 + 2))?;
+                    if let FrameName::Function { module_id, name, ty_args } = &self.name {
+                        let fun_env = env.find_function_by_language_storage_id_name(module_id, name).unwrap();
+                        let loc = fun_env.get_bytecode_loc(instr.offset).unwrap();
+                        write!(w, "{}: ", loc.display_file_name_and_line(env))?;
+                    } else {
+                        write!(w, "{}: ", instr.offset)?;
+                    }
+                    write!(w, "{} ", instr.display_qualified_instr())?;
+                    for arg in &instr.args {
+                        write!(w, "{} ", arg)?;
+                    }
+                    writeln!(w)?;
+                },
+                Event::Call(frame) => frame.simple_debug1(w, depth + 1, env)?,
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -306,7 +341,6 @@ where
     }
 
     fn charge_pop(&mut self, popped_val: impl ValueView + Display) -> PartialVMResult<()> {
-        println!("charge_pop: {:?}", self.frames);
         self.emit_generic_instr_and_inc_pc(Opcodes::POP, vec![], [&popped_val].into_iter());
         self.base.charge_pop(popped_val)
     }
@@ -380,10 +414,11 @@ where
     fn charge_pack(
         &mut self,
         is_generic: bool,
-        args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+        interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.inc_pc();
-        self.base.charge_pack(is_generic, args)
+        self.emit_instr_and_inc_pc(Opcodes::PACK, interpreter_view.view_last_n_values(args.len()).unwrap());
+        self.base.charge_pack(is_generic, args, interpreter_view)
     }
 
     fn charge_unpack(

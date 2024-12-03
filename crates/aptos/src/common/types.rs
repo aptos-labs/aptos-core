@@ -1652,6 +1652,9 @@ pub struct TransactionOptions {
     /// execution traces.
     #[clap(long)]
     pub(crate) trace_txn: bool,
+
+    #[clap(long)]
+    pub(crate) package_path: Option<String>,
 }
 
 impl TransactionOptions {
@@ -2025,6 +2028,7 @@ impl TransactionOptions {
     pub async fn trace_transaction(
         &self,
         payload: TransactionPayload,
+        path: Option<String>,
     ) -> CliTypedResult<TransactionSummary> {
         self.simulate_using_debugger(payload, local_simulation::trace_transaction_using_debugger).await
     }

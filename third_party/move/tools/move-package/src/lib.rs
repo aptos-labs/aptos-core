@@ -174,7 +174,7 @@ pub struct CompilerConfig {
     pub experiments: Vec<String>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Default)]
 pub struct ModelConfig {
     /// If set, also files which are in dependent packages are considered as targets.
     pub all_files_as_targets: bool,

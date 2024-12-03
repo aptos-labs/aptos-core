@@ -2584,6 +2584,7 @@ impl Frame {
                         gas_meter.charge_pack(
                             false,
                             interpreter.operand_stack.last_n(field_count as usize)?,
+                            &*interpreter,
                         )?;
                         let args = interpreter.operand_stack.popn(field_count)?;
                         interpreter
@@ -2599,6 +2600,7 @@ impl Frame {
                             interpreter
                                 .operand_stack
                                 .last_n(info.field_count as usize)?,
+                            &*interpreter,
                         )?;
                         let args = interpreter.operand_stack.popn(info.field_count)?;
                         interpreter
@@ -2629,6 +2631,7 @@ impl Frame {
                         gas_meter.charge_pack(
                             true,
                             interpreter.operand_stack.last_n(field_count as usize)?,
+                            &*interpreter,
                         )?;
                         let args = interpreter.operand_stack.popn(field_count)?;
                         interpreter
@@ -2657,6 +2660,7 @@ impl Frame {
                             interpreter
                                 .operand_stack
                                 .last_n(info.field_count as usize)?,
+                            &*interpreter,
                         )?;
                         let args = interpreter.operand_stack.popn(info.field_count)?;
                         interpreter

@@ -1999,6 +1999,8 @@ dependencies = [
  "move-bytecode-source-map",
  "move-core-types",
  "move-ir-types",
+ "move-model",
+ "move-package",
  "move-vm-types",
  "regex",
  "serde_json",

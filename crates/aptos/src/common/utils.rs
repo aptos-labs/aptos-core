@@ -510,7 +510,7 @@ pub async fn profile_or_submit(
     if txn_options_ref.profile_gas {
         txn_options_ref.profile_gas(payload).await
     } else if txn_options_ref.trace_txn {
-        txn_options_ref.trace_transaction(payload).await
+        txn_options_ref.trace_transaction(payload, txn_options_ref.package_path.clone()).await
     } else if txn_options_ref.benchmark {
         txn_options_ref.benchmark_locally(payload).await
     } else if txn_options_ref.local {

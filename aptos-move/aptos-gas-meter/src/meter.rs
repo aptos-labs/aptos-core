@@ -263,6 +263,7 @@ where
         &mut self,
         is_generic: bool,
         args: impl ExactSizeIterator<Item = impl ValueView>,
+        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         let num_args = NumArgs::new(args.len() as u64);
 
