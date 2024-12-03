@@ -564,7 +564,7 @@ impl ConsensusObserver {
                 let mut tree = self.block_tree.lock();
                 tree.ordered_root = commit_decision.commit_proof().clone();
                 tree.committed_root = commit_decision.commit_proof().clone();
-                for (_, block) in &tree.blocks {
+                for (_, block) in tree.blocks.drain() {
                     block.abort_pipeline();
                 }
             }
@@ -745,8 +745,11 @@ impl ConsensusObserver {
         if tree.blocks.contains_key(&block.id()) {
             return;
         }
-        info!("[CO] Received block: {}", block);
 
+        if self.state_sync_manager.is_syncing_to_commit() {
+            return;
+        }
+        info!("[CO] Received block: {}", block);
         let parent_fut = if let Some(parent) = tree.blocks.get(&block.parent_id()) {
             let fut = parent.pipeline_futs().unwrap();
             Some(fut)
@@ -780,11 +783,8 @@ impl ConsensusObserver {
             });
             self.pipeline_builder().build(&block, parent_fut, callback);
             if let Some(tx) = block.pipeline_tx().lock().as_mut() {
-                // hack to block execution during sync
-                if !self.state_sync_manager.is_syncing_to_commit() {
-                    if let Some(tx) = tx.rand_tx.take() {
-                        let _ = tx.send(None);
-                    }
+                if let Some(tx) = tx.rand_tx.take() {
+                    let _ = tx.send(None);
                 }
             }
             info!("[CO] Inserted block: {}", block);
@@ -1099,18 +1099,7 @@ impl ConsensusObserver {
         }
 
         // rebuild the pipeline after root change
-        let mut tree = self.block_tree.lock();
-        let mut blocks: Vec<_> = tree
-            .blocks
-            .drain()
-            .map(|(_, block)| block)
-            .filter(|block| block.round() > latest_synced_ledger_info.commit_info().round())
-            .collect();
-        drop(tree);
-        blocks.sort_by(|a, b| a.round().cmp(&b.round()));
-        for b in blocks {
-            self.process_block(b.block().clone());
-        }
+        self.block_tree.lock().blocks.clear();
         for b in foo {
             self.process_block(b);
         }
