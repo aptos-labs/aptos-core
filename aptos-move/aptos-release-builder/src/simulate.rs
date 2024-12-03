@@ -36,9 +36,8 @@ use aptos_types::{
     account_config::ChainIdResource,
     on_chain_config::{ApprovedExecutionHashes, Features, GasScheduleV2, OnChainConfig},
     state_store::{
-        in_memory_state_view::InMemoryStateView, state_key::StateKey,
-        state_storage_usage::StateStorageUsage, state_value::StateValue,
-        Result as StateStoreResult, StateView, TStateView,
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        StateView, StateViewResult as StateStoreResult, TStateView,
     },
     transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
     write_set::{TransactionWrite, WriteSet},
@@ -305,10 +304,6 @@ where
 
     fn get_usage(&self) -> StateStoreResult<StateStorageUsage> {
         Ok(StateStorageUsage::Untracked)
-    }
-
-    fn as_in_memory_state_view(&self) -> InMemoryStateView {
-        panic!("not supported")
     }
 }
 
@@ -667,11 +662,18 @@ pub async fn simulate_multistep_proposal(
         };
         // TODO: ensure all scripts trigger reconfiguration.
 
+        println!(
+            "{}",
+            format!("Fee statement: {:#?}", vm_output.fee_statement())
+                .lines()
+                .map(|line| format!("        {}", line))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+
         let txn_output = vm_output
             .try_materialize_into_transaction_output(&resolver)
             .context("failed to materialize transaction output")?;
-
-        println!("        Gas used: {}", txn_output.gas_used());
 
         let txn_status = txn_output.status();
         match txn_status {

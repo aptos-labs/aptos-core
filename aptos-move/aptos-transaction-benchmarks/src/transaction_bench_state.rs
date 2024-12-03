@@ -35,7 +35,7 @@ use aptos_types::{
     vm_status::VMStatus,
 };
 use aptos_vm::{
-    block_executor::{AptosTransactionOutput, BlockAptosVM},
+    block_executor::{AptosTransactionOutput, AptosVMBlockExecutorWrapper},
     data_cache::AsMoveResolver,
     sharded_block_executor::{
         local_executor_shard::{LocalExecutorClient, LocalExecutorService},
@@ -217,7 +217,7 @@ where
     ) -> (Vec<TransactionOutput>, usize) {
         let block_size = txn_provider.num_txns();
         let timer = Instant::now();
-        let output = BlockAptosVM::execute_block::<
+        let output = AptosVMBlockExecutorWrapper::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
             DefaultTxnProvider<SignatureVerifiedTransaction>,
@@ -268,7 +268,7 @@ where
     ) -> (Vec<TransactionOutput>, usize) {
         let block_size = txn_provider.num_txns();
         let timer = Instant::now();
-        let output = BlockAptosVM::execute_block::<
+        let output = AptosVMBlockExecutorWrapper::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
             DefaultTxnProvider<SignatureVerifiedTransaction>,

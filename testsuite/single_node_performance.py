@@ -31,6 +31,8 @@ class Flow(Flag):
     AGG_V2 = auto()
     # Test resource groups
     RESOURCE_GROUPS = auto()
+    # Test different executor types
+    EXECUTORS = auto()
 
 
 # Tests that are run on LAND_BLOCKING and continuously on main
@@ -101,8 +103,10 @@ else:
 
 if os.environ.get("DISABLE_FA_APT"):
     FEATURE_FLAGS = ""
+    FA_MIGRATION_COMPLETE = False
 else:
     FEATURE_FLAGS = "--enable-feature NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE --enable-feature OPERATIONS_DEFAULT_TO_FA_APT_STORE"
+    FA_MIGRATION_COMPLETE = True
 
 if os.environ.get("ENABLE_PRUNER"):
     DB_PRUNER_FLAGS = "--enable-state-pruner --enable-ledger-pruner --enable-epoch-snapshot-pruner --ledger-pruning-batch-size 10000 --state-prune-window 3000000 --epoch-snapshot-prune-window 3000000 --ledger-prune-window 3000000"
@@ -128,7 +132,9 @@ class RunGroupKeyExtra:
     sig_verify_num_threads_override: Optional[int] = field(default=None)
     execution_num_threads_override: Optional[int] = field(default=None)
     split_stages_override: bool = field(default=False)
+    skip_commit_override: bool = field(default=False)
     single_block_dst_working_set: bool = field(default=False)
+    execution_sharding: bool = field(default=False)
 
 
 @dataclass
@@ -160,49 +166,9 @@ CALIBRATED_MAX_RATIO_INDEX = -2
 CALIBRATION_SEPARATOR = "	"
 
 # transaction_type	module_working_set_size	executor_type	count	min_ratio	max_ratio	median
-CALIBRATION = """
-no-op	1	VM	6	0.938	1.019	38925.3
-no-op	1000	VM	6	0.943	1.019	36444.6
-apt-fa-transfer	1	VM	6	0.927	1.018	26954.7
-account-generation	1	VM	6	0.96	1.02	20606.2
-account-resource32-b	1	VM	6	0.94	1.026	34260.4
-modify-global-resource	1	VM	6	0.993	1.021	2260.5
-modify-global-resource	100	VM	6	0.982	1.02	33129.7
-publish-package	1	VM	6	0.983	1.012	1672.6
-mix_publish_transfer	1	VM	6	0.972	1.044	20832.8
-batch100-transfer	1	VM	6	0.953	1.024	645.1
-vector-picture30k	1	VM	6	0.992	1.039	103.6
-vector-picture30k	100	VM	6	0.913	1.015	1831.5
-smart-table-picture30-k-with200-change	1	VM	6	0.976	1.034	16.1
-smart-table-picture30-k-with200-change	100	VM	6	0.985	1.018	212.9
-modify-global-resource-agg-v2	1	VM	6	0.976	1.035	33992.5
-modify-global-flag-agg-v2	1	VM	6	0.986	1.016	4224
-modify-global-bounded-agg-v2	1	VM	6	0.964	1.047	7661.6
-modify-global-milestone-agg-v2	1	VM	6	0.973	1.017	25187.1
-resource-groups-global-write-tag1-kb	1	VM	6	0.989	1.03	9215.7
-resource-groups-global-write-and-read-tag1-kb	1	VM	6	0.982	1.018	5538.3
-resource-groups-sender-write-tag1-kb	1	VM	6	0.985	1.059	20084.2
-resource-groups-sender-multi-change1-kb	1	VM	6	0.968	1.034	16400.4
-token-v1ft-mint-and-transfer	1	VM	6	0.987	1.022	1156.3
-token-v1ft-mint-and-transfer	100	VM	6	0.964	1.024	17842.6
-token-v1nft-mint-and-transfer-sequential	1	VM	6	0.984	1.017	735.7
-token-v1nft-mint-and-transfer-sequential	100	VM	6	0.966	1.017	12819.7
-coin-init-and-mint	1	VM	6	0.95	1.024	26906.4
-coin-init-and-mint	100	VM	6	0.985	1.022	22312.6
-fungible-asset-mint	1	VM	6	0.955	1.013	23001.6
-fungible-asset-mint	100	VM	6	0.955	1.015	19973.5
-no-op5-signers	1	VM	6	0.934	1.016	38708.6
-token-v2-ambassador-mint	1	VM	6	0.975	1.008	15179.3
-token-v2-ambassador-mint	100	VM	6	0.985	1.007	15150.8
-liquidity-pool-swap	1	VM	6	0.987	1.018	805.5
-liquidity-pool-swap	100	VM	6	0.993	1.02	11156.3
-liquidity-pool-swap-stable	1	VM	6	0.985	1.017	778.7
-liquidity-pool-swap-stable	100	VM	6	0.982	1.009	11056.6
-deserialize-u256	1	VM	6	0.968	1.026	36444.6
-no-op-fee-payer	1	VM	6	0.994	1.026	2046
-no-op-fee-payer	100	VM	6	0.96	1.014	32866.5
-simple-script	1	VM	6	0.941	1.012	38206.1
-"""
+with open('testsuite/single_node_performance_values.tsv', 'r') as file:
+    CALIBRATION = file.read()
+
 
 # when adding a new test, add estimated expected_tps to it, as well as waived=True.
 # And then after a day or two - add calibration result for it above, removing expected_tps/waived fields.
@@ -213,10 +179,9 @@ TESTS = [
     RunGroupConfig(key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("apt-fa-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),
-    # RunGroupConfig(key=RunGroupKey("apt-fa-transfer", executor_type="NativeSpeculative"), included_in=Flow.CONTINUOUS),
-
+    RunGroupConfig(key=RunGroupKey("apt-fa-transfer", executor_type="NativeVM"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),
-    # RunGroupConfig(key=RunGroupKey("account-generation", executor_type="NativeSpeculative"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("account-generation", executor_type="NativeVM"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("account-resource32-b"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(key=RunGroupKey("modify-global-resource"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(key=RunGroupKey("modify-global-resource", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.CONTINUOUS),
@@ -224,9 +189,9 @@ TESTS = [
     RunGroupConfig(key=RunGroupKey("mix_publish_transfer"), key_extra=RunGroupKeyExtra(
         transaction_type_override="publish-package apt-fa-transfer",
         transaction_weights_override="1 100",
-    ), included_in=LAND_BLOCKING_AND_C, waived=True),
+    ), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("batch100-transfer"), included_in=LAND_BLOCKING_AND_C),
-    # RunGroupConfig(key=RunGroupKey("batch100-transfer", executor_type="NativeSpeculative"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("batch100-transfer", executor_type="NativeVM"), included_in=Flow.CONTINUOUS),
 
     RunGroupConfig(expected_tps=100, key=RunGroupKey("vector-picture40"), included_in=Flow(0), waived=True),
     RunGroupConfig(expected_tps=1000, key=RunGroupKey("vector-picture40", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow(0), waived=True),
@@ -286,7 +251,7 @@ TESTS = [
     # fee payer sequentializes transactions today. in these tests module publisher is the fee payer, so larger number of modules tests throughput with multiple fee payers
     RunGroupConfig(key=RunGroupKey("no-op-fee-payer"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("no-op-fee-payer", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(key=RunGroupKey("simple-script"), included_in=LAND_BLOCKING_AND_C, waived=True),
+    RunGroupConfig(key=RunGroupKey("simple-script"), included_in=LAND_BLOCKING_AND_C),
 
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
@@ -298,8 +263,62 @@ TESTS = [
     RunGroupConfig(expected_tps=6800, key=RunGroupKey("token-v2-ambassador-mint"), included_in=Flow.MAINNET_LARGE_DB),
     # RunGroupConfig(expected_tps=17000 if NUM_ACCOUNTS < 5000000 else 28000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
     # RunGroupConfig(expected_tps=27000 if NUM_ACCOUNTS < 5000000 else 23000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
-
+] + [ 
+    # no-commit throughput of different executor, used on continuous flow
+    RunGroupConfig(
+        expected_tps=40000,
+        key=RunGroupKey(
+            "no_commit_{}{}".format(
+                transaction_type:="apt-fa-transfer" if FA_MIGRATION_COMPLETE else "coin-transfer", 
+                "_sharding" if executor_sharding else "",
+            ),
+            executor_type=executor_type
+        ), 
+        key_extra=RunGroupKeyExtra(
+            transaction_type_override=transaction_type,
+            sig_verify_num_threads_override=16,
+            skip_commit_override=True,
+            execution_sharding=executor_sharding,
+        ), 
+        included_in=Flow.CONTINUOUS, 
+        waived=True,
+    )
+    for executor_sharding, executor_types in [
+        (False, ["VM", "NativeVM", "AptosVMSpeculative", "NativeSpeculative"]),
+        # executor sharding doesn't support FA for now.
+        (True, [] if FA_MIGRATION_COMPLETE else ["VM", "NativeVM"])
+    ]
+    for executor_type in executor_types
+] + [
+    # sweep of all executors for the extensive EXECUTORS flow
+    RunGroupConfig(
+        expected_tps=10000 if sequential else 30000, 
+        key=RunGroupKey(
+            "{}_{}_by_stages".format(
+                transaction_type:="apt-fa-transfer" if FA_MIGRATION_COMPLETE else "coin-transfer", 
+                "sequential" if sequential else "parallel"
+            ), 
+            executor_type=executor_type
+        ), 
+        key_extra=RunGroupKeyExtra(
+            transaction_type_override=transaction_type,
+            sig_verify_num_threads_override=1 if sequential else NUMBER_OF_EXECUTION_THREADS,
+            execution_num_threads_override=1 if sequential else None,
+            split_stages_override=True,
+            single_block_dst_working_set=True,
+        ), 
+        included_in=Flow.EXECUTORS,
+        waived=True,
+    )
+    for sequential in [True, False]
+    for executor_sharding, executor_types in [
+        (False, ["VM", "NativeVM", "AptosVMSpeculative", "NativeSpeculative", "NativeValueCacheSpeculative", "NativeNoStorageSpeculative"]),
+        # executor sharding doesn't support FA for now.
+        (True, [] if FA_MIGRATION_COMPLETE else ["VM", "NativeVM"])
+    ]
+    for executor_type in executor_types
 ]
+
 # fmt: on
 
 # Run the single node with performance optimizations enabled
@@ -721,29 +740,36 @@ with tempfile.TemporaryDirectory() as tmpdirname:
 
         if test.key_extra.split_stages_override:
             pipeline_extra_args.append("--split-stages")
+        if test.key_extra.skip_commit_override:
+            pipeline_extra_args.append("--skip-commit")
 
-        sharding_traffic_flags = test.key_extra.sharding_traffic_flags or ""
+        pipeline_extra_args.append(
+            test.key_extra.sharding_traffic_flags or "--transactions-per-sender 1"
+        )
 
         if test.key.executor_type == "VM":
-            executor_type_str = "--block-executor-type aptos-vm-with-block-stm --transactions-per-sender 1"
-        # elif test.key.executor_type == "NativeVM":
-        #     executor_type_str = (
-        #         "--block-executor-type native-vm-with-block-stm --transactions-per-sender 1"
-        #     )
+            executor_type_str = "--block-executor-type aptos-vm-with-block-stm"
+        elif test.key.executor_type == "NativeVM":
+            executor_type_str = "--block-executor-type native-vm-with-block-stm"
+        elif test.key.executor_type == "AptosVMSpeculative":
+            executor_type_str = "--block-executor-type aptos-vm-parallel-uncoordinated"
         elif test.key.executor_type == "NativeSpeculative":
-            executor_type_str = "--block-executor-type native-loose-speculative --transactions-per-sender 1"
-        # elif test.key.executor_type == "NativeValueCacheSpeculative":
-        #     executor_type_str = (
-        #         "--block-executor-type native-value-cache-loose-speculative --transactions-per-sender 1"
-        #     )
-        # elif test.key.executor_type == "NativeNoStorageSpeculative":
-        #     executor_type_str = (
-        #         "--block-executor-type native-no-storage-loose-speculative --transactions-per-sender 1"
-        #     )
-        elif test.key.executor_type == "sharded":
-            executor_type_str = f"--num-executor-shards {number_of_execution_threads} {sharding_traffic_flags}"
+            executor_type_str = "--block-executor-type native-parallel-uncoordinated"
+        elif test.key.executor_type == "NativeValueCacheSpeculative":
+            executor_type_str = (
+                "--block-executor-type native-value-cache-parallel-uncoordinated"
+            )
+        elif test.key.executor_type == "NativeNoStorageSpeculative":
+            executor_type_str = (
+                "--block-executor-type native-no-storage-parallel-uncoordinated"
+            )
         else:
             raise Exception(f"executor type not supported {test.key.executor_type}")
+
+        if test.key_extra.execution_sharding:
+            pipeline_extra_args.append(
+                f"--num-executor-shards {number_of_execution_threads}"
+            )
 
         if NUM_BLOCKS < 200:
             pipeline_extra_args.append("--generate-then-execute")
@@ -998,16 +1024,24 @@ if errors:
         """If you expect your PR to change the performance, you need to recalibrate the values.
 To do so, you should run the test on your branch 6 times
 (https://github.com/aptos-labs/aptos-core/actions/workflows/workflow-run-execution-performance.yaml ; remember to select CONTINUOUS).
-Then go to Humio calibration link (https://gist.github.com/igor-aptos/7b12ca28de03894cddda8e415f37889e),
-update it to your branch, and export values as CSV, and then open and copy values inside
-testsuite/single_node_performance.py testsuite), and add Blockchain oncall as the reviewer.
+Then run the script locally `./testsuite/single_node_performance_calibration.py --branch=YOUR_BRANCH` to update calibration values
+and add Blockchain oncall as the reviewer.
 """
     )
     exit(1)
 
 if move_e2e_benchmark_failed:
     print(
-        "Move e2e benchmark failed, failing the job. See logs at the beginning for more details."
+        """
+Move e2e benchmark failed, failing the job. See logs at the beginning for more details.
+
+If you expect your PR to change the performance, you need to recalibrate the values.
+To do so, you should run the test on your branch 6 times
+(https://github.com/aptos-labs/aptos-core/actions/workflows/workflow-run-execution-performance.yaml ; remember to select CONTINUOUS,
+and don't select to skip move-only e2e tests).
+Then run the script locally `./testsuite/single_node_performance_calibration.py --branch=YOUR_BRANCH --move-e2e` to update calibration values
+and add Blockchain oncall as the reviewer.
+"""
     )
     exit(1)
 

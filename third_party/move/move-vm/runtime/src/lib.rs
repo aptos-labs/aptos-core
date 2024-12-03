@@ -30,6 +30,8 @@ pub mod module_traversal;
 mod debug;
 
 mod access_control;
+mod frame_type_cache;
+mod runtime_type_checks;
 mod storage;
 
 pub use loader::{LoadedFunction, Module, Script};

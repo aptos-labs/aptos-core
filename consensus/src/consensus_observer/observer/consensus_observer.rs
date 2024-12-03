@@ -564,7 +564,7 @@ impl ConsensusObserver {
                 let mut tree = self.block_tree.lock();
                 tree.ordered_root = commit_decision.commit_proof().clone();
                 tree.committed_root = commit_decision.commit_proof().clone();
-                for (_, block) in &tree.blocks {
+                for (_, block) in tree.blocks.drain() {
                     block.abort_pipeline();
                 }
             }
@@ -593,10 +593,10 @@ impl ConsensusObserver {
         let mut block_id = commit_proof.commit_info().id();
         while let Some(block) = tree.blocks.get(&block_id) {
             if let Some(tx) = block.pipeline_tx().lock().as_mut() {
-                info!("[CO] Sending order proof for block: {}", block);
-                let _ = tx.order_proof_tx.send(());
-                info!("[CO] Sending commit proof for block: {}", block);
-                let _ = tx.commit_proof_tx.send(commit_proof.clone());
+                tx.order_proof_tx.take().map(|tx| tx.send(()));
+                tx.commit_proof_tx
+                    .take()
+                    .map(|tx| tx.send(commit_proof.clone()));
             }
             block_id = block.parent_id();
             if block_id == tree.committed_root.commit_info().id() {
@@ -729,8 +729,7 @@ impl ConsensusObserver {
         let mut block_id = proof.commit_info().id();
         while let Some(block) = tree.blocks.get(&block_id) {
             if let Some(tx) = block.pipeline_tx().lock().as_mut() {
-                info!("[CO] Sending order proof for block: {}", block);
-                let _ = tx.order_proof_tx.send(());
+                tx.order_proof_tx.take().map(|tx| tx.send(()));
             }
             block_id = block.parent_id();
             if block_id == tree.ordered_root.commit_info().id() {
@@ -746,8 +745,11 @@ impl ConsensusObserver {
         if tree.blocks.contains_key(&block.id()) {
             return;
         }
-        info!("[CO] Received block: {}", block);
 
+        if self.state_sync_manager.is_syncing_to_commit() {
+            return;
+        }
+        info!("[CO] Received block: {}", block);
         let parent_fut = if let Some(parent) = tree.blocks.get(&block.parent_id()) {
             let fut = parent.pipeline_futs().unwrap();
             Some(fut)
@@ -781,11 +783,8 @@ impl ConsensusObserver {
             });
             self.pipeline_builder().build(&block, parent_fut, callback);
             if let Some(tx) = block.pipeline_tx().lock().as_mut() {
-                // hack to block execution during sync
-                if !self.state_sync_manager.is_syncing_to_commit() {
-                    if let Some(tx) = tx.rand_tx.take() {
-                        let _ = tx.send(None);
-                    }
+                if let Some(tx) = tx.rand_tx.take() {
+                    let _ = tx.send(None);
                 }
             }
             info!("[CO] Inserted block: {}", block);
@@ -1100,18 +1099,7 @@ impl ConsensusObserver {
         }
 
         // rebuild the pipeline after root change
-        let mut tree = self.block_tree.lock();
-        let mut blocks: Vec<_> = tree
-            .blocks
-            .drain()
-            .map(|(_, block)| block)
-            .filter(|block| block.round() > latest_synced_ledger_info.commit_info().round())
-            .collect();
-        drop(tree);
-        blocks.sort_by(|a, b| a.round().cmp(&b.round()));
-        for b in blocks {
-            self.process_block(b.block().clone());
-        }
+        self.block_tree.lock().blocks.clear();
         for b in foo {
             self.process_block(b);
         }
@@ -1158,7 +1146,7 @@ impl ConsensusObserver {
             aptos_channel::new::<AccountAddress, IncomingRandGenRequest>(QueueStyle::FIFO, 1, None);
         self.execution_client
             .start_epoch(
-                Some(sk),
+                sk,
                 epoch_state.clone(),
                 dummy_signer.clone(),
                 payload_manager,

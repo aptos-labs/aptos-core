@@ -18,7 +18,9 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use aptos_schemadb::{SchemaBatch, DB};
-use aptos_storage_interface::{db_ensure as ensure, state_delta::StateDelta, AptosDbError, Result};
+use aptos_storage_interface::{
+    db_ensure as ensure, state_store::state_delta::StateDelta, AptosDbError, Result,
+};
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
@@ -162,8 +164,9 @@ pub(crate) fn save_transactions(
 
         ledger_db.write_schemas(ledger_db_batch)?;
 
-        *state_store.current_state().lock() =
-            StateDelta::new_empty_with_version(Some(last_version));
+        state_store
+            .current_state()
+            .set(StateDelta::new_empty_with_version(Some(last_version)));
     }
 
     Ok(())

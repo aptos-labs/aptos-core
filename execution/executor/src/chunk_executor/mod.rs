@@ -24,8 +24,11 @@ use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeHelper, TimerHelper};
 use aptos_storage_interface::{
-    async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView,
-    state_delta::StateDelta, DbReaderWriter,
+    state_store::{
+        state_delta::StateDelta,
+        state_view::{async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView},
+    },
+    DbReaderWriter,
 };
 use aptos_types::{
     block_executor::{
@@ -611,7 +614,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         // not `zip_eq`, deliberately
         for (version, txn_out, txn_info, write_set, events) in multizip((
             begin_version..end_version,
-            execution_output.to_commit.transaction_outputs(),
+            &execution_output.to_commit.transaction_outputs,
             transaction_infos.iter(),
             write_sets.iter(),
             event_vecs.iter(),

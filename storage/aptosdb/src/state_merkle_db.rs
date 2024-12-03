@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::NUM_STATE_SHARDS,
     db_options::gen_state_merkle_cfds,
     lru_node_cache::LruNodeCache,
     metrics::{NODE_CACHE_SECONDS, OTHER_TIMERS_SECONDS},
@@ -26,7 +25,9 @@ use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{SchemaBatch, DB};
 #[cfg(test)]
 use aptos_scratchpad::get_state_shard_id;
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{
+    db_ensure as ensure, state_store::NUM_STATE_SHARDS, AptosDbError, Result,
+};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProofExt, SparseMerkleRangeProof},

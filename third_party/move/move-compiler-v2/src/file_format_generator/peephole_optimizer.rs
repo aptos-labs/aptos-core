@@ -12,17 +12,18 @@ pub mod reducible_pairs;
 use inefficient_loads::InefficientLoads;
 use move_binary_format::{
     control_flow_graph::{ControlFlowGraph, VMControlFlowGraph},
-    file_format::{Bytecode, CodeOffset, CodeUnit},
+    file_format::{Bytecode, CodeOffset},
 };
-use optimizers::{BasicBlockOptimizer, WindowProcessor};
+use optimizers::{BasicBlockOptimizer, TransformedCodeChunk, WindowProcessor};
 use reducible_pairs::ReduciblePairs;
-use std::{collections::BTreeMap, mem};
+use std::collections::BTreeMap;
 
 /// Pre-requisite: `code` should not have spec block associations.
 /// Run peephole optimizers on the given `code`, possibly modifying it.
-pub fn run(code: &mut CodeUnit) {
-    let original_code = mem::take(&mut code.code);
-    code.code = BasicBlockOptimizerPipeline::default().optimize(original_code);
+/// Returns the optimized code, along with mapping to original offsets
+/// in `code`.
+pub fn optimize(code: &[Bytecode]) -> TransformedCodeChunk {
+    BasicBlockOptimizerPipeline::default().optimize(code)
 }
 
 /// A pipeline of basic block optimizers.
@@ -44,23 +45,24 @@ impl BasicBlockOptimizerPipeline {
 
     /// Run the basic block optimization pipeline on the given `code`,
     /// returning new (possibly optimized) code.
-    pub fn optimize(&self, mut code: Vec<Bytecode>) -> Vec<Bytecode> {
-        let mut cfg = VMControlFlowGraph::new(&code);
+    pub fn optimize(&self, code: &[Bytecode]) -> TransformedCodeChunk {
+        let mut code_chunk = TransformedCodeChunk::make_from(code);
+        let mut cfg = VMControlFlowGraph::new(&code_chunk.code);
         loop {
-            let optimized_blocks = self.get_optimized_blocks(&code, &cfg);
-            let optimized_code = Self::flatten_blocks(optimized_blocks);
-            let optimized_cfg = VMControlFlowGraph::new(&optimized_code);
+            let optimized_blocks = self.get_optimized_blocks(&code_chunk.code, &cfg);
+            let optimized_code_chunk = Self::flatten_blocks(optimized_blocks);
+            let optimized_cfg = VMControlFlowGraph::new(&optimized_code_chunk.code);
             if optimized_cfg.num_blocks() == cfg.num_blocks() {
                 // Proxy for convergence of basic block optimizations.
                 // This is okay for peephole optimizations that merge basic blocks.
                 // But may need to revisit if we have peephole optimizations that can
                 // split a basic block.
-                return optimized_code;
+                return optimized_code_chunk;
             } else {
                 // Number of basic blocks changed, re-run the basic-block
                 // optimization pipeline again on the new basic blocks.
                 cfg = optimized_cfg;
-                code = optimized_code;
+                code_chunk = optimized_code_chunk.remap(code_chunk.original_offsets);
             }
         }
     }
@@ -71,14 +73,16 @@ impl BasicBlockOptimizerPipeline {
         &self,
         code: &[Bytecode],
         cfg: &VMControlFlowGraph,
-    ) -> BTreeMap<CodeOffset, Vec<Bytecode>> {
+    ) -> BTreeMap<CodeOffset, TransformedCodeChunk> {
         let mut optimized_blocks = BTreeMap::new();
         for block_id in cfg.blocks() {
             let start = cfg.block_start(block_id);
             let end = cfg.block_end(block_id); // `end` is inclusive
-            let mut block = code[start as usize..=end as usize].to_vec();
+            let mut block = TransformedCodeChunk::make_from(&code[start as usize..=end as usize]);
             for bb_optimizer in self.optimizers.iter() {
-                block = bb_optimizer.optimize(&block);
+                block = bb_optimizer
+                    .optimize(&block.code)
+                    .remap(block.original_offsets);
             }
             optimized_blocks.insert(start, block);
         }
@@ -86,14 +90,16 @@ impl BasicBlockOptimizerPipeline {
     }
 
     /// Flatten the individually optimized basic blocks into a single code vector.
-    fn flatten_blocks(optimized_blocks: BTreeMap<CodeOffset, Vec<Bytecode>>) -> Vec<Bytecode> {
-        let mut optimized_code = vec![];
+    fn flatten_blocks(
+        optimized_blocks: BTreeMap<CodeOffset, TransformedCodeChunk>,
+    ) -> TransformedCodeChunk {
+        let mut optimized_code = TransformedCodeChunk::empty();
         let mut block_mapping = BTreeMap::new();
-        for (offset, mut block) in optimized_blocks {
-            block_mapping.insert(offset, optimized_code.len() as CodeOffset);
-            optimized_code.append(&mut block);
+        for (offset, block) in optimized_blocks {
+            block_mapping.insert(offset, optimized_code.code.len() as CodeOffset);
+            optimized_code.extend(block, offset);
         }
-        Self::remap_branch_targets(&mut optimized_code, &block_mapping);
+        Self::remap_branch_targets(&mut optimized_code.code, &block_mapping);
         optimized_code
     }
 

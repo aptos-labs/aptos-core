@@ -25,8 +25,7 @@ use aptos_api_types::{
     AsConverter, EncodeSubmissionRequest, GasEstimation, GasEstimationBcs, HashValue,
     HexEncodedBytes, LedgerInfo, MoveType, PendingTransaction, SubmitTransactionRequest,
     Transaction, TransactionData, TransactionOnChainData, TransactionsBatchSingleSubmissionFailure,
-    TransactionsBatchSubmissionResult, UserTransaction, VerifyInput, VerifyInputWithRecursion,
-    MAX_RECURSIVE_TYPES_ALLOWED, U64,
+    TransactionsBatchSubmissionResult, UserTransaction, VerifyInput, VerifyInputWithRecursion, U64,
 };
 use aptos_crypto::{hash::CryptoHash, signing_message};
 use aptos_types::{
@@ -1041,10 +1040,12 @@ impl TransactionsApi {
         ledger_info: &LedgerInfo,
         data: SubmitTransactionPost,
     ) -> Result<SignedTransaction, SubmitTransactionError> {
+        pub const MAX_SIGNED_TRANSACTION_DEPTH: usize = 16;
+
         match data {
             SubmitTransactionPost::Bcs(data) => {
                 let signed_transaction: SignedTransaction =
-                    bcs::from_bytes_with_limit(&data.0, MAX_RECURSIVE_TYPES_ALLOWED as usize)
+                    bcs::from_bytes_with_limit(&data.0, MAX_SIGNED_TRANSACTION_DEPTH)
                         .context("Failed to deserialize input into SignedTransaction")
                         .map_err(|err| {
                             SubmitTransactionError::bad_request_with_code(

@@ -27,6 +27,11 @@ on:
         default: false
         type: boolean
         description: Whether to run or skip move-only e2e tests at the beginning.
+      USE_COIN_APT:
+        required: false
+        default: false
+        type: boolean
+        description: By default, FA APT is exclusively used. If set Coin APT is used instead.
       SOURCE:
         required: false
         default: CI
@@ -74,6 +79,7 @@ on:
         - CONTINUOUS
         - MAINNET
         - MAINNET_LARGE_DB
+        - EXECUTORS
         type: choice
         description: Which set of tests to run. MAINNET/MAINNET_LARGE_DB are for performance validation of mainnet nodes.
       SKIP_MOVE_E2E:
@@ -81,6 +87,11 @@ on:
         default: false
         type: boolean
         description: Whether to skip move-only e2e tests at the beginning.
+      USE_COIN_APT:
+        required: false
+        default: false
+        type: boolean
+        description: By default, FA APT is exclusively used. If set Coin APT is used instead.
       IGNORE_TARGET_DETERMINATION:
         required: false
         default: true
@@ -123,7 +134,7 @@ jobs:
 
       - name: Run single node execution benchmark in performance build mode
         shell: bash
-        run: TABULATE_INSTALL=lib-only pip install tabulate && FLOW="${{ inputs.FLOW }}" SOURCE="${{ inputs.SOURCE }}" RUNNER_NAME="${{ inputs.RUNNER_NAME }}" SKIP_MOVE_E2E="${{ inputs.SKIP_MOVE_E2E && '1' || '' }}" NUMBER_OF_EXECUTION_THREADS="${{ inputs.NUMBER_OF_EXECUTION_THREADS }}" testsuite/single_node_performance.py
+        run: TABULATE_INSTALL=lib-only pip install tabulate && FLOW="${{ inputs.FLOW }}" SOURCE="${{ inputs.SOURCE }}" RUNNER_NAME="${{ inputs.RUNNER_NAME }}" SKIP_MOVE_E2E="${{ inputs.SKIP_MOVE_E2E && '1' || '' }}" DISABLE_FA_APT="${{ inputs.USE_COIN_APT && '1' || '' }}" NUMBER_OF_EXECUTION_THREADS="${{ inputs.NUMBER_OF_EXECUTION_THREADS }}" testsuite/single_node_performance.py
         if: ${{ (inputs.IGNORE_TARGET_DETERMINATION || needs.test-target-determinator.outputs.run_execution_performance_test == 'true') }}
 
       - run: echo "Skipping single node execution performance! Unrelated changes detected."

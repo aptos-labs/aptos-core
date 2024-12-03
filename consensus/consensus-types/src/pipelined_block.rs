@@ -107,15 +107,15 @@ impl PipelineFutures {
 pub struct PipelineInputTx {
     pub rand_tx: Option<oneshot::Sender<Option<Randomness>>>,
     pub order_vote_tx: Option<oneshot::Sender<()>>,
-    pub order_proof_tx: tokio::sync::broadcast::Sender<()>,
-    pub commit_proof_tx: tokio::sync::broadcast::Sender<LedgerInfoWithSignatures>,
+    pub order_proof_tx: Option<oneshot::Sender<()>>,
+    pub commit_proof_tx: Option<oneshot::Sender<LedgerInfoWithSignatures>>,
 }
 
 pub struct PipelineInputRx {
     pub rand_rx: oneshot::Receiver<Option<Randomness>>,
     pub order_vote_rx: oneshot::Receiver<()>,
-    pub order_proof_rx: tokio::sync::broadcast::Receiver<()>,
-    pub commit_proof_rx: tokio::sync::broadcast::Receiver<LedgerInfoWithSignatures>,
+    pub order_proof_fut: TaskFuture<()>,
+    pub commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
 }
 
 /// A representation of a block that has been added to the execution pipeline. It might either be in ordered

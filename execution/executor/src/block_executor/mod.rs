@@ -27,7 +27,10 @@ use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeHelper, TimerHelper};
 use aptos_storage_interface::{
-    async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
+    state_store::state_view::{
+        async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView,
+    },
+    DbReaderWriter,
 };
 use aptos_types::{
     block_executor::{

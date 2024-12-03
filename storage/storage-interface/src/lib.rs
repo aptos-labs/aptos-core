@@ -34,24 +34,21 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
-pub mod async_proof_fetcher;
 pub mod block_info;
-pub mod cached_state_view;
 pub mod chunk_to_commit;
 pub mod errors;
-mod executed_trees;
+mod ledger_summary;
 mod metrics;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod mock;
-pub mod state_delta;
-pub mod state_view;
+pub mod state_store;
 
 use crate::chunk_to_commit::ChunkToCommit;
 use aptos_scratchpad::SparseMerkleTree;
 pub use aptos_types::block_info::BlockHeight;
 use aptos_types::state_store::state_key::prefix::StateKeyPrefix;
 pub use errors::AptosDbError;
-pub use executed_trees::ExecutedTrees;
+pub use ledger_summary::LedgerSummary;
 
 pub type Result<T, E = AptosDbError> = std::result::Result<T, E>;
 // This is last line of defense against large queries slipping through external facing interfaces,
@@ -377,9 +374,9 @@ pub trait DbReader: Send + Sync {
             root_depth: usize,
         ) -> Result<(Option<StateValue>, SparseMerkleProofExt)>;
 
-        /// Gets the latest ExecutedTrees no matter if db has been bootstrapped.
+        /// Gets the latest LedgerView no matter if db has been bootstrapped.
         /// Used by the Db-bootstrapper.
-        fn get_latest_executed_trees(&self) -> Result<ExecutedTrees>;
+        fn get_pre_committed_ledger_summary(&self) -> Result<LedgerSummary>;
 
         /// Get the oldest in memory state tree.
         fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>>;

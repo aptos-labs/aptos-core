@@ -918,7 +918,14 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 /// # Definition Analysis
 
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
-    pub fn check_language_version(&self, loc: &Loc, feature: &str, version_min: LanguageVersion) {
+    /// Returns `true` if language version is ok. Otherwise,
+    /// issues an error message and returns `false`.
+    pub fn test_language_version(
+        &self,
+        loc: &Loc,
+        feature: &str,
+        version_min: LanguageVersion,
+    ) -> bool {
         if !self.parent.env.language_version().is_at_least(version_min) {
             self.parent.env.error(
                 loc,
@@ -926,7 +933,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     "not supported before language version `{}`: {}",
                     version_min, feature
                 ),
-            )
+            );
+            false
+        } else {
+            true
         }
     }
 
@@ -1012,11 +1022,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 if !self.parent.const_table.contains_key(&qsym) {
                     continue;
                 }
-                self.check_language_version(
+                if !self.test_language_version(
                     &loc,
                     "constant definitions referring to other constants",
                     LanguageVersion::V2_0,
-                );
+                ) {
+                    continue;
+                }
                 if visited.contains(&const_name) {
                     continue;
                 }
@@ -2634,10 +2646,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     ) {
         // Type check and translate lhs and rhs. They must have the same type.
         let mut et = self.exp_translator_for_context(loc, context, &ConditionKind::Requires);
-        let (expected_ty, lhs) = et.translate_exp_free(lhs);
-        let rhs = et.translate_exp(rhs, &expected_ty);
+        let (expected_ty, translated_lhs) = et.translate_exp_free(lhs);
+        let translated_rhs = et.translate_exp(rhs, &expected_ty);
         et.finalize_types();
-        if lhs.extract_ghost_mem_access(self.parent.env).is_some() {
+        if translated_lhs
+            .extract_ghost_mem_access(self.parent.env)
+            .is_some()
+        {
             // Add as a condition to the context.
             self.add_conditions_to_context(
                 context,
@@ -2646,15 +2661,15 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     loc: loc.clone(),
                     kind: ConditionKind::Update,
                     properties: Default::default(),
-                    exp: rhs.into_exp(),
-                    additional_exps: vec![lhs.into_exp()],
+                    exp: translated_rhs.into_exp(),
+                    additional_exps: vec![translated_lhs.into_exp()],
                 }],
                 PropertyBag::default(),
                 "",
             );
         } else {
             self.parent.error(
-                &self.parent.env.get_node_loc(lhs.node_id()),
+                &self.parent.env.get_node_loc(translated_lhs.node_id()),
                 "target of `update` restricted to specification variables",
             )
         }
@@ -3726,6 +3741,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let spec = self.fun_specs.remove(&name.symbol).unwrap_or_default();
             let def = self.fun_defs.remove(&name.symbol);
             let called_funs = Some(def.as_ref().map(|e| e.called_funs()).unwrap_or_default());
+            let used_funs = Some(def.as_ref().map(|e| e.used_funs()).unwrap_or_default());
             let access_specifiers = self.fun_access_specifiers.remove(&name.symbol);
             let fun_id = FunId::new(name.symbol);
             let data = FunctionData {
@@ -3751,6 +3767,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 called_funs,
                 calling_funs: RefCell::default(),
                 transitive_closure_of_called_funs: RefCell::default(),
+                used_funs,
+                using_funs: RefCell::default(),
+                transitive_closure_of_used_funs: RefCell::default(),
             };
             function_data.insert(fun_id, data);
         }

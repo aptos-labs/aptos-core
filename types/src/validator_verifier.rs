@@ -273,6 +273,9 @@ impl ValidatorVerifier {
         message: &T,
         signature_with_status: &SignatureWithStatus,
     ) -> std::result::Result<(), VerifyError> {
+        if self.get_public_key(&author).is_none() {
+            return Err(VerifyError::UnknownAuthor);
+        }
         if (!self.optimistic_sig_verification || self.pessimistic_verify_set.contains(&author))
             && !signature_with_status.is_verified()
         {

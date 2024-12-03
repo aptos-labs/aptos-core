@@ -21,7 +21,7 @@ use crate::{
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::{Features, ValidatorSet},
     proof::TransactionInfoListWithProof,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::state_key::StateKey,
     transaction::{
         block_epilogue::BlockEndInfo, ChangeSet, ExecutionStatus, Module, RawTransaction, Script,
         SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
@@ -43,8 +43,6 @@ use aptos_crypto::{
     traits::*,
     HashValue,
 };
-use arr_macro::arr;
-use bytes::Bytes;
 use move_core_types::language_storage::TypeTag;
 use proptest::{
     collection::{vec, SizeRange},
@@ -55,7 +53,7 @@ use proptest::{
 use proptest_derive::Arbitrary;
 use serde_json::Value;
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet},
     iter::Iterator,
     sync::Arc,
 };
@@ -795,33 +793,22 @@ impl TransactionToCommitGen {
             .map(|(index, event_gen)| event_gen.materialize(index, universe))
             .collect();
 
-        let (state_updates, write_set): (HashMap<_, _>, BTreeMap<_, _>) = self
+        let write_set: BTreeMap<_, _> = self
             .account_state_gens
             .into_iter()
             .flat_map(|(index, account_gen)| {
                 account_gen.materialize(index, universe).into_iter().map(
                     move |(state_key, value)| {
-                        (
-                            (
-                                state_key.clone(),
-                                Some(StateValue::new_legacy(Bytes::copy_from_slice(&value))),
-                            ),
-                            (state_key, WriteOp::legacy_modification(value.into())),
-                        )
+                        (state_key, WriteOp::legacy_modification(value.into()))
                     },
                 )
             })
-            .unzip();
-        let mut sharded_state_updates = arr![HashMap::new(); 16];
-        state_updates.into_iter().for_each(|(k, v)| {
-            sharded_state_updates[k.get_shard_id() as usize].insert(k, v);
-        });
+            .collect();
 
         TransactionToCommit::new(
             Transaction::UserTransaction(transaction),
             TransactionInfo::new_placeholder(self.gas_used, None, self.status),
-            sharded_state_updates,
-            WriteSetMut::new(write_set).freeze().expect("Cannot fail"),
+            WriteSet::new(write_set).unwrap(),
             events,
             false, /* event_gen never generates reconfig events */
             TransactionAuxiliaryData::default(),
@@ -1184,7 +1171,6 @@ impl BlockGen {
                 Some(HashValue::random()),
                 ExecutionStatus::Success,
             ),
-            arr![HashMap::new(); 16],
             WriteSet::default(),
             if ledger_info.ends_epoch() {
                 vec![ContractEvent::new_v2(

@@ -4,7 +4,6 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    common::NUM_STATE_SHARDS,
     db_options::gen_state_kv_cfds,
     metrics::OTHER_TIMERS_SECONDS,
     schema::{
@@ -20,7 +19,7 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
-use aptos_storage_interface::Result;
+use aptos_storage_interface::{state_store::NUM_STATE_SHARDS, Result};
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
@@ -200,6 +199,10 @@ impl StateKvDb {
 
     pub(crate) fn metadata_db(&self) -> &DB {
         &self.state_kv_metadata_db
+    }
+
+    pub(crate) fn metadata_db_arc(&self) -> Arc<DB> {
+        Arc::clone(&self.state_kv_metadata_db)
     }
 
     pub(crate) fn db_shard(&self, shard_id: u8) -> &DB {
