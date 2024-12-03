@@ -270,6 +270,25 @@ mod tests {
     }
 
     #[test]
+    fn test_transaction_vector_performance() {
+        let num_txns = 30000;
+
+        let mut txns = vec![];
+        let txns2 = create_signed_transaction(num_txns);
+        let extend_timer = Instant::now();
+        txns.extend(txns2);
+        let extend_time = extend_timer.elapsed();
+
+        let mut txns = vec![];
+        let mut txns2 = create_signed_transaction(num_txns);
+        let append_timer = Instant::now();
+        txns.append(&mut txns2);
+        let append_time = append_timer.elapsed();
+
+        assert_eq!(extend_time.as_micros(), append_time.as_micros());
+    }
+
+    #[test]
     fn test_single_user_txns() {
         for num_txns in [1, 5, 50, 500] {
             let txns = create_signed_transaction(num_txns);

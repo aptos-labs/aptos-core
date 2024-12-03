@@ -6,7 +6,6 @@ use crate::{
     metrics::TIMER,
 };
 use anyhow::Result;
-use aptos_block_executor::txn_provider::{default::DefaultTxnProvider, TxnProvider};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{DepositEvent, WithdrawEvent},
@@ -21,6 +20,7 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, ExecutionStatus,
         Transaction, TransactionAuxiliaryData, TransactionOutput, TransactionStatus,
     },
+    txn_provider::TxnProvider,
     vm_status::AbortLocation,
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -358,7 +358,7 @@ impl VMBlockExecutor for NativeExecutor {
 
     fn execute_block(
         &self,
-        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        txn_provider: &dyn TxnProvider<SignatureVerifiedTransaction>,
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
         _transaction_slice_metadata: TransactionSliceMetadata,

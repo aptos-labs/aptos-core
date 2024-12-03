@@ -6,9 +6,6 @@ use crate::{
     metrics::{EXECUTOR_ERRORS, OTHER_TIMERS},
 };
 use anyhow::{anyhow, Result};
-use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
-#[cfg(feature = "consensus-only-perf-test")]
-use aptos_block_executor::txn_provider::TxnProvider;
 use aptos_crypto::HashValue;
 use aptos_executor_service::{
     local_executor_helper::SHARDED_BLOCK_EXECUTOR,
@@ -41,6 +38,7 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockEndInfo, BlockOutput,
         Transaction, TransactionOutput, TransactionStatus, Version,
     },
+    txn_provider::{default::DefaultTxnProvider, TxnProvider},
     write_set::{TransactionWrite, WriteSet},
 };
 use aptos_vm::VMBlockExecutor;
@@ -59,9 +57,19 @@ impl DoGetExecutionOutput {
     ) -> Result<ExecutionOutput> {
         let out = match transactions {
             ExecutableTransactions::Unsharded(txns) => {
+                let txn_provider = DefaultTxnProvider::new(txns);
                 Self::by_transaction_execution_unsharded::<V>(
                     executor,
-                    txns,
+                    &txn_provider,
+                    state_view,
+                    onchain_config,
+                    transaction_slice_metadata,
+                )?
+            },
+            ExecutableTransactions::UnshardedBlocking(blocking_txn_provider) => {
+                Self::by_transaction_execution_unsharded::<V>(
+                    executor,
+                    &blocking_txn_provider,
                     state_view,
                     onchain_config,
                     transaction_slice_metadata,
@@ -92,17 +100,16 @@ impl DoGetExecutionOutput {
 
     fn by_transaction_execution_unsharded<V: VMBlockExecutor>(
         executor: &V,
-        transactions: Vec<SignatureVerifiedTransaction>,
+        txn_provider: &dyn TxnProvider<SignatureVerifiedTransaction>,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<ExecutionOutput> {
         let append_state_checkpoint_to_block =
             transaction_slice_metadata.append_state_checkpoint_to_block();
-        let txn_provider = DefaultTxnProvider::new(transactions);
         let block_output = Self::execute_block::<V>(
             executor,
-            &txn_provider,
+            txn_provider,
             &state_view,
             onchain_config,
             transaction_slice_metadata,
@@ -112,7 +119,7 @@ impl DoGetExecutionOutput {
         Parser::parse(
             state_view.next_version(),
             txn_provider
-                .txns
+                .to_vec()
                 .into_iter()
                 .map(|t| t.into_inner())
                 .collect(),
@@ -217,7 +224,7 @@ impl DoGetExecutionOutput {
     #[cfg(not(feature = "consensus-only-perf-test"))]
     fn execute_block<V: VMBlockExecutor>(
         executor: &V,
-        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        txn_provider: &dyn TxnProvider<SignatureVerifiedTransaction>,
         state_view: &CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,

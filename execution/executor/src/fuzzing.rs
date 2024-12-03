@@ -4,7 +4,6 @@
 
 use crate::block_executor::BlockExecutor;
 use anyhow::Result;
-use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_storage_interface::{chunk_to_commit::ChunkToCommit, DbReader, DbReaderWriter, DbWriter};
@@ -22,6 +21,7 @@ use aptos_types::{
         },
         BlockOutput, Transaction, TransactionOutput, Version,
     },
+    txn_provider::TxnProvider,
     vm_status::VMStatus,
 };
 use aptos_vm::{
@@ -78,7 +78,7 @@ impl VMBlockExecutor for FakeVM {
 
     fn execute_block(
         &self,
-        _txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        _txn_provider: &dyn TxnProvider<SignatureVerifiedTransaction>,
         _state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
         _transaction_slice_metadata: TransactionSliceMetadata,

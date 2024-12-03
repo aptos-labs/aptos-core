@@ -1,10 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::transaction::{
-    analyzed_transaction::{AnalyzedTransaction, StorageLocation},
-    signature_verified_transaction::{into_signature_verified_block, SignatureVerifiedTransaction},
-    Transaction,
+use crate::{
+    transaction::{
+        analyzed_transaction::{AnalyzedTransaction, StorageLocation},
+        signature_verified_transaction::{
+            into_signature_verified_block, SignatureVerifiedTransaction,
+        },
+        Transaction,
+    },
+    txn_provider::{blocking_txn_provider::BlockingTxnProvider, TxnProvider},
 };
 use aptos_crypto::HashValue;
 use serde::{Deserialize, Serialize};
@@ -549,6 +554,7 @@ impl PartitionedTransactions {
 #[derive(Clone)]
 pub enum ExecutableTransactions {
     Unsharded(Vec<SignatureVerifiedTransaction>),
+    UnshardedBlocking(BlockingTxnProvider<SignatureVerifiedTransaction>),
     Sharded(PartitionedTransactions),
 }
 
@@ -556,6 +562,7 @@ impl ExecutableTransactions {
     pub fn num_transactions(&self) -> usize {
         match self {
             ExecutableTransactions::Unsharded(transactions) => transactions.len(),
+            ExecutableTransactions::UnshardedBlocking(provider) => provider.num_txns(),
             ExecutableTransactions::Sharded(partitioned_txns) => partitioned_txns.num_txns(),
         }
     }
@@ -563,6 +570,7 @@ impl ExecutableTransactions {
     pub fn into_txns(self) -> Vec<SignatureVerifiedTransaction> {
         match self {
             ExecutableTransactions::Unsharded(txns) => txns,
+            ExecutableTransactions::UnshardedBlocking(provider) => provider.to_vec(),
             ExecutableTransactions::Sharded(partitioned) => {
                 PartitionedTransactions::flatten(partitioned)
                     .into_iter()

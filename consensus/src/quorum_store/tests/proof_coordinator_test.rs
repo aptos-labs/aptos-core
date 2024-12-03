@@ -34,7 +34,7 @@ impl BatchReader for MockBatchReader {
         _digest: HashValue,
         _expiration: u64,
         _signers: Vec<PeerId>,
-    ) -> tokio::sync::oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>> {
+    ) -> tokio::sync::oneshot::Receiver<ExecutorResult<Arc<Vec<SignedTransaction>>>> {
         unimplemented!()
     }
 

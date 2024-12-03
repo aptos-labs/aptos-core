@@ -786,7 +786,7 @@ impl ConsensusObserver {
                         self.block_payload_store.clone(),
                     );
                     self.pipeline_builder().build(
-                        block,
+                        block.clone(),
                         self.get_last_pipeline_futs(),
                         commit_callback,
                     );

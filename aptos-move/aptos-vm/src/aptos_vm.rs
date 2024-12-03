@@ -28,9 +28,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use aptos_block_executor::{
-    code_cache_global_manager::AptosModuleCacheManager,
-    txn_commit_hook::NoOpTransactionCommitHook,
-    txn_provider::{default::DefaultTxnProvider, TxnProvider},
+    code_cache_global_manager::AptosModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
 };
 use aptos_crypto::HashValue;
 use aptos_framework::{
@@ -73,6 +71,7 @@ use aptos_types::{
         TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
         VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
+    txn_provider::TxnProvider,
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use aptos_utils::aptos_try;
@@ -2801,7 +2800,7 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
 
     fn execute_block(
         &self,
-        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        txn_provider: &dyn TxnProvider<SignatureVerifiedTransaction>,
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
@@ -2823,7 +2822,7 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
         let ret = BlockAptosVM::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
-            DefaultTxnProvider<SignatureVerifiedTransaction>,
+            dyn TxnProvider<SignatureVerifiedTransaction>,
         >(
             txn_provider,
             state_view,

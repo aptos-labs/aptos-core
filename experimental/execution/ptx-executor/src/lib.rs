@@ -21,7 +21,6 @@ use crate::{
     analyzer::PtxAnalyzer, finalizer::PtxFinalizer, metrics::TIMER, runner::PtxRunner,
     scheduler::PtxScheduler, sorter::PtxSorter, state_reader::PtxStateReader,
 };
-use aptos_block_executor::txn_provider::{default::DefaultTxnProvider, TxnProvider};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::TimerHelper;
@@ -35,6 +34,7 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         TransactionOutput,
     },
+    txn_provider::TxnProvider,
 };
 use aptos_vm::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
@@ -52,7 +52,7 @@ impl VMBlockExecutor for PtxBlockExecutor {
 
     fn execute_block(
         &self,
-        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        txn_provider: &dyn TxnProvider<SignatureVerifiedTransaction>,
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
         _transaction_slice_metadata: TransactionSliceMetadata,

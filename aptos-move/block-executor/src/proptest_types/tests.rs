@@ -14,11 +14,11 @@ use crate::{
         },
     },
     txn_commit_hook::NoOpTransactionCommitHook,
-    txn_provider::default::DefaultTxnProvider,
 };
 use aptos_types::{
     block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
     executable::ExecutableTestType, state_store::MockStateView,
+    txn_provider::default::DefaultTxnProvider,
 };
 use claims::{assert_matches, assert_ok};
 use num_cpus;

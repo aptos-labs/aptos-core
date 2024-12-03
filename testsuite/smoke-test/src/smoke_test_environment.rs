@@ -17,7 +17,7 @@ use rand::rngs::OsRng;
 use std::{num::NonZeroUsize, sync::Arc};
 use tokio::task::JoinHandle;
 
-const SWARM_BUILD_NUM_RETRIES: u8 = 3;
+const SWARM_BUILD_NUM_RETRIES: u8 = 0;
 
 #[derive(Clone)]
 pub struct SwarmBuilder {

@@ -6,7 +6,6 @@
 mod mock_vm_test;
 
 use anyhow::Result;
-use aptos_block_executor::txn_provider::{default::DefaultTxnProvider, TxnProvider};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_types::{
     account_address::AccountAddress,
@@ -27,6 +26,7 @@ use aptos_types::{
         TransactionArgument, TransactionAuxiliaryData, TransactionOutput, TransactionPayload,
         TransactionStatus, WriteSetPayload,
     },
+    txn_provider::TxnProvider,
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -68,7 +68,7 @@ impl VMBlockExecutor for MockVM {
 
     fn execute_block(
         &self,
-        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        txn_provider: &dyn TxnProvider<SignatureVerifiedTransaction>,
         state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
         _transaction_slice_metadata: TransactionSliceMetadata,

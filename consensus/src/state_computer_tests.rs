@@ -10,7 +10,9 @@ use crate::{
 use aptos_config::config::transaction_filter_type::Filter;
 use aptos_consensus_notifications::{ConsensusNotificationSender, Error};
 use aptos_consensus_types::{
-    block::Block, block_data::BlockData, pipelined_block::OrderedBlockWindow,
+    block::Block,
+    block_data::BlockData,
+    pipelined_block::{OrderedBlockWindow, PipelinedBlock},
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
@@ -119,9 +121,10 @@ impl BlockExecutorTrait for DummyBlockExecutor {
         block: ExecutableBlock,
         _parent_block_id: HashValue,
         _onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> ExecutorResult<()> {
+    ) -> ExecutorResult<Vec<TransactionStatus>> {
         self.blocks_received.lock().push(block);
-        Ok(())
+        // TODO: fix
+        Ok(vec![])
     }
 
     fn ledger_update(
@@ -186,6 +189,7 @@ async fn should_see_and_notify_validator_txns() {
         ]),
         None,
     );
+    let pipelined_block = PipelinedBlock::new_with_window(block, OrderedBlockWindow::empty());
 
     let epoch_state = EpochState::empty();
 
@@ -200,13 +204,7 @@ async fn should_see_and_notify_validator_txns() {
 
     // Ensure the dummy executor has received the txns.
     let _ = execution_policy
-        .schedule_compute(
-            &block,
-            &OrderedBlockWindow::empty(),
-            HashValue::zero(),
-            None,
-            dummy_guard(),
-        )
+        .schedule_compute(&pipelined_block, HashValue::zero(), None, dummy_guard())
         .await
         .await
         .unwrap();

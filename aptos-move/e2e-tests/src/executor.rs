@@ -16,7 +16,6 @@ use aptos_abstract_gas_usage::CalibrationAlgebra;
 use aptos_bitvec::BitVec;
 use aptos_block_executor::{
     code_cache_global_manager::AptosModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
-    txn_provider::default::DefaultTxnProvider,
 };
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
@@ -49,6 +48,7 @@ use aptos_types::{
         BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
         TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
     },
+    txn_provider::default::DefaultTxnProvider,
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
     AptosCoinType, CoinType,

@@ -18,7 +18,6 @@ use crate::{
     task::{ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::{KeyKind, TxnLastInputOutput},
-    txn_provider::TxnProvider,
     types::ReadWriteSummary,
     view::{LatestView, ParallelState, SequentialState, ViewState},
 };
@@ -43,6 +42,7 @@ use aptos_types::{
     transaction::{
         block_epilogue::BlockEndInfo, BlockExecutableTransaction as Transaction, BlockOutput,
     },
+    txn_provider::TxnProvider,
     vm::modules::AptosModuleExtension,
     write_set::{TransactionWrite, WriteOp},
 };
@@ -72,7 +72,7 @@ use std::{
     },
 };
 
-pub struct BlockExecutor<T, E, S, L, X, TP> {
+pub struct BlockExecutor<T, E, S, L, X, TP: ?Sized> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     config: BlockExecutorConfig,
@@ -88,7 +88,7 @@ where
     S: TStateView<Key = T::Key> + Sync,
     L: TransactionCommitHook<Output = E::Output>,
     X: Executable + 'static,
-    TP: TxnProvider<T> + Sync,
+    TP: TxnProvider<T> + Sync + ?Sized,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.

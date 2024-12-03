@@ -69,7 +69,7 @@ fn extract_txns_from_quorum_store(
     for digest in digests {
         if let Some(batch) = all_batches.get(&digest) {
             if let Some(txns) = batch.payload() {
-                block_txns.extend(txns);
+                block_txns.extend(txns.as_ref());
             } else {
                 bail!("Payload is not found for batch ({digest}).");
             }
@@ -108,7 +108,7 @@ pub fn extract_txns_from_block<'a>(
                 )
                 .unwrap();
                 for (_, txns) in inline_batches {
-                    all_txns.extend(txns);
+                    all_txns.extend(txns.as_ref());
                 }
                 Ok(all_txns)
             },

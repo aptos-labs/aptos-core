@@ -3,9 +3,7 @@
 
 use anyhow::{bail, format_err, Result};
 use aptos_block_executor::{
-    code_cache_global_manager::AptosModuleCacheManager,
-    txn_commit_hook::NoOpTransactionCommitHook,
-    txn_provider::{default::DefaultTxnProvider, TxnProvider},
+    code_cache_global_manager::AptosModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
 };
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_rest_client::Client;
@@ -22,6 +20,7 @@ use aptos_types::{
         SignedTransaction, Transaction, TransactionInfo, TransactionOutput, TransactionPayload,
         Version,
     },
+    txn_provider::{default::DefaultTxnProvider, TxnProvider},
     vm_status::VMStatus,
 };
 use aptos_validator_interface::{
@@ -430,14 +429,14 @@ fn is_reconfiguration(vm_output: &TransactionOutput) -> bool {
 }
 
 fn execute_block_no_limit(
-    txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+    txn_provider: &dyn TxnProvider<SignatureVerifiedTransaction>,
     state_view: &DebuggerStateView,
     concurrency_level: usize,
 ) -> Result<Vec<TransactionOutput>, VMStatus> {
     BlockAptosVM::execute_block::<
         _,
         NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
-        DefaultTxnProvider<SignatureVerifiedTransaction>,
+        dyn TxnProvider<SignatureVerifiedTransaction>,
     >(
         txn_provider,
         state_view,

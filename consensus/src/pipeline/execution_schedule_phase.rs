@@ -99,8 +99,7 @@ impl StatelessPipeline for ExecutionSchedulePhase {
                 let fut = self
                     .execution_proxy
                     .schedule_compute(
-                        b.block(),
-                        b.block_window(),
+                        b,
                         b.parent_id(),
                         b.randomness().cloned(),
                         lifetime_guard.spawn(()),

@@ -379,11 +379,11 @@ impl ProposalGenerator {
             // being executed: pending blocks vector keeps all the pending ancestors of the extended branch.
             let mut pending_blocks = self
                 .block_store
-                .path_from_commit_root(hqc.certified_block().id())
+                .path_from_window_root(hqc.certified_block().id())
                 .ok_or_else(|| format_err!("HQC {} already pruned", hqc.certified_block().id()))?;
             // Avoid txn manager long poll if the root block has txns, so that the leader can
             // deliver the commit proof to others without delay.
-            pending_blocks.push(self.block_store.commit_root());
+            pending_blocks.push(self.block_store.window_root());
 
             // Exclude all the pending transactions: these are all the ancestors of
             // parent (including) up to the root (including).

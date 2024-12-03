@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::transaction::SignedTransaction;
+use crate::transaction::{
+    signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
+};
 use move_core_types::account_address::AccountAddress;
 
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -49,6 +51,30 @@ impl UseCaseAwareTransaction for SignedTransaction {
                     ContractAddress(*module_id.address())
                 }
             },
+        }
+    }
+}
+
+impl UseCaseAwareTransaction for SignatureVerifiedTransaction {
+    fn parse_sender(&self) -> AccountAddress {
+        let txn = match self {
+            SignatureVerifiedTransaction::Valid(txn) => txn,
+            SignatureVerifiedTransaction::Invalid(txn) => txn,
+        };
+        match txn {
+            crate::transaction::Transaction::UserTransaction(txn) => txn.parse_sender(),
+            _ => unreachable!("UseCaseAwareTransaction should not be given non-UserTransaction"),
+        }
+    }
+
+    fn parse_use_case(&self) -> UseCaseKey {
+        let txn = match self {
+            SignatureVerifiedTransaction::Valid(txn) => txn,
+            SignatureVerifiedTransaction::Invalid(txn) => txn,
+        };
+        match txn {
+            crate::transaction::Transaction::UserTransaction(txn) => txn.parse_use_case(),
+            _ => unreachable!("UseCaseAwareTransaction should not be given non-UserTransaction"),
         }
     }
 }

@@ -190,6 +190,8 @@ pub struct PipelinedBlock {
     pipeline_tx: Arc<Mutex<Option<PipelineInputTx>>>,
     #[derivative(PartialEq = "ignore")]
     pipeline_abort_handle: Arc<Mutex<Option<Vec<AbortHandle>>>>,
+    #[derivative(PartialEq = "ignore")]
+    committed_transactions: Arc<Mutex<Option<Arc<OnceCell<ExecutorResult<Arc<Vec<HashValue>>>>>>>>,
 }
 
 impl Serialize for PipelinedBlock {
@@ -377,10 +379,11 @@ impl PipelinedBlock {
             pipeline_futs: Arc::new(Mutex::new(None)),
             pipeline_tx: Arc::new(Mutex::new(None)),
             pipeline_abort_handle: Arc::new(Mutex::new(None)),
+            committed_transactions: Arc::new(Mutex::new(None)),
         }
     }
 
-    pub fn new_ordered(block: Block, window: OrderedBlockWindow) -> Self {
+    pub fn new_with_window(block: Block, window: OrderedBlockWindow) -> Self {
         info!(
             "New Ordered PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, txns: {}",
             block.id(),
@@ -401,6 +404,35 @@ impl PipelinedBlock {
             pipeline_futs: Arc::new(Mutex::new(None)),
             pipeline_tx: Arc::new(Mutex::new(None)),
             pipeline_abort_handle: Arc::new(Mutex::new(None)),
+            committed_transactions: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    pub fn new_recovered(block: Block, committed_transactions: Vec<HashValue>) -> Self {
+        info!(
+            "New Recovered PipelinedBlock with block_id: {}, parent_id: {}, round: {}, epoch: {}, txns: {}, committed_txns: {}",
+            block.id(),
+            block.parent_id(),
+            block.round(),
+            block.epoch(),
+            block.payload().map_or(0, |p| p.len()),
+            committed_transactions.len(),
+        );
+        Self {
+            block,
+            block_window: OrderedBlockWindow::empty(),
+            input_transactions: vec![],
+            state_compute_result: StateComputeResult::new_dummy(),
+            randomness: OnceCell::new(),
+            pipeline_insertion_time: OnceCell::new(),
+            execution_summary: Arc::new(OnceCell::new()),
+            pre_commit_fut: Arc::new(Mutex::new(None)),
+            pipeline_futs: Arc::new(Mutex::new(None)),
+            pipeline_tx: Arc::new(Mutex::new(None)),
+            pipeline_abort_handle: Arc::new(Mutex::new(None)),
+            committed_transactions: Arc::new(Mutex::new(Some(Arc::new(OnceCell::with_value(Ok(
+                Arc::new(committed_transactions),
+            )))))),
         }
     }
 
@@ -506,6 +538,124 @@ impl PipelinedBlock {
 
     pub fn get_execution_summary(&self) -> Option<ExecutionSummary> {
         self.execution_summary.get().cloned()
+    }
+
+    pub fn init_committed_transactions(&self) {
+        info!(
+            "Init committed transactions: ({}, {}) {}",
+            self.epoch(),
+            self.round(),
+            self.id()
+        );
+        *self.committed_transactions.lock() = Some(Arc::new(OnceCell::new()));
+    }
+
+    pub fn set_committed_transactions(&self, committed_transactions: Vec<HashValue>) {
+        info!(
+            "Setting committed transactions: ({}, {}) {}",
+            self.epoch(),
+            self.round(),
+            self.id()
+        );
+        if let Some(once_cell) = self.committed_transactions.lock().as_ref() {
+            info!(
+                "Setting committed transactions: locked: ({}, {}) {}",
+                self.epoch(),
+                self.round(),
+                self.id()
+            );
+            once_cell
+                .set(Ok(Arc::new(committed_transactions)))
+                .expect("committed_transactions already set")
+        } else {
+            warn!(
+                "Setting committed transactions: no once_cell to set: ({}, {}) {}",
+                self.epoch(),
+                self.round(),
+                self.id()
+            );
+        }
+        info!(
+            "Setting committed transactions: done: ({}, {}) {}",
+            self.epoch(),
+            self.round(),
+            self.id()
+        );
+    }
+
+    pub fn cancel_committed_transactions(&self) {
+        info!(
+            "Cancelled committed transactions: ({}, {}) {}",
+            self.epoch(),
+            self.round(),
+            self.id()
+        );
+        if let Some(once_cell) = self.committed_transactions.lock().as_ref() {
+            once_cell
+                .set(Err(ExecutorError::CouldNotGetCommittedTransactions))
+                .expect("committed_transactions already set")
+        } else {
+            warn!(
+                "Cancelled committed transactions: no once_cell to cancel: ({}, {}) {}",
+                self.epoch(),
+                self.round(),
+                self.id()
+            );
+        }
+    }
+
+    // TODO: change return value
+    pub fn wait_for_committed_transactions(&self) -> ExecutorResult<Arc<Vec<HashValue>>> {
+        if self.block().is_genesis_block() || self.block.is_nil_block() {
+            return Ok(Arc::new(vec![]));
+        }
+        info!(
+            "Waiting for committed transactions: ({}, {}) {}",
+            self.epoch(),
+            self.round(),
+            self.id()
+        );
+
+        let guard = self.committed_transactions.lock();
+        info!(
+            "Waiting for committed transactions: locked: ({}, {}) {}",
+            self.epoch(),
+            self.round(),
+            self.id()
+        );
+        let inner = guard.clone();
+        drop(guard);
+
+        if let Some(once_cell) = inner {
+            match once_cell.wait() {
+                Ok(committed_transactions) => {
+                    info!(
+                        "Done waiting for committed transactions: ({}, {}) {}",
+                        self.epoch(),
+                        self.round(),
+                        self.id()
+                    );
+                    Ok(committed_transactions.clone())
+                },
+                Err(_) => {
+                    warn!(
+                        "Failed to wait for committed transactions: ({}, {}) {}",
+                        self.epoch(),
+                        self.round(),
+                        self.id()
+                    );
+                    Err(ExecutorError::CouldNotGetCommittedTransactions)
+                },
+            }
+        } else {
+            warn!(
+                "No committed transactions to wait for: ({}, {}) {}",
+                self.epoch(),
+                self.round(),
+                self.id()
+            );
+            Err(ExecutorError::CouldNotGetCommittedTransactions)
+        }
     }
 }
 

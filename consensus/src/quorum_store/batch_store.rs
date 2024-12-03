@@ -435,7 +435,7 @@ pub trait BatchReader: Send + Sync {
         digest: HashValue,
         expiration: u64,
         signers: Vec<PeerId>,
-    ) -> oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>;
+    ) -> oneshot::Receiver<ExecutorResult<Arc<Vec<SignedTransaction>>>>;
 
     fn update_certified_timestamp(&self, certified_time: u64);
 }
@@ -467,7 +467,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for Batch
         digest: HashValue,
         expiration: u64,
         signers: Vec<PeerId>,
-    ) -> oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>> {
+    ) -> oneshot::Receiver<ExecutorResult<Arc<Vec<SignedTransaction>>>> {
         let (tx, rx) = oneshot::channel();
         let batch_store = self.batch_store.clone();
         let batch_requester = self.batch_requester.clone();
