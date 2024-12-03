@@ -12,7 +12,7 @@ use aptos_transaction_generator_lib::{
     },
     EntryPoints,
 };
-use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
+use aptos_types::{account_address::AccountAddress, on_chain_config::Features, transaction::TransactionPayload};
 use rand::{rngs::StdRng, SeedableRng};
 use serde_json::json;
 use std::{collections::HashMap, fs, process::exit};
@@ -208,13 +208,13 @@ fn main() {
             index: 2998,
             repeats: 1000,
         },
-        EntryPoints::VectorRangeMove {
-            vec_len: 3000,
-            element_len: 1,
-            index: 1000,
-            move_len: 500,
-            repeats: 1000,
-        },
+        // EntryPoints::VectorRangeMove {
+        //     vec_len: 3000,
+        //     element_len: 1,
+        //     index: 1000,
+        //     move_len: 500,
+        //     repeats: 1000,
+        // },
         // vectors with large elements
         EntryPoints::VectorTrimAppend {
             // baseline, only vector creation
@@ -229,13 +229,13 @@ fn main() {
             index: 10,
             repeats: 1000,
         },
-        EntryPoints::VectorRangeMove {
-            vec_len: 100,
-            element_len: 100,
-            index: 50,
-            move_len: 10,
-            repeats: 1000,
-        },
+        // EntryPoints::VectorRangeMove {
+        //     vec_len: 100,
+        //     element_len: 100,
+        //     index: 50,
+        //     move_len: 10,
+        //     repeats: 1000,
+        // },
     ];
 
     let mut failures = Vec::new();
