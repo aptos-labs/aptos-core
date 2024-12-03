@@ -78,8 +78,8 @@ impl Default for ConsensusObserverConfig {
             subscription_refresh_interval_ms: 600_000,         // 10 minutes
             observer_fallback_duration_ms: 600_000,            // 10 minutes
             observer_fallback_startup_period_ms: 60_000,       // 60 seconds
-            observer_fallback_progress_threshold_ms: 10_000,   // 10 seconds
-            observer_fallback_sync_lag_threshold_ms: 15_000,   // 15 seconds
+            observer_fallback_progress_threshold_ms: 1000_000,   // 1000 seconds
+            observer_fallback_sync_lag_threshold_ms: 1000_000,   // 1000 seconds
         }
     }
 }
