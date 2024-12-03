@@ -35,21 +35,14 @@ impl ScriptTransactions {
         account_manager: &mut AccountManager,
     ) -> anyhow::Result<()> {
         // Get all accounts that'll be used in this run.
-        // TODO: improve this to support account address as argument.
-        let mut account_symbols: HashMap<String, Account> = HashMap::new();
-        for transaction in &self.transactions {
-            account_symbols.insert(
-                transaction.sender_address.clone(),
-                account_manager.allocate_account()?,
-            );
-        }
         let mut versions_to_capture = vec![];
         for transaction in &self.transactions {
-            let sender_account = account_symbols
-                .get(transaction.sender_address.as_str())
+            let sender_account = account_manager
+                .get_account(&transaction.sender_address)
                 .unwrap();
+
             let version = self
-                .execute_script_transaction(move_folder_path, transaction, sender_account)
+                .execute_script_transaction(move_folder_path, transaction, &sender_account)
                 .await?;
             if let Some(output_name) = &transaction.output_name {
                 versions_to_capture.push((version, output_name.clone()));
