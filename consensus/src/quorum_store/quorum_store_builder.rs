@@ -235,6 +235,7 @@ impl InnerBuilder {
             .get_latest_ledger_info()
             .expect("could not get latest ledger info");
         let last_committed_timestamp = latest_ledger_info_with_sigs.commit_info().timestamp_usecs();
+        let is_new_epoch = latest_ledger_info_with_sigs.ledger_info().ends_epoch();
 
         let batch_requester = BatchRequester::new(
             self.epoch,
@@ -248,6 +249,7 @@ impl InnerBuilder {
         );
         let batch_store = Arc::new(BatchStore::new(
             self.epoch,
+            is_new_epoch,
             last_committed_timestamp,
             self.quorum_store_storage.clone(),
             self.config.memory_quota,
