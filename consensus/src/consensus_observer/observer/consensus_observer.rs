@@ -593,10 +593,10 @@ impl ConsensusObserver {
         let mut block_id = commit_proof.commit_info().id();
         while let Some(block) = tree.blocks.get(&block_id) {
             if let Some(tx) = block.pipeline_tx().lock().as_mut() {
-                info!("[CO] Sending order proof for block: {}", block);
-                let _ = tx.order_proof_tx.send(());
-                info!("[CO] Sending commit proof for block: {}", block);
-                let _ = tx.commit_proof_tx.send(commit_proof.clone());
+                tx.order_proof_tx.take().map(|tx| tx.send(()));
+                tx.commit_proof_tx
+                    .take()
+                    .map(|tx| tx.send(commit_proof.clone()));
             }
             block_id = block.parent_id();
             if block_id == tree.committed_root.commit_info().id() {
@@ -729,8 +729,7 @@ impl ConsensusObserver {
         let mut block_id = proof.commit_info().id();
         while let Some(block) = tree.blocks.get(&block_id) {
             if let Some(tx) = block.pipeline_tx().lock().as_mut() {
-                info!("[CO] Sending order proof for block: {}", block);
-                let _ = tx.order_proof_tx.send(());
+                tx.order_proof_tx.take().map(|tx| tx.send(()));
             }
             block_id = block.parent_id();
             if block_id == tree.ordered_root.commit_info().id() {
