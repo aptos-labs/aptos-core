@@ -22,6 +22,10 @@ TESTNET_SNAPSHOT_NAME = "testnet-archive"
 MAINNET_SNAPSHOT_NAME = "mainnet-archive"
 
 
+def get_region_from_zone(zone):
+    return zone.rsplit("-", 1)[0]
+
+
 def get_kubectl_credentials(project_id, region, cluster_name):
     try:
         # Command to get kubectl credentials for the cluster
@@ -141,6 +145,8 @@ def create_snapshot_with_gcloud(
         source_disk_link,
         "--project",
         target_project,
+        "--storage-location",
+        get_region_from_zone(source_zone),
     ]
 
     try:
@@ -154,6 +160,22 @@ def create_snapshot_with_gcloud(
     except subprocess.CalledProcessError as e:
         print(f"Error creating snapshot: {e}")
         raise Exception(f"Error creating snapshot: {e}")
+
+
+def delete_disk(disk_client, project, zone, disk_name):
+    # Check if the disk already exists
+
+    try:
+        disk = disk_client.get(project=project, zone=zone, disk=disk_name)
+        logger.info(f"Disk {disk_name} already exists. Deleting it.")
+        # Delete the existing disk
+        operation = disk_client.delete(project=project, zone=zone, disk=disk_name)
+        wait_for_operation(
+            project, zone, operation.name, compute_v1.ZoneOperationsClient()
+        )
+        logger.info(f"Disk {disk_name} deleted.")
+    except Exception as e:
+        logger.info(f"Disk {e} {disk_name} does not exist, no delete needed.")
 
 
 # Creating disk from import snapshots
@@ -172,19 +194,7 @@ def create_disk_pv_pvc_from_snapshot(
 ):
     disk_client = compute_v1.DisksClient()
     snapshot_client = compute_v1.SnapshotsClient()
-
-    # Check if the disk already exists
-    try:
-        disk = disk_client.get(project=project, zone=zone, disk=disk_name)
-        logger.info(f"Disk {disk_name} already exists. Deleting it.")
-        # Delete the existing disk
-        operation = disk_client.delete(project=project, zone=zone, disk=disk_name)
-        wait_for_operation(
-            project, zone, operation.name, compute_v1.ZoneOperationsClient()
-        )
-        logger.info(f"Disk {disk_name} deleted.")
-    except Exception as e:
-        logger.info(f"Disk {e} {disk_name} does not exist. Creating a new one.")
+    delete_disk(disk_client, project, zone, disk_name)
 
     # Create a new disk from the snapshot
     logger.info(f"Creating disk {disk_name} from snapshot {og_snapshot_name}.")
@@ -199,14 +209,16 @@ def create_disk_pv_pvc_from_snapshot(
     wait_for_operation(project, zone, operation.name, compute_v1.ZoneOperationsClient())
     logger.info(f"Disk {disk_name} created from snapshot {og_snapshot_name}.")
 
-    region_name = zone.rsplit("-", 1)[0]
+    region_name = get_region_from_zone(zone)
     get_kubectl_credentials(project, region_name, cluster_name)
     # create_persistent_volume(disk_name, pv_name, pvc_name, namespace, True)
     # this is only for xfs replaying logs to repair the disk
     repair_pv = f"{pv_name}-repair"
     repair_pvc = f"{pvc_name}-repair"
     repair_job_name = f"xfs-repair-{pvc_name}"
-    create_persistent_volume(disk_name, repair_pv, repair_pvc, namespace, False)
+    create_persistent_volume(
+        project, zone, disk_name, repair_pv, repair_pvc, namespace, False
+    )
     # start a pod to mount the disk and run simple task
     with open("xfs-disk-repair.yaml", "r") as f:
         pod_manifest = yaml.safe_load(f)
@@ -228,6 +240,9 @@ def create_disk_pv_pvc_from_snapshot(
         time.sleep(10)
     logger.info(f"creating final snapshot")
     create_snapshot_with_gcloud(snapshot_name, project, disk_name, zone, project)
+    logger.info("deleting repair disks")
+    # delete the disk used for repair
+    delete_disk(disk_client, project, zone, disk_name)
 
 
 def is_job_pod_cleanedup(namespace, job_name):
@@ -255,7 +270,9 @@ def wait_for_operation(project, zone, operation_name, zone_operations_client):
         time.sleep(20)
 
 
-def create_persistent_volume(disk_name, pv_name, pvc_name, namespace, read_only):
+def create_persistent_volume(
+    project, zone, disk_name, pv_name, pvc_name, namespace, read_only
+):
     config.load_kube_config()
     v1 = client.CoreV1Api()
 
@@ -286,20 +303,22 @@ def create_persistent_volume(disk_name, pv_name, pvc_name, namespace, read_only)
             raise
 
     # Create PersistentVolume
+    volume_handle = f"projects/{project}/zones/{zone}/disks/{disk_name}"
     pv = client.V1PersistentVolume(
         api_version="v1",
         kind="PersistentVolume",
         metadata=client.V1ObjectMeta(name=pv_name),
         spec=client.V1PersistentVolumeSpec(
             capacity={"storage": "10000Gi"},
-            access_modes=["ReadOnlyMany"],
-            gce_persistent_disk=client.V1GCEPersistentDiskVolumeSource(
-                pd_name=disk_name,
+            access_modes=["ReadWriteOnce"],
+            csi=client.V1CSIPersistentVolumeSource(
+                driver="pd.csi.storage.gke.io",
+                volume_handle=volume_handle,
                 fs_type="xfs",
                 read_only=read_only,
             ),
-            persistent_volume_reclaim_policy="Retain",
-            storage_class_name="standard",
+            persistent_volume_reclaim_policy="Retain",  # this is to delete the PV and disk separately to speed up pv deletion
+            storage_class_name="ssd-data-xfs",
         ),
     )
 
@@ -309,9 +328,9 @@ def create_persistent_volume(disk_name, pv_name, pvc_name, namespace, read_only)
         kind="PersistentVolumeClaim",
         metadata=client.V1ObjectMeta(name=pvc_name, namespace=namespace),
         spec=client.V1PersistentVolumeClaimSpec(
-            access_modes=["ReadOnlyMany"],
+            access_modes=["ReadWriteOnce"],
             resources=client.V1ResourceRequirements(requests={"storage": "10000Gi"}),
-            storage_class_name="standard",
+            storage_class_name="ssd-data-xfs",
             volume_name=pv_name,
         ),
     )
@@ -427,7 +446,7 @@ def create_pvcs_from_snapshot(run_id, snapshot_name, namespace, pvc_num, label):
     return res
 
 
-def create_disk_pv_pvc(
+def create_repair_disk_and_its_snapshot(
     project, zone, cluster_name, og_snapshot_name, snapshot_name, prefix, namespace
 ):
     tasks = []
@@ -461,8 +480,6 @@ def create_disk_pv_pvc(
                 logger.info(f"Task result: {result}")
             except Exception as e:
                 logger.error(f"Task generated an exception: {e}")
-
-    # start a self deleteing job to mount the xfs disks for repairing
 
 
 def parse_args():
@@ -506,7 +523,7 @@ if __name__ == "__main__":
         source_namespace,
         project_id,
     )
-    create_disk_pv_pvc(
+    create_repair_disk_and_its_snapshot(
         project_id,
         zone,
         cluster_name,
