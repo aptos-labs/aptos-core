@@ -20,7 +20,7 @@ pub struct State {
     ///  N.b. this is not directly iteratable, one needs to make a `StateDelta`
     ///       between this and a `base_version` to list the updates or create a
     ///       new `State` at a descendant version.
-    shards: Arc<[MapLayer<StateKey, StateWrite>; NUM_STATE_SHARDS]>,
+    pub shards: Arc<[MapLayer<StateKey, StateWrite>; NUM_STATE_SHARDS]>,
     /// The total usage of the state at the current version.
     usage: StateStorageUsage,
 }
@@ -55,12 +55,27 @@ impl State {
         todo!()
     }
 
+    pub fn make_delta(&self, _base: &State) -> StateDelta {
+        // FIXME(aldenhu)
+        todo!()
+    }
+
     pub fn is_the_same(&self, _rhs: &Self) -> bool {
         // FIXME(aldenhu)
         todo!()
     }
 
     pub fn is_family(&self, _rhs: &State) -> bool {
+        // FIXME(aldenhu)
+        todo!()
+    }
+
+    pub fn follows(&self, _rhs: &State) -> bool {
+        // FIXME(aldenhu)
+        todo!()
+    }
+
+    pub fn count_items_heavy(&self) -> usize {
         // FIXME(aldenhu)
         todo!()
     }

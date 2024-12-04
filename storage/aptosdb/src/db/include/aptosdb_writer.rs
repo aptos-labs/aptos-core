@@ -31,12 +31,12 @@ impl DbWriter for AptosDB {
 
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["save_transactions__others"]);
 
-            // n.b make sure buffered_state.update() is called after all other commits are done, since
-            // internally it updates state_store.current_state which indicates the "pre-committed version"
             self.state_store.buffered_state().lock().update(
-                chunk.state_summary,
+                chunk.last_checkpoint(),
                 sync_commit || chunk.is_reconfig,
             )?;
+
+            self.state_store.current_state().set(chunk.state.clone());
 
             Ok(())
         })

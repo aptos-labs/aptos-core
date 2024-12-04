@@ -1,10 +1,14 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::{state::LedgerState, state_delta::StateDelta};
+use crate::state_store::{
+    state::{LedgerState, State},
+    state_delta::StateDelta,
+};
 use aptos_crypto::HashValue;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_types::{state_store::state_value::StateValue, transaction::Version};
+use derive_more::Deref;
 
 /// The data structure through which the entire state at a given
 /// version can be summarized to a concise digest (the root hash).
@@ -94,5 +98,21 @@ impl LedgerStateSummary {
 
     pub fn state_summary(&self) -> &StateSummary {
         &self.state_summary
+    }
+}
+
+#[derive(Clone, Debug, Deref)]
+pub struct StateWithSummary {
+    #[deref]
+    pub state: State,
+    pub summary: StateSummary,
+}
+
+impl StateWithSummary {
+    pub fn new_empty() -> Self {
+        Self {
+            state: State::new_empty(),
+            summary: StateSummary::new_empty(),
+        }
     }
 }

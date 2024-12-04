@@ -3,8 +3,8 @@
 
 use crate::state_store::{
     sharded_state_update_refs::ShardedStateUpdateRefs,
-    state::{LedgerState, State},
-    state_summary::LedgerStateSummary,
+    state::LedgerState,
+    state_summary::{LedgerStateSummary, StateWithSummary},
     state_view::cached_state_view::ShardedStateCache,
 };
 use aptos_types::transaction::{Transaction, TransactionInfo, TransactionOutput, Version};
@@ -15,7 +15,6 @@ pub struct ChunkToCommit<'a> {
     pub transactions: &'a [Transaction],
     pub transaction_outputs: &'a [TransactionOutput],
     pub transaction_infos: &'a [TransactionInfo],
-    pub last_state_checkpoint: Option<&'a State>,
     pub state: &'a LedgerState,
     pub state_summary: &'a LedgerStateSummary,
     pub state_update_refs: &'a ShardedStateUpdateRefs<'a>,
@@ -38,5 +37,12 @@ impl<'a> ChunkToCommit<'a> {
 
     pub fn expect_last_version(&self) -> Version {
         self.next_version() - 1
+    }
+
+    pub fn last_checkpoint(&self) -> StateWithSummary {
+        StateWithSummary {
+            state: self.state.last_checkpoint_state().clone(),
+            summary: self.state_summary.last_checkpoint_summary().clone(),
+        }
     }
 }

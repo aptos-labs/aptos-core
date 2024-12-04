@@ -62,6 +62,7 @@ use aptos_storage_interface::{
         sharded_state_update_refs::{ShardedStateUpdateRefs, StateUpdateRefWithOffset},
         state::{LedgerState, State},
         state_delta::StateDelta,
+        state_summary::StateWithSummary,
         state_update::StateValueWithVersionOpt,
         state_view::{
             async_proof_fetcher::AsyncProofFetcher,
@@ -233,7 +234,8 @@ impl DbReader for StateDb {
 
 impl DbReader for StateStore {
     fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>> {
-        Ok(self.persisted_state().clone())
+        // FIXME(aldenhu)
+        todo!()
     }
 
     /// Returns the latest state snapshot strictly before `next_version` if any.
@@ -343,9 +345,8 @@ impl StateStore {
         let buffered_state = if empty_buffered_state_for_restore {
             BufferedState::new(
                 &state_db,
-                StateDelta::new_empty(),
+                StateWithSummary::new_empty(),
                 buffered_state_target_items,
-                current_state.clone(),
                 persisted_state.clone(),
             )
         } else {
@@ -649,7 +650,7 @@ impl StateStore {
     }
 
     pub fn reset(&self) {
-        self.buffered_state.lock().drain();
+        self.buffered_state.lock().quit();
         *self.buffered_state.lock() = Self::create_buffered_state_from_latest_snapshot(
             &self.state_db,
             self.buffered_state_target_items,

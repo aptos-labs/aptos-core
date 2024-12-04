@@ -18,17 +18,22 @@ use crate::{
     },
     versioned_node_cache::VersionedNodeCache,
 };
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_logger::trace;
+use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{
     jmt_update_refs, jmt_updates,
-    state_store::{state_delta::StateDelta, NUM_STATE_SHARDS},
+    state_store::{state_delta::StateDelta, state_summary::StateWithSummary, NUM_STATE_SHARDS},
     Result,
 };
+use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
+use itertools::Itertools;
 use rayon::prelude::*;
 use static_assertions::const_assert;
 use std::{
+    collections::HashMap,
     sync::{
         mpsc,
         mpsc::{Receiver, SyncSender},
@@ -39,7 +44,9 @@ use std::{
 
 pub(crate) struct StateSnapshotCommitter {
     state_db: Arc<StateDb>,
-    state_snapshot_commit_receiver: Receiver<CommitMessage<Arc<StateDelta>>>,
+    /// Last snapshot merklized and sent for persistence, not guaranteed to have committed already.
+    last_snapshot: StateWithSummary,
+    state_snapshot_commit_receiver: Receiver<CommitMessage<StateWithSummary>>,
     state_merkle_batch_commit_sender: SyncSender<CommitMessage<StateMerkleBatch>>,
     join_handle: Option<JoinHandle<()>>,
 }
@@ -49,7 +56,8 @@ impl StateSnapshotCommitter {
 
     pub fn new(
         state_db: Arc<StateDb>,
-        state_snapshot_commit_receiver: Receiver<CommitMessage<Arc<StateDelta>>>,
+        state_snapshot_commit_receiver: Receiver<CommitMessage<StateWithSummary>>,
+        last_snapshot: StateWithSummary,
         persisted_state: Arc<Mutex<PersistedState>>,
     ) -> Self {
         // Note: This is to ensure we cache nodes in memory from previous batches before they get committed to DB.
@@ -73,19 +81,19 @@ impl StateSnapshotCommitter {
             .expect("Failed to spawn state merkle batch committer thread.");
         Self {
             state_db,
+            last_snapshot,
             state_snapshot_commit_receiver,
             state_merkle_batch_commit_sender,
             join_handle: Some(join_handle),
         }
     }
 
-    pub fn run(self) {
-        /*
+    pub fn run(mut self) {
         while let Ok(msg) = self.state_snapshot_commit_receiver.recv() {
             match msg {
-                CommitMessage::Data(delta_to_commit) => {
-                    let version = delta_to_commit.current_version.expect("Cannot be empty");
-                    let base_version = delta_to_commit.base_version;
+                CommitMessage::Data(snapshot) => {
+                    let version = snapshot.version().expect("Cannot be empty");
+                    let base_version = self.last_snapshot.version();
                     let previous_epoch_ending_version = self
                         .state_db
                         .ledger_db
@@ -95,9 +103,8 @@ impl StateSnapshotCommitter {
                         .map(|(v, _e)| v);
 
                     let (shard_root_nodes, batches_for_shards) = {
-                        let _timer = OTHER_TIMERS_SECONDS
-                            .with_label_values(&["calculate_batches_for_shards"])
-                            .start_timer();
+                        let _timer =
+                            OTHER_TIMERS_SECONDS.timer_with(&["calculate_batches_for_shards"]);
 
                         let shard_persisted_versions = self
                             .state_db
@@ -109,18 +116,30 @@ impl StateSnapshotCommitter {
                             (0..NUM_STATE_SHARDS as u8)
                                 .into_par_iter()
                                 .map(|shard_id| {
-                                    let node_hashes = delta_to_commit
-                                        .current
-                                        .new_node_hashes_since(&delta_to_commit.base, shard_id);
+                                    let node_hashes = snapshot
+                                        .summary
+                                        .global_state_summary
+                                        .new_node_hashes_since(
+                                            &self.last_snapshot.summary.global_state_summary,
+                                            shard_id,
+                                        );
+                                    // TODO(aldenhu): iterator of refs
+                                    let updates = snapshot.state.shards[shard_id as usize]
+                                        .view_layers_after(
+                                            &self.last_snapshot.state.shards[shard_id as usize],
+                                        )
+                                        .iter()
+                                        .map(|(k, w)| {
+                                            (
+                                                CryptoHash::hash(&k),
+                                                w.value.map(|v| (CryptoHash::hash(&v), k)),
+                                            )
+                                        })
+                                        .collect_vec();
+
                                     self.state_db.state_merkle_db.merklize_value_set_for_shard(
                                         shard_id,
-                                        jmt_update_refs(&jmt_updates(
-                                            &delta_to_commit.updates_since_base.shards
-                                                [shard_id as usize]
-                                                .iter()
-                                                .map(|(k, v)| (k, v.as_ref()))
-                                                .collect(),
-                                        )),
+                                        jmt_update_refs(&updates),
                                         Some(&node_hashes),
                                         version,
                                         base_version,
@@ -155,9 +174,11 @@ impl StateSnapshotCommitter {
                             top_levels_batch,
                             batches_for_shards,
                             root_hash,
-                            state_delta: delta_to_commit,
+                            snapshot: snapshot.clone(),
                         }))
                         .unwrap();
+
+                    self.last_snapshot = snapshot;
                 },
                 CommitMessage::Sync(finish_sender) => {
                     self.state_merkle_batch_commit_sender
@@ -173,9 +194,6 @@ impl StateSnapshotCommitter {
             }
             trace!("State snapshot committing thread exit.")
         }
-        FIXME(aldenhu)
-         */
-        todo!()
     }
 }
 

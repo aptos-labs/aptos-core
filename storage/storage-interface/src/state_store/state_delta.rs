@@ -119,6 +119,11 @@ impl StateDelta {
         // FIXME(aldenhu)
         todo!()
     }
+
+    pub fn count_items_heavy(&self) -> usize {
+        // FIXME(aldenhu)
+        todo!()
+    }
 }
 
 impl Default for StateDelta {

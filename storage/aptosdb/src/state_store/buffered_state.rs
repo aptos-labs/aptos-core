@@ -21,8 +21,10 @@ use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{
     db_ensure as ensure,
     state_store::{
-        sharded_state_updates::ShardedStateUpdates, state::State, state_delta::StateDelta,
-        state_summary::LedgerStateSummary,
+        sharded_state_updates::ShardedStateUpdates,
+        state::State,
+        state_delta::StateDelta,
+        state_summary::{LedgerStateSummary, StateWithSummary},
     },
     AptosDbError, Result,
 };
@@ -38,16 +40,20 @@ use std::{
 pub(crate) const ASYNC_COMMIT_CHANNEL_BUFFER_SIZE: u64 = 1;
 pub(crate) const TARGET_SNAPSHOT_INTERVAL_IN_VERSION: u64 = 100_000;
 
-/// The in-memory buffered state that consists of two pieces:
-/// `state_until_checkpoint`: The ready-to-commit data in range (last snapshot, latest checkpoint].
-/// `state_after_checkpoint`: The pending data from the latest checkpoint(exclusive) until the
-/// latest version committed, which has not reached the next checkpoint.
-/// Since these are divided by the latest checkpoint, it is guaranteed
-/// state_until_checkpoint.current = state_after_checkpoint.base, same for their versions.
+/// BufferedState manages a range of recent state checkpoints and asynchronously commits
+/// the updates in batches.
 #[derive(Debug)]
 pub struct BufferedState {
-    current_state: Arc<Mutex<CurrentState>>,
-    state_commit_sender: SyncSender<CommitMessage<Arc<StateDelta>>>,
+    /// Needed for estimating the size of the buffer by counting the diff between this and a later
+    /// checkpoint added via `update()`
+    latest_checkpoint: StateWithSummary,
+    /// The most recent checkpoint sent for persistence, not guaranteed to have committed already.
+    last_snapshot: StateWithSummary,
+    /// channel to send a checkpoint for persistence asynchronously
+    state_commit_sender: SyncSender<CommitMessage<StateWithSummary>>,
+    /// Estimated number of items in the buffer.
+    estimated_items: usize,
+    /// The target number of items in the buffer between commits.
     target_items: usize,
     join_handle: Option<JoinHandle<()>>,
 }
@@ -61,19 +67,16 @@ pub(crate) enum CommitMessage<T> {
 impl BufferedState {
     pub(crate) fn new(
         state_db: &Arc<StateDb>,
-        state_after_checkpoint: StateDelta,
+        last_snapshot: StateWithSummary,
         target_items: usize,
-        current_state: Arc<Mutex<CurrentState>>,
         persisted_state: Arc<Mutex<PersistedState>>,
     ) -> Self {
-        /*
         let (state_commit_sender, state_commit_receiver) =
             mpsc::sync_channel(ASYNC_COMMIT_CHANNEL_BUFFER_SIZE as usize);
         let arc_state_db = Arc::clone(state_db);
-        persisted_state
-            .lock()
-            .set(state_after_checkpoint.base.clone());
+        persisted_state.lock().set(last_snapshot.clone());
         let persisted_state_clone = persisted_state.clone();
+        let last_snapshot_clone = last_snapshot.clone();
         // Create a new thread with receiver subscribing to state commit changes
         let join_handle = std::thread::Builder::new()
             .name("state-committer".to_string())
@@ -81,77 +84,62 @@ impl BufferedState {
                 let committer = StateSnapshotCommitter::new(
                     arc_state_db,
                     state_commit_receiver,
+                    last_snapshot_clone,
                     persisted_state_clone,
                 );
                 committer.run();
             })
             .expect("Failed to spawn state committer thread.");
-        current_state.lock().set(state_after_checkpoint.clone());
         let myself = Self {
-            state_until_checkpoint: None,
-            state_after_checkpoint: current_state.clone(),
+            latest_checkpoint: last_snapshot.clone(),
+            last_snapshot,
             state_commit_sender,
+            estimated_items: 0,
             target_items,
             // The join handle of the async state commit thread for graceful drop.
             join_handle: Some(join_handle),
         };
         myself.report_latest_committed_version();
         myself
-        FIXME(aldenhu)
-         */
-        todo!()
     }
 
     /// This method checks whether a commit is needed based on the target_items value and the number of items in state_until_checkpoint.
     /// If a commit is needed, it sends a CommitMessage::Data message to the StateSnapshotCommitter thread to commit the data.
     /// If sync_commit is true, it also sends a CommitMessage::Sync message to ensure that the commit is completed before returning.
     fn maybe_commit(&mut self, sync_commit: bool) {
-        /*
-        if sync_commit {
-            let (commit_sync_sender, commit_sync_receiver) = mpsc::channel();
-            if let Some(to_commit) = self.state_until_checkpoint.take().map(Arc::from) {
-                self.state_commit_sender
-                    .send(CommitMessage::Data(to_commit))
-                    .unwrap();
-            }
-            self.state_commit_sender
-                .send(CommitMessage::Sync(commit_sync_sender))
-                .unwrap();
-            commit_sync_receiver.recv().unwrap(); // blocks until the to_commit is received.
-        } else if self.state_until_checkpoint.is_some() {
-            let take_out_to_commit = {
-                let state_until_checkpoint =
-                    self.state_until_checkpoint.as_ref().expect("Must exist");
-                state_until_checkpoint
-                    .updates_since_base
-                    .shards
-                    .iter()
-                    .map(|shard| shard.len())
-                    .sum::<usize>()
-                    >= self.target_items
-                    || state_until_checkpoint.current_version.map_or(0, |v| v + 1)
-                        - state_until_checkpoint.base_version.map_or(0, |v| v + 1)
-                        >= TARGET_SNAPSHOT_INTERVAL_IN_VERSION
-            };
-            if take_out_to_commit {
-                let to_commit: Arc<StateDelta> = self
-                    .state_until_checkpoint
-                    .take()
-                    .map(Arc::from)
-                    .expect("Must exist");
-                info!(
-                    base_version = to_commit.base_version,
-                    version = to_commit.current_version,
-                    "Sent StateDelta to async commit thread."
-                );
-                self.state_commit_sender
-                    .send(CommitMessage::Data(to_commit))
-                    .unwrap();
-            }
+        if sync_commit
+            || self.estimated_items >= self.target_items
+            || self.buffered_versions() >= TARGET_SNAPSHOT_INTERVAL_IN_VERSION
+        {
+            self.enqueue_commit();
         }
-        FIXME(aldenhu)
-         */
-        todo!()
+        if sync_commit {
+            self.drain_commits();
+        }
+    }
+
+    fn buffered_versions(&self) -> u64 {
+        self.latest_checkpoint.next_version() - self.last_snapshot.next_version()
+    }
+
+    fn enqueue_commit(&mut self) {
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___enqueue_commit"]);
+
+        self.state_commit_sender
+            .send(CommitMessage::Data(self.latest_checkpoint.clone()))
+            .unwrap();
+        self.estimated_items = 0;
+        self.last_snapshot = self.latest_checkpoint.clone();
+    }
+
+    fn drain_commits(&mut self) {
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___drain_commits"]);
+
+        let (commit_sync_sender, commit_sync_receiver) = mpsc::channel();
+        self.state_commit_sender
+            .send(CommitMessage::Sync(commit_sync_sender))
+            .unwrap();
+        commit_sync_receiver.recv().unwrap();
     }
 
     pub(crate) fn sync_commit(&mut self) {
@@ -159,62 +147,28 @@ impl BufferedState {
     }
 
     fn report_latest_committed_version(&self) {
-        LATEST_CHECKPOINT_VERSION.set(self.current_state.lock().version().map_or(-1, |v| v as i64));
+        LATEST_CHECKPOINT_VERSION.set(self.latest_checkpoint.version().map_or(-1, |v| v as i64));
     }
 
     /// This method updates the buffered state with new data.
-    pub fn update(&mut self, state_summary: &LedgerStateSummary, sync_commit: bool) -> Result<()> {
-        /* FIXME(aldenhu)
+    pub fn update(&mut self, latest_checkpoint: StateWithSummary, sync_commit: bool) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___update"]);
 
-        assert!(new_state_after_checkpoint
-            .current
-            .is_family(&state_after_checkpoint.current));
-        ensure!(
-            new_state_after_checkpoint.base_version >= state_after_checkpoint.base_version,
-            "new state base version smaller than state after checkpoint base version",
-        );
-        if let Some(updates_until_next_checkpoint_since_current) =
-            updates_until_next_checkpoint_since_current_option
-        {
-            ensure!(
-                new_state_after_checkpoint.base_version > state_after_checkpoint.base_version,
-                "Diff between base and latest checkpoints provided, while they are the same.",
-            );
-            state_after_checkpoint
-                .updates_since_base
-                .clone_merge(updates_until_next_checkpoint_since_current);
+        assert!(latest_checkpoint.follows(&self.latest_checkpoint));
+        self.estimated_items += {
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___count_items_heavy"]);
+            latest_checkpoint
+                .make_delta(&self.latest_checkpoint)
+                .count_items_heavy()
+        };
+        self.latest_checkpoint = latest_checkpoint;
 
-            let mut old_state =
-                state_after_checkpoint.replace_with(new_state_after_checkpoint.clone());
-            old_state.current = state_after_checkpoint.base.clone();
-            old_state.current_version = state_after_checkpoint.base_version;
-
-            if let Some(ref mut delta) = self.state_until_checkpoint {
-                delta.merge(old_state);
-            } else {
-                self.state_until_checkpoint = Some(Box::new(old_state));
-            }
-        } else {
-            ensure!(
-                new_state_after_checkpoint.base_version == state_after_checkpoint.base_version,
-                "Diff between base and latest checkpoints not provided.",
-            );
-            state_after_checkpoint.set(new_state_after_checkpoint.clone());
-        }
-
-        // n.b. make sure these are called after self.state_after_checkpoint is unlocked.
-        //      otherwise things reading the "pre-committed version" will be blocked by
-        //      the buffered state lock.
         self.maybe_commit(sync_commit);
         self.report_latest_committed_version();
         Ok(())
-
-         */
-        todo!()
     }
 
-    pub(crate) fn drain(&mut self) {
+    pub(crate) fn quit(&mut self) {
         if let Some(handle) = self.join_handle.take() {
             self.sync_commit();
             self.state_commit_sender.send(CommitMessage::Exit).unwrap();
@@ -227,6 +181,6 @@ impl BufferedState {
 
 impl Drop for BufferedState {
     fn drop(&mut self) {
-        self.drain()
+        self.quit()
     }
 }
