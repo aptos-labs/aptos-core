@@ -347,25 +347,27 @@ public fun m::inner_value($t0: 0xc0ffee::m::Inner): u64 {
      var $t5: u64
      var $t6: u64
      var $t7: u64
+     var $t8: u64
   0: $t2 := borrow_local($t0)
   1: $t3 := test_variant 0xc0ffee::m::Inner::Inner1($t2)
   2: if ($t3) goto 3 else goto 7
   3: label L2
   4: $t4 := unpack_variant 0xc0ffee::m::Inner::Inner1($t0)
   5: $t1 := infer($t4)
-  6: goto 17
+  6: goto 18
   7: label L1
   8: $t3 := test_variant 0xc0ffee::m::Inner::Inner2($t2)
-  9: if ($t3) goto 10 else goto 14
+  9: if ($t3) goto 10 else goto 15
  10: label L4
  11: ($t5, $t6) := unpack_variant 0xc0ffee::m::Inner::Inner2($t0)
- 12: $t1 := +($t5, $t6)
- 13: goto 17
- 14: label L3
- 15: $t7 := 14566554180833181697
- 16: abort($t7)
- 17: label L0
- 18: return $t1
+ 12: $t7 := infer($t5)
+ 13: $t1 := +($t7, $t6)
+ 14: goto 18
+ 15: label L3
+ 16: $t8 := 14566554180833181697
+ 17: abort($t8)
+ 18: label L0
+ 19: return $t1
 }
 
 
