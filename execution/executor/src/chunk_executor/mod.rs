@@ -24,8 +24,11 @@ use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeHelper, TimerHelper};
 use aptos_storage_interface::{
-    async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView,
-    state_delta::StateDelta, DbReaderWriter,
+    state_store::{
+        state_delta::StateDelta,
+        state_view::{async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView},
+    },
+    DbReaderWriter,
 };
 use aptos_types::{
     block_executor::{

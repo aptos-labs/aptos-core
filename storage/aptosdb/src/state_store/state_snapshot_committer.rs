@@ -7,16 +7,20 @@ use crate::{
     metrics::OTHER_TIMERS_SECONDS,
     state_store::{
         buffered_state::CommitMessage,
+        persisted_state::PersistedState,
         state_merkle_batch_committer::{StateMerkleBatch, StateMerkleBatchCommitter},
         StateDb,
     },
     versioned_node_cache::VersionedNodeCache,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
+use aptos_infallible::Mutex;
 use aptos_logger::trace;
-use aptos_scratchpad::SmtAncestors;
-use aptos_storage_interface::{jmt_update_refs, jmt_updates, state_delta::StateDelta, Result};
-use aptos_types::state_store::{state_value::StateValue, NUM_STATE_SHARDS};
+use aptos_storage_interface::{
+    jmt_update_refs, jmt_updates,
+    state_store::{state_delta::StateDelta, NUM_STATE_SHARDS},
+    Result,
+};
 use rayon::prelude::*;
 use static_assertions::const_assert;
 use std::{
@@ -41,7 +45,7 @@ impl StateSnapshotCommitter {
     pub fn new(
         state_db: Arc<StateDb>,
         state_snapshot_commit_receiver: Receiver<CommitMessage<Arc<StateDelta>>>,
-        smt_ancestors: SmtAncestors<StateValue>,
+        persisted_state: Arc<Mutex<PersistedState>>,
     ) -> Self {
         // Note: This is to ensure we cache nodes in memory from previous batches before they get committed to DB.
         const_assert!(
@@ -57,7 +61,7 @@ impl StateSnapshotCommitter {
                 let committer = StateMerkleBatchCommitter::new(
                     arc_state_db,
                     state_merkle_batch_commit_receiver,
-                    smt_ancestors,
+                    persisted_state,
                 );
                 committer.run();
             })

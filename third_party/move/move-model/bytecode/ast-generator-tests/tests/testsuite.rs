@@ -96,22 +96,22 @@ fn generate_output(target: &FunctionTarget, test_output: &mut String) -> Option<
     };
     *test_output += &format!(
         "--- Raw Generated AST\n{}\n\n",
-        exp.display_for_fun(target.func_env.clone())
+        exp.display_for_fun(target.func_env)
     );
     let exp = astifier::transform_assigns(target, exp);
     *test_output += &format!(
         "--- Assign-Transformed Generated AST\n{}\n\n",
-        exp.display_for_fun(target.func_env.clone())
+        exp.display_for_fun(target.func_env)
     );
     let exp = astifier::transform_conditionals(target, exp);
     *test_output += &format!(
         "--- If-Transformed Generated AST\n{}\n\n",
-        exp.display_for_fun(target.func_env.clone())
+        exp.display_for_fun(target.func_env)
     );
     let exp = astifier::bind_free_vars(target, exp);
     *test_output += &format!(
         "--- Var-Bound Generated AST\n{}\n\n",
-        exp.display_for_fun(target.func_env.clone())
+        exp.display_for_fun(target.func_env)
     );
     Some(exp)
 }

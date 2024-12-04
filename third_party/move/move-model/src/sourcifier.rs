@@ -4,7 +4,8 @@
 
 use crate::{
     ast::{
-        AddressSpecifier, Exp, ExpData, Operation, Pattern, ResourceSpecifier, TempIndex, Value,
+        self, AddressSpecifier, Exp, ExpData, LambdaCaptureKind, Operation, Pattern,
+        ResourceSpecifier, TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -284,6 +285,15 @@ impl<'a> Sourcifier<'a> {
                     emit!(self.writer, "{}", self.env().display(address))
                 })
             },
+            Value::Function(mid, fid) => {
+                emit!(
+                    self.writer,
+                    "{}",
+                    self.env()
+                        .get_function(mid.qualified(*fid))
+                        .get_full_name_str()
+                );
+            },
         }
     }
 
@@ -525,9 +535,22 @@ impl<'a> ExpSourcifier<'a> {
         match exp.as_ref() {
             // Following forms are all atomic and do not require parenthesis
             Invalid(_) => emit!(self.wr(), "*invalid*"),
-            Value(_, v) => {
+            Value(id, v) => {
                 let ty = self.env().get_node_type(exp.node_id());
-                self.parent.print_value(v, Some(&ty))
+                self.parent.print_value(v, Some(&ty));
+                if let ast::Value::Function(..) = v {
+                    let type_inst = self.env().get_node_instantiation(*id);
+                    if !type_inst.is_empty() {
+                        emit!(
+                            self.wr(),
+                            "<{}>",
+                            type_inst
+                                .iter()
+                                .map(|ty| ty.display(&self.type_display_context))
+                                .join(", ")
+                        );
+                    }
+                }
             },
             LocalVar(_, name) => {
                 emit!(self.wr(), "{}", self.sym(*name))
@@ -540,12 +563,19 @@ impl<'a> ExpSourcifier<'a> {
                 }
             },
             // Following forms may require parenthesis
-            Lambda(_, pat, body) => {
+            Lambda(_, pat, body, capture_kind, abilities) => {
                 self.parenthesize(context_prio, Prio::General, || {
+                    if *capture_kind != LambdaCaptureKind::Default {
+                        emit!(self.wr(), "{} ", capture_kind);
+                    };
                     emit!(self.wr(), "|");
                     self.print_pat(pat);
                     emit!(self.wr(), "| ");
-                    self.print_exp(Prio::General, true, body)
+                    self.print_exp(Prio::General, true, body);
+                    if !abilities.is_subset(AbilitySet::FUNCTIONS) {
+                        let abilities_as_str = abilities.iter().map(|a| a.to_string()).join("+");
+                        emit!(self.wr(), " with {}", abilities_as_str);
+                    }
                 });
             },
             Block(..) | Sequence(..) => {
@@ -793,6 +823,11 @@ impl<'a> ExpSourcifier<'a> {
                     self.print_exp_list("(", ")", args)
                 })
             },
+            Operation::EarlyBind => self.parenthesize(context_prio, Prio::Postfix, || {
+                emit!(self.wr(), "earlybind");
+                self.print_node_inst(id);
+                self.print_exp_list("(", ")", args)
+            }),
             Operation::Pack(mid, sid, variant) => {
                 self.parenthesize(context_prio, Prio::Postfix, || {
                     let qid = mid.qualified_inst(*sid, self.env().get_node_instantiation(id));
@@ -962,7 +997,6 @@ impl<'a> ExpSourcifier<'a> {
             | Operation::EventStoreIncludes
             | Operation::EventStoreIncludedIn
             | Operation::SpecFunction(_, _, _)
-            | Operation::Closure(_, _)
             | Operation::UpdateField(_, _, _)
             | Operation::Result(_)
             | Operation::Index
@@ -1024,7 +1058,11 @@ impl<'a> ExpSourcifier<'a> {
         self.parenthesize(context_prio, prio, || {
             self.print_exp(prio, false, &args[0]);
             emit!(self.wr(), " {} ", repr);
-            self.print_exp(prio + 1, false, &args[1])
+            if args.len() > 1 {
+                self.print_exp(prio + 1, false, &args[1])
+            } else {
+                emit!(self.wr(), "ERROR")
+            }
         })
     }
 

@@ -19,7 +19,7 @@ use aptos_config::config::{
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_storage_interface::{DbReader, ExecutedTrees, Order};
+use aptos_storage_interface::{DbReader, LedgerSummary, Order};
 use aptos_temppath::TempPath;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -181,8 +181,8 @@ fn test_get_latest_executed_trees() {
     let db = AptosDB::new_for_test(&tmp_dir);
 
     // entirely empty db
-    let empty = db.get_latest_executed_trees().unwrap();
-    assert!(empty.is_same_view(&ExecutedTrees::new_empty()));
+    let empty = db.get_pre_committed_ledger_summary().unwrap();
+    assert!(empty.is_same_view(&LedgerSummary::new_empty()));
 
     // bootstrapped db (any transaction info is in)
     let key = StateKey::raw(b"test_key");
@@ -199,9 +199,9 @@ fn test_get_latest_executed_trees() {
     );
     put_transaction_infos(&db, 0, &[txn_info.clone()]);
 
-    let bootstrapped = db.get_latest_executed_trees().unwrap();
+    let bootstrapped = db.get_pre_committed_ledger_summary().unwrap();
     assert!(
-        bootstrapped.is_same_view(&ExecutedTrees::new_at_state_checkpoint(
+        bootstrapped.is_same_view(&LedgerSummary::new_at_state_checkpoint(
             txn_info.state_checkpoint_hash().unwrap(),
             StateStorageUsage::new_untracked(),
             vec![txn_info.hash()],

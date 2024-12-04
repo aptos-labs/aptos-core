@@ -1,0 +1,43 @@
+
+Diagnostics:
+error: unsupported language construct
+   ┌─ tests/lambda/storable/registry_ok.move:10:22
+   │
+10 │         f: |u64| u64 with store+copy,
+   │                      ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/registry_ok.move:29:84
+   │
+29 │     fun replace_or_add_function(v: &mut vector<Function>, k: u64, new_f: |u64| u64 with store+copy): Option<|u64| u64 with store+copy> {
+   │                                                                                    ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/registry_ok.move:29:119
+   │
+29 │     fun replace_or_add_function(v: &mut vector<Function>, k: u64, new_f: |u64| u64 with store+copy): Option<|u64| u64 with store+copy> {
+   │                                                                                                                       ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/registry_ok.move:53:47
+   │
+53 │     fun register(owner: &signer, f: |u64| u64 with store+copy, k: u64) acquires Registry {
+   │                                               ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/registry_ok.move:106:41
+    │
+106 │     fun multiply_by_x(x: u64): |u64|u64 with store {
+    │                                         ^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/registry_ok.move:110:42
+    │
+110 │     fun multiply_by_x2(x: u64): |u64|u64 with store {
+    │                                          ^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/registry_ok.move:111:9
+    │
+111 │         move |y| multiply(x, y)
+    │         ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression

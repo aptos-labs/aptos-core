@@ -821,6 +821,7 @@ impl AsyncTryInto<ChunkedPublishPayloads> for &PublishPackage {
             PublishType::AccountDeploy,
             None,
             self.chunked_publish_option.large_packages_module_address,
+            self.chunked_publish_option.chunk_size,
         )?;
 
         let size = &chunked_publish_payloads
@@ -1013,6 +1014,7 @@ fn create_chunked_publish_payloads(
     publish_type: PublishType,
     object_address: Option<AccountAddress>,
     large_packages_module_address: AccountAddress,
+    chunk_size: usize,
 ) -> CliTypedResult<ChunkedPublishPayloads> {
     let compiled_units = package.extract_code();
     let metadata = package.extract_metadata()?;
@@ -1030,6 +1032,7 @@ fn create_chunked_publish_payloads(
         publish_type,
         maybe_object_address,
         large_packages_module_address,
+        chunk_size,
     );
 
     Ok(ChunkedPublishPayloads { payloads })
@@ -1157,6 +1160,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 PublishType::AccountDeploy,
                 None,
                 self.chunked_publish_option.large_packages_module_address,
+                self.chunked_publish_option.chunk_size,
             )?
             .payloads;
             let staging_tx_count = (mock_payloads.len() - 1) as u64;
@@ -1183,6 +1187,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 PublishType::ObjectDeploy,
                 None,
                 self.chunked_publish_option.large_packages_module_address,
+                self.chunked_publish_option.chunk_size,
             )?
             .payloads;
 
@@ -1295,6 +1300,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
                 PublishType::ObjectUpgrade,
                 Some(self.object_address),
                 self.chunked_publish_option.large_packages_module_address,
+                self.chunked_publish_option.chunk_size,
             )?
             .payloads;
 
@@ -1386,6 +1392,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
                 PublishType::AccountDeploy,
                 None,
                 self.chunked_publish_option.large_packages_module_address,
+                self.chunked_publish_option.chunk_size,
             )?
             .payloads;
             let staging_tx_count = (mock_payloads.len() - 1) as u64;
@@ -1412,6 +1419,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
                 PublishType::ObjectDeploy,
                 None,
                 self.chunked_publish_option.large_packages_module_address,
+                self.chunked_publish_option.chunk_size,
             )?
             .payloads;
 
@@ -1530,6 +1538,7 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
                 PublishType::ObjectUpgrade,
                 Some(self.object_address),
                 self.chunked_publish_option.large_packages_module_address,
+                self.chunked_publish_option.chunk_size,
             )?
             .payloads;
 

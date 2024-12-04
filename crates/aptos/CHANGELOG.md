@@ -4,8 +4,10 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+## [4.6.0] - 2024/11/29
 - Add `--node-api-key` flag to `aptos move replay` to allow for querying the fullnode with an API key.
-
+- Add `--chunk-size` flag to allow configuring chunk size for chunked publish mode.
+- Lower the default chunk size for chunked publish mode (`CHUNK_SIZE_IN_BYTES`) from 60,000 to 55,000.
 
 ## [4.5.0] - 2024/11/15
 - Determine network from URL to make explorer links better for legacy users

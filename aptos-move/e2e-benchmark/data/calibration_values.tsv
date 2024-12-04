@@ -1,0 +1,26 @@
+Loop { loop_count: Some(100000), loop_type: NoOp }	60	0.960	1.119	42122.6
+Loop { loop_count: Some(10000), loop_type: Arithmetic }	60	0.956	1.074	26240.7
+CreateObjects { num_objects: 10, object_payload_size: 0 }	60	0.938	1.168	156.6
+CreateObjects { num_objects: 10, object_payload_size: 10240 }	60	0.924	1.086	9713.2
+CreateObjects { num_objects: 100, object_payload_size: 0 }	60	0.922	1.275	1577.0
+CreateObjects { num_objects: 100, object_payload_size: 10240 }	60	0.935	1.070	11728.7
+InitializeVectorPicture { length: 128 }	60	0.926	1.069	169.4
+VectorPicture { length: 128 }	60	0.908	1.075	50.2
+VectorPictureRead { length: 128 }	60	0.919	1.059	48.0
+InitializeVectorPicture { length: 30720 }	60	0.939	1.127	28404.4
+VectorPicture { length: 30720 }	60	0.936	1.095	6935.6
+VectorPictureRead { length: 30720 }	60	0.939	1.093	6948.2
+SmartTablePicture { length: 30720, num_points_per_txn: 200 }	60	0.947	1.080	43673.3
+SmartTablePicture { length: 1048576, num_points_per_txn: 300 }	60	0.947	1.111	74145.8
+ResourceGroupsSenderWriteTag { string_length: 1024 }	60	0.918	1.075	15.8
+ResourceGroupsSenderMultiChange { string_length: 1024 }	60	0.909	1.169	32.9
+TokenV1MintAndTransferFT	60	0.953	1.069	384.6
+TokenV1MintAndTransferNFTSequential	60	0.938	1.064	600.3
+TokenV2AmbassadorMint { numbered: true }	60	0.951	1.057	516.6
+LiquidityPoolSwap { is_stable: true }	60	0.961	1.139	582.6
+LiquidityPoolSwap { is_stable: false }	60	0.929	1.099	563.0
+CoinInitAndMint	60	0.928	1.130	205.0
+FungibleAssetMint	60	0.930	1.098	235.8
+IncGlobalMilestoneAggV2 { milestone_every: 1 }	60	0.914	1.051	33.5
+IncGlobalMilestoneAggV2 { milestone_every: 2 }	60	0.914	1.105	19.0
+EmitEvents { count: 1000 }	60	0.937	1.158	8818.7
