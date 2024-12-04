@@ -47,7 +47,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         name: "baseline",
         runner: |p| run(p, get_config_by_name("baseline")),
         experiments: &[],
-        language_version: LanguageVersion::V2_2,
+        language_version: LanguageVersion::latest_stable(),
         include: &[],
         exclude: &["/operator_eval/", "/access_control/"],
     },
