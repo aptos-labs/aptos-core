@@ -31,4 +31,14 @@ fun m::test(): u64 {
 }
 
 
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+test(): u64 /* def_idx: 0 */ {
+B0:
+	0: Branch(0)
+}
+}
 ============ bytecode verification succeeded ========
