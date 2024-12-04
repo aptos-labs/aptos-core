@@ -1233,7 +1233,7 @@ mod tests {
         match peer_manager_request_receiver.next().await {
             Some(PeerManagerRequest::SendRpc(_, network_request)) => {
                 // Parse the network request
-                let (_, data, response_sender, _) = network_request.into_parts();
+                let (_, _, data, response_sender, _) = network_request.into_parts();
                 let message: ConsensusObserverMessage = bcs::from_bytes(data.as_ref()).unwrap();
 
                 // Process the network message

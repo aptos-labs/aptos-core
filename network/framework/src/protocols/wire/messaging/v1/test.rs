@@ -4,9 +4,15 @@
 
 use super::*;
 use crate::{
-    protocols::stream::{InboundStreamBuffer, OutboundStream, StreamFragment, StreamHeader},
+    protocols::{
+        stream::{InboundStreamBuffer, OutboundStream, StreamFragment, StreamHeader},
+        wire::messaging::v1::metadata::{
+            MessageMetadata, MessageSendType, NetworkMessageWithMetadata,
+        },
+    },
     testutils::fake_socket::{ReadOnlyTestSocket, ReadWriteTestSocket},
 };
+use aptos_config::network_id::NetworkId;
 use aptos_memsocket::MemorySocket;
 use bcs::test_helpers::assert_canonical_encode_decode;
 use futures::{executor::block_on, future, sink::SinkExt, stream::StreamExt};
@@ -242,17 +248,20 @@ proptest! {
         let messages_clone = messages.clone();
         let f_stream_all = async move {
             for message in messages_clone {
-                if outbound_stream.should_stream(&message) {
-                    outbound_stream.stream_message(message).await.unwrap();
+                let message_metadata = MessageMetadata::new(NetworkId::Validator, None, MessageSendType::DirectSend, None);
+                let message_with_metadata = NetworkMessageWithMetadata::new(message_metadata, message);
+                if outbound_stream.should_stream(&message_with_metadata) {
+                    outbound_stream.stream_message(message_with_metadata).await.unwrap();
                 } else {
-                    msg_tx.send(MultiplexMessage::Message(message)).await.unwrap();
+                    msg_tx.send(message_with_metadata.into_multiplex_message()).await.unwrap();
                 }
             }
         };
 
         let f_send_all = async {
             let mut stream = select(msg_rx, stream_rx);
-            while let Some(message) = stream.next().await {
+            while let Some(message_with_metadata) = stream.next().await {
+                let (_, message) = message_with_metadata.into_parts();
                 message_tx.send(&message).await.unwrap();
             }
             message_tx.close().await.unwrap();
