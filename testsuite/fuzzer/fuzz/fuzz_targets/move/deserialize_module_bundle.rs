@@ -5,8 +5,9 @@
 use arbitrary::Arbitrary;
 use libfuzzer_sys::{fuzz_target, Corpus};
 // mod utils;
-use move_binary_format::{deserializer::DeserializerConfig, CompiledModule, file_format::CompiledScript};
-
+use move_binary_format::{
+    deserializer::DeserializerConfig, file_format::CompiledScript, CompiledModule,
+};
 
 #[derive(Arbitrary, Debug)]
 struct FuzzData {
@@ -15,9 +16,7 @@ struct FuzzData {
     script: CompiledScript,
 }
 
-fuzz_target!(|fuzz_data: FuzzData| -> Corpus {
-    run_case(&fuzz_data)
-});
+fuzz_target!(|fuzz_data: FuzzData| -> Corpus { run_case(&fuzz_data) });
 
 fn run_case(data: &FuzzData) -> Corpus {
     if data.flip {
@@ -28,7 +27,7 @@ fn run_case(data: &FuzzData) -> Corpus {
 }
 
 fn run_case_module(data: &FuzzData) -> Corpus {
-    let mut module_code  = vec![];
+    let mut module_code = vec![];
     if data.module.serialize(&mut module_code).is_err() {
         return Corpus::Reject;
     }
@@ -39,7 +38,7 @@ fn run_case_module(data: &FuzzData) -> Corpus {
 }
 
 fn run_case_script(data: &FuzzData) -> Corpus {
-    let mut script_code  = vec![];
+    let mut script_code = vec![];
     if data.script.serialize(&mut script_code).is_err() {
         return Corpus::Reject;
     }
