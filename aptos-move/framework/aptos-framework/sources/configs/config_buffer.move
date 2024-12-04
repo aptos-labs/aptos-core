@@ -5,7 +5,7 @@
 ///   - Implement `C::set_for_next_epoch()` using `upsert()` function in this module.
 ///   - Implement `C::on_new_epoch()` using `extract()` function in this module.
 ///   - Update `0x1::reconfiguration_with_dkg::finish()` to call `C::on_new_epoch()`.
-/// - Support sychronous update when DKG is disabled.
+/// - Support synchronous update when DKG is disabled.
 ///   This is typically done by implementing `C::set()` to update the config resource directly.
 ///
 /// NOTE: on-chain config `0x1::state::ValidatorSet` implemented its own buffer.
