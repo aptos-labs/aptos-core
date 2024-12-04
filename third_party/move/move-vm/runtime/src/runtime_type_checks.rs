@@ -29,6 +29,12 @@ pub(crate) trait RuntimeTypeCheck {
         ty_cache: &mut FrameTypeCache,
         instruction: &Bytecode,
     ) -> PartialVMResult<()>;
+
+    /// Paranoid check that operand and type stacks have the same size
+    fn check_operand_stack_balance(operand_stack: &Stack) -> PartialVMResult<()>;
+
+    /// For any other checks are performed externally
+    fn should_perform_checks() -> bool;
 }
 
 fn verify_pack<'a>(
@@ -90,6 +96,15 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
         _instruction: &Bytecode,
     ) -> PartialVMResult<()> {
         Ok(())
+    }
+
+    fn check_operand_stack_balance(_operand_stack: &Stack) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn should_perform_checks() -> bool {
+        false
     }
 }
 
@@ -687,5 +702,14 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
         }
         Ok(())
+    }
+
+    fn check_operand_stack_balance(operand_stack: &Stack) -> PartialVMResult<()> {
+        operand_stack.check_balance()
+    }
+
+    #[inline(always)]
+    fn should_perform_checks() -> bool {
+        true
     }
 }

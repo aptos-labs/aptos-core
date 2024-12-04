@@ -42,7 +42,7 @@ use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     db_ensure as ensure, db_other_bail as bail,
     state_store::sharded_state_updates::ShardedStateUpdates, AptosDbError, DbReader, DbWriter,
-    ExecutedTrees, Order, Result, StateSnapshotReceiver, MAX_REQUEST_LIMIT,
+    LedgerSummary, Order, Result, StateSnapshotReceiver, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     account_address::AccountAddress,

@@ -28,6 +28,7 @@ QUERY_DELAY = 5  # seconds
 
 REPLAY_CONCURRENCY_LEVEL = 1
 
+
 class Network(Enum):
     TESTNET = 1
     MAINNET = 2
@@ -241,6 +242,7 @@ class WorkerPod:
     def get_humio_log_link(self):
         return construct_humio_url(self.label, self.name, self.start_time, time.time())
 
+
 class ReplayConfig:
     def __init__(self, network):
         if network == Network.TESTNET:
@@ -253,8 +255,9 @@ class ReplayConfig:
             self.concurrent_replayer = 18
             self.pvc_number = 8
             self.min_range_size = 10_000
-            self.range_size = 2_000_000 
+            self.range_size = 2_000_000
             self.timeout_secs = 400
+
 
 class TaskStats:
     def __init__(self, name):
@@ -308,7 +311,7 @@ class ReplayScheduler:
         self.image = image
         self.pvcs = []
         self.config = replay_config
-        
+
     def __str__(self):
         return f"""ReplayScheduler:
             id: {self.id}
@@ -360,7 +363,11 @@ class ReplayScheduler:
             else MAINNET_SNAPSHOT_NAME
         )
         pvcs = create_pvcs_from_snapshot(
-            self.id, snapshot_name, self.namespace, self.config.pvc_number, self.get_label()
+            self.id,
+            snapshot_name,
+            self.namespace,
+            self.config.pvc_number,
+            self.get_label(),
         )
         assert len(pvcs) == self.config.pvc_number, "failed to create all pvcs"
         self.pvcs = pvcs
@@ -504,12 +511,16 @@ def get_image(image_tag=None):
     shell = forge.LocalShell()
     git = forge.Git(shell)
     image_name = "tools"
-    default_latest_image = forge.find_recent_images(
-        shell,
-        git,
-        1,
-        image_name=image_name,
-    )[0] if image_tag is None else image_tag
+    default_latest_image = (
+        forge.find_recent_images(
+            shell,
+            git,
+            1,
+            image_name=image_name,
+        )[0]
+        if image_tag is None
+        else image_tag
+    )
     full_image = f"{forge.GAR_REPO_NAME}/{image_name}:{default_latest_image}"
     return full_image
 
@@ -546,7 +557,7 @@ if __name__ == "__main__":
         range_size=range_size,
         image=image,
         replay_config=config,
-        network= network,
+        network=network,
         namespace=args.namespace,
     )
     logger.info(f"scheduler: {scheduler}")
@@ -561,6 +572,9 @@ if __name__ == "__main__":
             (failed_logs, txn_mismatch_logs) = scheduler.collect_all_failed_logs()
             scheduler.print_stats()
             print_logs(failed_logs, txn_mismatch_logs)
+            if txn_mismatch_logs:  
+                logger.error("Transaction mismatch logs found.")  
+                exit(1)  
 
         finally:
             scheduler.cleanup()

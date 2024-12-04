@@ -11,7 +11,7 @@ use crate::{
     },
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_storage_interface::{state_store::state_delta::StateDelta, DbReader, ExecutedTrees};
+use aptos_storage_interface::{state_store::state_delta::StateDelta, DbReader, LedgerSummary};
 use aptos_types::{proof::accumulator::InMemoryTransactionAccumulator, transaction::Version};
 use std::{collections::VecDeque, sync::Arc};
 
@@ -41,10 +41,10 @@ pub struct ChunkCommitQueue {
 
 impl ChunkCommitQueue {
     pub(crate) fn new_from_db(db: &Arc<dyn DbReader>) -> Result<Self> {
-        let ExecutedTrees {
+        let LedgerSummary {
             state,
             transaction_accumulator,
-        } = db.get_latest_executed_trees()?;
+        } = db.get_pre_committed_ledger_summary()?;
         Ok(Self {
             latest_state: state,
             latest_txn_accumulator: transaction_accumulator,

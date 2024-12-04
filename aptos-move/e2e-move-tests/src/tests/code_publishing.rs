@@ -242,17 +242,10 @@ fn code_publishing_upgrade_loader_cache_consistency() {
             |_| {},
         ),
     ];
-    let result = h.run_block_get_output(txns);
-    assert_success!(result[0].status().to_owned());
-    assert_success!(result[1].status().to_owned());
-    assert_eq!(
-        result[2]
-            .auxiliary_data()
-            .get_detail_error_message()
-            .unwrap()
-            .status_code(),
-        StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE
-    )
+    let result = h.run_block(txns);
+    assert_success!(result[0]);
+    assert_success!(result[1]);
+    assert_vm_status!(result[2], StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
 }
 
 #[test]

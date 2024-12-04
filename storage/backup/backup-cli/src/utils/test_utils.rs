@@ -36,7 +36,7 @@ pub fn tmp_db_with_random_content() -> (
     let (tmpdir, db) = tmp_db_empty();
     let mut cur_ver: Version = 0;
     let mut in_memory_state = db
-        .get_latest_executed_trees()
+        .get_pre_committed_ledger_summary()
         .unwrap()
         .state
         .as_ref()

@@ -619,8 +619,9 @@ def format_pre_comment(context: ForgeContext) -> str:
         context.forge_namespace,
     )
 
-    return textwrap.dedent(
-        f"""
+    return (
+        textwrap.dedent(
+            f"""
             ### Forge is running suite `{context.forge_test_suite}` on {get_testsuite_images(context)}
             * [Grafana dashboard (auto-refresh)]({dashboard_link})
             * [Humio Logs]({humio_logs_link})
@@ -628,7 +629,9 @@ def format_pre_comment(context: ForgeContext) -> str:
             * [Validator CPU Profile]({validator_cpu_profile_link})
             * [Fullnode CPU Profile]({fullnode_cpu_profile_link})
             """
-    ).lstrip() + format_github_info(context)
+        ).lstrip()
+        + format_github_info(context)
+    )
 
 
 def format_comment(context: ForgeContext, result: ForgeResult) -> str:

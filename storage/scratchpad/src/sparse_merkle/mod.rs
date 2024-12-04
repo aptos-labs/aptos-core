@@ -70,8 +70,7 @@
 // See https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=795cd4f459f1d4a0005a99650726834b
 #![allow(clippy::while_let_loop)]
 
-pub mod ancestors;
-mod dropper;
+pub mod dropper;
 mod metrics;
 mod node;
 #[cfg(test)]

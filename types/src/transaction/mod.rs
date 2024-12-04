@@ -11,7 +11,6 @@ use crate::{
     contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
     keyless::{KeylessPublicKey, KeylessSignature},
     ledger_info::LedgerInfo,
-    on_chain_config::{FeatureFlag, Features},
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
     transaction::authenticator::{
         AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator,
@@ -914,22 +913,6 @@ impl ExecutionStatus {
             _ => ExecutionStatus::MiscellaneousError(None),
         }
     }
-
-    pub fn remove_error_detail(self) -> Self {
-        match self {
-            ExecutionStatus::MoveAbort {
-                location,
-                code,
-                info: _,
-            } => ExecutionStatus::MoveAbort {
-                location,
-                code,
-                info: None,
-            },
-            ExecutionStatus::MiscellaneousError(_) => ExecutionStatus::MiscellaneousError(None),
-            _ => self,
-        }
-    }
 }
 
 /// The status of executing a transaction. The VM decides whether or not we should `Keep` the
@@ -979,15 +962,10 @@ impl TransactionStatus {
         }
     }
 
-    pub fn from_vm_status(
-        vm_status: VMStatus,
-        charge_invariant_violation: bool,
-        features: &Features,
-    ) -> (Self, TransactionAuxiliaryData) {
+    pub fn from_vm_status(vm_status: VMStatus, charge_invariant_violation: bool) -> Self {
         let status_code = vm_status.status_code();
-        let txn_aux = TransactionAuxiliaryData::from_vm_status(&vm_status);
         // TODO: keep_or_discard logic should be deprecated from Move repo and refactored into here.
-        let status = match vm_status.keep_or_discard() {
+        match vm_status.keep_or_discard() {
             Ok(recorded) => match recorded {
                 // TODO(bowu):status code should be removed from transaction status
                 KeptVMStatus::MiscellaneousError => {
@@ -1004,21 +982,6 @@ impl TransactionStatus {
                     TransactionStatus::Discard(code)
                 }
             },
-        };
-
-        if features.is_enabled(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH) {
-            (status.remove_error_detail(), txn_aux)
-        } else {
-            (status, txn_aux)
-        }
-    }
-
-    pub fn remove_error_detail(self) -> Self {
-        match self {
-            TransactionStatus::Keep(status) => {
-                TransactionStatus::Keep(status.remove_error_detail())
-            },
-            _ => self,
         }
     }
 
@@ -1264,17 +1227,6 @@ impl TransactionOutput {
             auxiliary_data,
         } = self;
         (write_set, events, gas_used, status, auxiliary_data)
-    }
-
-    // This function is supposed to be called in various tests only
-    pub fn fill_error_status(&mut self) {
-        if let TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)) = self.status {
-            if let Some(detail) = self.auxiliary_data.get_detail_error_message() {
-                self.status = TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
-                    detail.status_code(),
-                )));
-            }
-        }
     }
 
     pub fn ensure_match_transaction_info(

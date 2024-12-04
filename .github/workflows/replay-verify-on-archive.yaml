@@ -58,7 +58,6 @@ jobs:
   replay-testnet:
     if: |
       github.event_name == 'schedule' ||
-      github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' && (inputs.NETWORK == 'testnet' || inputs.NETWORK == 'all')
     needs: determine-test-metadata
     uses: ./.github/workflows/workflow-run-replay-verify-on-archive.yaml
@@ -72,8 +71,6 @@ jobs:
   replay-mainnet:
     if: |
       github.event_name == 'schedule' ||
-      github.event_name == 'push' ||
-      github.event_name == 'pull_request' ||
       github.event_name == 'workflow_dispatch' && (inputs.NETWORK == 'mainnet' || inputs.NETWORK == 'all' )
     needs: determine-test-metadata
     uses: ./.github/workflows/workflow-run-replay-verify-on-archive.yaml
