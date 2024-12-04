@@ -213,6 +213,13 @@ impl PipelineBackpressureConfig {
                     );
                     Some(computed_target_block_gas_limit)
                 } else {
+                    warn!(
+                        block_execution_times = format!("{:?}", block_execution_times),
+                        computed_target_block_gas_limits =
+                            format!("{:?}", computed_target_block_gas_limits),
+                        computed_target_block_gas_limit = computed_target_block_gas_limit,
+                        "Execution backpressure recalibration: not proposing",
+                    );
                     None
                 }
             } else {
