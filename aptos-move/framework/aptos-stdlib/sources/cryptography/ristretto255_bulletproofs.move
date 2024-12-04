@@ -114,6 +114,25 @@ module aptos_std::ristretto255_bulletproofs {
         )
     }
 
+    #[test_only]
+    /// Computes a range proof for the Pedersen commitment to 'val' with randomness 'r', and custom bases `val_base` and `rand_base`
+    /// (v * val_base + r * rand_base). Returns the said commitment too.
+    ///  Only works for `num_bits` in `{8, 16, 32, 64}`.
+    public fun prove_range(
+        val: &Scalar, r: &Scalar,
+        val_base: &RistrettoPoint, rand_base: &RistrettoPoint,
+        num_bits: u64, dst: vector<u8>
+    ): (RangeProof, pedersen::Commitment) {
+        let (bytes, compressed_comm) = prove_range_internal(scalar_to_bytes(val), scalar_to_bytes(r), num_bits, dst, val_base, rand_base);
+        let point = ristretto255::new_compressed_point_from_bytes(compressed_comm);
+        let point = &std::option::extract(&mut point);
+
+        (
+            RangeProof { bytes },
+            pedersen::commitment_from_compressed(point)
+        )
+    }
+
     //
     // Native functions
     //
