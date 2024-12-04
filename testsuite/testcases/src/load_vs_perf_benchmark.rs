@@ -115,6 +115,8 @@ pub struct TransactionWorkload {
     pub unique_senders: bool,
     pub load: EmitJobMode,
     pub transactions_per_account_override: Option<usize>,
+    pub num_accounts_override: Option<usize>,
+    pub gas_price_override: Option<u64>,
 }
 
 impl TransactionWorkload {
@@ -125,6 +127,8 @@ impl TransactionWorkload {
             unique_senders: false,
             load: EmitJobMode::MaxLoad { mempool_backlog },
             transactions_per_account_override: None,
+            num_accounts_override: None,
+            gas_price_override: None,
         }
     }
 
@@ -135,6 +139,8 @@ impl TransactionWorkload {
             unique_senders: false,
             load: EmitJobMode::ConstTps { tps },
             transactions_per_account_override: None,
+            num_accounts_override: None,
+            gas_price_override: None,
         }
     }
 
@@ -154,6 +160,8 @@ impl TransactionWorkload {
                 num_waves,
             },
             transactions_per_account_override: None,
+            num_accounts_override: None,
+            gas_price_override: None,
         }
     }
 
@@ -172,6 +180,16 @@ impl TransactionWorkload {
         self
     }
 
+    pub fn with_num_accounts(mut self, num_accounts: usize) -> Self {
+        self.num_accounts_override = Some(num_accounts);
+        self
+    }
+
+    pub fn with_gas_price(mut self, gas_price: u64) -> Self {
+        self.gas_price_override = Some(gas_price);
+        self
+    }
+
     fn is_phased(&self) -> bool {
         self.unique_senders
     }
@@ -182,10 +200,23 @@ impl TransactionWorkload {
 
         let mut request = request.mode(self.load.clone());
 
+        assert!(
+            !(self.transactions_per_account_override.is_some()
+                && self.num_accounts_override.is_some())
+        );
+
         if let Some(transactions_per_account) = &self.transactions_per_account_override {
             request = request.num_accounts_mode(NumAccountsMode::TransactionsPerAccount(
                 *transactions_per_account,
             ))
+        }
+
+        if let Some(num_accounts) = &self.num_accounts_override {
+            request = request.num_accounts_mode(NumAccountsMode::NumAccounts(*num_accounts))
+        }
+
+        if let Some(gas_price) = &self.gas_price_override {
+            request = request.gas_price(*gas_price)
         }
 
         if self.is_phased() {
