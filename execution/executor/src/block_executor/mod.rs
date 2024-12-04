@@ -215,7 +215,7 @@ where
                     CachedStateView::new(
                         StateViewId::BlockExecution { block_id },
                         Arc::clone(&self.db.reader),
-                        parent_output.execution_output.result_state.state().clone(),
+                        parent_output.execution_output.result_state.latest().clone(),
                     )?
                 };
 

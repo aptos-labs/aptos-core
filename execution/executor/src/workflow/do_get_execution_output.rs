@@ -23,6 +23,7 @@ use aptos_executor_types::{
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
+use aptos_sdk::types::HardwareWalletType::Ledger;
 use aptos_storage_interface::state_store::{
     state::LedgerState,
     state_view::cached_state_view::{CachedStateView, ShardedStateCache},
@@ -328,6 +329,7 @@ impl Parser {
             let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__to_commit"]);
             let to_commit = TransactionsWithOutput::new(transactions, transaction_outputs);
             TransactionsToKeep::index(
+                first_version,
                 Self::maybe_add_block_epilogue(
                     to_commit,
                     has_reconfig,
@@ -344,8 +346,8 @@ impl Parser {
                 .transpose()?
         };
 
-        let state_reads = base_state_view.finish();
-        let result_state = Self::update_state(&to_commit, parent_state, &state_reads);
+        let state_cache = base_state_view.into_state_cache();
+        let result_state = Self::update_state(&to_commit, parent_state, &state_cache);
 
         let out = ExecutionOutput::new(
             is_block,
@@ -355,7 +357,7 @@ impl Parser {
             to_discard,
             to_retry,
             result_state,
-            state_reads,
+            state_cache,
             block_end_info,
             next_epoch_state,
             Planned::place_holder(),

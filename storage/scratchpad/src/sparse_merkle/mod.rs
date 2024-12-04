@@ -98,6 +98,7 @@ use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble},
     proof::SparseMerkleProofExt,
     state_store::state_storage_usage::StateStorageUsage,
+    transaction::Version,
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -198,6 +199,7 @@ where
     /// Constructs a Sparse Merkle Tree with a root hash. This is often used when we restart and
     /// the scratch pad and the storage have identical state, so we use a single root hash to
     /// represent the entire state.
+    /// FIXME(aldenhu): remove usage
     pub fn new(root_hash: HashValue, usage: StateStorageUsage) -> Self {
         let root = if root_hash != *SPARSE_MERKLE_PLACEHOLDER_HASH {
             SubTree::new_unknown(root_hash)
@@ -577,6 +579,11 @@ where
 pub trait ProofRead: Sync {
     /// Gets verified proof for this key in persistent storage.
     fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt>;
+
+    fn next_version(&self) -> Version {
+        // FIXME(aldenhu): impl
+        unimplemented!()
+    }
 }
 
 /// All errors `update` can possibly return.

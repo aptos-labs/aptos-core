@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::state_store::{
-    sharded_state_update_refs::ShardedStateUpdateRefs,
+    per_version_state_update_refs::PerVersionStateUpdateRefs,
     state::LedgerState,
     state_summary::{LedgerStateSummary, StateWithSummary},
     state_view::cached_state_view::ShardedStateCache,
@@ -17,7 +17,7 @@ pub struct ChunkToCommit<'a> {
     pub transaction_infos: &'a [TransactionInfo],
     pub state: &'a LedgerState,
     pub state_summary: &'a LedgerStateSummary,
-    pub state_update_refs: &'a ShardedStateUpdateRefs<'a>,
+    pub state_update_refs: &'a PerVersionStateUpdateRefs<'a>,
     pub state_reads: Option<&'a ShardedStateCache>,
     pub is_reconfig: bool,
 }
@@ -39,10 +39,17 @@ impl<'a> ChunkToCommit<'a> {
         self.next_version() - 1
     }
 
-    pub fn last_checkpoint(&self) -> StateWithSummary {
-        StateWithSummary {
-            state: self.state.last_checkpoint_state().clone(),
-            summary: self.state_summary.last_checkpoint_summary().clone(),
-        }
+    pub fn state(&self) -> StateWithSummary {
+        StateWithSummary::new(
+            self.state.latest().clone(),
+            self.state_summary.latest().clone(),
+        )
+    }
+
+    pub fn last_checkpoint_state(&self) -> StateWithSummary {
+        StateWithSummary::new(
+            self.state.last_checkpoint().clone(),
+            self.state_summary.last_checkpoint().clone(),
+        )
     }
 }

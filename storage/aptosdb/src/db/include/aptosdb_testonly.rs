@@ -8,7 +8,7 @@ use aptos_storage_interface::state_store::state_view::cached_state_view::Sharded
 use aptos_storage_interface::state_store::state_delta::StateDelta;
 use aptos_types::transaction::{TransactionStatus, TransactionToCommit};
 use aptos_executor_types::transactions_with_output::TransactionsToKeep;
-use aptos_storage_interface::state_store::sharded_state_update_refs::ShardedStateUpdateRefs;
+use aptos_storage_interface::state_store::per_version_state_update_refs::PerVersionStateUpdateRefs;
 
 impl AptosDB {
     /// This opens db in non-readonly mode, without the pruner.
@@ -126,7 +126,6 @@ pub struct ChunkToCommitOwned {
     transactions_to_keep: TransactionsToKeep,
     transaction_infos: Vec<TransactionInfo>,
     base_state_version: Option<Version>,
-    state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
     sharded_state_cache: Option<ShardedStateCache>,
     is_reconfig: bool,
 }
@@ -210,13 +209,13 @@ impl ChunkToCommitOwned {
         }).multiunzip()
     }
 
-    pub fn gather_state_updates_until_last_checkpoint(
+    pub fn gather_state_updates_until_last_checkpoint<'kv>(
         _first_version: Version,
         _latest_in_memory_state: &StateDelta,
-        _state_update_refs: &ShardedStateUpdateRefs,
+        _state_update_refs: &PerVersionStateUpdateRefs<'kv>,
         _transaction_infos: &[TransactionInfo],
-    ) -> Option<ShardedStateUpdates> {
-        /*
+    ) -> Option<BatchedStateUpdateRefs<'kv>> {
+        /* FIXME(aldenhu)
         if let Some(latest_checkpoint_version) = latest_in_memory_state.base_version {
             if latest_checkpoint_version >= first_version {
                 let idx = (latest_checkpoint_version - first_version) as usize;

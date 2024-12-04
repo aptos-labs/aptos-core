@@ -4,16 +4,14 @@
 use crate::{
     metrics::TIMER,
     state_store::{
-        state::State, state_delta::StateDelta, state_update::StateValueWithVersionOpt,
+        state::State, state_delta::StateDelta, state_update::StateCacheEntry,
         state_view::db_state_view::DbStateView,
     },
     DbReader,
 };
 use anyhow::Result;
-use aptos_crypto::HashValue;
-use aptos_scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree};
+use aptos_scratchpad::SparseMerkleTree;
 use aptos_types::{
-    proof::SparseMerkleProofExt,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
         StateViewId, StateViewResult, TStateView,
@@ -29,20 +27,12 @@ use std::{
     fmt::{Debug, Formatter},
     sync::Arc,
 };
-/* FIXME(aldenhu): remove
-static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(32)
-        .thread_name(|index| format!("kv_reader_{}", index))
-        .build()
-        .unwrap()
-});
- */
 
-pub type StateCacheShard = DashMap<StateKey, StateValueWithVersionOpt>;
+pub type StateCacheShard = DashMap<StateKey, StateCacheEntry>;
 
 #[derive(Debug, Default)]
 pub struct ShardedStateCache {
+    next_version: Version,
     pub shards: [StateCacheShard; 16],
 }
 
@@ -56,10 +46,14 @@ impl ShardedStateCache {
         &self.shards[shard_id as usize]
     }
 
-    pub fn get_cloned(&self, state_key: &StateKey) -> Option<StateValueWithVersionOpt> {
+    pub fn get_cloned(&self, state_key: &StateKey) -> Option<StateCacheEntry> {
         self.shard(state_key.get_shard_id())
             .get(state_key)
             .map(|r| r.clone())
+    }
+
+    pub fn next_version(&self) -> Version {
+        self.next_version
     }
 }
 
@@ -143,13 +137,8 @@ impl CachedStateView {
         todo!()
     }
 
-    pub fn into_state_cache(self) -> StateCache {
-        // FIXME(aldenhu): rename: seal
-        todo!()
-    }
-
     /// Consumes `Self` and returns the state and all the memorized state reads.
-    pub fn finish(self) -> ShardedStateCache {
+    pub fn into_state_cache(self) -> ShardedStateCache {
         todo!()
         /* FIXME(aldenhu)
         let Self {
@@ -167,17 +156,17 @@ impl CachedStateView {
         self.speculative.parent_version()
     }
 
-    fn get_uncached(&self, state_key: &StateKey) -> Result<StateValueWithVersionOpt> {
+    fn get_uncached(&self, state_key: &StateKey) -> Result<StateCacheEntry> {
         let ret = if let Some(update) = self.speculative.get_state_update(state_key) {
             // found in speculative state, can be either a new value or a deletion
             update.to_state_value_with_version()
         } else if let Some(parent_version) = self.parent_version() {
-            StateValueWithVersionOpt::from_tuple_opt(
+            StateCacheEntry::from_tuple_opt(
                 self.reader
                     .get_state_value_with_version_by_version(state_key, parent_version)?,
             )
         } else {
-            StateValueWithVersionOpt::NonExistent
+            StateCacheEntry::NonExistent
         };
 
         Ok(ret)
@@ -191,19 +180,22 @@ impl CachedStateView {
 // FIXME(aldenhu): remove unnecessary fields, probably remove entirely and use ShardedStateCache directly
 #[derive(Debug)]
 pub struct StateCache {
-    pub frozen_base: FrozenSparseMerkleTree<StateValue>,
-    pub sharded_state_cache: ShardedStateCache,
-    pub proofs: HashMap<HashValue, SparseMerkleProofExt>,
+    pub speculative: StateDelta,
+    pub memorized: ShardedStateCache,
 }
 
 impl StateCache {
-    pub fn new_empty(smt: SparseMerkleTree<StateValue>) -> Self {
+    pub fn new_empty(_smt: SparseMerkleTree<StateValue>) -> Self {
+        /*
         let frozen_base = smt.freeze(&smt);
         Self {
             frozen_base,
             sharded_state_cache: ShardedStateCache::default(),
             proofs: HashMap::new(),
         }
+        FIXME(aldenhu)
+         */
+        todo!()
     }
 
     pub fn new_dummy() -> Self {

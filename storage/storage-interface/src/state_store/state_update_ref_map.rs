@@ -1,25 +1,25 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::NUM_STATE_SHARDS;
-use aptos_experimental_layered_map::LayeredMap;
-use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
+use crate::state_store::{state_update::StateUpdateRef, NUM_STATE_SHARDS};
+use aptos_types::{state_store::state_key::StateKey, transaction::Version};
+use arr_macro::arr;
+use std::collections::HashMap;
 
-// FIXME(aldenhu): rename DeduppedStateWrites?
-// FIXME(aldenhu): shall we inline this type into StateDelta?
 #[derive(Clone, Debug)]
-pub struct ShardedStateUpdates {
-    pub shards: [LayeredMap<StateKey, Option<StateValue>>; NUM_STATE_SHARDS],
+pub struct BatchedStateUpdateRefs<'kv> {
+    pub first_version: Version,
+    pub num_versions: usize,
+    pub shards: [HashMap<&'kv StateKey, StateUpdateRef<'kv>>; NUM_STATE_SHARDS],
 }
 
-impl ShardedStateUpdates {
-    pub fn new_empty() -> Self {
-        /* FIXME(aldenhu)
+impl<'kv> BatchedStateUpdateRefs<'kv> {
+    pub fn new_empty(first_version: Version, num_versions: usize) -> Self {
         Self {
+            first_version,
+            num_versions,
             shards: arr![HashMap::new(); 16],
         }
-         */
-        todo!()
     }
 
     pub fn all_shards_empty(&self) -> bool {
@@ -34,6 +34,10 @@ impl ShardedStateUpdates {
         self.shards.iter().map(|shard| shard.len()).sum()
          */
         todo!()
+    }
+
+    pub fn next_version(&self) -> Version {
+        self.first_version + self.num_versions as Version
     }
 
     /* FIXME(aldenhu): remove

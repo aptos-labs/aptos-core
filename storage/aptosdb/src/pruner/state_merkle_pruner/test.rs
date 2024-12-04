@@ -24,7 +24,7 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_schemadb::SchemaBatch;
 use aptos_storage_interface::{
     jmt_update_refs, jmt_updates,
-    state_store::{sharded_state_update_refs::ShardedStateUpdateRefs, NUM_STATE_SHARDS},
+    state_store::{per_version_state_update_refs::PerVersionStateUpdateRefs, NUM_STATE_SHARDS},
     DbReader,
 };
 use aptos_temppath::TempPath;

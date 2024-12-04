@@ -3,6 +3,7 @@
 
 use itertools::Itertools;
 use aptos_storage_interface::chunk_to_commit::ChunkToCommit;
+use crate::state_store::current_state::LedgerStateWithSummary;
 
 impl DbWriter for AptosDB {
     fn pre_commit_ledger(
@@ -21,7 +22,7 @@ impl DbWriter for AptosDB {
                 .expect("Concurrent committing detected.");
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["pre_commit_ledger"]);
 
-            chunk.state_summary.state_summary().global_state_summary.log_generation("db_save");
+            chunk.state_summary.latest().global_state_summary.log_generation("db_save");
 
             self.pre_commit_validation(&chunk)?;
             let _new_root_hash = self.calculate_and_commit_ledger_and_state_kv(
@@ -32,11 +33,12 @@ impl DbWriter for AptosDB {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["save_transactions__others"]);
 
             self.state_store.buffered_state().lock().update(
-                chunk.last_checkpoint(),
+                LedgerStateWithSummary::new(
+                    chunk.state(),
+                    chunk.last_checkpoint_state(),
+                ),
                 sync_commit || chunk.is_reconfig,
             )?;
-
-            self.state_store.current_state().set(chunk.state.clone());
 
             Ok(())
         })

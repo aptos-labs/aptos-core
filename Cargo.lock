@@ -3947,6 +3947,7 @@ dependencies = [
  "crossbeam-channel",
  "dashmap",
  "derive_more",
+ "itertools 0.13.0",
  "once_cell",
  "parking_lot 0.12.1",
  "proptest",

@@ -301,7 +301,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
 
         let num_txns = chunk.len();
 
-        let state_view = self.state_view(parent_state.state())?;
+        let state_view = self.state_view(parent_state.latest())?;
         let execution_output = chunk.into_output::<V>(&parent_state, state_view)?;
         let output = PartialStateComputeResult::new(execution_output);
 
@@ -581,7 +581,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
     ) -> Result<Version> {
         // Execute transactions.
         let parent_state = self.commit_queue.lock().latest_state().clone();
-        let state_view = self.state_view(parent_state.state())?;
+        let state_view = self.state_view(parent_state.latest())?;
         let txns = transactions
             .iter()
             .take((end_version - begin_version) as usize)

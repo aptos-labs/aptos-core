@@ -11,9 +11,9 @@ use aptos_executor_types::{
 };
 use aptos_scratchpad::FrozenSparseMerkleTree;
 use aptos_storage_interface::state_store::{
-    sharded_state_update_refs::ShardedStateUpdateRefs,
-    sharded_state_updates::ShardedStateUpdates,
+    per_version_state_update_refs::PerVersionStateUpdateRefs,
     state_delta::StateDelta,
+    state_update_ref_map::BatchedStateUpdateRefs,
     state_view::cached_state_view::{ShardedStateCache, StateCache, StateCacheShard},
 };
 use aptos_types::{
@@ -56,8 +56,11 @@ impl InMemoryStateCalculatorV2 {
         last_checkpoint_index: Option<usize>,
         write_sets: &[WriteSet],
     ) -> Result<StateCheckpointOutput> {
-        let state_update_refs =
-            ShardedStateUpdateRefs::index_write_sets(write_sets, write_sets.len());
+        let state_update_refs = PerVersionStateUpdateRefs::index_write_sets(
+            parent_state.next_version(),
+            write_sets,
+            write_sets.len(),
+        );
 
         Self::calculate_impl(
             parent_state,
@@ -72,7 +75,7 @@ impl InMemoryStateCalculatorV2 {
     fn calculate_impl(
         _parent_state: &Arc<StateDelta>,
         _state_cache: &StateCache,
-        _state_update_refs: &ShardedStateUpdateRefs,
+        _state_update_refs: &PerVersionStateUpdateRefs,
         _last_checkpoint_index: Option<usize>,
         _is_block: bool,
         _known_state_checkpoints: Option<impl IntoIterator<Item = Option<HashValue>>>,
@@ -211,52 +214,6 @@ impl InMemoryStateCalculatorV2 {
         todo!()
     }
 
-    fn calculate_updates(
-        _state_update_refs: &ShardedStateUpdateRefs,
-        _last_checkpoint_index: Option<usize>,
-    ) -> (ShardedStateUpdates, ShardedStateUpdates) {
-        /*
-        let _timer = OTHER_TIMERS.timer_with(&["calculate_updates"]);
-
-        let mut shard_iters = state_update_refs
-            .shards
-            .iter()
-            .map(|shard| shard.iter())
-            .collect::<Vec<_>>();
-        let mut before_last_checkpoint = ShardedStateUpdates::new_empty();
-        let mut after_last_checkpoint = ShardedStateUpdates::new_empty();
-
-        // TODO(aldenhu): no need to par_iter() if no need to clone.
-        if let Some(last_checkpoint_index) = last_checkpoint_index {
-            shard_iters
-                .par_iter_mut()
-                .zip_eq(before_last_checkpoint.shards.par_iter_mut())
-                .for_each(|(shard_iter, shard_updates)| {
-                    shard_updates.extend(
-                        shard_iter
-                            // n.b. take_while_ref so that in the next step we can process the rest of the entries from the iters.
-                            .take_while_ref(|(idx, _k, _v)| *idx <= last_checkpoint_index)
-                            .map(|(_idx, k, v)| ((*k).clone(), v.cloned())),
-                    )
-                });
-        }
-
-        let num_txns = state_update_refs.num_versions;
-        if num_txns != 0 && last_checkpoint_index != Some(num_txns - 1) {
-            shard_iters
-                .par_iter_mut()
-                .zip_eq(after_last_checkpoint.shards.par_iter_mut())
-                .for_each(|(shard_iter, shard_updates)| {
-                    shard_updates.extend(shard_iter.map(|(_idx, k, v)| ((*k).clone(), v.cloned())))
-                });
-        }
-
-        (before_last_checkpoint, after_last_checkpoint)
-
-         */
-        todo!()
-    }
-
     fn add_to_delta(
         _k: &StateKey,
         _v: &Option<&StateValue>,
@@ -285,7 +242,7 @@ impl InMemoryStateCalculatorV2 {
     fn calculate_usage(
         _old_usage: StateStorageUsage,
         _sharded_state_cache: &ShardedStateCache,
-        _updates: &ShardedStateUpdates,
+        _updates: &BatchedStateUpdateRefs,
     ) -> StateStorageUsage {
         /*
         let _timer = OTHER_TIMERS.timer_with(&["calculate_usage"]);
@@ -325,7 +282,7 @@ impl InMemoryStateCalculatorV2 {
 
     fn make_checkpoint(
         _latest_checkpoint: FrozenSparseMerkleTree<StateValue>,
-        _updates: &ShardedStateUpdates,
+        _updates: &BatchedStateUpdateRefs,
         _usage: StateStorageUsage,
         _proof_reader: &ProofReader,
     ) -> Result<FrozenSparseMerkleTree<StateValue>> {

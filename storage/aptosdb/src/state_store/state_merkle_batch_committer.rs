@@ -96,7 +96,7 @@ impl StateMerkleBatchCommitter {
                     self.check_usage_consistency(&snapshot).unwrap();
 
                     snapshot
-                        .summary
+                        .summary()
                         .global_state_summary
                         .log_generation("buffered_state_commit");
                     self.persisted_state.lock().set(snapshot);

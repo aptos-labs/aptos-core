@@ -1,14 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::{
-    sharded_state_updates::ShardedStateUpdates, state::State, state_update::StateWrite,
-};
+use crate::state_store::{state::State, state_update::StateUpdate, NUM_STATE_SHARDS};
 use aptos_crypto::HashValue;
+use aptos_experimental_layered_map::LayeredMap;
 use aptos_types::{
     state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
     transaction::Version,
 };
+use std::sync::Arc;
 
 /// This represents two state sparse merkle trees at their versions in memory with the updates
 /// reflecting the difference of `current` on top of `base`.
@@ -21,7 +21,7 @@ use aptos_types::{
 pub struct StateDelta {
     pub base: State,
     pub current: State,
-    pub updates: ShardedStateUpdates,
+    pub shards: Arc<[LayeredMap<StateKey, StateUpdate>; NUM_STATE_SHARDS]>,
 }
 
 impl StateDelta {
@@ -72,7 +72,6 @@ impl StateDelta {
             checkpoint_version,
             ShardedStateUpdates::new_empty(),
         )
-
          */
         todo!()
     }
@@ -115,7 +114,7 @@ impl StateDelta {
 
     /// Get the state update for a given state key.
     /// `None` indicates the key is not updated in the delta.
-    pub fn get_state_update(&self, _state_key: &StateKey) -> Option<&StateWrite> {
+    pub fn get_state_update(&self, _state_key: &StateKey) -> Option<&StateUpdate> {
         // FIXME(aldenhu)
         todo!()
     }

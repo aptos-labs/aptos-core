@@ -161,7 +161,7 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
         let state_view = CachedStateView::new(
             StateViewId::Miscellaneous,
             Arc::clone(&db.reader),
-            output.execution_output.result_state.state().clone(),
+            output.execution_output.result_state.latest().clone(),
         )?;
         let next_epoch = epoch
             .checked_add(1)

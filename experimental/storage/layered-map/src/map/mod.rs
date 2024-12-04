@@ -107,7 +107,7 @@ where
         self.get_with_hasher(key, &Default::default())
     }
 
-    // FIXME(aldenhu): make `Item = (&K, &V)`
+    // TODO(aldenhu): make `Item = (&K, &V)`
     pub fn iter(&self) -> impl Iterator<Item = (K, V)> + '_ {
         self.top_layer
             .peak()

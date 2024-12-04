@@ -6,9 +6,13 @@ use crate::state_store::{
     state_delta::StateDelta,
 };
 use aptos_crypto::HashValue;
-use aptos_scratchpad::SparseMerkleTree;
-use aptos_types::{state_store::state_value::StateValue, transaction::Version};
+use aptos_scratchpad::{ProofRead, SparseMerkleTree};
+use aptos_types::{
+    state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
+    transaction::Version,
+};
 use derive_more::Deref;
+use std::sync::Arc;
 
 /// The data structure through which the entire state at a given
 /// version can be summarized to a concise digest (the root hash).
@@ -20,9 +24,12 @@ pub struct StateSummary {
 }
 
 impl StateSummary {
-    pub fn new(next_version: Version, global_state_summary: SparseMerkleTree<StateValue>) -> Self {
+    pub fn new_at_version(
+        version: Option<Version>,
+        global_state_summary: SparseMerkleTree<StateValue>,
+    ) -> Self {
         Self {
-            next_version,
+            next_version: version.map_or(0, |v| v + 1),
             global_state_summary,
         }
     }
@@ -32,11 +39,6 @@ impl StateSummary {
             next_version: 0,
             global_state_summary: SparseMerkleTree::new_empty(),
         }
-    }
-
-    pub fn update(&self, _persisted: &StateSummary, _state_delta: &StateDelta) -> Self {
-        // FIXME(aldenhu)
-        todo!()
     }
 
     pub fn root_hash(&self) -> HashValue {
@@ -56,13 +58,25 @@ impl StateSummary {
         // FIXME(aldenhu)
         todo!()
     }
+
+    pub fn update(
+        &self,
+        _persisted: &StateSummary,
+        _base: &StateSummary,
+        _updates: &StateDelta,
+        _proof_reader: Arc<dyn ProofRead>,
+    ) -> Self {
+        // FIXME(aldenhu)
+        todo!()
+    }
 }
 
 /// At a given version, the summaries of the state and the last checkpoint state at or before the version.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deref)]
 pub struct LedgerStateSummary {
-    last_checkpoint_summary: StateSummary,
-    state_summary: StateSummary,
+    #[deref]
+    latest: StateSummary,
+    last_checkpoint: StateSummary,
 }
 
 impl LedgerStateSummary {
@@ -70,8 +84,8 @@ impl LedgerStateSummary {
         assert!(last_checkpoint_summary.next_version() <= state_summary.next_version());
 
         Self {
-            last_checkpoint_summary,
-            state_summary,
+            last_checkpoint: last_checkpoint_summary,
+            latest: state_summary,
         }
     }
 
@@ -81,31 +95,41 @@ impl LedgerStateSummary {
     }
 
     pub fn next_version(&self) -> Version {
-        self.state_summary.next_version()
+        self.latest.next_version()
     }
 
     pub fn assert_versions_match(&self, latest_state: &LedgerState) {
         assert_eq!(self.next_version(), latest_state.next_version());
         assert_eq!(
-            self.last_checkpoint_summary.next_version(),
-            latest_state.last_checkpoint_state().next_version()
+            self.last_checkpoint.next_version(),
+            latest_state.last_checkpoint().next_version()
         );
     }
 
-    pub fn last_checkpoint_summary(&self) -> &StateSummary {
-        &self.last_checkpoint_summary
+    pub fn latest(&self) -> &StateSummary {
+        &self.latest
     }
 
-    pub fn state_summary(&self) -> &StateSummary {
-        &self.state_summary
+    pub fn last_checkpoint(&self) -> &StateSummary {
+        &self.last_checkpoint
+    }
+
+    pub fn update(
+        &self,
+        _persisted: &LedgerStateSummary,
+        _state_delta: &StateDelta,
+        _proof_reader: Arc<dyn ProofRead>,
+    ) -> Self {
+        // FIXME(aldenhu)
+        todo!()
     }
 }
 
 #[derive(Clone, Debug, Deref)]
 pub struct StateWithSummary {
     #[deref]
-    pub state: State,
-    pub summary: StateSummary,
+    state: State,
+    summary: StateSummary,
 }
 
 impl StateWithSummary {
@@ -114,5 +138,33 @@ impl StateWithSummary {
             state: State::new_empty(),
             summary: StateSummary::new_empty(),
         }
+    }
+
+    // FIXME(aldenhu): rename
+    pub fn new_at_version(
+        version: Option<Version>,
+        global_state_root_hash: HashValue,
+        state_usage: StateStorageUsage,
+    ) -> Self {
+        Self {
+            state: State::new_empty_at_version(version, state_usage),
+            summary: StateSummary::new_at_version(
+                version,
+                SparseMerkleTree::new(global_state_root_hash, state_usage),
+            ),
+        }
+    }
+
+    pub fn new(state: State, summary: StateSummary) -> Self {
+        assert_eq!(state.next_version(), summary.next_version());
+        Self { state, summary }
+    }
+
+    pub fn state(&self) -> &State {
+        &self.state
+    }
+
+    pub fn summary(&self) -> &StateSummary {
+        &self.summary
     }
 }

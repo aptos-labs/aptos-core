@@ -3,11 +3,6 @@
 
 //! This file defines the state snapshot committer running in background thread within StateStore.
 
-// FIXME(aldenhu)
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
-
 use crate::{
     metrics::OTHER_TIMERS_SECONDS,
     state_store::{
@@ -117,16 +112,16 @@ impl StateSnapshotCommitter {
                                 .into_par_iter()
                                 .map(|shard_id| {
                                     let node_hashes = snapshot
-                                        .summary
+                                        .summary()
                                         .global_state_summary
                                         .new_node_hashes_since(
-                                            &self.last_snapshot.summary.global_state_summary,
+                                            &self.last_snapshot.summary().global_state_summary,
                                             shard_id,
                                         );
                                     // TODO(aldenhu): iterator of refs
-                                    let updates = snapshot.state.shards[shard_id as usize]
+                                    let updates = snapshot.state().shards[shard_id as usize]
                                         .view_layers_after(
-                                            &self.last_snapshot.state.shards[shard_id as usize],
+                                            &self.last_snapshot.state().shards[shard_id as usize],
                                         )
                                         .iter()
                                         .map(|(k, w)| {
@@ -155,9 +150,8 @@ impl StateSnapshotCommitter {
                     };
 
                     let (root_hash, top_levels_batch) = {
-                        let _timer = OTHER_TIMERS_SECONDS
-                            .with_label_values(&["calculate_top_levels_batch"])
-                            .start_timer();
+                        let _timer =
+                            OTHER_TIMERS_SECONDS.timer_with(&["calculate_top_levels_batch"]);
                         self.state_db
                             .state_merkle_db
                             .calculate_top_levels(

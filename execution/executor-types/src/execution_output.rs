@@ -43,7 +43,7 @@ impl ExecutionOutput {
         subscribable_events: Planned<Vec<ContractEvent>>,
     ) -> Self {
         let next_version = first_version + to_commit.len() as Version;
-        assert_eq!(next_version, result_state.state().next_version());
+        assert_eq!(next_version, result_state.latest().next_version());
         if is_block {
             // If it's a block, ensure it ends with state checkpoint.
             assert!(to_commit.is_empty() || to_commit.ends_with_sole_checkpoint());

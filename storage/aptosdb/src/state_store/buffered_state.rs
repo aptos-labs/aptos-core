@@ -12,7 +12,7 @@ use crate::{
     metrics::{LATEST_CHECKPOINT_VERSION, OTHER_TIMERS_SECONDS},
     state_store::{
         persisted_state::PersistedState, state_snapshot_committer::StateSnapshotCommitter,
-        CurrentState, StateDb,
+        LedgerStateWithSummary, StateDb,
     },
 };
 use aptos_infallible::Mutex;
@@ -21,18 +21,19 @@ use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{
     db_ensure as ensure,
     state_store::{
-        sharded_state_updates::ShardedStateUpdates,
         state::State,
         state_delta::StateDelta,
         state_summary::{LedgerStateSummary, StateWithSummary},
+        state_update_ref_map::BatchedStateUpdateRefs,
     },
     AptosDbError, Result,
 };
+use aptos_types::transaction::Version;
 use std::{
     sync::{
         mpsc,
         mpsc::{Sender, SyncSender},
-        Arc,
+        Arc, MutexGuard,
     },
     thread::JoinHandle,
 };
@@ -44,9 +45,8 @@ pub(crate) const TARGET_SNAPSHOT_INTERVAL_IN_VERSION: u64 = 100_000;
 /// the updates in batches.
 #[derive(Debug)]
 pub struct BufferedState {
-    /// Needed for estimating the size of the buffer by counting the diff between this and a later
-    /// checkpoint added via `update()`
-    latest_checkpoint: StateWithSummary,
+    /// the current state and the last checkpoint. shared with outside world.
+    current_state: Arc<Mutex<LedgerStateWithSummary>>,
     /// The most recent checkpoint sent for persistence, not guaranteed to have committed already.
     last_snapshot: StateWithSummary,
     /// channel to send a checkpoint for persistence asynchronously
@@ -65,17 +65,23 @@ pub(crate) enum CommitMessage<T> {
 }
 
 impl BufferedState {
-    pub(crate) fn new(
+    pub(crate) fn new_at_snapshot(
         state_db: &Arc<StateDb>,
         last_snapshot: StateWithSummary,
         target_items: usize,
-        persisted_state: Arc<Mutex<PersistedState>>,
+        out_current_state: Arc<Mutex<LedgerStateWithSummary>>,
+        out_persisted_state: Arc<Mutex<PersistedState>>,
     ) -> Self {
         let (state_commit_sender, state_commit_receiver) =
             mpsc::sync_channel(ASYNC_COMMIT_CHANNEL_BUFFER_SIZE as usize);
         let arc_state_db = Arc::clone(state_db);
-        persisted_state.lock().set(last_snapshot.clone());
-        let persisted_state_clone = persisted_state.clone();
+        out_current_state
+            .lock()
+            .set(LedgerStateWithSummary::new_at_checkpoint(
+                last_snapshot.clone(),
+            ));
+        out_persisted_state.lock().set(last_snapshot.clone());
+        let persisted_state_clone = out_persisted_state.clone();
         let last_snapshot_clone = last_snapshot.clone();
         // Create a new thread with receiver subscribing to state commit changes
         let join_handle = std::thread::Builder::new()
@@ -90,17 +96,16 @@ impl BufferedState {
                 committer.run();
             })
             .expect("Failed to spawn state committer thread.");
-        let myself = Self {
-            latest_checkpoint: last_snapshot.clone(),
+        Self::report_last_checkpoint_version(last_snapshot.version());
+        Self {
+            current_state: out_current_state.clone(),
             last_snapshot,
             state_commit_sender,
             estimated_items: 0,
             target_items,
             // The join handle of the async state commit thread for graceful drop.
             join_handle: Some(join_handle),
-        };
-        myself.report_latest_committed_version();
-        myself
+        }
     }
 
     /// This method checks whether a commit is needed based on the target_items value and the number of items in state_until_checkpoint.
@@ -118,18 +123,27 @@ impl BufferedState {
         }
     }
 
+    fn current_state(&self) -> MutexGuard<LedgerStateWithSummary> {
+        self.current_state.lock()
+    }
+
     fn buffered_versions(&self) -> u64 {
-        self.latest_checkpoint.next_version() - self.last_snapshot.next_version()
+        self.current_state().next_version() - self.last_snapshot.next_version()
+    }
+
+    fn last_checkpoint(&self) -> StateWithSummary {
+        self.current_state().last_checkpoint().clone()
     }
 
     fn enqueue_commit(&mut self) {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___enqueue_commit"]);
 
+        let last_checkpoint = self.last_checkpoint();
         self.state_commit_sender
-            .send(CommitMessage::Data(self.latest_checkpoint.clone()))
+            .send(CommitMessage::Data(last_checkpoint.clone()))
             .unwrap();
         self.estimated_items = 0;
-        self.last_snapshot = self.latest_checkpoint.clone();
+        self.last_snapshot = last_checkpoint;
     }
 
     fn drain_commits(&mut self) {
@@ -146,25 +160,28 @@ impl BufferedState {
         self.maybe_commit(true /* sync_commit */);
     }
 
-    fn report_latest_committed_version(&self) {
-        LATEST_CHECKPOINT_VERSION.set(self.latest_checkpoint.version().map_or(-1, |v| v as i64));
+    fn report_last_checkpoint_version(version: Option<Version>) {
+        LATEST_CHECKPOINT_VERSION.set(version.map_or(-1, |v| v as i64));
     }
 
     /// This method updates the buffered state with new data.
-    pub fn update(&mut self, latest_checkpoint: StateWithSummary, sync_commit: bool) -> Result<()> {
+    pub fn update(&mut self, new_state: LedgerStateWithSummary, sync_commit: bool) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___update"]);
 
-        assert!(latest_checkpoint.follows(&self.latest_checkpoint));
+        let old_state = self.current_state.lock().clone();
+        assert!(new_state.follows(&old_state));
+        self.current_state.lock().set(new_state.clone());
+
         self.estimated_items += {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___count_items_heavy"]);
-            latest_checkpoint
-                .make_delta(&self.latest_checkpoint)
+            new_state
+                .last_checkpoint()
+                .make_delta(old_state.last_checkpoint())
                 .count_items_heavy()
         };
-        self.latest_checkpoint = latest_checkpoint;
 
         self.maybe_commit(sync_commit);
-        self.report_latest_committed_version();
+        Self::report_last_checkpoint_version(new_state.last_checkpoint().version());
         Ok(())
     }
 
