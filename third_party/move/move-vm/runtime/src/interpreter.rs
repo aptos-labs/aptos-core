@@ -296,46 +296,32 @@ impl InterpreterImpl {
                 },
                 ExitCode::Call(fh_idx) => {
                     let (function, frame_cache) = {
-                        match self.call_stack.top() {
-                            Some(top_frame) => {
-                                let top_frame_cache = std::rc::Rc::clone(&top_frame.ty_cache);
-                                let top_frame_cache = &mut *top_frame_cache.borrow_mut();
+                        let current_frame_cache = &mut *current_frame.ty_cache.borrow_mut();
 
-                                match top_frame_cache.sub_frame_cache.entry(fh_idx) {
-                                    std::collections::btree_map::Entry::Occupied(entry) => {
-                                        let entry = entry.get();
-                                        let function = std::rc::Rc::<LoadedFunction>::new(
-                                            self.load_function(&resolver, &current_frame, fh_idx)?,
-                                        );
+                        match current_frame_cache.sub_frame_cache.entry(fh_idx) {
+                            std::collections::btree_map::Entry::Occupied(entry) => {
+                                let entry = entry.get();
+                                //let function = std::rc::Rc::<LoadedFunction>::new(
+                                //    self.load_function(&resolver, &current_frame, fh_idx)?,
+                                //);
 
-                                        // Doesn't work:
-                                        // (std::rc::Rc::clone(&entry.0), std::rc::Rc::clone(&entry.1))
+                                // Doesn't work:
+                                // (std::rc::Rc::clone(&entry.0), std::rc::Rc::clone(&entry.1))
 
-                                        // Works:
-                                        (function, std::rc::Rc::clone(&entry.1))
-                                    },
-                                    std::collections::btree_map::Entry::Vacant(entry) => {
-                                        let function = std::rc::Rc::<LoadedFunction>::new(
-                                            self.load_function(&resolver, &current_frame, fh_idx)?,
-                                        );
-                                        let frame_cache = std::rc::Rc::new(
-                                            std::cell::RefCell::new(Default::default()),
-                                        );
-
-                                        entry.insert((
-                                            std::rc::Rc::clone(&function),
-                                            std::rc::Rc::clone(&frame_cache),
-                                        ));
-                                        (function, frame_cache)
-                                    },
-                                }
+                                // Works:
+                                (std::rc::Rc::clone(&entry.0), std::rc::Rc::clone(&entry.1))
                             },
-                            None => {
+                            std::collections::btree_map::Entry::Vacant(entry) => {
                                 let function = std::rc::Rc::<LoadedFunction>::new(
                                     self.load_function(&resolver, &current_frame, fh_idx)?,
                                 );
-                                let frame_cache = std::rc::Rc::new(Default::default());
+                                let frame_cache =
+                                    std::rc::Rc::new(std::cell::RefCell::new(Default::default()));
 
+                                entry.insert((
+                                    std::rc::Rc::clone(&function),
+                                    std::rc::Rc::clone(&frame_cache),
+                                ));
                                 (function, frame_cache)
                             },
                         }
@@ -384,66 +370,14 @@ impl InterpreterImpl {
                 },
                 ExitCode::CallGeneric(idx) => {
                     let (function, frame_cache) = {
-                        match self.call_stack.top() {
-                            Some(top_frame) => {
-                                let top_frame_cache = std::rc::Rc::clone(&top_frame.ty_cache);
-                                let top_frame_cache = &mut *top_frame_cache.borrow_mut();
+                        let current_frame_cache = &mut *current_frame.ty_cache.borrow_mut();
 
-                                match top_frame_cache.generic_sub_frame_cache.entry(idx) {
-                                    std::collections::btree_map::Entry::Occupied(entry) => {
-                                        let entry = entry.get();
-                                        let function = std::rc::Rc::<LoadedFunction>::new(
-                                            self.load_generic_function(
-                                                &resolver,
-                                                &current_frame,
-                                                gas_meter,
-                                                idx,
-                                            )?,
-                                        );
-
-                                        // Works:
-                                        let frame_cache = std::rc::Rc::new(
-                                            std::cell::RefCell::new(Default::default()),
-                                        );
-                                        (function, frame_cache)
-
-                                        // Doesn't work:
-                                        // (function, std::rc::Rc::clone(&entry.1))
-                                    },
-                                    std::collections::btree_map::Entry::Vacant(entry) => {
-                                        let function = std::rc::Rc::<LoadedFunction>::new(
-                                            self.load_generic_function(
-                                                &resolver,
-                                                &current_frame,
-                                                gas_meter,
-                                                idx,
-                                            )?,
-                                        );
-                                        let frame_cache = std::rc::Rc::new(
-                                            std::cell::RefCell::new(Default::default()),
-                                        );
-
-                                        entry.insert((
-                                            std::rc::Rc::clone(&function),
-                                            std::rc::Rc::clone(&frame_cache),
-                                        ));
-                                        (function, frame_cache)
-                                    },
-                                }
-                                //     },
-                                // let function = std::rc::Rc::<LoadedFunction>::new(
-                                //     self.load_generic_function(
-                                //         &resolver,
-                                //         &current_frame,
-                                //         gas_meter,
-                                //         idx,
-                                //     )?,
-                                // );
-                                // let frame_cache = std::rc::Rc::new(Default::default());
-
-                                // (function, frame_cache)
+                        match current_frame_cache.generic_sub_frame_cache.entry(idx) {
+                            std::collections::btree_map::Entry::Occupied(entry) => {
+                                let entry = entry.get();
+                                (std::rc::Rc::clone(&entry.0), std::rc::Rc::clone(&entry.1))
                             },
-                            None => {
+                            std::collections::btree_map::Entry::Vacant(entry) => {
                                 let function = std::rc::Rc::<LoadedFunction>::new(
                                     self.load_generic_function(
                                         &resolver,
@@ -452,16 +386,19 @@ impl InterpreterImpl {
                                         idx,
                                     )?,
                                 );
-                                let frame_cache = std::rc::Rc::new(Default::default());
+                                let frame_cache =
+                                    std::rc::Rc::new(std::cell::RefCell::new(Default::default()));
 
+                                entry.insert((
+                                    std::rc::Rc::clone(&function),
+                                    std::rc::Rc::clone(&frame_cache),
+                                ));
                                 (function, frame_cache)
                             },
                         }
                     };
 
-                    // let (function, frame_cache) =
-
-                    // Charge gas
+                    // Charge gas?
                     let module_id = function
                         .module_id()
                         .ok_or_else(|| {
