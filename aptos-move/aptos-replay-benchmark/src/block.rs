@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    comparison::Comparison,
+    diff::TransactionDiff,
     state_view::{ReadSet, ReadSetCapturingStateView},
     workload::Workload,
 };
+use aptos_logger::warn;
 use aptos_types::{
     block_executor::config::{
         BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
@@ -31,75 +32,93 @@ fn block_execution_config(concurrency_level: usize) -> BlockExecutorConfig {
     }
 }
 
+/// Represents a single benchmarking unit: a block of transactions with the input pre-block state.
+/// Also stores the comparison of outputs based on the input state to on-chain outputs (recall that
+/// input state may contain an override and differ from on-chain pre-block state).
 pub struct Block {
+    /// Stores all data needed to execute this block.
     inputs: ReadSet,
+    /// Stores transactions to execute and benchmark.
     workload: Workload,
-    comparisons: Vec<Comparison>,
+    /// Stores diff results for each transaction output. The number of diffs is always equal to the
+    /// number of transactions, but they may or may not be empty.
+    diffs: Vec<TransactionDiff>,
 }
 
 impl Block {
+    /// Creates a new block for benchmarking by executing transactions on top of an overridden
+    /// state. If there are any state overrides, transactions are first executed based on the
+    /// on-chain state for later comparison (otherwise, if there are no overrides diffs are empty).
+    ///
+    /// Note: transaction execution is sequential, so that multiple blocks can be constructed in
+    /// parallel.
     pub(crate) fn new(
         workload: Workload,
         state_view: &(impl StateView + Sync),
         state_override: HashMap<StateKey, StateValue>,
     ) -> Self {
-        let onchain_outputs = if state_override.is_empty() {
-            None
+        // Execute transactions, recording all reads.
+        let capturing_state_view =
+            ReadSetCapturingStateView::new(state_view, state_override.clone());
+        let outputs = execute_workload(
+            &AptosVMBlockExecutor::new(),
+            &workload,
+            &capturing_state_view,
+            1,
+        );
+        let inputs = capturing_state_view.into_read_set();
+
+        let diffs = if state_override.is_empty() {
+            // No overrides, skip executing on top of the on-chain state, use empty diffs.
+            (0..outputs.len())
+                .map(|_| TransactionDiff::empty())
+                .collect()
         } else {
             // Execute transactions with on-chain configs.
             let onchain_outputs =
                 execute_workload(&AptosVMBlockExecutor::new(), &workload, state_view, 1);
 
-            // Check on-chain outputs do not modify state we override. If so, benchmarking results may
-            // not be correct.
-            let begin = workload.transaction_slice_metadata().begin_version().expect("Transaction metadata must be a chunk");
-            for (idx, output) in onchain_outputs.iter().enumerate() {
-                for (state_key, _) in output.write_set() {
+            // Construct diffs and check on-chain outputs do not modify state we override. If so,
+            // benchmarking results may not be correct.
+            let begin = workload
+                .transaction_slice_metadata()
+                .begin_version()
+                .expect("Transaction metadata must be a chunk");
+            let mut diffs = Vec::with_capacity(onchain_outputs.len());
+            for (idx, (on_chain_output, new_output)) in
+                onchain_outputs.into_iter().zip(outputs).enumerate()
+            {
+                for (state_key, _) in on_chain_output.write_set() {
                     if state_override.contains_key(state_key) {
-                        println!(
+                        warn!(
                             "Transaction {} writes to overridden state value for {:?}",
                             begin + idx as Version,
                             state_key
                         );
                     }
                 }
+                diffs.push(TransactionDiff::from_outputs(on_chain_output, new_output));
             }
-            Some(onchain_outputs)
-        };
-
-        // Execute transactions, recording all reads.
-        let state_view = ReadSetCapturingStateView::new(state_view, state_override);
-        let outputs = execute_workload(&AptosVMBlockExecutor::new(), &workload, &state_view, 1);
-        let inputs = state_view.into_read_set();
-
-        let comparisons = if let Some(onchain_outputs) = onchain_outputs {
-            let mut comparisons = Vec::with_capacity(onchain_outputs.len());
-            for (left, right) in onchain_outputs.into_iter().zip(outputs) {
-                let comparison = Comparison::diff(left, right);
-                comparisons.push(comparison);
-            }
-            comparisons
-        } else {
-            vec![]
+            diffs
         };
 
         Self {
             inputs,
             workload,
-            comparisons,
+            diffs,
         }
     }
 
     /// Prints the difference in transaction outputs when running with overrides.
     pub fn print_diffs(&self) {
-        let begin = self.workload.transaction_slice_metadata().begin_version().expect("Transaction metadata is a chunk");
-        for (idx, comparison) in self.comparisons.iter().enumerate() {
-            if !comparison.is_ok() {
-                println!(
-                    "Transaction {} diff:\n {}\n",
-                    begin + idx as Version,
-                    comparison
-                );
+        let begin = self
+            .workload
+            .transaction_slice_metadata()
+            .begin_version()
+            .expect("Transaction metadata is a chunk");
+        for (idx, diff) in self.diffs.iter().enumerate() {
+            if !diff.is_empty() {
+                println!("Transaction {} diff:\n {}\n", begin + idx as Version, diff);
             }
         }
     }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod block;
-mod comparison;
+mod diff;
 pub mod generator;
 pub mod overrides;
 pub mod runner;

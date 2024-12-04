@@ -1,6 +1,10 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! Defines different overrides for on-chain state used for benchmarking. With overrides, past
+//! transactions can be replayed on top of a modified state, and we can evaluate how it impacts
+//! performance or other things.
+
 use aptos_logger::warn;
 use aptos_types::{
     on_chain_config::{FeatureFlag, Features, OnChainConfig},
@@ -9,6 +13,7 @@ use aptos_types::{
 use serde::Serialize;
 use std::collections::HashMap;
 
+/// Stores feature flags to enable/disable, essentially overriding on-chain state.
 pub struct OverrideConfig {
     enable_features: Vec<FeatureFlag>,
     disable_features: Vec<FeatureFlag>,
