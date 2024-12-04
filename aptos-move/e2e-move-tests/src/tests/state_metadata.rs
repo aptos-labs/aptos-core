@@ -3,10 +3,11 @@
 
 use crate::MoveHarness;
 use aptos_types::{
+    account_config::{primary_apt_store, ObjectGroupResource},
     on_chain_config::{CurrentTimeMicroseconds, FeatureFlag},
     state_store::state_value::StateValueMetadata,
 };
-use move_core_types::{account_address::AccountAddress, parser::parse_struct_tag};
+use move_core_types::{account_address::AccountAddress, move_resource::MoveStructType};
 
 #[test]
 fn test_metadata_tracking() {
@@ -15,8 +16,6 @@ fn test_metadata_tracking() {
     let timestamp = CurrentTimeMicroseconds {
         microseconds: 7200000001,
     };
-
-    let coin_store = parse_struct_tag("0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>").unwrap();
 
     let address1 = AccountAddress::from_hex_literal("0x100").unwrap();
     let address2 = AccountAddress::from_hex_literal("0x200").unwrap();
@@ -35,10 +34,14 @@ fn test_metadata_tracking() {
         &account1,
         aptos_cached_packages::aptos_stdlib::aptos_account_transfer(address2, 100),
     );
+
     // Observe that metadata is not tracked for address2 resources
     assert_eq!(
         harness
-            .read_resource_metadata(&address2, coin_store.clone())
+            .read_resource_group_metadata(
+                &primary_apt_store(address2),
+                ObjectGroupResource::struct_tag()
+            )
             .unwrap(),
         StateValueMetadata::none()
     );
@@ -59,7 +62,10 @@ fn test_metadata_tracking() {
 
     // Observe that metadata is tracked for address3 resources
     let meta3a = harness
-        .read_resource_metadata(&address3, coin_store.clone())
+        .read_resource_group_metadata(
+            &primary_apt_store(address3),
+            ObjectGroupResource::struct_tag(),
+        )
         .unwrap();
     assert!(meta3a.slot_deposit() > 0);
     assert!(meta3a.bytes_deposit() > 0);
@@ -72,7 +78,10 @@ fn test_metadata_tracking() {
         aptos_cached_packages::aptos_stdlib::aptos_account_transfer(address3, 100),
     );
     let meta3b = harness
-        .read_resource_metadata(&address3, coin_store.clone())
+        .read_resource_group_metadata(
+            &primary_apt_store(address3),
+            ObjectGroupResource::struct_tag(),
+        )
         .unwrap();
     assert_eq!(meta3a, meta3b);
 
@@ -83,7 +92,10 @@ fn test_metadata_tracking() {
     );
     assert_eq!(
         harness
-            .read_resource_metadata(&address2, coin_store.clone())
+            .read_resource_group_metadata(
+                &primary_apt_store(address2),
+                ObjectGroupResource::struct_tag()
+            )
             .unwrap(),
         StateValueMetadata::new(0, 0, &CurrentTimeMicroseconds { microseconds: 0 })
     );

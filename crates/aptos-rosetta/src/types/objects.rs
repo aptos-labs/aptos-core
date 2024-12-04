@@ -998,18 +998,29 @@ impl Transaction {
         // Reorder operations by type so that there's no invalid ordering
         // (Create before transfer) (Withdraw before deposit)
         operations.sort();
-        for (i, operation) in operations.iter_mut().enumerate() {
-            operation.operation_identifier.index = i as u64;
-        }
 
         // Everything committed costs gas
         if let Some(txn) = maybe_user_txn {
-            operations.push(Operation::gas_fee(
+            let gas_fee = Operation::gas_fee(
                 operation_index,
                 txn.sender(),
                 txn_info.gas_used(),
                 txn.gas_unit_price(),
-            ));
+            );
+            // deal with FA withdraw because of fee
+            if let Some(pos) = operations
+                .iter()
+                .rposition(|o| o.operation_type == OperationType::Withdraw.to_string())
+            {
+                if operations[pos].amount == gas_fee.amount {
+                    operations.remove(pos);
+                }
+            }
+            operations.push(gas_fee);
+        }
+
+        for (i, operation) in operations.iter_mut().enumerate() {
+            operation.operation_identifier.index = i as u64;
         }
 
         // TODO: Handle storage gas refund (though nothing currently in Rosetta refunds)

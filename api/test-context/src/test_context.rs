@@ -44,6 +44,7 @@ use aptos_types::{
     chain_id::ChainId,
     indexer::indexer_db_reader::IndexerReader,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    on_chain_config::{FeatureFlag, Features},
     transaction::{
         signature_verified_transaction::into_signature_verified_block, Transaction,
         TransactionPayload, TransactionStatus, Version,
@@ -125,6 +126,10 @@ pub fn new_test_context_inner(
     .unwrap()
     .with_init_genesis_config(Some(Arc::new(|genesis_config| {
         genesis_config.recurring_lockup_duration_secs = 86400;
+        let mut features = Features::default();
+        features.disable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
+        features.disable(FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE);
+        genesis_config.initial_features_override = Some(features);
     })))
     .with_randomize_first_validator_ports(false);
 

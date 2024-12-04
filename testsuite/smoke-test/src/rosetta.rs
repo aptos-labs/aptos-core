@@ -335,7 +335,7 @@ async fn test_account_balance() {
     let _ = cli
         .transfer_invalid_addr(
             0,
-            TRANSFER_AMOUNT,
+            u64::MAX,
             Some(GasOptions {
                 gas_unit_price: None,
                 max_gas: Some(1000),
@@ -1846,7 +1846,7 @@ async fn test_invalid_transaction_gas_charged() {
         .await;
 
     // Now let's see some transfers
-    const TRANSFER_AMOUNT: u64 = 5000;
+    const TRANSFER_AMOUNT: u64 = u64::MAX;
     let _ = cli
         .transfer_invalid_addr(
             0,

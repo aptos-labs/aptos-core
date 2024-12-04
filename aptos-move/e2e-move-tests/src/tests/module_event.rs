@@ -4,9 +4,8 @@
 use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{account_address::AccountAddress, on_chain_config::FeatureFlag};
-use move_core_types::{language_storage::TypeTag, vm_status::StatusCode};
+use move_core_types::vm_status::StatusCode;
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 struct Field {
@@ -42,27 +41,28 @@ fn test_module_event_enabled() {
         &account,
         str::parse("0xcafe::event::emit").unwrap(),
         vec![],
-        vec![bcs::to_bytes(&10u64).unwrap()],
+        vec![bcs::to_bytes(&5u64).unwrap()],
     );
     let events = h.get_events();
-    assert_eq!(events.len(), 13);
-    let my_event_tag = TypeTag::from_str("0xcafe::event::MyEvent").unwrap();
-    let mut count = 0;
-    for event in events.iter() {
-        if event.type_tag() == &my_event_tag {
-            let module_event = event.v2().unwrap();
-            assert_eq!(
-                bcs::from_bytes::<MyEvent>(module_event.event_data()).unwrap(),
-                MyEvent {
-                    seq: count as u64,
-                    field: Field { field: false },
-                    bytes: vec![],
-                }
-            );
-            count += 1;
-        }
-    }
-    assert_eq!(count, 10);
+    let struct_tags = vec![
+        "0x1::code::PublishPackage",
+        "0x1::fungible_asset::Withdraw",
+        "0x1::transaction_fee::FeeStatement",
+        "0xcafe::event::MyEvent",
+        "0xcafe::event::MyEvent",
+        "0xcafe::event::MyEvent",
+        "0xcafe::event::MyEvent",
+        "0xcafe::event::MyEvent",
+        "0x1::fungible_asset::Withdraw",
+        "0x1::transaction_fee::FeeStatement",
+    ];
+    assert_eq!(
+        events
+            .iter()
+            .map(|e| e.type_tag().to_string())
+            .collect::<Vec<_>>(),
+        struct_tags
+    );
 }
 
 #[test]

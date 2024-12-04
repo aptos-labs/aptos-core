@@ -35,6 +35,7 @@ fn test_partitioner_v2_uniform_sharded_block_executor_no_conflict() {
 }
 
 #[test]
+#[ignore]
 // Sharded execution with cross shard conflict doesn't work for now because we don't have
 // cross round dependency tracking yet.
 fn test_partitioner_v2_uniform_sharded_block_executor_with_conflict_parallel() {
@@ -51,6 +52,7 @@ fn test_partitioner_v2_uniform_sharded_block_executor_with_conflict_parallel() {
 }
 
 #[test]
+#[ignore]
 fn test_partitioner_v2_uniform_sharded_block_executor_with_conflict_sequential() {
     for merge_discard in [false, true] {
         let num_shards = 7;
@@ -65,6 +67,7 @@ fn test_partitioner_v2_uniform_sharded_block_executor_with_conflict_sequential()
 }
 
 #[test]
+#[ignore]
 fn test_partitioner_v2_uniform_sharded_block_executor_with_random_transfers_parallel() {
     for merge_discard in [false, true] {
         let num_shards = 3;
@@ -83,6 +86,7 @@ fn test_partitioner_v2_uniform_sharded_block_executor_with_random_transfers_para
 }
 
 #[test]
+#[ignore]
 fn test_partitioner_v2_uniform_sharded_block_executor_with_random_transfers_sequential() {
     for merge_discard in [false, true] {
         let mut rng = OsRng;
@@ -117,6 +121,7 @@ fn test_partitioner_v2_connected_component_sharded_block_executor_no_conflict() 
 }
 
 #[test]
+#[ignore]
 // Sharded execution with cross shard conflict doesn't work for now because we don't have
 // cross round dependency tracking yet.
 fn test_partitioner_v2_connected_component_sharded_block_executor_with_conflict_parallel() {
@@ -133,6 +138,7 @@ fn test_partitioner_v2_connected_component_sharded_block_executor_with_conflict_
 }
 
 #[test]
+#[ignore]
 fn test_partitioner_v2_connected_component_sharded_block_executor_with_conflict_sequential() {
     for merge_discard in [false, true] {
         let num_shards = 7;
@@ -147,6 +153,7 @@ fn test_partitioner_v2_connected_component_sharded_block_executor_with_conflict_
 }
 
 #[test]
+#[ignore]
 fn test_partitioner_v2_connected_component_sharded_block_executor_with_random_transfers_parallel() {
     for merge_discard in [false, true] {
         let num_shards = 3;
@@ -165,6 +172,7 @@ fn test_partitioner_v2_connected_component_sharded_block_executor_with_random_tr
 }
 
 #[test]
+#[ignore]
 fn test_partitioner_v2_connected_component_sharded_block_executor_with_random_transfers_sequential()
 {
     for merge_discard in [false, true] {

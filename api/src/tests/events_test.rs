@@ -198,17 +198,32 @@ async fn test_module_events() {
         .as_array()
         .unwrap()
         .iter()
-        .filter(|e| {
-            e.get("guid")
+        .filter_map(|e| {
+            if e.get("guid")
                 .unwrap()
                 .get("account_address")
                 .unwrap()
                 .as_str()
                 .unwrap()
                 == "0x0"
+            {
+                Some(e.get("type").unwrap().as_str().unwrap())
+            } else {
+                None
+            }
         })
         .collect::<Vec<_>>();
-    assert_eq!(events.len(), 8);
+    let expected_types = vec![
+        "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf::event::MyEvent",
+        "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf::event::MyEvent",
+        "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf::event::MyEvent",
+        "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf::event::MyEvent",
+        "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf::event::MyEvent",
+        "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf::event::MyEvent",
+        "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf::event::MyEvent",
+        "0x1::transaction_fee::FeeStatement",
+    ];
+    assert_eq!(&events, &expected_types);
 }
 
 // until we have generics in the genesis

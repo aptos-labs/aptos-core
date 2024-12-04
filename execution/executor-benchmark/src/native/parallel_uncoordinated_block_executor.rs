@@ -512,6 +512,9 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
         state_view: &(impl StateView + Sync),
         output: &mut IncrementalOutput,
     ) -> Result<()> {
+        if transfer_amount + gas == 0 {
+            return Ok(());
+        }
         let sender_store_address = primary_apt_store(sender_address);
 
         let sender_fa_store_object_key = self
@@ -623,6 +626,9 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
         state_view: &(impl StateView + Sync),
         output: &mut IncrementalOutput,
     ) -> Result<bool> {
+        if transfer_amount == 0 {
+            return Ok(false);
+        }
         let recipient_store_address = primary_apt_store(recipient_address);
         let recipient_fa_store_object_key = self
             .db_util

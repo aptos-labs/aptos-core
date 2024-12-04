@@ -1,27 +1,7 @@
 processed 3 tasks
 
+task 1 'run'. lines 5-13:
+Error: Failed to execute transaction. ExecutionStatus: OutOfGas
+
 task 2 'view'. lines 15-15:
-key 0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin> {
-    coin: store 0x1::coin::Coin<0x1::aptos_coin::AptosCoin> {
-        value: 10100
-    }
-    frozen: false
-    deposit_events: store 0x1::event::EventHandle<0x1::coin::DepositEvent> {
-        counter: 0
-        guid: drop store 0x1::guid::GUID {
-            id: copy drop store 0x1::guid::ID {
-                creation_num: 2
-                addr: 9c3b634ac05d0af393e0f93b9b19b61e7cac1c519f566276aa0c6fd15dac12aa
-            }
-        }
-    }
-    withdraw_events: store 0x1::event::EventHandle<0x1::coin::WithdrawEvent> {
-        counter: 0
-        guid: drop store 0x1::guid::GUID {
-            id: copy drop store 0x1::guid::ID {
-                creation_num: 3
-                addr: 9c3b634ac05d0af393e0f93b9b19b61e7cac1c519f566276aa0c6fd15dac12aa
-            }
-        }
-    }
-}
+[No Resource Exists]

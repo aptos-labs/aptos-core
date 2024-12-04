@@ -539,7 +539,7 @@ module aptos_framework::genesis {
         aptos_account::register_apt(&core_resources); // registers APT store
 
         let apt_metadata = object::address_to_object<Metadata>(@aptos_fungible_asset);
-        assert!(primary_fungible_store::primary_store_exists(@core_resources, apt_metadata), 2);
+        assert!(!primary_fungible_store::primary_store_exists(@core_resources, apt_metadata), 2);
 
         aptos_coin::configure_accounts_for_test(aptos_framework, &core_resources, mint_cap);
 
