@@ -68,7 +68,7 @@ module aptos_framework::config_buffer {
     /// Take the buffered config `T` out (buffer cleared). Abort if the buffer is empty.
     /// Should only be used at the end of a reconfiguration.
     ///
-    /// Typically used in `X::on_new_epoch()` where X is an on-chaon config.
+    /// Typically used in `X::on_new_epoch()` where X is an on-chain config.
     public fun extract<T: store>(): T acquires PendingConfigs {
         let configs = borrow_global_mut<PendingConfigs>(@aptos_framework);
         let key = type_info::type_name<T>();
