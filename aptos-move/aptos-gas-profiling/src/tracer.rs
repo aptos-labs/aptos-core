@@ -1,8 +1,6 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{env, fmt::Display, io::Write, path::Path};
-
 use crate::FrameName;
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
 use move_binary_format::{
@@ -11,15 +9,19 @@ use move_binary_format::{
     file_format_common::Opcodes,
 };
 use move_bytecode_source_map::source_map::SourceMap;
-use move_core_types::{identifier::Identifier, language_storage::{ModuleId, TypeTag}};
+use move_core_types::{
+    identifier::Identifier,
+    language_storage::{ModuleId, TypeTag},
+};
 use move_ir_types::location::Loc;
+use move_model::model::GlobalEnv;
+use move_package::{BuildConfig, ModelConfig};
 use move_vm_types::{
     gas::{GasMeter, InterpreterView, SimpleInstruction},
     values::Value,
     views::{TypeView, ValueView, ValueVisitor},
 };
-use move_package::{BuildConfig, ModelConfig};
-use move_model::model::GlobalEnv;
+use std::{env, fmt::Display, io::Write, path::Path};
 #[derive(Debug)]
 pub struct ExecutionTrace<Value>(CallFrame<Value>);
 
@@ -28,7 +30,9 @@ impl<Value: Display> ExecutionTrace<Value> {
         let path_str = env::var("PKG_PATH").expect("PKG_PATH must be set");
         let path = Path::new(&path_str);
         let build_config = BuildConfig::default();
-        let model = build_config.move_model_for_package(path, ModelConfig::default()).unwrap();
+        let model = build_config
+            .move_model_for_package(path, ModelConfig::default())
+            .unwrap();
 
         self.0.simple_debug1(w, 0, &model)
     }
@@ -45,7 +49,12 @@ pub struct ExecutionTracer<G, Value> {
 }
 
 impl<G, Value> ExecutionTracer<G, Value> {
-    pub fn from_entry_fun(base: G, module_id: ModuleId, function: Identifier, ty_args: Vec<TypeTag>) -> Self {
+    pub fn from_entry_fun(
+        base: G,
+        module_id: ModuleId,
+        function: Identifier,
+        ty_args: Vec<TypeTag>,
+    ) -> Self {
         Self {
             base,
             frames: vec![CallFrame::new_function(module_id, function, ty_args)],
@@ -80,24 +89,34 @@ impl<G, Value> ExecutionTracer<G, Value> {
     }
 
     pub fn dump_trace(mut self) -> ExecutionTrace<Value> {
-        debug_assert!(self.frames.len() == 1);
+        // debug_assert!(self.frames.len() == 1);
         ExecutionTrace(self.frames.pop().expect("non-empty stack of frames"))
     }
 }
 
 impl<G> ExecutionTracer<G, String> {
-    fn emit_instr(&mut self, op: Opcodes, args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone) {
+    fn emit_instr(
+        &mut self,
+        op: Opcodes,
+        args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
+    ) {
         self.emit_generic_instr(op, vec![], args);
     }
 
-    fn emit_generic_instr(&mut self, op: Opcodes, ty_args: Vec<TypeTag>, args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone) {
+    fn emit_generic_instr(
+        &mut self,
+        op: Opcodes,
+        ty_args: Vec<TypeTag>,
+        args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
+    ) {
         let pc = self.get_pc();
-        self.get_top_events_mut().push(Event::Instruction(Instruction {
-            op,
-            ty_args,
-            args: args.map(|v| v.to_string()).collect(),
-            offset: pc
-        }));
+        self.get_top_events_mut()
+            .push(Event::Instruction(Instruction {
+                op,
+                ty_args,
+                args: args.map(|v| v.to_string()).collect(),
+                offset: pc,
+            }));
     }
 
     fn emit_generic_instr_and_inc_pc(
@@ -165,7 +184,10 @@ impl<Value: Display> Instruction<Value> {
                 Ok(())
             }
         }
-        QualifiedInstr { op: self.op, ty_args: &self.ty_args }
+        QualifiedInstr {
+            op: self.op,
+            ty_args: &self.ty_args,
+        }
     }
 }
 
@@ -180,7 +202,11 @@ pub struct CallFrame<Value> {
 impl<Value> CallFrame<Value> {
     fn new_function(module_id: ModuleId, name: Identifier, ty_args: Vec<TypeTag>) -> Self {
         Self {
-            name: FrameName::Function { module_id, name, ty_args },
+            name: FrameName::Function {
+                module_id,
+                name,
+                ty_args,
+            },
             events: Vec::new(),
             pc: 0,
         }
@@ -215,22 +241,33 @@ impl<Value: Display> CallFrame<Value> {
         Ok(())
     }
 
-    pub fn simple_debug1(&self, w: &mut impl Write, depth: usize, env: &GlobalEnv) -> Result<(), std::io::Error> {
+    pub fn simple_debug1(
+        &self,
+        w: &mut impl Write,
+        depth: usize,
+        env: &GlobalEnv,
+    ) -> Result<(), std::io::Error> {
         writeln!(w, "{}{}", " ".repeat(depth * 4), self.name)?;
         for event in &self.events {
             match event {
                 Event::Instruction(instr) => {
                     write!(w, "{}", " ".repeat(depth * 4 + 2))?;
-                    if let FrameName::Function { module_id, name, ty_args } = &self.name {
-                        let fun_env = env.find_function_by_language_storage_id_name(module_id, name).unwrap();
-                        let loc = fun_env.get_bytecode_loc(instr.offset).unwrap();
-                        write!(w, "{}: ", loc.display_file_name_and_line(env))?;
-                    } else {
-                        write!(w, "{}: ", instr.offset)?;
-                    }
+                    write!(w, "{}: ", instr.offset)?;
                     write!(w, "{} ", instr.display_qualified_instr())?;
                     for arg in &instr.args {
                         write!(w, "{} ", arg)?;
+                    }
+                    if let FrameName::Function {
+                        module_id,
+                        name,
+                        ty_args,
+                    } = &self.name
+                    {
+                        let fun_env = env
+                            .find_function_by_language_storage_id_name(module_id, name)
+                            .unwrap();
+                        let loc = fun_env.get_bytecode_loc(instr.offset).unwrap();
+                        write!(w, "{}: ", loc.display_file_name_and_line(env))?;
                     }
                     writeln!(w)?;
                 },
@@ -255,55 +292,152 @@ where
         self.base.balance_internal()
     }
 
-    fn charge_simple_instr(&mut self, instr: SimpleInstruction, interpreter: impl InterpreterView) -> PartialVMResult<()> {
+    fn charge_simple_instr(
+        &mut self,
+        instr: SimpleInstruction,
+        interpreter: impl InterpreterView,
+    ) -> PartialVMResult<()> {
+        println!("Press Enter to continue...");
+        std::io::stdin().read_line(&mut String::new()).unwrap();
         match instr {
             SimpleInstruction::Nop => (),
             SimpleInstruction::Ret => {
+                self.emit_instr_and_inc_pc(Opcodes::RET, std::iter::empty::<&Value>());
                 if self.frames.len() > 1 {
                     let cur_frame = self.frames.pop().expect("frame must exist");
                     let last_frame = self.frames.last_mut().expect("frame must exist");
                     last_frame.events.push(Event::Call(cur_frame));
                 }
             },
-            SimpleInstruction::LdU8 => self.emit_instr_and_inc_pc(Opcodes::LD_U8, std::iter::empty::<&Value>()),
-            SimpleInstruction::LdU64 => self.emit_instr_and_inc_pc(Opcodes::LD_U64, std::iter::empty::<&Value>()),
-            SimpleInstruction::LdU128 => self.emit_instr_and_inc_pc(Opcodes::LD_U128, std::iter::empty::<&Value>()),
-            SimpleInstruction::LdTrue => self.emit_instr_and_inc_pc(Opcodes::LD_TRUE, std::iter::empty::<&Value>()),
-            SimpleInstruction::LdFalse => self.emit_instr_and_inc_pc(Opcodes::LD_FALSE, std::iter::empty::<&Value>()),
-            SimpleInstruction::FreezeRef => self.emit_instr_and_inc_pc(Opcodes::FREEZE_REF, std::iter::empty::<&Value>()),
-            SimpleInstruction::MutBorrowLoc => self.emit_instr_and_inc_pc(Opcodes::MUT_BORROW_LOC, std::iter::empty::<&Value>()),
-            SimpleInstruction::ImmBorrowLoc => self.emit_instr_and_inc_pc(Opcodes::IMM_BORROW_LOC, std::iter::empty::<&Value>()),
-            SimpleInstruction::ImmBorrowField => self.emit_instr_and_inc_pc(Opcodes::IMM_BORROW_FIELD, interpreter.view_last_n_values(1).unwrap()),
-            SimpleInstruction::MutBorrowField => self.emit_instr_and_inc_pc(Opcodes::MUT_BORROW_FIELD, interpreter.view_last_n_values(1).unwrap()),
-            SimpleInstruction::ImmBorrowFieldGeneric => self.emit_instr_and_inc_pc(Opcodes::IMM_BORROW_FIELD_GENERIC, interpreter.view_last_n_values(1).unwrap()),
-            SimpleInstruction::MutBorrowFieldGeneric => self.emit_instr_and_inc_pc(Opcodes::MUT_BORROW_FIELD_GENERIC, interpreter.view_last_n_values(1).unwrap()),
-            SimpleInstruction::ImmBorrowVariantField => self.emit_instr_and_inc_pc(Opcodes::IMM_BORROW_VARIANT_FIELD, interpreter.view_last_n_values(1).unwrap()),
-            SimpleInstruction::MutBorrowVariantField => self.emit_instr_and_inc_pc(Opcodes::MUT_BORROW_VARIANT_FIELD, interpreter.view_last_n_values(1).unwrap()),
-            SimpleInstruction::ImmBorrowVariantFieldGeneric => self.emit_instr_and_inc_pc(Opcodes::IMM_BORROW_VARIANT_FIELD_GENERIC, interpreter.view_last_n_values(1).unwrap()),
-            SimpleInstruction::MutBorrowVariantFieldGeneric => self.emit_instr_and_inc_pc(Opcodes::MUT_BORROW_VARIANT_FIELD_GENERIC, interpreter.view_last_n_values(1).unwrap()),
-            SimpleInstruction::TestVariant => self.emit_instr_and_inc_pc(Opcodes::TEST_VARIANT, interpreter.view_last_n_values(1).unwrap()),
-            SimpleInstruction::TestVariantGeneric => self.emit_instr_and_inc_pc(Opcodes::TEST_VARIANT_GENERIC, interpreter.view_last_n_values(1).unwrap()),
-            SimpleInstruction::CastU8 => self.emit_instr_and_inc_pc(Opcodes::CAST_U8, interpreter.view_last_n_values(1).unwrap()),
-            SimpleInstruction::CastU64 => self.emit_instr_and_inc_pc(Opcodes::CAST_U64, interpreter.view_last_n_values(1).unwrap()),
-            SimpleInstruction::CastU128 => self.emit_instr_and_inc_pc(Opcodes::CAST_U128, interpreter.view_last_n_values(1).unwrap()),
-            SimpleInstruction::Add => self.emit_instr_and_inc_pc(Opcodes::ADD, interpreter.view_last_n_values(2).unwrap()),
-            SimpleInstruction::Sub => self.emit_instr_and_inc_pc(Opcodes::SUB, interpreter.view_last_n_values(2).unwrap()),
-            SimpleInstruction::Mul => self.emit_instr_and_inc_pc(Opcodes::MUL, interpreter.view_last_n_values(2).unwrap()),
-            SimpleInstruction::Mod => self.emit_instr_and_inc_pc(Opcodes::MOD, interpreter.view_last_n_values(2).unwrap()),
-            SimpleInstruction::Div => self.emit_instr_and_inc_pc(Opcodes::DIV, interpreter.view_last_n_values(2).unwrap()),
-            SimpleInstruction::BitOr => self.emit_instr_and_inc_pc(Opcodes::BIT_OR, interpreter.view_last_n_values(2).unwrap()),
-            SimpleInstruction::BitAnd => self.emit_instr_and_inc_pc(Opcodes::BIT_AND, interpreter.view_last_n_values(2).unwrap()),
-            SimpleInstruction::Xor => self.emit_instr_and_inc_pc(Opcodes::XOR, interpreter.view_last_n_values(2).unwrap()),
-            SimpleInstruction::Shl => self.emit_instr_and_inc_pc(Opcodes::SHL, interpreter.view_last_n_values(2).unwrap()),
-            SimpleInstruction::Shr => self.emit_instr_and_inc_pc(Opcodes::SHR, interpreter.view_last_n_values(2).unwrap()),
-            SimpleInstruction::Or => self.emit_instr_and_inc_pc(Opcodes::OR, interpreter.view_last_n_values(2).unwrap()),
-            SimpleInstruction::And => self.emit_instr_and_inc_pc(Opcodes::AND, interpreter.view_last_n_values(2).unwrap()),
-            SimpleInstruction::Not => self.emit_instr_and_inc_pc(Opcodes::NOT, interpreter.view_last_n_values(1).unwrap()),
-            SimpleInstruction::Lt => self.emit_instr_and_inc_pc(Opcodes::LT, interpreter.view_last_n_values(2).unwrap()),
-            SimpleInstruction::Gt => self.emit_instr_and_inc_pc(Opcodes::GT, interpreter.view_last_n_values(2).unwrap()),
-            SimpleInstruction::Le => self.emit_instr_and_inc_pc(Opcodes::LE, interpreter.view_last_n_values(2).unwrap()),
-            SimpleInstruction::Ge => self.emit_instr_and_inc_pc(Opcodes::GE, interpreter.view_last_n_values(2).unwrap()),
-            SimpleInstruction::Abort => self.emit_instr_and_inc_pc(Opcodes::ABORT, interpreter.view_last_n_values(1).unwrap()),
+            SimpleInstruction::LdU8 => {
+                self.emit_instr_and_inc_pc(Opcodes::LD_U8, std::iter::empty::<&Value>())
+            },
+            SimpleInstruction::LdU64 => {
+                self.emit_instr_and_inc_pc(Opcodes::LD_U64, std::iter::empty::<&Value>())
+            },
+            SimpleInstruction::LdU128 => {
+                self.emit_instr_and_inc_pc(Opcodes::LD_U128, std::iter::empty::<&Value>())
+            },
+            SimpleInstruction::LdTrue => {
+                self.emit_instr_and_inc_pc(Opcodes::LD_TRUE, std::iter::empty::<&Value>())
+            },
+            SimpleInstruction::LdFalse => {
+                self.emit_instr_and_inc_pc(Opcodes::LD_FALSE, std::iter::empty::<&Value>())
+            },
+            SimpleInstruction::FreezeRef => {
+                self.emit_instr_and_inc_pc(Opcodes::FREEZE_REF, std::iter::empty::<&Value>())
+            },
+            SimpleInstruction::MutBorrowLoc => {
+                self.emit_instr_and_inc_pc(Opcodes::MUT_BORROW_LOC, std::iter::empty::<&Value>())
+            },
+            SimpleInstruction::ImmBorrowLoc => {
+                self.emit_instr_and_inc_pc(Opcodes::IMM_BORROW_LOC, std::iter::empty::<&Value>())
+            },
+            SimpleInstruction::ImmBorrowField => self.emit_instr_and_inc_pc(
+                Opcodes::IMM_BORROW_FIELD,
+                interpreter.view_last_n_values(1).unwrap(),
+            ),
+            SimpleInstruction::MutBorrowField => self.emit_instr_and_inc_pc(
+                Opcodes::MUT_BORROW_FIELD,
+                interpreter.view_last_n_values(1).unwrap(),
+            ),
+            SimpleInstruction::ImmBorrowFieldGeneric => self.emit_instr_and_inc_pc(
+                Opcodes::IMM_BORROW_FIELD_GENERIC,
+                interpreter.view_last_n_values(1).unwrap(),
+            ),
+            SimpleInstruction::MutBorrowFieldGeneric => self.emit_instr_and_inc_pc(
+                Opcodes::MUT_BORROW_FIELD_GENERIC,
+                interpreter.view_last_n_values(1).unwrap(),
+            ),
+            SimpleInstruction::ImmBorrowVariantField => self.emit_instr_and_inc_pc(
+                Opcodes::IMM_BORROW_VARIANT_FIELD,
+                interpreter.view_last_n_values(1).unwrap(),
+            ),
+            SimpleInstruction::MutBorrowVariantField => self.emit_instr_and_inc_pc(
+                Opcodes::MUT_BORROW_VARIANT_FIELD,
+                interpreter.view_last_n_values(1).unwrap(),
+            ),
+            SimpleInstruction::ImmBorrowVariantFieldGeneric => self.emit_instr_and_inc_pc(
+                Opcodes::IMM_BORROW_VARIANT_FIELD_GENERIC,
+                interpreter.view_last_n_values(1).unwrap(),
+            ),
+            SimpleInstruction::MutBorrowVariantFieldGeneric => self.emit_instr_and_inc_pc(
+                Opcodes::MUT_BORROW_VARIANT_FIELD_GENERIC,
+                interpreter.view_last_n_values(1).unwrap(),
+            ),
+            SimpleInstruction::TestVariant => self.emit_instr_and_inc_pc(
+                Opcodes::TEST_VARIANT,
+                interpreter.view_last_n_values(1).unwrap(),
+            ),
+            SimpleInstruction::TestVariantGeneric => self.emit_instr_and_inc_pc(
+                Opcodes::TEST_VARIANT_GENERIC,
+                interpreter.view_last_n_values(1).unwrap(),
+            ),
+            SimpleInstruction::CastU8 => self.emit_instr_and_inc_pc(
+                Opcodes::CAST_U8,
+                interpreter.view_last_n_values(1).unwrap(),
+            ),
+            SimpleInstruction::CastU64 => self.emit_instr_and_inc_pc(
+                Opcodes::CAST_U64,
+                interpreter.view_last_n_values(1).unwrap(),
+            ),
+            SimpleInstruction::CastU128 => self.emit_instr_and_inc_pc(
+                Opcodes::CAST_U128,
+                interpreter.view_last_n_values(1).unwrap(),
+            ),
+            SimpleInstruction::Add => {
+                self.emit_instr_and_inc_pc(Opcodes::ADD, interpreter.view_last_n_values(2).unwrap())
+            },
+            SimpleInstruction::Sub => {
+                self.emit_instr_and_inc_pc(Opcodes::SUB, interpreter.view_last_n_values(2).unwrap())
+            },
+            SimpleInstruction::Mul => {
+                self.emit_instr_and_inc_pc(Opcodes::MUL, interpreter.view_last_n_values(2).unwrap())
+            },
+            SimpleInstruction::Mod => {
+                self.emit_instr_and_inc_pc(Opcodes::MOD, interpreter.view_last_n_values(2).unwrap())
+            },
+            SimpleInstruction::Div => {
+                self.emit_instr_and_inc_pc(Opcodes::DIV, interpreter.view_last_n_values(2).unwrap())
+            },
+            SimpleInstruction::BitOr => self
+                .emit_instr_and_inc_pc(Opcodes::BIT_OR, interpreter.view_last_n_values(2).unwrap()),
+            SimpleInstruction::BitAnd => self.emit_instr_and_inc_pc(
+                Opcodes::BIT_AND,
+                interpreter.view_last_n_values(2).unwrap(),
+            ),
+            SimpleInstruction::Xor => {
+                self.emit_instr_and_inc_pc(Opcodes::XOR, interpreter.view_last_n_values(2).unwrap())
+            },
+            SimpleInstruction::Shl => {
+                self.emit_instr_and_inc_pc(Opcodes::SHL, interpreter.view_last_n_values(2).unwrap())
+            },
+            SimpleInstruction::Shr => {
+                self.emit_instr_and_inc_pc(Opcodes::SHR, interpreter.view_last_n_values(2).unwrap())
+            },
+            SimpleInstruction::Or => {
+                self.emit_instr_and_inc_pc(Opcodes::OR, interpreter.view_last_n_values(2).unwrap())
+            },
+            SimpleInstruction::And => {
+                self.emit_instr_and_inc_pc(Opcodes::AND, interpreter.view_last_n_values(2).unwrap())
+            },
+            SimpleInstruction::Not => {
+                self.emit_instr_and_inc_pc(Opcodes::NOT, interpreter.view_last_n_values(1).unwrap())
+            },
+            SimpleInstruction::Lt => {
+                self.emit_instr_and_inc_pc(Opcodes::LT, interpreter.view_last_n_values(2).unwrap())
+            },
+            SimpleInstruction::Gt => {
+                self.emit_instr_and_inc_pc(Opcodes::GT, interpreter.view_last_n_values(2).unwrap())
+            },
+            SimpleInstruction::Le => {
+                self.emit_instr_and_inc_pc(Opcodes::LE, interpreter.view_last_n_values(2).unwrap())
+            },
+            SimpleInstruction::Ge => {
+                self.emit_instr_and_inc_pc(Opcodes::GE, interpreter.view_last_n_values(2).unwrap())
+            },
+            SimpleInstruction::Abort => self
+                .emit_instr_and_inc_pc(Opcodes::ABORT, interpreter.view_last_n_values(1).unwrap()),
             SimpleInstruction::LdU16 => (),
             SimpleInstruction::LdU32 => (),
             SimpleInstruction::LdU256 => (),
@@ -358,7 +492,8 @@ where
             name: Identifier::new(func_name).unwrap(),
             ty_args: vec![],
         });
-        self.base.charge_call(module_id, func_name, args, num_locals)
+        self.base
+            .charge_call(module_id, func_name, args, num_locals)
     }
 
     fn charge_call_generic(
@@ -380,7 +515,8 @@ where
             name: Identifier::new(func_name).unwrap(),
             ty_args: ty_tags,
         });
-        self.base.charge_call_generic(module_id, func_name, ty_args, args, num_locals)
+        self.base
+            .charge_call_generic(module_id, func_name, ty_args, args, num_locals)
     }
 
     fn charge_ld_const(&mut self, size: aptos_gas_algebra::NumBytes) -> PartialVMResult<()> {
@@ -402,12 +538,21 @@ where
     }
 
     fn charge_move_loc(&mut self, val: impl ValueView + Display) -> PartialVMResult<()> {
+        println!("Press Enter to continue...");
+        std::io::stdin().read_line(&mut String::new()).unwrap();
         self.emit_instr_and_inc_pc(Opcodes::MOVE_LOC, std::iter::empty::<&Value>());
         self.base.charge_move_loc(val)
     }
 
-    fn charge_store_loc(&mut self, val: impl ValueView, interpreter_view: impl InterpreterView) -> PartialVMResult<()> {
-        self.emit_instr_and_inc_pc(Opcodes::ST_LOC, interpreter_view.view_last_n_values(1).unwrap());
+    fn charge_store_loc(
+        &mut self,
+        val: impl ValueView,
+        interpreter_view: impl InterpreterView,
+    ) -> PartialVMResult<()> {
+        self.emit_instr_and_inc_pc(
+            Opcodes::ST_LOC,
+            interpreter_view.view_last_n_values(1).unwrap(),
+        );
         self.base.charge_store_loc(val, interpreter_view)
     }
 
@@ -417,7 +562,10 @@ where
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
         interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.emit_instr_and_inc_pc(Opcodes::PACK, interpreter_view.view_last_n_values(args.len()).unwrap());
+        self.emit_instr_and_inc_pc(
+            Opcodes::PACK,
+            interpreter_view.view_last_n_values(args.len()).unwrap(),
+        );
         self.base.charge_pack(is_generic, args, interpreter_view)
     }
 
@@ -444,12 +592,20 @@ where
         self.base.charge_write_ref(new_val, old_val)
     }
 
-    fn charge_eq(&mut self, lhs: impl ValueView + Display, rhs: impl ValueView + Display) -> PartialVMResult<()> {
+    fn charge_eq(
+        &mut self,
+        lhs: impl ValueView + Display,
+        rhs: impl ValueView + Display,
+    ) -> PartialVMResult<()> {
         self.inc_pc();
         self.base.charge_eq(lhs, rhs)
     }
 
-    fn charge_neq(&mut self, lhs: impl ValueView + Display, rhs: impl ValueView + Display) -> PartialVMResult<()> {
+    fn charge_neq(
+        &mut self,
+        lhs: impl ValueView + Display,
+        rhs: impl ValueView + Display,
+    ) -> PartialVMResult<()> {
         self.inc_pc();
         self.base.charge_neq(lhs, rhs)
     }
@@ -462,7 +618,8 @@ where
         is_success: bool,
     ) -> PartialVMResult<()> {
         self.inc_pc();
-        self.base.charge_borrow_global(is_mut, is_generic, ty, is_success)
+        self.base
+            .charge_borrow_global(is_mut, is_generic, ty, is_success)
     }
 
     fn charge_exists(
@@ -472,7 +629,11 @@ where
         // TODO(Gas): see if we can get rid of this param
         exists: bool,
     ) -> PartialVMResult<()> {
-        self.emit_generic_instr_and_inc_pc(Opcodes::EXISTS, vec![ty.to_type_tag()], Vec::<&Value>::new().into_iter());
+        self.emit_generic_instr_and_inc_pc(
+            Opcodes::EXISTS,
+            vec![ty.to_type_tag()],
+            Vec::<&Value>::new().into_iter(),
+        );
         self.base.charge_exists(is_generic, ty, exists)
     }
 
@@ -486,7 +647,11 @@ where
         if let Some(val) = &val {
             self.emit_generic_instr_and_inc_pc(Opcodes::MOVE_FROM, ty_args, [&val].into_iter());
         } else {
-            self.emit_generic_instr_and_inc_pc(Opcodes::MOVE_FROM, ty_args, Vec::<&Value>::new().into_iter());
+            self.emit_generic_instr_and_inc_pc(
+                Opcodes::MOVE_FROM,
+                ty_args,
+                Vec::<&Value>::new().into_iter(),
+            );
         }
         self.base.charge_move_from(is_generic, ty, val)
     }
@@ -585,7 +750,8 @@ where
         args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
     ) -> PartialVMResult<()> {
         self.inc_pc();
-        self.base.charge_native_function_before_execution(ty_args, args)
+        self.base
+            .charge_native_function_before_execution(ty_args, args)
     }
 
     fn charge_drop_frame(
@@ -636,7 +802,10 @@ where
         self.base.charge_storage_fee(amount, gas_unit_price)
     }
 
-    fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: aptos_gas_algebra::NumBytes) -> move_binary_format::errors::VMResult<()> {
+    fn charge_intrinsic_gas_for_transaction(
+        &mut self,
+        txn_size: aptos_gas_algebra::NumBytes,
+    ) -> move_binary_format::errors::VMResult<()> {
         self.base.charge_intrinsic_gas_for_transaction(txn_size)
     }
 
@@ -644,15 +813,25 @@ where
         self.base.charge_keyless()
     }
 
-    fn charge_io_gas_for_transaction(&mut self, txn_size: aptos_gas_algebra::NumBytes) -> move_binary_format::errors::VMResult<()> {
+    fn charge_io_gas_for_transaction(
+        &mut self,
+        txn_size: aptos_gas_algebra::NumBytes,
+    ) -> move_binary_format::errors::VMResult<()> {
         self.base.charge_io_gas_for_transaction(txn_size)
     }
 
-    fn charge_io_gas_for_event(&mut self, event: &aptos_types::contract_event::ContractEvent) -> move_binary_format::errors::VMResult<()> {
+    fn charge_io_gas_for_event(
+        &mut self,
+        event: &aptos_types::contract_event::ContractEvent,
+    ) -> move_binary_format::errors::VMResult<()> {
         self.base.charge_io_gas_for_event(event)
     }
 
-    fn charge_io_gas_for_write(&mut self, key: &aptos_types::state_store::state_key::StateKey, op: &aptos_types::write_set::WriteOpSize) -> move_binary_format::errors::VMResult<()> {
+    fn charge_io_gas_for_write(
+        &mut self,
+        key: &aptos_types::state_store::state_key::StateKey,
+        op: &aptos_types::write_set::WriteOpSize,
+    ) -> move_binary_format::errors::VMResult<()> {
         self.base.charge_io_gas_for_write(key, op)
     }
 }
