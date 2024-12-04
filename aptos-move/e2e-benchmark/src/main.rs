@@ -12,7 +12,7 @@ use aptos_transaction_generator_lib::{
     },
     EntryPoints,
 };
-use aptos_types::{account_address::AccountAddress, on_chain_config::Features, transaction::TransactionPayload};
+use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
 use rand::{rngs::StdRng, SeedableRng};
 use serde_json::json;
 use std::{collections::HashMap, fs, process::exit};
