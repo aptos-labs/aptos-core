@@ -571,7 +571,7 @@ impl<'a> Disassembler<'a> {
     ) -> Result<String> {
         Ok(match sig_tok {
             // TODO: function types
-            SignatureToken::Function(..) => unimplemented!("disassembling function sig tokens"),
+            SignatureToken::Function { .. } => unimplemented!("disassembling function sig tokens"),
 
             SignatureToken::Bool => "bool".to_string(),
             SignatureToken::U8 => "u8".to_string(),

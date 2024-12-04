@@ -148,11 +148,11 @@ impl<'a> InstantiationLoopChecker<'a> {
                     type_params.insert(*idx);
                 },
                 Vector(ty) => rec(type_params, ty),
-                Function(args, result, _) => {
+                Function { args, results, .. } => {
                     for ty in args {
                         rec(type_params, ty);
                     }
-                    for ty in result {
+                    for ty in results {
                         rec(type_params, ty);
                     }
                 },

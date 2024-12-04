@@ -235,11 +235,15 @@ impl CompiledScriptBuilder {
                 MutableReference(Box::new(self.import_signature_token(module, ty)?))
             },
             Vector(ty) => Vector(Box::new(self.import_signature_token(module, ty)?)),
-            Function(args, result, abilities) => Function(
-                import_vec(self, args)?,
-                import_vec(self, result)?,
-                *abilities,
-            ),
+            Function {
+                args,
+                results,
+                abilities,
+            } => Function {
+                args: import_vec(self, args)?,
+                results: import_vec(self, results)?,
+                abilities: *abilities,
+            },
             Struct(idx) => Struct(self.import_struct(module, *idx)?),
             StructInstantiation(idx, inst_tys) => StructInstantiation(
                 self.import_struct(module, *idx)?,

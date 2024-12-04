@@ -212,23 +212,20 @@ impl<'a> AcquiresVerifier<'a> {
 
     fn ld_function_acquire(
         &mut self,
-        fh_idx: FunctionHandleIndex,
-        offset: CodeOffset,
+        _fh_idx: FunctionHandleIndex,
+        _offset: CodeOffset,
     ) -> PartialVMResult<()> {
-        // Currenty we are disallowing acquires for any function value which
-        // is created, so InvokeFunction does nothing with acquires.
+        // Note that function values are dynamically disallowed to be called from the module hosting
+        // their implementation function, and to be called while their host module is on the stack,
+        // so we don't need to do anything about acquires at this point.
         // TODO(LAMBDA) In the future this may change.
-        let function_handle = self.module.function_handle_at(fh_idx);
-        let function_acquired_resources = self.function_acquired_resources(function_handle, fh_idx);
-        if !function_acquired_resources.is_empty() {
-            return Err(self.error(StatusCode::LD_FUNCTION_NONEMPTY_ACQUIRES, offset));
-        }
         Ok(())
     }
 
     fn invoke_acquire(&mut self, _offset: CodeOffset) -> PartialVMResult<()> {
-        // Currenty we are disallowing acquires for any function value which
-        // is created, so InvokeFunction does nothing with acquires.
+        // Note that function values are dynamically disallowed to be called from their
+        // hosting module, or if that module appears on the stack at all.  This means
+        // that a dynamic call cannot affect local resources in the caller.
         // TODO(LAMBDA) In the future this may change.
         Ok(())
     }

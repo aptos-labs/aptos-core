@@ -456,13 +456,22 @@ fn compare_types(
             compare_types(context, ty1, ty2, def_module)
         },
         (
-            SignatureToken::Function(args1, result1, ab1),
-            SignatureToken::Function(args2, result2, ab2),
+            SignatureToken::Function {
+                args: args1,
+                results: result1,
+                abilities: abilities1,
+            },
+            SignatureToken::Function {
+                args: args2,
+                results: result2,
+                abilities: abilities2,
+            },
         ) => {
             compare_cross_module_signatures(context, args1, args2, def_module)?;
             compare_cross_module_signatures(context, result1, result2, def_module)?;
-            if ab1 != ab2 {
-                Err(PartialVMError::new(StatusCode::TYPE_MISMATCH))
+            if abilities1 != abilities2 {
+                Err(PartialVMError::new(StatusCode::TYPE_MISMATCH)
+                    .with_message("Function type ability constraints mismatch".to_string()))
             } else {
                 Ok(())
             }
@@ -495,7 +504,7 @@ fn compare_types(
         | (SignatureToken::Address, _)
         | (SignatureToken::Signer, _)
         | (SignatureToken::Vector(_), _)
-        | (SignatureToken::Function(..), _)
+        | (SignatureToken::Function { .. }, _)
         | (SignatureToken::Struct(_), _)
         | (SignatureToken::StructInstantiation(_, _), _)
         | (SignatureToken::Reference(_), _)

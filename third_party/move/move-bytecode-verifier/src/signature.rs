@@ -372,7 +372,7 @@ impl<'a> SignatureChecker<'a> {
                 }
             },
 
-            SignatureToken::Function(..) => {
+            SignatureToken::Function { .. } => {
                 return Err(PartialVMError::new(StatusCode::UNEXPECTED_VERIFIER_ERROR)
                     .with_message("function types not supported".to_string()));
             },
@@ -429,7 +429,7 @@ impl<'a> SignatureChecker<'a> {
                 Err(PartialVMError::new(StatusCode::INVALID_SIGNATURE_TOKEN)
                     .with_message("reference not allowed".to_string()))
             },
-            Function(..) => Err(PartialVMError::new(StatusCode::UNEXPECTED_VERIFIER_ERROR)
+            Function { .. } => Err(PartialVMError::new(StatusCode::UNEXPECTED_VERIFIER_ERROR)
                 .with_message("function types not supported".to_string())),
             Vector(ty) => self.check_signature_token(ty),
             StructInstantiation(_, type_arguments) => self.check_signature_tokens(type_arguments),
@@ -481,7 +481,7 @@ impl<'a> SignatureChecker<'a> {
                     type_parameters,
                 )
             },
-            SignatureToken::Function(..) => {
+            SignatureToken::Function { .. } => {
                 Err(PartialVMError::new(StatusCode::UNEXPECTED_VERIFIER_ERROR)
                     .with_message("function types not supported".to_string()))
             },

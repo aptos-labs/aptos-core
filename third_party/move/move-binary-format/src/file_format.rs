@@ -1262,7 +1262,11 @@ pub enum SignatureToken {
     /// Vector
     Vector(Box<SignatureToken>),
     /// Function, with n argument types and m result types, and an associated ability set.
-    Function(Vec<SignatureToken>, Vec<SignatureToken>, AbilitySet),
+    Function {
+        args: Vec<SignatureToken>,
+        results: Vec<SignatureToken>,
+        abilities: AbilitySet,
+    },
     /// User defined type
     Struct(StructHandleIndex),
     StructInstantiation(StructHandleIndex, Vec<SignatureToken>),
@@ -1305,9 +1309,9 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIter<'a> {
                         self.stack.extend(inner_toks.iter().rev())
                     },
 
-                    Function(args, result, _) => {
+                    Function { args, results, .. } => {
                         self.stack.extend(args.iter().rev());
-                        self.stack.extend(result.iter().rev());
+                        self.stack.extend(results.iter().rev());
                     },
 
                     Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | Struct(_)
@@ -1343,11 +1347,11 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIterWithDepth<'a> {
                         .stack
                         .extend(inner_toks.iter().map(|tok| (tok, depth + 1)).rev()),
 
-                    Function(args, result, _) => {
+                    Function { args, results, .. } => {
                         self.stack
                             .extend(args.iter().map(|tok| (tok, depth + 1)).rev());
                         self.stack
-                            .extend(result.iter().map(|tok| (tok, depth + 1)).rev());
+                            .extend(results.iter().map(|tok| (tok, depth + 1)).rev());
                     },
 
                     Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | Struct(_)
@@ -1410,8 +1414,12 @@ impl std::fmt::Debug for SignatureToken {
             SignatureToken::Address => write!(f, "Address"),
             SignatureToken::Signer => write!(f, "Signer"),
             SignatureToken::Vector(boxed) => write!(f, "Vector({:?})", boxed),
-            SignatureToken::Function(args, result, abilities) => {
-                write!(f, "Function({:?}, {:?}, {})", args, result, abilities)
+            SignatureToken::Function {
+                args,
+                results,
+                abilities,
+            } => {
+                write!(f, "Function({:?}, {:?}, {})", args, results, abilities)
             },
             SignatureToken::Reference(boxed) => write!(f, "Reference({:?})", boxed),
             SignatureToken::Struct(idx) => write!(f, "Struct({:?})", idx),
@@ -1425,7 +1433,7 @@ impl std::fmt::Debug for SignatureToken {
 }
 
 impl SignatureToken {
-    // Returns `true` if the `SignatureToken` is an integer type.
+    /// Returns `true` if the `SignatureToken` is an integer type.
     pub fn is_integer(&self) -> bool {
         use SignatureToken::*;
         match self {
@@ -1434,7 +1442,7 @@ impl SignatureToken {
             | Address
             | Signer
             | Vector(_)
-            | Function(..)
+            | Function { .. }
             | Struct(_)
             | StructInstantiation(_, _)
             | Reference(_)
@@ -1473,7 +1481,7 @@ impl SignatureToken {
             Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
             Vector(inner) => inner.is_valid_for_constant(),
             Signer
-            | Function(..)
+            | Function { .. }
             | Struct(_)
             | StructInstantiation(_, _)
             | Reference(_)
@@ -1486,7 +1494,7 @@ impl SignatureToken {
     pub fn is_function(&self) -> bool {
         use SignatureToken::*;
 
-        matches!(self, Function(..))
+        matches!(self, Function { .. })
     }
 
     /// Set the index to this one. Useful for random testing.
@@ -1537,8 +1545,14 @@ impl SignatureToken {
             Address => Address,
             Signer => Signer,
             Vector(ty) => Vector(Box::new(ty.instantiate(subst_mapping))),
-            Function(args, result, abilities) => {
-                Function(inst_vec(args), inst_vec(result), *abilities)
+            Function {
+                args,
+                results,
+                abilities,
+            } => Function {
+                args: inst_vec(args),
+                results: inst_vec(results),
+                abilities: *abilities,
             },
             Struct(idx) => Struct(*idx),
             StructInstantiation(idx, struct_type_args) => {
@@ -1833,6 +1847,11 @@ pub enum Bytecode {
         func = <func from handle or instantiation>
         // Here `func` is loaded from the file format, containing information like the
         // the function signature, the locals, and the body.
+
+        // TODO(LAMBDA) - try to loosen this restriction after MVP if we can
+        // prove safety using access specifiers or other mechanisms.
+        if conservative_invocation_mode then
+            if stack already contains a call to the same module as func, then abort
 
         ty_args = if func.is_generic then func.ty_args else []
 
@@ -3047,8 +3066,13 @@ pub enum Bytecode {
         Return values are pushed onto the stack from the first to the last and
         available to the caller after returning from the callee.
 
-        During execution of the function conservative_invocation_mode is enabled;
-        afterwards, it is restored to its original state.
+        For MVP, we dynamically disallow all module reentrancy starting with
+        any dynamic call.  This means that normal calls need a dynamic stack check
+        if there is a dynamic call frame on the stack.  We denote this here
+        using a "conservative_invocation_mode" state variable.
+
+        During execution of the dynamic function conservative_invocation_mode
+        is enabled; afterwards, it is restored to its original state.
     "#]
     #[semantics = r#"
         stack >> function_handle
@@ -3057,6 +3081,10 @@ pub enum Bytecode {
         // and compared with the signature parameter.
         n = func.num_params
         ty_args = if func.is_generic then func.ty_args else []
+
+        // TODO(LAMBDA) - try to loosen this restriction after MVP if we can
+        // prove safety using access specifiers or other mechanisms.
+        if stack already contains a call to the same module as func, then abort
 
         n = func.num_params
         stack >> arg_{n-1}

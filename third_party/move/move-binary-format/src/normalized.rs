@@ -193,7 +193,7 @@ impl Type {
             Reference(t) => Type::Reference(Box::new(Type::new(m, t))),
             MutableReference(t) => Type::MutableReference(Box::new(Type::new(m, t))),
 
-            Function(..) => panic!("normalized representation does not support function types"),
+            Function { .. } => panic!("normalized representation does not support function types"),
         }
     }
 

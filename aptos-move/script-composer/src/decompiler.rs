@@ -208,7 +208,7 @@ impl LocalState {
             SignatureToken::Vector(s) => {
                 TypeTag::Vector(Box::new(Self::type_tag_from_sig_token(script, s)?))
             },
-            SignatureToken::Function(..) => {
+            SignatureToken::Function { .. } => {
                 // TODO(LAMBDA)
                 bail!("function types not yet implemented for script composer")
             },

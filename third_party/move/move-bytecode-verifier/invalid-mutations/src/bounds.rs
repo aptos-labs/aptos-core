@@ -358,7 +358,17 @@ fn struct_handle(token: &SignatureToken) -> Option<StructHandleIndex> {
         Struct(sh_idx) => Some(*sh_idx),
         StructInstantiation(sh_idx, _) => Some(*sh_idx),
         Reference(token) | MutableReference(token) => struct_handle(token),
-        Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | Vector(_)
-        | TypeParameter(_) | Function(..) => None,
+        Bool
+        | U8
+        | U16
+        | U32
+        | U64
+        | U128
+        | U256
+        | Address
+        | Signer
+        | Vector(_)
+        | TypeParameter(_)
+        | Function { .. } => None,
     }
 }

@@ -250,7 +250,7 @@ fn fun_type(
     idx: SignatureIndex,
 ) -> PartialVMResult<(Vec<SignatureToken>, Vec<SignatureToken>)> {
     match verifier.resolver.signature_at(idx).0.first() {
-        Some(SignatureToken::Function(args, result, _)) => Ok((args.clone(), result.clone())),
+        Some(SignatureToken::Function { args, results, .. }) => Ok((args.clone(), results.clone())),
         _ => Err(PartialVMError::new(
             StatusCode::VERIFIER_INVARIANT_VIOLATION,
         )),

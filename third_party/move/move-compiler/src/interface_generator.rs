@@ -365,8 +365,8 @@ fn write_signature_token(ctx: &mut Context, t: &SignatureToken) -> String {
         SignatureToken::Address => "address".to_string(),
         SignatureToken::Signer => "signer".to_string(),
         SignatureToken::Vector(inner) => format!("vector<{}>", write_signature_token(ctx, inner)),
-        SignatureToken::Function(args, result, _) => {
-            format!("|{}|{}", tok_list(ctx, args), tok_list(ctx, result))
+        SignatureToken::Function { args, results, .. } => {
+            format!("|{}|{}", tok_list(ctx, args), tok_list(ctx, results))
         },
         SignatureToken::Struct(idx) => write_struct_handle_type(ctx, *idx),
         SignatureToken::StructInstantiation(idx, types) => {

@@ -685,8 +685,20 @@ impl<'a> BoundsChecker<'a> {
 
         for ty in ty.preorder_traversal() {
             match ty {
-                Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | TypeParameter(_)
-                | Reference(_) | MutableReference(_) | Vector(_) | Function(..) => (),
+                Bool
+                | U8
+                | U16
+                | U32
+                | U64
+                | U128
+                | U256
+                | Address
+                | Signer
+                | TypeParameter(_)
+                | Reference(_)
+                | MutableReference(_)
+                | Vector(_)
+                | Function { .. } => (),
                 Struct(idx) => {
                     check_bounds_impl(self.view.struct_handles(), *idx)?;
                     if let Some(sh) = self.view.struct_handles().get(idx.into_index()) {
