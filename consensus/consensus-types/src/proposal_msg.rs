@@ -26,8 +26,16 @@ impl ProposalMsg {
         }
     }
 
-    pub fn epoch(&self) -> u64 {
-        self.proposal.epoch()
+    /// Returns the epoch associated with the proposal after verifying that the
+    /// payload data is also associated with the same epoch
+    pub fn verified_epoch(&self) -> Result<u64> {
+        let proposal_epoch = self.proposal.epoch();
+
+        self.proposal
+            .payload()
+            .map_or(Ok(()), |p| p.verify_epoch(proposal_epoch))?;
+
+        Ok(proposal_epoch)
     }
 
     /// Verifies that the ProposalMsg is well-formed.
