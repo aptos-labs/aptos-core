@@ -5,7 +5,7 @@
 //! transactions can be replayed on top of a modified state, and we can evaluate how it impacts
 //! performance or other things.
 
-use aptos_logger::warn;
+use aptos_logger::error;
 use aptos_types::{
     on_chain_config::{FeatureFlag, Features, OnChainConfig},
     state_store::{state_key::StateKey, state_value::StateValue, StateView},
@@ -38,13 +38,13 @@ impl OverrideConfig {
             config_override::<Features, _>(state_view, |features| {
                 for feature in &self.enable_features {
                     if features.is_enabled(*feature) {
-                        warn!("Feature {:?} is already enabled", feature);
+                        error!("Feature {:?} is already enabled", feature);
                     }
                     features.enable(*feature);
                 }
                 for feature in &self.disable_features {
                     if !features.is_enabled(*feature) {
-                        warn!("Feature {:?} is already disabled", feature);
+                        error!("Feature {:?} is already disabled", feature);
                     }
                     features.disable(*feature);
                 }

@@ -33,7 +33,7 @@ feature. It takes two measurements: when Block-STM uses 2 threads, or 4 threads 
 #[derive(Parser)]
 #[command(about, long_about = Some(LONG_ABOUT))]
 pub struct Command {
-    #[clap(long, default_value_t = Level::Warn)]
+    #[clap(long, default_value_t = Level::Error)]
     log_level: Level,
 
     #[clap(
