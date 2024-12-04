@@ -330,12 +330,14 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     let mut expansion_ast = {
         let E::Program { modules, scripts } = expansion_ast;
         let modules = modules.filter_map(|mident, mut mdef| {
-            // Always need to include the vector module because it can be implicitly used.
-            // TODO(#12492): we can remove this once this bug is fixed
+            // We need to always include the `vector` module (only for compiler v2),
+            // to handle cases of implicit usage.
+            // E.g., index operation on a vector results in a call to `vector::borrow`.
+            // TODO(#15483): consider refactoring code to avoid this special case.
             let is_vector = mident.value.address.into_addr_bytes().into_inner()
                 == AccountAddress::ONE
                 && mident.value.module.0.value.as_str() == "vector";
-            (is_vector || visited_modules.contains(&mident.value)).then(|| {
+            (is_vector && compile_via_model || visited_modules.contains(&mident.value)).then(|| {
                 mdef.is_source_module = true;
                 mdef
             })
