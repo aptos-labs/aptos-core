@@ -60,6 +60,7 @@ mainnet:
 
     # objects processor
     578318306: 578318306_objects_write_resource
+    1806220919: 1806220919_object_untransferable
 
     # stake processor
     121508544: 121508544_stake_distribute
