@@ -27,8 +27,7 @@ struct TestConfig {
     name: &'static str,
     runner: fn(&Path) -> datatest_stable::Result<()>,
     experiments: &'static [(&'static str, bool)],
-    /// Run the tests with language version 1 (if true),
-    /// or with latest language version (if false).
+    /// Run the tests with specified language version.
     language_version: LanguageVersion,
     /// Path substrings for tests to include. If empty, all tests are included.
     include: &'static [&'static str],
@@ -183,7 +182,9 @@ const SEPARATE_BASELINE: &[&str] = &[
     "no-v1-comparison/assert_one.move",
     // Flaky redundant unused assignment error
     "no-v1-comparison/enum/enum_scoping.move",
+    // Needs LAMBDA features and V2.2+ to function; baseline checks expected errors
     "/lambda/",
+    // Needs ACQUIRES_CHECK disabled to function; baseline checks expected errors
     "/access_control/",
 ];
 
