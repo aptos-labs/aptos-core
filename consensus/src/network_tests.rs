@@ -155,7 +155,7 @@ impl NetworkPlayground {
                         None => continue, // drop rpc
                     };
 
-                    let (protocol_id, data, res_tx, _) = outbound_req.into_parts();
+                    let (_, protocol_id, data, res_tx, _) = outbound_req.into_parts();
                     if timeout_config
                         .read()
                         .is_message_timedout(&src_twin_id, dst_twin_id)

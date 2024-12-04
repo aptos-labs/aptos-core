@@ -285,7 +285,7 @@ pub trait TestNode: ApplicationNode + Sync {
         match message {
             PeerManagerRequest::SendRpc(peer_id, outbound_rpc_request) => {
                 // Unpack the request
-                let (protocol_id, data, res_tx, _) = outbound_rpc_request.into_parts();
+                let (_, protocol_id, data, res_tx, _) = outbound_rpc_request.into_parts();
 
                 // Forcefully close the oneshot channel, otherwise listening task will hang forever
                 drop(res_tx);
@@ -305,7 +305,7 @@ pub trait TestNode: ApplicationNode + Sync {
         let (remote_peer_id, protocol_id, rmsg) = match request {
             PeerManagerRequest::SendRpc(peer_id, msg) => {
                 // Unpack the request
-                let (protocol_id, data, res_tx, _) = msg.into_parts();
+                let (_, protocol_id, data, res_tx, _) = msg.into_parts();
 
                 // Create the received message
                 let rmsg = ReceivedMessage {

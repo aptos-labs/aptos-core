@@ -782,7 +782,7 @@ mod test {
                 let (protocol_id, peer_manager_notification) = match peer_manager_request {
                     PeerManagerRequest::SendRpc(peer_id, outbound_rpc_request) => {
                         // Unpack the request
-                        let (protocol_id, data, res_tx, timeout) = outbound_rpc_request.into_parts();
+                        let (_, protocol_id, data, res_tx, timeout) = outbound_rpc_request.into_parts();
 
                         // Verify the message is correct
                         assert!(is_rpc_request);
@@ -806,7 +806,7 @@ mod test {
                     }
                     PeerManagerRequest::SendDirectSend(peer_id, message) => {
                         // Unpack the message
-                        let (protocol_id, data) = message.into_parts();
+                        let (_, protocol_id, data) = message.into_parts();
 
                         // Verify the message is correct
                         assert!(!is_rpc_request);

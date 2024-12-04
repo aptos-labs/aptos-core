@@ -2,7 +2,17 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{protocols::network::SerializedRequest, ProtocolId};
+use crate::{
+    protocols::{
+        network::SerializedRequest,
+        wire::messaging::v1::{
+            metadata::{MessageMetadata, MessageSendType, NetworkMessageWithMetadata},
+            DirectSendMsg, NetworkMessage, Priority,
+        },
+    },
+    ProtocolId,
+};
+use aptos_config::network_id::NetworkId;
 use bytes::Bytes;
 use serde::Serialize;
 use std::{fmt::Debug, time::SystemTime};
@@ -33,14 +43,30 @@ impl Message {
         }
     }
 
-    /// Returns the time at which the message was sent by the application
-    pub fn application_send_time(&self) -> SystemTime {
-        self.application_send_time
+    /// Transforms the message into a direct send network message with metadata
+    pub fn into_network_message(self, network_id: NetworkId) -> NetworkMessageWithMetadata {
+        // Create the direct send network message
+        let network_message = NetworkMessage::DirectSendMsg(DirectSendMsg {
+            protocol_id: self.protocol_id,
+            priority: Priority::default(),
+            raw_msg: Vec::from(self.data.as_ref()),
+        });
+
+        // Create and return the network message with metadata
+        let message_metadata = MessageMetadata::new(
+            network_id,
+            Some(self.protocol_id),
+            MessageSendType::DirectSend,
+            Some(self.application_send_time),
+        );
+        NetworkMessageWithMetadata::new(message_metadata, network_message)
     }
 
-    /// Consumes the message and returns the protocol id and data
-    pub fn into_parts(self) -> (ProtocolId, Bytes) {
-        (self.protocol_id, self.data)
+    /// Consumes the message and returns the individual parts.
+    /// Note: this is only for testing purposes (but, it cannot be marked
+    /// as `#[cfg(test)]` because of several non-wrapped test utils).
+    pub fn into_parts(self) -> (SystemTime, ProtocolId, Bytes) {
+        (self.application_send_time, self.protocol_id, self.data)
     }
 }
 

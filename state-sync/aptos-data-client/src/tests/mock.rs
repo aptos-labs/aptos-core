@@ -234,7 +234,7 @@ impl MockNetwork {
         match peer_mgr_reqs_rx.next().await {
             Some(PeerManagerRequest::SendRpc(peer_id, network_request)) => {
                 // Unpack the network request
-                let (protocol_id, data, res_tx, _) = network_request.into_parts();
+                let (_, protocol_id, data, res_tx, _) = network_request.into_parts();
 
                 // Create the peer network ID
                 let peer_network_id = PeerNetworkId::new(network_id, peer_id);
