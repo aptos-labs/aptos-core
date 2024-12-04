@@ -7,7 +7,8 @@ use aptos_block_executor::{
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::{default::DefaultTxnProvider, TxnProvider},
 };
-use aptos_gas_profiling::{ExecutionTrace, ExecutionTracer, GasProfiler, TransactionGasLog};
+use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
+use aptos_tracer::{get_env, standard_io_command_reader, ExecutionTrace, ExecutionTracer};
 use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
@@ -180,6 +181,8 @@ impl AptosDebugger {
         let resolver = state_view.as_move_resolver();
         let code_storage = state_view.as_aptos_code_storage(env);
 
+        let env = get_env();
+
         let (status, output, execution_tracer) = vm.execute_user_transaction_with_modified_gas_meter(
             &resolver,
             &code_storage,
@@ -188,12 +191,17 @@ impl AptosDebugger {
             |gas_meter| {
                 let execution_tracer = match txn.payload() {
                     TransactionPayload::Script(_) => ExecutionTracer::from_script(gas_meter),
-                    TransactionPayload::EntryFunction(entry_func) => ExecutionTracer::from_entry_fun(
-                        gas_meter,
-                        entry_func.module().clone(),
-                        entry_func.function().to_owned(),
-                        entry_func.ty_args().to_vec(),
-                    ),
+                    TransactionPayload::EntryFunction(entry_func) => {
+                        // let env = get_env();
+                        ExecutionTracer::from_entry_fun(
+                            gas_meter,
+                            entry_func.module().clone(),
+                            entry_func.function().to_owned(),
+                            entry_func.ty_args().to_vec(),
+                            standard_io_command_reader(),
+                            Some(&env),
+                        )
+                    },
                     TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
 
                     // Deprecated.

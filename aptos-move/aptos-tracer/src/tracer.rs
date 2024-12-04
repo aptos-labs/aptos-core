@@ -1,8 +1,8 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::FrameName;
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
+use aptos_gas_profiling::FrameName;
 use move_binary_format::{
     errors::PartialVMResult,
     file_format::{Bytecode, CodeOffset},
@@ -21,7 +21,12 @@ use move_vm_types::{
     values::Value,
     views::{TypeView, ValueView, ValueVisitor},
 };
-use std::{env, fmt::Display, io::Write, path::Path};
+use std::{
+    env,
+    fmt::Display,
+    io::{BufRead, Read, Write},
+    path::Path,
+};
 #[derive(Debug)]
 pub struct ExecutionTrace<Value>(CallFrame<Value>);
 
@@ -43,21 +48,31 @@ impl<Value: Display> ExecutionTrace<Value> {
 }
 
 #[derive(Debug)]
-pub struct ExecutionTracer<G, Value> {
+pub struct ExecutionTracer<'a, G, Value, Reader> {
     base: G,
     frames: Vec<CallFrame<Value>>,
+    collect_trace: bool,
+    command_reader: Reader,
+    step_counter: usize,
+    env: Option<&'a GlobalEnv>,
 }
 
-impl<G, Value> ExecutionTracer<G, Value> {
+impl<'a, G, Value, Reader> ExecutionTracer<'a, G, Value, Reader> {
     pub fn from_entry_fun(
         base: G,
         module_id: ModuleId,
         function: Identifier,
         ty_args: Vec<TypeTag>,
+        command_reader: Reader,
+        env: Option<&'a GlobalEnv>,
     ) -> Self {
         Self {
             base,
             frames: vec![CallFrame::new_function(module_id, function, ty_args)],
+            collect_trace: false,
+            command_reader,
+            step_counter: 0,
+            env,
         }
     }
 
@@ -65,6 +80,10 @@ impl<G, Value> ExecutionTracer<G, Value> {
         Self {
             base,
             frames: vec![CallFrame::new_script()],
+            collect_trace: false,
+            command_reader: todo!(),
+            step_counter: 0,
+            env: None,
         }
     }
 
@@ -95,47 +114,75 @@ impl<G, Value> ExecutionTracer<G, Value> {
     }
 }
 
-impl<G> ExecutionTracer<G, String> {
-    fn emit_instr(
+impl<'a, G, Reader: GetCommand> ExecutionTracer<'a, G, String, Reader> {
+    fn emit_instr(&mut self, instr: &Instruction<String>) {
+        print!("{}[{}]: ", self.get_top_frame().name, instr.offset);
+        print!("{} ", instr.display_qualified_instr());
+        for arg in &instr.args {
+            print!("{} ", arg);
+        }
+        if let FrameName::Function {
+            module_id,
+            name,
+            ty_args,
+        } = &self.get_top_frame().name
+        {
+            let fun_env = self
+                .env
+                .as_ref()
+                .unwrap()
+                .find_function_by_language_storage_id_name(module_id, name)
+                .unwrap();
+            let loc = fun_env.get_bytecode_loc(instr.offset).unwrap();
+            print!(
+                "{}: ",
+                loc.display_file_name_and_line(self.env.as_ref().unwrap())
+            );
+        }
+        println!();
+    }
+
+    fn record_instr(
         &mut self,
         op: Opcodes,
         args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
     ) {
-        self.emit_generic_instr(op, vec![], args);
+        self.record_generic_instr(op, vec![], args);
     }
 
-    fn emit_generic_instr(
+    fn record_generic_instr(
         &mut self,
         op: Opcodes,
         ty_args: Vec<TypeTag>,
         args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
     ) {
         let pc = self.get_pc();
-        self.get_top_events_mut()
-            .push(Event::Instruction(Instruction {
-                op,
-                ty_args,
-                args: args.map(|v| v.to_string()).collect(),
-                offset: pc,
-            }));
+        let instr = Instruction {
+            op,
+            ty_args,
+            args: args.map(|v| v.to_string()).collect(),
+            offset: pc,
+        };
+        self.emit_instr(&instr);
+        self.get_top_events_mut().push(Event::Instruction(instr));
     }
 
-    fn emit_generic_instr_and_inc_pc(
+    fn record_generic_instr_and_inc_pc(
         &mut self,
         op: Opcodes,
         ty_args: Vec<TypeTag>,
         args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
     ) {
-        self.emit_generic_instr(op, ty_args, args);
+        self.record_generic_instr(op, ty_args, args);
         self.inc_pc();
     }
 
-    fn emit_instr_and_inc_pc(
+    fn record_instr_and_inc_pc(
         &mut self,
         op: Opcodes,
         args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
     ) {
-        self.emit_generic_instr_and_inc_pc(op, vec![], args)
+        self.record_generic_instr_and_inc_pc(op, vec![], args)
     }
 
     fn get_pc(&self) -> CodeOffset {
@@ -148,6 +195,36 @@ impl<G> ExecutionTracer<G, String> {
 
     fn inc_pc(&mut self) {
         *self.get_pc_mut() += 1;
+    }
+
+    fn step(&mut self) {
+        if self.step_counter > 0 {
+            self.step_counter -= 1;
+        } else {
+            loop {
+                let command = self.command_reader.get_command();
+                match command {
+                    Command::Step(n) => {
+                        self.step_counter = n - 1;
+                        break;
+                    },
+                    Command::Continue => todo!(),
+                    Command::Help => {
+                        println!("Usage:");
+                        println!("step <n>: step n instructions");
+                        println!("continue: continue execution");
+                        println!("break <module_id> <function_name>: break at function");
+                        println!("backtrace: print backtrace");
+                    },
+                    Command::Break(module_id, name) => todo!(),
+                    Command::Backtrace(_) => {
+                        for (i, frame) in self.frames.iter().rev().enumerate() {
+                            println!("{:2}: {}", i, frame.name);
+                        }
+                    },
+                }
+            }
+        }
     }
 }
 
@@ -285,7 +362,7 @@ pub enum Event<Value> {
     Instruction(Instruction<Value>),
 }
 
-impl<G> GasMeter for ExecutionTracer<G, String>
+impl<'a, G, Reader: GetCommand> GasMeter for ExecutionTracer<'a, G, String, Reader>
 where
     G: AptosGasMeter,
 {
@@ -298,12 +375,10 @@ where
         instr: SimpleInstruction,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        println!("Press Enter to continue...");
-        std::io::stdin().read_line(&mut String::new()).unwrap();
         match instr {
             SimpleInstruction::Nop => (),
             SimpleInstruction::Ret => {
-                self.emit_instr_and_inc_pc(Opcodes::RET, std::iter::empty::<&Value>());
+                self.record_instr_and_inc_pc(Opcodes::RET, std::iter::empty::<&Value>());
                 if self.frames.len() > 1 {
                     let cur_frame = self.frames.pop().expect("frame must exist");
                     let last_frame = self.frames.last_mut().expect("frame must exist");
@@ -311,134 +386,123 @@ where
                 }
             },
             SimpleInstruction::LdU8 => {
-                self.emit_instr_and_inc_pc(Opcodes::LD_U8, std::iter::empty::<&Value>())
+                self.record_instr_and_inc_pc(Opcodes::LD_U8, std::iter::empty::<&Value>())
             },
             SimpleInstruction::LdU64 => {
-                self.emit_instr_and_inc_pc(Opcodes::LD_U64, std::iter::empty::<&Value>())
+                self.record_instr_and_inc_pc(Opcodes::LD_U64, std::iter::empty::<&Value>())
             },
             SimpleInstruction::LdU128 => {
-                self.emit_instr_and_inc_pc(Opcodes::LD_U128, std::iter::empty::<&Value>())
+                self.record_instr_and_inc_pc(Opcodes::LD_U128, std::iter::empty::<&Value>())
             },
             SimpleInstruction::LdTrue => {
-                self.emit_instr_and_inc_pc(Opcodes::LD_TRUE, std::iter::empty::<&Value>())
+                self.record_instr_and_inc_pc(Opcodes::LD_TRUE, std::iter::empty::<&Value>())
             },
             SimpleInstruction::LdFalse => {
-                self.emit_instr_and_inc_pc(Opcodes::LD_FALSE, std::iter::empty::<&Value>())
+                self.record_instr_and_inc_pc(Opcodes::LD_FALSE, std::iter::empty::<&Value>())
             },
             SimpleInstruction::FreezeRef => {
-                self.emit_instr_and_inc_pc(Opcodes::FREEZE_REF, std::iter::empty::<&Value>())
+                self.record_instr_and_inc_pc(Opcodes::FREEZE_REF, std::iter::empty::<&Value>())
             },
             SimpleInstruction::MutBorrowLoc => {
-                self.emit_instr_and_inc_pc(Opcodes::MUT_BORROW_LOC, std::iter::empty::<&Value>())
+                self.record_instr_and_inc_pc(Opcodes::MUT_BORROW_LOC, std::iter::empty::<&Value>())
             },
             SimpleInstruction::ImmBorrowLoc => {
-                self.emit_instr_and_inc_pc(Opcodes::IMM_BORROW_LOC, std::iter::empty::<&Value>())
+                self.record_instr_and_inc_pc(Opcodes::IMM_BORROW_LOC, std::iter::empty::<&Value>())
             },
-            SimpleInstruction::ImmBorrowField => self.emit_instr_and_inc_pc(
+            SimpleInstruction::ImmBorrowField => self.record_instr_and_inc_pc(
                 Opcodes::IMM_BORROW_FIELD,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::MutBorrowField => self.emit_instr_and_inc_pc(
+            SimpleInstruction::MutBorrowField => self.record_instr_and_inc_pc(
                 Opcodes::MUT_BORROW_FIELD,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::ImmBorrowFieldGeneric => self.emit_instr_and_inc_pc(
+            SimpleInstruction::ImmBorrowFieldGeneric => self.record_instr_and_inc_pc(
                 Opcodes::IMM_BORROW_FIELD_GENERIC,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::MutBorrowFieldGeneric => self.emit_instr_and_inc_pc(
+            SimpleInstruction::MutBorrowFieldGeneric => self.record_instr_and_inc_pc(
                 Opcodes::MUT_BORROW_FIELD_GENERIC,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::ImmBorrowVariantField => self.emit_instr_and_inc_pc(
+            SimpleInstruction::ImmBorrowVariantField => self.record_instr_and_inc_pc(
                 Opcodes::IMM_BORROW_VARIANT_FIELD,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::MutBorrowVariantField => self.emit_instr_and_inc_pc(
+            SimpleInstruction::MutBorrowVariantField => self.record_instr_and_inc_pc(
                 Opcodes::MUT_BORROW_VARIANT_FIELD,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::ImmBorrowVariantFieldGeneric => self.emit_instr_and_inc_pc(
+            SimpleInstruction::ImmBorrowVariantFieldGeneric => self.record_instr_and_inc_pc(
                 Opcodes::IMM_BORROW_VARIANT_FIELD_GENERIC,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::MutBorrowVariantFieldGeneric => self.emit_instr_and_inc_pc(
+            SimpleInstruction::MutBorrowVariantFieldGeneric => self.record_instr_and_inc_pc(
                 Opcodes::MUT_BORROW_VARIANT_FIELD_GENERIC,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::TestVariant => self.emit_instr_and_inc_pc(
+            SimpleInstruction::TestVariant => self.record_instr_and_inc_pc(
                 Opcodes::TEST_VARIANT,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::TestVariantGeneric => self.emit_instr_and_inc_pc(
+            SimpleInstruction::TestVariantGeneric => self.record_instr_and_inc_pc(
                 Opcodes::TEST_VARIANT_GENERIC,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::CastU8 => self.emit_instr_and_inc_pc(
+            SimpleInstruction::CastU8 => self.record_instr_and_inc_pc(
                 Opcodes::CAST_U8,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::CastU64 => self.emit_instr_and_inc_pc(
+            SimpleInstruction::CastU64 => self.record_instr_and_inc_pc(
                 Opcodes::CAST_U64,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::CastU128 => self.emit_instr_and_inc_pc(
+            SimpleInstruction::CastU128 => self.record_instr_and_inc_pc(
                 Opcodes::CAST_U128,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::Add => {
-                self.emit_instr_and_inc_pc(Opcodes::ADD, interpreter.view_last_n_values(2).unwrap())
-            },
-            SimpleInstruction::Sub => {
-                self.emit_instr_and_inc_pc(Opcodes::SUB, interpreter.view_last_n_values(2).unwrap())
-            },
-            SimpleInstruction::Mul => {
-                self.emit_instr_and_inc_pc(Opcodes::MUL, interpreter.view_last_n_values(2).unwrap())
-            },
-            SimpleInstruction::Mod => {
-                self.emit_instr_and_inc_pc(Opcodes::MOD, interpreter.view_last_n_values(2).unwrap())
-            },
-            SimpleInstruction::Div => {
-                self.emit_instr_and_inc_pc(Opcodes::DIV, interpreter.view_last_n_values(2).unwrap())
-            },
-            SimpleInstruction::BitOr => self
-                .emit_instr_and_inc_pc(Opcodes::BIT_OR, interpreter.view_last_n_values(2).unwrap()),
-            SimpleInstruction::BitAnd => self.emit_instr_and_inc_pc(
+            SimpleInstruction::Add => self
+                .record_instr_and_inc_pc(Opcodes::ADD, interpreter.view_last_n_values(2).unwrap()),
+            SimpleInstruction::Sub => self
+                .record_instr_and_inc_pc(Opcodes::SUB, interpreter.view_last_n_values(2).unwrap()),
+            SimpleInstruction::Mul => self
+                .record_instr_and_inc_pc(Opcodes::MUL, interpreter.view_last_n_values(2).unwrap()),
+            SimpleInstruction::Mod => self
+                .record_instr_and_inc_pc(Opcodes::MOD, interpreter.view_last_n_values(2).unwrap()),
+            SimpleInstruction::Div => self
+                .record_instr_and_inc_pc(Opcodes::DIV, interpreter.view_last_n_values(2).unwrap()),
+            SimpleInstruction::BitOr => self.record_instr_and_inc_pc(
+                Opcodes::BIT_OR,
+                interpreter.view_last_n_values(2).unwrap(),
+            ),
+            SimpleInstruction::BitAnd => self.record_instr_and_inc_pc(
                 Opcodes::BIT_AND,
                 interpreter.view_last_n_values(2).unwrap(),
             ),
-            SimpleInstruction::Xor => {
-                self.emit_instr_and_inc_pc(Opcodes::XOR, interpreter.view_last_n_values(2).unwrap())
-            },
-            SimpleInstruction::Shl => {
-                self.emit_instr_and_inc_pc(Opcodes::SHL, interpreter.view_last_n_values(2).unwrap())
-            },
-            SimpleInstruction::Shr => {
-                self.emit_instr_and_inc_pc(Opcodes::SHR, interpreter.view_last_n_values(2).unwrap())
-            },
-            SimpleInstruction::Or => {
-                self.emit_instr_and_inc_pc(Opcodes::OR, interpreter.view_last_n_values(2).unwrap())
-            },
-            SimpleInstruction::And => {
-                self.emit_instr_and_inc_pc(Opcodes::AND, interpreter.view_last_n_values(2).unwrap())
-            },
-            SimpleInstruction::Not => {
-                self.emit_instr_and_inc_pc(Opcodes::NOT, interpreter.view_last_n_values(1).unwrap())
-            },
-            SimpleInstruction::Lt => {
-                self.emit_instr_and_inc_pc(Opcodes::LT, interpreter.view_last_n_values(2).unwrap())
-            },
-            SimpleInstruction::Gt => {
-                self.emit_instr_and_inc_pc(Opcodes::GT, interpreter.view_last_n_values(2).unwrap())
-            },
-            SimpleInstruction::Le => {
-                self.emit_instr_and_inc_pc(Opcodes::LE, interpreter.view_last_n_values(2).unwrap())
-            },
-            SimpleInstruction::Ge => {
-                self.emit_instr_and_inc_pc(Opcodes::GE, interpreter.view_last_n_values(2).unwrap())
-            },
-            SimpleInstruction::Abort => self
-                .emit_instr_and_inc_pc(Opcodes::ABORT, interpreter.view_last_n_values(1).unwrap()),
+            SimpleInstruction::Xor => self
+                .record_instr_and_inc_pc(Opcodes::XOR, interpreter.view_last_n_values(2).unwrap()),
+            SimpleInstruction::Shl => self
+                .record_instr_and_inc_pc(Opcodes::SHL, interpreter.view_last_n_values(2).unwrap()),
+            SimpleInstruction::Shr => self
+                .record_instr_and_inc_pc(Opcodes::SHR, interpreter.view_last_n_values(2).unwrap()),
+            SimpleInstruction::Or => self
+                .record_instr_and_inc_pc(Opcodes::OR, interpreter.view_last_n_values(2).unwrap()),
+            SimpleInstruction::And => self
+                .record_instr_and_inc_pc(Opcodes::AND, interpreter.view_last_n_values(2).unwrap()),
+            SimpleInstruction::Not => self
+                .record_instr_and_inc_pc(Opcodes::NOT, interpreter.view_last_n_values(1).unwrap()),
+            SimpleInstruction::Lt => self
+                .record_instr_and_inc_pc(Opcodes::LT, interpreter.view_last_n_values(2).unwrap()),
+            SimpleInstruction::Gt => self
+                .record_instr_and_inc_pc(Opcodes::GT, interpreter.view_last_n_values(2).unwrap()),
+            SimpleInstruction::Le => self
+                .record_instr_and_inc_pc(Opcodes::LE, interpreter.view_last_n_values(2).unwrap()),
+            SimpleInstruction::Ge => self
+                .record_instr_and_inc_pc(Opcodes::GE, interpreter.view_last_n_values(2).unwrap()),
+            SimpleInstruction::Abort => self.record_instr_and_inc_pc(
+                Opcodes::ABORT,
+                interpreter.view_last_n_values(1).unwrap(),
+            ),
             SimpleInstruction::LdU16 => (),
             SimpleInstruction::LdU32 => (),
             SimpleInstruction::LdU256 => (),
@@ -446,38 +510,46 @@ where
             SimpleInstruction::CastU32 => (),
             SimpleInstruction::CastU256 => (),
         }
-        self.base.charge_simple_instr(instr, interpreter)
+        let res = self.base.charge_simple_instr(instr, interpreter);
+		self.step();
+        res
     }
 
     fn charge_br_true(&mut self, target_offset: Option<CodeOffset>) -> PartialVMResult<()> {
-        self.emit_instr(Opcodes::BR_TRUE, Vec::<&Value>::new().into_iter());
+        self.record_instr(Opcodes::BR_TRUE, Vec::<&Value>::new().into_iter());
         if let Some(offset) = target_offset {
             *self.get_pc_mut() = offset;
         } else {
             *self.get_pc_mut() += 1;
         }
-        self.base.charge_br_true(target_offset)
+        let res = self.base.charge_br_true(target_offset);
+        self.step();
+        res
     }
 
     fn charge_br_false(&mut self, target_offset: Option<CodeOffset>) -> PartialVMResult<()> {
-        self.emit_instr(Opcodes::BR_FALSE, Vec::<&Value>::new().into_iter());
+        self.record_instr(Opcodes::BR_FALSE, Vec::<&Value>::new().into_iter());
         if let Some(offset) = target_offset {
             *self.get_pc_mut() = offset;
         } else {
             *self.get_pc_mut() += 1;
         }
-        self.base.charge_br_false(target_offset)
+        let res = self.base.charge_br_false(target_offset);
+        self.step();
+        res
     }
 
     fn charge_branch(&mut self, target_offset: CodeOffset) -> PartialVMResult<()> {
-        self.emit_instr(Opcodes::BRANCH, Vec::<&Value>::new().into_iter());
+        self.record_instr(Opcodes::BRANCH, Vec::<&Value>::new().into_iter());
         *self.get_pc_mut() = target_offset;
         self.base.charge_branch(target_offset)
     }
 
     fn charge_pop(&mut self, popped_val: impl ValueView + Display) -> PartialVMResult<()> {
-        self.emit_generic_instr_and_inc_pc(Opcodes::POP, vec![], [&popped_val].into_iter());
-        self.base.charge_pop(popped_val)
+        self.record_generic_instr_and_inc_pc(Opcodes::POP, vec![], [&popped_val].into_iter());
+        let res = self.base.charge_pop(popped_val);
+        self.step();
+        res
     }
 
     fn charge_call(
@@ -487,14 +559,18 @@ where
         args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
         num_locals: aptos_gas_algebra::NumArgs,
     ) -> PartialVMResult<()> {
-        self.inc_pc();
+        self.record_instr_and_inc_pc(
+            Opcodes::CALL,
+            args.clone().into_iter(),
+        );
         self.gen_new_frame(FrameName::Function {
             module_id: module_id.clone(),
             name: Identifier::new(func_name).unwrap(),
             ty_args: vec![],
         });
-        self.base
-            .charge_call(module_id, func_name, args, num_locals)
+        let res = self.base.charge_call(module_id, func_name, args, num_locals);
+        self.step();
+        res
     }
 
     fn charge_call_generic(
@@ -522,7 +598,9 @@ where
 
     fn charge_ld_const(&mut self, size: aptos_gas_algebra::NumBytes) -> PartialVMResult<()> {
         self.inc_pc();
-        self.base.charge_ld_const(size)
+        let res = self.base.charge_ld_const(size);
+        self.step();
+        res
     }
 
     fn charge_ld_const_after_deserialization(
@@ -530,7 +608,9 @@ where
         val: impl ValueView + Display,
     ) -> PartialVMResult<()> {
         self.inc_pc();
-        self.base.charge_ld_const_after_deserialization(val)
+        let res = self.base.charge_ld_const_after_deserialization(val);
+        self.step();
+        res
     }
 
     fn charge_copy_loc(&mut self, val: impl ValueView + Display) -> PartialVMResult<()> {
@@ -539,10 +619,10 @@ where
     }
 
     fn charge_move_loc(&mut self, val: impl ValueView + Display) -> PartialVMResult<()> {
-        println!("Press Enter to continue...");
-        std::io::stdin().read_line(&mut String::new()).unwrap();
-        self.emit_instr_and_inc_pc(Opcodes::MOVE_LOC, std::iter::empty::<&Value>());
-        self.base.charge_move_loc(val)
+        self.record_instr_and_inc_pc(Opcodes::MOVE_LOC, std::iter::empty::<&Value>());
+        let res = self.base.charge_move_loc(val);
+        self.step();
+        res
     }
 
     fn charge_store_loc(
@@ -550,7 +630,7 @@ where
         val: impl ValueView,
         interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.emit_instr_and_inc_pc(
+        self.record_instr_and_inc_pc(
             Opcodes::ST_LOC,
             interpreter_view.view_last_n_values(1).unwrap(),
         );
@@ -563,11 +643,13 @@ where
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
         interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.emit_instr_and_inc_pc(
+        self.record_instr_and_inc_pc(
             Opcodes::PACK,
             interpreter_view.view_last_n_values(args.len()).unwrap(),
         );
-        self.base.charge_pack(is_generic, args, interpreter_view)
+        let res = self.base.charge_pack(is_generic, args, interpreter_view);
+		self.step();
+        res
     }
 
     fn charge_unpack(
@@ -575,8 +657,10 @@ where
         is_generic: bool,
         args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
     ) -> PartialVMResult<()> {
-        self.emit_instr_and_inc_pc(Opcodes::UNPACK, args.clone());
-        self.base.charge_unpack(is_generic, args)
+        self.record_instr_and_inc_pc(Opcodes::UNPACK, args.clone());
+        let res = self.base.charge_unpack(is_generic, args);
+        self.step();
+        res
     }
 
     fn charge_read_ref(&mut self, val: impl ValueView) -> PartialVMResult<()> {
@@ -630,7 +714,7 @@ where
         // TODO(Gas): see if we can get rid of this param
         exists: bool,
     ) -> PartialVMResult<()> {
-        self.emit_generic_instr_and_inc_pc(
+        self.record_generic_instr_and_inc_pc(
             Opcodes::EXISTS,
             vec![ty.to_type_tag()],
             Vec::<&Value>::new().into_iter(),
@@ -646,9 +730,9 @@ where
     ) -> PartialVMResult<()> {
         let ty_args = vec![ty.to_type_tag()];
         if let Some(val) = &val {
-            self.emit_generic_instr_and_inc_pc(Opcodes::MOVE_FROM, ty_args, [&val].into_iter());
+            self.record_generic_instr_and_inc_pc(Opcodes::MOVE_FROM, ty_args, [&val].into_iter());
         } else {
-            self.emit_generic_instr_and_inc_pc(
+            self.record_generic_instr_and_inc_pc(
                 Opcodes::MOVE_FROM,
                 ty_args,
                 Vec::<&Value>::new().into_iter(),
@@ -668,9 +752,9 @@ where
         self.base.charge_move_to(is_generic, ty, val, is_success)
     }
 
-    fn charge_vec_pack<'a>(
+    fn charge_vec_pack<'b>(
         &mut self,
-        ty: impl TypeView + 'a,
+        ty: impl TypeView + 'b,
         args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
     ) -> PartialVMResult<()> {
         self.inc_pc();
@@ -733,7 +817,9 @@ where
         bytes_loaded: aptos_gas_algebra::NumBytes,
     ) -> PartialVMResult<()> {
         self.inc_pc();
-        self.base.charge_load_resource(addr, ty, val, bytes_loaded)
+        let res = self.base.charge_load_resource(addr, ty, val, bytes_loaded);
+        self.step();
+        res
     }
 
     fn charge_native_function(
@@ -759,7 +845,6 @@ where
         &mut self,
         locals: impl Iterator<Item = impl ValueView + Display> + Clone,
     ) -> PartialVMResult<()> {
-        self.inc_pc();
         self.base.charge_drop_frame(locals)
     }
 
@@ -781,7 +866,7 @@ where
     }
 }
 
-impl<G> AptosGasMeter for ExecutionTracer<G, String>
+impl<'a, G, Reader: GetCommand> AptosGasMeter for ExecutionTracer<'a, G, String, Reader>
 where
     G: AptosGasMeter,
 {
@@ -835,4 +920,69 @@ where
     ) -> move_binary_format::errors::VMResult<()> {
         self.base.charge_io_gas_for_write(key, op)
     }
+}
+
+enum Command {
+    Step(usize),
+    Continue,
+    Help,
+    Break(ModuleId, Identifier),
+    Backtrace(Option<usize>),
+}
+
+trait GetCommand {
+    fn get_command(&mut self) -> Command;
+}
+
+struct AlwaysContinue;
+
+impl GetCommand for AlwaysContinue {
+    fn get_command(&mut self) -> Command {
+        Command::Continue
+    }
+}
+
+pub struct CommandReader<R, W> {
+    reader: R,
+    writer: W,
+}
+
+impl<R: BufRead, W: Write> GetCommand for CommandReader<R, W> {
+    fn get_command(&mut self) -> Command {
+        let mut line = String::new();
+        write!(self.writer, "> ").expect("Failed to write");
+        self.writer.flush().expect("Failed to flush");
+        self.reader.read_line(&mut line).expect("Invalid character");
+        match line.trim() {
+            "s" | "step" => Command::Step(1),
+            "c" | "continue" => Command::Continue,
+            "h" | "help" => Command::Help,
+            "b" | "backtrace" => Command::Backtrace(None),
+            x => {
+                if x.starts_with("step") {
+                    Command::Step(x[4..].trim().parse().expect("Invalid step count"))
+                } else {
+                    self.get_command()
+                }
+            },
+        }
+    }
+}
+
+pub fn standard_io_command_reader(
+) -> CommandReader<std::io::BufReader<std::io::Stdin>, std::io::Stdout> {
+    CommandReader {
+        reader: std::io::BufReader::new(std::io::stdin()),
+        writer: std::io::stdout(),
+    }
+}
+
+pub fn get_env() -> GlobalEnv {
+    let path_str = env::var("PKG_PATH").expect("PKG_PATH must be set");
+    let path = Path::new(&path_str);
+    let build_config = BuildConfig::default();
+    let model = build_config
+        .move_model_for_package(path, ModelConfig::default())
+        .unwrap();
+    model
 }

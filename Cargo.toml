@@ -14,6 +14,7 @@ members = [
     "aptos-move/aptos-gas-calibration",
     "aptos-move/aptos-gas-meter",
     "aptos-move/aptos-gas-profiling",
+    "aptos-move/aptos-tracer",
     "aptos-move/aptos-gas-schedule",
     "aptos-move/aptos-gas-schedule-updator",
     "aptos-move/aptos-memory-usage-tracker",
@@ -352,6 +353,7 @@ aptos-gas-meter = { path = "aptos-move/aptos-gas-meter" }
 aptos-gas-algebra = { path = "aptos-move/aptos-gas-algebra" }
 aptos-gas-calibration = { path = "aptos-move/aptos-gas-calibration" }
 aptos-gas-profiling = { path = "aptos-move/aptos-gas-profiling" }
+aptos-tracer = { path = "aptos-move/aptos-tracer" }
 aptos-gas-schedule = { path = "aptos-move/aptos-gas-schedule" }
 aptos-gas-schedule-updator = { path = "aptos-move/aptos-gas-schedule-updator" }
 aptos-genesis = { path = "crates/aptos-genesis" }

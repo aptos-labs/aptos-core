@@ -2857,6 +2857,7 @@ dependencies = [
  "aptos-gas-profiling",
  "aptos-logger",
  "aptos-rest-client",
+ "aptos-tracer",
  "aptos-types",
  "aptos-validator-interface",
  "aptos-vm",
@@ -4199,6 +4200,24 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-test",
+]
+
+[[package]]
+name = "aptos-tracer"
+version = "0.1.0"
+dependencies = [
+ "aptos-gas-algebra",
+ "aptos-gas-meter",
+ "aptos-gas-profiling",
+ "aptos-types",
+ "aptos-vm-types",
+ "move-binary-format",
+ "move-bytecode-source-map",
+ "move-core-types",
+ "move-ir-types",
+ "move-model",
+ "move-package",
+ "move-vm-types",
 ]
 
 [[package]]
