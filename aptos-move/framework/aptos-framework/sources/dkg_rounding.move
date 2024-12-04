@@ -293,15 +293,16 @@ module aptos_framework::dkg_rounding {
 
     #[test_only]
     fun random_stake_dist(): vector<u64> {
-        let n = randomness::u64_range(10, 200);
+        let n = randomness::u64_range(3, 5);
 
         let ret = vector[];
         while (n > 0) {
-            let stake = if (randomness::u64_range(0, 2) == 0) {
-                randomness::u64_range(100000000000000, 1000000000000000)
-            } else {
-                randomness::u64_range(1000000000000000, 10000000000000000)
-            };
+            // let stake = if (randomness::u64_range(0, 2) == 0) {
+            //     randomness::u64_range(100000000000000, 1000000000000000)
+            // } else {
+            //     randomness::u64_range(1000000000000000, 10000000000000000)
+            // };
+            let stake = randomness::u64_range(10, 100);
             vector::push_back(&mut ret, stake);
             n = n - 1;
         };
@@ -309,10 +310,20 @@ module aptos_framework::dkg_rounding {
     }
 
     #[test(framework = @0x1)]
+    fun test_mainnet_dist(framework: signer) {
+        let stakes = mainnet_stakes();
+        let secrecy_thre = fixed_point64::create_from_rational(1, 2);
+        let recon_thre = fixed_point64::create_from_rational(2, 3);
+        let fast_recon_thre = option::some(fixed_point64::create_from_rational(67, 100));
+        let result = rounding(stakes, secrecy_thre, recon_thre, fast_recon_thre);
+        debug::print(&result);
+    }
+
+    #[test(framework = @0x1)]
     fun rounding_test(framework: signer) {
         randomness::initialize_for_testing(&framework);
         let stake_distributions = vector[mainnet_stakes()];
-        let n = 9;
+        let n = 20;
         while (n > 0) {
             vector::push_back(&mut stake_distributions, random_stake_dist());
             n = n - 1;
@@ -342,11 +353,15 @@ module aptos_framework::dkg_rounding {
                 i = i + 1;
             };
             debug::print(&utf8(b">>>>>>>>>>>>>>>>>>>>>>>>>>>>>"));
+            debug::print(&result_0.weights);
             debug::print(&get_total_weight(&result_0));
             debug::print(&result_0.ideal_total_weight);
+            debug::print(&result_0.reconstruct_threshold_default_path);
             debug::print(&utf8(b"-----------------------------"));
+            debug::print(&result_1.weights);
             debug::print(&get_total_weight(&result_1));
             debug::print(&result_1.ideal_total_weight);
+            debug::print(&result_1.reconstruct_threshold_default_path);
             debug::print(&utf8(b"<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"));
         });
     }

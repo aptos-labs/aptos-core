@@ -147,9 +147,6 @@ module aptos_framework::randomness_config {
     }
 
     #[test_only]
-    use aptos_std::fixed_point64;
-
-    #[test_only]
     fun initialize_for_testing(framework: &signer) {
         config_buffer::initialize(framework);
         initialize(framework, new_off());

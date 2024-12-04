@@ -32,6 +32,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
 
     let ut_config = UnitTestingConfig {
         filter: std::env::var("MOVE_TEST_FILTER").ok(),
+        report_statistics: true,
         ..Default::default()
     };
     let mut ok = run_move_unit_tests(
