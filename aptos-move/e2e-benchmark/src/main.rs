@@ -202,6 +202,8 @@ fn main() {
         EntryPoints::IncGlobalMilestoneAggV2 { milestone_every: 1 },
         EntryPoints::IncGlobalMilestoneAggV2 { milestone_every: 2 },
         EntryPoints::EmitEvents { count: 1000 },
+        EntryPoints::APTPermissionedTransfer,
+        EntryPoints::APTTransfer,
     ];
 
     let mut failures = Vec::new();
