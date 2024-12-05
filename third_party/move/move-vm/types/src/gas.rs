@@ -178,7 +178,7 @@ pub trait GasMeter {
         &mut self,
         module_id: &ModuleId,
         func_name: &str,
-        args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
         num_locals: NumArgs,
         interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()>;
@@ -188,14 +188,14 @@ pub trait GasMeter {
         module_id: &ModuleId,
         func_name: &str,
         ty_args: impl ExactSizeIterator<Item = impl TypeView> + Clone,
-        args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
         num_locals: NumArgs,
         interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()>;
 
     fn charge_ld_const(&mut self, size: NumBytes, interpreter_view: impl InterpreterView) -> PartialVMResult<()>;
 
-    fn charge_ld_const_after_deserialization(&mut self, val: impl ValueView, interpreter_view: impl InterpreterView)
+    fn charge_ld_const_after_deserialization(&mut self, val: impl ValueView)
         -> PartialVMResult<()>;
 
     fn charge_copy_loc(&mut self, val: impl ValueView, interpreter_view: impl InterpreterView) -> PartialVMResult<()>;
@@ -293,7 +293,7 @@ pub trait GasMeter {
         interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()>;
 
-    fn charge_vec_len(&mut self, ty: impl TypeView) -> PartialVMResult<()>;
+    fn charge_vec_len(&mut self, ty: impl TypeView, interpreter_view: impl InterpreterView) -> PartialVMResult<()>;
 
     fn charge_vec_borrow(
         &mut self,
@@ -359,7 +359,6 @@ pub trait GasMeter {
         &mut self,
         ty_args: impl ExactSizeIterator<Item = impl TypeView> + Clone,
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
-        interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()>;
 
     fn charge_drop_frame(
@@ -437,7 +436,6 @@ impl GasMeter for UnmeteredGasMeter {
     fn charge_ld_const_after_deserialization(
         &mut self,
         _val: impl ValueView,
-        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         Ok(())
     }
@@ -544,7 +542,7 @@ impl GasMeter for UnmeteredGasMeter {
         Ok(())
     }
 
-    fn charge_vec_len(&mut self, _ty: impl TypeView) -> PartialVMResult<()> {
+    fn charge_vec_len(&mut self, _ty: impl TypeView, _interpreter_view: impl InterpreterView) -> PartialVMResult<()> {
         Ok(())
     }
 
@@ -613,7 +611,6 @@ impl GasMeter for UnmeteredGasMeter {
         &mut self,
         _ty_args: impl ExactSizeIterator<Item = impl TypeView>,
         _args: impl ExactSizeIterator<Item = impl ValueView>,
-        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         Ok(())
     }

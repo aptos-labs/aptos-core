@@ -56,17 +56,17 @@ where
     }
 
     #[inline]
-    fn charge_br_false(&mut self, _target_offset: Option<CodeOffset>) -> PartialVMResult<()> {
+    fn charge_br_false(&mut self, _target_offset: Option<CodeOffset>, _interpreter: impl InterpreterView) -> PartialVMResult<()> {
         self.algebra.charge_execution(BR_FALSE)
     }
 
     #[inline]
-    fn charge_br_true(&mut self, _target_offset: Option<CodeOffset>) -> PartialVMResult<()> {
+    fn charge_br_true(&mut self, _target_offset: Option<CodeOffset>, _interpreter: impl InterpreterView) -> PartialVMResult<()> {
         self.algebra.charge_execution(BR_TRUE)
     }
 
     #[inline]
-    fn charge_branch(&mut self, _target_offset: CodeOffset) -> PartialVMResult<()> {
+    fn charge_branch(&mut self, _target_offset: CodeOffset, _interpreter: impl InterpreterView) -> PartialVMResult<()> {
         self.algebra.charge_execution(BRANCH)
     }
 
@@ -154,6 +154,7 @@ where
         &mut self,
         amount: InternalGas,
         _ret_vals: Option<impl ExactSizeIterator<Item = impl ValueView>>,
+        _interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         // TODO(Gas): Is this correct???
         self.algebra.charge_execution(amount)
@@ -178,7 +179,7 @@ where
     }
 
     #[inline]
-    fn charge_pop(&mut self, _popped_val: impl ValueView + std::fmt::Display) -> PartialVMResult<()> {
+    fn charge_pop(&mut self, _popped_val: impl ValueView, _interpreter: impl InterpreterView) -> PartialVMResult<()> {
         self.algebra.charge_execution(POP)
     }
 
@@ -189,6 +190,7 @@ where
         _func_name: &str,
         args: impl ExactSizeIterator<Item = impl ValueView>,
         num_locals: NumArgs,
+        _interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         let cost = CALL_BASE + CALL_PER_ARG * NumArgs::new(args.len() as u64);
 
@@ -208,6 +210,7 @@ where
         ty_args: impl ExactSizeIterator<Item = impl TypeView>,
         args: impl ExactSizeIterator<Item = impl ValueView>,
         num_locals: NumArgs,
+        _interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         let cost = CALL_GENERIC_BASE
             + CALL_GENERIC_PER_TY_ARG * NumArgs::new(ty_args.len() as u64)
@@ -222,7 +225,7 @@ where
     }
 
     #[inline]
-    fn charge_ld_const(&mut self, size: NumBytes) -> PartialVMResult<()> {
+    fn charge_ld_const(&mut self, size: NumBytes, _interpreter: impl InterpreterView) -> PartialVMResult<()> {
         self.algebra
             .charge_execution(LD_CONST_BASE + LD_CONST_PER_BYTE * size)
     }
@@ -236,7 +239,7 @@ where
     }
 
     #[inline]
-    fn charge_copy_loc(&mut self, val: impl ValueView) -> PartialVMResult<()> {
+    fn charge_copy_loc(&mut self, val: impl ValueView, _interpreter: impl InterpreterView) -> PartialVMResult<()> {
         let (stack_size, heap_size) = self
             .vm_gas_params()
             .misc
@@ -249,7 +252,7 @@ where
     }
 
     #[inline]
-    fn charge_move_loc(&mut self, _val: impl ValueView) -> PartialVMResult<()> {
+    fn charge_move_loc(&mut self, _val: impl ValueView, _interpreter: impl InterpreterView) -> PartialVMResult<()> {
         self.algebra.charge_execution(MOVE_LOC_BASE)
     }
 
@@ -282,6 +285,7 @@ where
         &mut self,
         is_generic: bool,
         args: impl ExactSizeIterator<Item = impl ValueView>,
+        _interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         let num_args = NumArgs::new(args.len() as u64);
 
@@ -296,7 +300,7 @@ where
     }
 
     #[inline]
-    fn charge_read_ref(&mut self, val: impl ValueView) -> PartialVMResult<()> {
+    fn charge_read_ref(&mut self, val: impl ValueView, _interpreter: impl InterpreterView) -> PartialVMResult<()> {
         let (stack_size, heap_size) = self
             .vm_gas_params()
             .misc
@@ -313,12 +317,13 @@ where
         &mut self,
         _new_val: impl ValueView,
         _old_val: impl ValueView,
+        _interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         self.algebra.charge_execution(WRITE_REF_BASE)
     }
 
     #[inline]
-    fn charge_eq(&mut self, lhs: impl ValueView, rhs: impl ValueView) -> PartialVMResult<()> {
+    fn charge_eq(&mut self, lhs: impl ValueView, rhs: impl ValueView, _interpreter: impl InterpreterView) -> PartialVMResult<()> {
         let abs_val_params = &self.vm_gas_params().misc.abs_val;
 
         let cost = EQ_BASE
@@ -330,7 +335,7 @@ where
     }
 
     #[inline]
-    fn charge_neq(&mut self, lhs: impl ValueView, rhs: impl ValueView) -> PartialVMResult<()> {
+    fn charge_neq(&mut self, lhs: impl ValueView, rhs: impl ValueView, _interpreter: impl InterpreterView) -> PartialVMResult<()> {
         let abs_val_params = &self.vm_gas_params().misc.abs_val;
 
         let cost = NEQ_BASE
@@ -348,6 +353,7 @@ where
         is_generic: bool,
         _ty: impl TypeView,
         _is_success: bool,
+        _interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         match (is_mut, is_generic) {
             (false, false) => self.algebra.charge_execution(IMM_BORROW_GLOBAL_BASE),
@@ -367,6 +373,7 @@ where
         is_generic: bool,
         _ty: impl TypeView,
         _exists: bool,
+        _interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         match is_generic {
             false => self.algebra.charge_execution(EXISTS_BASE),
@@ -380,6 +387,7 @@ where
         is_generic: bool,
         _ty: impl TypeView,
         _val: Option<impl ValueView>,
+        _interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         match is_generic {
             false => self.algebra.charge_execution(MOVE_FROM_BASE),
@@ -394,6 +402,7 @@ where
         _ty: impl TypeView,
         _val: impl ValueView,
         _is_success: bool,
+        _interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         match is_generic {
             false => self.algebra.charge_execution(MOVE_TO_BASE),
@@ -406,6 +415,7 @@ where
         &mut self,
         _ty: impl TypeView + 'a,
         args: impl ExactSizeIterator<Item = impl ValueView>,
+        _interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         let num_args = NumArgs::new(args.len() as u64);
 
@@ -419,13 +429,18 @@ where
         _ty: impl TypeView,
         expect_num_elements: NumArgs,
         _elems: impl ExactSizeIterator<Item = impl ValueView>,
+        _interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         self.algebra
             .charge_execution(VEC_UNPACK_BASE + VEC_UNPACK_PER_EXPECTED_ELEM * expect_num_elements)
     }
 
     #[inline]
-    fn charge_vec_len(&mut self, _ty: impl TypeView) -> PartialVMResult<()> {
+    fn charge_vec_len(
+        &mut self,
+        _ty: impl TypeView,
+        _interpreter: impl InterpreterView,
+    ) -> PartialVMResult<()> {
         self.algebra.charge_execution(VEC_LEN_BASE)
     }
 
@@ -435,6 +450,7 @@ where
         is_mut: bool,
         _ty: impl TypeView,
         _is_success: bool,
+        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         match is_mut {
             false => self.algebra.charge_execution(VEC_IMM_BORROW_BASE),
@@ -447,6 +463,7 @@ where
         &mut self,
         _ty: impl TypeView,
         _val: impl ValueView,
+        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         self.algebra.charge_execution(VEC_PUSH_BACK_BASE)
     }
@@ -456,12 +473,17 @@ where
         &mut self,
         _ty: impl TypeView,
         _val: Option<impl ValueView>,
+        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         self.algebra.charge_execution(VEC_POP_BACK_BASE)
     }
 
     #[inline]
-    fn charge_vec_swap(&mut self, _ty: impl TypeView) -> PartialVMResult<()> {
+    fn charge_vec_swap(
+        &mut self,
+        _ty: impl TypeView,
+        _interpreter_view: impl InterpreterView,
+    ) -> PartialVMResult<()> {
         self.algebra.charge_execution(VEC_SWAP_BASE)
     }
 

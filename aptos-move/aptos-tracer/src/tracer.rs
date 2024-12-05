@@ -138,7 +138,7 @@ impl<G, Reader: GetCommand> ExecutionTracer<G, String, Reader> {
     fn record_instr(
         &mut self,
         op: Opcodes,
-        args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
     ) {
         self.record_generic_instr(op, vec![], args);
     }
@@ -147,13 +147,13 @@ impl<G, Reader: GetCommand> ExecutionTracer<G, String, Reader> {
         &mut self,
         op: Opcodes,
         ty_args: Vec<TypeTag>,
-        args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
     ) {
         let pc = self.get_pc();
         let instr = Instruction {
             op,
             ty_args,
-            args: args.map(|v| v.to_string()).collect(),
+            args: args.map(|v| format!("{:?}", Into::<TValue>::into(v))).collect(),
             offset: pc,
         };
         self.emit_instr(&instr);
@@ -164,7 +164,7 @@ impl<G, Reader: GetCommand> ExecutionTracer<G, String, Reader> {
         &mut self,
         op: Opcodes,
         ty_args: Vec<TypeTag>,
-        args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
     ) {
         self.record_generic_instr(op, ty_args, args);
         self.inc_pc();
@@ -173,7 +173,7 @@ impl<G, Reader: GetCommand> ExecutionTracer<G, String, Reader> {
     fn record_instr_and_inc_pc(
         &mut self,
         op: Opcodes,
-        args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
     ) {
         self.record_generic_instr_and_inc_pc(op, vec![], args)
     }
@@ -508,41 +508,41 @@ where
         res
     }
 
-    fn charge_br_true(&mut self, target_offset: Option<CodeOffset>) -> PartialVMResult<()> {
+    fn charge_br_true(&mut self, target_offset: Option<CodeOffset>, interpreter: impl InterpreterView) -> PartialVMResult<()> {
         self.record_instr(Opcodes::BR_TRUE, Vec::<&Value>::new().into_iter());
         if let Some(offset) = target_offset {
             *self.get_pc_mut() = offset;
         } else {
             *self.get_pc_mut() += 1;
         }
-        let res = self.base.charge_br_true(target_offset);
+        let res = self.base.charge_br_true(target_offset, interpreter);
         self.step();
         res
     }
 
-    fn charge_br_false(&mut self, target_offset: Option<CodeOffset>) -> PartialVMResult<()> {
+    fn charge_br_false(&mut self, target_offset: Option<CodeOffset>, interpreter: impl InterpreterView) -> PartialVMResult<()> {
         self.record_instr(Opcodes::BR_FALSE, Vec::<&Value>::new().into_iter());
         if let Some(offset) = target_offset {
             *self.get_pc_mut() = offset;
         } else {
             *self.get_pc_mut() += 1;
         }
-        let res = self.base.charge_br_false(target_offset);
+        let res = self.base.charge_br_false(target_offset, interpreter);
         self.step();
         res
     }
 
-    fn charge_branch(&mut self, target_offset: CodeOffset) -> PartialVMResult<()> {
+    fn charge_branch(&mut self, target_offset: CodeOffset, interpreter: impl InterpreterView) -> PartialVMResult<()> {
         self.record_instr(Opcodes::BRANCH, Vec::<&Value>::new().into_iter());
         *self.get_pc_mut() = target_offset;
-        let res = self.base.charge_branch(target_offset);
+        let res = self.base.charge_branch(target_offset, interpreter);
         self.step();
         res
     }
 
-    fn charge_pop(&mut self, popped_val: impl ValueView + Display) -> PartialVMResult<()> {
+    fn charge_pop(&mut self, popped_val: impl ValueView, interpreter: impl InterpreterView) -> PartialVMResult<()> {
         self.record_generic_instr_and_inc_pc(Opcodes::POP, vec![], [&popped_val].into_iter());
-        let res = self.base.charge_pop(popped_val);
+        let res = self.base.charge_pop(popped_val, interpreter);
         self.step();
         res
     }
@@ -551,8 +551,9 @@ where
         &mut self,
         module_id: &move_core_types::language_storage::ModuleId,
         func_name: &str,
-        args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
         num_locals: aptos_gas_algebra::NumArgs,
+        interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         self.record_instr_and_inc_pc(
             Opcodes::CALL,
@@ -563,7 +564,7 @@ where
             name: Identifier::new(func_name).unwrap(),
             ty_args: vec![],
         });
-        let res = self.base.charge_call(module_id, func_name, args, num_locals);
+        let res = self.base.charge_call(module_id, func_name, args, num_locals, interpreter);
         self.step();
         res
     }
@@ -573,8 +574,9 @@ where
         module_id: &move_core_types::language_storage::ModuleId,
         func_name: &str,
         ty_args: impl ExactSizeIterator<Item = impl TypeView> + Clone,
-        args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
         num_locals: aptos_gas_algebra::NumArgs,
+        interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         self.inc_pc();
         let ty_tags = ty_args
@@ -587,20 +589,21 @@ where
             name: Identifier::new(func_name).unwrap(),
             ty_args: ty_tags,
         });
-        self.base
-            .charge_call_generic(module_id, func_name, ty_args, args, num_locals)
+        let res = self.base.charge_call_generic(module_id, func_name, ty_args, args, num_locals, interpreter);
+        self.step();
+        res
     }
 
-    fn charge_ld_const(&mut self, size: aptos_gas_algebra::NumBytes) -> PartialVMResult<()> {
+    fn charge_ld_const(&mut self, size: aptos_gas_algebra::NumBytes, interpreter: impl InterpreterView) -> PartialVMResult<()> {
         self.inc_pc();
-        let res = self.base.charge_ld_const(size);
+        let res = self.base.charge_ld_const(size, interpreter);
         self.step();
         res
     }
 
     fn charge_ld_const_after_deserialization(
         &mut self,
-        val: impl ValueView + Display,
+        val: impl ValueView,
     ) -> PartialVMResult<()> {
         self.inc_pc();
         let res = self.base.charge_ld_const_after_deserialization(val);
@@ -608,14 +611,16 @@ where
         res
     }
 
-    fn charge_copy_loc(&mut self, val: impl ValueView + Display) -> PartialVMResult<()> {
+    fn charge_copy_loc(&mut self, val: impl ValueView, interpreter: impl InterpreterView) -> PartialVMResult<()> {
         self.inc_pc();
-        self.base.charge_copy_loc(val)
+        let res = self.base.charge_copy_loc(val, interpreter);
+        self.step();
+        res
     }
 
-    fn charge_move_loc(&mut self, val: impl ValueView + Display) -> PartialVMResult<()> {
+    fn charge_move_loc(&mut self, val: impl ValueView, interpreter: impl InterpreterView) -> PartialVMResult<()> {
         self.record_instr_and_inc_pc(Opcodes::MOVE_LOC, std::iter::empty::<&Value>());
-        let res = self.base.charge_move_loc(val);
+        let res = self.base.charge_move_loc(val, interpreter);
         self.step();
         res
     }
@@ -650,44 +655,56 @@ where
     fn charge_unpack(
         &mut self,
         is_generic: bool,
-        args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+        interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         self.record_instr_and_inc_pc(Opcodes::UNPACK, args.clone());
-        let res = self.base.charge_unpack(is_generic, args);
+        let res = self.base.charge_unpack(is_generic, args, interpreter);
         self.step();
         res
     }
 
-    fn charge_read_ref(&mut self, val: impl ValueView) -> PartialVMResult<()> {
+    fn charge_read_ref(&mut self, val: impl ValueView, interpreter: impl InterpreterView) -> PartialVMResult<()> {
         self.inc_pc();
-        self.base.charge_read_ref(val)
+        let res = self.base.charge_read_ref(val, interpreter);
+        self.step();
+        res
     }
 
     fn charge_write_ref(
         &mut self,
-        new_val: impl ValueView + Display,
+        new_val: impl ValueView,
         old_val: impl ValueView,
+        interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         self.inc_pc();
-        self.base.charge_write_ref(new_val, old_val)
+        let res = self.base.charge_write_ref(new_val, old_val, interpreter);
+        self.step();
+        res
     }
 
     fn charge_eq(
         &mut self,
-        lhs: impl ValueView + Display,
-        rhs: impl ValueView + Display,
+        lhs: impl ValueView,
+        rhs: impl ValueView,
+        interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         self.inc_pc();
-        self.base.charge_eq(lhs, rhs)
+        let res = self.base.charge_eq(lhs, rhs, interpreter);
+        self.step();
+        res
     }
 
     fn charge_neq(
         &mut self,
-        lhs: impl ValueView + Display,
-        rhs: impl ValueView + Display,
+        lhs: impl ValueView,
+        rhs: impl ValueView,
+        interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         self.inc_pc();
-        self.base.charge_neq(lhs, rhs)
+        let res = self.base.charge_neq(lhs, rhs, interpreter);
+        self.step();
+        res
     }
 
     fn charge_borrow_global(
@@ -696,10 +713,12 @@ where
         is_generic: bool,
         ty: impl TypeView,
         is_success: bool,
+        interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         self.inc_pc();
-        self.base
-            .charge_borrow_global(is_mut, is_generic, ty, is_success)
+        let res = self.base.charge_borrow_global(is_mut, is_generic, ty, is_success, interpreter);
+        self.step();
+        res
     }
 
     fn charge_exists(
@@ -708,20 +727,24 @@ where
         ty: impl TypeView,
         // TODO(Gas): see if we can get rid of this param
         exists: bool,
+        interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         self.record_generic_instr_and_inc_pc(
             Opcodes::EXISTS,
             vec![ty.to_type_tag()],
             Vec::<&Value>::new().into_iter(),
         );
-        self.base.charge_exists(is_generic, ty, exists)
+        let res = self.base.charge_exists(is_generic, ty, exists, interpreter);
+        self.step();
+        res
     }
 
     fn charge_move_from(
         &mut self,
         is_generic: bool,
         ty: impl TypeView,
-        val: Option<impl ValueView + Display>,
+        val: Option<impl ValueView>,
+        interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         let ty_args = vec![ty.to_type_tag()];
         if let Some(val) = &val {
@@ -733,7 +756,7 @@ where
                 Vec::<&Value>::new().into_iter(),
             );
         }
-        self.base.charge_move_from(is_generic, ty, val)
+        self.base.charge_move_from(is_generic, ty, val, interpreter)
     }
 
     fn charge_move_to(
@@ -742,23 +765,31 @@ where
         ty: impl TypeView,
         val: impl ValueView,
         is_success: bool,
+        interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         self.inc_pc();
-        self.base.charge_move_to(is_generic, ty, val, is_success)
+        let res = self.base.charge_move_to(is_generic, ty, val, is_success, interpreter);
+        self.step();
+        res
     }
 
     fn charge_vec_pack<'b>(
         &mut self,
         ty: impl TypeView + 'b,
-        args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+        interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         self.inc_pc();
-        self.base.charge_vec_pack(ty, args)
+        let res = self.base.charge_vec_pack(ty, args, interpreter);
+        self.step();
+        res
     }
 
-    fn charge_vec_len(&mut self, ty: impl TypeView) -> PartialVMResult<()> {
+    fn charge_vec_len(&mut self, ty: impl TypeView, interpreter: impl InterpreterView) -> PartialVMResult<()> {
         self.inc_pc();
-        self.base.charge_vec_len(ty)
+        let res = self.base.charge_vec_len(ty, interpreter);
+        self.step();
+        res
     }
 
     fn charge_vec_borrow(
@@ -766,27 +797,36 @@ where
         is_mut: bool,
         ty: impl TypeView,
         is_success: bool,
+        interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         self.inc_pc();
-        self.base.charge_vec_borrow(is_mut, ty, is_success)
+        let res = self.base.charge_vec_borrow(is_mut, ty, is_success, interpreter);
+        self.step();
+        res
     }
 
     fn charge_vec_push_back(
         &mut self,
         ty: impl TypeView,
-        val: impl ValueView + Display,
+        val: impl ValueView,
+        interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         self.inc_pc();
-        self.base.charge_vec_push_back(ty, val)
+        let res = self.base.charge_vec_push_back(ty, val, interpreter);
+        self.step();
+        res
     }
 
     fn charge_vec_pop_back(
         &mut self,
         ty: impl TypeView,
-        val: Option<impl ValueView + Display>,
+        val: Option<impl ValueView>,
+        interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         self.inc_pc();
-        self.base.charge_vec_pop_back(ty, val)
+        let res = self.base.charge_vec_pop_back(ty, val, interpreter);
+        self.step();
+        res
     }
 
     fn charge_vec_unpack(
@@ -794,14 +834,19 @@ where
         ty: impl TypeView,
         expect_num_elements: aptos_gas_algebra::NumArgs,
         elems: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+        interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         self.inc_pc();
-        self.base.charge_vec_unpack(ty, expect_num_elements, elems)
+        let res = self.base.charge_vec_unpack(ty, expect_num_elements, elems, interpreter);
+        self.step();
+        res
     }
 
-    fn charge_vec_swap(&mut self, ty: impl TypeView) -> PartialVMResult<()> {
+    fn charge_vec_swap(&mut self, ty: impl TypeView, interpreter: impl InterpreterView) -> PartialVMResult<()> {
         self.inc_pc();
-        self.base.charge_vec_swap(ty)
+        let res = self.base.charge_vec_swap(ty, interpreter);
+        self.step();
+        res
     }
 
     fn charge_load_resource(
@@ -820,16 +865,19 @@ where
     fn charge_native_function(
         &mut self,
         amount: aptos_gas_algebra::InternalGas,
-        ret_vals: Option<impl ExactSizeIterator<Item = impl ValueView + Display> + Clone>,
+        ret_vals: Option<impl ExactSizeIterator<Item = impl ValueView> + Clone>,
+        interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         self.inc_pc();
-        self.base.charge_native_function(amount, ret_vals)
+        let res = self.base.charge_native_function(amount, ret_vals, interpreter);
+        self.step();
+        res
     }
 
     fn charge_native_function_before_execution(
         &mut self,
         ty_args: impl ExactSizeIterator<Item = impl TypeView> + Clone,
-        args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
     ) -> PartialVMResult<()> {
         self.inc_pc();
         self.base
@@ -838,7 +886,7 @@ where
 
     fn charge_drop_frame(
         &mut self,
-        locals: impl Iterator<Item = impl ValueView + Display> + Clone,
+        locals: impl Iterator<Item = impl ValueView> + Clone,
     ) -> PartialVMResult<()> {
         self.base.charge_drop_frame(locals)
     }
@@ -981,4 +1029,121 @@ pub fn get_env() -> GlobalEnv {
         .compile_package_no_exit(path, vec![], &mut std::io::stdout())
         .unwrap();
     env.unwrap()
+}
+
+#[derive(Debug)]
+enum TValue {
+    Bool(bool),
+    U8(u8),
+    U16(u16),
+    U32(u32),
+    U64(u64),
+    Struct(Vec<TValue>),
+    VecU8(Vec<TValue>),
+    Vec(Vec<TValue>),
+}
+
+impl<T: ValueView> From<T> for TValue {
+    fn from(val: T) -> Self {
+        let mut visitor = Visitor::new();
+        val.visit(&mut visitor);
+        visitor.finish()
+    }
+}
+
+/// Convert a `ValueView` back into a value.
+struct Visitor {
+    stack: Vec<TValue>,
+}
+
+impl Visitor {
+    fn new() -> Self {
+        Self { stack: Vec::new() }
+    }
+}
+
+impl Visitor {
+    fn return_1(&mut self) {
+        let top = self.stack.pop().unwrap();
+        if let Some(last) = self.stack.last_mut() {
+            match last {
+                TValue::Struct(fields) => fields.push(top),
+                TValue::Vec(elems) => elems.push(top),
+                TValue::VecU8(elems) => elems.push(top),
+                _ => panic!(),
+            }
+        } else {
+            panic!();
+        }
+    }
+
+    fn return_to(&mut self, len: usize) {
+        while self.stack.len() > len {
+            self.return_1();
+        }
+    }
+
+    fn finish(mut self) -> TValue {
+        self.return_to(1);
+        self.stack.pop().unwrap()
+    }
+}
+
+impl ValueVisitor for Visitor {
+    fn visit_delayed(&mut self, depth: usize, id: move_vm_types::delayed_values::delayed_field_id::DelayedFieldID) {
+        todo!()
+    }
+
+    fn visit_u8(&mut self, depth: usize, val: u8) {
+        self.return_to(depth);
+        self.stack.push(TValue::U8(val));
+    }
+
+    fn visit_u16(&mut self, depth: usize, val: u16) {
+        self.return_to(depth);
+        self.stack.push(TValue::U16(val));
+    }
+
+    fn visit_u32(&mut self, depth: usize, val: u32) {
+        self.return_to(depth);
+        self.stack.push(TValue::U32(val));
+    }
+
+    fn visit_u64(&mut self, depth: usize, val: u64) {
+        self.return_to(depth);
+        self.stack.push(TValue::U64(val));
+    }
+
+    fn visit_u128(&mut self, depth: usize, val: u128) {
+        todo!()
+    }
+
+    fn visit_u256(&mut self, depth: usize, val: move_core_types::u256::U256) {
+        todo!()
+    }
+
+    fn visit_bool(&mut self, depth: usize, val: bool) {
+        self.return_to(depth);
+        self.stack.push(TValue::Bool(val));
+    }
+
+    fn visit_address(&mut self, depth: usize, val: aptos_types::PeerId) {
+        todo!()
+    }
+
+    fn visit_struct(&mut self, depth: usize, len: usize) -> bool {
+        self.return_to(depth);
+        self.stack.push(TValue::Struct(Vec::new()));
+        true
+    }
+
+    fn visit_vec(&mut self, depth: usize, len: usize) -> bool {
+        self.return_to(depth);
+        self.stack.push(TValue::Vec(Vec::new()));
+        true
+    }
+
+    fn visit_ref(&mut self, depth: usize, is_global: bool) -> bool {
+        todo!()
+    }
 }
