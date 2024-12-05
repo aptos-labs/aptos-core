@@ -244,3 +244,26 @@ fn test_serialized_size() {
         assert_err!(serialized_size_allowing_delayed_values(&value, &layout));
     }
 }
+
+#[test]
+fn signer_round_trip_vm_value() {
+    let v = MoveValue::Signer(AccountAddress::ZERO);
+    let bytes = v.simple_serialize().unwrap();
+    let vm_value = Value::simple_deserialize(&bytes, &MoveTypeLayout::Signer).unwrap();
+    let vm_bytes = serialize_and_allow_delayed_values(&vm_value, &MoveTypeLayout::Signer)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        v,
+        MoveValue::simple_deserialize(&vm_bytes, &MoveTypeLayout::Signer).unwrap()
+    );
+
+    let permissioned_signer = Value::permissioned_signer(AccountAddress::ZERO, AccountAddress::ONE);
+    let bytes = permissioned_signer
+        .simple_serialize(&MoveTypeLayout::Signer)
+        .unwrap();
+    assert_eq!(
+        v,
+        MoveValue::simple_deserialize(&bytes, &MoveTypeLayout::Signer).unwrap(),
+    );
+}
