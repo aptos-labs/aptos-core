@@ -32,6 +32,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Struct `TransferRef`](#0x1_object_TransferRef)
 -  [Struct `LinearTransferRef`](#0x1_object_LinearTransferRef)
 -  [Struct `DeriveRef`](#0x1_object_DeriveRef)
+-  [Struct `TransferPermission`](#0x1_object_TransferPermission)
 -  [Struct `TransferEvent`](#0x1_object_TransferEvent)
 -  [Struct `Transfer`](#0x1_object_Transfer)
 -  [Constants](#@Constants_0)
@@ -89,6 +90,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `is_owner`](#0x1_object_is_owner)
 -  [Function `owns`](#0x1_object_owns)
 -  [Function `root_owner`](#0x1_object_root_owner)
+-  [Function `grant_permission`](#0x1_object_grant_permission)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
@@ -133,6 +135,7 @@ make it so that a reference to a global object can be returned from a function.
     -  [Function `is_owner`](#@Specification_1_is_owner)
     -  [Function `owns`](#@Specification_1_owns)
     -  [Function `root_owner`](#@Specification_1_root_owner)
+    -  [Function `grant_permission`](#@Specification_1_grant_permission)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -144,6 +147,7 @@ make it so that a reference to a global object can be returned from a function.
 <b>use</b> <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs">0x1::from_bcs</a>;
 <b>use</b> <a href="guid.md#0x1_guid">0x1::guid</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">0x1::hash</a>;
+<b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="transaction_context.md#0x1_transaction_context">0x1::transaction_context</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
@@ -489,6 +493,34 @@ Used to create derived objects from a given objects.
 <dl>
 <dt>
 <code>self: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_object_TransferPermission"></a>
+
+## Struct `TransferPermission`
+
+Permission to transfer object with permissioned signer.
+
+
+<pre><code><b>struct</b> <a href="object.md#0x1_object_TransferPermission">TransferPermission</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="object.md#0x1_object">object</a>: <b>address</b></code>
 </dt>
 <dd>
 
@@ -1999,6 +2031,10 @@ hierarchy.
     <b>to</b>: <b>address</b>,
 ) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
     <b>let</b> owner_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
+    <b>assert</b>!(
+        <a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_exists">permissioned_signer::check_permission_exists</a>(owner, <a href="object.md#0x1_object_TransferPermission">TransferPermission</a> { <a href="object.md#0x1_object">object</a> }),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_EOBJECT_NOT_TRANSFERRABLE">EOBJECT_NOT_TRANSFERRABLE</a>)
+    );
     <a href="object.md#0x1_object_verify_ungated_and_descendant">verify_ungated_and_descendant</a>(owner_address, <a href="object.md#0x1_object">object</a>);
     <a href="object.md#0x1_object_transfer_raw_inner">transfer_raw_inner</a>(<a href="object.md#0x1_object">object</a>, <b>to</b>);
 }
@@ -2188,6 +2224,10 @@ Allow origin owners to reclaim any objects they previous burnt.
 ) <b>acquires</b> <a href="object.md#0x1_object_TombStone">TombStone</a>, <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
     <b>let</b> object_addr = <a href="object.md#0x1_object">object</a>.inner;
     <b>assert</b>!(<b>exists</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(object_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="object.md#0x1_object_EOBJECT_NOT_BURNT">EOBJECT_NOT_BURNT</a>));
+    <b>assert</b>!(
+        <a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_exists">permissioned_signer::check_permission_exists</a>(original_owner, <a href="object.md#0x1_object_TransferPermission">TransferPermission</a> { <a href="object.md#0x1_object">object</a>: object_addr }),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_EOBJECT_NOT_TRANSFERRABLE">EOBJECT_NOT_TRANSFERRABLE</a>)
+    );
 
     <b>let</b> <a href="object.md#0x1_object_TombStone">TombStone</a> { original_owner: original_owner_addr } = <b>move_from</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(object_addr);
     <b>assert</b>!(original_owner_addr == <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(original_owner), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_OBJECT_OWNER">ENOT_OBJECT_OWNER</a>));
@@ -2362,6 +2402,38 @@ to determine the identity of the starting point of ownership.
 
 </details>
 
+<a id="0x1_object_grant_permission"></a>
+
+## Function `grant_permission`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_grant_permission">grant_permission</a>&lt;T&gt;(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_grant_permission">grant_permission</a>&lt;T&gt;(
+    master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;,
+) {
+    <a href="permissioned_signer.md#0x1_permissioned_signer_authorize_unlimited">permissioned_signer::authorize_unlimited</a>(
+        master,
+        <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>,
+        <a href="object.md#0x1_object_TransferPermission">TransferPermission</a> { <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object">object</a>.inner }
+    )
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="@Specification_1"></a>
 
 ## Specification
@@ -2437,15 +2509,6 @@ to determine the identity of the starting point of ownership.
 
 
 <pre><code><b>pragma</b> aborts_if_is_strict;
-</code></pre>
-
-
-
-
-<a id="0x1_object_spec_exists_at"></a>
-
-
-<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_exists_at">spec_exists_at</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): bool;
 </code></pre>
 
 
@@ -3398,6 +3461,34 @@ to determine the identity of the starting point of ownership.
 
 
 <pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_guid_object_address">spec_create_guid_object_address</a>(source: <b>address</b>, creation_num: u64): <b>address</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_grant_permission"></a>
+
+### Function `grant_permission`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_grant_permission">grant_permission</a>&lt;T&gt;(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>aborts_if</b> !<a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">permissioned_signer::spec_is_permissioned_signer</a>(<a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>);
+<b>aborts_if</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">permissioned_signer::spec_is_permissioned_signer</a>(master);
+<b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(master) != <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>);
+</code></pre>
+
+
+
+
+<a id="0x1_object_spec_exists_at"></a>
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_exists_at">spec_exists_at</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): bool;
 </code></pre>
 
 
