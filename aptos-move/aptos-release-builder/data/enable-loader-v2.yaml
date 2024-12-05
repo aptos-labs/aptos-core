@@ -1,6 +1,6 @@
 ---
 remote_endpoint: ~
-name: "v1.24.0"
+name: "v1.24-enable-v2-loader"
 proposals:
   - name: feature_flags
     metadata:
