@@ -14,20 +14,17 @@ edition = "2021"
 anyhow = { workspace = true }
 bytes = { workspace = true }
 memory-stats = { workspace = true }
-move-binary-format = { path = "../../move-binary-format", features = ["testing"] }
-move-bytecode-verifier = { path = "../../move-bytecode-verifier" }
-move-compiler = { path = "../../move-compiler" }
+move-binary-format = { workspace = true, features = ["testing"] }
+move-bytecode-verifier = { workspace = true }
+move-compiler = { workspace = true }
+move-core-types = { workspace = true }
+move-stdlib = { path = "../../move-stdlib" }
+move-vm-runtime = { workspace = true, features = ["testing"] }
+move-vm-test-utils = { workspace = true }
+move-vm-types = { workspace = true }
 smallvec = { workspace = true }
 tempfile = { workspace = true }
 
-move-core-types = { path = "../../move-core/types" }
-move-stdlib = { path = "../../move-stdlib" }
-move-vm-runtime = { path = "../runtime", features = ["testing"] }
-move-vm-test-utils = { path = "../test-utils" }
-move-vm-types = { path = "../types" }
-
 [features]
 default = []
-table-extension = [
-    "move-vm-test-utils/table-extension"
-]
+table-extension = ["move-vm-test-utils/table-extension"]
