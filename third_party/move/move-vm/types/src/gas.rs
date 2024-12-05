@@ -166,13 +166,13 @@ pub trait GasMeter {
     /// Charge an instruction and fail if not enough gas units are left.
     fn charge_simple_instr(&mut self, instr: SimpleInstruction, interpreter_view: impl InterpreterView) -> PartialVMResult<()>;
 
-    fn charge_br_true(&mut self, target_offset: Option<CodeOffset>) -> PartialVMResult<()>;
+    fn charge_br_true(&mut self, target_offset: Option<CodeOffset>, interpreter_view: impl InterpreterView) -> PartialVMResult<()>;
 
-    fn charge_br_false(&mut self, target_offset: Option<CodeOffset>) -> PartialVMResult<()>;
+    fn charge_br_false(&mut self, target_offset: Option<CodeOffset>, interpreter_view: impl InterpreterView) -> PartialVMResult<()>;
 
-    fn charge_branch(&mut self, target_offset: CodeOffset) -> PartialVMResult<()>;
+    fn charge_branch(&mut self, target_offset: CodeOffset, interpreter_view: impl InterpreterView) -> PartialVMResult<()>;
 
-    fn charge_pop(&mut self, popped_val: impl ValueView + Display) -> PartialVMResult<()>;
+    fn charge_pop(&mut self, popped_val: impl ValueView, interpreter_view: impl InterpreterView) -> PartialVMResult<()>;
 
     fn charge_call(
         &mut self,
@@ -180,6 +180,7 @@ pub trait GasMeter {
         func_name: &str,
         args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
         num_locals: NumArgs,
+        interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()>;
 
     fn charge_call_generic(
@@ -189,16 +190,17 @@ pub trait GasMeter {
         ty_args: impl ExactSizeIterator<Item = impl TypeView> + Clone,
         args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
         num_locals: NumArgs,
+        interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()>;
 
-    fn charge_ld_const(&mut self, size: NumBytes) -> PartialVMResult<()>;
+    fn charge_ld_const(&mut self, size: NumBytes, interpreter_view: impl InterpreterView) -> PartialVMResult<()>;
 
-    fn charge_ld_const_after_deserialization(&mut self, val: impl ValueView + Display)
+    fn charge_ld_const_after_deserialization(&mut self, val: impl ValueView, interpreter_view: impl InterpreterView)
         -> PartialVMResult<()>;
 
-    fn charge_copy_loc(&mut self, val: impl ValueView + Display) -> PartialVMResult<()>;
+    fn charge_copy_loc(&mut self, val: impl ValueView, interpreter_view: impl InterpreterView) -> PartialVMResult<()>;
 
-    fn charge_move_loc(&mut self, val: impl ValueView + Display) -> PartialVMResult<()>;
+    fn charge_move_loc(&mut self, val: impl ValueView, interpreter_view: impl InterpreterView) -> PartialVMResult<()>;
 
     fn charge_store_loc(&mut self, val: impl ValueView, interpreter_view: impl InterpreterView) -> PartialVMResult<()>;
 
@@ -222,29 +224,32 @@ pub trait GasMeter {
     fn charge_unpack(
         &mut self,
         is_generic: bool,
-        args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+        interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()>;
 
     fn charge_unpack_variant(
         &mut self,
         is_generic: bool,
-        args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+        interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         // Currently mapped to pack, can be specialized if needed
-        self.charge_unpack(is_generic, args)
+        self.charge_unpack(is_generic, args, interpreter_view)
     }
 
-    fn charge_read_ref(&mut self, val: impl ValueView) -> PartialVMResult<()>;
+    fn charge_read_ref(&mut self, val: impl ValueView, interpreter_view: impl InterpreterView) -> PartialVMResult<()>;
 
     fn charge_write_ref(
         &mut self,
-        new_val: impl ValueView + Display,
+        new_val: impl ValueView,
         old_val: impl ValueView,
+        interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()>;
 
-    fn charge_eq(&mut self, lhs: impl ValueView + Display, rhs: impl ValueView + Display) -> PartialVMResult<()>;
+    fn charge_eq(&mut self, lhs: impl ValueView, rhs: impl ValueView, interpreter_view: impl InterpreterView) -> PartialVMResult<()>;
 
-    fn charge_neq(&mut self, lhs: impl ValueView + Display, rhs: impl ValueView + Display) -> PartialVMResult<()>;
+    fn charge_neq(&mut self, lhs: impl ValueView, rhs: impl ValueView, interpreter_view: impl InterpreterView) -> PartialVMResult<()>;
 
     fn charge_borrow_global(
         &mut self,
@@ -252,6 +257,7 @@ pub trait GasMeter {
         is_generic: bool,
         ty: impl TypeView,
         is_success: bool,
+        interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()>;
 
     fn charge_exists(
@@ -260,13 +266,15 @@ pub trait GasMeter {
         ty: impl TypeView,
         // TODO(Gas): see if we can get rid of this param
         exists: bool,
+        interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()>;
 
     fn charge_move_from(
         &mut self,
         is_generic: bool,
         ty: impl TypeView,
-        val: Option<impl ValueView + Display>,
+        val: Option<impl ValueView>,
+        interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()>;
 
     fn charge_move_to(
@@ -275,12 +283,14 @@ pub trait GasMeter {
         ty: impl TypeView,
         val: impl ValueView,
         is_success: bool,
+        interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()>;
 
     fn charge_vec_pack<'a>(
         &mut self,
         ty: impl TypeView + 'a,
-        args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+        interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()>;
 
     fn charge_vec_len(&mut self, ty: impl TypeView) -> PartialVMResult<()>;
@@ -290,18 +300,21 @@ pub trait GasMeter {
         is_mut: bool,
         ty: impl TypeView,
         is_success: bool,
+        interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()>;
 
     fn charge_vec_push_back(
         &mut self,
         ty: impl TypeView,
-        val: impl ValueView + Display,
+        val: impl ValueView,
+        interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()>;
 
     fn charge_vec_pop_back(
         &mut self,
         ty: impl TypeView,
-        val: Option<impl ValueView + Display>,
+        val: Option<impl ValueView>,
+        interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()>;
 
     // TODO(Gas): Expose the elements
@@ -310,10 +323,11 @@ pub trait GasMeter {
         ty: impl TypeView,
         expect_num_elements: NumArgs,
         elems: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+        interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()>;
 
     // TODO(Gas): Expose the two elements
-    fn charge_vec_swap(&mut self, ty: impl TypeView) -> PartialVMResult<()>;
+    fn charge_vec_swap(&mut self, ty: impl TypeView, interpreter_view: impl InterpreterView) -> PartialVMResult<()>;
 
     /// Charges for loading a resource from storage. This is only called when the resource is not
     /// cached.
@@ -337,18 +351,20 @@ pub trait GasMeter {
     fn charge_native_function(
         &mut self,
         amount: InternalGas,
-        ret_vals: Option<impl ExactSizeIterator<Item = impl ValueView + Display> + Clone>,
+        ret_vals: Option<impl ExactSizeIterator<Item = impl ValueView> + Clone>,
+        interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()>;
 
     fn charge_native_function_before_execution(
         &mut self,
         ty_args: impl ExactSizeIterator<Item = impl TypeView> + Clone,
-        args: impl ExactSizeIterator<Item = impl ValueView + Display> + Clone,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+        interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()>;
 
     fn charge_drop_frame(
         &mut self,
-        locals: impl Iterator<Item = impl ValueView + Display> + Clone,
+        locals: impl Iterator<Item = impl ValueView> + Clone,
     ) -> PartialVMResult<()>;
 
     fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()>;
@@ -375,19 +391,19 @@ impl GasMeter for UnmeteredGasMeter {
         Ok(())
     }
 
-    fn charge_br_false(&mut self, _target_offset: Option<CodeOffset>) -> PartialVMResult<()> {
+    fn charge_br_false(&mut self, _target_offset: Option<CodeOffset>, _interpreter_view: impl InterpreterView) -> PartialVMResult<()> {
         Ok(())
     }
 
-    fn charge_br_true(&mut self, _target_offset: Option<CodeOffset>) -> PartialVMResult<()> {
+    fn charge_br_true(&mut self, _target_offset: Option<CodeOffset>, _interpreter_view: impl InterpreterView) -> PartialVMResult<()> {
         Ok(())
     }
 
-    fn charge_branch(&mut self, _target_offset: CodeOffset) -> PartialVMResult<()> {
+    fn charge_branch(&mut self, _target_offset: CodeOffset, _interpreter_view: impl InterpreterView) -> PartialVMResult<()> {
         Ok(())
     }
 
-    fn charge_pop(&mut self, _popped_val: impl ValueView + Display) -> PartialVMResult<()> {
+    fn charge_pop(&mut self, _popped_val: impl ValueView, _interpreter_view: impl InterpreterView) -> PartialVMResult<()> {
         Ok(())
     }
 
@@ -395,8 +411,9 @@ impl GasMeter for UnmeteredGasMeter {
         &mut self,
         _module_id: &ModuleId,
         _func_name: &str,
-        _args: impl IntoIterator<Item = impl ValueView + Display>,
+        _args: impl IntoIterator<Item = impl ValueView>,
         _num_locals: NumArgs,
+        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         Ok(())
     }
@@ -406,28 +423,30 @@ impl GasMeter for UnmeteredGasMeter {
         _module_id: &ModuleId,
         _func_name: &str,
         _ty_args: impl ExactSizeIterator<Item = impl TypeView>,
-        _args: impl ExactSizeIterator<Item = impl ValueView + Display>,
+        _args: impl ExactSizeIterator<Item = impl ValueView>,
         _num_locals: NumArgs,
+        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         Ok(())
     }
 
-    fn charge_ld_const(&mut self, _size: NumBytes) -> PartialVMResult<()> {
+    fn charge_ld_const(&mut self, _size: NumBytes, _interpreter_view: impl InterpreterView) -> PartialVMResult<()> {
         Ok(())
     }
 
     fn charge_ld_const_after_deserialization(
         &mut self,
-        _val: impl ValueView + Display,
+        _val: impl ValueView,
+        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         Ok(())
     }
 
-    fn charge_copy_loc(&mut self, _val: impl ValueView + Display) -> PartialVMResult<()> {
+    fn charge_copy_loc(&mut self, _val: impl ValueView, _interpreter_view: impl InterpreterView) -> PartialVMResult<()> {
         Ok(())
     }
 
-    fn charge_move_loc(&mut self, _val: impl ValueView + Display) -> PartialVMResult<()> {
+    fn charge_move_loc(&mut self, _val: impl ValueView, _interpreter_view: impl InterpreterView) -> PartialVMResult<()> {
         Ok(())
     }
 
@@ -447,28 +466,30 @@ impl GasMeter for UnmeteredGasMeter {
     fn charge_unpack(
         &mut self,
         _is_generic: bool,
-        _args: impl ExactSizeIterator<Item = impl ValueView + Display>,
+        _args: impl ExactSizeIterator<Item = impl ValueView>,
+        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         Ok(())
     }
 
-    fn charge_read_ref(&mut self, _val: impl ValueView) -> PartialVMResult<()> {
+    fn charge_read_ref(&mut self, _val: impl ValueView, _interpreter_view: impl InterpreterView) -> PartialVMResult<()> {
         Ok(())
     }
 
     fn charge_write_ref(
         &mut self,
-        _new_val: impl ValueView + Display,
+        _new_val: impl ValueView,
         _old_val: impl ValueView,
+        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         Ok(())
     }
 
-    fn charge_eq(&mut self, _lhs: impl ValueView + Display, _rhs: impl ValueView + Display) -> PartialVMResult<()> {
+    fn charge_eq(&mut self, _lhs: impl ValueView, _rhs: impl ValueView, _interpreter_view: impl InterpreterView) -> PartialVMResult<()> {
         Ok(())
     }
 
-    fn charge_neq(&mut self, _lhs: impl ValueView + Display, _rhs: impl ValueView + Display) -> PartialVMResult<()> {
+    fn charge_neq(&mut self, _lhs: impl ValueView, _rhs: impl ValueView, _interpreter_view: impl InterpreterView) -> PartialVMResult<()> {
         Ok(())
     }
 
@@ -478,6 +499,7 @@ impl GasMeter for UnmeteredGasMeter {
         _is_generic: bool,
         _ty: impl TypeView,
         _is_success: bool,
+        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         Ok(())
     }
@@ -487,6 +509,7 @@ impl GasMeter for UnmeteredGasMeter {
         _is_generic: bool,
         _ty: impl TypeView,
         _exists: bool,
+        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         Ok(())
     }
@@ -495,7 +518,8 @@ impl GasMeter for UnmeteredGasMeter {
         &mut self,
         _is_generic: bool,
         _ty: impl TypeView,
-        _val: Option<impl ValueView + Display>,
+        _val: Option<impl ValueView>,
+        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         Ok(())
     }
@@ -506,6 +530,7 @@ impl GasMeter for UnmeteredGasMeter {
         _ty: impl TypeView,
         _val: impl ValueView,
         _is_success: bool,
+        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         Ok(())
     }
@@ -513,7 +538,8 @@ impl GasMeter for UnmeteredGasMeter {
     fn charge_vec_pack<'a>(
         &mut self,
         _ty: impl TypeView + 'a,
-        _args: impl ExactSizeIterator<Item = impl ValueView + Display>,
+        _args: impl ExactSizeIterator<Item = impl ValueView>,
+        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         Ok(())
     }
@@ -527,6 +553,7 @@ impl GasMeter for UnmeteredGasMeter {
         _is_mut: bool,
         _ty: impl TypeView,
         _is_success: bool,
+        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         Ok(())
     }
@@ -534,7 +561,8 @@ impl GasMeter for UnmeteredGasMeter {
     fn charge_vec_push_back(
         &mut self,
         _ty: impl TypeView,
-        _val: impl ValueView + Display,
+        _val: impl ValueView,
+        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         Ok(())
     }
@@ -542,7 +570,8 @@ impl GasMeter for UnmeteredGasMeter {
     fn charge_vec_pop_back(
         &mut self,
         _ty: impl TypeView,
-        _val: Option<impl ValueView + Display>,
+        _val: Option<impl ValueView>,
+        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         Ok(())
     }
@@ -552,11 +581,12 @@ impl GasMeter for UnmeteredGasMeter {
         _ty: impl TypeView,
         _expect_num_elements: NumArgs,
         _elems: impl ExactSizeIterator<Item = impl ValueView>,
+        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         Ok(())
     }
 
-    fn charge_vec_swap(&mut self, _ty: impl TypeView) -> PartialVMResult<()> {
+    fn charge_vec_swap(&mut self, _ty: impl TypeView, _interpreter_view: impl InterpreterView) -> PartialVMResult<()> {
         Ok(())
     }
 
@@ -573,7 +603,8 @@ impl GasMeter for UnmeteredGasMeter {
     fn charge_native_function(
         &mut self,
         _amount: InternalGas,
-        _ret_vals: Option<impl ExactSizeIterator<Item = impl ValueView + Display>>,
+        _ret_vals: Option<impl ExactSizeIterator<Item = impl ValueView>>,
+        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         Ok(())
     }
@@ -581,14 +612,15 @@ impl GasMeter for UnmeteredGasMeter {
     fn charge_native_function_before_execution(
         &mut self,
         _ty_args: impl ExactSizeIterator<Item = impl TypeView>,
-        _args: impl ExactSizeIterator<Item = impl ValueView + Display>,
+        _args: impl ExactSizeIterator<Item = impl ValueView>,
+        _interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
         Ok(())
     }
 
     fn charge_drop_frame(
         &mut self,
-        _locals: impl Iterator<Item = impl ValueView + Display>,
+        _locals: impl Iterator<Item = impl ValueView>,
     ) -> PartialVMResult<()> {
         Ok(())
     }
