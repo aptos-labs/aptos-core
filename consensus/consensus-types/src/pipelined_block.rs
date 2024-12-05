@@ -17,7 +17,7 @@ use aptos_executor_types::{
     state_compute_result::StateComputeResult, ExecutorError, ExecutorResult,
 };
 use aptos_infallible::Mutex;
-use aptos_logger::{error, warn};
+use aptos_logger::{error, info, warn};
 use aptos_types::{
     block_info::BlockInfo,
     contract_event::ContractEvent,
@@ -451,6 +451,12 @@ impl PipelinedBlock {
     }
 
     pub fn abort_pipeline(&self) -> Option<PipelineFutures> {
+        info!(
+            "[Pipeline] Aborting pipeline for block {} {} {}",
+            self.id(),
+            self.epoch(),
+            self.round()
+        );
         if let Some(abort_handles) = self.pipeline_abort_handle.lock().take() {
             for handle in abort_handles {
                 handle.abort();
@@ -461,7 +467,9 @@ impl PipelinedBlock {
 
     pub async fn wait_for_compute_result(&self) -> ExecutorResult<(StateComputeResult, Duration)> {
         self.pipeline_futs()
-            .expect("Pipeline needs to be enabled")
+            .ok_or(ExecutorError::InternalError {
+                error: "Pipeline aborted".to_string(),
+            })?
             .ledger_update_fut
             .await
             .map(|(compute_result, execution_time, _)| (compute_result, execution_time))
@@ -471,11 +479,11 @@ impl PipelinedBlock {
     }
 
     pub async fn wait_for_commit_ledger(&self) {
-        self.pipeline_futs()
-            .expect("Pipeline needs to be enabled")
-            .commit_ledger_fut
-            .await
-            .expect("Commit ledger should succeed");
+        // may be aborted (e.g. by reset)
+        if let Some(fut) = self.pipeline_futs() {
+            // this may be cancelled
+            let _ = fut.commit_ledger_fut.await;
+        }
     }
 }
 
