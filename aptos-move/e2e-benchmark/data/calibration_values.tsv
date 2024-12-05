@@ -24,12 +24,12 @@ FungibleAssetMint	60	0.930	1.098	235.8
 IncGlobalMilestoneAggV2 { milestone_every: 1 }	60	0.914	1.051	33.5
 IncGlobalMilestoneAggV2 { milestone_every: 2 }	60	0.914	1.105	19.0
 EmitEvents { count: 1000 }	60	0.937	1.158	8818.7
-VectorTrimAppend { vec_len: 3000, element_len: 1, index: 0, repeats: 0 }	6	0.925	1.001	22909
-VectorTrimAppend { vec_len: 3000, element_len: 1, index: 100, repeats: 1000 }	6	0.925	1.001	47073
-VectorTrimAppend { vec_len: 3000, element_len: 1, index: 2990, repeats: 1000 }	6	0.925	1.001	34788
-VectorRemoveInsert { vec_len: 3000, element_len: 1, index: 100, repeats: 1000 }	6	0.925	1.001	45273
-VectorRemoveInsert { vec_len: 3000, element_len: 1, index: 2998, repeats: 1000 }	6	0.925	1.001	36859
+VectorTrimAppend { vec_len: 3000, element_len: 1, index: 0, repeats: 0 }	6	0.925	1.001	15387.1
+VectorTrimAppend { vec_len: 3000, element_len: 1, index: 100, repeats: 1000 }	6	0.925	1.001	40020.2
+VectorTrimAppend { vec_len: 3000, element_len: 1, index: 2990, repeats: 1000 }	6	0.925	1.001	27311.4
+VectorRemoveInsert { vec_len: 3000, element_len: 1, index: 100, repeats: 1000 }	6	0.925	1.001	38015.6
+VectorRemoveInsert { vec_len: 3000, element_len: 1, index: 2998, repeats: 1000 }	6	0.925	1.001	29632.0
 VectorRangeMove { vec_len: 3000, element_len: 1, index: 1000, move_len: 500, repeats: 1000 }	6	0.925	1.001	65311
-VectorTrimAppend { vec_len: 100, element_len: 100, index: 0, repeats: 0 }	6	0.925	1.001	875
-VectorTrimAppend { vec_len: 100, element_len: 100, index: 10, repeats: 1000 }	6	0.925	1.001	13366
+VectorTrimAppend { vec_len: 100, element_len: 100, index: 0, repeats: 0 }	6	0.925	1.001	607.8
+VectorTrimAppend { vec_len: 100, element_len: 100, index: 10, repeats: 1000 }	6	0.925	1.001	13041.9
 VectorRangeMove { vec_len: 100, element_len: 100, index: 50, move_len: 10, repeats: 1000 }	6	0.925	1.001	7098
