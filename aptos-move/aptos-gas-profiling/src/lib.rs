@@ -9,8 +9,6 @@ mod misc;
 mod profiler;
 mod render;
 mod report;
-mod tracer;
 
 pub use log::{FrameName, TransactionGasLog};
 pub use profiler::GasProfiler;
-pub use tracer::{ExecutionTrace, ExecutionTracer};

@@ -31,15 +31,8 @@ use std::{
 pub struct ExecutionTrace<Value>(CallFrame<Value>);
 
 impl<Value: Display> ExecutionTrace<Value> {
-    pub fn debug_with_loc(&self, w: &mut impl Write) -> Result<(), std::io::Error> {
-        let path_str = env::var("PKG_PATH").expect("PKG_PATH must be set");
-        let path = Path::new(&path_str);
-        let build_config = BuildConfig::default();
-        let model = build_config
-            .move_model_for_package(path, ModelConfig::default())
-            .unwrap();
-
-        self.0.simple_debug1(w, 0, &model)
+    pub fn debug_with_loc(&self, w: &mut impl Write, env: &GlobalEnv) -> Result<(), std::io::Error> {
+        self.0.simple_debug1(w, 0, env)
     }
 
     pub fn simple_debug(&self, w: &mut impl Write) -> Result<(), std::io::Error> {
@@ -48,23 +41,23 @@ impl<Value: Display> ExecutionTrace<Value> {
 }
 
 #[derive(Debug)]
-pub struct ExecutionTracer<'a, G, Value, Reader> {
+pub struct ExecutionTracer<G, Value, Reader> {
     base: G,
     frames: Vec<CallFrame<Value>>,
     collect_trace: bool,
     command_reader: Reader,
     step_counter: usize,
-    env: Option<&'a GlobalEnv>,
+    pub env: Option<GlobalEnv>,
 }
 
-impl<'a, G, Value, Reader> ExecutionTracer<'a, G, Value, Reader> {
+impl<G, Value, Reader> ExecutionTracer<G, Value, Reader> {
     pub fn from_entry_fun(
         base: G,
         module_id: ModuleId,
         function: Identifier,
         ty_args: Vec<TypeTag>,
         command_reader: Reader,
-        env: Option<&'a GlobalEnv>,
+        env: Option<GlobalEnv>,
     ) -> Self {
         Self {
             base,
@@ -107,14 +100,14 @@ impl<'a, G, Value, Reader> ExecutionTracer<'a, G, Value, Reader> {
         });
     }
 
-    pub fn dump_trace(mut self) -> ExecutionTrace<Value> {
+    pub fn dump_trace(&mut self) -> ExecutionTrace<Value> {
         // debug_assert!(self.frames.len() == 1);
         // TODO: fix for abort
         ExecutionTrace(self.frames.pop().expect("non-empty stack of frames"))
     }
 }
 
-impl<'a, G, Reader: GetCommand> ExecutionTracer<'a, G, String, Reader> {
+impl<G, Reader: GetCommand> ExecutionTracer<G, String, Reader> {
     fn emit_instr(&mut self, instr: &Instruction<String>) {
         print!("{}[{}]: ", self.get_top_frame().name, instr.offset);
         print!("{} ", instr.display_qualified_instr());
@@ -362,7 +355,7 @@ pub enum Event<Value> {
     Instruction(Instruction<Value>),
 }
 
-impl<'a, G, Reader: GetCommand> GasMeter for ExecutionTracer<'a, G, String, Reader>
+impl<G, Reader: GetCommand> GasMeter for ExecutionTracer<G, String, Reader>
 where
     G: AptosGasMeter,
 {
@@ -542,7 +535,9 @@ where
     fn charge_branch(&mut self, target_offset: CodeOffset) -> PartialVMResult<()> {
         self.record_instr(Opcodes::BRANCH, Vec::<&Value>::new().into_iter());
         *self.get_pc_mut() = target_offset;
-        self.base.charge_branch(target_offset)
+        let res = self.base.charge_branch(target_offset);
+        self.step();
+        res
     }
 
     fn charge_pop(&mut self, popped_val: impl ValueView + Display) -> PartialVMResult<()> {
@@ -632,7 +627,7 @@ where
     ) -> PartialVMResult<()> {
         self.record_instr_and_inc_pc(
             Opcodes::ST_LOC,
-            interpreter_view.view_last_n_values(1).unwrap(),
+            std::iter::empty::<&Value>(),
         );
         self.base.charge_store_loc(val, interpreter_view)
     }
@@ -866,7 +861,7 @@ where
     }
 }
 
-impl<'a, G, Reader: GetCommand> AptosGasMeter for ExecutionTracer<'a, G, String, Reader>
+impl<G, Reader: GetCommand> AptosGasMeter for ExecutionTracer<G, String, Reader>
 where
     G: AptosGasMeter,
 {
@@ -930,15 +925,15 @@ enum Command {
     Backtrace(Option<usize>),
 }
 
-trait GetCommand {
+pub trait GetCommand {
     fn get_command(&mut self) -> Command;
 }
 
-struct AlwaysContinue;
+pub struct AlwaysContinue;
 
 impl GetCommand for AlwaysContinue {
     fn get_command(&mut self) -> Command {
-        Command::Continue
+        Command::Step(1)
     }
 }
 
@@ -980,9 +975,10 @@ pub fn standard_io_command_reader(
 pub fn get_env() -> GlobalEnv {
     let path_str = env::var("PKG_PATH").expect("PKG_PATH must be set");
     let path = Path::new(&path_str);
-    let build_config = BuildConfig::default();
-    let model = build_config
-        .move_model_for_package(path, ModelConfig::default())
+    let mut build_config = BuildConfig::default();
+	build_config.generate_move_model = true;
+    let (_, env) = build_config
+        .compile_package_no_exit(path, vec![], &mut std::io::stdout())
         .unwrap();
-    model
+    env.unwrap()
 }

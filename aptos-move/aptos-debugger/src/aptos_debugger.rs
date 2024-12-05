@@ -8,7 +8,7 @@ use aptos_block_executor::{
     txn_provider::{default::DefaultTxnProvider, TxnProvider},
 };
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
-use aptos_tracer::{get_env, standard_io_command_reader, ExecutionTrace, ExecutionTracer};
+use aptos_tracer::{get_env, standard_io_command_reader, AlwaysContinue, CommandReader, ExecutionTrace, ExecutionTracer};
 use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
@@ -29,9 +29,7 @@ use aptos_validator_interface::{
     AptosValidatorInterface, DBDebuggerInterface, DebuggerStateView, RestDebuggerInterface,
 };
 use aptos_vm::{
-    block_executor::{AptosTransactionOutput, AptosVMBlockExecutorWrapper},
-    data_cache::AsMoveResolver,
-    AptosVM,
+    block_executor::{AptosTransactionOutput, AptosVMBlockExecutorWrapper}, data_cache::AsMoveResolver, gas::ProdGasMeter, AptosVM
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -164,7 +162,7 @@ impl AptosDebugger {
         &self,
         version: Version,
         txn: SignedTransaction,
-    ) -> Result<(VMStatus, VMOutput, ExecutionTrace<String>)> {
+    ) -> Result<(VMStatus, VMOutput, ExecutionTracer<ProdGasMeter, String, CommandReader<std::io::BufReader<std::io::Stdin>, std::io::Stdout>>)> {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         let txn = txn
@@ -199,7 +197,7 @@ impl AptosDebugger {
                             entry_func.function().to_owned(),
                             entry_func.ty_args().to_vec(),
                             standard_io_command_reader(),
-                            Some(&env),
+                            Some(env),
                         )
                     },
                     TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
@@ -213,7 +211,7 @@ impl AptosDebugger {
             },
         )?;
 
-        Ok((status, output, execution_tracer.dump_trace()))
+        Ok((status, output, execution_tracer))
     }
 
     pub async fn execute_past_transactions(

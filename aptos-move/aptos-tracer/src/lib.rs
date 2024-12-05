@@ -3,4 +3,4 @@
 
 mod tracer;
 
-pub use tracer::{ExecutionTracer, ExecutionTrace, standard_io_command_reader, get_env};
+pub use tracer::{ExecutionTracer, ExecutionTrace, standard_io_command_reader, get_env, AlwaysContinue, CommandReader};
