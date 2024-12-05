@@ -122,8 +122,26 @@ mod test {
         assert_eq!(Level::Error, Level::from_str("Error").unwrap());
         assert_eq!(Level::Error, Level::from_str("error").unwrap());
 
+        assert_eq!(Level::Warn, Level::from_str("WARN").unwrap());
+        assert_eq!(Level::Warn, Level::from_str("wArN").unwrap());
+        assert_eq!(Level::Warn, Level::from_str("warn").unwrap());
+
+        assert_eq!(Level::Info, Level::from_str("INFO").unwrap());
+        assert_eq!(Level::Info, Level::from_str("infO").unwrap());
+        assert_eq!(Level::Info, Level::from_str("info").unwrap());
+
+        assert_eq!(Level::Debug, Level::from_str("DEBUG").unwrap());
+        assert_eq!(Level::Debug, Level::from_str("Debug").unwrap());
+        assert_eq!(Level::Debug, Level::from_str("debug").unwrap());
+
+        assert_eq!(Level::Trace, Level::from_str("TRACE").unwrap());
+        assert_eq!(Level::Trace, Level::from_str("trAce").unwrap());
+        assert_eq!(Level::Trace, Level::from_str("trace").unwrap());
+
         assert!(Level::from_str("ERR").is_err());
         assert!(Level::from_str("err_or").is_err());
+        assert!(Level::from_str("INF").is_err());
+        assert!(Level::from_str("tracey").is_err());
     }
 
     #[test]

@@ -8,7 +8,7 @@ use aptos_types::state_store::{
 use parking_lot::Mutex;
 use std::collections::HashMap;
 
-/// Represents the read-set for obtained when executing transactions.
+/// Represents the read-set obtained when executing transactions.
 pub(crate) struct ReadSet {
     data: HashMap<StateKey, StateValue>,
 }
@@ -65,7 +65,7 @@ impl<'s, S: StateView> TStateView for ReadSetCapturingStateView<'s, S> {
                 panic!("Failed to fetch state value for {:?}: {:?}", state_key, err)
             });
 
-        // Populate the read-set if first access.
+        // Capture the read on first access.
         if let Some(state_value) = &maybe_state_value {
             let mut captured_reads = self.captured_reads.lock();
             if !captured_reads.contains_key(state_key) {

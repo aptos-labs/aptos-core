@@ -15,15 +15,18 @@ use std::collections::HashMap;
 
 /// Stores feature flags to enable/disable, essentially overriding on-chain state.
 pub struct OverrideConfig {
-    enable_features: Vec<FeatureFlag>,
-    disable_features: Vec<FeatureFlag>,
+    additional_enabled_features: Vec<FeatureFlag>,
+    additional_disabled_features: Vec<FeatureFlag>,
 }
 
 impl OverrideConfig {
-    pub fn new(enable_features: Vec<FeatureFlag>, disable_features: Vec<FeatureFlag>) -> Self {
+    pub fn new(
+        additional_enabled_features: Vec<FeatureFlag>,
+        additional_disabled_features: Vec<FeatureFlag>,
+    ) -> Self {
         Self {
-            enable_features,
-            disable_features,
+            additional_enabled_features,
+            additional_disabled_features,
         }
     }
 
@@ -36,13 +39,13 @@ impl OverrideConfig {
         // Enable/disable features.
         let (features_state_key, features_state_value) =
             config_override::<Features, _>(state_view, |features| {
-                for feature in &self.enable_features {
+                for feature in &self.additional_enabled_features {
                     if features.is_enabled(*feature) {
                         error!("Feature {:?} is already enabled", feature);
                     }
                     features.enable(*feature);
                 }
-                for feature in &self.disable_features {
+                for feature in &self.additional_disabled_features {
                     if !features.is_enabled(*feature) {
                         error!("Feature {:?} is already disabled", feature);
                     }

@@ -13,32 +13,33 @@ use std::{
 };
 
 pub struct BenchmarkGenerator {
-    generator: Arc<BenchmarkGeneratorContext>,
+    debugger: AptosDebugger,
+    begin_version: Version,
+    end_version: Version,
+    override_config: OverrideConfig,
 }
 
 impl BenchmarkGenerator {
-    pub fn new(
+    /// Generates a sequence of [Block] for benchmarking.
+    pub async fn generate_blocks(
         debugger: AptosDebugger,
         begin_version: Version,
         end_version: Version,
         override_config: OverrideConfig,
-    ) -> Self {
-        let generator =
-            BenchmarkGeneratorContext::new(debugger, begin_version, end_version, override_config);
-        Self {
-            generator: Arc::new(generator),
-        }
-    }
+    ) -> anyhow::Result<Vec<Block>> {
+        let generator = Arc::new(Self {
+            debugger,
+            begin_version,
+            end_version,
+            override_config,
+        });
 
-    /// Generates a sequence of [Block] for benchmarking.
-    pub async fn generate_blocks(&self) -> anyhow::Result<Vec<Block>> {
-        let limit = self.generator.end_version - self.generator.begin_version + 1;
-        let (txns, _) = self
-            .generator
+        let limit = generator.end_version - generator.begin_version + 1;
+        let (txns, _) = generator
             .debugger
-            .get_committed_transactions(self.generator.begin_version, limit)
+            .get_committed_transactions(generator.begin_version, limit)
             .await?;
-        let txn_blocks = self.generator.partition(txns);
+        let txn_blocks = generator.partition(txns);
 
         let num_generated = Arc::new(AtomicU64::new(0));
         let num_blocks = txn_blocks.len();
@@ -46,7 +47,7 @@ impl BenchmarkGenerator {
         let mut tasks = Vec::with_capacity(num_blocks);
         for (begin, txn_block) in txn_blocks {
             let task = tokio::task::spawn_blocking({
-                let generator = self.generator.clone();
+                let generator = generator.clone();
                 let num_generated = num_generated.clone();
                 move || {
                     let start_time = Instant::now();
@@ -71,38 +72,12 @@ impl BenchmarkGenerator {
 
         Ok(blocks)
     }
-}
-
-struct BenchmarkGeneratorContext {
-    debugger: AptosDebugger,
-    begin_version: Version,
-    end_version: Version,
-    override_config: OverrideConfig,
-}
-
-impl BenchmarkGeneratorContext {
-    fn new(
-        debugger: AptosDebugger,
-        begin_version: Version,
-        end_version: Version,
-        override_config: OverrideConfig,
-    ) -> Self {
-        Self {
-            debugger,
-            begin_version,
-            end_version,
-            override_config,
-        }
-    }
 
     /// Generates a single [Block] for benchmarking.
     fn generate_block(&self, begin: Version, txns: Vec<Transaction>) -> Block {
         let workload = Workload::new(begin, txns);
-
         let state_view = self.debugger.state_view_at_version(begin);
         let state_override = self.override_config.get_state_override(&state_view);
-
-        let state_view = self.debugger.state_view_at_version(begin);
         Block::new(workload, &state_view, state_override)
     }
 
@@ -115,9 +90,8 @@ impl BenchmarkGeneratorContext {
 
         for txn in txns {
             if txn.is_block_start() && !curr_block.is_empty() {
-                let block = std::mem::take(&mut curr_block);
-                let block_size = block.len();
-                begin_versions_and_blocks.push((curr_begin, block));
+                let block_size = curr_block.len();
+                begin_versions_and_blocks.push((curr_begin, std::mem::take(&mut curr_block)));
                 curr_begin += block_size as Version;
             }
             curr_block.push(txn);
