@@ -41,7 +41,7 @@ anyhow = { workspace = true }
 datatest-stable = { workspace = true }
 move-command-line-common = { workspace = true }
 move-ir-types = { workspace = true }
-move-prover-test-utils = { path = "../move-prover/test-utils" }
+move-prover-test-utils = { workspace = true }
 move-stdlib = { path = "../move-stdlib" }
 walkdir = { workspace = true }
 

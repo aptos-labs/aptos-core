@@ -23,7 +23,7 @@ serde = { workspace = true, features = ["derive"] }
 [dev-dependencies]
 datatest-stable = { workspace = true }
 move-prover = { workspace = true }
-move-prover-test-utils = { path = "../test-utils" }
+move-prover-test-utils = { workspace = true }
 tempfile = { workspace = true }
 
 [[test]]

@@ -1,5 +1,5 @@
 [package]
-name = "invalid-mutations"
+name = "move-bytecode-verifier-invalid-mutations"
 version = "0.1.0"
 edition = "2021"
 authors = ["Diem Association <opensource@diem.com>"]

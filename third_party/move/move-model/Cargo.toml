@@ -30,7 +30,7 @@ serde = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
 datatest-stable = { workspace = true }
-move-prover-test-utils = { path = "../move-prover/test-utils" }
+move-prover-test-utils = { workspace = true }
 
 [[test]]
 name = "testsuite"

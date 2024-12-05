@@ -33,7 +33,7 @@ sha3 = { workspace = true }
 datatest-stable = { workspace = true }
 evm = { workspace = true }
 evm-exec-utils = { path = "../exec-utils" }
-move-prover-test-utils = { path = "../../move-prover/test-utils" }
+move-prover-test-utils = { workspace = true }
 move-stdlib = { path = "../../move-stdlib" }
 tempfile = { workspace = true }
 walkdir = { workspace = true }
