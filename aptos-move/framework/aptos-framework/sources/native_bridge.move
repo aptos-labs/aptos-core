@@ -164,13 +164,13 @@ module aptos_framework::native_bridge {
         assert!(nonce > 0, EINVALID_NONCE);
 
         // Validate the bridge_transfer_id by reconstructing the hash
-        let initiator_bytes = native_bridge_store::hex_to_bytes(initiator);
+        //let initiator_bytes = native_bridge_store::hex_to_bytes(initiator);
         let recipient_bytes = bcs::to_bytes(&recipient);
         let amount_bytes = native_bridge_store::normalize_to_32_bytes(bcs::to_bytes<u64>(&amount));
         let nonce_bytes = native_bridge_store::normalize_to_32_bytes(bcs::to_bytes<u64>(&nonce));
 
         let combined_bytes = vector::empty<u8>();
-        vector::append(&mut combined_bytes, initiator_bytes);
+        vector::append(&mut combined_bytes, initiator);
         vector::append(&mut combined_bytes, recipient_bytes);
         vector::append(&mut combined_bytes, amount_bytes);
         vector::append(&mut combined_bytes, nonce_bytes);
