@@ -1158,6 +1158,7 @@ pub fn get_env() -> GlobalEnv {
     let path = Path::new(&path_str);
     let mut build_config = BuildConfig::default();
     build_config.generate_move_model = true;
+    build_config.dev_mode = true;
     let (_, env) = build_config
         .compile_package_no_exit(path, vec![], &mut std::io::stdout())
         .unwrap();
