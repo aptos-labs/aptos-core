@@ -11,7 +11,7 @@ module 0xABCD::vector_example {
         let vec = vector::empty();
         for (i in 0..vec_len) {
             let cur = elem;
-            vector::replace(&mut cur, 0, i);
+            cur[0] = i;
             vector::push_back(&mut vec, cur);
         };
         vec

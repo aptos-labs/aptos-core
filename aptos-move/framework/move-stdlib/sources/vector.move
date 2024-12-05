@@ -29,7 +29,7 @@ module std::vector {
     /// Whether to utilize native vector::move_range
     /// Vector module cannot call features module, due to cyclic dependency,
     /// so this is a constant.
-    const USE_MOVE_RANGE: bool = false;
+    const USE_MOVE_RANGE: bool = true;
 
     #[bytecode_instruction]
     /// Create an empty vector.
