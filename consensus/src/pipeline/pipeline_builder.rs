@@ -348,6 +348,7 @@ impl PipelineBuilder {
             Self::post_commit_ledger(
                 pre_commit_fut.clone(),
                 commit_ledger_fut.clone(),
+                post_pre_commit_fut.clone(),
                 parent.post_commit_fut.clone(),
                 self.payload_manager.clone(),
                 block_store_callback,
@@ -679,11 +680,12 @@ impl PipelineBuilder {
         Ok(Some(ledger_info_with_sigs))
     }
 
-    /// Precondition: 1. commit ledger finishes, 2. parent block's phase finishes
+    /// Precondition: 1. commit ledger finishes, 2. parent block's phase finishes 3. post pre commit finishes
     /// What it does: Update counters for the block, and notify block tree about the commit
     async fn post_commit_ledger(
         pre_commit_fut: TaskFuture<PreCommitResult>,
         commit_ledger_fut: TaskFuture<CommitLedgerResult>,
+        post_pre_commit_fut: TaskFuture<PostPreCommitResult>,
         parent_post_commit: TaskFuture<PostCommitResult>,
         payload_manager: Arc<dyn TPayloadManager>,
         block_store_callback: Box<dyn FnOnce(LedgerInfoWithSignatures) + Send + Sync>,
@@ -692,6 +694,7 @@ impl PipelineBuilder {
         parent_post_commit.await?;
         let maybe_ledger_info_with_sigs = commit_ledger_fut.await?;
         let compute_result = pre_commit_fut.await?;
+        post_pre_commit_fut.await?;
 
         let _tracker = Tracker::new("post_commit_ledger", &block);
         update_counters_for_block(&block);
