@@ -1317,7 +1317,6 @@ Burns a specified amount of AptosCoin from an address.
 -  [Struct `BridgeTransferCompletedEvent`](#0x1_native_bridge_BridgeTransferCompletedEvent)
 -  [Resource `BridgeEvents`](#0x1_native_bridge_BridgeEvents)
 -  [Resource `Nonce`](#0x1_native_bridge_Nonce)
--  [Resource `TransferStatuses`](#0x1_native_bridge_TransferStatuses)
 -  [Constants](#@Constants_0)
 -  [Function `increment_and_get_nonce`](#0x1_native_bridge_increment_and_get_nonce)
 -  [Function `initialize`](#0x1_native_bridge_initialize)
@@ -1335,7 +1334,6 @@ Burns a specified amount of AptosCoin from an address.
 <b>use</b> <a href="native_bridge.md#0x1_native_bridge_core">0x1::native_bridge_core</a>;
 <b>use</b> <a href="native_bridge.md#0x1_native_bridge_store">0x1::native_bridge_store</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
-<b>use</b> <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table">0x1::smart_table</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
@@ -1509,33 +1507,6 @@ This struct will store the event handles for bridge events.
 
 </details>
 
-<a id="0x1_native_bridge_TransferStatuses"></a>
-
-## Resource `TransferStatuses`
-
-
-
-<pre><code><b>struct</b> <a href="native_bridge.md#0x1_native_bridge_TransferStatuses">TransferStatuses</a> <b>has</b> store, key
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>inner: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;u64, bool&gt;</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
 <a id="@Constants_0"></a>
 
 ## Constants
@@ -1550,20 +1521,20 @@ This struct will store the event handles for bridge events.
 
 
 
-<a id="0x1_native_bridge_EINVALID_VALUE"></a>
-
-
-
-<pre><code><b>const</b> <a href="native_bridge.md#0x1_native_bridge_EINVALID_VALUE">EINVALID_VALUE</a>: u64 = 5;
-</code></pre>
-
-
-
 <a id="0x1_native_bridge_EEVENT_NOT_FOUND"></a>
 
 
 
 <pre><code><b>const</b> <a href="native_bridge.md#0x1_native_bridge_EEVENT_NOT_FOUND">EEVENT_NOT_FOUND</a>: u64 = 3;
+</code></pre>
+
+
+
+<a id="0x1_native_bridge_EINVALID_AMOUNT"></a>
+
+
+
+<pre><code><b>const</b> <a href="native_bridge.md#0x1_native_bridge_EINVALID_AMOUNT">EINVALID_AMOUNT</a>: u64 = 5;
 </code></pre>
 
 
@@ -1771,13 +1742,13 @@ Completes a bridge transfer on the destination chain.
     <b>assert</b>!(nonce &gt; 0, <a href="native_bridge.md#0x1_native_bridge_EINVALID_NONCE">EINVALID_NONCE</a>);
 
     // Validate the bridge_transfer_id by reconstructing the <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>
-    <b>let</b> initiator_bytes = <a href="native_bridge.md#0x1_native_bridge_store_hex_to_bytes">native_bridge_store::hex_to_bytes</a>(initiator);
+    //<b>let</b> initiator_bytes = <a href="native_bridge.md#0x1_native_bridge_store_hex_to_bytes">native_bridge_store::hex_to_bytes</a>(initiator);
     <b>let</b> recipient_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&recipient);
     <b>let</b> amount_bytes = <a href="native_bridge.md#0x1_native_bridge_store_normalize_to_32_bytes">native_bridge_store::normalize_to_32_bytes</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>&lt;u64&gt;(&amount));
     <b>let</b> nonce_bytes = <a href="native_bridge.md#0x1_native_bridge_store_normalize_to_32_bytes">native_bridge_store::normalize_to_32_bytes</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>&lt;u64&gt;(&nonce));
 
     <b>let</b> combined_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, initiator_bytes);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, initiator);
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, recipient_bytes);
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, amount_bytes);
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, nonce_bytes);
@@ -1832,7 +1803,7 @@ Charge bridge fee to the initiate bridge transfer.
 <pre><code><b>fun</b> <a href="native_bridge.md#0x1_native_bridge_charge_bridge_fee">charge_bridge_fee</a>(amount: u64) : u64 {
     <b>let</b> bridge_fee = <a href="native_bridge.md#0x1_native_bridge_configuration_bridge_fee">native_bridge_configuration::bridge_fee</a>();
     <b>let</b> bridge_relayer = <a href="native_bridge.md#0x1_native_bridge_configuration_bridge_relayer">native_bridge_configuration::bridge_relayer</a>();
-    <b>assert</b>!(amount &gt; bridge_fee, <a href="native_bridge.md#0x1_native_bridge_EINVALID_VALUE">EINVALID_VALUE</a>);
+    <b>assert</b>!(amount &gt; bridge_fee, <a href="native_bridge.md#0x1_native_bridge_EINVALID_AMOUNT">EINVALID_AMOUNT</a>);
     <b>let</b> new_amount = amount - bridge_fee;
     <a href="native_bridge.md#0x1_native_bridge_core_mint">native_bridge_core::mint</a>(bridge_relayer, bridge_fee);
     new_amount

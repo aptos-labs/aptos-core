@@ -22,7 +22,7 @@ module aptos_framework::native_bridge {
     const EINVALID_BRIDGE_TRANSFER_ID: u64 = 2;
     const EEVENT_NOT_FOUND : u64 = 3;
     const EINVALID_NONCE : u64 = 4;
-    const EINVALID_VALUE : u64 = 5;
+    const EINVALID_AMOUNT : u64 = 5;
 
     #[event]
     /// An event triggered upon initiating a bridge transfer
@@ -205,7 +205,7 @@ module aptos_framework::native_bridge {
     fun charge_bridge_fee(amount: u64) : u64 {
         let bridge_fee = native_bridge_configuration::bridge_fee();
         let bridge_relayer = native_bridge_configuration::bridge_relayer();
-        assert!(amount > bridge_fee, EINVALID_VALUE);
+        assert!(amount > bridge_fee, EINVALID_AMOUNT);
         let new_amount = amount - bridge_fee;
         native_bridge_core::mint(bridge_relayer, bridge_fee);
         new_amount
@@ -296,7 +296,7 @@ module aptos_framework::native_bridge {
 
         // Create a bridge transfer ID algorithmically
         let combined_bytes = vector::empty<u8>();
-        vector::append(&mut combined_bytes, native_bridge_store::hex_to_bytes(initiator));
+        vector::append(&mut combined_bytes, initiator);
         vector::append(&mut combined_bytes, bcs::to_bytes(&recipient));
         vector::append(&mut combined_bytes, native_bridge_store::normalize_to_32_bytes(bcs::to_bytes(&amount)));
         vector::append(&mut combined_bytes, native_bridge_store::normalize_to_32_bytes(bcs::to_bytes(&nonce)));
@@ -473,24 +473,28 @@ module aptos_framework::native_bridge_store {
     /// @return 32-byte vector left-padded with zeroes, similar to how Ethereum serializes with abi.encodePacked
     public(friend) fun normalize_to_32_bytes(value: vector<u8>): vector<u8> {
         let meaningful = vector::empty<u8>();
-        let i = 0;
+        let i = vector::length(&value) - 1;
 
         // Remove trailing zeroes
-        while (i < vector::length(&value)) {
-            if (*vector::borrow(&value, i) != 0x00) {
-                vector::push_back(&mut meaningful, *vector::borrow(&value, i));
-            };
-            i = i + 1;
+        while (i >= 0 && *vector::borrow(&value, i) == 0x00) {
+            i = i - 1;
+        };
+
+        // Copy the meaningful bytes
+        let j = 0;
+        while (j <= i) {
+            vector::push_back(&mut meaningful, *vector::borrow(&value, j));
+            j = j + 1;
         };
 
         let result = vector::empty<u8>();
 
         // Pad with zeros on the left
         let padding_length = 32 - vector::length(&meaningful);
-        let j = 0;
-        while (j < padding_length) {
+        let k = 0;
+        while (k < padding_length) {
             vector::push_back(&mut result, 0x00);
-            j = j + 1;
+            k = k + 1;
         };
 
         // Append the meaningful bytes

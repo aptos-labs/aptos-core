@@ -290,7 +290,7 @@ fn test_native_bridge_initiate() {
 
     let initiator = harness.new_account_at(AccountAddress::from_hex_literal("0x726563697069656e740000000000000000000000000000000000000000000000").unwrap());
     let recipient = b"5B38Da6a701c568545dCfcB03FcB875f56beddC4".to_vec();
-    let amount = 100; // 0.1
+    let amount = 100_000_000_000;
 
     let original_balance = harness.read_aptos_balance(initiator.address());
     let gas_used = harness.evaluate_entry_function_gas(&initiator,
@@ -357,7 +357,7 @@ fn test_native_bridge_complete() {
 
     let initiator = b"5B38Da6a701c568545dCfcB03FcB875f56beddC4".to_vec();
     let recipient = harness.new_account_at(AccountAddress::from_hex_literal("0x726563697069656e740000000000000000000000000000000000000000000000").unwrap());
-    let amount = 100; // 0.1
+    let amount = 100_000_000_000;
     let nonce = 1;
 
     let mut combined_bytes = Vec::new();
@@ -367,7 +367,7 @@ fn test_native_bridge_complete() {
     // Convert recipient from hex to bytes
     let initiator_bytes = hex::decode(String::from_utf8(initiator.clone()).expect("Invalid UTF-8 recipient"))
     .expect("Failed to decode recipient hex");
-    combined_bytes.extend(initiator_bytes);
+    combined_bytes.extend(&initiator);
     combined_bytes.extend(bcs::to_bytes(&recipient.address()).expect("Failed to serialize recipient"));
     combined_bytes.extend(normalize_to_32_bytes(bcs::to_bytes(&amount).expect("Failed to serialize amount")));
     combined_bytes.extend(normalize_to_32_bytes(bcs::to_bytes(&nonce).expect("Failed to serialize nonce")));
