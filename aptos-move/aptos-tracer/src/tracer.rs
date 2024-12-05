@@ -496,12 +496,30 @@ where
                 Opcodes::ABORT,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::LdU16 => (),
-            SimpleInstruction::LdU32 => (),
-            SimpleInstruction::LdU256 => (),
-            SimpleInstruction::CastU16 => (),
-            SimpleInstruction::CastU32 => (),
-            SimpleInstruction::CastU256 => (),
+            SimpleInstruction::LdU16 => self.record_instr_and_inc_pc(
+                Opcodes::LD_U16,
+                std::iter::empty::<&Value>(),
+            ),
+            SimpleInstruction::LdU32 => self.record_instr_and_inc_pc(
+                Opcodes::LD_U32,
+                std::iter::empty::<&Value>(),
+            ),
+            SimpleInstruction::LdU256 => self.record_instr_and_inc_pc(
+                Opcodes::LD_U256,
+                std::iter::empty::<&Value>(),
+            ),
+            SimpleInstruction::CastU16 => self.record_instr_and_inc_pc(
+                Opcodes::CAST_U16,
+                interpreter.view_last_n_values(1).unwrap(),
+            ),
+            SimpleInstruction::CastU32 => self.record_instr_and_inc_pc(
+                Opcodes::CAST_U32,
+                interpreter.view_last_n_values(1).unwrap(),
+            ),
+            SimpleInstruction::CastU256 => self.record_instr_and_inc_pc(
+                Opcodes::CAST_U256,
+                interpreter.view_last_n_values(1).unwrap(),
+            ),
         }
         let res = self.base.charge_simple_instr(instr, interpreter);
 		self.step();
@@ -578,12 +596,16 @@ where
         num_locals: aptos_gas_algebra::NumArgs,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.inc_pc();
         let ty_tags = ty_args
             .clone()
             .map(|ty| ty.to_type_tag())
             .collect::<Vec<_>>();
 
+        self.record_generic_instr_and_inc_pc(
+            Opcodes::CALL,
+            ty_tags.clone(),
+            args.clone().into_iter(),
+        );
         self.gen_new_frame(FrameName::Function {
             module_id: module_id.clone(),
             name: Identifier::new(func_name).unwrap(),
@@ -595,7 +617,10 @@ where
     }
 
     fn charge_ld_const(&mut self, size: aptos_gas_algebra::NumBytes, interpreter: impl InterpreterView) -> PartialVMResult<()> {
-        self.inc_pc();
+        self.record_instr_and_inc_pc(
+            Opcodes::LD_CONST,
+            std::iter::empty::<&Value>(),
+        );
         let res = self.base.charge_ld_const(size, interpreter);
         self.step();
         res
@@ -605,21 +630,26 @@ where
         &mut self,
         val: impl ValueView,
     ) -> PartialVMResult<()> {
-        self.inc_pc();
         let res = self.base.charge_ld_const_after_deserialization(val);
         self.step();
         res
     }
 
     fn charge_copy_loc(&mut self, val: impl ValueView, interpreter: impl InterpreterView) -> PartialVMResult<()> {
-        self.inc_pc();
+        self.record_instr_and_inc_pc(
+            Opcodes::COPY_LOC,
+            std::iter::empty::<&Value>(),
+        );
         let res = self.base.charge_copy_loc(val, interpreter);
         self.step();
         res
     }
 
     fn charge_move_loc(&mut self, val: impl ValueView, interpreter: impl InterpreterView) -> PartialVMResult<()> {
-        self.record_instr_and_inc_pc(Opcodes::MOVE_LOC, std::iter::empty::<&Value>());
+        self.record_instr_and_inc_pc(
+            Opcodes::MOVE_LOC,
+            std::iter::empty::<&Value>(),
+        );
         let res = self.base.charge_move_loc(val, interpreter);
         self.step();
         res
@@ -632,7 +662,7 @@ where
     ) -> PartialVMResult<()> {
         self.record_instr_and_inc_pc(
             Opcodes::ST_LOC,
-            std::iter::empty::<&Value>(),
+            std::iter::once(&val),
         );
         self.base.charge_store_loc(val, interpreter_view)
     }
@@ -645,7 +675,7 @@ where
     ) -> PartialVMResult<()> {
         self.record_instr_and_inc_pc(
             Opcodes::PACK,
-            interpreter_view.view_last_n_values(args.len()).unwrap(),
+            args.clone().into_iter(),
         );
         let res = self.base.charge_pack(is_generic, args, interpreter_view);
 		self.step();
@@ -658,6 +688,7 @@ where
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
+        // TODO: this is technically wrong, the argument should be the struct value instead of the fields
         self.record_instr_and_inc_pc(Opcodes::UNPACK, args.clone());
         let res = self.base.charge_unpack(is_generic, args, interpreter);
         self.step();
@@ -665,7 +696,10 @@ where
     }
 
     fn charge_read_ref(&mut self, val: impl ValueView, interpreter: impl InterpreterView) -> PartialVMResult<()> {
-        self.inc_pc();
+        self.record_instr_and_inc_pc(
+            Opcodes::READ_REF,
+            std::iter::once(&val),
+        );
         let res = self.base.charge_read_ref(val, interpreter);
         self.step();
         res
@@ -677,7 +711,11 @@ where
         old_val: impl ValueView,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.inc_pc();
+        self.record_instr_and_inc_pc(
+            Opcodes::WRITE_REF,
+            // TODO
+            std::iter::empty::<&Value>(),
+        );
         let res = self.base.charge_write_ref(new_val, old_val, interpreter);
         self.step();
         res
@@ -689,7 +727,11 @@ where
         rhs: impl ValueView,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.inc_pc();
+        self.record_instr_and_inc_pc(
+            Opcodes::EQ,
+            // TODO
+            std::iter::empty::<&Value>(),
+        );
         let res = self.base.charge_eq(lhs, rhs, interpreter);
         self.step();
         res
@@ -701,7 +743,11 @@ where
         rhs: impl ValueView,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.inc_pc();
+        self.record_instr_and_inc_pc(
+            Opcodes::NEQ,
+            // TODO
+            std::iter::empty::<&Value>(),
+        );
         let res = self.base.charge_neq(lhs, rhs, interpreter);
         self.step();
         res
@@ -715,7 +761,12 @@ where
         is_success: bool,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.inc_pc();
+        self.record_generic_instr_and_inc_pc(
+            if is_mut { Opcodes::MUT_BORROW_GLOBAL } else { Opcodes::IMM_BORROW_GLOBAL },
+            vec![ty.to_type_tag()],
+            // TODO
+            std::iter::empty::<&Value>(),
+        );
         let res = self.base.charge_borrow_global(is_mut, is_generic, ty, is_success, interpreter);
         self.step();
         res
@@ -747,15 +798,12 @@ where
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         let ty_args = vec![ty.to_type_tag()];
-        if let Some(val) = &val {
-            self.record_generic_instr_and_inc_pc(Opcodes::MOVE_FROM, ty_args, [&val].into_iter());
-        } else {
-            self.record_generic_instr_and_inc_pc(
-                Opcodes::MOVE_FROM,
-                ty_args,
-                Vec::<&Value>::new().into_iter(),
-            );
-        }
+        self.record_generic_instr_and_inc_pc(
+            Opcodes::MOVE_FROM,
+            ty_args,
+            // TODO
+            std::iter::empty::<&Value>(),
+        );
         self.base.charge_move_from(is_generic, ty, val, interpreter)
     }
 
@@ -767,7 +815,11 @@ where
         is_success: bool,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.inc_pc();
+        self.record_generic_instr_and_inc_pc(
+            Opcodes::MOVE_TO,
+            vec![ty.to_type_tag()],
+            std::iter::once(&val),
+        );
         let res = self.base.charge_move_to(is_generic, ty, val, is_success, interpreter);
         self.step();
         res
@@ -779,14 +831,23 @@ where
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.inc_pc();
+        self.record_generic_instr_and_inc_pc(
+            Opcodes::VEC_PACK,
+            vec![ty.to_type_tag()],
+            args.clone().into_iter(),
+        );
         let res = self.base.charge_vec_pack(ty, args, interpreter);
         self.step();
         res
     }
 
     fn charge_vec_len(&mut self, ty: impl TypeView, interpreter: impl InterpreterView) -> PartialVMResult<()> {
-        self.inc_pc();
+        self.record_generic_instr_and_inc_pc(
+            Opcodes::VEC_LEN,
+            vec![ty.to_type_tag()],
+            // TODO
+            std::iter::empty::<&Value>(),
+        );
         let res = self.base.charge_vec_len(ty, interpreter);
         self.step();
         res
@@ -799,7 +860,12 @@ where
         is_success: bool,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.inc_pc();
+        self.record_generic_instr_and_inc_pc(
+            if is_mut { Opcodes::VEC_MUT_BORROW } else { Opcodes::VEC_IMM_BORROW },
+            vec![ty.to_type_tag()],
+            // TODO
+            std::iter::empty::<&Value>(),
+        );
         let res = self.base.charge_vec_borrow(is_mut, ty, is_success, interpreter);
         self.step();
         res
@@ -811,7 +877,11 @@ where
         val: impl ValueView,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.inc_pc();
+        self.record_generic_instr_and_inc_pc(
+            Opcodes::VEC_PUSH_BACK,
+            vec![ty.to_type_tag()],
+            std::iter::once(&val),
+        );
         let res = self.base.charge_vec_push_back(ty, val, interpreter);
         self.step();
         res
@@ -823,7 +893,12 @@ where
         val: Option<impl ValueView>,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.inc_pc();
+        self.record_generic_instr_and_inc_pc(
+            Opcodes::VEC_POP_BACK,
+            vec![ty.to_type_tag()],
+            // TODO
+            std::iter::empty::<&Value>(),
+        );
         let res = self.base.charge_vec_pop_back(ty, val, interpreter);
         self.step();
         res
@@ -836,14 +911,23 @@ where
         elems: impl ExactSizeIterator<Item = impl ValueView> + Clone,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.inc_pc();
+        self.record_generic_instr_and_inc_pc(
+            Opcodes::VEC_UNPACK,
+            vec![ty.to_type_tag()],
+            elems.clone().into_iter(),
+        );
         let res = self.base.charge_vec_unpack(ty, expect_num_elements, elems, interpreter);
         self.step();
         res
     }
 
     fn charge_vec_swap(&mut self, ty: impl TypeView, interpreter: impl InterpreterView) -> PartialVMResult<()> {
-        self.inc_pc();
+        self.record_generic_instr_and_inc_pc(
+            Opcodes::VEC_SWAP,
+            vec![ty.to_type_tag()],
+            // TODO
+            std::iter::empty::<&Value>(),
+        );
         let res = self.base.charge_vec_swap(ty, interpreter);
         self.step();
         res
@@ -856,9 +940,7 @@ where
         val: Option<impl ValueView>,
         bytes_loaded: aptos_gas_algebra::NumBytes,
     ) -> PartialVMResult<()> {
-        self.inc_pc();
         let res = self.base.charge_load_resource(addr, ty, val, bytes_loaded);
-        self.step();
         res
     }
 
@@ -870,7 +952,6 @@ where
     ) -> PartialVMResult<()> {
         self.inc_pc();
         let res = self.base.charge_native_function(amount, ret_vals, interpreter);
-        self.step();
         res
     }
 
@@ -879,7 +960,6 @@ where
         ty_args: impl ExactSizeIterator<Item = impl TypeView> + Clone,
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
     ) -> PartialVMResult<()> {
-        self.inc_pc();
         self.base
             .charge_native_function_before_execution(ty_args, args)
     }
