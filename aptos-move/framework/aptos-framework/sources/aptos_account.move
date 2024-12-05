@@ -328,7 +328,7 @@ module aptos_framework::aptos_account {
         coin::deposit(signer::address_of(alice), coin::mint(10000, &mint_cap));
 
         let perm_handle = permissioned_signer::create_permissioned_handle(alice);
-        let alice_perm_signer = permissioned_signer::signer_from_permissioned(&perm_handle);
+        let alice_perm_signer = permissioned_signer::signer_from_permissioned_handle(&perm_handle);
         fungible_asset::grant_apt_permission(alice, &alice_perm_signer, 500);
 
         transfer(&alice_perm_signer, bob, 500);
