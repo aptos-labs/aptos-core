@@ -1,7 +1,7 @@
 spec aptos_framework::native_bridge {
 
-    use std::features;
-    use aptos_framework::coin;
+    //use std::features;
+    //use aptos_framework::coin;
 
     // spec initialize(aptos_framework: &signer) {
     //     aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));

@@ -3,12 +3,12 @@ module aptos_framework::native_bridge {
     use aptos_framework::account;
     use aptos_framework::native_bridge_core;
     use aptos_framework::native_bridge_configuration;
+    #[test_only]
     use aptos_framework::native_bridge_configuration::update_bridge_fee;
     use aptos_framework::native_bridge_store;
     use aptos_framework::ethereum;
     use aptos_framework::event::{Self, EventHandle}; 
     use aptos_framework::signer;
-    use aptos_std::smart_table;
     use aptos_framework::system_addresses;
     #[test_only]
     use aptos_framework::aptos_account;
@@ -164,7 +164,6 @@ module aptos_framework::native_bridge {
         assert!(nonce > 0, EINVALID_NONCE);
 
         // Validate the bridge_transfer_id by reconstructing the hash
-        //let initiator_bytes = native_bridge_store::hex_to_bytes(initiator);
         let recipient_bytes = bcs::to_bytes(&recipient);
         let amount_bytes = native_bridge_store::normalize_to_32_bytes(bcs::to_bytes<u64>(&amount));
         let nonce_bytes = native_bridge_store::normalize_to_32_bytes(bcs::to_bytes<u64>(&nonce));
@@ -434,40 +433,6 @@ module aptos_framework::native_bridge_store {
         move_to(aptos_framework, ids_to_inbound_nonces);
     }
 
-    /// Takes an Ethereum address in ASCII hex, and converts to u8 (the raw Ethereum address bytes)
-    /// @param input: the vector<u8> to convert to raw bytes
-    /// @return vector of raw Ethereum address bytes (the human-readable characters of the address)
-    public(friend) fun hex_to_bytes(input: vector<u8>): vector<u8> {
-        let result = vector::empty<u8>();
-        let i = 0;
-
-        // Ensure the input length is valid (2 characters per byte)
-        assert!(vector::length(&input) % 2 == 0, 1); 
-
-        while (i < vector::length(&input)) {
-            let high_nibble = ascii_hex_to_u8(*vector::borrow(&input, i));
-            let low_nibble = ascii_hex_to_u8(*vector::borrow(&input, i + 1));
-            let byte = (high_nibble << 4) | low_nibble;
-            vector::push_back(&mut result, byte);
-            i = i + 2;
-        };
-
-        result
-    }
-
-    fun ascii_hex_to_u8(ch: u8): u8 {
-        if (ch >= 0x30 && ch <= 0x39) { // '0'-'9'
-            ch - 0x30
-        } else if (ch >= 0x41 && ch <= 0x46) { // 'A'-'F'
-            ch - 0x41 + 10
-        } else if (ch >= 0x61 && ch <= 0x66) { // 'a'-'f'
-            ch - 0x61 + 10
-        } else {
-            assert!(false, 2); // Abort with error code 2
-            0 // This is unreachable, but ensures type consistency
-        }
-    }
-
     /// Takes a vector, removes trailing zeroes, and pads with zeroes on the left until the value is 32 bytes.
     /// @param value: the vector<u8> to normalize
     /// @return 32-byte vector left-padded with zeroes, similar to how Ethereum serializes with abi.encodePacked
@@ -577,7 +542,7 @@ module aptos_framework::native_bridge_store {
     public(friend) fun bridge_transfer_id(initiator: address, recipient: EthereumAddress, amount: u64, nonce: u64) : vector<u8> {
         // Serialize each param
         let initiator_bytes = bcs::to_bytes<address>(&initiator);
-        let recipient_bytes = hex_to_bytes(ethereum::get_inner_ethereum_address(recipient));
+        let recipient_bytes = ethereum::get_inner_ethereum_address(recipient);
         let amount_bytes = normalize_to_32_bytes(bcs::to_bytes<u64>(&amount));
         let nonce_bytes = normalize_to_32_bytes(bcs::to_bytes<u64>(&nonce));
         //Contatenate then hash and return bridge transfer ID
