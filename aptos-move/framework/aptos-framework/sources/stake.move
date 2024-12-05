@@ -34,6 +34,7 @@ module aptos_framework::stake {
     use aptos_framework::system_addresses;
     use aptos_framework::staking_config::{Self, StakingConfig, StakingRewardsConfig};
     use aptos_framework::chain_status;
+    use aptos_framework::permissioned_signer;
 
     friend aptos_framework::block;
     friend aptos_framework::genesis;
@@ -81,6 +82,8 @@ module aptos_framework::stake {
     const EFEES_TABLE_ALREADY_EXISTS: u64 = 19;
     /// Validator set change temporarily disabled because of in-progress reconfiguration. Please retry after 1 minute.
     const ERECONFIGURATION_IN_PROGRESS: u64 = 20;
+    /// Signer does not have permission to perform stake logic.
+    const ENO_STAKE_PERMISSION: u64 = 28;
 
     /// Validator status enum. We can switch to proper enum later once Move supports it.
     const VALIDATOR_STATUS_PENDING_ACTIVE: u64 = 1;
@@ -203,6 +206,8 @@ module aptos_framework::stake {
     struct RegisterValidatorCandidateEvent has drop, store {
         pool_address: address,
     }
+
+    struct StakePermission has copy, drop, store {}
 
     #[event]
     struct RegisterValidatorCandidate has drop, store {
@@ -342,6 +347,19 @@ module aptos_framework::stake {
     /// DEPRECATED
     struct ValidatorFees has key {
         fees_table: Table<address, Coin<AptosCoin>>,
+    }
+
+    /// Permissions
+    inline fun check_signer_permission(s: &signer) {
+        assert!(
+            permissioned_signer::check_permission_exists(s, StakePermission {}),
+            error::permission_denied(ENO_STAKE_PERMISSION),
+        );
+    }
+
+    /// Grant permission to mutate staking on behalf of the master signer.
+    public fun grant_permission(master: &signer, permissioned_signer: &signer) {
+        permissioned_signer::authorize_unlimited(master, permissioned_signer, StakePermission {})
     }
 
     #[view]
@@ -536,6 +554,7 @@ module aptos_framework::stake {
         operator: address,
         voter: address,
     ) acquires AllowedValidators, OwnerCapability, StakePool, ValidatorSet {
+        check_signer_permission(owner);
         initialize_owner(owner);
         move_to(owner, ValidatorConfig {
             consensus_pubkey: vector::empty(),
@@ -565,6 +584,7 @@ module aptos_framework::stake {
         network_addresses: vector<u8>,
         fullnode_addresses: vector<u8>,
     ) acquires AllowedValidators {
+        check_signer_permission(account);
         // Checks the public key has a valid proof-of-possession to prevent rogue-key attacks.
         let pubkey_from_pop = &bls12381::public_key_from_bytes_with_pop(
             consensus_pubkey,
@@ -582,6 +602,7 @@ module aptos_framework::stake {
     }
 
     fun initialize_owner(owner: &signer) acquires AllowedValidators {
+        check_signer_permission(owner);
         let owner_address = signer::address_of(owner);
         assert!(is_allowed(owner_address), error::not_found(EINELIGIBLE_VALIDATOR));
         assert!(!stake_pool_exists(owner_address), error::already_exists(EALREADY_REGISTERED));
@@ -616,6 +637,7 @@ module aptos_framework::stake {
 
     /// Extract and return owner capability from the signing account.
     public fun extract_owner_cap(owner: &signer): OwnerCapability acquires OwnerCapability {
+        check_signer_permission(owner);
         let owner_address = signer::address_of(owner);
         assert_owner_cap_exists(owner_address);
         move_from<OwnerCapability>(owner_address)
@@ -624,6 +646,7 @@ module aptos_framework::stake {
     /// Deposit `owner_cap` into `account`. This requires `account` to not already have ownership of another
     /// staking pool.
     public fun deposit_owner_cap(owner: &signer, owner_cap: OwnerCapability) {
+        check_signer_permission(owner);
         assert!(!exists<OwnerCapability>(signer::address_of(owner)), error::not_found(EOWNER_CAP_ALREADY_EXISTS));
         move_to(owner, owner_cap);
     }
@@ -635,6 +658,7 @@ module aptos_framework::stake {
 
     /// Allows an owner to change the operator of the stake pool.
     public entry fun set_operator(owner: &signer, new_operator: address) acquires OwnerCapability, StakePool {
+        check_signer_permission(owner);
         let owner_address = signer::address_of(owner);
         assert_owner_cap_exists(owner_address);
         let ownership_cap = borrow_global<OwnerCapability>(owner_address);
@@ -671,6 +695,7 @@ module aptos_framework::stake {
 
     /// Allows an owner to change the delegated voter of the stake pool.
     public entry fun set_delegated_voter(owner: &signer, new_voter: address) acquires OwnerCapability, StakePool {
+        check_signer_permission(owner);
         let owner_address = signer::address_of(owner);
         assert_owner_cap_exists(owner_address);
         let ownership_cap = borrow_global<OwnerCapability>(owner_address);
@@ -687,6 +712,7 @@ module aptos_framework::stake {
 
     /// Add `amount` of coins from the `account` owning the StakePool.
     public entry fun add_stake(owner: &signer, amount: u64) acquires OwnerCapability, StakePool, ValidatorSet {
+        check_signer_permission(owner);
         let owner_address = signer::address_of(owner);
         assert_owner_cap_exists(owner_address);
         let ownership_cap = borrow_global<OwnerCapability>(owner_address);
@@ -748,6 +774,7 @@ module aptos_framework::stake {
 
     /// Move `amount` of coins from pending_inactive to active.
     public entry fun reactivate_stake(owner: &signer, amount: u64) acquires OwnerCapability, StakePool {
+        check_signer_permission(owner);
         assert_reconfig_not_in_progress();
         let owner_address = signer::address_of(owner);
         assert_owner_cap_exists(owner_address);
@@ -796,6 +823,7 @@ module aptos_framework::stake {
         new_consensus_pubkey: vector<u8>,
         proof_of_possession: vector<u8>,
     ) acquires StakePool, ValidatorConfig {
+        check_signer_permission(operator);
         assert_reconfig_not_in_progress();
         assert_stake_pool_exists(pool_address);
 
@@ -840,6 +868,7 @@ module aptos_framework::stake {
         new_network_addresses: vector<u8>,
         new_fullnode_addresses: vector<u8>,
     ) acquires StakePool, ValidatorConfig {
+        check_signer_permission(operator);
         assert_reconfig_not_in_progress();
         assert_stake_pool_exists(pool_address);
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
@@ -877,6 +906,7 @@ module aptos_framework::stake {
 
     /// Similar to increase_lockup_with_cap but will use ownership capability from the signing account.
     public entry fun increase_lockup(owner: &signer) acquires OwnerCapability, StakePool {
+        check_signer_permission(owner);
         let owner_address = signer::address_of(owner);
         assert_owner_cap_exists(owner_address);
         let ownership_cap = borrow_global<OwnerCapability>(owner_address);
@@ -921,6 +951,7 @@ module aptos_framework::stake {
         operator: &signer,
         pool_address: address
     ) acquires StakePool, ValidatorConfig, ValidatorSet {
+        check_signer_permission(operator);
         assert!(
             staking_config::get_allow_validator_set_change(&staking_config::get()),
             error::invalid_argument(ENO_POST_GENESIS_VALIDATOR_SET_CHANGE_ALLOWED),
@@ -984,6 +1015,7 @@ module aptos_framework::stake {
 
     /// Similar to unlock_with_cap but will use ownership capability from the signing account.
     public entry fun unlock(owner: &signer, amount: u64) acquires OwnerCapability, StakePool {
+        check_signer_permission(owner);
         assert_reconfig_not_in_progress();
         let owner_address = signer::address_of(owner);
         assert_owner_cap_exists(owner_address);
@@ -1032,6 +1064,7 @@ module aptos_framework::stake {
         owner: &signer,
         withdraw_amount: u64
     ) acquires OwnerCapability, StakePool, ValidatorSet {
+        check_signer_permission(owner);
         let owner_address = signer::address_of(owner);
         assert_owner_cap_exists(owner_address);
         let ownership_cap = borrow_global<OwnerCapability>(owner_address);
@@ -1091,6 +1124,7 @@ module aptos_framework::stake {
         operator: &signer,
         pool_address: address
     ) acquires StakePool, ValidatorSet {
+        check_signer_permission(operator);
         assert_reconfig_not_in_progress();
         let config = staking_config::get();
         assert!(

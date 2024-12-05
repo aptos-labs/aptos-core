@@ -53,6 +53,7 @@ module aptos_framework::vesting {
     use aptos_framework::staking_contract;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
+    use aptos_framework::permissioned_signer;
 
     friend aptos_framework::genesis;
 
@@ -90,6 +91,8 @@ module aptos_framework::vesting {
     const EPERMISSION_DENIED: u64 = 15;
     /// Zero items were provided to a *_many function.
     const EVEC_EMPTY_FOR_MANY_FUNCTION: u64 = 16;
+    /// Current permissioned signer cannot perform vesting operations.
+    const ENO_VESTING_PERMISSION: u64 = 17;
 
     /// Maximum number of shareholders a vesting pool can support.
     const MAXIMUM_SHAREHOLDERS: u64 = 30;
@@ -326,6 +329,21 @@ module aptos_framework::vesting {
         admin: address,
         vesting_contract_address: address,
         amount: u64,
+    }
+
+    struct VestPermission has copy, drop, store {}
+
+    /// Permissions
+    inline fun check_signer_permission(s: &signer) {
+        assert!(
+            permissioned_signer::check_permission_exists(s, VestPermission {}),
+            error::permission_denied(ENO_VESTING_PERMISSION),
+        );
+    }
+
+    /// Grant permission to perform vesting operations on behalf of the master signer.
+    public fun grant_permission(master: &signer, permissioned_signer: &signer) {
+        permissioned_signer::authorize_unlimited(master, permissioned_signer, VestPermission {})
     }
 
     #[view]
@@ -1151,6 +1169,7 @@ module aptos_framework::vesting {
     }
 
     fun verify_admin(admin: &signer, vesting_contract: &VestingContract) {
+        check_signer_permission(admin);
         assert!(signer::address_of(admin) == vesting_contract.admin, error::unauthenticated(ENOT_ADMIN));
     }
 
