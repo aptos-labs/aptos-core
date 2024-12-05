@@ -487,7 +487,7 @@ fn nodes_to_left_of(node: u64) -> u64 {
 }
 
 /// Given `node`, an index in an in-order traversal of a perfect binary tree,
-/// what order would the node be visited in in post-order traversal?
+/// what order would the node be visited in post-order traversal?
 /// For example, consider this tree of in-order nodes.
 ///
 /// ```text

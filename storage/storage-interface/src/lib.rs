@@ -264,7 +264,7 @@ pub trait DbReader: Send + Sync {
         /// Gets the latest epoch state currently held in storage.
         fn get_latest_epoch_state(&self) -> Result<EpochState>;
 
-        /// Returns the (key, value) iterator for a particular state key prefix at at desired version. This
+        /// Returns the (key, value) iterator for a particular state key prefix at desired version. This
         /// API can be used to get all resources of an account by passing the account address as the
         /// key prefix.
         fn get_prefixed_state_value_iterator(

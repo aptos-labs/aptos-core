@@ -662,7 +662,7 @@ impl StateStore {
         self.current_state().get().clone()
     }
 
-    /// Returns the key, value pairs for a particular state key prefix at at desired version. This
+    /// Returns the key, value pairs for a particular state key prefix at desired version. This
     /// API can be used to get all resources of an account by passing the account address as the
     /// key prefix.
     pub fn get_prefixed_state_value_iterator(

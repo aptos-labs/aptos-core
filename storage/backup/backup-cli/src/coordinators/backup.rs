@@ -52,7 +52,7 @@ pub struct BackupCoordinatorOpt {
         Notice: If, while a snapshot is being taken, the chain advanced several epoch, past several \
         new points where a snapshot is eligible according to this setting, we will skip those in the \
         middle and take only at the newest epoch among them. For example, if the setting is 5, \
-        then the snapshots will be at at 0, 5, 10 ... If when the snapshot at 5 ends the chain \
+        then the snapshots will be at 0, 5, 10 ... If when the snapshot at 5 ends the chain \
         is already at 19, then snapshot at 15 will be taken instead of at 10 (not at 18)."
     )]
     pub state_snapshot_interval_epochs: usize,
