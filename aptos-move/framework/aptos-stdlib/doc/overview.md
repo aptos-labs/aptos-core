@@ -14,7 +14,6 @@ This is the reference documentation of the Aptos standard library.
 
 -  [`0x1::any`](any.md#0x1_any)
 -  [`0x1::aptos_hash`](hash.md#0x1_aptos_hash)
--  [`0x1::arbitrary_precision`](arbitrary_precision.md#0x1_arbitrary_precision)
 -  [`0x1::big_vector`](big_vector.md#0x1_big_vector)
 -  [`0x1::bls12381`](bls12381.md#0x1_bls12381)
 -  [`0x1::bls12381_algebra`](bls12381_algebra.md#0x1_bls12381_algebra)

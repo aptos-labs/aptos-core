@@ -1,7 +1,5 @@
 /// Structs and functions for on-chain randomness configurations.
 module aptos_framework::randomness_config {
-    use std::option;
-    use std::option::Option;
     use std::string;
     use std::string::String;
     use aptos_std::copyable_any;

@@ -139,7 +139,7 @@ impl DKGRounding {
 
 #[derive(Clone, Default)]
 pub struct DKGRoundingProfile {
-    pub ideal_total_weight: u64,
+    pub ideal_total_weight: u128,
     // calculated weights for each validator after rounding
     pub validator_weights: Vec<u64>,
     // The ratio of stake that may reveal the randomness, e.g. 50%
@@ -294,12 +294,6 @@ impl DKGRoundingProfile {
     }
 }
 
-#[test]
-fn hihihi() {
-    let x = U64F64::from_bits(12174851088648304066);
-    println!("x={x}");
-}
-
 fn is_valid_profile(
     profile: &DKGRoundingProfile,
     reconstruct_threshold_in_stake_ratio: U64F64,
@@ -371,7 +365,7 @@ fn compute_profile_fixed_point(
         };
 
     DKGRoundingProfile {
-        ideal_total_weight,
+        ideal_total_weight: ideal_total_weight as u128,
         validator_weights,
         secrecy_threshold_in_stake_ratio,
         reconstruct_threshold_in_stake_ratio,

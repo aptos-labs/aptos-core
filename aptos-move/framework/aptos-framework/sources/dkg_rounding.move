@@ -4,7 +4,6 @@ module aptos_framework::dkg_rounding {
     use std::vector;
     use aptos_std::fixed_point64;
     use aptos_std::fixed_point64::FixedPoint64;
-    use aptos_std::arbitrary_precision;
     #[test_only]
     use std::string::utf8;
     #[test_only]
@@ -14,16 +13,8 @@ module aptos_framework::dkg_rounding {
 
     friend aptos_framework::reconfiguration_with_dkg;
 
-    const ROUNDING_METHOD_BINARY_SEARCH: u64 = 1;
-    const ROUNDING_METHOD_INFALLIBLE: u64 = 2;
-
-    struct WeightConfig has drop {
-        weights: vector<u64>,
-        reconsutruct_threshold: u128,
-    }
-
     struct RoundingResult has drop, store {
-        ideal_total_weight: u64,
+        ideal_total_weight: u128,
         weights: vector<u64>,
         reconstruct_threshold_default_path: u128,
         reconstruct_threshold_fast_path: Option<u128>,
@@ -37,26 +28,8 @@ module aptos_framework::dkg_rounding {
         rounding: RoundingResult,
     }
 
-    const E_FATAL: u64 = 9999;
-
-    fun default_threshold_info(): ReconstructThresholdInfo {
-        ReconstructThresholdInfo {
-            in_weights: 0,
-            in_stakes: 0,
-        }
-    }
-
-    fun default_profile(): Profile {
-        Profile {
-            ideal_total_weight: 0,
-            validator_weights: vector[],
-            threshold_default_path: default_threshold_info(),
-            threshold_fast_path: option::none(),
-        }
-    }
-
-    /// Invoked when an async reconfig starts.
-    /// Compute rounding for the next epoch and store it on chain.
+    /// When an async reconfig starts,
+    /// compute weights + threshold for the next validator set and store it on chain.
     public(friend) fun on_reconfig_start(
         framework: &signer,
         stakes: vector<u64>,
@@ -72,7 +45,7 @@ module aptos_framework::dkg_rounding {
     }
 
     /// Invoked when an async reconfig finishes.
-    /// Update discard the rounding for the current epoch, mark the rounding for the next epoch as "current".
+    /// Discard the rounding for the current epoch, mark the rounding for the next epoch as "current".
     public(friend) fun on_new_epoch(framework: &signer) acquires CurEpochRounding, NextEpochRounding {
         if (exists<CurEpochRounding>(@aptos_framework)) {
             move_from<CurEpochRounding>(@aptos_framework);
@@ -83,208 +56,34 @@ module aptos_framework::dkg_rounding {
         }
     }
 
-    /// Given a stake distribution, compute a weight distribution.
-    ///
     fun rounding(
         stakes: vector<u64>,
         secrecy_threshold_in_stake_ratio: FixedPoint64,
         reconstruct_threshold_in_stake_ratio: FixedPoint64,
         fast_secrecy_threshold_in_stake_ratio: Option<FixedPoint64>,
     ): RoundingResult {
-        let epsilon = fixed_point64::create_from_raw_value(1);
-        let n = vector::length(&stakes);
-
-        // Ensure reconstruct_threshold > secrecy_threshold
-        reconstruct_threshold_in_stake_ratio = fixed_point64::max(
-            reconstruct_threshold_in_stake_ratio,
-            fixed_point64::add(secrecy_threshold_in_stake_ratio, epsilon)
-        );
-
-        let secrecy_threshold_in_stake_ratio = arbitrary_precision::from_fixed_point64(secrecy_threshold_in_stake_ratio);
-        let reconstruct_threshold_in_stake_ratio = arbitrary_precision::from_fixed_point64(reconstruct_threshold_in_stake_ratio);
-
-        let total_weight_max = arbitrary_precision::div_ceil(
-            arbitrary_precision::sum(vector[arbitrary_precision::from_u64(n), arbitrary_precision::from_u64(4)]),
-            arbitrary_precision::product(vector[
-                arbitrary_precision::sub(reconstruct_threshold_in_stake_ratio, secrecy_threshold_in_stake_ratio),
-                arbitrary_precision::from_u64(2),
-            ]),
-        );
-        let stakes_total = 0;
-        vector::for_each(stakes, |stake|{
-            stakes_total = stakes_total + (stake as u128);
-        });
-        let stakes_total = arbitrary_precision::from_u128(stakes_total);
-
-        let bar = arbitrary_precision::as_u128(
-            arbitrary_precision::ceil(
-                arbitrary_precision::product(vector[stakes_total, reconstruct_threshold_in_stake_ratio])));
-        let fast_secrecy_threshold_in_stake_ratio = option::map(fast_secrecy_threshold_in_stake_ratio, |v|arbitrary_precision::from_fixed_point64(v));
-
-        let profile = default_profile();
-        let lo = 0;
-        let hi = arbitrary_precision::as_u128(total_weight_max) * 2;
-        // while (lo + 1 < hi) {
-        while (true) {
-            let md = lo + 1;
-            let weight_per_stake = arbitrary_precision::shift_down_by_bit(
-                arbitrary_precision::div_ceil(
-                    arbitrary_precision::shift_up_by_bit(arbitrary_precision::from_u128(md), 64),
-                    stakes_total,
-                ),
-                64,
-            );
-            let cur_profile = compute_profile(secrecy_threshold_in_stake_ratio, fast_secrecy_threshold_in_stake_ratio, stakes, (md as u64), weight_per_stake);
-
-            if (cur_profile.threshold_default_path.in_stakes <= bar) {
-                // hi = md;
-                profile = cur_profile;
-                break;
-            } else {
-                lo = md;
-            };
+        let fast_secrecy_thresh_raw = if (option::is_some(&fast_secrecy_threshold_in_stake_ratio)) {
+            fixed_point64::get_raw_value(option::extract(&mut fast_secrecy_threshold_in_stake_ratio))
+        } else {
+            0
         };
-
-        let Profile {
-            ideal_total_weight,
-            validator_weights,
-            threshold_default_path,
-            threshold_fast_path,
-        } = profile;
-
-        RoundingResult {
-            ideal_total_weight,
-            weights: validator_weights,
-            reconstruct_threshold_default_path: threshold_default_path.in_weights,
-            reconstruct_threshold_fast_path: option::map(threshold_fast_path, |t|{let t: ReconstructThresholdInfo = t; t.in_weights}),
-        }
+        rounding_internal(
+            stakes,
+            fixed_point64::get_raw_value(secrecy_threshold_in_stake_ratio),
+            fixed_point64::get_raw_value(reconstruct_threshold_in_stake_ratio),
+            fast_secrecy_thresh_raw,
+        )
     }
 
-    const BINARY_SEARCH_ERR_1: u64 = 0;
-    const BINARY_SEARCH_ERR_2: u64 = 0;
-    const BINARY_SEARCH_ERR_3: u64 = 0;
-    const BINARY_SEARCH_ERR_4: u64 = 0;
-    const BINARY_SEARCH_ERR_5: u64 = 0;
-
-    struct ReconstructThresholdInfo has drop {
-        in_weights: u128,
-        in_stakes: u128,
-    }
-
-    struct Profile has drop {
-        ideal_total_weight: u64,
-        /// weight is a u64 because we assume `weight_per_stake <= 1` and validator stake is a u64.
-        validator_weights: vector<u64>,
-        threshold_default_path: ReconstructThresholdInfo,
-        threshold_fast_path: Option<ReconstructThresholdInfo>,
-    }
-
-    ///
-    /// Now, a validator subset of stake ratio `r` has `weight_sub_total` in range `[stake_total * r * weight_per_stake - delta_down, stake_total * r * weight_per_stake + delta_up]`.
-    /// Therefore,
-    /// - the threshold in weight has to be set to `1 + floor(secrecy_threshold_in_stake_ratio * stake_total * weight_per_stake + delta_up)`;
-    /// - the stake ratio required for liveness is `secrecy_threshold_in_stake_ratio + (1 + delta_down + delta_up) / (take_total * weight_per_stake)`.
-    /// Note that as `weight_per_stake` increases, the `stake_ratio_required_for_liveness` decreases.
-    /// Further, when `weight_per_stake >= (n + 2) / (2 * stake_total * (reconstruct_threshold_in_stake_ratio - secrecy_threshold_in_stake_ratio))`,
-    /// it is guaranteed that `stake_ratio_required_for_liveness <= reconstruct_threshold_in_stake_ratio`.
-    fun compute_profile(
-        secrecy_threshold_in_stake_ratio: arbitrary_precision::Number,
-        secrecy_threshold_in_stake_ratio_fast_path: Option<arbitrary_precision::Number>,
+    native fun rounding_internal(
         stakes: vector<u64>,
-        ideal_total_weight: u64,
-        weight_per_stake: arbitrary_precision::Number,
-    ): Profile {
-        let one = arbitrary_precision::from_u64(1);
-        arbitrary_precision::min_assign(&mut weight_per_stake, one);
+        secrecy_thresh_raw: u128,
+        recon_thresh_raw: u128,
+        fast_secrecy_thresh_raw: u128,
+    ): RoundingResult;
 
-        // Initialize accumulators.
-        let validator_weights = vector[];
-        let delta_down = arbitrary_precision::from_u64(0);
-        let delta_up = arbitrary_precision::from_u64(0);
-        let weight_total = 0;
-        let stake_total = 0;
-
-        // Assign weights.
-        vector::for_each(stakes, |stake|{
-            let stake: u64 = stake;
-            stake_total = stake_total + (stake as u128);
-            let ideal_weight = weight_per_stake;
-            arbitrary_precision::mul_u64_assign(&mut ideal_weight, stake);
-            let rounded_weight = arbitrary_precision::round(ideal_weight, one);
-            let rounded_weight_u64 = arbitrary_precision::as_u64(rounded_weight);
-            vector::push_back(&mut validator_weights, rounded_weight_u64);
-            weight_total = weight_total + (rounded_weight_u64 as u128);
-            if (arbitrary_precision::greater_than(&ideal_weight, &rounded_weight)) {
-                arbitrary_precision::add_assign(&mut delta_down, arbitrary_precision::sub(ideal_weight, rounded_weight));
-            } else {
-                arbitrary_precision::add_assign(&mut delta_up, arbitrary_precision::sub(rounded_weight, ideal_weight));
-            };
-        });
-
-        // Compute default path thresholds.
-        let threshold_default_path = compute_threshold(
-            secrecy_threshold_in_stake_ratio,
-            weight_per_stake,
-            stake_total,
-            weight_total,
-            delta_up,
-            delta_down,
-        );
-
-        let threshold_fast_path = option::map(secrecy_threshold_in_stake_ratio_fast_path, |t|{
-            let t: arbitrary_precision::Number = t;
-            compute_threshold(
-                t,
-                weight_per_stake,
-                stake_total,
-                weight_total,
-                delta_up,
-                delta_down,
-            )
-        });
-
-        Profile {
-            ideal_total_weight,
-            validator_weights,
-            threshold_default_path,
-            threshold_fast_path,
-        }
-    }
-
-    /// Once a **weight assignment** with `weight_per_stake` is done and `(weight_total, delta_up, delta_down)` are available,
-    /// return the minimum reconstruct threshold that satisfies a `secrecy_threshold_in_stake_ratio`.
-    fun compute_threshold(
-        secrecy_threshold_in_stake_ratio: arbitrary_precision::Number,
-        weight_per_stake: arbitrary_precision::Number,
-        stake_total: u128,
-        weight_total: u128,
-        delta_up: arbitrary_precision::Number,
-        delta_down: arbitrary_precision::Number,
-    ): ReconstructThresholdInfo {
-        let reconstruct_threshold_in_weights = arbitrary_precision::sum(vector[
-            arbitrary_precision::product(vector[
-                secrecy_threshold_in_stake_ratio,
-                arbitrary_precision::from_u128(stake_total),
-                weight_per_stake,
-            ]),
-            delta_up
-        ]);
-        arbitrary_precision::floor_assign(&mut reconstruct_threshold_in_weights);
-        arbitrary_precision::add_assign(&mut reconstruct_threshold_in_weights, arbitrary_precision::from_u64(1));
-        arbitrary_precision::min_assign(&mut reconstruct_threshold_in_weights, arbitrary_precision::from_u128(weight_total));
-
-        let reconstruct_threshold_in_stakes = arbitrary_precision::div_ceil(
-            arbitrary_precision::sum(vector[reconstruct_threshold_in_weights, delta_down]),
-            weight_per_stake,
-        );
-
-        ReconstructThresholdInfo {
-            in_stakes: arbitrary_precision::as_u128(reconstruct_threshold_in_stakes),
-            in_weights: arbitrary_precision::as_u128(reconstruct_threshold_in_weights),
-        }
-    }
-
-    struct Obj has drop {
+    #[test_only]
+    struct Diff has drop {
         vid: u64,
         stake: u64,
         weight_0: u64,
@@ -293,24 +92,104 @@ module aptos_framework::dkg_rounding {
 
     #[test_only]
     fun random_stake_dist(): vector<u64> {
-        let n = randomness::u64_range(3, 5);
+        let n = randomness::u64_range(10, 200);
 
         let ret = vector[];
         while (n > 0) {
-            // let stake = if (randomness::u64_range(0, 2) == 0) {
-            //     randomness::u64_range(100000000000000, 1000000000000000)
-            // } else {
-            //     randomness::u64_range(1000000000000000, 10000000000000000)
-            // };
-            let stake = randomness::u64_range(10, 100);
+            let stake = if (randomness::u64_range(0, 2) == 0) {
+                randomness::u64_range(100000000000000, 1000000000000000)
+            } else {
+                randomness::u64_range(1000000000000000, 10000000000000000)
+            };
+            // let stake = randomness::u64_range(10, 100);
             vector::push_back(&mut ret, stake);
             n = n - 1;
         };
         ret
     }
 
+    #[test_only]
+    fun membership_arr(n: u64, subset_idx: u64): vector<u64> {
+        let ret = vector[];
+        while (n > 0) {
+            vector::push_back(&mut ret, subset_idx % 2);
+            subset_idx = subset_idx / 2;
+            n = n - 1;
+        };
+        ret
+    }
+
+    #[test_only]
+    fun subsum(values: &vector<u64>, subset: &vector<u64>): u128 {
+        let ret = 0;
+        vector::zip_ref(values, subset, |value, flag|{
+            ret = ret + ((*value * *flag) as u128);
+        });
+        ret
+    }
+
     #[test(framework = @0x1)]
-    fun test_mainnet_dist(framework: signer) {
+    fun test_correctness(framework: signer) {
+        randomness::initialize_for_testing(&framework);
+        let attempts = 100;
+        while (attempts > 0) {
+            let n = randomness::u64_range(1, 7);
+            let stake_total: u128 = 0;
+            let stakes = vector::map(vector::range(0, n), |i|{
+                let stake = randomness::u64_range(1000000, 20000000);
+                stake_total = stake_total + (stake as u128);
+                stake
+            });
+            let secrecy_thresh_pct = 50;
+            let secrecy_thresh = fixed_point64::create_from_rational(secrecy_thresh_pct, 100);
+            let recon_thresh_pct = 66;
+            let recon_thresh = fixed_point64::create_from_rational(recon_thresh_pct, 100);
+            let fast_secrecy_thresh_pct = 67;
+            let fast_secrecy_thresh = fixed_point64::create_from_rational(fast_secrecy_thresh_pct, 100);
+            let has_fast_secrect_thresh = 1;
+            let maybe_fast_secrecy_thresh = if (has_fast_secrect_thresh == 1) {
+                option::some(fast_secrecy_thresh)
+            } else {
+                option::none()
+            };
+            debug::print(&utf8(b"stakes="));
+            debug::print(&stakes);
+
+            let rounding_result = rounding(stakes, secrecy_thresh, recon_thresh, maybe_fast_secrecy_thresh);
+            debug::print(&utf8(b"rounding_result="));
+            debug::print(&rounding_result);
+            let computed_fast_threshold = if (has_fast_secrect_thresh == 1) {
+                option::extract(&mut rounding_result.reconstruct_threshold_fast_path)
+            } else {
+                0
+            };
+
+            let subset = 0;
+            let num_subsets = 1 << (n as u8);
+            while (subset < num_subsets) {
+                let memberships = membership_arr(n, subset);
+                let stake_subtotal = subsum(&stakes, &memberships);
+                let stake_frac = fixed_point64::create_from_rational(stake_subtotal, stake_total);
+                let weight_subtotal = subsum(&rounding_result.weights, &memberships);
+                let secrecy_failure = fixed_point64::less_or_equal(stake_frac, secrecy_thresh) && weight_subtotal >= rounding_result.reconstruct_threshold_default_path;
+                let recon_default_failure = fixed_point64::greater(stake_frac, recon_thresh) && weight_subtotal < rounding_result.reconstruct_threshold_default_path;
+                let fast_secrecy_failure = has_fast_secrect_thresh == 1 && fixed_point64::less_or_equal(stake_frac, fast_secrecy_thresh) && weight_subtotal >= computed_fast_threshold;
+                if (secrecy_failure || recon_default_failure || fast_secrecy_failure) {
+                    debug::print(&memberships);
+                    debug::print(&secrecy_failure);
+                    debug::print(&recon_default_failure);
+                    debug::print(&fast_secrecy_failure);
+                    abort(1)
+                };
+                subset = subset + 1;
+            };
+
+            attempts = attempts - 1;
+        }
+    }
+
+    #[test]
+    fun test_mainnet_dist() {
         let stakes = mainnet_stakes();
         let secrecy_thre = fixed_point64::create_from_rational(1, 2);
         let recon_thre = fixed_point64::create_from_rational(2, 3);
@@ -320,10 +199,10 @@ module aptos_framework::dkg_rounding {
     }
 
     #[test(framework = @0x1)]
-    fun rounding_test(framework: signer) {
+    fun compare(framework: signer) {
         randomness::initialize_for_testing(&framework);
-        let stake_distributions = vector[mainnet_stakes()];
-        let n = 20;
+        let stake_distributions = vector[];
+        let n = 10;
         while (n > 0) {
             vector::push_back(&mut stake_distributions, random_stake_dist());
             n = n - 1;
@@ -341,14 +220,14 @@ module aptos_framework::dkg_rounding {
             let n = vector::length(&stakes);
             let i = 0;
             while (i < n) {
-                let obj = Obj {
+                let diff = Diff {
                     vid: i,
                     stake: *vector::borrow(&stakes, i),
                     weight_0: *vector::borrow(&result_0.weights, i),
                     weight_1: *vector::borrow(&result_1.weights, i),
                 };
-                if (obj.weight_0 != obj.weight_1) {
-                    debug::print(&obj);
+                if (diff.weight_0 != diff.weight_1) {
+                    debug::print(&diff);
                 };
                 i = i + 1;
             };
@@ -366,6 +245,7 @@ module aptos_framework::dkg_rounding {
         });
     }
 
+    #[test_only]
     fun rounding_v0(
         stakes: vector<u64>,
         secrecy_threshold_in_stake_ratio: FixedPoint64,
@@ -386,6 +266,7 @@ module aptos_framework::dkg_rounding {
         )
     }
 
+    #[test_only]
     native fun rounding_v0_internal(
         stakes: vector<u64>,
         secrecy_thresh_raw: u128,

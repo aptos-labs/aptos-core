@@ -1924,6 +1924,8 @@ dependencies = [
  "move-unit-test",
  "move-vm-runtime",
  "move-vm-types",
+ "num-bigint 0.3.3",
+ "num-integer",
  "num-traits",
  "once_cell",
  "rand 0.7.3",
