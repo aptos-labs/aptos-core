@@ -278,7 +278,10 @@ impl BlockStore {
         for block in &blocks_to_commit {
             // Given the block is ready to commit, then it certainly must have a QC.
             // However, we keep it an Option to be safe.
-            block.set_qc(self.get_quorum_cert_for_block(block.id()));
+            block.set_qc(
+                self.get_quorum_cert_for_block(block.id())
+                    .expect(&format!("QC for block {} must exist", block.id())),
+            );
         }
 
         let block_tree = self.inner.clone();

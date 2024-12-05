@@ -617,21 +617,14 @@ async fn process_payload_helper<T: TDataInfo>(
         }
     }
 
-    let result = {
-        // If the future is completed then use the result.
-        if let Some(result) = fut.clone().now_or_never() {
-            result
-        } else {
-            // Otherwise, append the additional peers to existing responders list
-            // NB: this might append the same signers multiple times, but this
-            // should be very rare and has no negative effects.
-            for responders in existing_responders {
-                responders.lock().append(&mut signers.clone());
-            }
+    // Append the additional peers to existing responders list
+    // NB: this might append the same signers multiple times, but this
+    // should be very rare and has no negative effects.
+    for responders in existing_responders {
+        responders.lock().append(&mut signers.clone());
+    }
 
-            fut.await
-        }
-    };
+    let result = fut.await;
 
     // If error, reschedule before returning the result
     if result.is_err() {
@@ -642,14 +635,14 @@ async fn process_payload_helper<T: TDataInfo>(
             let batches_and_responders = data_ptr
                 .batch_summary
                 .iter()
-                .map(|proof| {
+                .map(|summary| {
                     let mut signers = signers.clone();
-                    signers.append(&mut proof.signers(ordered_authors));
+                    signers.append(&mut summary.signers(ordered_authors));
                     if let Some(author) = block.author() {
                         signers.push(author);
                     }
 
-                    (proof.info().clone(), Arc::new(Mutex::new(signers)))
+                    (summary.info().clone(), Arc::new(Mutex::new(signers)))
                 })
                 .collect();
             data_fut.fut = request_txns_from_quorum_store(

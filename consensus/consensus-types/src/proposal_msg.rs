@@ -26,16 +26,8 @@ impl ProposalMsg {
         }
     }
 
-    /// Returns the epoch associated with the proposal after verifying that the
-    /// payload data is also associated with the same epoch
-    pub fn verified_epoch(&self) -> Result<u64> {
-        let proposal_epoch = self.proposal.epoch();
-
-        self.proposal
-            .payload()
-            .map_or(Ok(()), |p| p.verify_epoch(proposal_epoch))?;
-
-        Ok(proposal_epoch)
+    pub fn epoch(&self) -> u64 {
+        self.proposal.epoch()
     }
 
     /// Verifies that the ProposalMsg is well-formed.
@@ -85,6 +77,9 @@ impl ProposalMsg {
             "Proposal {} does not define an author",
             self.proposal
         );
+        self.proposal
+            .payload()
+            .map_or(Ok(()), |p| p.verify_epoch(self.proposal.epoch()))?;
         Ok(())
     }
 

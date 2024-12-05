@@ -289,8 +289,8 @@ impl PipelinedBlock {
             .expect("pre_commit_result_rx missing.")
     }
 
-    pub fn set_qc(&self, qc: Option<Arc<QuorumCert>>) {
-        *self.block_qc.lock() = qc;
+    pub fn set_qc(&self, qc: Arc<QuorumCert>) {
+        *self.block_qc.lock() = Some(qc)
     }
 }
 

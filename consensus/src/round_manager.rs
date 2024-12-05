@@ -185,7 +185,7 @@ impl UnverifiedEvent {
 
     pub fn epoch(&self) -> anyhow::Result<u64> {
         match self {
-            UnverifiedEvent::ProposalMsg(p) => p.verified_epoch(),
+            UnverifiedEvent::ProposalMsg(p) => Ok(p.epoch()),
             UnverifiedEvent::VoteMsg(v) => Ok(v.epoch()),
             UnverifiedEvent::OrderVoteMsg(v) => Ok(v.epoch()),
             UnverifiedEvent::SyncInfo(s) => Ok(s.epoch()),
