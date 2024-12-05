@@ -90,7 +90,7 @@ test = false
 doc = false
 
 [[bin]]
-name = "deserialize_module_bundle"
-path = "fuzz_targets/move/deserialize_module_bundle.rs"
+name = "deserialize_script_module"
+path = "fuzz_targets/move/deserialize_script_module.rs"
 test = false
 doc = false
