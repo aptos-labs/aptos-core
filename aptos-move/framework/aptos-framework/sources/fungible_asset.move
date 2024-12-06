@@ -785,7 +785,7 @@ module aptos_framework::fungible_asset {
         amount: u64,
     ): FungibleAsset acquires FungibleStore, DispatchFunctionStore, ConcurrentFungibleBalance {
         withdraw_sanity_check(owner, store, true);
-        withdraw_internal(object::object_address(&store), amount)
+        unchecked_withdraw(object::object_address(&store), amount)
     }
 
     /// Check the permission for withdraw operation.
@@ -819,7 +819,7 @@ module aptos_framework::fungible_asset {
     /// Deposit `amount` of the fungible asset to `store`.
     public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore, DispatchFunctionStore, ConcurrentFungibleBalance {
         deposit_sanity_check(store, true);
-        deposit_internal(object::object_address(&store), fa);
+        unchecked_deposit(object::object_address(&store), fa);
     }
 
     /// Mint the specified `amount` of the fungible asset.
@@ -844,7 +844,7 @@ module aptos_framework::fungible_asset {
     public fun mint_to<T: key>(ref: &MintRef, store: Object<T>, amount: u64)
     acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance {
         deposit_sanity_check(store, false);
-        deposit_internal(object::object_address(&store), mint(ref, amount));
+        unchecked_deposit(object::object_address(&store), mint(ref, amount));
     }
 
     /// Enable/disable a store's ability to do direct transfers of the fungible asset.
@@ -898,16 +898,17 @@ module aptos_framework::fungible_asset {
         amount: u64
     ) acquires FungibleStore, Supply, ConcurrentSupply, ConcurrentFungibleBalance {
         // ref metadata match is checked in burn() call
-        burn(ref, withdraw_internal(object::object_address(&store), amount));
+        burn(ref, unchecked_withdraw(object::object_address(&store), amount));
     }
 
-    public(friend) fun address_burn_from(
+    /// Burn the `amount` of the fungible asset from the given store for gas charge.
+    public(friend) fun address_burn_from_for_gas(
         ref: &BurnRef,
         store_addr: address,
         amount: u64
     ) acquires FungibleStore, Supply, ConcurrentSupply, ConcurrentFungibleBalance {
         // ref metadata match is checked in burn() call
-        burn(ref, withdraw_internal(store_addr, amount));
+        burn(ref, unchecked_withdraw_with_no_events(store_addr, amount));
     }
 
     /// Withdraw `amount` of the fungible asset from the `store` ignoring `frozen`.
@@ -920,7 +921,7 @@ module aptos_framework::fungible_asset {
             ref.metadata == store_metadata(store),
             error::invalid_argument(ETRANSFER_REF_AND_STORE_MISMATCH),
         );
-        withdraw_internal(object::object_address(&store), amount)
+        unchecked_withdraw(object::object_address(&store), amount)
     }
 
     /// Deposit the fungible asset into the `store` ignoring `frozen`.
@@ -933,7 +934,7 @@ module aptos_framework::fungible_asset {
             ref.metadata == fa.metadata,
             error::invalid_argument(ETRANSFER_REF_AND_FUNGIBLE_ASSET_MISMATCH)
         );
-        deposit_internal(object::object_address(&store), fa);
+        unchecked_deposit(object::object_address(&store), fa);
     }
 
     /// Transfer `amount` of the fungible asset with `TransferRef` even it is frozen.
@@ -1019,26 +1020,57 @@ module aptos_framework::fungible_asset {
         assert!(amount == 0, error::invalid_argument(EAMOUNT_IS_NOT_ZERO));
     }
 
-    public(friend) fun deposit_internal(store_addr: address, fa: FungibleAsset) acquires FungibleStore, ConcurrentFungibleBalance {
+    inline fun unchecked_deposit_with_no_events_inline(
+        store_addr: address,
+        fa: FungibleAsset
+    ): u64 acquires FungibleStore, ConcurrentFungibleBalance {
         let FungibleAsset { metadata, amount } = fa;
         assert!(exists<FungibleStore>(store_addr), error::not_found(EFUNGIBLE_STORE_EXISTENCE));
         let store = borrow_global_mut<FungibleStore>(store_addr);
         assert!(metadata == store.metadata, error::invalid_argument(EFUNGIBLE_ASSET_AND_STORE_MISMATCH));
 
-        if (amount == 0) return;
-
-        if (store.balance == 0 && concurrent_fungible_balance_exists_inline(store_addr)) {
-            let balance_resource = borrow_global_mut<ConcurrentFungibleBalance>(store_addr);
-            aggregator_v2::add(&mut balance_resource.balance, amount);
-        } else {
-            store.balance = store.balance + amount;
+        if (amount != 0) {
+            if (store.balance == 0 && concurrent_fungible_balance_exists_inline(store_addr)) {
+                let balance_resource = borrow_global_mut<ConcurrentFungibleBalance>(store_addr);
+                aggregator_v2::add(&mut balance_resource.balance, amount);
+            } else {
+                store.balance = store.balance + amount;
+            };
         };
-
-        event::emit(Deposit { store: store_addr, amount });
+        amount
     }
 
-    /// Extract `amount` of the fungible asset from `store`.
-    public(friend) fun withdraw_internal(
+    public(friend) fun unchecked_deposit(
+        store_addr: address,
+        fa: FungibleAsset
+    ) acquires FungibleStore, ConcurrentFungibleBalance {
+        let amount = unchecked_deposit_with_no_events_inline(store_addr, fa);
+        if (amount != 0) {
+            event::emit(Deposit { store: store_addr, amount });
+        }
+    }
+
+    public(friend) fun unchecked_deposit_with_no_events(
+        store_addr: address,
+        fa: FungibleAsset
+    ) acquires FungibleStore, ConcurrentFungibleBalance {
+        unchecked_deposit_with_no_events_inline(store_addr, fa);
+    }
+
+    /// Extract `amount` of the fungible asset from `store` emitting event.
+    public(friend) fun unchecked_withdraw(
+        store_addr: address,
+        amount: u64
+    ): FungibleAsset acquires FungibleStore, ConcurrentFungibleBalance {
+        let fa = unchecked_withdraw_with_no_events(store_addr, amount);
+        if (amount != 0) {
+            event::emit<Withdraw>(Withdraw { store: store_addr, amount });
+        };
+        fa
+    }
+
+    /// Extract `amount` of the fungible asset from `store` w/o emitting event.
+    inline fun unchecked_withdraw_with_no_events(
         store_addr: address,
         amount: u64,
     ): FungibleAsset acquires FungibleStore, ConcurrentFungibleBalance {
@@ -1057,8 +1089,6 @@ module aptos_framework::fungible_asset {
                 assert!(store.balance >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
                 store.balance = store.balance - amount;
             };
-
-            event::emit<Withdraw>(Withdraw { store: store_addr, amount });
         };
         FungibleAsset { metadata, amount }
     }
