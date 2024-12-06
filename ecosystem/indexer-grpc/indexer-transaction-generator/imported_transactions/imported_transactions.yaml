@@ -1,3 +1,11 @@
+# devnet:
+#   # Transaction Stream endpoint addresss.
+#   transaction_stream_endpoint: https://grpc.devnet.aptoslabs.com:443
+#   # (Optional) The key to use with developers.aptoslabs.com
+#   api_key: DEVNET_API_KEY
+#   # A map from versions to dump and their output names.
+#   versions_to_import:
+#     # devnet is reset weekly 
 testnet:
   # Transaction Stream endpoint addresss.
   transaction_stream_endpoint: https://grpc.testnet.aptoslabs.com:443
