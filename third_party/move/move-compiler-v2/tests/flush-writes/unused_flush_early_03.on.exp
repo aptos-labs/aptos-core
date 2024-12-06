@@ -29,18 +29,21 @@ public fun m::test1() {
      var $t1: u64
      var $t2: u64
      var $t3: bool
-     var $t4: u64
-     var $t5: bool [unused]
-     var $t6: u64 [unused]
-     var $t7: bool [unused]
+     var $t4: u64 [unused]
+     var $t5: u64
+     var $t6: bool [unused]
+     var $t7: u64 [unused]
      var $t8: u64 [unused]
+     var $t9: bool [unused]
+     var $t10: u64 [unused]
+     var $t11: u64 [unused]
      # flush: $t1, $t2
      # live vars:
   0: ($t0, $t1, $t2) := m::foo()
      # live vars: $t0, $t1, $t2
-  1: $t4 := 0
-     # live vars: $t0, $t1, $t2, $t4
-  2: $t3 := ==($t0, $t4)
+  1: $t5 := 0
+     # live vars: $t0, $t1, $t2, $t5
+  2: $t3 := ==($t0, $t5)
      # live vars: $t1, $t2, $t3
   3: if ($t3) goto 6 else goto 4
      # live vars: $t1, $t2
@@ -54,39 +57,43 @@ public fun m::test1() {
      # live vars: $t1, $t2
   8: label L2
      # live vars: $t1, $t2
-  9: $t0 := 0
+  9: $t1 := move($t1)
+     # live vars: $t1, $t2
+ 10: $t0 := 0
      # live vars: $t0, $t1, $t2
- 10: $t3 := ==($t1, $t0)
+ 11: $t3 := ==($t1, $t0)
      # live vars: $t2, $t3
- 11: if ($t3) goto 14 else goto 12
+ 12: if ($t3) goto 15 else goto 13
      # live vars: $t2
- 12: label L10
+ 13: label L10
      # live vars: $t2
- 13: goto 16
+ 14: goto 17
      # live vars: $t2
- 14: label L3
+ 15: label L3
      # live vars: $t2
- 15: m::bar()
+ 16: m::bar()
      # live vars: $t2
- 16: label L5
+ 17: label L5
      # live vars: $t2
- 17: $t0 := 0
+ 18: $t2 := move($t2)
+     # live vars: $t2
+ 19: $t0 := 0
      # live vars: $t0, $t2
- 18: $t3 := ==($t2, $t0)
+ 20: $t3 := ==($t2, $t0)
      # live vars: $t3
- 19: if ($t3) goto 22 else goto 20
+ 21: if ($t3) goto 24 else goto 22
      # live vars:
- 20: label L11
+ 22: label L11
      # live vars:
- 21: goto 24
+ 23: goto 26
      # live vars:
- 22: label L6
+ 24: label L6
      # live vars:
- 23: m::bar()
+ 25: m::bar()
      # live vars:
- 24: label L8
+ 26: label L8
      # live vars:
- 25: return ()
+ 27: return ()
 }
 
 
@@ -109,7 +116,6 @@ B0:
 public test1() /* def_idx: 2 */ {
 L0:	loc0: u64
 L1:	loc1: u64
-L2:	loc2: u64
 B0:
 	0: Call foo(): u64 * u64 * u64
 	1: StLoc[0](loc0: u64)

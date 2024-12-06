@@ -1,8 +1,10 @@
 
 Diagnostics:
-error: same mutable reference in local `r` is used again in argument list
+error: same mutable reference in local `r` is also used in other value in argument list
    ┌─ tests/reference-safety/freeze.move:18:9
    │
+17 │         let r = &mut x;
+   │                 ------ previous mutable local borrow
 18 │         ref_mut_mut(r, r); // error
    │         ^^^^^^^^^^^^^^^^^ requirement enforced here
 

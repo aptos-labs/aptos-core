@@ -75,12 +75,14 @@ fun globals::check($t0: address): bool {
 
 [variant baseline]
 fun globals::publish($t0: &signer) {
-     var $t1: 0x42::globals::R
-     var $t2: u64
-  0: $t2 := 1
-  1: $t1 := pack 0x42::globals::R($t2)
-  2: move_to<0x42::globals::R>($t0, $t1)
-  3: return ()
+     var $t1: &signer
+     var $t2: 0x42::globals::R
+     var $t3: u64
+  0: $t1 := infer($t0)
+  1: $t3 := 1
+  2: $t2 := pack 0x42::globals::R($t3)
+  3: move_to<0x42::globals::R>($t1, $t2)
+  4: return ()
 }
 
 
@@ -111,4 +113,47 @@ fun globals::write($t0: address, $t1: u64): u64 {
 }
 
 
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.globals {
+struct R has store, key {
+	f: u64
+}
+
+check(Arg0: address): bool /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: address)
+	1: Exists[0](R)
+	2: Ret
+}
+publish(Arg0: &signer) /* def_idx: 1 */ {
+B0:
+	0: MoveLoc[0](Arg0: &signer)
+	1: LdU64(1)
+	2: Pack[0](R)
+	3: MoveTo[0](R)
+	4: Ret
+}
+read(Arg0: address): u64 /* def_idx: 2 */ {
+B0:
+	0: MoveLoc[0](Arg0: address)
+	1: ImmBorrowGlobal[0](R)
+	2: ImmBorrowField[0](R.f: u64)
+	3: ReadRef
+	4: Ret
+}
+write(Arg0: address, Arg1: u64): u64 /* def_idx: 3 */ {
+L2:	loc0: &mut R
+B0:
+	0: MoveLoc[0](Arg0: address)
+	1: MutBorrowGlobal[0](R)
+	2: StLoc[2](loc0: &mut R)
+	3: LdU64(2)
+	4: MoveLoc[2](loc0: &mut R)
+	5: MutBorrowField[0](R.f: u64)
+	6: WriteRef
+	7: LdU64(9)
+	8: Ret
+}
+}
 ============ bytecode verification succeeded ========
