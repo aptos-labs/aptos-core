@@ -3,6 +3,8 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # Unreleased
+- Set Compiler v2 as the default compiler and Move 2 as the default language version except for `aptos governance`.
+- Add new `--move-1` flag to use Compiler v1 and Move 1.  
 
 ## [4.6.0] - 2024/11/29
 - Add `--node-api-key` flag to `aptos move replay` to allow for querying the fullnode with an API key.
