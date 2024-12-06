@@ -25,7 +25,7 @@ IncGlobalMilestoneAggV2 { milestone_every: 1 }	60	0.914	1.051	33.5
 IncGlobalMilestoneAggV2 { milestone_every: 2 }	60	0.914	1.105	19.0
 EmitEvents { count: 1000 }	60	0.937	1.158	8818.7
 VectorTrimAppend { vec_len: 3000, element_len: 1, index: 0, repeats: 0 }	6	0.925	1.001	6058.1
-VectorTrimAppend { vec_len: 3000, element_len: 1, index: 100, repeats: 1000 }	6	0.925	1.001	29450.7
+VectorTrimAppend { vec_len: 3000, element_len: 1, index: 100, repeats: 1000 }	6	0.925	1.001	34000.0
 VectorTrimAppend { vec_len: 3000, element_len: 1, index: 2990, repeats: 1000 }	6	0.925	1.001	17626.5
 VectorRemoveInsert { vec_len: 3000, element_len: 1, index: 100, repeats: 1000 }	6	0.925	1.001	30870.3
 VectorRemoveInsert { vec_len: 3000, element_len: 1, index: 2998, repeats: 1000 }	6	0.925	1.001	20343.2
