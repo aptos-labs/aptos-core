@@ -1204,78 +1204,76 @@ impl RoundManager {
     }
 
     async fn process_order_vote_msg(&mut self, order_vote_msg: OrderVoteMsg) -> anyhow::Result<()> {
-        if self.onchain_config.order_vote_enabled() {
-            fail_point!("consensus::process_order_vote_msg", |_| {
-                Err(anyhow::anyhow!("Injected error in process_order_vote_msg"))
-            });
+        fail_point!("consensus::process_order_vote_msg", |_| {
+            Err(anyhow::anyhow!("Injected error in process_order_vote_msg"))
+        });
 
-            let order_vote = order_vote_msg.order_vote();
-            debug!(
-                self.new_log(LogEvent::ReceiveOrderVote)
-                    .remote_peer(order_vote.author()),
-                epoch = order_vote.ledger_info().epoch(),
-                round = order_vote.ledger_info().round(),
-                id = order_vote.ledger_info().consensus_block_id(),
-            );
+        let order_vote = order_vote_msg.order_vote();
+        debug!(
+            self.new_log(LogEvent::ReceiveOrderVote)
+                .remote_peer(order_vote.author()),
+            epoch = order_vote.ledger_info().epoch(),
+            round = order_vote.ledger_info().round(),
+            id = order_vote.ledger_info().consensus_block_id(),
+        );
 
-            if self
-                .pending_order_votes
-                .has_enough_order_votes(order_vote_msg.order_vote().ledger_info())
-            {
-                return Ok(());
-            }
+        if self
+            .pending_order_votes
+            .has_enough_order_votes(order_vote_msg.order_vote().ledger_info())
+        {
+            return Ok(());
+        }
 
-            let highest_ordered_round = self.block_store.sync_info().highest_ordered_round();
-            let order_vote_round = order_vote_msg.order_vote().ledger_info().round();
-            let li_digest = order_vote_msg.order_vote().ledger_info().hash();
-            if order_vote_round > highest_ordered_round
-                && order_vote_round < highest_ordered_round + 100
-            {
-                // If it is the first order vote received for the block, verify the QC and insert along with QC.
-                // For the subsequent order votes for the same block, we don't have to verify the QC. Just inserting the
-                // order vote is enough.
-                let vote_reception_result = if !self.pending_order_votes.exists(&li_digest) {
-                    let start = Instant::now();
-                    order_vote_msg
-                        .quorum_cert()
-                        .verify(&self.epoch_state.verifier)
-                        .context("[OrderVoteMsg QuorumCert verification failed")?;
-                    counters::VERIFY_MSG
-                        .with_label_values(&["order_vote_qc"])
-                        .observe(start.elapsed().as_secs_f64());
-                    self.pending_order_votes.insert_order_vote(
-                        order_vote_msg.order_vote(),
-                        &self.epoch_state.verifier,
-                        Some(order_vote_msg.quorum_cert().clone()),
-                    )
-                } else {
-                    self.pending_order_votes.insert_order_vote(
-                        order_vote_msg.order_vote(),
-                        &self.epoch_state.verifier,
-                        None,
-                    )
-                };
-                self.process_order_vote_reception_result(
-                    vote_reception_result,
-                    order_vote_msg.order_vote().author(),
+        let highest_ordered_round = self.block_store.sync_info().highest_ordered_round();
+        let order_vote_round = order_vote_msg.order_vote().ledger_info().round();
+        let li_digest = order_vote_msg.order_vote().ledger_info().hash();
+        if order_vote_round > highest_ordered_round
+            && order_vote_round < highest_ordered_round + 100
+        {
+            // If it is the first order vote received for the block, verify the QC and insert along with QC.
+            // For the subsequent order votes for the same block, we don't have to verify the QC. Just inserting the
+            // order vote is enough.
+            let vote_reception_result = if !self.pending_order_votes.exists(&li_digest) {
+                let start = Instant::now();
+                order_vote_msg
+                    .quorum_cert()
+                    .verify(&self.epoch_state.verifier)
+                    .context("[OrderVoteMsg QuorumCert verification failed]")?;
+                counters::VERIFY_MSG
+                    .with_label_values(&["order_vote_qc"])
+                    .observe(start.elapsed().as_secs_f64());
+                self.pending_order_votes.insert_order_vote(
+                    order_vote_msg.order_vote(),
+                    &self.epoch_state.verifier,
+                    Some(order_vote_msg.quorum_cert().clone()),
                 )
-                .await?;
             } else {
-                ORDER_VOTE_NOT_IN_RANGE.inc();
-                sample!(
-                    SampleRate::Duration(Duration::from_secs(1)),
-                    info!(
-                        "[sampled] Received an order vote not in the 100 rounds. Order vote round: {:?}, Highest ordered round: {:?}",
-                        order_vote_msg.order_vote().ledger_info().round(),
-                        self.block_store.sync_info().highest_ordered_round()
-                    )
-                );
-                debug!(
-                    "Received an order vote not in the next 100 rounds. Order vote round: {:?}, Highest ordered round: {:?}",
+                self.pending_order_votes.insert_order_vote(
+                    order_vote_msg.order_vote(),
+                    &self.epoch_state.verifier,
+                    None,
+                )
+            };
+            self.process_order_vote_reception_result(
+                vote_reception_result,
+                order_vote_msg.order_vote().author(),
+            )
+            .await?;
+        } else {
+            ORDER_VOTE_NOT_IN_RANGE.inc();
+            sample!(
+                SampleRate::Duration(Duration::from_secs(1)),
+                info!(
+                    "[sampled] Received an order vote not in the 100 rounds. Order vote round: {:?}, Highest ordered round: {:?}",
                     order_vote_msg.order_vote().ledger_info().round(),
                     self.block_store.sync_info().highest_ordered_round()
                 )
-            }
+            );
+            debug!(
+                "Received an order vote not in the next 100 rounds. Order vote round: {:?}, Highest ordered round: {:?}",
+                order_vote_msg.order_vote().ledger_info().round(),
+                self.block_store.sync_info().highest_ordered_round()
+            )
         }
         Ok(())
     }
@@ -1438,26 +1436,24 @@ impl RoundManager {
                         "[RoundManager] Unable to process the created QC {:?}",
                         qc
                     ))?;
-                if self.onchain_config.order_vote_enabled() {
-                    // This check is already done in safety rules. As printing the "failed to broadcast order vote"
-                    // in humio logs could sometimes look scary, we are doing the same check again here.
-                    if let Some(last_sent_vote) = self.round_state.vote_sent() {
-                        if let Some((two_chain_timeout, _)) = last_sent_vote.two_chain_timeout() {
-                            if round <= two_chain_timeout.round() {
-                                return Ok(());
-                            }
+                // This check is already done in safety rules. As printing the "failed to broadcast order vote"
+                // in humio logs could sometimes look scary, we are doing the same check again here.
+                if let Some(last_sent_vote) = self.round_state.vote_sent() {
+                    if let Some((two_chain_timeout, _)) = last_sent_vote.two_chain_timeout() {
+                        if round <= two_chain_timeout.round() {
+                            return Ok(());
                         }
                     }
-                    // Broadcast order vote if the QC is successfully aggregated
-                    // Even if broadcast order vote fails, the function will return Ok
-                    if let Err(e) = self.broadcast_order_vote(vote, qc.clone()).await {
-                        warn!(
-                            "Failed to broadcast order vote for QC {:?}. Error: {:?}",
-                            qc, e
-                        );
-                    } else {
-                        self.broadcast_fast_shares(qc.certified_block()).await;
-                    }
+                }
+                // Broadcast order vote if the QC is successfully aggregated
+                // Even if broadcast order vote fails, the function will return Ok
+                if let Err(e) = self.broadcast_order_vote(vote, qc.clone()).await {
+                    warn!(
+                        "Failed to broadcast order vote for QC {:?}. Error: {:?}",
+                        qc, e
+                    );
+                } else {
+                    self.broadcast_fast_shares(qc.certified_block()).await;
                 }
                 Ok(())
             },
