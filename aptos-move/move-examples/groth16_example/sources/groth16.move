@@ -1,6 +1,10 @@
 /// Generic implementation of Groth16 (proof verification) as defined in https://eprint.iacr.org/2016/260.pdf, Section 3.2.
 /// Actual proof verifiers can be constructed using the pairings supported in the generic algebra module.
+///
 /// See the test cases in this module for an example of constructing with BLS12-381 curves.
+///
+/// If you work with snarkjs, try [this tool](https://github.com/aptos-labs/snarkjs-to-aptos)
+/// which generates this module from snarkjs outputs, with all format conversions taken care of.
 ///
 /// **WARNING:** This code has NOT been audited. If using it in a production system, proceed at your own risk.
 module groth16_example::groth16 {
