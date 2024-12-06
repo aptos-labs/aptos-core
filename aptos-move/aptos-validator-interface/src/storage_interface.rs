@@ -82,6 +82,7 @@ impl AptosValidatorInterface for DBDebuggerInterface {
             ),
         >,
         _handled_function_vec: &mut Vec<(AccountAddress, String)>,
+        _sampling: u32,
     ) -> Result<
         Vec<(
             u64,
