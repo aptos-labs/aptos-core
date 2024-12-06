@@ -49,7 +49,7 @@ pub struct Command {
 
     #[clap(
         long,
-        value_delimiter = ' ',
+        num_args = 1..,
         help = "List of space-separated concurrency levels that define how many threads Block-STM \
                 is using to execute a block of transactions. For each level, the time taken to \
                 execute blocks of transactions is measured and reported."
@@ -73,6 +73,7 @@ pub struct Command {
 
     #[clap(
         long,
+        num_args = 1..,
         value_delimiter = ' ',
         help = "List of space-separated feature flags to enable, in capital letters. For example, \
                 GAS_PAYER_ENABLED or EMIT_FEE_STATEMENT. For the full list of feature flags, see \
@@ -82,6 +83,7 @@ pub struct Command {
 
     #[clap(
         long,
+        num_args = 1..,
         value_delimiter = ' ',
         help = "List of space-separated feature flags to disable, in capital letters. For \
                 example, GAS_PAYER_ENABLED or EMIT_FEE_STATEMENT. For the full list of feature \
