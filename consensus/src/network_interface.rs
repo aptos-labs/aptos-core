@@ -12,7 +12,7 @@ use crate::{
 };
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
-    block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
+    block_retrieval::{BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalResponse},
     epoch_retrieval::EpochRetrievalRequest,
     order_vote_msg::OrderVoteMsg,
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
@@ -36,7 +36,8 @@ use std::{collections::HashMap, time::Duration};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum ConsensusMsg {
     /// RPC to get a chain of block of the given length starting from the given block id.
-    BlockRetrievalRequest(Box<BlockRetrievalRequest>),
+    /// TODO double check renaming here is OK for backwards compatability
+    DeprecatedBlockRetrievalRequest(Box<BlockRetrievalRequestV1>),
     /// Carries the returned blocks and the retrieval status.
     BlockRetrievalResponse(Box<BlockRetrievalResponse>),
     /// Request to get a EpochChangeProof from current_epoch to target_epoch
@@ -83,6 +84,8 @@ pub enum ConsensusMsg {
     OrderVoteMsg(Box<OrderVoteMsg>),
     /// RoundTimeoutMsg is broadcasted by a validator once it decides to timeout the current round.
     RoundTimeoutMsg(Box<RoundTimeoutMsg>),
+    /// RPC to get a chain of block of the given length starting from the given block id.
+    BlockRetrievalRequest(Box<BlockRetrievalRequest>),
 }
 
 /// Network type for consensus
@@ -91,7 +94,7 @@ impl ConsensusMsg {
     ///
     pub fn name(&self) -> &str {
         match self {
-            ConsensusMsg::BlockRetrievalRequest(_) => "BlockRetrievalRequest",
+            ConsensusMsg::DeprecatedBlockRetrievalRequest(_) => "DeprecatedBlockRetrievalRequest",
             ConsensusMsg::BlockRetrievalResponse(_) => "BlockRetrievalResponse",
             ConsensusMsg::EpochRetrievalRequest(_) => "EpochRetrievalRequest",
             ConsensusMsg::ProposalMsg(_) => "ProposalMsg",
@@ -111,6 +114,7 @@ impl ConsensusMsg {
             ConsensusMsg::RandGenMessage(_) => "RandGenMessage",
             ConsensusMsg::BatchResponseV2(_) => "BatchResponseV2",
             ConsensusMsg::RoundTimeoutMsg(_) => "RoundTimeoutV2",
+            ConsensusMsg::BlockRetrievalRequest(_) => "BlockRetrievalRequest",
         }
     }
 }

@@ -241,7 +241,7 @@ mod test {
     use aptos_consensus_types::{
         block::Block,
         block_data::{BlockData, BlockType},
-        pipelined_block::PipelinedBlock,
+        pipelined_block::{OrderedBlockWindow, PipelinedBlock},
         quorum_cert::QuorumCert,
     };
     use aptos_crypto::HashValue;
@@ -965,7 +965,11 @@ mod test {
                 BlockType::Genesis,
             );
             let block = Block::new_for_testing(block_info.id(), block_data, None);
-            let pipelined_block = Arc::new(PipelinedBlock::new_ordered(block));
+            let pipelined_block = Arc::new(PipelinedBlock::new_ordered(
+                block,
+                // TODO revisit this, not sure how i would do this right now...
+                OrderedBlockWindow::empty(),
+            ));
 
             // Add the pipelined block to the list
             pipelined_blocks.push(pipelined_block);
