@@ -132,9 +132,17 @@ impl CliCommand<&'static str> for LintPackage {
                 true,
             )?
         };
-        BuiltPackage::build_with_external_checks(package_path, build_options, vec![
-            MoveLintChecks::make(),
-        ])?;
+
+        let build_config = BuiltPackage::create_build_config(&build_options)?;
+        let resolved_graph =
+            BuiltPackage::prepare_resolution_graph(package_path, build_config.clone())?;
+        BuiltPackage::build_with_external_checks(
+            resolved_graph,
+            build_options,
+            build_config,
+            vec![MoveLintChecks::make()],
+        )?;
+
         Ok("succeeded")
     }
 }
