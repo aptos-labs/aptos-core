@@ -17,8 +17,9 @@ from testsuite import forge
 from archive_disk_utils import (
     TESTNET_SNAPSHOT_NAME,
     MAINNET_SNAPSHOT_NAME,
-    create_pvcs_from_snapshot,
+    create_pvcs_from_snapshot_with_sdk,
     get_kubectl_credentials,
+    cleanup_disks,
 )
 
 SHARDING_ENABLED = False
@@ -362,7 +363,7 @@ class ReplayScheduler:
             if self.network == Network.TESTNET
             else MAINNET_SNAPSHOT_NAME
         )
-        pvcs = create_pvcs_from_snapshot(
+        pvcs = create_pvcs_from_snapshot_with_sdk(
             self.id,
             snapshot_name,
             self.namespace,
@@ -438,6 +439,7 @@ class ReplayScheduler:
     def cleanup(self):
         self.kill_all_pods()
         self.delete_all_pvcs()
+        self.delete_all_disks()
 
     def kill_all_pods(self):
         # Delete all pods in the namespace
@@ -451,6 +453,14 @@ class ReplayScheduler:
             namespace=self.namespace,
             label_selector=f"run={self.get_label()}",
         )
+
+    def delete_all_disks(self):
+        snapshot_name = (
+            TESTNET_SNAPSHOT_NAME
+            if self.network == Network.TESTNET
+            else MAINNET_SNAPSHOT_NAME
+        )
+        cleanup_disks(self.id, snapshot_name, self.config.pvc_number)
 
     def collect_all_failed_logs(self):
         logger.info("Collecting logs from remaining pods")
@@ -500,7 +510,9 @@ def parse_args():
     parser.add_argument("--end", required=False, type=int)
     parser.add_argument("--worker_cnt", required=False, type=int)
     parser.add_argument("--range_size", required=False, type=int)
-    parser.add_argument("--namespace", required=False, type=str, default="default")
+    parser.add_argument(
+        "--namespace", required=False, type=str, default="replay-verify"
+    )
     parser.add_argument("--image_tag", required=False, type=str)
     parser.add_argument("--cleanup", required=False, action="store_true", default=False)
     args = parser.parse_args()
@@ -548,6 +560,10 @@ if __name__ == "__main__":
     config = ReplayConfig(network)
     worker_cnt = args.worker_cnt if args.worker_cnt else config.pvc_number * 7
     range_size = args.range_size if args.range_size else config.range_size
+
+    if args.end is not None:
+        assert args.end <= end, "end version is out of range"
+
     scheduler = ReplayScheduler(
         run_id,
         start if args.start is None else args.start,
@@ -572,9 +588,9 @@ if __name__ == "__main__":
             (failed_logs, txn_mismatch_logs) = scheduler.collect_all_failed_logs()
             scheduler.print_stats()
             print_logs(failed_logs, txn_mismatch_logs)
-            if txn_mismatch_logs:  
-                logger.error("Transaction mismatch logs found.")  
-                exit(1)  
+            if txn_mismatch_logs:
+                logger.error("Transaction mismatch logs found.")
+                exit(1)
 
         finally:
             scheduler.cleanup()
