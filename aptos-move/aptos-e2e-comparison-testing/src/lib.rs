@@ -60,6 +60,7 @@ const MAX_TO_FLUSH: usize = 50000;
 pub const DISABLE_SPEC_CHECK: &str = "spec-check=off";
 pub const DISABLE_REF_CHECK: &str = "reference-safety=off";
 pub const ENABLE_REF_CHECK: &str = "reference-safety=on";
+pub const SAMPLING_RATE: u32 = 3;
 
 struct IndexWriter {
     index_writer: BufWriter<File>,
@@ -297,6 +298,7 @@ async fn download_aptos_packages(path: &Path) -> anyhow::Result<()> {
     let tmp_dir = TempDir::new()?;
     Command::new("git")
         .args(["clone", git_url, tmp_dir.path().to_str().unwrap(), "--depth", "1"])
+        //.args(["clone", "--branch", "aptos-release-v1.20", git_url, tmp_dir.path().to_str().unwrap(), "--depth", "1"])
         .output()
         .map_err(|_| anyhow::anyhow!("Failed to clone Git repository"))?;
     let source_framework_path = PathBuf::from(tmp_dir.path()).join("aptos-move/framework");
