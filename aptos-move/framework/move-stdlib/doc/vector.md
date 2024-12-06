@@ -372,7 +372,7 @@ Move prevents from having two mutable references to the same value, so <code>fro
 vectors are always distinct.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="vector.md#0x1_vector_move_range">move_range</a>&lt;T&gt;(from: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;T&gt;, removal_position: u64, length: u64, <b>to</b>: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;T&gt;, insert_position: u64)
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_move_range">move_range</a>&lt;T&gt;(from: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;T&gt;, removal_position: u64, length: u64, <b>to</b>: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;T&gt;, insert_position: u64)
 </code></pre>
 
 
@@ -381,7 +381,7 @@ vectors are always distinct.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>public</b>(<b>friend</b>) <b>fun</b> <a href="vector.md#0x1_vector_move_range">move_range</a>&lt;T&gt;(
+<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_move_range">move_range</a>&lt;T&gt;(
     from: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;T&gt;,
     removal_position: u64,
     length: u64,
