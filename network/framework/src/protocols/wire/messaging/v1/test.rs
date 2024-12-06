@@ -282,7 +282,7 @@ proptest! {
                     match msg {
                         StreamMessage::Header(header) => inbound_stream.new_stream(header).unwrap(),
                         StreamMessage::Fragment(fragment) => {
-                            if let Some(network_msg) = inbound_stream.append_fragment(fragment).unwrap() {
+                            if let Some((_, network_msg)) = inbound_stream.append_fragment(fragment).unwrap() {
                                 recv.push(network_msg);
                             }
                         }

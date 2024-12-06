@@ -791,17 +791,13 @@ mod test {
                         assert_eq!(timeout, Duration::from_millis(RPC_REQUEST_TIMEOUT_MS));
 
                         // Create and return the received message
-                        let received_message = ReceivedMessage {
-                            message: NetworkMessage::RpcRequest(RpcRequest{
-                                protocol_id,
-                                request_id: 0,
-                                priority: 0,
-                                raw_request: data.into(),
-                            }),
-                            sender: PeerNetworkId::new(expected_network_id, peer_id),
-                            receive_timestamp_micros: 0,
-                            rpc_replier: Some(Arc::new(res_tx)),
-                        };
+                        let network_message = NetworkMessage::RpcRequest(RpcRequest{
+                            protocol_id,
+                            request_id: 0,
+                            priority: 0,
+                            raw_request: data.into(),
+                        });
+                        let received_message = ReceivedMessage::new_for_testing(network_message, PeerNetworkId::new(expected_network_id, peer_id), Some(Arc::new(res_tx)));
                         (protocol_id, received_message)
                     }
                     PeerManagerRequest::SendDirectSend(peer_id, message) => {
@@ -814,16 +810,12 @@ mod test {
                         assert_eq!(Some(protocol_id), expected_direct_send_protocol);
 
                         // Create and return the received message
-                        let received_message = ReceivedMessage {
-                            message: NetworkMessage::DirectSendMsg(DirectSendMsg{
-                                protocol_id,
-                                priority: 0,
-                                raw_msg: data.into(),
-                            }),
-                            sender: PeerNetworkId::new(expected_network_id, peer_id),
-                            receive_timestamp_micros: 0,
-                            rpc_replier: None,
-                        };
+                        let network_message = NetworkMessage::DirectSendMsg(DirectSendMsg{
+                            protocol_id,
+                            priority: 0,
+                            raw_msg: data.into(),
+                        });
+                        let received_message = ReceivedMessage::new_for_testing(network_message, PeerNetworkId::new(expected_network_id, peer_id), None);
                         (protocol_id, received_message)
                     }
                 };

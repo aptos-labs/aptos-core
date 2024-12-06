@@ -4,7 +4,9 @@
 
 use crate::protocols::wire::{
     handshake::v1::ProtocolId,
-    messaging::v1::metadata::{MessageSendLatency, MessageSendType, MessageStreamType},
+    messaging::v1::metadata::{
+        MessageReceiveType, MessageSendLatency, MessageSendType, MessageStreamType,
+    },
 };
 use aptos_config::network_id::{NetworkContext, NetworkId};
 use aptos_metrics_core::{
@@ -203,7 +205,23 @@ pub static APTOS_NETWORK_DISCOVERY_NOTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Time it takes to for messages to be sent by the network layer
+/// Time it takes for messages to be received by the network layer
+pub static APTOS_NETWORK_MESSAGE_RECEIVE_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_network_message_receive_latency",
+        "Time it takes for messages to be received by the network layer",
+        &[
+            "network_id",
+            "protocol_id",
+            "message_type",
+            "message_stream_type",
+        ],
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
+/// Time it takes for messages to be sent by the network layer
 pub static APTOS_NETWORK_MESSAGE_SEND_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_network_message_send_latency",
@@ -220,9 +238,33 @@ pub static APTOS_NETWORK_MESSAGE_SEND_LATENCY: Lazy<HistogramVec> = Lazy::new(||
     .unwrap()
 });
 
-/// Observes the value for the provided histogram and labels
+/// Observes the message receive latency
+pub fn observe_message_receive_latency(
+    network_id: &NetworkId,
+    protocol_id: &Option<ProtocolId>,
+    message_receive_type: &MessageReceiveType,
+    message_stream_type: &MessageStreamType,
+    value: f64,
+) {
+    // Get the protocol ID
+    let protocol_id = protocol_id
+        .as_ref()
+        .map(|id| id.as_str())
+        .unwrap_or(UNKNOWN_PROTOCOL_ID_LABEL);
+
+    // Update the histogram
+    APTOS_NETWORK_MESSAGE_RECEIVE_LATENCY
+        .with_label_values(&[
+            network_id.as_str(),
+            protocol_id,
+            message_receive_type.get_label(),
+            message_stream_type.get_label(),
+        ])
+        .observe(value)
+}
+
+/// Observes the message send latency
 pub fn observe_message_send_latency(
-    histogram: &Lazy<HistogramVec>,
     network_id: &NetworkId,
     protocol_id: &Option<ProtocolId>,
     message_send_type: &MessageSendType,
@@ -237,7 +279,7 @@ pub fn observe_message_send_latency(
         .unwrap_or(UNKNOWN_PROTOCOL_ID_LABEL);
 
     // Update the histogram
-    histogram
+    APTOS_NETWORK_MESSAGE_SEND_LATENCY
         .with_label_values(&[
             network_id.as_str(),
             protocol_id,
@@ -745,19 +787,3 @@ pub static OP_MEASURE: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .unwrap()
 });
-
-pub static INBOUND_QUEUE_DELAY: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        "aptos_network_inbound_queue_time",
-        "Time a message sits in queue between peer socket and app code",
-        &["protocol_id"],
-        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
-    )
-    .unwrap()
-});
-
-pub fn inbound_queue_delay_observe(protocol_id: ProtocolId, seconds: f64) {
-    INBOUND_QUEUE_DELAY
-        .with_label_values(&[protocol_id.as_str()])
-        .observe(seconds)
-}
