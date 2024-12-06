@@ -1691,6 +1691,9 @@ This can only be called at object creation time as constructor_ref is only avail
 
 Get the current supply from the <code>metadata</code> object.
 
+Note: This function can be in-place replaced by <code><a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_derived_supply">dispatchable_fungible_asset::derived_supply</a></code>. You should use
+that function unless you DO NOT want to support fungible assets with dispatchable hooks.
+
 
 <pre><code>#[view]
 <b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_supply">supply</a>&lt;T: key&gt;(metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u128&gt;
@@ -2075,6 +2078,9 @@ Return the <code>amount</code> of a given fungible asset.
 ## Function `balance`
 
 Get the balance of a given store.
+
+Note: This function can be in-place replaced by <code><a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_derived_balance">dispatchable_fungible_asset::derived_balance</a></code>. You should use
+that function unless you DO NOT want to support fungible assets with dispatchable hooks.
 
 
 <pre><code>#[view]
@@ -2536,6 +2542,9 @@ Get the underlying metadata object from the <code><a href="fungible_asset.md#0x1
 Transfer an <code>amount</code> of fungible asset from <code>from_store</code>, which should be owned by <code>sender</code>, to <code>receiver</code>.
 Note: it does not move the underlying object.
 
+This function can be in-place replaced by <code><a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_transfer">dispatchable_fungible_asset::transfer</a></code>. You should use
+that function unless you DO NOT want to support fungible assets with dispatchable hooks.
+
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_transfer">transfer</a>&lt;T: key&gt;(sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, from: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, <b>to</b>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64)
 </code></pre>
@@ -2659,6 +2668,9 @@ Used to delete a store.  Requires the store to be completely empty prior to remo
 
 Withdraw <code>amount</code> of the fungible asset from <code>store</code> by the owner.
 
+Note: This function can be in-place replaced by <code><a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_withdraw">dispatchable_fungible_asset::withdraw</a></code>. You should use
+that function unless you DO NOT want to support fungible assets with dispatchable hooks.
+
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_withdraw">withdraw</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>
 </code></pre>
@@ -2756,6 +2768,9 @@ Deposit <code>amount</code> of the fungible asset to <code>store</code>.
 ## Function `deposit`
 
 Deposit <code>amount</code> of the fungible asset to <code>store</code>.
+
+Note: This function can be in-place replaced by <code><a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_deposit">dispatchable_fungible_asset::deposit</a></code>. You should use
+that function unless you DO NOT want to support fungible assets with dispatchable hooks.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deposit">deposit</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>)
