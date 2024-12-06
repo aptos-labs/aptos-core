@@ -307,10 +307,22 @@ pub fn run_model_builder_with_options_and_compilation_flags<
 
     // Extract the module/script closure
     let mut visited_modules = BTreeSet::new();
+    // Extract the module closure for the vector module
+    let mut vector_and_its_dependencies = BTreeSet::new();
+    let mut seen_vector = false;
     for (_, mident, mdef) in &expansion_ast.modules {
         let src_file_hash = mdef.loc.file_hash();
         if !dep_files.contains(&src_file_hash) {
             collect_related_modules_recursive(mident, &expansion_ast.modules, &mut visited_modules);
+        }
+        if !seen_vector && is_vector(*mident) {
+            seen_vector = true;
+            // Collect the vector module and its dependencies.
+            collect_related_modules_recursive(
+                mident,
+                &expansion_ast.modules,
+                &mut vector_and_its_dependencies,
+            );
         }
     }
     for sdef in expansion_ast.scripts.values() {
@@ -334,8 +346,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
             // to handle cases of implicit usage.
             // E.g., index operation on a vector results in a call to `vector::borrow`.
             // TODO(#15483): consider refactoring code to avoid this special case.
-            let is_vector_or_its_dependencies = is_vector_or_its_dependencies(mident.value);
-            (is_vector_or_its_dependencies && compile_via_model
+            ((compile_via_model && vector_and_its_dependencies.contains(&mident.value))
                 || visited_modules.contains(&mident.value))
             .then(|| {
                 mdef.is_source_module = true;
@@ -416,14 +427,10 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     }
 }
 
-/// Is `module_ident` the `vector` module, or any module that `vector` depends on?
-fn is_vector_or_its_dependencies(module_ident: ModuleIdent_) -> bool {
-    if module_ident.address.into_addr_bytes().into_inner() == AccountAddress::ONE {
-        let module_name = module_ident.module.0.value.as_str();
-        module_name == "vector" || module_name == "mem"
-    } else {
-        false
-    }
+/// Is `module_ident` the `vector` module?
+fn is_vector(module_ident: ModuleIdent_) -> bool {
+    module_ident.address.into_addr_bytes().into_inner() == AccountAddress::ONE
+        && module_ident.module.0.value.as_str() == "vector"
 }
 
 fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
