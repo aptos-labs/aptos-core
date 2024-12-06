@@ -12,8 +12,6 @@ use crate::{
 use aptos_crypto::HashValue;
 use bytes::Bytes;
 use move_core_types::move_resource::MoveResource;
-#[cfg(any(test, feature = "testing"))]
-use std::hash::Hash;
 use std::ops::Deref;
 
 pub mod errors;
@@ -89,6 +87,9 @@ where
         self.deref().get_usage()
     }
 }
+
+#[cfg(any(test, feature = "testing"))]
+use std::hash::Hash;
 
 /// Test-only basic [StateView] implementation with generic keys.
 #[cfg(any(test, feature = "testing"))]

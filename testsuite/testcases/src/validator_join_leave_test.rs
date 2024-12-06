@@ -91,10 +91,7 @@ impl NetworkLoadTest for ValidatorJoinLeaveTest {
                 .await
                 .unwrap();
 
-            let account_balance = public_info
-                .get_balance(validator_account_address)
-                .await
-                .unwrap();
+            let account_balance = public_info.get_balance(validator_account_address).await;
             assert_eq!(account_balance, DEFAULT_FUNDED_COINS);
             validator_cli_indices.push(validator_cli_index);
 
