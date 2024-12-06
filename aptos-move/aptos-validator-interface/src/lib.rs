@@ -62,6 +62,7 @@ pub trait AptosValidatorInterface: Sync {
             ),
         >,
         handled_function_vec: &mut Vec<(AccountAddress, String)>,
+        sampling: u32,
     ) -> Result<
         Vec<(
             u64,

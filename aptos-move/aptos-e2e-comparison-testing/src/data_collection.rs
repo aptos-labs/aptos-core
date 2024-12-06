@@ -4,7 +4,7 @@
 use crate::{
     add_aptos_packages_to_data_store, check_aptos_packages_availability, compile_aptos_packages,
     data_state_view::DataStateView, dump_and_compile_from_package_metadata, is_aptos_package,
-    CompilationCache, DataManager, IndexWriter, PackageInfo, TxnIndex, APTOS_COMMONS,
+    CompilationCache, DataManager, IndexWriter, PackageInfo, TxnIndex, APTOS_COMMONS, SAMPLING_RATE
 };
 use anyhow::{format_err, Result};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
@@ -164,10 +164,10 @@ impl DataCollection {
         }
     }
 
-    pub async fn dump_data(&self, begin: Version, limit: u64) -> Result<()> {
+    pub async fn dump_data(&self, begin: Version, limit: u64, rate: u32) -> Result<()> {
         println!("begin dumping data");
         let aptos_commons_path = self.current_dir.join(APTOS_COMMONS);
-        if !check_aptos_packages_availability(aptos_commons_path.clone()) {
+        if self.filter_condition.check_source_code && !check_aptos_packages_availability(aptos_commons_path.clone()) {
             return Err(anyhow::Error::msg("aptos packages are missing"));
         }
         let mut compiled_cache = CompilationCache::default();
@@ -199,6 +199,7 @@ impl DataCollection {
                     self.filter_condition,
                     &mut module_registry_map,
                     &mut filtered_vec,
+                    rate
                 )
                 .await;
             // if error happens when collecting txns, log the version range
