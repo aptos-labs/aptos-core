@@ -19,6 +19,15 @@ use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_sta
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::collections::{BTreeMap, HashMap};
 
+/// Gives a global (from an executing txn perspective) view into the synchronization aspects of the
+/// encompassing block execution. The goal is to improve the efficiency of overall block execution.
+/// For example, if the block execution has halted due to gas limit (committing only a prefix),
+/// ongoing speculative executions can return early. Similarly, if a read-write dependency is
+/// preficted between txns, it can allow the dependent txn to wait and avoid costly re-executions.
+pub trait BlockSynchronizationView {
+    fn early_abort_execution(&self) -> bool;
+}
+
 /// Allows to query resources from the state.
 pub trait TResourceView {
     type Key;
@@ -204,7 +213,8 @@ pub trait StateStorageView {
 /// resolve AggregatorV2 via the state-view based default implementation, as it
 /// doesn't provide a value exchange functionality).
 pub trait TExecutorView<K, T, L, I, V>:
-    TResourceView<Key = K, Layout = L>
+    BlockSynchronizationView
+    + TResourceView<Key = K, Layout = L>
     + TModuleView<Key = K>
     + TAggregatorV1View<Identifier = K>
     + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
@@ -213,7 +223,8 @@ pub trait TExecutorView<K, T, L, I, V>:
 }
 
 impl<A, K, T, L, I, V> TExecutorView<K, T, L, I, V> for A where
-    A: TResourceView<Key = K, Layout = L>
+    A: BlockSynchronizationView
+        + TResourceView<Key = K, Layout = L>
         + TModuleView<Key = K>
         + TAggregatorV1View<Identifier = K>
         + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
@@ -296,6 +307,15 @@ where
 
     fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
         self.get_usage().map_err(Into::into)
+    }
+}
+
+impl<S> BlockSynchronizationView for S
+where
+    S: StateView,
+{
+    fn early_abort_execution(&self) -> bool {
+        false
     }
 }
 

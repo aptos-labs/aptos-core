@@ -88,7 +88,7 @@ use aptos_vm_types::{
     },
     module_write_set::ModuleWriteSet,
     output::VMOutput,
-    resolver::{ExecutorView, ResourceGroupView},
+    resolver::{BlockSynchronizationView, ExecutorView, ResourceGroupView},
     storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters},
 };
 use ark_bn254::Bn254;
@@ -2043,9 +2043,9 @@ impl AptosVM {
 
     /// Main entrypoint for executing a user transaction that also allows the customization of the
     /// gas meter to be used.
-    pub fn execute_user_transaction_with_custom_gas_meter<G, F>(
+    pub fn execute_user_transaction_with_custom_gas_meter<'a, G, F>(
         &self,
-        resolver: &impl AptosMoveResolver,
+        resolver: &'a impl AptosMoveResolver,
         code_storage: &impl AptosCodeStorage,
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
@@ -2053,7 +2053,14 @@ impl AptosVM {
     ) -> Result<(VMStatus, VMOutput, G), VMStatus>
     where
         G: AptosGasMeter,
-        F: FnOnce(u64, VMGasParameters, StorageGasParameters, bool, Gas) -> G,
+        F: FnOnce(
+            u64,
+            VMGasParameters,
+            StorageGasParameters,
+            bool,
+            Gas,
+            Option<&'a dyn BlockSynchronizationView>,
+        ) -> G,
     {
         let txn_metadata = TransactionMetadata::new(txn);
 
@@ -2066,6 +2073,7 @@ impl AptosVM {
             self.storage_gas_params(log_context)?.clone(),
             is_approved_gov_script,
             balance,
+            Some(resolver.as_block_synchronization_view()),
         );
         let (status, output) = self.execute_user_transaction_impl(
             resolver,
@@ -2085,16 +2093,16 @@ impl AptosVM {
     ///
     /// This can be useful for off-chain applications that wants to perform additional
     /// measurements or analysis while preserving the production gas behavior.
-    pub fn execute_user_transaction_with_modified_gas_meter<G, F>(
+    pub fn execute_user_transaction_with_modified_gas_meter<'a, G, F>(
         &self,
-        resolver: &impl AptosMoveResolver,
+        resolver: &'a impl AptosMoveResolver,
         code_storage: &impl AptosCodeStorage,
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
         modify_gas_meter: F,
     ) -> Result<(VMStatus, VMOutput, G), VMStatus>
     where
-        F: FnOnce(ProdGasMeter) -> G,
+        F: FnOnce(ProdGasMeter<'a>) -> G,
         G: AptosGasMeter,
     {
         self.execute_user_transaction_with_custom_gas_meter(
@@ -2106,13 +2114,15 @@ impl AptosVM {
              vm_gas_params,
              storage_gas_params,
              is_approved_gov_script,
-             meter_balance| {
+             meter_balance,
+             _maybe_block_synchronization_view| {
                 modify_gas_meter(make_prod_gas_meter(
                     gas_feature_version,
                     vm_gas_params,
                     storage_gas_params,
                     is_approved_gov_script,
                     meter_balance,
+                    None, // No block synchronization view
                 ))
             },
         )
@@ -2484,6 +2494,7 @@ impl AptosVM {
             storage_gas_params,
             /* is_approved_gov_script */ false,
             max_gas_amount.into(),
+            None, // No block synchronization view
         );
 
         let resolver = state_view.as_move_resolver();
