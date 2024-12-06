@@ -46,6 +46,7 @@ pub(crate) fn get_realistic_env_test(
         "realistic_env_graceful_workload_sweep" => realistic_env_graceful_workload_sweep(),
         "realistic_env_graceful_overload" => realistic_env_graceful_overload(duration),
         "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
+        "land_blocking" | "realistic_env_max_load" => bcho_test(),
         _ => return None, // The test name does not match a realistic-env test
     };
     Some(test)
@@ -108,6 +109,23 @@ pub(crate) fn realistic_env_load_sweep_test() -> ForgeConfig {
     })
 }
 
+pub(crate) fn bcho_test() -> ForgeConfig {
+    realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
+        test: Box::new(PerformanceBenchmark),
+        workloads: Workloads::TRANSACTIONS(vec![
+            // Sequential workload
+            TransactionWorkload::new(TransactionTypeArg::SmartTablePicture1MWith256Change, 50)
+                .with_gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+                .with_transactions_per_account(50),
+        ]),
+        criteria: Vec::new(),
+        background_traffic: background_traffic_for_sweep_with_latency(&[
+            (3.0, 8.0),
+            (3.0, 8.0),
+            (3.0, 4.0),
+        ]),
+    })
+}
 pub(crate) fn realistic_env_workload_sweep_test() -> ForgeConfig {
     realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
