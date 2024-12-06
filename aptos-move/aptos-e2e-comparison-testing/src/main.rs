@@ -4,7 +4,7 @@
 use anyhow::Result;
 use aptos_comparison_testing::{
     prepare_aptos_packages, DataCollection, Execution, ExecutionMode, OnlineExecutor,
-    APTOS_COMMONS, DISABLE_SPEC_CHECK,
+    APTOS_COMMONS, DISABLE_SPEC_CHECK, SAMPLING_RATE,
 };
 use aptos_rest_client::Client;
 use clap::{Parser, Subcommand};
@@ -41,6 +41,9 @@ pub enum Cmd {
         /// With this set, only dump transactions that are sent to this account
         #[clap(long)]
         target_account: Option<AccountAddress>,
+         /// Sampling rate (1-10)
+        #[clap(long, default_value_t = SAMPLING_RATE)]
+        rate: u32,
     },
     /// Collect and execute txns without dumping the state data
     Online {
@@ -64,6 +67,9 @@ pub enum Cmd {
         /// Packages to be skipped for reference safety check
         #[clap(long)]
         skip_ref_packages: Option<String>,
+        /// Sampling rate (1-10)
+        #[clap(long, default_value_t = SAMPLING_RATE)]
+        rate: u32,
     },
     /// Execution of txns
     Execute {
@@ -113,6 +119,7 @@ async fn main() -> Result<()> {
             skip_source_code_check: skip_source_code,
             dump_write_set,
             target_account,
+            rate
         } => {
             let batch_size = BATCH_SIZE;
             let output = if let Some(path) = output_path {
@@ -137,7 +144,7 @@ async fn main() -> Result<()> {
                 target_account,
             )?;
             data_collector
-                .dump_data(args.begin_version, args.limit)
+                .dump_data(args.begin_version, args.limit, rate)
                 .await?;
         },
         Cmd::Online {
@@ -147,6 +154,7 @@ async fn main() -> Result<()> {
             skip_publish_txns,
             execution_mode,
             skip_ref_packages,
+            rate
         } => {
             let batch_size = BATCH_SIZE;
             let output = if let Some(path) = output_path {
@@ -168,7 +176,7 @@ async fn main() -> Result<()> {
                 endpoint,
                 skip_ref_packages,
             )?;
-            online.execute(args.begin_version, args.limit).await?;
+            online.execute(args.begin_version, args.limit, rate).await?;
         },
         Cmd::Execute {
             input_path,

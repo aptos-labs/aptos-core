@@ -957,7 +957,8 @@ impl Execution {
         package_name: Option<String>,
     ) {
         let gas_diff = |gas_1: u64, gas_2: u64, x: u64| -> (f64, bool, bool) {
-            let gas2_ge_gas1 = gas_2 >= gas_1;
+            let gas2_ge_gas1: bool = gas_2 > gas_1;
+            let gas1_ge_gas2: bool = gas_1 > gas_2;
             let mut denominator = gas_1;
             let mut difference = gas_2 as i64 - gas_1 as i64;
             if !gas2_ge_gas1 {
@@ -967,8 +968,8 @@ impl Execution {
             let percentage_difference = difference as f64 / denominator as f64 * 100.0;
             (
                 percentage_difference,
-                gas2_ge_gas1 && percentage_difference > x as f64,
-                !gas2_ge_gas1,
+                gas2_ge_gas1,
+                gas1_ge_gas2,
             )
         };
         match (res_1, res_2) {
@@ -1078,12 +1079,16 @@ impl Execution {
                 }
                 let (diff, gas2_gt_gas1, gas1_gt_gas_2) =
                     gas_diff(*gas_used_1, *gas_used_2, GAS_DIFF_PERCENTAGE);
-                println!("gas v1:{}, gas v2:{}", gas_used_1, gas_used_2);
                 let greater_version = if gas1_gt_gas_2 { "v1" } else { "v2" };
                 if gas2_gt_gas1 || gas1_gt_gas_2 {
                     self.output_result_str(format!(
-                        "gas diff: {}'s gas usage is {} percent more than the other at version: {}, v1 status:{:?}, v2 status:{:?} for package:{}",
-                        greater_version, diff, cur_version, txn_status_1, txn_status_2, package_name.unwrap_or("unknown package".to_string())
+                        "gas v1:{}, gas v2:{}, gas diff: {}'s gas usage is {} percent more than the other at version: {}, v1 status:{:?}, v2 status:{:?} for package:{}",
+                        gas_used_1, gas_used_2, greater_version, diff, cur_version, txn_status_1, txn_status_2, package_name.unwrap_or("unknown package".to_string())
+                    ));
+                } else {
+                    self.output_result_str(format!(
+                        "v1 and v2 cosumes same amount of gas {} at version: {}, v1 status:{:?}, v2 status:{:?} for package:{}",
+                        gas_used_1, cur_version, txn_status_1, txn_status_2, package_name.unwrap_or("unknown package".to_string())
                     ));
                 }
             },

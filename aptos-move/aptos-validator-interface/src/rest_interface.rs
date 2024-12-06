@@ -23,6 +23,9 @@ use aptos_types::{
 use async_recursion::async_recursion;
 use move_core_types::language_storage::ModuleId;
 use std::collections::HashMap;
+use rand::Rng;
+
+const SAMPLING_BOUND: u32 = 10;
 
 pub struct RestDebuggerInterface(Client);
 
@@ -259,6 +262,7 @@ impl AptosValidatorInterface for RestDebuggerInterface {
             ),
         >,
         handled_function_vec: &mut Vec<(AccountAddress, String)>,
+        sampling: u32,
     ) -> Result<
         Vec<(
             u64,
@@ -270,6 +274,7 @@ impl AptosValidatorInterface for RestDebuggerInterface {
             )>,
         )>,
     > {
+        let sampling = sampling % SAMPLING_BOUND;
         let mut txns = Vec::with_capacity(limit as usize);
         let (tns, infos) = self.get_committed_transactions(start, limit).await?;
         let temp_txns = tns
@@ -311,11 +316,11 @@ impl AptosValidatorInterface for RestDebuggerInterface {
                         continue;
                     }
                     let function_name = entry_function.function().as_str().to_string();
-                    if handled_function_vec.contains(&(*addr, function_name.clone())) {
-                        continue;
-                    } else {
-                        handled_function_vec.push((*addr, function_name));
-                    }
+                    // if handled_function_vec.contains(&(*addr, function_name.clone())) {
+                    //     continue;
+                    // } else {
+                    //     handled_function_vec.push((*addr, function_name));
+                    // }
                     if entry_function.function().as_str() == "publish_package_txn" {
                         if filter_condition.skip_publish_txns {
                             continue;
@@ -323,6 +328,13 @@ impl AptosValidatorInterface for RestDebuggerInterface {
                         // For publish txn, we remove all items in the package_cache where module_id.address is the sender of this txn
                         // to update the new package in the cache.
                         package_cache.retain(|k, _| k.address != signed_trans.sender());
+                    }
+                    // sampling when txns to obtain is more than 1
+                    if limit > 1 {
+                        let num = rand::thread_rng().gen_range(0, SAMPLING_BOUND);
+                        if num >= sampling {
+                            continue;
+                        }
                     }
                     if !filter_condition.check_source_code {
                         txns.push((version, txn.clone(), None));

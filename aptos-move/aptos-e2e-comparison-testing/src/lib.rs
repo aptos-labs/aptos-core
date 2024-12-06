@@ -60,6 +60,7 @@ const MAX_TO_FLUSH: usize = 50000;
 pub const DISABLE_SPEC_CHECK: &str = "spec-check=off";
 pub const DISABLE_REF_CHECK: &str = "reference-safety=off";
 pub const ENABLE_REF_CHECK: &str = "reference-safety=on";
+pub const SAMPLING_RATE: u32 = 3;
 
 struct IndexWriter {
     index_writer: BufWriter<File>,

@@ -4,7 +4,7 @@
 use crate::{
     compile_aptos_packages, dump_and_compile_from_package_metadata, is_aptos_package,
     CompilationCache, ExecutionMode, IndexWriter, PackageInfo, TxnIndex, APTOS_COMMONS,
-    DISABLE_REF_CHECK, DISABLE_SPEC_CHECK, ENABLE_REF_CHECK,
+    DISABLE_REF_CHECK, DISABLE_SPEC_CHECK, ENABLE_REF_CHECK, SAMPLING_RATE
 };
 use anyhow::Result;
 use aptos_framework::natives::code::PackageMetadata;
@@ -124,7 +124,7 @@ impl OnlineExecutor {
         Some(package_info)
     }
 
-    pub async fn execute(&self, begin: Version, limit: u64) -> Result<()> {
+    pub async fn execute(&self, begin: Version, limit: u64, rate: u32) -> Result<()> {
         println!("begin executing events");
         let compilation_cache = Arc::new(Mutex::new(CompilationCache::default()));
         let index_writer = Arc::new(Mutex::new(IndexWriter::new(&self.current_dir)));
@@ -162,6 +162,7 @@ impl OnlineExecutor {
                     self.filter_condition,
                     &mut module_registry_map,
                     &mut filtered_vec,
+                    rate
                 )
                 .await;
             // if error happens when collecting txns, log the version range
