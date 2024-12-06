@@ -17,7 +17,7 @@ use aptos_executor_types::{
     state_compute_result::StateComputeResult, ExecutorError, ExecutorResult,
 };
 use aptos_infallible::Mutex;
-use aptos_logger::{error, warn};
+use aptos_logger::{error, info, warn};
 use aptos_types::{
     block_info::BlockInfo,
     contract_event::ContractEvent,
@@ -60,6 +60,16 @@ impl Display for TaskError {
     }
 }
 
+pub struct NotificationGuard {
+    pub callback: Mutex<Option<Box<dyn FnOnce() -> () + Send + Sync>>>,
+}
+
+impl Drop for NotificationGuard {
+    fn drop(&mut self) {
+        self.callback.lock().take().map(|c| c());
+    }
+}
+
 impl From<Error> for TaskError {
     fn from(value: Error) -> Self {
         Self::InternalError(Arc::new(value))
@@ -74,9 +84,8 @@ pub type LedgerUpdateResult = (StateComputeResult, Duration, Option<u64>);
 pub type PostLedgerUpdateResult = ();
 pub type CommitVoteResult = CommitVote;
 pub type PreCommitResult = StateComputeResult;
-pub type PostPreCommitResult = ();
 pub type CommitLedgerResult = Option<LedgerInfoWithSignatures>;
-pub type PostCommitResult = ();
+pub type PostCommitResult = Vec<Arc<NotificationGuard>>;
 
 #[derive(Clone)]
 pub struct PipelineFutures {
@@ -86,7 +95,6 @@ pub struct PipelineFutures {
     pub post_ledger_update_fut: TaskFuture<PostLedgerUpdateResult>,
     pub commit_vote_fut: TaskFuture<CommitVoteResult>,
     pub pre_commit_fut: TaskFuture<PreCommitResult>,
-    pub post_pre_commit_fut: TaskFuture<PostPreCommitResult>,
     pub commit_ledger_fut: TaskFuture<CommitLedgerResult>,
     pub post_commit_fut: TaskFuture<PostCommitResult>,
 }
@@ -451,6 +459,12 @@ impl PipelinedBlock {
     }
 
     pub fn abort_pipeline(&self) -> Option<PipelineFutures> {
+        info!(
+            "[Pipeline] Aborting pipeline for block {} {} {}",
+            self.id(),
+            self.epoch(),
+            self.round()
+        );
         if let Some(abort_handles) = self.pipeline_abort_handle.lock().take() {
             for handle in abort_handles {
                 handle.abort();
@@ -461,7 +475,9 @@ impl PipelinedBlock {
 
     pub async fn wait_for_compute_result(&self) -> ExecutorResult<(StateComputeResult, Duration)> {
         self.pipeline_futs()
-            .expect("Pipeline needs to be enabled")
+            .ok_or(ExecutorError::InternalError {
+                error: "Pipeline aborted".to_string(),
+            })?
             .ledger_update_fut
             .await
             .map(|(compute_result, execution_time, _)| (compute_result, execution_time))
@@ -471,11 +487,18 @@ impl PipelinedBlock {
     }
 
     pub async fn wait_for_commit_ledger(&self) {
+        // may be aborted (e.g. by reset)
+        if let Some(fut) = self.pipeline_futs() {
+            // this may be cancelled
+            let _ = fut.commit_ledger_fut.await;
+        }
+    }
+
+    pub async fn wait_for_commit_vote(&self) -> TaskResult<CommitVote> {
         self.pipeline_futs()
             .expect("Pipeline needs to be enabled")
-            .commit_ledger_fut
+            .commit_vote_fut
             .await
-            .expect("Commit ledger should succeed");
     }
 }
 

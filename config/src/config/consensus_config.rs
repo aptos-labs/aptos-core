@@ -194,116 +194,119 @@ impl Default for ConsensusConfig {
             // in the pipline very low, we can keep this limit pretty low, too.
             vote_back_pressure_limit: 7,
             min_max_txns_in_block_after_filtering_from_backpressure: MIN_BLOCK_TXNS_AFTER_FILTERING,
-            execution_backpressure: Some(ExecutionBackpressureConfig {
-                num_blocks_to_look_at: 12,
-                min_blocks_to_activate: 4,
-                percentile: 0.5,
-                target_block_time_ms: 250,
-                min_block_time_ms_to_activate: 100,
-                // allow at least two spreading group from reordering in a single block, to utilize paralellism
-                min_calibrated_txns_per_block: 8,
-            }),
-            pipeline_backpressure: vec![
-                PipelineBackpressureValues {
-                    // pipeline_latency looks how long has the oldest block still in pipeline
-                    // been in the pipeline.
-                    // Block enters the pipeline after consensus orders it, and leaves the
-                    // pipeline once quorum on execution result among validators has been reached
-                    // (so-(badly)-called "commit certificate"), meaning 2f+1 validators have finished execution.
-                    back_pressure_pipeline_latency_limit_ms: 1200,
-                    max_sending_block_txns_after_filtering_override:
-                        MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 50,
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1500,
-                    max_sending_block_txns_after_filtering_override:
-                        MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 100,
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1900,
-                    max_sending_block_txns_after_filtering_override:
-                        MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 200,
-                },
-                // with execution backpressure, only later start reducing block size
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 2500,
-                    max_sending_block_txns_after_filtering_override: 1000,
-                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
-                    backpressure_proposal_delay_ms: 300,
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 3500,
-                    max_sending_block_txns_after_filtering_override: 200,
-                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
-                    backpressure_proposal_delay_ms: 300,
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 4500,
-                    max_sending_block_txns_after_filtering_override: 30,
-                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
-                    backpressure_proposal_delay_ms: 300,
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 6000,
-                    // in practice, latencies and delay make it such that ~2 blocks/s is max,
-                    // meaning that most aggressively we limit to ~10 TPS
-                    // For transactions that are more expensive than that, we should
-                    // instead rely on max gas per block to limit latency.
-                    max_sending_block_txns_after_filtering_override: 5,
-                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
-                    backpressure_proposal_delay_ms: 300,
-                },
-            ],
+            // execution_backpressure: Some(ExecutionBackpressureConfig {
+            //     num_blocks_to_look_at: 20,
+            //     min_blocks_to_activate: 4,
+            //     percentile: 0.5,
+            //     target_block_time_ms: 200,
+            //     min_block_time_ms_to_activate: 100,
+            //     // allow at least two spreading group from reordering in a single block, to utilize paralellism
+            //     min_calibrated_txns_per_block: 8,
+            // }),
+            execution_backpressure: None,
+            pipeline_backpressure: vec![],
+            // vec![
+            //     PipelineBackpressureValues {
+            //         // pipeline_latency looks how long has the oldest block still in pipeline
+            //         // been in the pipeline.
+            //         // Block enters the pipeline after consensus orders it, and leaves the
+            //         // pipeline once quorum on execution result among validators has been reached
+            //         // (so-(badly)-called "commit certificate"), meaning 2f+1 validators have finished execution.
+            //         back_pressure_pipeline_latency_limit_ms: 1200,
+            //         max_sending_block_txns_after_filtering_override:
+            //             MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
+            //         max_sending_block_bytes_override: 5 * 1024 * 1024,
+            //         backpressure_proposal_delay_ms: 50,
+            //     },
+            //     PipelineBackpressureValues {
+            //         back_pressure_pipeline_latency_limit_ms: 1500,
+            //         max_sending_block_txns_after_filtering_override:
+            //             MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
+            //         max_sending_block_bytes_override: 5 * 1024 * 1024,
+            //         backpressure_proposal_delay_ms: 100,
+            //     },
+            //     PipelineBackpressureValues {
+            //         back_pressure_pipeline_latency_limit_ms: 1900,
+            //         max_sending_block_txns_after_filtering_override:
+            //             MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
+            //         max_sending_block_bytes_override: 5 * 1024 * 1024,
+            //         backpressure_proposal_delay_ms: 200,
+            //     },
+            //     // with execution backpressure, only later start reducing block size
+            //     PipelineBackpressureValues {
+            //         back_pressure_pipeline_latency_limit_ms: 2500,
+            //         max_sending_block_txns_after_filtering_override: 1000,
+            //         max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
+            //         backpressure_proposal_delay_ms: 300,
+            //     },
+            //     PipelineBackpressureValues {
+            //         back_pressure_pipeline_latency_limit_ms: 3500,
+            //         max_sending_block_txns_after_filtering_override: 200,
+            //         max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
+            //         backpressure_proposal_delay_ms: 300,
+            //     },
+            //     PipelineBackpressureValues {
+            //         back_pressure_pipeline_latency_limit_ms: 4500,
+            //         max_sending_block_txns_after_filtering_override: 30,
+            //         max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
+            //         backpressure_proposal_delay_ms: 300,
+            //     },
+            //     PipelineBackpressureValues {
+            //         back_pressure_pipeline_latency_limit_ms: 6000,
+            //         // in practice, latencies and delay make it such that ~2 blocks/s is max,
+            //         // meaning that most aggressively we limit to ~10 TPS
+            //         // For transactions that are more expensive than that, we should
+            //         // instead rely on max gas per block to limit latency.
+            //         max_sending_block_txns_after_filtering_override: 5,
+            //         max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
+            //         backpressure_proposal_delay_ms: 300,
+            //     },
+            // ],
             window_for_chain_health: 100,
-            chain_health_backoff: vec![
-                ChainHealthBackoffValues {
-                    backoff_if_below_participating_voting_power_percentage: 80,
-                    max_sending_block_txns_after_filtering_override:
-                        MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backoff_proposal_delay_ms: 150,
-                },
-                ChainHealthBackoffValues {
-                    backoff_if_below_participating_voting_power_percentage: 78,
-                    max_sending_block_txns_after_filtering_override: 2000,
-                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
-                    backoff_proposal_delay_ms: 300,
-                },
-                ChainHealthBackoffValues {
-                    backoff_if_below_participating_voting_power_percentage: 76,
-                    max_sending_block_txns_after_filtering_override: 500,
-                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
-                    backoff_proposal_delay_ms: 300,
-                },
-                ChainHealthBackoffValues {
-                    backoff_if_below_participating_voting_power_percentage: 74,
-                    max_sending_block_txns_after_filtering_override: 100,
-                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
-                    backoff_proposal_delay_ms: 300,
-                },
-                ChainHealthBackoffValues {
-                    backoff_if_below_participating_voting_power_percentage: 72,
-                    max_sending_block_txns_after_filtering_override: 25,
-                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
-                    backoff_proposal_delay_ms: 300,
-                },
-                ChainHealthBackoffValues {
-                    backoff_if_below_participating_voting_power_percentage: 70,
-                    // in practice, latencies and delay make it such that ~2 blocks/s is max,
-                    // meaning that most aggressively we limit to ~10 TPS
-                    // For transactions that are more expensive than that, we should
-                    // instead rely on max gas per block to limit latency.
-                    max_sending_block_txns_after_filtering_override: 5,
-                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
-                    backoff_proposal_delay_ms: 300,
-                },
-            ],
+            chain_health_backoff: vec![],
+            // vec![
+            //     ChainHealthBackoffValues {
+            //         backoff_if_below_participating_voting_power_percentage: 80,
+            //         max_sending_block_txns_after_filtering_override:
+            //             MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
+            //         max_sending_block_bytes_override: 5 * 1024 * 1024,
+            //         backoff_proposal_delay_ms: 150,
+            //     },
+            //     ChainHealthBackoffValues {
+            //         backoff_if_below_participating_voting_power_percentage: 78,
+            //         max_sending_block_txns_after_filtering_override: 2000,
+            //         max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
+            //         backoff_proposal_delay_ms: 300,
+            //     },
+            //     ChainHealthBackoffValues {
+            //         backoff_if_below_participating_voting_power_percentage: 76,
+            //         max_sending_block_txns_after_filtering_override: 500,
+            //         max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
+            //         backoff_proposal_delay_ms: 300,
+            //     },
+            //     ChainHealthBackoffValues {
+            //         backoff_if_below_participating_voting_power_percentage: 74,
+            //         max_sending_block_txns_after_filtering_override: 100,
+            //         max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
+            //         backoff_proposal_delay_ms: 300,
+            //     },
+            //     ChainHealthBackoffValues {
+            //         backoff_if_below_participating_voting_power_percentage: 72,
+            //         max_sending_block_txns_after_filtering_override: 25,
+            //         max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
+            //         backoff_proposal_delay_ms: 300,
+            //     },
+            //     ChainHealthBackoffValues {
+            //         backoff_if_below_participating_voting_power_percentage: 70,
+            //         // in practice, latencies and delay make it such that ~2 blocks/s is max,
+            //         // meaning that most aggressively we limit to ~10 TPS
+            //         // For transactions that are more expensive than that, we should
+            //         // instead rely on max gas per block to limit latency.
+            //         max_sending_block_txns_after_filtering_override: 5,
+            //         max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
+            //         backoff_proposal_delay_ms: 300,
+            //     },
+            // ],
             qc_aggregator_type: QcAggregatorType::default(),
             // This needs to fit into the network message size, so with quorum store it can be much bigger
             max_blocks_per_sending_request: 10,
@@ -324,7 +327,7 @@ impl Default for ConsensusConfig {
             max_pending_rounds_in_commit_vote_cache: 100,
             optimistic_sig_verification: true,
             enable_round_timeout_msg: true,
-            enable_pipeline: false,
+            enable_pipeline: true,
         }
     }
 }

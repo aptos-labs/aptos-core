@@ -3,6 +3,7 @@
 
 use crate::consensus_observer::common::error::Error;
 use aptos_consensus_types::{
+    block::Block,
     common::{BatchPayload, Payload},
     payload::InlineBatches,
     pipelined_block::PipelinedBlock,
@@ -60,6 +61,10 @@ impl ConsensusObserverMessage {
     ) -> ConsensusObserverDirectSend {
         let block_payload = BlockPayload::new(block, transaction_payload);
         ConsensusObserverDirectSend::BlockPayload(block_payload)
+    }
+
+    pub fn new_block(block: Block) -> ConsensusObserverDirectSend {
+        ConsensusObserverDirectSend::Block(block)
     }
 }
 
@@ -131,6 +136,7 @@ pub enum ConsensusObserverDirectSend {
     OrderedBlock(OrderedBlock),
     CommitDecision(CommitDecision),
     BlockPayload(BlockPayload),
+    Block(Block),
 }
 
 impl ConsensusObserverDirectSend {
@@ -140,6 +146,7 @@ impl ConsensusObserverDirectSend {
             ConsensusObserverDirectSend::OrderedBlock(_) => "ordered_block",
             ConsensusObserverDirectSend::CommitDecision(_) => "commit_decision",
             ConsensusObserverDirectSend::BlockPayload(_) => "block_payload",
+            ConsensusObserverDirectSend::Block(_) => "block",
         }
     }
 }
@@ -162,6 +169,9 @@ impl Display for ConsensusObserverDirectSend {
                     block_payload.transaction_payload.limit(),
                     block_payload.transaction_payload.payload_proofs(),
                 )
+            },
+            ConsensusObserverDirectSend::Block(block) => {
+                write!(f, "Block: {}", block.id())
             },
         }
     }

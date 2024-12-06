@@ -37,10 +37,11 @@ use aptos_config::{
     network_id::PeerNetworkId,
 };
 use aptos_consensus_types::{
+    block::Block,
     pipeline,
     pipelined_block::{PipelineFutures, PipelinedBlock},
 };
-use aptos_crypto::{bls12381, Genesis};
+use aptos_crypto::{bls12381, Genesis, HashValue};
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_executor_types::state_compute_result::StateComputeResult;
 use aptos_infallible::Mutex;
@@ -60,6 +61,7 @@ use futures::StreamExt;
 use futures_channel::oneshot;
 use move_core_types::account_address::AccountAddress;
 use std::{
+    collections::{BTreeMap, HashMap},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -69,8 +71,15 @@ use tokio_stream::wrappers::IntervalStream;
 // Whether to log messages at the info level (useful for debugging)
 const LOG_MESSAGES_AT_INFO_LEVEL: bool = true;
 
+struct BlockTree {
+    blocks: HashMap<HashValue, Arc<PipelinedBlock>>,
+    ordered_root: LedgerInfoWithSignatures,
+    committed_root: LedgerInfoWithSignatures,
+}
+
 /// The consensus observer receives consensus updates and propagates them to the execution pipeline
 pub struct ConsensusObserver {
+    block_tree: Arc<Mutex<BlockTree>>,
     // The currently active observer state (e.g., epoch and root)
     active_observer_state: ActiveObserverState,
 
@@ -143,6 +152,7 @@ impl ConsensusObserver {
             reconfig_events.expect("Reconfig events should exist for the consensus observer!");
         let active_observer_state =
             ActiveObserverState::new(node_config, db_reader, reconfig_events, consensus_publisher);
+        let root = active_observer_state.root();
 
         // Create the block and payload stores
         let ordered_block_store = OrderedBlockStore::new(consensus_observer_config);
@@ -151,6 +161,11 @@ impl ConsensusObserver {
 
         // Create the consensus observer
         Self {
+            block_tree: Arc::new(Mutex::new(BlockTree {
+                blocks: HashMap::new(),
+                ordered_root: root.clone(),
+                committed_root: root,
+            })),
             active_observer_state,
             ordered_block_store: Arc::new(Mutex::new(ordered_block_store)),
             block_payload_store: Arc::new(Mutex::new(block_payload_store)),
@@ -245,6 +260,11 @@ impl ConsensusObserver {
                 ))
             );
         }
+        {
+            let mut tree = self.block_tree.lock();
+            tree.committed_root = root.clone();
+            tree.blocks.clear();
+        }
 
         // Increment the cleared block state counter
         metrics::increment_counter_without_labels(&metrics::OBSERVER_CLEARED_BLOCK_STATE);
@@ -272,30 +292,30 @@ impl ConsensusObserver {
         );
 
         // Create the commit callback (to be called after the execution pipeline)
-        let commit_callback = self
-            .active_observer_state
-            .create_commit_callback_deprecated(
-                self.ordered_block_store.clone(),
-                self.block_payload_store.clone(),
-            );
+        // let commit_callback = self
+        //     .active_observer_state
+        //     .create_commit_callback_deprecated(
+        //         self.ordered_block_store.clone(),
+        //         self.block_payload_store.clone(),
+        //     );
 
         // Send the ordered block to the execution pipeline
-        if let Err(error) = self
-            .execution_client
-            .finalize_order(
-                ordered_block.blocks(),
-                ordered_block.ordered_proof().clone(),
-                commit_callback,
-            )
-            .await
-        {
-            error!(
-                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Failed to finalize ordered block! Error: {:?}",
-                    error
-                ))
-            );
-        }
+        // if let Err(error) = self
+        //     .execution_client
+        //     .finalize_order(
+        //         ordered_block.blocks(),
+        //         ordered_block.ordered_proof().clone(),
+        //         commit_callback,
+        //     )
+        //     .await
+        // {
+        //     error!(
+        //         LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+        //             "Failed to finalize ordered block! Error: {:?}",
+        //             error
+        //         ))
+        //     );
+        // }
     }
 
     /// Forwards the commit decision to the execution pipeline
@@ -455,7 +475,7 @@ impl ConsensusObserver {
         // Update the payload store with the payload
         self.block_payload_store
             .lock()
-            .insert_block_payload(block_payload, verified_payload);
+            .insert_block_payload(block_payload, true);
 
         // Check if there are blocks that were missing payloads but are
         // now ready because of the new payload. Note: this should only
@@ -540,6 +560,14 @@ impl ConsensusObserver {
             // Update the root and clear the pending blocks (up to the commit).
             self.active_observer_state
                 .update_root(commit_decision.commit_proof().clone());
+            {
+                let mut tree = self.block_tree.lock();
+                tree.ordered_root = commit_decision.commit_proof().clone();
+                tree.committed_root = commit_decision.commit_proof().clone();
+                for (_, block) in tree.blocks.drain() {
+                    block.abort_pipeline();
+                }
+            }
             self.block_payload_store
                 .lock()
                 .remove_blocks_for_epoch_round(commit_epoch, commit_round);
@@ -553,6 +581,30 @@ impl ConsensusObserver {
         }
     }
 
+    fn process_commit_proof(&self, commit_proof: LedgerInfoWithSignatures) {
+        let tree = self.block_tree.lock();
+        if commit_proof.commit_info().round() <= tree.committed_root.commit_info().round() {
+            return;
+        }
+        info!(
+            "[CO] Received commit decision: {}",
+            commit_proof.commit_info()
+        );
+        let mut block_id = commit_proof.commit_info().id();
+        while let Some(block) = tree.blocks.get(&block_id) {
+            if let Some(tx) = block.pipeline_tx().lock().as_mut() {
+                tx.order_proof_tx.take().map(|tx| tx.send(()));
+                tx.commit_proof_tx
+                    .take()
+                    .map(|tx| tx.send(commit_proof.clone()));
+            }
+            block_id = block.parent_id();
+            if block_id == tree.committed_root.commit_info().id() {
+                break;
+            }
+        }
+    }
+
     /// Processes the commit decision for the pending block and returns true iff
     /// the commit decision was successfully processed. Note: this function
     /// assumes the commit decision has already been verified.
@@ -562,6 +614,8 @@ impl ConsensusObserver {
             .ordered_block_store
             .lock()
             .get_ordered_block(commit_decision.epoch(), commit_decision.round());
+
+        self.process_commit_proof(commit_decision.commit_proof().clone());
 
         // Process the pending block
         if let Some(pending_block) = pending_block {
@@ -585,7 +639,7 @@ impl ConsensusObserver {
                             commit_decision.proof_block_info()
                         ))
                     );
-                    self.forward_commit_decision(commit_decision.clone());
+                    // self.forward_commit_decision(commit_decision.clone());
                 }
 
                 return true; // The commit decision was successfully processed
@@ -633,6 +687,10 @@ impl ConsensusObserver {
         // Process the message based on the type
         match message {
             ConsensusObserverDirectSend::OrderedBlock(ordered_block) => {
+                self.process_ordered_proof(ordered_block.ordered_proof().clone());
+                for b in ordered_block.blocks() {
+                    self.process_block(b.block().clone());
+                }
                 self.process_ordered_block_message(
                     peer_network_id,
                     message_received_time,
@@ -655,10 +713,83 @@ impl ConsensusObserver {
                 )
                 .await;
             },
+            ConsensusObserverDirectSend::Block(block) => self.process_block(block),
         }
 
         // Update the metrics for the processed blocks
         self.update_processed_blocks_metrics();
+    }
+
+    fn process_ordered_proof(&self, proof: LedgerInfoWithSignatures) {
+        let mut tree = self.block_tree.lock();
+        if proof.commit_info().round() <= tree.ordered_root.commit_info().round() {
+            return;
+        }
+        info!("[CO] Received ordered proof: {}", proof.commit_info());
+        let mut block_id = proof.commit_info().id();
+        while let Some(block) = tree.blocks.get(&block_id) {
+            if let Some(tx) = block.pipeline_tx().lock().as_mut() {
+                tx.order_proof_tx.take().map(|tx| tx.send(()));
+            }
+            block_id = block.parent_id();
+            if block_id == tree.ordered_root.commit_info().id() {
+                break;
+            }
+        }
+        tree.ordered_root = proof;
+    }
+
+    fn process_block(&self, block: Block) {
+        let mut tree = self.block_tree.lock();
+
+        if tree.blocks.contains_key(&block.id()) {
+            return;
+        }
+
+        if self.state_sync_manager.is_syncing_to_commit() {
+            return;
+        }
+        info!("[CO] Received block: {}", block);
+        let parent_fut = if let Some(parent) = tree.blocks.get(&block.parent_id()) {
+            let fut = parent.pipeline_futs().unwrap();
+            Some(fut)
+        } else {
+            if block.parent_id() == tree.committed_root.commit_info().id() {
+                let fut = self
+                    .pipeline_builder()
+                    .build_root(StateComputeResult::new_dummy(), tree.committed_root.clone());
+                Some(fut)
+            } else {
+                None
+            }
+        };
+        if let Some(parent_fut) = parent_fut {
+            let block = Arc::new(PipelinedBlock::new_ordered(block));
+            let weak_tree = Arc::downgrade(&self.block_tree);
+            let commit_callback = self.active_observer_state.create_commit_callback(
+                self.ordered_block_store.clone(),
+                self.block_payload_store.clone(),
+            );
+            let callback = Box::new(move |ledger_info: LedgerInfoWithSignatures| {
+                commit_callback(ledger_info.clone());
+                if let Some(tree) = weak_tree.upgrade() {
+                    let mut tree = tree.lock();
+                    let mut id = ledger_info.commit_info().id();
+                    while let Some(block) = tree.blocks.remove(&id) {
+                        id = block.parent_id();
+                    }
+                    tree.committed_root = ledger_info;
+                }
+            });
+            self.pipeline_builder().build(&block, parent_fut, callback);
+            if let Some(tx) = block.pipeline_tx().lock().as_mut() {
+                if let Some(tx) = tx.rand_tx.take() {
+                    let _ = tx.send(None);
+                }
+            }
+            info!("[CO] Inserted block: {}", block);
+            tree.blocks.insert(block.id(), block);
+        }
     }
 
     /// Processes the ordered block
@@ -754,20 +885,20 @@ impl ConsensusObserver {
         };
 
         // Verify the block payloads against the ordered block
-        if let Err(error) = self
-            .block_payload_store
-            .lock()
-            .verify_payloads_against_ordered_block(&ordered_block)
-        {
-            error!(
-                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Failed to verify block payloads against ordered block! Ignoring: {:?}, Error: {:?}",
-                    ordered_block.proof_block_info(),
-                    error
-                ))
-            );
-            return;
-        }
+        // if let Err(error) = self
+        //     .block_payload_store
+        //     .lock()
+        //     .verify_payloads_against_ordered_block(&ordered_block)
+        // {
+        //     error!(
+        //         LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+        //             "Failed to verify block payloads against ordered block! Ignoring: {:?}, Error: {:?}",
+        //             ordered_block.proof_block_info(),
+        //             error
+        //         ))
+        //     );
+        //     return;
+        // }
 
         // The block was verified correctly. If the block is a child of our
         // last block, we can insert it into the ordered block store.
@@ -779,19 +910,19 @@ impl ConsensusObserver {
                 metrics::ORDERED_BLOCK_LABEL,
             );
 
-            if self.pipeline_enabled() {
-                for block in ordered_block.blocks() {
-                    let commit_callback = self.active_observer_state.create_commit_callback(
-                        self.ordered_block_store.clone(),
-                        self.block_payload_store.clone(),
-                    );
-                    self.pipeline_builder().build(
-                        block,
-                        self.get_last_pipeline_futs(),
-                        commit_callback,
-                    );
-                }
-            }
+            // if self.pipeline_enabled() {
+            //     for block in ordered_block.blocks() {
+            //         let commit_callback = self.active_observer_state.create_commit_callback(
+            //             self.ordered_block_store.clone(),
+            //             self.block_payload_store.clone(),
+            //         );
+            //         self.pipeline_builder().build(
+            //             block,
+            //             self.get_last_pipeline_futs(),
+            //             commit_callback,
+            //         );
+            //     }
+            // }
             // Insert the ordered block into the pending blocks
             self.ordered_block_store
                 .lock()
@@ -948,14 +1079,32 @@ impl ConsensusObserver {
 
         // Process all the newly ordered blocks
         let all_ordered_blocks = self.ordered_block_store.lock().get_all_ordered_blocks();
+        let mut foo = vec![];
+        let mut commit_proofs = BTreeMap::new();
         for (_, (ordered_block, commit_decision)) in all_ordered_blocks {
+            for b in ordered_block.blocks() {
+                foo.push(b.block().clone());
+            }
             // Finalize the ordered block
             self.finalize_ordered_block(ordered_block).await;
 
             // If a commit decision is available, forward it to the execution pipeline
             if let Some(commit_decision) = commit_decision {
                 self.forward_commit_decision(commit_decision.clone());
+                commit_proofs.insert(
+                    commit_decision.proof_block_info().round(),
+                    commit_decision.commit_proof().clone(),
+                );
             }
+        }
+
+        // rebuild the pipeline after root change
+        self.block_tree.lock().blocks.clear();
+        for b in foo {
+            self.process_block(b);
+        }
+        for (_, proof) in commit_proofs {
+            self.process_commit_proof(proof);
         }
     }
 
