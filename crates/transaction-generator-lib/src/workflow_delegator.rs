@@ -439,9 +439,7 @@ impl WorkflowTxnGeneratorCreator {
                             root_account,
                             txn_executor,
                             &mut packages,
-                            &mut EntryPointTransactionGenerator {
-                                entry_point: EntryPoints::EconiaPlaceRandomLimitOrder,
-                            },
+                            &mut EntryPointTransactionGenerator::new_singleton(EntryPoints::EconiaPlaceRandomLimitOrder),
                         )
                         .await
                     },

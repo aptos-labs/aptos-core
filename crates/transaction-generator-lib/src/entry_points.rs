@@ -142,6 +142,9 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
                   _txn_counter,
                   _prev_orders,
                   _market_maker| {
+                
+                let entry_point_idx = Self::pick_random(&entry_points, total_weight, rng);
+                let entry_point = entry_points[entry_point_idx].0;
                 let payload = entry_point.create_payload(
                       package,
                       entry_point.module_name(),
