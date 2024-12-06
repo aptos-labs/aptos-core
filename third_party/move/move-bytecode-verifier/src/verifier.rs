@@ -42,6 +42,7 @@ pub struct VerifierConfig {
     pub sig_checker_v2_fix_script_ty_param_count: bool,
     pub enable_enum_types: bool,
     pub enable_resource_access_control: bool,
+    pub enable_function_values: bool,
 }
 
 /// Helper for a "canonical" verification of a module.
@@ -121,7 +122,7 @@ pub fn verify_module_with_config(config: &VerifierConfig, module: &CompiledModul
             SignatureChecker::verify_module(module)?;
         }
 
-        InstructionConsistency::verify_module(module)?;
+        InstructionConsistency::verify_module(config, module)?;
         constants::verify_module(module)?;
         friends::verify_module(module)?;
         if !config.use_signature_checker_v2 {
@@ -182,7 +183,7 @@ pub fn verify_script_with_config(config: &VerifierConfig, script: &CompiledScrip
             SignatureChecker::verify_script(script)?;
         }
 
-        InstructionConsistency::verify_script(script)?;
+        InstructionConsistency::verify_script(config, script)?;
         constants::verify_script(script)?;
         CodeUnitVerifier::verify_script(config, script)?;
         script_signature::verify_script(script, no_additional_script_signature_checks)
@@ -240,6 +241,7 @@ impl Default for VerifierConfig {
 
             enable_enum_types: true,
             enable_resource_access_control: true,
+            enable_function_values: true,
         }
     }
 }
@@ -284,6 +286,8 @@ impl VerifierConfig {
 
             enable_enum_types: true,
             enable_resource_access_control: true,
+
+            enable_function_values: false,
         }
     }
 }

@@ -800,8 +800,15 @@ fn serialize_signature_token_single_node_impl(
             binary.push(SerializedType::TYPE_PARAMETER as u8)?;
             serialize_type_parameter_index(binary, *idx)?;
         },
-        SignatureToken::Function { .. } => {
-            unimplemented!("serialization of function types")
+        SignatureToken::Function {
+            args,
+            results,
+            abilities,
+        } => {
+            binary.push(SerializedType::FUNCTION as u8)?;
+            serialize_signature_size(binary, args.len())?;
+            serialize_signature_size(binary, results.len())?;
+            serialize_ability_set(binary, *abilities)?;
         },
     }
     Ok(())

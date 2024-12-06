@@ -140,6 +140,7 @@ pub enum SerializedType {
     U16                     = 0xD,
     U32                     = 0xE,
     U256                    = 0xF,
+    FUNCTION                = 0x10,
 }
 
 /// A marker for an option in the serialized output.

@@ -149,6 +149,15 @@ impl BuildOptions {
         }
     }
 
+    pub fn move_2_2() -> Self {
+        BuildOptions {
+            bytecode_version: Some(VERSION_7),
+            language_version: Some(LanguageVersion::V2_2),
+            compiler_version: Some(CompilerVersion::latest_stable()),
+            ..Self::default()
+        }
+    }
+
     pub fn inferred_bytecode_version(&self) -> u32 {
         self.language_version
             .unwrap_or_default()

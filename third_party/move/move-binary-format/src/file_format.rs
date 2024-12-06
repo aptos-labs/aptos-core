@@ -1246,6 +1246,7 @@ pub enum AddressSpecifier {
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
 )]
+#[allow(unused_variables)]
 pub enum SignatureToken {
     /// Boolean, `true` or `false`.
     Bool,
