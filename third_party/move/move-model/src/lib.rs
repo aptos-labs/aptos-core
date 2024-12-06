@@ -330,14 +330,14 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     let mut expansion_ast = {
         let E::Program { modules, scripts } = expansion_ast;
         let modules = modules.filter_map(|mident, mut mdef| {
-            // We need to always include the `vector` module (only for compiler v2),
+            // For compiler v2, we need to always include the `vector` module and any of its dependencies,
             // to handle cases of implicit usage.
             // E.g., index operation on a vector results in a call to `vector::borrow`.
             // TODO(#15483): consider refactoring code to avoid this special case.
-            let is_vector = mident.value.address.into_addr_bytes().into_inner()
-                == AccountAddress::ONE
-                && mident.value.module.0.value.as_str() == "vector";
-            (is_vector && compile_via_model || visited_modules.contains(&mident.value)).then(|| {
+            let is_vector_or_its_dependencies = is_vector_or_its_dependencies(mident.value);
+            (is_vector_or_its_dependencies && compile_via_model
+                || visited_modules.contains(&mident.value))
+            .then(|| {
                 mdef.is_source_module = true;
                 mdef
             })
@@ -413,6 +413,16 @@ pub fn run_model_builder_with_options_and_compilation_flags<
         // No bytecode is attached.
         run_move_checker(&mut env, expansion_ast);
         Ok(env)
+    }
+}
+
+/// Is `module_ident` the `vector` module, or any module that `vector` depends on?
+fn is_vector_or_its_dependencies(module_ident: ModuleIdent_) -> bool {
+    if module_ident.address.into_addr_bytes().into_inner() == AccountAddress::ONE {
+        let module_name = module_ident.module.0.value.as_str();
+        module_name == "vector" || module_name == "mem"
+    } else {
+        false
     }
 }
 
