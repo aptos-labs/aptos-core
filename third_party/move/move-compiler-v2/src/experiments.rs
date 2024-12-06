@@ -284,6 +284,14 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
                     .to_string(),
             default: Given(true),
         },
+        Experiment {
+            name: Experiment::RETAIN_TEMPS_FOR_ARGS.to_string(),
+            description:
+                "Create temps for each argument of a function call during stackless bytecode \
+                 generation and retain them until file format bytecode generation"
+                    .to_string(),
+            default: Inherited(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string()),
+        },
     ];
     experiments
         .into_iter()
