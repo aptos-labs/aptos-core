@@ -1342,27 +1342,16 @@ pub fn test_genesis_module_publishing() {
     let genesis_vm = genesis_runtime_builder.build_genesis_vm();
     let genesis_runtime_environment = genesis_runtime_builder.build_genesis_runtime_environment();
 
-    // We only test loader V2 flow here because V1 flow does not make sense. V1 relies on modules
-    // being cached in loader prior to publishing, which happens to be the case when resources are
-    // initialized (when we generate a genesis transaction). This is not the case here, and so the
-    // publishing will always fail. The previous version of this test did a wonderful thing:
-    //   1. added modules to state view,
-    //   2. run publishing (which obviously was passing because 0x1::code existed),
-    //   3. did not assert anything about the write set, even though in this test modifications
-    //      were created...
-    if genesis_runtime_environment.vm_config().use_loader_v2 {
-        let (change_set, module_write_set) = publish_framework(
-            &genesis_vm,
-            &genesis_runtime_environment,
-            HashValue::zero(),
-            aptos_cached_packages::head_release_bundle(),
-        );
+    let (change_set, module_write_set) = publish_framework(
+        &genesis_vm,
+        &genesis_runtime_environment,
+        HashValue::zero(),
+        aptos_cached_packages::head_release_bundle(),
+    );
 
-        // All write ops must be a creation!
-        let change_set =
-            assert_ok!(change_set.try_combine_into_storage_change_set(module_write_set));
-        verify_genesis_module_write_set(change_set.write_set());
-    }
+    // All write ops must be a creation!
+    let change_set = assert_ok!(change_set.try_combine_into_storage_change_set(module_write_set));
+    verify_genesis_module_write_set(change_set.write_set());
 }
 
 #[test]
