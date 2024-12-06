@@ -202,6 +202,7 @@ export interface Block {
     | undefined;
   /** Chain ID informs us which chain we're trying to index, this is important to ensure that we're not mixing chains within a single pipeline. */
   chainId?: number | undefined;
+  nothing?: bigint | undefined;
 }
 
 /**
@@ -1189,7 +1190,7 @@ export interface WriteOpSizeInfo {
 }
 
 function createBaseBlock(): Block {
-  return { timestamp: undefined, height: BigInt("0"), transactions: [], chainId: 0 };
+  return { timestamp: undefined, height: BigInt("0"), transactions: [], chainId: 0, nothing: BigInt("0") };
 }
 
 export const Block = {
@@ -1210,6 +1211,12 @@ export const Block = {
     }
     if (message.chainId !== undefined && message.chainId !== 0) {
       writer.uint32(32).uint32(message.chainId);
+    }
+    if (message.nothing !== undefined && message.nothing !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.nothing) !== message.nothing) {
+        throw new globalThis.Error("value provided for field message.nothing of type uint64 too large");
+      }
+      writer.uint32(40).uint64(message.nothing.toString());
     }
     return writer;
   },
@@ -1248,6 +1255,13 @@ export const Block = {
           }
 
           message.chainId = reader.uint32();
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.nothing = longToBigint(reader.uint64() as Long);
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -1298,6 +1312,7 @@ export const Block = {
         ? object.transactions.map((e: any) => Transaction.fromJSON(e))
         : [],
       chainId: isSet(object.chainId) ? globalThis.Number(object.chainId) : 0,
+      nothing: isSet(object.nothing) ? BigInt(object.nothing) : BigInt("0"),
     };
   },
 
@@ -1315,6 +1330,9 @@ export const Block = {
     if (message.chainId !== undefined && message.chainId !== 0) {
       obj.chainId = Math.round(message.chainId);
     }
+    if (message.nothing !== undefined && message.nothing !== BigInt("0")) {
+      obj.nothing = message.nothing.toString();
+    }
     return obj;
   },
 
@@ -1329,6 +1347,7 @@ export const Block = {
     message.height = object.height ?? BigInt("0");
     message.transactions = object.transactions?.map((e) => Transaction.fromPartial(e)) || [];
     message.chainId = object.chainId ?? 0;
+    message.nothing = object.nothing ?? BigInt("0");
     return message;
   },
 };

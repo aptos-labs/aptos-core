@@ -30,6 +30,8 @@ message Block {
 
   // Chain ID informs us which chain we're trying to index, this is important to ensure that we're not mixing chains within a single pipeline.
   uint32 chain_id = 4;
+
+  uint64 nothing = 5;
 }
 
 // Transaction as it happened on the chain, there are 4 types of transactions:
