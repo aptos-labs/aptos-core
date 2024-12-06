@@ -116,4 +116,50 @@ fun m::will_autoref(): address {
 }
 
 
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.m {
+struct Object has copy, drop {
+	inner: address
+}
+struct ObjectCore has key {
+	owner: address
+}
+
+make(): Object /* def_idx: 0 */ {
+B0:
+	0: LdU64(0)
+	1: Abort
+}
+owner_correct(Arg0: Object): address /* def_idx: 1 */ {
+B0:
+	0: ImmBorrowLoc[0](Arg0: Object)
+	1: ImmBorrowField[0](Object.inner: address)
+	2: ReadRef
+	3: ImmBorrowGlobal[1](ObjectCore)
+	4: ImmBorrowField[1](ObjectCore.owner: address)
+	5: ReadRef
+	6: Ret
+}
+owner_read_ref_missing(Arg0: Object): address /* def_idx: 2 */ {
+B0:
+	0: ImmBorrowLoc[0](Arg0: Object)
+	1: ImmBorrowField[0](Object.inner: address)
+	2: ReadRef
+	3: ImmBorrowGlobal[1](ObjectCore)
+	4: ImmBorrowField[1](ObjectCore.owner: address)
+	5: ReadRef
+	6: Ret
+}
+will_autoref(): address /* def_idx: 3 */ {
+L0:	loc0: Object
+B0:
+	0: Call make(): Object
+	1: StLoc[0](loc0: Object)
+	2: ImmBorrowLoc[0](loc0: Object)
+	3: ImmBorrowField[0](Object.inner: address)
+	4: ReadRef
+	5: Ret
+}
+}
 ============ bytecode verification succeeded ========
