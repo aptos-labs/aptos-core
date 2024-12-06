@@ -181,7 +181,8 @@ impl FunctionTargetProcessor for FlushWritesProcessor {
         let cfg = StacklessControlFlowGraph::new_forward(code);
         let mut flush_writes: BTreeMap<CodeOffset, BTreeSet<TempIndex>> = BTreeMap::new();
         // TODO: After comparison testing, remove the `assign_optimize` flag and always
-        // perform the optimization.
+        // perform the optimization. It currently is passed around so that existing behavior
+        // is retained when the flag is off.
         let assign_optimize = func_env
             .module_env
             .env
@@ -230,6 +231,10 @@ impl FlushWritesProcessor {
             // Only `Assign`, `Call`, and `Load` instructions push temps to the stack.
             // We need to find if any of these temps are better flushed right away.
             if matches!(instr, Assign(..) | Call(..) | Load(..)) {
+                if !assign_optimize && matches!(instr, Assign(..)) {
+                    // Retain previous behavior.
+                    continue;
+                }
                 for (dest_index, dest) in instr.dests().into_iter().enumerate().rev() {
                     let def = DefOrUsePoint {
                         offset,
@@ -272,7 +277,9 @@ impl FlushWritesProcessor {
                 // If used outside the basic block, flush right away.
                 return true;
             }
-            // If has intervening definition, flush right away.
+            // If has intervening definitions, flush right away.
+            // The first call checks the definitions of preceding uses in the same instruction.
+            // The second call checks definitions between `def` and `use_`.
             Self::has_intervening_def(&def, use_, use_def_links)
                 || Self::has_flush_causing_defs_in_between(
                     &def,
@@ -313,6 +320,8 @@ impl FlushWritesProcessor {
         })
     }
 
+    /// Check for various conditions where between a `def` and its `use_`, there are other
+    /// definitions that could cause `def` to be flushed before its `use_`.
     fn has_flush_causing_defs_in_between(
         def: &DefOrUsePoint,
         use_: &DefOrUsePoint,
@@ -324,10 +333,11 @@ impl FlushWritesProcessor {
         if !assign_optimize {
             return false;
         }
-        // For each def in between, is there at least one def that is:
+        // For each definition in between `def` and `use_`, is there at least one that is:
         // 1. not flushed right away?
         // 2. not consumed before `use_`?
         // 3. not used in the same offset as `use_`?
+        // If so, `def` could be flushed before its `use_`, so we should instead flush it right away.
         let defs_in_between = Self::get_defs_between(def, use_, use_def_links);
         for def_in_between in defs_in_between {
             if Self::is_def_flushed_away(&def_in_between, code, flush_writes) {
@@ -381,6 +391,7 @@ impl FlushWritesProcessor {
             .map_or(false, |uses| uses.iter().all(|u| u.offset == use_offset))
     }
 
+    /// Get all the definitions between `def` and `use_`.
     fn get_defs_between(
         def: &DefOrUsePoint,
         use_: &DefOrUsePoint,
