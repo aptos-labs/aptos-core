@@ -10,7 +10,7 @@ module 0x1::batched_execution {
         val: u8,
     }
 
-    struct CopyableValue has copy {
+    struct CopyableValue has drop, copy {
         val: u8,
     }
 
@@ -72,5 +72,9 @@ module 0x1::batched_execution {
     public fun consume_generic_non_droppable_value<T>(v: GenericNonDroppableValue<T>, expected_val: u8) {
         let GenericNonDroppableValue { val } = v;
         assert!(val == expected_val, 10);
+    }
+
+    public fun multiple_returns(): (DroppableValue, NonDroppableValue) {
+        return (DroppableValue { val: 0 }, NonDroppableValue { val: 1} )
     }
 }

@@ -53,8 +53,8 @@ fn put_value_set(
     let state_kv_metadata_batch = SchemaBatch::new();
     state_store
         .put_value_sets(
-            &[sharded_value_set],
             version,
+            &ShardedStateUpdateRefs::index_per_version_updates([value_set.clone().into_iter()], 1),
             StateStorageUsage::new_untracked(),
             None,
             &ledger_batch,

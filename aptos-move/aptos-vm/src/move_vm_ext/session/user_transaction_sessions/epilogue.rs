@@ -17,7 +17,7 @@ use crate::{
 use aptos_gas_algebra::Fee;
 use aptos_types::{
     fee_statement::FeeStatement,
-    transaction::{ExecutionStatus, TransactionAuxiliaryData, TransactionStatus},
+    transaction::{ExecutionStatus, TransactionStatus},
 };
 use aptos_vm_types::{
     change_set::VMChangeSet, module_and_script_storage::module_storage::AptosModuleStorage,
@@ -104,7 +104,6 @@ impl<'r, 'l> EpilogueSession<'r, 'l> {
         self,
         fee_statement: FeeStatement,
         execution_status: ExecutionStatus,
-        txn_aux_data: TransactionAuxiliaryData,
         change_set_configs: &ChangeSetConfigs,
         module_storage: &impl AptosModuleStorage,
     ) -> Result<VMOutput, VMStatus> {
@@ -135,7 +134,6 @@ impl<'r, 'l> EpilogueSession<'r, 'l> {
             module_write_set,
             fee_statement,
             TransactionStatus::Keep(execution_status),
-            txn_aux_data,
         ))
     }
 }

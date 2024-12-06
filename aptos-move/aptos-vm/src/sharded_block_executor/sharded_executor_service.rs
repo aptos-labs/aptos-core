@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_executor::BlockAptosVM,
+    block_executor::AptosVMBlockExecutorWrapper,
     sharded_block_executor::{
         aggr_overridden_state_view::{AggregatorOverriddenStateView, TOTAL_SUPPLY_AGGR_BASE_VAL},
         coordinator_client::CoordinatorClient,
@@ -140,7 +140,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             });
             s.spawn(move |_| {
                 let txn_provider = DefaultTxnProvider::new(signature_verified_transactions);
-                let ret = BlockAptosVM::execute_block_on_thread_pool(
+                let ret = AptosVMBlockExecutorWrapper::execute_block_on_thread_pool(
                     executor_thread_pool,
                     &txn_provider,
                     aggr_overridden_state_view.as_ref(),

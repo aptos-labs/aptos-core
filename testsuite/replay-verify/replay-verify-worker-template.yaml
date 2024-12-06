@@ -1,7 +1,7 @@
 apiVersion: v1  
 kind: Pod  
 metadata:  
-  name: worker-pod
+  name: worker-pod-9
   labels:
     run: some-label
 spec:  
@@ -9,12 +9,12 @@ spec:
   restartPolicy: Never  # Pod restarts only if it fails  
   containers:  
     - name: replay-verify-worker  
-      image: us-docker.pkg.dev/aptos-registry/docker/tools:performance_65a65fc719cd40dc989a5832819095aa8f1e384d  
+      image: us-docker.pkg.dev/aptos-registry/docker/tools:nightly  
       volumeMounts:  
-        - mountPath: /mnt/testnet_archive  
-          name: testnet-archive  
+        - mountPath: /mnt/archive  
+          name: archive  
           readOnly: true  # Mount the volume as read-only  
-      command: ["/bin/sh", "-c", "ls -al /mnt/testnet_archive && sleep 3600"]  
+      command: ["/bin/sh", "-c", "ls -al /mnt/archive && sleep 3600"]
       env:  
         #- name: PUSH_METRICS_ENDPOINT  
         #  value: "http://localhost:9091"
@@ -22,12 +22,12 @@ spec:
           value: "info"
       resources:  
         requests:  
-          memory: "110Gi"  
+          memory: "90Gi"  
           cpu: "30"  
         limits:  
-          memory: "110Gi"  
+          memory: "90Gi"  
           cpu: "30"  
   volumes:  
-    - name: testnet-archive  
+    - name: archive
       persistentVolumeClaim:  
-        claimName: testnet-archive-claim-0  
+        claimName: testnet-archive-9

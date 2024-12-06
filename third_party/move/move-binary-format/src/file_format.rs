@@ -851,10 +851,18 @@ impl AbilitySet {
     );
     /// The empty ability set
     pub const EMPTY: Self = Self(0);
-    /// Abilities for `Functions`
+    /// Minimal abilities for all `Functions`
     pub const FUNCTIONS: AbilitySet = Self(Ability::Drop as u8);
+    /// Maximal abilities for all `Functions`.  This is used for identity when unifying function types.
+    pub const MAXIMAL_FUNCTIONS: AbilitySet = Self::PUBLIC_FUNCTIONS;
     /// Abilities for `Bool`, `U8`, `U64`, `U128`, and `Address`
     pub const PRIMITIVES: AbilitySet =
+        Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));
+    /// Abilities for `private` user-defined/"primitive" functions (not closures).
+    /// These can be be changed in module upgrades, so should not be stored
+    pub const PRIVATE_FUNCTIONS: AbilitySet = Self((Ability::Copy as u8) | (Ability::Drop as u8));
+    /// Abilities for `public` user-defined/"primitive" functions (not closures)
+    pub const PUBLIC_FUNCTIONS: AbilitySet =
         Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));
     /// Abilities for `Reference` and `MutableReference`
     pub const REFERENCES: AbilitySet = Self((Ability::Copy as u8) | (Ability::Drop as u8));

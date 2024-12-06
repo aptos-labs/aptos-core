@@ -7,7 +7,7 @@ use aptos_executor_types::{
     execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
     state_compute_result::StateComputeResult, LedgerUpdateOutput,
 };
-use aptos_storage_interface::state_delta::StateDelta;
+use aptos_storage_interface::state_store::state_delta::StateDelta;
 use aptos_types::proof::accumulator::InMemoryTransactionAccumulator;
 use once_cell::sync::OnceCell;
 use std::sync::Arc;

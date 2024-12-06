@@ -18,19 +18,12 @@ Ok(
             gas_used: 3,
             status: Keep(
                 MiscellaneousError(
-                    None,
+                    Some(
+                        UNEXPECTED_VERIFIER_ERROR,
+                    ),
                 ),
             ),
-            auxiliary_data: V1(
-                TransactionAuxiliaryDataV1 {
-                    detail_error_message: Some(
-                        VMErrorDetail {
-                            status_code: UNEXPECTED_VERIFIER_ERROR,
-                            message: None,
-                        },
-                    ),
-                },
-            ),
+            auxiliary_data: None,
         },
     ],
 )

@@ -6,6 +6,7 @@ mod db;
 pub mod db_indexer;
 pub mod db_ops;
 pub mod db_v2;
+pub mod event_v2_translator;
 pub mod indexer_reader;
 mod metrics;
 mod utils;
@@ -23,7 +24,8 @@ use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{
-    db_ensure, db_other_bail, state_view::DbStateViewAtVersion, AptosDbError, DbReader, Result,
+    db_ensure, db_other_bail, state_store::state_view::db_state_view::DbStateViewAtVersion,
+    AptosDbError, DbReader, Result,
 };
 use aptos_types::{
     access_path::Path,

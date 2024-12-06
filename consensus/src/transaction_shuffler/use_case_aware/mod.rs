@@ -40,7 +40,7 @@ pub struct UseCaseAwareShuffler {
     pub config: Config,
 }
 
-#[cfg(any(test, feature = "fuzzing"))]
+#[cfg(feature = "fuzzing")]
 impl UseCaseAwareShuffler {
     pub fn shuffle_generic<
         Txn: aptos_types::transaction::use_case::UseCaseAwareTransaction + Debug,
