@@ -284,7 +284,7 @@ impl<I: Iterator<Item = Token>> Parser<I> {
     }
 
     fn parse_type_tag(&mut self, depth: u8) -> Result<TypeTag> {
-        if depth >= crate::safe_serialize::MAX_TYPE_TAG_NESTING {
+        if depth > crate::safe_serialize::MAX_TYPE_TAG_NESTING {
             bail!("Exceeded TypeTag nesting limit during parsing: {}", depth);
         }
 

@@ -11,7 +11,7 @@ use aptos_aggregator::{
 use aptos_types::{
     error::{code_invariant_error, expect_ok, PanicError, PanicOr},
     state_store::{
-        errors::StateviewError,
+        errors::StateViewError,
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
@@ -318,12 +318,18 @@ impl<'r> TModuleView for ExecutorViewWithChangeSet<'r> {
 }
 
 impl<'r> StateStorageView for ExecutorViewWithChangeSet<'r> {
+    type Key = StateKey;
+
     fn id(&self) -> StateViewId {
         self.base_executor_view.id()
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
-        Err(StateviewError::Other(
+    fn read_state_value(&self, state_key: &Self::Key) -> Result<(), StateViewError> {
+        self.base_executor_view.read_state_value(state_key)
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
+        Err(StateViewError::Other(
             "Unexpected access to get_usage()".to_string(),
         ))
     }

@@ -131,6 +131,7 @@ pub enum FeatureFlag {
     FederatedKeyless,
     TransactionSimulationEnhancement,
     CollectionOwner,
+    NativeMemoryOperations,
     EnableLoaderV2,
 }
 
@@ -281,10 +282,12 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::Bn254Structures => AptosFeatureFlag::BN254_STRUCTURES,
             FeatureFlag::WebAuthnSignature => AptosFeatureFlag::WEBAUTHN_SIGNATURE,
-            FeatureFlag::ReconfigureWithDkg => AptosFeatureFlag::RECONFIGURE_WITH_DKG,
+            FeatureFlag::ReconfigureWithDkg => AptosFeatureFlag::_DEPRECATED_RECONFIGURE_WITH_DKG,
             FeatureFlag::KeylessAccounts => AptosFeatureFlag::KEYLESS_ACCOUNTS,
             FeatureFlag::KeylessButZklessAccounts => AptosFeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
-            FeatureFlag::RemoveDetailedError => AptosFeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH,
+            FeatureFlag::RemoveDetailedError => {
+                AptosFeatureFlag::_DEPRECATED_REMOVE_DETAILED_ERROR_FROM_HASH
+            },
             FeatureFlag::JwkConsensus => AptosFeatureFlag::JWK_CONSENSUS,
             FeatureFlag::ConcurrentFungibleAssets => AptosFeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
             FeatureFlag::RefundableBytes => AptosFeatureFlag::REFUNDABLE_BYTES,
@@ -348,6 +351,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT
             },
             FeatureFlag::CollectionOwner => AptosFeatureFlag::COLLECTION_OWNER,
+            FeatureFlag::NativeMemoryOperations => AptosFeatureFlag::NATIVE_MEMORY_OPERATIONS,
             FeatureFlag::EnableLoaderV2 => AptosFeatureFlag::ENABLE_LOADER_V2,
         }
     }
@@ -425,10 +429,12 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::BN254_STRUCTURES => FeatureFlag::Bn254Structures,
             AptosFeatureFlag::WEBAUTHN_SIGNATURE => FeatureFlag::WebAuthnSignature,
-            AptosFeatureFlag::RECONFIGURE_WITH_DKG => FeatureFlag::ReconfigureWithDkg,
+            AptosFeatureFlag::_DEPRECATED_RECONFIGURE_WITH_DKG => FeatureFlag::ReconfigureWithDkg,
             AptosFeatureFlag::KEYLESS_ACCOUNTS => FeatureFlag::KeylessAccounts,
             AptosFeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS => FeatureFlag::KeylessButZklessAccounts,
-            AptosFeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH => FeatureFlag::RemoveDetailedError,
+            AptosFeatureFlag::_DEPRECATED_REMOVE_DETAILED_ERROR_FROM_HASH => {
+                FeatureFlag::RemoveDetailedError
+            },
             AptosFeatureFlag::JWK_CONSENSUS => FeatureFlag::JwkConsensus,
             AptosFeatureFlag::CONCURRENT_FUNGIBLE_ASSETS => FeatureFlag::ConcurrentFungibleAssets,
             AptosFeatureFlag::REFUNDABLE_BYTES => FeatureFlag::RefundableBytes,
@@ -492,6 +498,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::TransactionSimulationEnhancement
             },
             AptosFeatureFlag::COLLECTION_OWNER => FeatureFlag::CollectionOwner,
+            AptosFeatureFlag::NATIVE_MEMORY_OPERATIONS => FeatureFlag::NativeMemoryOperations,
             AptosFeatureFlag::ENABLE_LOADER_V2 => FeatureFlag::EnableLoaderV2,
         }
     }

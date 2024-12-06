@@ -171,6 +171,15 @@ impl CompilerVersion {
             _ => Ok(()),
         }
     }
+
+    /// Infer the latest stable language version based on the compiler version
+    pub fn infer_stable_language_version(&self) -> LanguageVersion {
+        if *self == CompilerVersion::V1 {
+            LanguageVersion::V1
+        } else {
+            LanguageVersion::latest_stable()
+        }
+    }
 }
 
 // ================================================================================'
@@ -196,6 +205,11 @@ pub enum LanguageVersion {
     V2_1,
     /// The currently unstable 2.2 version of Move
     V2_2,
+}
+
+impl LanguageVersion {
+    /// Leave this symbolic for now in case of more versions.
+    pub const V2_LAMBDA: Self = Self::V2_2;
 }
 
 impl Default for LanguageVersion {

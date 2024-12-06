@@ -239,7 +239,6 @@ members = [
     "third_party/move/move-vm/transactional-tests",
     "third_party/move/move-vm/types",
     "third_party/move/testing-infra/module-generation",
-    "third_party/move/testing-infra/test-generation",
     "third_party/move/testing-infra/transactional-test-runner",
     "third_party/move/tools/move-bytecode-utils",
     "third_party/move/tools/move-bytecode-viewer",
@@ -589,6 +588,7 @@ ethnum = "1.5.0"
 event-listener = "2.5.3"
 evm = { version = "0.33.1", features = ["tracing"] }
 evm-runtime = { version = "0.33.0", features = ["tracing"] }
+dearbitrary = { version = "1.0.4", features = ["derive"] }
 fail = "0.5.0"
 ff = { version = "0.13", features = ["derive"] }
 field_count = "0.1.1"
@@ -623,6 +623,7 @@ http = "0.2.9"
 httpmock = "0.6.8"
 hyper = { version = "0.14.18", features = ["full"] }
 hyper-tls = "0.5.0"
+im = "15.0.0"
 image = "0.24.5"
 indexmap = "1.9.3"
 include_dir = { version = "0.7.2", features = ["glob"] }
@@ -840,8 +841,12 @@ z3tracer = "0.8.0"
 # MOVE DEPENDENCIES
 move-abigen = { path = "third_party/move/move-prover/move-abigen" }
 move-binary-format = { path = "third_party/move/move-binary-format" }
+move-borrow-graph = { path = "third_party/move/move-borrow-graph" }
+move-bytecode-source-map = { path = "third_party/move/move-ir-compiler/move-bytecode-source-map" }
 move-bytecode-spec = { path = "third_party/move/move-bytecode-spec" }
 move-bytecode-verifier = { path = "third_party/move/move-bytecode-verifier" }
+move-bytecode-verifier-invalid-mutations = { path = "third_party/move/move-bytecode-verifier/invalid-mutations" }
+move-bytecode-viewer = { path = "third_party/move/tools/move-bytecode-viewer" }
 move-bytecode-utils = { path = "third_party/move/tools/move-bytecode-utils" }
 move-cli = { path = "third_party/move/tools/move-cli" }
 move-command-line-common = { path = "third_party/move/move-command-line-common" }
@@ -852,32 +857,29 @@ move-core-types = { path = "third_party/move/move-core/types" }
 move-decompiler = { path = "third_party/move/tools/move-decompiler" }
 move-docgen = { path = "third_party/move/move-prover/move-docgen" }
 move-disassembler = { path = "third_party/move/tools/move-disassembler" }
+move-errmapgen = { path = "third_party/move/move-prover/move-errmapgen" }
 move-ir-types = { path = "third_party/move/move-ir/types" }
 move-ir-compiler = { path = "third_party/move/move-ir-compiler" }
+move-ir-to-bytecode = { path = "third_party/move/move-ir-compiler/move-ir-to-bytecode" }
 move-linter = { path = "third_party/move/tools/move-linter" }
-move-bytecode-source-map = { path = "third_party/move/move-ir-compiler/move-bytecode-source-map" }
 move-model = { path = "third_party/move/move-model" }
 move-package = { path = "third_party/move/tools/move-package" }
 move-prover = { path = "third_party/move/move-prover" }
 move-prover-boogie-backend = { path = "third_party/move/move-prover/boogie-backend" }
 move-prover-bytecode-pipeline = { path = "third_party/move/move-prover/bytecode-pipeline" }
-move-stackless-bytecode = { path = "third_party/move/move-model/bytecode" }
-move-stackless-bytecode-test-utils = { path = "third_party/move/move-model/bytecode-test-utils" }
+move-prover-test-utils = { path = "third_party/move/move-prover/test-utils" }
 aptos-move-stdlib = { path = "aptos-move/framework/move-stdlib" }
 aptos-table-natives = { path = "aptos-move/framework/table-natives" }
-move-prover-test-utils = { path = "third_party/move/move-prover/test-utils" }
 move-resource-viewer = { path = "third_party/move/tools/move-resource-viewer" }
+move-stackless-bytecode = { path = "third_party/move/move-model/bytecode" }
+move-stackless-bytecode-test-utils = { path = "third_party/move/move-model/bytecode-test-utils" }
 move-symbol-pool = { path = "third_party/move/move-symbol-pool" }
 move-table-extension = { path = "third_party/move/extensions/move-table-extension" }
 move-transactional-test-runner = { path = "third_party/move/testing-infra/transactional-test-runner" }
-move-unit-test = { path = "third_party/move/tools/move-unit-test", features = [
-    "table-extension",
-] }
+move-unit-test = { path = "third_party/move/tools/move-unit-test", features = ["table-extension"] }
 move-vm-metrics = { path = "third_party/move/move-vm/metrics" }
 move-vm-runtime = { path = "third_party/move/move-vm/runtime" }
-move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = [
-    "table-extension",
-] }
+move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = ["table-extension"] }
 move-vm-types = { path = "third_party/move/move-vm/types" }
 
 [profile.release]
@@ -916,3 +918,12 @@ serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev
 merlin = { git = "https://github.com/aptos-labs/merlin" }
 x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", branch = "zeroize_v1" }
 tonic = { git = "https://github.com/aptos-labs/tonic.git", rev = "0da1ba8b1751d6e19eb55be24cccf9ae933c666e" }
+futures = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-channel = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-executor = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-core = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-util = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-sink = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-io = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-task = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-macro = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }

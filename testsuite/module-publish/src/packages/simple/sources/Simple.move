@@ -15,6 +15,7 @@ module 0xABCD::simple {
     use std::vector;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::account;
+    use aptos_framework::code;
     use aptos_std::table::{Self, Table};
 
     // Through the constant pool it will be possible to change this
@@ -489,5 +490,9 @@ module 0xABCD::simple {
                 SimpleEvent { event_id: count },
             );
         }
+    }
+
+    public entry fun publish_p(_s: &signer, owner: &signer, metadata_serialized: vector<u8>, code: vector<vector<u8>>) {
+        code::publish_package_txn(owner, metadata_serialized, code)
     }
 }

@@ -324,7 +324,7 @@ impl<'env> Abigen<'env> {
             },
             Tuple(_)
             | TypeParameter(_)
-            | Fun(_, _)
+            | Fun(..)
             | TypeDomain(_)
             | ResourceDomain(..)
             | Error

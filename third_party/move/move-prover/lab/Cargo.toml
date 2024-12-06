@@ -7,26 +7,18 @@ edition = "2021"
 license = "Apache-2.0"
 
 [dependencies]
-# Move dependencies
-move-compiler = { path = "../../move-compiler" }
-move-compiler-v2 = { path = "../../move-compiler-v2" }
-move-model = { path = "../../move-model" }
-move-prover = { path = ".." }
-move-prover-boogie-backend = { path = "../boogie-backend" }
-move-prover-bytecode-pipeline = { path = "../bytecode-pipeline" }
-
-# FB external dependencies
-z3tracer = { workspace = true }
-
-# external dependencies
 anyhow = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 codespan-reporting = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true, features = ["serde"] }
-plotters = { workspace = true, features = [
-    "evcxr",
-    "line_series",
-    "histogram",
-] }
+move-compiler = { workspace = true }
+move-compiler-v2 = { workspace = true }
+move-model = { workspace = true }
+move-prover = { workspace = true }
+move-prover-boogie-backend = { workspace = true }
+move-prover-bytecode-pipeline = { workspace = true }
+plotters = { workspace = true, features = ["evcxr", "line_series", "histogram"] }
+z3tracer = { workspace = true }
+

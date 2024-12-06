@@ -19,13 +19,14 @@ use aptos_crypto::{
 };
 use aptos_db_indexer_schemas::schema::{
     event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
+    translated_v1_event::TranslatedV1EventSchema,
 };
 use aptos_schemadb::{iterator::SchemaIterator, schema::ValueCodec, ReadOptions, SchemaBatch, DB};
 use aptos_storage_interface::{db_ensure as ensure, db_other_bail, AptosDbError, Result};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{new_block_event_key, NewBlockEvent},
-    contract_event::ContractEvent,
+    contract_event::{ContractEvent, ContractEventV1},
     event::EventKey,
     proof::position::Position,
     transaction::Version,

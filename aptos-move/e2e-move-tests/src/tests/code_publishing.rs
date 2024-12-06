@@ -242,17 +242,10 @@ fn code_publishing_upgrade_loader_cache_consistency() {
             |_| {},
         ),
     ];
-    let result = h.run_block_get_output(txns);
-    assert_success!(result[0].status().to_owned());
-    assert_success!(result[1].status().to_owned());
-    assert_eq!(
-        result[2]
-            .auxiliary_data()
-            .get_detail_error_message()
-            .unwrap()
-            .status_code(),
-        StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE
-    )
+    let result = h.run_block(txns);
+    assert_success!(result[0]);
+    assert_success!(result[1]);
+    assert_vm_status!(result[2], StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
 }
 
 #[test]
@@ -427,7 +420,6 @@ fn test_module_publishing_does_not_fallback() {
     executor.disable_block_executor_fallback();
 
     let mut h = MoveHarness::new_with_executor(executor);
-    h.enable_features(vec![FeatureFlag::ENABLE_LOADER_V2], vec![]);
     let addr = AccountAddress::from_hex_literal("0x123").unwrap();
     let account = h.new_account_at(addr);
 
@@ -530,7 +522,6 @@ fn test_module_publishing_does_not_leak_speculative_information() {
     executor.disable_block_executor_fallback();
 
     let mut h = MoveHarness::new_with_executor(executor);
-    h.enable_features(vec![FeatureFlag::ENABLE_LOADER_V2], vec![]);
     let addr = AccountAddress::random();
     let account = h.new_account_at(addr);
 

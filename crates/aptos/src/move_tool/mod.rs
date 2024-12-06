@@ -45,7 +45,7 @@ use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_rest_client::{
     aptos_api_types::{EntryFunctionId, HexEncodedBytes, IdentifierWrapper, MoveModuleId},
     error::RestError,
-    Client,
+    AptosBaseUrl, Client,
 };
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
@@ -821,6 +821,7 @@ impl AsyncTryInto<ChunkedPublishPayloads> for &PublishPackage {
             PublishType::AccountDeploy,
             None,
             self.chunked_publish_option.large_packages_module_address,
+            self.chunked_publish_option.chunk_size,
         )?;
 
         let size = &chunked_publish_payloads
@@ -1013,6 +1014,7 @@ fn create_chunked_publish_payloads(
     publish_type: PublishType,
     object_address: Option<AccountAddress>,
     large_packages_module_address: AccountAddress,
+    chunk_size: usize,
 ) -> CliTypedResult<ChunkedPublishPayloads> {
     let compiled_units = package.extract_code();
     let metadata = package.extract_metadata()?;
@@ -1030,6 +1032,7 @@ fn create_chunked_publish_payloads(
         publish_type,
         maybe_object_address,
         large_packages_module_address,
+        chunk_size,
     );
 
     Ok(ChunkedPublishPayloads { payloads })
@@ -1157,6 +1160,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 PublishType::AccountDeploy,
                 None,
                 self.chunked_publish_option.large_packages_module_address,
+                self.chunked_publish_option.chunk_size,
             )?
             .payloads;
             let staging_tx_count = (mock_payloads.len() - 1) as u64;
@@ -1183,6 +1187,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 PublishType::ObjectDeploy,
                 None,
                 self.chunked_publish_option.large_packages_module_address,
+                self.chunked_publish_option.chunk_size,
             )?
             .payloads;
 
@@ -1295,6 +1300,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
                 PublishType::ObjectUpgrade,
                 Some(self.object_address),
                 self.chunked_publish_option.large_packages_module_address,
+                self.chunked_publish_option.chunk_size,
             )?
             .payloads;
 
@@ -1386,6 +1392,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
                 PublishType::AccountDeploy,
                 None,
                 self.chunked_publish_option.large_packages_module_address,
+                self.chunked_publish_option.chunk_size,
             )?
             .payloads;
             let staging_tx_count = (mock_payloads.len() - 1) as u64;
@@ -1412,6 +1419,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
                 PublishType::ObjectDeploy,
                 None,
                 self.chunked_publish_option.large_packages_module_address,
+                self.chunked_publish_option.chunk_size,
             )?
             .payloads;
 
@@ -1530,6 +1538,7 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
                 PublishType::ObjectUpgrade,
                 Some(self.object_address),
                 self.chunked_publish_option.large_packages_module_address,
+                self.chunked_publish_option.chunk_size,
             )?
             .payloads;
 
@@ -2179,6 +2188,11 @@ pub struct Replay {
     /// If present, skip the comparison against the expected transaction output.
     #[clap(long)]
     pub(crate) skip_comparison: bool,
+
+    /// Key to use for ratelimiting purposes with the node API. This value will be used
+    /// as `Authorization: Bearer <key>`
+    #[clap(long)]
+    pub(crate) node_api_key: Option<String>,
 }
 
 impl FromStr for ReplayNetworkSelection {
@@ -2216,10 +2230,20 @@ impl CliCommand<TransactionSummary> for Replay {
             RestEndpoint(url) => url,
         };
 
-        let debugger = AptosDebugger::rest_client(Client::new(
+        // Build the client
+        let client = Client::builder(AptosBaseUrl::Custom(
             Url::parse(rest_endpoint)
                 .map_err(|_err| CliError::UnableToParse("url", rest_endpoint.to_string()))?,
-        ))?;
+        ));
+
+        // add the node API key if it is provided
+        let client = if let Some(api_key) = self.node_api_key {
+            client.api_key(&api_key).unwrap().build()
+        } else {
+            client.build()
+        };
+
+        let debugger = AptosDebugger::rest_client(client)?;
 
         // Fetch the transaction to replay.
         let (txn, txn_info) = debugger

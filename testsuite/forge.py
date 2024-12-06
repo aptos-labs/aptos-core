@@ -379,16 +379,19 @@ def get_cpu_profile_link(
     start_time: datetime | None = None,
     end_time: datetime | None = None,
 ) -> str:
-    base_url = "https://aptoslabs.grafana.net/a/grafana-pyroscope-app/single"
+    base_url = "https://grafana.aptoslabs.com/a/grafana-pyroscope-app/profiles-explorer"
     start_timestamp = str(int(start_time.timestamp())) if start_time else "now-1h"
     end_timestamp = str(int(end_time.timestamp())) if end_time else "now"
 
-    query_params = {
-        "query": f'process_cpu:cpu:nanoseconds:cpu:nanoseconds{{service_name="ebpf/{forge_namespace}/{container_name.value}"}}',
-        "from": start_timestamp,
-        "until": end_timestamp,
-        "maxNodes": "16384",
-    }
+    query_params = [
+        ("from", start_timestamp),
+        ("until", end_timestamp),
+        ("maxNodes", "16384"),
+        ("explorationType", "flame-graph"),
+        ("var-serviceName", "ebpf/forge"),
+        ("var-filters", f"namespace|=|{forge_namespace}"),
+        ("var-filters", f"pod|=~|.*{container_name.value}.*"),
+    ]
     encoded_params = urlencode(query_params)
 
     return f"{base_url}?{encoded_params}"

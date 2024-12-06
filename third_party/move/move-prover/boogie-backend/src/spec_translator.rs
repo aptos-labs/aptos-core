@@ -270,8 +270,12 @@ impl<'env> SpecTranslator<'env> {
             // so we don't need to translate it.
             return;
         }
-        if let Type::Tuple(..) | Type::Fun(..) = fun.result_type {
-            self.error(&fun.loc, "function or tuple result type not yet supported");
+        if let Type::Tuple(..) = fun.result_type {
+            self.error(&fun.loc, "tuple result type not yet supported");
+            return;
+        }
+        if let Type::Fun(..) = fun.result_type {
+            self.error(&fun.loc, "function result type not yet supported"); // TODO(LAMBDA)
             return;
         }
         let qid = module_env.get_id().qualified(id);
@@ -528,7 +532,7 @@ impl<'env> SpecTranslator<'env> {
                 | Type::Struct(_, _, _)
                 | Type::TypeParameter(_)
                 | Type::Reference(_, _)
-                | Type::Fun(_, _)
+                | Type::Fun(..)
                 | Type::TypeDomain(_)
                 | Type::ResourceDomain(_, _, _)
                 | Type::Error
@@ -684,6 +688,7 @@ impl<'env> SpecTranslator<'env> {
             },
             ExpData::Invoke(node_id, ..) => {
                 self.error(&self.env.get_node_loc(*node_id), "Invoke not yet supported");
+                // TODO(LAMBDA)
             },
             ExpData::Lambda(node_id, ..) => self.error(
                 &self.env.get_node_loc(*node_id),
@@ -774,6 +779,10 @@ impl<'env> SpecTranslator<'env> {
                 let loc = self.env.get_node_loc(node_id);
                 self.error(&loc, &format!("tuple value not yet supported: {:#?}", val))
             },
+            Value::Function(_mid, _fid) => {
+                let loc = self.env.get_node_loc(node_id);
+                self.error(&loc, "Function values not yet supported") // TODO(LAMBDA)
+            },
         }
     }
 
@@ -836,7 +845,6 @@ impl<'env> SpecTranslator<'env> {
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
         match oper {
-            Operation::Closure(..) => unimplemented!("closures in specs"),
             // Operators we introduced in the top level public entry `SpecTranslator::translate`,
             // mapping between Boogies single value domain and our typed world.
             Operation::BoxValue | Operation::UnboxValue => panic!("unexpected box/unbox"),
@@ -1012,12 +1020,12 @@ impl<'env> SpecTranslator<'env> {
             | Operation::Deref
             | Operation::MoveTo
             | Operation::MoveFrom
+            | Operation::EarlyBind
             | Operation::Old => {
                 self.env.error(
                     &self.env.get_node_loc(node_id),
                     &format!(
-                        "bug: operation {} is not supported \
-                in the current context",
+                        "bug: operation {} is not supported in the current context",
                         oper.display(self.env, node_id)
                     ),
                 );
@@ -1464,7 +1472,7 @@ impl<'env> SpecTranslator<'env> {
                 | Type::Tuple(_)
                 | Type::TypeParameter(_)
                 | Type::Reference(_, _)
-                | Type::Fun(_, _)
+                | Type::Fun(..)
                 | Type::TypeDomain(_)
                 | Type::ResourceDomain(_, _, _)
                 | Type::Error
@@ -1627,7 +1635,7 @@ impl<'env> SpecTranslator<'env> {
                 | Type::Tuple(_)
                 | Type::TypeParameter(_)
                 | Type::Reference(_, _)
-                | Type::Fun(_, _)
+                | Type::Fun(..)
                 | Type::Error
                 | Type::Var(_) => panic!("unexpected type"),
             }

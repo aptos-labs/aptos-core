@@ -1734,11 +1734,12 @@ Staker can call this function to create a simple staking contract with a specifi
 
     <b>if</b> (std::features::module_event_migration_enabled()) {
         emit(<a href="staking_contract.md#0x1_staking_contract_CreateStakingContract">CreateStakingContract</a> { operator, voter, pool_address, principal, commission_percentage });
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> store.create_staking_contract_events,
+            <a href="staking_contract.md#0x1_staking_contract_CreateStakingContractEvent">CreateStakingContractEvent</a> { operator, voter, pool_address, principal, commission_percentage },
+        );
     };
-    emit_event(
-        &<b>mut</b> store.create_staking_contract_events,
-        <a href="staking_contract.md#0x1_staking_contract_CreateStakingContractEvent">CreateStakingContractEvent</a> { operator, voter, pool_address, principal, commission_percentage },
-    );
     pool_address
 }
 </code></pre>
@@ -1778,11 +1779,12 @@ Add more stake to an existing staking contract.
     <b>let</b> pool_address = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.pool_address;
     <b>if</b> (std::features::module_event_migration_enabled()) {
         emit(<a href="staking_contract.md#0x1_staking_contract_AddStake">AddStake</a> { operator, pool_address, amount });
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> store.add_stake_events,
+            <a href="staking_contract.md#0x1_staking_contract_AddStakeEvent">AddStakeEvent</a> { operator, pool_address, amount },
+        );
     };
-    emit_event(
-        &<b>mut</b> store.add_stake_events,
-        <a href="staking_contract.md#0x1_staking_contract_AddStakeEvent">AddStakeEvent</a> { operator, pool_address, amount },
-    );
 }
 </code></pre>
 
@@ -1818,12 +1820,12 @@ Convenient function to allow the staker to update the voter address in a staking
 
     <b>if</b> (std::features::module_event_migration_enabled()) {
         emit(<a href="staking_contract.md#0x1_staking_contract_UpdateVoter">UpdateVoter</a> { operator, pool_address, old_voter, new_voter });
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> store.update_voter_events,
+            <a href="staking_contract.md#0x1_staking_contract_UpdateVoterEvent">UpdateVoterEvent</a> { operator, pool_address, old_voter, new_voter },
+        );
     };
-    emit_event(
-        &<b>mut</b> store.update_voter_events,
-        <a href="staking_contract.md#0x1_staking_contract_UpdateVoterEvent">UpdateVoterEvent</a> { operator, pool_address, old_voter, new_voter },
-    );
-
 }
 </code></pre>
 
@@ -1858,8 +1860,9 @@ Convenient function to allow the staker to reset their stake pool's lockup perio
 
     <b>if</b> (std::features::module_event_migration_enabled()) {
         emit(<a href="staking_contract.md#0x1_staking_contract_ResetLockup">ResetLockup</a> { operator, pool_address });
+    } <b>else</b> {
+        emit_event(&<b>mut</b> store.reset_lockup_events, <a href="staking_contract.md#0x1_staking_contract_ResetLockupEvent">ResetLockupEvent</a> { operator, pool_address });
     };
-    emit_event(&<b>mut</b> store.reset_lockup_events, <a href="staking_contract.md#0x1_staking_contract_ResetLockupEvent">ResetLockupEvent</a> { operator, pool_address });
 }
 </code></pre>
 
@@ -1922,11 +1925,12 @@ TODO: fix the typo in function name. commision -> commission
         emit(
             <a href="staking_contract.md#0x1_staking_contract_UpdateCommission">UpdateCommission</a> { staker: staker_address, operator, old_commission_percentage, new_commission_percentage }
         );
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="staking_contract.md#0x1_staking_contract_StakingGroupUpdateCommissionEvent">StakingGroupUpdateCommissionEvent</a>&gt;(staker_address).update_commission_events,
+            <a href="staking_contract.md#0x1_staking_contract_UpdateCommissionEvent">UpdateCommissionEvent</a> { staker: staker_address, operator, old_commission_percentage, new_commission_percentage }
+        );
     };
-    emit_event(
-        &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="staking_contract.md#0x1_staking_contract_StakingGroupUpdateCommissionEvent">StakingGroupUpdateCommissionEvent</a>&gt;(staker_address).update_commission_events,
-        <a href="staking_contract.md#0x1_staking_contract_UpdateCommissionEvent">UpdateCommissionEvent</a> { staker: staker_address, operator, old_commission_percentage, new_commission_percentage }
-    );
 }
 </code></pre>
 
@@ -2029,11 +2033,12 @@ Only staker, operator or beneficiary can call this.
     <b>let</b> pool_address = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.pool_address;
     <b>if</b> (std::features::module_event_migration_enabled()) {
         emit(<a href="staking_contract.md#0x1_staking_contract_RequestCommission">RequestCommission</a> { operator, pool_address, accumulated_rewards, commission_amount });
+    } <b>else</b> {
+        emit_event(
+            request_commission_events,
+            <a href="staking_contract.md#0x1_staking_contract_RequestCommissionEvent">RequestCommissionEvent</a> { operator, pool_address, accumulated_rewards, commission_amount },
+        );
     };
-    emit_event(
-        request_commission_events,
-        <a href="staking_contract.md#0x1_staking_contract_RequestCommissionEvent">RequestCommissionEvent</a> { operator, pool_address, accumulated_rewards, commission_amount },
-    );
 
     commission_amount
 }
@@ -2104,11 +2109,12 @@ This also triggers paying commission to the operator for accounting simplicity.
     <b>let</b> pool_address = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.pool_address;
     <b>if</b> (std::features::module_event_migration_enabled()) {
         emit(<a href="staking_contract.md#0x1_staking_contract_UnlockStake">UnlockStake</a> { pool_address, operator, amount, commission_paid });
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> store.unlock_stake_events,
+            <a href="staking_contract.md#0x1_staking_contract_UnlockStakeEvent">UnlockStakeEvent</a> { pool_address, operator, amount, commission_paid },
+        );
     };
-    emit_event(
-        &<b>mut</b> store.unlock_stake_events,
-        <a href="staking_contract.md#0x1_staking_contract_UnlockStakeEvent">UnlockStakeEvent</a> { pool_address, operator, amount, commission_paid },
-    );
 }
 </code></pre>
 
@@ -2234,11 +2240,12 @@ Allows staker to switch operator without going through the lenghthy process to u
     <a href="../../../aptos-stdlib/tests/compiler-v2-doc/simple_map.md#0x1_simple_map_add">simple_map::add</a>(staking_contracts, new_operator, <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>);
     <b>if</b> (std::features::module_event_migration_enabled()) {
         emit(<a href="staking_contract.md#0x1_staking_contract_SwitchOperator">SwitchOperator</a> { pool_address, old_operator, new_operator });
+    } <b>else</b> {
+        emit_event(
+            &<b>mut</b> store.switch_operator_events,
+            <a href="staking_contract.md#0x1_staking_contract_SwitchOperatorEvent">SwitchOperatorEvent</a> { pool_address, old_operator, new_operator }
+        );
     };
-    emit_event(
-        &<b>mut</b> store.switch_operator_events,
-        <a href="staking_contract.md#0x1_staking_contract_SwitchOperatorEvent">SwitchOperatorEvent</a> { pool_address, old_operator, new_operator }
-    );
 }
 </code></pre>
 
@@ -2361,7 +2368,7 @@ Distribute all unlocked (inactive) funds according to distribution shares.
     // Buy all recipients out of the distribution pool.
     <b>while</b> (<a href="../../../aptos-stdlib/tests/compiler-v2-doc/pool_u64.md#0x1_pool_u64_shareholders_count">pool_u64::shareholders_count</a>(distribution_pool) &gt; 0) {
         <b>let</b> recipients = <a href="../../../aptos-stdlib/tests/compiler-v2-doc/pool_u64.md#0x1_pool_u64_shareholders">pool_u64::shareholders</a>(distribution_pool);
-        <b>let</b> recipient = *<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&<b>mut</b> recipients, 0);
+        <b>let</b> recipient = *<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&recipients, 0);
         <b>let</b> current_shares = <a href="../../../aptos-stdlib/tests/compiler-v2-doc/pool_u64.md#0x1_pool_u64_shares">pool_u64::shares</a>(distribution_pool, recipient);
         <b>let</b> amount_to_distribute = <a href="../../../aptos-stdlib/tests/compiler-v2-doc/pool_u64.md#0x1_pool_u64_redeem_shares">pool_u64::redeem_shares</a>(distribution_pool, recipient, current_shares);
         // If the recipient is the operator, send the commission <b>to</b> the beneficiary instead.
@@ -2372,11 +2379,12 @@ Distribute all unlocked (inactive) funds according to distribution shares.
 
         <b>if</b> (std::features::module_event_migration_enabled()) {
             emit(<a href="staking_contract.md#0x1_staking_contract_Distribute">Distribute</a> { operator, pool_address, recipient, amount: amount_to_distribute });
+        } <b>else</b> {
+            emit_event(
+                distribute_events,
+                <a href="staking_contract.md#0x1_staking_contract_DistributeEvent">DistributeEvent</a> { operator, pool_address, recipient, amount: amount_to_distribute }
+            );
         };
-        emit_event(
-            distribute_events,
-            <a href="staking_contract.md#0x1_staking_contract_DistributeEvent">DistributeEvent</a> { operator, pool_address, recipient, amount: amount_to_distribute }
-        );
     };
 
     // In case there's <a href="../../../aptos-stdlib/tests/compiler-v2-doc/any.md#0x1_any">any</a> dust left, send them all <b>to</b> the staker.
@@ -2411,7 +2419,7 @@ Assert that a staking_contract exists for the staker/operator pair.
 
 <pre><code><b>fun</b> <a href="staking_contract.md#0x1_staking_contract_assert_staking_contract_exists">assert_staking_contract_exists</a>(staker: <b>address</b>, operator: <b>address</b>) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a> {
     <b>assert</b>!(<b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker), <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="staking_contract.md#0x1_staking_contract_ENO_STAKING_CONTRACT_FOUND_FOR_STAKER">ENO_STAKING_CONTRACT_FOUND_FOR_STAKER</a>));
-    <b>let</b> staking_contracts = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker).staking_contracts;
+    <b>let</b> staking_contracts = &<b>borrow_global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker).staking_contracts;
     <b>assert</b>!(
         <a href="../../../aptos-stdlib/tests/compiler-v2-doc/simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(staking_contracts, &operator),
         <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="staking_contract.md#0x1_staking_contract_ENO_STAKING_CONTRACT_FOUND_FOR_OPERATOR">ENO_STAKING_CONTRACT_FOUND_FOR_OPERATOR</a>),
@@ -2455,11 +2463,12 @@ Add a new distribution for <code>recipient</code> and <code>amount</code> to the
     <b>let</b> pool_address = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.pool_address;
     <b>if</b> (std::features::module_event_migration_enabled()) {
         emit(<a href="staking_contract.md#0x1_staking_contract_AddDistribution">AddDistribution</a> { operator, pool_address, amount: coins_amount });
+    } <b>else</b> {
+        emit_event(
+            add_distribution_events,
+            <a href="staking_contract.md#0x1_staking_contract_AddDistributionEvent">AddDistributionEvent</a> { operator, pool_address, amount: coins_amount }
+        );
     };
-    emit_event(
-        add_distribution_events,
-        <a href="staking_contract.md#0x1_staking_contract_AddDistributionEvent">AddDistributionEvent</a> { operator, pool_address, amount: coins_amount }
-    );
 }
 </code></pre>
 
@@ -3597,7 +3606,6 @@ a staking_contract exists for the staker/operator pair.
     <b>requires</b> <b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">staking_config::StakingRewardsConfig</a>&gt;(
         @aptos_framework
     ) || !std::features::spec_periodical_reward_rate_decrease_enabled();
-    <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework);
     <b>requires</b> <b>exists</b>&lt;aptos_framework::timestamp::CurrentTimeMicroseconds&gt;(@aptos_framework);
     <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_AptosCoinCapabilities">stake::AptosCoinCapabilities</a>&gt;(@aptos_framework);
 }

@@ -7,7 +7,9 @@ use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_db::AptosDB;
 use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
-use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
+use aptos_storage_interface::{
+    state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReaderWriter,
+};
 use aptos_types::{
     account_address, account_config,
     chain_id::ChainId,
@@ -15,7 +17,7 @@ use aptos_types::{
     transaction::{Script, TransactionPayload},
     vm_status::StatusCode,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use move_core_types::{account_address::AccountAddress, gas_algebra::GasQuantity};
 use rand::SeedableRng;
 
@@ -31,7 +33,7 @@ impl TestValidator {
         let _db_path = aptos_temppath::TempPath::new();
         _db_path.create_as_dir().unwrap();
         let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(_db_path.path()));
-        aptos_executor_test_helpers::bootstrap_genesis::<AptosVM>(
+        aptos_executor_test_helpers::bootstrap_genesis::<AptosVMBlockExecutor>(
             &db_rw,
             &aptos_vm_genesis::test_genesis_transaction(),
         )

@@ -302,6 +302,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             Compatibility::new(
                 !extra_args.skip_check_struct_layout,
                 !extra_args.skip_check_friend_linking,
+                false,
             )
         };
         if vm.vm_config().use_loader_v2 {

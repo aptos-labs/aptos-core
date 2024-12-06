@@ -30,7 +30,7 @@ const DEVTOOL_TARGET_DIRECTORY: &str = "target/aptos-x-tool";
 
 // File types in `aptos-core` that are not relevant to the rust build and test process.
 // Note: this is a best effort list and will need to be updated as time goes on.
-const IGNORED_DETERMINATOR_FILE_TYPES: [&str; 4] = ["*.json", "*.md", "*.yaml", "*.yml"];
+const IGNORED_DETERMINATOR_FILE_TYPES: [&str; 1] = ["*.md"];
 
 // Paths in `aptos-core` that are not relevant to the rust build and test process.
 // Note: this is a best effort list and will need to be updated as time goes on.

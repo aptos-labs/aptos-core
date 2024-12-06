@@ -181,12 +181,12 @@ impl Environment {
         // If no chain ID is in storage, we assume we are in a testing environment.
         let chain_id = fetch_config_and_update_hash::<ChainId>(&mut sha3_256, state_view)
             .unwrap_or_else(ChainId::test);
-        let timestamp =
+        let timestamp_micros =
             fetch_config_and_update_hash::<ConfigurationResource>(&mut sha3_256, state_view)
-                .map(|config| config.last_reconfiguration_time())
+                .map(|config| config.last_reconfiguration_time_micros())
                 .unwrap_or(0);
 
-        let mut timed_features_builder = TimedFeaturesBuilder::new(chain_id, timestamp);
+        let mut timed_features_builder = TimedFeaturesBuilder::new(chain_id, timestamp_micros);
         if let Some(profile) = get_timed_feature_override() {
             // We need to ensure the override is taken into account for the hash.
             let profile_bytes = bcs::to_bytes(&profile)
@@ -272,12 +272,12 @@ fn fetch_config_and_update_hash<T: OnChainConfig>(
 #[cfg(test)]
 pub mod test {
     use super::*;
-    use aptos_language_e2e_tests::data_store::FakeDataStore;
+    use aptos_types::state_store::MockStateView;
 
     #[test]
     fn test_new_environment() {
         // This creates an empty state.
-        let state_view = FakeDataStore::default();
+        let state_view = MockStateView::empty();
         let env = Environment::new(&state_view, false, None);
 
         // Check default values.

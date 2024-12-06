@@ -3,65 +3,13 @@
 
 #![forbid(unsafe_code)]
 
-use crate::transactions_with_output::TransactionsWithOutput;
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DropHelper;
-use aptos_storage_interface::state_delta::StateDelta;
-use aptos_types::{state_store::ShardedStateUpdates, transaction::TransactionStatus};
+use aptos_storage_interface::state_store::{
+    sharded_state_updates::ShardedStateUpdates, state_delta::StateDelta,
+};
 use derive_more::Deref;
 use std::sync::Arc;
-
-#[derive(Default)]
-pub struct TransactionsByStatus {
-    // Statuses of the input transactions, in the same order as the input transactions.
-    // Contains BlockMetadata/Validator transactions,
-    // but doesn't contain StateCheckpoint/BlockEpilogue, as those get added during execution
-    statuses_for_input_txns: Vec<TransactionStatus>,
-    // List of all transactions to be committed, including StateCheckpoint/BlockEpilogue if needed.
-    to_commit: TransactionsWithOutput,
-    to_discard: TransactionsWithOutput,
-    to_retry: TransactionsWithOutput,
-}
-
-impl TransactionsByStatus {
-    pub fn new(
-        statuses_for_input_txns: Vec<TransactionStatus>,
-        to_commit: TransactionsWithOutput,
-        to_discard: TransactionsWithOutput,
-        to_retry: TransactionsWithOutput,
-    ) -> Self {
-        Self {
-            statuses_for_input_txns,
-            to_commit,
-            to_discard,
-            to_retry,
-        }
-    }
-
-    pub fn input_txns_len(&self) -> usize {
-        self.statuses_for_input_txns.len()
-    }
-
-    pub fn to_commit(&self) -> &TransactionsWithOutput {
-        &self.to_commit
-    }
-
-    pub fn into_inner(
-        self,
-    ) -> (
-        Vec<TransactionStatus>,
-        TransactionsWithOutput,
-        TransactionsWithOutput,
-        TransactionsWithOutput,
-    ) {
-        (
-            self.statuses_for_input_txns,
-            self.to_commit,
-            self.to_discard,
-            self.to_retry,
-        )
-    }
-}
 
 #[derive(Clone, Debug, Default, Deref)]
 pub struct StateCheckpointOutput {
@@ -74,14 +22,12 @@ impl StateCheckpointOutput {
         parent_state: Arc<StateDelta>,
         result_state: Arc<StateDelta>,
         state_updates_before_last_checkpoint: Option<ShardedStateUpdates>,
-        per_version_state_updates: Vec<ShardedStateUpdates>,
         state_checkpoint_hashes: Vec<Option<HashValue>>,
     ) -> Self {
         Self::new_impl(Inner {
             parent_state,
             result_state,
             state_updates_before_last_checkpoint,
-            per_version_state_updates,
             state_checkpoint_hashes,
         })
     }
@@ -91,7 +37,6 @@ impl StateCheckpointOutput {
             parent_state: state.clone(),
             result_state: state,
             state_updates_before_last_checkpoint: None,
-            per_version_state_updates: vec![],
             state_checkpoint_hashes: vec![],
         })
     }
@@ -117,8 +62,5 @@ pub struct Inner {
     pub parent_state: Arc<StateDelta>,
     pub result_state: Arc<StateDelta>,
     pub state_updates_before_last_checkpoint: Option<ShardedStateUpdates>,
-    pub per_version_state_updates: Vec<ShardedStateUpdates>,
     pub state_checkpoint_hashes: Vec<Option<HashValue>>,
 }
-
-impl Inner {}

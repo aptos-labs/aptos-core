@@ -16,7 +16,7 @@ use aptos_sdk::{
     types::{AccountKey, LocalAccount},
 };
 use aptos_storage_interface::{
-    state_view::{DbStateViewAtVersion, VerifiedStateViewAtVersion},
+    state_store::state_view::db_state_view::{DbStateViewAtVersion, VerifiedStateViewAtVersion},
     DbReaderWriter,
 };
 use aptos_types::{
@@ -37,7 +37,7 @@ use aptos_types::{
     waypoint::Waypoint,
     AptosCoinType,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use rand::SeedableRng;
 use std::{path::Path, sync::Arc};
 
@@ -382,7 +382,7 @@ pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
 ) -> (
     Arc<AptosDB>,
     DbReaderWriter,
-    BlockExecutor<AptosVM>,
+    BlockExecutor<AptosVMBlockExecutor>,
     Waypoint,
 ) {
     let (db, dbrw) = force_sharding
@@ -393,7 +393,7 @@ pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
             ))
         })
         .unwrap_or_else(|| DbReaderWriter::wrap(AptosDB::new_for_test(&path)));
-    let waypoint = bootstrap_genesis::<AptosVM>(&dbrw, genesis).unwrap();
+    let waypoint = bootstrap_genesis::<AptosVMBlockExecutor>(&dbrw, genesis).unwrap();
     let executor = BlockExecutor::new(dbrw.clone());
 
     (db, dbrw, executor, waypoint)

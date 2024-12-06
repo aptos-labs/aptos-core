@@ -330,9 +330,7 @@ impl WorkflowTxnGeneratorCreator {
                     root_account,
                     txn_executor,
                     &mut packages,
-                    &mut EntryPointTransactionGenerator {
-                        entry_point: mint_entry_point,
-                    },
+                    &mut EntryPointTransactionGenerator::new_singleton(mint_entry_point),
                 )
                 .await;
                 let burn_worker = CustomModulesDelegationGeneratorCreator::create_worker(
@@ -340,9 +338,7 @@ impl WorkflowTxnGeneratorCreator {
                     root_account,
                     txn_executor,
                     &mut packages,
-                    &mut EntryPointTransactionGenerator {
-                        entry_point: burn_entry_point,
-                    },
+                    &mut EntryPointTransactionGenerator::new_singleton(burn_entry_point),
                 )
                 .await;
 

@@ -14,13 +14,13 @@ use aptos_types::{
     transaction::BlockExecutableTransaction as Transaction,
     write_set::WriteOp,
 };
+use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::{
     module_and_script_storage::code_storage::AptosCodeStorage,
     module_write_set::ModuleWrite,
     resolver::{ResourceGroupSize, TExecutorView, TResourceGroupView},
 };
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_runtime::WithRuntimeEnvironment;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
@@ -64,13 +64,9 @@ pub trait ExecutorTask: Sync {
     /// Type of error when the executor failed to process a transaction and needs to abort.
     type Error: Debug + Clone + Send + Sync + Eq + 'static;
 
-    /// Type to initialize the single thread transaction executor. Clone and Sync are required because
-    /// we will create an instance of executor on each individual thread.
-    type Environment: Sync + Clone + WithRuntimeEnvironment;
-
     /// Create an instance of the transaction executor.
     fn init(
-        env: Self::Environment,
+        environment: AptosEnvironment,
         state_view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
     ) -> Self;
 

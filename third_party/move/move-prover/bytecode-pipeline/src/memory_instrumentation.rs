@@ -99,7 +99,7 @@ impl<'a> Instrumenter<'a> {
             | Tuple(_)
             | TypeParameter(_)
             | Reference(_, _)
-            | Fun(_, _)
+            | Fun(..)
             | TypeDomain(_)
             | ResourceDomain(_, _, _)
             | Error

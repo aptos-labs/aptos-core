@@ -57,7 +57,7 @@ pub use publishing::module_simple::EntryPoints;
 
 pub const SEND_AMOUNT: u64 = 1;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub enum TransactionType {
     CoinTransfer {
         invalid_transaction_ratio: usize,
@@ -75,6 +75,11 @@ pub enum TransactionType {
     },
     CallCustomModules {
         entry_point: EntryPoints,
+        num_modules: usize,
+        use_account_pool: bool,
+    },
+    CallCustomModulesMix {
+        entry_points: Vec<(EntryPoints, usize)>,
         num_modules: usize,
         use_account_pool: bool,
     },
@@ -370,10 +375,29 @@ pub async fn create_txn_generator_creator(
                             txn_executor,
                             *num_modules,
                             entry_point.package_name(),
-                            &mut EntryPointTransactionGenerator {
-                                entry_point: *entry_point,
-                            },
-                            true,
+                            &mut EntryPointTransactionGenerator::new_singleton(*entry_point),
+                            true
+                        )
+                        .await,
+                    ),
+                    *use_account_pool,
+                    &accounts_pool,
+                ),
+                TransactionType::CallCustomModulesMix {
+                    entry_points,
+                    num_modules,
+                    use_account_pool,
+                } => wrap_accounts_pool(
+                    Box::new(
+                        CustomModulesDelegationGeneratorCreator::new(
+                            txn_factory.clone(),
+                            init_txn_factory.clone(),
+                            &root_account,
+                            txn_executor,
+                            *num_modules,
+                            entry_points[0].0.package_name(),
+                            &mut EntryPointTransactionGenerator::new(entry_points.clone()),
+                            true
                         )
                         .await,
                     ),

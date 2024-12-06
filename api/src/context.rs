@@ -22,7 +22,9 @@ use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_logger::{error, info, Schema};
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_storage_interface::{
-    state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
+    state_store::state_view::db_state_view::{
+        DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView,
+    },
     AptosDbError, DbReader, Order, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
@@ -30,7 +32,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, NewBlockEvent},
     chain_id::ChainId,
-    contract_event::EventWithVersion,
+    contract_event::{ContractEvent, ContractEventV1, EventWithVersion},
     event::EventKey,
     indexer::indexer_db_reader::IndexerReader,
     ledger_info::LedgerInfoWithSignatures,
@@ -818,12 +820,16 @@ impl Context {
             .into_iter()
             .zip(infos)
             .enumerate()
-            .map(|(i, ((txn, txn_output), info))| {
-                let version = start_version + i as u64;
-                let (write_set, events, _, _, _) = txn_output.unpack();
-                self.get_accumulator_root_hash(version)
-                    .map(|h| (version, txn, info, events, h, write_set).into())
-            })
+            .map(
+                |(i, ((txn, txn_output), info))| -> Result<TransactionOnChainData> {
+                    let version = start_version + i as u64;
+                    let (write_set, events, _, _, _) = txn_output.unpack();
+                    let h = self.get_accumulator_root_hash(version)?;
+                    let txn: TransactionOnChainData =
+                        (version, txn, info, events, h, write_set).into();
+                    Ok(self.maybe_translate_v2_to_v1_events(txn))
+                },
+            )
             .collect()
     }
 
@@ -878,7 +884,10 @@ impl Context {
             })?;
         txns.into_inner()
             .into_iter()
-            .map(|t| self.convert_into_transaction_on_chain_data(t))
+            .map(|t| -> Result<TransactionOnChainData> {
+                let txn = self.convert_into_transaction_on_chain_data(t)?;
+                Ok(self.maybe_translate_v2_to_v1_events(txn))
+            })
             .collect::<Result<Vec<_>>>()
             .context("Failed to parse account transactions")
             .map_err(|err| E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info))
@@ -889,10 +898,15 @@ impl Context {
         hash: HashValue,
         ledger_version: u64,
     ) -> Result<Option<TransactionOnChainData>> {
-        self.db
+        if let Some(t) = self
+            .db
             .get_transaction_by_hash(hash, ledger_version, true)?
-            .map(|t| self.convert_into_transaction_on_chain_data(t))
-            .transpose()
+        {
+            let txn: TransactionOnChainData = self.convert_into_transaction_on_chain_data(t)?;
+            Ok(Some(self.maybe_translate_v2_to_v1_events(txn)))
+        } else {
+            Ok(None)
+        }
     }
 
     pub async fn get_pending_transaction_by_hash(
@@ -915,11 +929,73 @@ impl Context {
         version: u64,
         ledger_version: u64,
     ) -> Result<TransactionOnChainData> {
-        self.convert_into_transaction_on_chain_data(self.db.get_transaction_by_version(
-            version,
-            ledger_version,
-            true,
-        )?)
+        let txn = self.convert_into_transaction_on_chain_data(
+            self.db
+                .get_transaction_by_version(version, ledger_version, true)?,
+        )?;
+        Ok(self.maybe_translate_v2_to_v1_events(txn))
+    }
+
+    fn maybe_translate_v2_to_v1_events(
+        &self,
+        mut txn: TransactionOnChainData,
+    ) -> TransactionOnChainData {
+        if self.indexer_reader.is_some()
+            && self
+                .node_config
+                .indexer_db_config
+                .enable_event_v2_translation
+        {
+            self.translate_v2_to_v1_events_for_version(txn.version, &mut txn.events)
+                .ok();
+        }
+        txn
+    }
+
+    fn translate_v2_to_v1_events_for_version(
+        &self,
+        version: u64,
+        events: &mut [ContractEvent],
+    ) -> Result<()> {
+        for (idx, event) in events.iter_mut().enumerate() {
+            let translated_event = self
+                .indexer_reader
+                .as_ref()
+                .ok_or(anyhow!("Internal indexer reader doesn't exist"))?
+                .get_translated_v1_event_by_version_and_index(version, idx as u64);
+            if let Ok(translated_event) = translated_event {
+                *event = ContractEvent::V1(translated_event);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn translate_v2_to_v1_events_for_simulation(
+        &self,
+        events: &mut [ContractEvent],
+    ) -> Result<()> {
+        let mut count_map: HashMap<EventKey, u64> = HashMap::new();
+        for event in events.iter_mut() {
+            if let ContractEvent::V2(v2) = event {
+                let translated_event = self
+                    .indexer_reader
+                    .as_ref()
+                    .ok_or(anyhow!("Internal indexer reader doesn't exist"))?
+                    .translate_event_v2_to_v1(v2)?;
+                if let Some(v1) = translated_event {
+                    let count = count_map.get(v1.key()).unwrap_or(&0);
+                    let v1_adjusted = ContractEventV1::new(
+                        *v1.key(),
+                        v1.sequence_number() + count,
+                        v1.type_tag().clone(),
+                        v1.event_data().to_vec(),
+                    );
+                    *event = ContractEvent::V1(v1_adjusted);
+                    count_map.insert(*v1.key(), count + 1);
+                }
+            }
+        }
+        Ok(())
     }
 
     pub fn get_accumulator_root_hash(&self, version: u64) -> Result<HashValue> {

@@ -35,11 +35,10 @@ use move_core_types::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::BTreeMap, str::FromStr};
-use tsify_next::Tsify;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
-#[derive(Tsify, Clone, Serialize, Deserialize, PartialEq, Eq, Debug)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub struct AllocatedLocal {
     op_type: ArgumentOperation,
     is_parameter: bool,
@@ -169,10 +168,16 @@ impl TransactionComposer {
         module: String,
         function: String,
         ty_args: Vec<String>,
-        args: Vec<CallArgument>,
-    ) -> Result<Vec<CallArgument>, JsValue> {
-        self.add_batched_call(module, function, ty_args, args)
-            .map_err(|err| JsValue::from(format!("{:?}", err)))
+        args: Vec<CallArgumentWasm>,
+    ) -> Result<Vec<CallArgumentWasm>, JsValue> {
+        self.add_batched_call(
+            module,
+            function,
+            ty_args,
+            args.into_iter().map(|a| a.into()).collect(),
+        )
+        .map_err(|err| JsValue::from(format!("{:?}", err)))
+        .map(|results| results.into_iter().map(|a| a.into()).collect())
     }
 }
 
@@ -312,14 +317,35 @@ impl TransactionComposer {
                 .collect::<Vec<_>>()
         };
 
-        for return_ty in expected_returns_ty {
+        let mut returned_arguments = vec![];
+        let num_of_calls = self.calls.len() as u16;
+
+        for (idx, return_ty) in expected_returns_ty.into_iter().enumerate() {
+            let ability = BinaryIndexedView::Script(self.builder.as_script())
+                .abilities(&return_ty, &[])
+                .map_err(|_| anyhow!("Failed to calculate ability for type"))?;
+
             let local_idx = self.locals_ty.len() as u16;
             self.locals_ty.push(return_ty);
             self.locals_availability.push(true);
             returns.push(local_idx);
+
+            // For values that has drop and copy ability, use copy by default to avoid calling copy manually
+            // on the client side.
+            returned_arguments.push(CallArgument::PreviousResult(PreviousResult {
+                operation_type: if ability.has_drop() && ability.has_copy() {
+                    ArgumentOperation::Copy
+                } else {
+                    ArgumentOperation::Move
+                },
+                call_idx: num_of_calls,
+                return_idx: idx as u16,
+            }));
         }
 
-        let num_of_calls = self.calls.len() as u16;
+        if self.parameters.len() + self.locals_ty.len() > u8::MAX as usize {
+            bail!("Too many locals being allocated, please truncate the transaction");
+        }
 
         self.calls.push(BuilderCall {
             type_args: type_arguments,
@@ -330,15 +356,7 @@ impl TransactionComposer {
             type_tags: ty_args,
         });
 
-        Ok((0..returns.len())
-            .map(|idx| {
-                CallArgument::PreviousResult(PreviousResult {
-                    operation_type: ArgumentOperation::Move,
-                    call_idx: num_of_calls,
-                    return_idx: idx as u16,
-                })
-            })
-            .collect())
+        Ok(returned_arguments)
     }
 
     fn check_drop_at_end(&self) -> anyhow::Result<()> {
@@ -385,11 +403,11 @@ impl TransactionComposer {
             }
 
             // Storing return values
-            for arg in call.returns {
+            for arg in call.returns.iter().rev() {
                 script
                     .code
                     .code
-                    .push(Bytecode::StLoc((arg + parameters_count) as u8));
+                    .push(Bytecode::StLoc((*arg + parameters_count) as u8));
             }
         }
         script.code.code.push(Bytecode::Ret);
@@ -552,5 +570,88 @@ impl AllocatedLocal {
             ArgumentOperation::Move => Bytecode::MoveLoc(local_idx as u8),
             ArgumentOperation::Copy => Bytecode::CopyLoc(local_idx as u8),
         })
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum ArgumentType {
+    Signer,
+    Raw,
+    PreviousResult,
+}
+
+/// WASM Representation of CallArgument. This is because wasm_bindgen can only support c-style enum.
+#[wasm_bindgen(js_name = "CallArgument")]
+#[derive(Clone, Debug)]
+pub struct CallArgumentWasm {
+    ty: ArgumentType,
+    signer: Option<u16>,
+    raw: Option<Vec<u8>>,
+    previous_result: Option<PreviousResult>,
+}
+
+impl From<CallArgument> for CallArgumentWasm {
+    fn from(value: CallArgument) -> Self {
+        match value {
+            CallArgument::PreviousResult(r) => CallArgumentWasm {
+                ty: ArgumentType::PreviousResult,
+                signer: None,
+                raw: None,
+                previous_result: Some(r),
+            },
+            CallArgument::Raw(b) => CallArgumentWasm {
+                ty: ArgumentType::Raw,
+                signer: None,
+                raw: Some(b),
+                previous_result: None,
+            },
+            CallArgument::Signer(i) => CallArgumentWasm {
+                ty: ArgumentType::Signer,
+                signer: Some(i),
+                raw: None,
+                previous_result: None,
+            },
+        }
+    }
+}
+
+impl From<CallArgumentWasm> for CallArgument {
+    fn from(value: CallArgumentWasm) -> Self {
+        match value.ty {
+            ArgumentType::PreviousResult => {
+                CallArgument::PreviousResult(value.previous_result.unwrap())
+            },
+            ArgumentType::Raw => CallArgument::Raw(value.raw.unwrap()),
+            ArgumentType::Signer => CallArgument::Signer(value.signer.unwrap()),
+        }
+    }
+}
+
+#[wasm_bindgen(js_class = "CallArgument")]
+impl CallArgumentWasm {
+    pub fn new_bytes(bytes: Vec<u8>) -> Self {
+        CallArgument::Raw(bytes).into()
+    }
+
+    pub fn new_signer(signer_idx: u16) -> Self {
+        CallArgument::Signer(signer_idx).into()
+    }
+
+    pub fn borrow(&self) -> Result<Self, String> {
+        self.change_op_type(ArgumentOperation::Borrow)
+    }
+
+    pub fn borrow_mut(&self) -> Result<Self, String> {
+        self.change_op_type(ArgumentOperation::BorrowMut)
+    }
+
+    pub fn copy(&self) -> Result<Self, String> {
+        self.change_op_type(ArgumentOperation::Copy)
+    }
+
+    fn change_op_type(&self, operation_type: ArgumentOperation) -> Result<Self, String> {
+        Ok(CallArgument::from(self.clone())
+            .change_op_type(operation_type)?
+            .into())
     }
 }

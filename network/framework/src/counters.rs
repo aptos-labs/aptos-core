@@ -28,6 +28,11 @@ pub const SUCCEEDED_LABEL: &str = "succeeded";
 pub const FAILED_LABEL: &str = "failed";
 pub const UNKNOWN_LABEL: &str = "unknown";
 
+// Connection operation labels
+pub const DIAL_LABEL: &str = "dial";
+pub const DIAL_PEER_LABEL: &str = "dial_peer";
+pub const DISCONNECT_LABEL: &str = "disconnect";
+
 // Direction labels
 pub const INBOUND_LABEL: &str = "inbound";
 pub const OUTBOUND_LABEL: &str = "outbound";
@@ -137,6 +142,27 @@ pub fn pending_connection_upgrades(
         network_context.peer_id().short_str().as_str(),
         direction.as_str(),
     ])
+}
+
+/// A simple counter for tracking network connection operations
+pub static APTOS_NETWORK_CONNECTION_OPERATIONS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_network_connection_operations",
+        "Counter for tracking connection operations",
+        &["network_id", "operation", "label"]
+    )
+    .unwrap()
+});
+
+/// Updates the network connection operation metrics with the given operation and label
+pub fn update_network_connection_operation_metrics(
+    network_context: &NetworkContext,
+    operation: String,
+    label: String,
+) {
+    APTOS_NETWORK_CONNECTION_OPERATIONS
+        .with_label_values(&[network_context.network_id().as_str(), &operation, &label])
+        .inc();
 }
 
 pub static APTOS_NETWORK_CONNECTION_UPGRADE_TIME: Lazy<HistogramVec> = Lazy::new(|| {

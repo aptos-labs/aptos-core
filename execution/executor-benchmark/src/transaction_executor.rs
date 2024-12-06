@@ -2,12 +2,15 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::pipeline::LedgerUpdateMessage;
+use crate::{metrics::TIMER, pipeline::LedgerUpdateMessage};
 use aptos_crypto::hash::HashValue;
-use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
+use aptos_executor::block_executor::BlockExecutor;
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::info;
-use aptos_types::block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock};
+use aptos_types::block_executor::{
+    config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock,
+};
+use aptos_vm::VMBlockExecutor;
 use std::{
     collections::HashMap,
     sync::{mpsc, Arc},
@@ -27,7 +30,7 @@ pub struct TransactionExecutor<V> {
 
 impl<V> TransactionExecutor<V>
 where
-    V: TransactionBlockExecutor,
+    V: VMBlockExecutor,
 {
     pub fn new(
         executor: Arc<BlockExecutor<V>>,
@@ -60,14 +63,16 @@ where
             self.num_blocks_processed, block_id
         );
         let num_input_txns = executable_block.transactions.num_transactions();
-        self.executor
-            .execute_and_state_checkpoint(
-                executable_block,
-                self.parent_block_id,
-                BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
-            )
-            .unwrap();
-
+        {
+            let _timer = TIMER.with_label_values(&["execute"]).start_timer();
+            self.executor
+                .execute_and_state_checkpoint(
+                    executable_block,
+                    self.parent_block_id,
+                    BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
+                )
+                .unwrap();
+        }
         let msg = LedgerUpdateMessage {
             current_block_start_time,
             first_block_start_time: *self.maybe_first_block_start_time.as_ref().unwrap(),

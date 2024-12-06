@@ -1,4 +1,4 @@
 script {
-    fun main(src: &signer) {
+    fun main(_: &signer) {
     }
 }

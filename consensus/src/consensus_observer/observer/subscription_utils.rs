@@ -324,29 +324,29 @@ pub fn sort_peers_by_subscription_optimality(
 
     // Sort the peers by distance and latency. Note: BTreeMaps are
     // sorted by key, so the entries will be sorted by distance in ascending order.
-    let mut sorted_peers = Vec::new();
+    let mut sorted_peers_and_latencies = Vec::new();
     for (_, mut peers_and_latencies) in peers_and_latencies_by_distance {
         // Sort the peers by latency
         peers_and_latencies.sort_by_key(|(_, latency)| *latency);
 
         // Add the peers to the sorted list (in sorted order)
-        sorted_peers.extend(
-            peers_and_latencies
-                .into_iter()
-                .map(|(peer_network_id, _)| peer_network_id),
-        );
+        sorted_peers_and_latencies.extend(peers_and_latencies);
     }
 
-    // Log the sorted peers
+    // Log the sorted peers and latencies
     info!(
         LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-            "Sorted {} peers by subscription optimality! Peers: {:?}",
-            sorted_peers.len(),
-            sorted_peers
+            "Sorted {} peers by subscription optimality! Peers and latencies: {:?}",
+            sorted_peers_and_latencies.len(),
+            sorted_peers_and_latencies
         ))
     );
 
-    sorted_peers
+    // Only return the sorted peers (without the latencies)
+    sorted_peers_and_latencies
+        .into_iter()
+        .map(|(peer, _)| peer)
+        .collect()
 }
 
 /// Returns true iff the peer metadata indicates support for consensus observer
