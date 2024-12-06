@@ -162,10 +162,48 @@ impl MessageStreamType {
     }
 }
 
-/// A struct holding metadata about each message.
+/// An enum representing metadata about each message type.
 /// Note: this is not sent along the wire, it is only used internally.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MessageMetadata {
+pub enum MessageMetadata {
+    SentMessageMetadata(SentMessageMetadata),
+    ReceivedMessageMetadata(ReceivedMessageMetadata),
+}
+
+impl MessageMetadata {
+    /// Creates and returns new metadata for a sent message
+    pub fn new_sent_metadata(metadata: SentMessageMetadata) -> Self {
+        MessageMetadata::SentMessageMetadata(metadata)
+    }
+
+    /// Creates and returns new metadata for a received message
+    pub fn new_received_metadata(metadata: ReceivedMessageMetadata) -> Self {
+        MessageMetadata::ReceivedMessageMetadata(metadata)
+    }
+
+    /// Transforms the metadata into a sent message metadata.
+    /// Note: if the metadata is for another message type, this will return None.
+    pub fn into_sent_metadata(self) -> Option<SentMessageMetadata> {
+        match self {
+            MessageMetadata::SentMessageMetadata(metadata) => Some(metadata),
+            _ => None,
+        }
+    }
+
+    /// Transforms the metadata into a received message metadata.
+    /// Note: if the metadata is for another message type, this will return None.
+    pub fn into_received_metadata(self) -> Option<ReceivedMessageMetadata> {
+        match self {
+            MessageMetadata::ReceivedMessageMetadata(metadata) => Some(metadata),
+            _ => None,
+        }
+    }
+}
+
+/// A struct holding metadata about a sent message.
+/// Note: this is not sent along the wire, it is only used internally.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SentMessageMetadata {
     /// The network ID for the message
     network_id: NetworkId,
 
@@ -186,7 +224,7 @@ pub struct MessageMetadata {
     wire_send_start_time: Option<SystemTime>,
 }
 
-impl MessageMetadata {
+impl SentMessageMetadata {
     pub fn new(
         network_id: NetworkId,
         protocol_id: Option<ProtocolId>,
@@ -275,5 +313,36 @@ impl MessageMetadata {
     /// Updates the time at which the message started being sent over the wire
     pub fn update_wire_send_start_time(&mut self) {
         self.wire_send_start_time = Some(SystemTime::now());
+    }
+}
+
+/// A struct holding metadata about a received message.
+/// Note: this is not sent along the wire, it is only used internally.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ReceivedMessageMetadata {
+    /// The network ID for the message
+    network_id: NetworkId,
+
+    /// The protocol ID for the message. This may not always be
+    /// known (e.g., when failing to deserialize a message).
+    protocol_id: Option<ProtocolId>,
+}
+
+impl ReceivedMessageMetadata {
+    pub fn new(network_id: NetworkId, protocol_id: Option<ProtocolId>) -> Self {
+        Self {
+            network_id,
+            protocol_id,
+        }
+    }
+
+    /// Returns a reference to the network ID
+    pub fn network_id(&self) -> &NetworkId {
+        &self.network_id
+    }
+
+    /// Returns a reference to the protocol ID
+    pub fn protocol_id(&self) -> &Option<ProtocolId> {
+        &self.protocol_id
     }
 }

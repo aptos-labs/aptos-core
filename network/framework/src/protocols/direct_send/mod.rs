@@ -6,7 +6,9 @@ use crate::{
     protocols::{
         network::SerializedRequest,
         wire::messaging::v1::{
-            metadata::{MessageMetadata, MessageSendType, NetworkMessageWithMetadata},
+            metadata::{
+                MessageMetadata, MessageSendType, NetworkMessageWithMetadata, SentMessageMetadata,
+            },
             DirectSendMsg, NetworkMessage, Priority,
         },
     },
@@ -53,12 +55,13 @@ impl Message {
         });
 
         // Create and return the network message with metadata
-        let message_metadata = MessageMetadata::new(
+        let sent_message_metadata = SentMessageMetadata::new(
             network_id,
             Some(self.protocol_id),
             MessageSendType::DirectSend,
             Some(self.application_send_time),
         );
+        let message_metadata = MessageMetadata::new_sent_metadata(sent_message_metadata);
         NetworkMessageWithMetadata::new(message_metadata, network_message)
     }
 
