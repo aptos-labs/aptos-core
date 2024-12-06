@@ -44,7 +44,7 @@ use std::{
     collections::{HashMap, HashSet},
     str::FromStr,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
     },
     time::{Duration, Instant},
@@ -868,6 +868,7 @@ impl TxnEmitter {
         // traffic pattern to be correct.
         info!("Tx emitter creating workers");
         let mut submission_workers = Vec::with_capacity(num_accounts);
+        let txn_counter: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
         let all_clients = Arc::new(req.rest_clients.clone());
         for index in 0..num_accounts {
             let main_client_index = index % all_clients.len();
@@ -875,7 +876,8 @@ impl TxnEmitter {
             let accounts = all_accounts.split_off(all_accounts.len() - 1);
             let stop = stop.clone();
             let stats = Arc::clone(&stats);
-            let txn_generator = txn_generator_creator.create_transaction_generator();
+            let txn_generator =
+                txn_generator_creator.create_transaction_generator(txn_counter.clone());
             let worker_index = submission_workers.len();
 
             let worker = SubmissionWorker::new(

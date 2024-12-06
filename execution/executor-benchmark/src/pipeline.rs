@@ -154,7 +154,7 @@ where
             .name("txn_executor".to_string())
             .spawn(move || {
                 start_execution_rx.map(|rx| rx.recv());
-                let overall_measuring = OverallMeasuring::start();
+                let mut overall_measuring = OverallMeasuring::start();
                 let mut executed = 0;
 
                 let mut stage_index = 0;
@@ -174,7 +174,12 @@ where
                     info!("Received block of size {:?} to execute", block_size);
                     executed += block_size;
                     stage_executed += block_size;
-                    exe.execute_block(current_block_start_time, partition_time, block);
+                    exe.execute_block(
+                        current_block_start_time,
+                        partition_time,
+                        block,
+                        overall_measuring.event_summary_mut(),
+                    );
                     info!("Finished executing block");
 
                     // Empty blocks indicate the end of a stage.
