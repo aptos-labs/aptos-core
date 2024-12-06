@@ -136,22 +136,20 @@ impl TestHarness {
         let (res_tx, res_rx) = oneshot::channel();
         let key = (peer_id, ProtocolId::HealthCheckerRpc);
         let (delivered_tx, delivered_rx) = oneshot::channel();
+        let network_message = NetworkMessage::RpcRequest(RpcRequest {
+            protocol_id,
+            request_id: 0,
+            priority: 0,
+            raw_request: data,
+        });
+        let received_message = ReceivedMessage::new_for_testing(
+            network_message,
+            PeerNetworkId::new(NetworkId::Validator, peer_id),
+            Some(Arc::new(res_tx)),
+        );
+
         self.peer_mgr_notifs_tx
-            .push_with_feedback(
-                key,
-                ReceivedMessage {
-                    message: NetworkMessage::RpcRequest(RpcRequest {
-                        protocol_id,
-                        request_id: 0,
-                        priority: 0,
-                        raw_request: data,
-                    }),
-                    sender: PeerNetworkId::new(NetworkId::Validator, peer_id),
-                    receive_timestamp_micros: 0,
-                    rpc_replier: Some(Arc::new(res_tx)),
-                },
-                Some(delivered_tx),
-            )
+            .push_with_feedback(key, received_message, Some(delivered_tx))
             .unwrap();
         delivered_rx.await.unwrap();
         res_rx

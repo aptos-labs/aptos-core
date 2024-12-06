@@ -1213,18 +1213,18 @@ async fn wait_for_network_event(
                     assert_eq!(timeout, message_wait_time);
 
                     // Create and return the peer manager notification
-                    let rmsg = ReceivedMessage {
-                        message: NetworkMessage::RpcRequest(RpcRequest{
-                            protocol_id,
-                            request_id: 0,
-                            priority: 0,
-                            raw_request: data.into(),
-                        }),
-                        sender: PeerNetworkId::new(expected_network_id, peer_id),
-                        receive_timestamp_micros: 0,
-                        rpc_replier: Some(Arc::new(res_tx)),
-                    };
-                    (protocol_id, rmsg)
+                    let network_message = NetworkMessage::RpcRequest(RpcRequest{
+                        protocol_id,
+                        request_id: 0,
+                        priority: 0,
+                        raw_request: data.into(),
+                    });
+                    let received_message = ReceivedMessage::new_for_testing(
+                        network_message,
+                        PeerNetworkId::new(expected_network_id, peer_id),
+                        Some(Arc::new(res_tx)),
+                    );
+                    (protocol_id, received_message)
                 }
                 PeerManagerRequest::SendDirectSend(peer_id, message) => {
                     // Unpack the message
@@ -1236,17 +1236,17 @@ async fn wait_for_network_event(
                     assert_eq!(Some(protocol_id), expected_direct_send_protocol_id);
 
                     // Create and return the peer manager notification
-                    let rmsg = ReceivedMessage {
-                        message: NetworkMessage::DirectSendMsg(DirectSendMsg{
-                            protocol_id,
-                            priority: 0,
-                            raw_msg: data.into(),
-                        }),
-                        sender: PeerNetworkId::new(expected_network_id, peer_id),
-                        receive_timestamp_micros: 0,
-                        rpc_replier: None,
-                    };
-                    (protocol_id, rmsg)
+                    let network_message = NetworkMessage::DirectSendMsg(DirectSendMsg{
+                        protocol_id,
+                        priority: 0,
+                        raw_msg: data.into(),
+                    });
+                    let received_message = ReceivedMessage::new_for_testing(
+                        network_message,
+                        PeerNetworkId::new(expected_network_id, peer_id),
+                        None,
+                    );
+                    (protocol_id, received_message)
                 }
             };
 

@@ -18,7 +18,7 @@ use futures_util::SinkExt;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{fmt::Debug, time::SystemTime};
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
@@ -94,14 +94,17 @@ impl InboundStreamBuffer {
     pub fn append_fragment(
         &mut self,
         fragment: StreamFragment,
-    ) -> anyhow::Result<Option<NetworkMessage>> {
+    ) -> anyhow::Result<Option<(SystemTime, NetworkMessage)>> {
         let stream = self
             .stream
             .as_mut()
             .ok_or_else(|| anyhow::anyhow!("No stream exist"))?;
         let stream_end = stream.append_fragment(fragment)?;
         if stream_end {
-            Ok(Some(self.stream.take().unwrap().message))
+            let stream = self.stream.take().unwrap();
+            let message = stream.message;
+            let stream_start_time = stream.stream_start_time;
+            Ok(Some((stream_start_time, message)))
         } else {
             Ok(None)
         }
@@ -113,6 +116,7 @@ pub struct InboundStream {
     num_fragments: u8,
     current_fragment_id: u8,
     message: NetworkMessage,
+    stream_start_time: SystemTime, // The time the stream started (i.e., the time the header was received)
 }
 
 impl InboundStream {
@@ -130,6 +134,7 @@ impl InboundStream {
             num_fragments: header.num_fragments,
             current_fragment_id: 0,
             message: header.message,
+            stream_start_time: SystemTime::now(),
         })
     }
 

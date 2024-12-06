@@ -289,7 +289,7 @@ fn peer_recv_message() {
         for _ in 0..30 {
             // Wait to receive notification of DirectSendMsg from Peer.
             let received = receiver.next().await.unwrap();
-            assert_eq!(recv_msg, received.message);
+            assert_eq!(recv_msg, received.network_message().clone());
         }
         info!("server exiting");
     };
@@ -332,7 +332,7 @@ fn peers_send_message_concurrent() {
         let notif_a = prot_a_rx.next().await;
         let notif_b = prot_b_rx.next().await;
         assert_eq!(
-            notif_a.unwrap().message,
+            notif_a.unwrap().network_message().clone(),
             NetworkMessage::DirectSendMsg(DirectSendMsg {
                 protocol_id: PROTOCOL,
                 priority: 0,
@@ -340,7 +340,7 @@ fn peers_send_message_concurrent() {
             })
         );
         assert_eq!(
-            notif_b.unwrap().message,
+            notif_b.unwrap().network_message().clone(),
             NetworkMessage::DirectSendMsg(DirectSendMsg {
                 protocol_id: PROTOCOL,
                 priority: 0,
@@ -408,13 +408,8 @@ fn peer_recv_rpc() {
     let server = async move {
         for _ in 0..30 {
             // Wait to receive RpcRequest from Peer.
-            let received = prot_rx.next().await.unwrap();
-            let ReceivedMessage {
-                message,
-                sender: _sender,
-                receive_timestamp_micros: _rx_at,
-                rpc_replier,
-            } = received;
+            let received_message = prot_rx.next().await.unwrap();
+            let (message, _, _, rpc_replier) = received_message.into_parts();
             assert_eq!(
                 message,
                 NetworkMessage::RpcRequest(RpcRequest {
@@ -486,10 +481,10 @@ fn peer_recv_rpc_concurrent() {
         // Wait to receive RpcRequests from Peer.
         for _ in 0..30 {
             let received = prot_rx.next().await.unwrap();
-            match &received.message {
+            match received.network_message() {
                 NetworkMessage::RpcRequest(req) => {
                     assert_eq!(Vec::from("hello world"), req.raw_request);
-                    let arcsender = received.rpc_replier.unwrap();
+                    let arcsender = received.rpc_replier().unwrap();
                     let sender = Arc::into_inner(arcsender).unwrap();
                     res_txs.push(sender)
                 },
@@ -535,10 +530,10 @@ fn peer_recv_rpc_timeout() {
         let received = prot_rx.next().await.unwrap();
 
         // Pull out the request completion handle.
-        let mut res_tx = match &received.message {
+        let mut res_tx = match received.network_message() {
             NetworkMessage::RpcRequest(req) => {
                 assert_eq!(Vec::from("hello world"), req.raw_request);
-                let arcsender = received.rpc_replier.unwrap();
+                let arcsender = received.rpc_replier().unwrap();
                 Arc::into_inner(arcsender).unwrap()
             },
             _ => panic!("Unexpected NetworkMessage: {:?}", received),
@@ -592,10 +587,10 @@ fn peer_recv_rpc_cancel() {
         let received = prot_rx.next().await.unwrap();
 
         // Pull out the request completion handle.
-        let res_tx = match &received.message {
+        let res_tx = match received.network_message() {
             NetworkMessage::RpcRequest(req) => {
                 assert_eq!(Vec::from("hello world"), req.raw_request);
-                let arcsender = received.rpc_replier.unwrap();
+                let arcsender = received.rpc_replier().unwrap();
                 Arc::into_inner(arcsender).unwrap()
             },
             _ => panic!("Unexpected NetworkMessage: {:?}", received),
@@ -985,7 +980,7 @@ fn peers_send_multiplex() {
         let notif_a = prot_a_rx.next().await;
         let notif_b = prot_b_rx.next().await;
         assert_eq!(
-            notif_a.unwrap().message,
+            notif_a.unwrap().network_message().clone(),
             NetworkMessage::DirectSendMsg(DirectSendMsg {
                 protocol_id: PROTOCOL,
                 priority: 0,
@@ -993,7 +988,7 @@ fn peers_send_multiplex() {
             })
         );
         assert_eq!(
-            notif_b.unwrap().message,
+            notif_b.unwrap().network_message().clone(),
             NetworkMessage::DirectSendMsg(DirectSendMsg {
                 protocol_id: PROTOCOL,
                 priority: 0,
