@@ -7,7 +7,7 @@ use crate::{
     protocols::{
         stream::{InboundStreamBuffer, OutboundStream, StreamFragment, StreamHeader},
         wire::messaging::v1::metadata::{
-            MessageMetadata, MessageSendType, NetworkMessageWithMetadata,
+            MessageMetadata, MessageSendType, NetworkMessageWithMetadata, SentMessageMetadata,
         },
     },
     testutils::fake_socket::{ReadOnlyTestSocket, ReadWriteTestSocket},
@@ -248,7 +248,8 @@ proptest! {
         let messages_clone = messages.clone();
         let f_stream_all = async move {
             for message in messages_clone {
-                let message_metadata = MessageMetadata::new(NetworkId::Validator, None, MessageSendType::DirectSend, None);
+                let sent_message_metadata = SentMessageMetadata::new(NetworkId::Validator, None, MessageSendType::DirectSend, None);
+                let message_metadata = MessageMetadata::new_sent_metadata(sent_message_metadata);
                 let message_with_metadata = NetworkMessageWithMetadata::new(message_metadata, message);
                 if outbound_stream.should_stream(&message_with_metadata) {
                     outbound_stream.stream_message(message_with_metadata).await.unwrap();

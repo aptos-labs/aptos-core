@@ -56,7 +56,7 @@ use crate::{
         wire::messaging::v1::{
             metadata::{
                 MessageMetadata, MessageSendType, NetworkMessageWithMetadata,
-                RpcResponseWithMetadata,
+                RpcResponseWithMetadata, SentMessageMetadata,
             },
             NetworkMessage, Priority, RequestId, RpcRequest, RpcResponse,
         },
@@ -191,12 +191,13 @@ impl OutboundRpcRequest {
         });
 
         // Create the network message with metadata
-        let message_metadata = MessageMetadata::new(
+        let sent_message_metadata = SentMessageMetadata::new(
             network_id,
             Some(self.protocol_id),
             MessageSendType::RpcRequest,
             Some(self.application_send_time),
         );
+        let message_metadata = MessageMetadata::new_sent_metadata(sent_message_metadata);
         let message_with_metadata =
             NetworkMessageWithMetadata::new(message_metadata, network_message);
 
@@ -363,12 +364,14 @@ impl InboundRpcs {
                 let maybe_response = match result {
                     Ok(Ok(Ok(response_bytes))) => {
                         // Create a new message metadata
-                        let message_metadata = MessageMetadata::new(
+                        let sent_message_metadata = SentMessageMetadata::new(
                             network_id,
                             Some(protocol_id),
                             MessageSendType::RpcResponse,
                             Some(SystemTime::now()),
                         );
+                        let message_metadata =
+                            MessageMetadata::new_sent_metadata(sent_message_metadata);
 
                         // Create an RPC response with metadata
                         let rpc_response = RpcResponse {

@@ -30,7 +30,7 @@ use crate::{
         wire::messaging::v1::{
             metadata::{
                 MessageMetadata, MessageSendType, MultiplexMessageWithMetadata,
-                NetworkMessageWithMetadata,
+                NetworkMessageWithMetadata, SentMessageMetadata,
             },
             ErrorCode, MultiplexMessage, MultiplexMessageSink, MultiplexMessageStream,
             NetworkMessage, ReadError, WriteError,
@@ -368,10 +368,20 @@ where
                 futures::select! {
                     message_with_metadata = stream.select_next_some() => {
                         // Extract the message and metadata
-                        let (mut message_metadata, message) = message_with_metadata.into_parts();
+                        let (message_metadata, message) = message_with_metadata.into_parts();
+                        let mut sent_message_metadata = match message_metadata.into_sent_metadata() {
+                            Some(sent_message_metadata) => sent_message_metadata,
+                            None => {
+                                error!(
+                                    "{} Failed to write message (metadata has the incorrect type)! Expected a sent message!",
+                                    network_context,
+                                );
+                                continue; // Skip ahead to the next event
+                            }
+                        };
 
                         // Update the wire send start time for the message
-                        message_metadata.update_wire_send_start_time();
+                        sent_message_metadata.update_wire_send_start_time();
 
                         // Send the message along the wire
                         if let Err(err) = timeout(transport::TRANSPORT_TIMEOUT, writer.send(&message)).await {
@@ -384,7 +394,7 @@ where
                             );
                         } else {
                             // Otherwise, mark the message as sent along the wire
-                            message_metadata.mark_message_as_sent();
+                            sent_message_metadata.mark_message_as_sent();
                         }
                     }
                     _ = close_rx => {
@@ -609,13 +619,14 @@ where
                     let protocol_id = frame_prefix.as_ref().get(1).unwrap_or(&0);
                     let error_code = ErrorCode::parsing_error(*message_type, *protocol_id);
                     let message = NetworkMessage::Error(error_code);
+                    let sent_message_metadata = SentMessageMetadata::new(
+                        self.network_context.network_id(),
+                        None,
+                        MessageSendType::DirectSend,
+                        None,
+                    );
                     let message_with_metadata = NetworkMessageWithMetadata::new(
-                        MessageMetadata::new(
-                            self.network_context.network_id(),
-                            None,
-                            MessageSendType::DirectSend,
-                            None,
-                        ),
+                        MessageMetadata::new_sent_metadata(sent_message_metadata),
                         message,
                     );
 
