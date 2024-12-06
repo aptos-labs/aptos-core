@@ -617,7 +617,7 @@ impl EntryPoints {
                 repeats,
             } => get_payload(
                 module_id,
-                ident_str!("test_middle_range_move").to_owned(),
+                ident_str!("test_middle_move_range").to_owned(),
                 vec![
                     bcs::to_bytes(vec_len).unwrap(),
                     bcs::to_bytes(element_len).unwrap(),
