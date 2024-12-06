@@ -138,6 +138,7 @@ pub struct ReceivedMessage {
     pub message: NetworkMessage,
     pub sender: PeerNetworkId,
 
+    // TODO: clean this up!
     // unix microseconds
     pub receive_timestamp_micros: u64,
 

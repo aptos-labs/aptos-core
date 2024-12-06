@@ -24,12 +24,16 @@ use crate::{
     peer_manager::{PeerManagerError, TransportNotification},
     protocols::{
         direct_send::Message,
-        network::ReceivedMessage,
+        network::{ReceivedMessage, SerializedRequest},
         rpc::{error::RpcError, InboundRpcs, OutboundRpcRequest, OutboundRpcs},
         stream::{InboundStreamBuffer, OutboundStream, StreamMessage},
         wire::messaging::v1::{
-            DirectSendMsg, ErrorCode, MultiplexMessage, MultiplexMessageSink,
-            MultiplexMessageStream, NetworkMessage, Priority, ReadError, WriteError,
+            metadata::{
+                MessageMetadata, MessageSendType, MultiplexMessageWithMetadata,
+                NetworkMessageWithMetadata,
+            },
+            ErrorCode, MultiplexMessage, MultiplexMessageSink, MultiplexMessageStream,
+            NetworkMessage, ReadError, WriteError,
         },
     },
     transport::{self, Connection, ConnectionMetadata},
@@ -274,7 +278,7 @@ where
                 maybe_response = self.inbound_rpcs.next_completed_response() => {
                     // Extract the relevant metadata from the message
                     let message_metadata = match &maybe_response {
-                        Ok((response, protocol_id)) => Some((response.request_id, *protocol_id)),
+                        Ok((response_with_metadata, protocol_id)) => Some((response_with_metadata.rpc_response().request_id, *protocol_id)),
                         _ => None,
                     };
 
@@ -334,19 +338,24 @@ where
         max_frame_size: usize,
         max_message_size: usize,
     ) -> (
-        aptos_channel::Sender<(), NetworkMessage>,
+        aptos_channel::Sender<(), NetworkMessageWithMetadata>,
         oneshot::Sender<()>,
     ) {
         let remote_peer_id = connection_metadata.remote_peer_id;
-        let (write_reqs_tx, mut write_reqs_rx): (aptos_channel::Sender<(), NetworkMessage>, _) =
-            aptos_channel::new(
-                QueueStyle::KLAST,
-                1024,
-                Some(&counters::PENDING_WIRE_MESSAGES),
-            );
+        let (write_reqs_tx, mut write_reqs_rx): (
+            aptos_channel::Sender<(), NetworkMessageWithMetadata>,
+            _,
+        ) = aptos_channel::new(
+            QueueStyle::KLAST,
+            1024,
+            Some(&counters::PENDING_WIRE_MESSAGES),
+        );
         let (close_tx, mut close_rx) = oneshot::channel();
 
-        let (mut msg_tx, msg_rx) = aptos_channels::new(1024, &counters::PENDING_MULTIPLEX_MESSAGE);
+        let (mut msg_tx, msg_rx) = aptos_channels::new::<MultiplexMessageWithMetadata>(
+            1024,
+            &counters::PENDING_MULTIPLEX_MESSAGE,
+        );
         let (stream_msg_tx, stream_msg_rx) =
             aptos_channels::new(1024, &counters::PENDING_MULTIPLEX_STREAM);
 
@@ -357,8 +366,15 @@ where
                 NetworkSchema::new(&network_context).connection_metadata(&connection_metadata);
             loop {
                 futures::select! {
-                    message = stream.select_next_some() => {
-                        if let Err(err) = timeout(transport::TRANSPORT_TIMEOUT,writer.send(&message)).await {
+                    message_with_metadata = stream.select_next_some() => {
+                        // Extract the message and metadata
+                        let (mut message_metadata, message) = message_with_metadata.into_parts();
+
+                        // Update the wire send start time for the message
+                        message_metadata.update_wire_send_start_time();
+
+                        // Send the message along the wire
+                        if let Err(err) = timeout(transport::TRANSPORT_TIMEOUT, writer.send(&message)).await {
                             warn!(
                                 log_context,
                                 error = %err,
@@ -366,6 +382,9 @@ where
                                 network_context,
                                 remote_peer_id.short_str(),
                             );
+                        } else {
+                            // Otherwise, mark the message as sent along the wire
+                            message_metadata.mark_message_as_sent();
                         }
                     }
                     _ = close_rx => {
@@ -416,17 +435,23 @@ where
                 },
             }
         };
+
         // the task ends when the write_reqs_tx is dropped
         let multiplex_task = async move {
             let mut outbound_stream =
                 OutboundStream::new(max_frame_size, max_message_size, stream_msg_tx);
-            while let Some(message) = write_reqs_rx.next().await {
+            while let Some(message_with_metadata) = write_reqs_rx.next().await {
                 // either channel full would block the other one
-                let result = if outbound_stream.should_stream(&message) {
-                    outbound_stream.stream_message(message).await
+                let result = if outbound_stream.should_stream(&message_with_metadata) {
+                    outbound_stream.stream_message(message_with_metadata).await
                 } else {
+                    // Transform the message into a multiplex message
+                    let multiplex_message_with_metadata =
+                        message_with_metadata.into_multiplex_message();
+
+                    // Send the message to the writer task
                     msg_tx
-                        .send(MultiplexMessage::Message(message))
+                        .send(multiplex_message_with_metadata)
                         .await
                         .map_err(|_| anyhow::anyhow!("Writer task ended"))
                 };
@@ -440,8 +465,10 @@ where
                 }
             }
         };
+
         executor.spawn(writer_task);
         executor.spawn(multiplex_task);
+
         (write_reqs_tx, close_tx)
     }
 
@@ -561,7 +588,7 @@ where
     fn handle_inbound_message(
         &mut self,
         message: Result<MultiplexMessage, ReadError>,
-        write_reqs_tx: &mut aptos_channel::Sender<(), NetworkMessage>,
+        write_reqs_tx: &mut aptos_channel::Sender<(), NetworkMessageWithMetadata>,
     ) -> Result<(), PeerManagerError> {
         trace!(
             NetworkSchema::new(&self.network_context)
@@ -582,8 +609,17 @@ where
                     let protocol_id = frame_prefix.as_ref().get(1).unwrap_or(&0);
                     let error_code = ErrorCode::parsing_error(*message_type, *protocol_id);
                     let message = NetworkMessage::Error(error_code);
+                    let message_with_metadata = NetworkMessageWithMetadata::new(
+                        MessageMetadata::new(
+                            self.network_context.network_id(),
+                            None,
+                            MessageSendType::DirectSend,
+                            None,
+                        ),
+                        message,
+                    );
 
-                    write_reqs_tx.push((), message)?;
+                    write_reqs_tx.push((), message_with_metadata)?;
                     return Err(err.into());
                 },
                 ReadError::IoError(_) => {
@@ -603,7 +639,7 @@ where
     fn handle_outbound_request(
         &mut self,
         request: PeerRequest,
-        write_reqs_tx: &mut aptos_channel::Sender<(), NetworkMessage>,
+        write_reqs_tx: &mut aptos_channel::Sender<(), NetworkMessageWithMetadata>,
     ) {
         trace!(
             "Peer {} PeerRequest::{:?}",
@@ -614,18 +650,18 @@ where
             // To send an outbound DirectSendMsg, we just bump some counters and
             // push it onto our outbound writer queue.
             PeerRequest::SendDirectSend(message) => {
-                // Create the direct send message
-                let message_len = message.mdata.len();
-                let protocol_id = message.protocol_id;
-                let message = NetworkMessage::DirectSendMsg(DirectSendMsg {
-                    protocol_id,
-                    priority: Priority::default(),
-                    raw_msg: Vec::from(message.mdata.as_ref()),
-                });
+                // Get the data length and protocol id
+                let data_len = message.data().len();
+                let protocol_id = message.protocol_id();
 
-                match write_reqs_tx.push((), message) {
+                // Convert the message into a network message with metadata
+                let message_with_metadata =
+                    message.into_network_message(self.network_context.network_id());
+
+                // Send the message to the outbound writer queue
+                match write_reqs_tx.push((), message_with_metadata) {
                     Ok(_) => {
-                        self.update_outbound_direct_send_metrics(protocol_id, message_len as u64);
+                        self.update_outbound_direct_send_metrics(protocol_id, data_len as u64);
                     },
                     Err(e) => {
                         counters::direct_send_messages(&self.network_context, FAILED_LABEL).inc();
@@ -642,7 +678,7 @@ where
                 }
             },
             PeerRequest::SendRpc(request) => {
-                let protocol_id = request.protocol_id;
+                let protocol_id = request.protocol_id();
                 if let Err(e) = self
                     .outbound_rpcs
                     .handle_outbound_request(request, write_reqs_tx)
@@ -682,7 +718,7 @@ where
 
     async fn do_shutdown(
         mut self,
-        write_req_tx: aptos_channel::Sender<(), NetworkMessage>,
+        write_req_tx: aptos_channel::Sender<(), NetworkMessageWithMetadata>,
         writer_close_tx: oneshot::Sender<()>,
         reason: DisconnectReason,
     ) {
