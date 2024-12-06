@@ -126,7 +126,7 @@ impl Default for QuorumStoreConfig {
             batch_request_retry_limit: 10,
             batch_request_retry_interval_ms: 1000,
             batch_request_rpc_timeout_ms: 5000,
-            batch_expiry_gap_when_init_usecs: Duration::from_secs(60).as_micros() as u64,
+            batch_expiry_gap_when_init_usecs: Duration::from_secs(1).as_micros() as u64,
             remote_batch_expiry_gap_when_init_usecs: Duration::from_millis(500).as_micros() as u64,
             memory_quota: 120_000_000,
             db_quota: 300_000_000,
@@ -136,7 +136,7 @@ impl Default for QuorumStoreConfig {
             num_workers_for_remote_batches: 10,
             batch_buckets: DEFAULT_BUCKETS.to_vec(),
             allow_batches_without_pos_in_proposal: true,
-            enable_opt_quorum_store: false,
+            enable_opt_quorum_store: true,
             opt_qs_minimum_batch_age_usecs: Duration::from_millis(20).as_micros() as u64,
         }
     }
