@@ -12,12 +12,20 @@ warning: Unused local variable `y`. Consider removing or prefixing with an under
 fun <SELF>_0::main() {
      var $t0: u64
      var $t1: u64
-  0: $t1 := +($t0, $t0)
-  1: return ()
+     var $t2: u64
+  0: $t2 := infer($t0)
+  1: $t1 := +($t2, $t0)
+  2: return ()
 }
 
 
 Diagnostics:
+error: use of unassigned local `x`
+  ┌─ tests/uninit-use-checker/use_twice_before_assign.move:4:13
+  │
+4 │     let y = x + x;
+  │             ^
+
 error: use of unassigned local `x`
   ┌─ tests/uninit-use-checker/use_twice_before_assign.move:4:13
   │
@@ -30,8 +38,11 @@ error: use of unassigned local `x`
 fun <SELF>_0::main() {
      var $t0: u64
      var $t1: u64
+     var $t2: u64
+     # before: { no: $t0, $t1, $t2 }, after: { no: $t0, $t1 }
+  0: $t2 := infer($t0)
      # before: { no: $t0, $t1 }, after: { no: $t0 }
-  0: $t1 := +($t0, $t0)
+  1: $t1 := +($t2, $t0)
      # before: { no: $t0 }, after: { no: $t0 }
-  1: return ()
+  2: return ()
 }

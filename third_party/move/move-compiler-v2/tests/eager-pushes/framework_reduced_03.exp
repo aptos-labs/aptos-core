@@ -5,16 +5,24 @@ public fun m::make($t0: u64, $t1: u64, $t2: u64, $t3: address, $t4: u64): 0xc0ff
      var $t5: 0xc0ffee::m::Wrap
      var $t6: &0xc0ffee::m::S
      var $t7: u64
-     var $t8: &u64
+     var $t8: u64
      var $t9: u64
-     var $t10: &u64
+     var $t10: u64
+     var $t11: &u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: &u64
   0: $t6 := borrow_global<0xc0ffee::m::S>($t3)
-  1: $t8 := borrow_field<0xc0ffee::m::S>.x($t6)
-  2: $t7 := read_ref($t8)
-  3: $t10 := borrow_field<0xc0ffee::m::S>.y($t6)
-  4: $t9 := read_ref($t10)
-  5: $t5 := pack 0xc0ffee::m::Wrap($t0, $t1, $t2, $t7, $t4, $t9)
-  6: return $t5
+  1: $t7 := infer($t0)
+  2: $t8 := infer($t1)
+  3: $t9 := infer($t2)
+  4: $t11 := borrow_field<0xc0ffee::m::S>.x($t6)
+  5: $t10 := read_ref($t11)
+  6: $t12 := infer($t4)
+  7: $t14 := borrow_field<0xc0ffee::m::S>.y($t6)
+  8: $t13 := read_ref($t14)
+  9: $t5 := pack 0xc0ffee::m::Wrap($t7, $t8, $t9, $t10, $t12, $t13)
+ 10: return $t5
 }
 
 ============ after LiveVarAnalysisProcessor: ================
@@ -23,24 +31,36 @@ public fun m::make($t0: u64, $t1: u64, $t2: u64, $t3: address, $t4: u64): 0xc0ff
 public fun m::make($t0: u64, $t1: u64, $t2: u64, $t3: address, $t4: u64): 0xc0ffee::m::Wrap {
      var $t5: 0xc0ffee::m::Wrap
      var $t6: &0xc0ffee::m::S
-     var $t7: u64
-     var $t8: &u64
-     var $t9: u64
-     var $t10: &u64 [unused]
+     var $t7: u64 [unused]
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
+     var $t10: u64
+     var $t11: &u64
+     var $t12: u64 [unused]
+     var $t13: u64
+     var $t14: &u64 [unused]
      # live vars: $t0, $t1, $t2, $t3, $t4
   0: $t6 := borrow_global<0xc0ffee::m::S>($t3)
      # live vars: $t0, $t1, $t2, $t4, $t6
-  1: $t8 := borrow_field<0xc0ffee::m::S>.x($t6)
-     # live vars: $t0, $t1, $t2, $t4, $t6, $t8
-  2: $t7 := read_ref($t8)
-     # live vars: $t0, $t1, $t2, $t4, $t6, $t7
-  3: $t8 := borrow_field<0xc0ffee::m::S>.y($t6)
-     # live vars: $t0, $t1, $t2, $t4, $t7, $t8
-  4: $t9 := read_ref($t8)
-     # live vars: $t0, $t1, $t2, $t4, $t7, $t9
-  5: $t5 := pack 0xc0ffee::m::Wrap($t0, $t1, $t2, $t7, $t4, $t9)
+  1: $t0 := move($t0)
+     # live vars: $t0, $t1, $t2, $t4, $t6
+  2: $t1 := move($t1)
+     # live vars: $t0, $t1, $t2, $t4, $t6
+  3: $t2 := move($t2)
+     # live vars: $t0, $t1, $t2, $t4, $t6
+  4: $t11 := borrow_field<0xc0ffee::m::S>.x($t6)
+     # live vars: $t0, $t1, $t2, $t4, $t6, $t11
+  5: $t10 := read_ref($t11)
+     # live vars: $t0, $t1, $t2, $t4, $t6, $t10
+  6: $t4 := move($t4)
+     # live vars: $t0, $t1, $t2, $t4, $t6, $t10
+  7: $t11 := borrow_field<0xc0ffee::m::S>.y($t6)
+     # live vars: $t0, $t1, $t2, $t4, $t10, $t11
+  8: $t13 := read_ref($t11)
+     # live vars: $t0, $t1, $t2, $t4, $t10, $t13
+  9: $t5 := pack 0xc0ffee::m::Wrap($t0, $t1, $t2, $t10, $t4, $t13)
      # live vars: $t5
-  6: return $t5
+ 10: return $t5
 }
 
 
@@ -62,28 +82,22 @@ struct Wrap {
 
 public make(Arg0: u64, Arg1: u64, Arg2: u64, Arg3: address, Arg4: u64): Wrap /* def_idx: 0 */ {
 L5:	loc0: &S
-L6:	loc1: u64
-L7:	loc2: u64
 B0:
 	0: MoveLoc[3](Arg3: address)
 	1: ImmBorrowGlobal[0](S)
 	2: StLoc[5](loc0: &S)
-	3: CopyLoc[5](loc0: &S)
-	4: ImmBorrowField[0](S.x: u64)
-	5: ReadRef
-	6: MoveLoc[5](loc0: &S)
-	7: ImmBorrowField[1](S.y: u64)
+	3: MoveLoc[0](Arg0: u64)
+	4: MoveLoc[1](Arg1: u64)
+	5: MoveLoc[2](Arg2: u64)
+	6: CopyLoc[5](loc0: &S)
+	7: ImmBorrowField[0](S.x: u64)
 	8: ReadRef
-	9: StLoc[6](loc1: u64)
-	10: StLoc[7](loc2: u64)
-	11: MoveLoc[0](Arg0: u64)
-	12: MoveLoc[1](Arg1: u64)
-	13: MoveLoc[2](Arg2: u64)
-	14: MoveLoc[7](loc2: u64)
-	15: MoveLoc[4](Arg4: u64)
-	16: MoveLoc[6](loc1: u64)
-	17: Pack[1](Wrap)
-	18: Ret
+	9: MoveLoc[4](Arg4: u64)
+	10: MoveLoc[5](loc0: &S)
+	11: ImmBorrowField[1](S.y: u64)
+	12: ReadRef
+	13: Pack[1](Wrap)
+	14: Ret
 }
 }
 ============ bytecode verification succeeded ========

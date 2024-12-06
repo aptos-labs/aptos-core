@@ -4,15 +4,18 @@
 fun m::foo($t0: u64): (u64, u64) {
      var $t1: u64
      var $t2: u64 [unused]
-     var $t3: u64
+     var $t3: u64 [unused]
+     var $t4: u64
      # live vars: $t0
   0: $t1 := copy($t0)
      # live vars: $t0, $t1
-  1: $t3 := 1
-     # live vars: $t0, $t1, $t3
-  2: $t0 := -($t0, $t3)
+  1: $t0 := move($t0)
      # live vars: $t0, $t1
-  3: return ($t1, $t0)
+  2: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  3: $t0 := -($t0, $t4)
+     # live vars: $t0, $t1
+  4: return ($t1, $t0)
 }
 
 
@@ -20,16 +23,17 @@ fun m::foo($t0: u64): (u64, u64) {
 public fun m::test1($t0: u64) {
      var $t1: u64
      var $t2: bool
-     var $t3: u64
+     var $t3: u64 [unused]
+     var $t4: u64
      # live vars: $t0
   0: label L0
      # flush: $t0
      # live vars: $t0
   1: ($t1, $t0) := m::foo($t0)
      # live vars: $t0, $t1
-  2: $t3 := 0
-     # live vars: $t0, $t1, $t3
-  3: $t2 := ==($t1, $t3)
+  2: $t4 := 0
+     # live vars: $t0, $t1, $t4
+  3: $t2 := ==($t1, $t4)
      # live vars: $t0, $t2
   4: if ($t2) goto 5 else goto 0
      # live vars: $t0
@@ -43,16 +47,17 @@ public fun m::test1($t0: u64) {
 public fun m::test2($t0: u64) {
      var $t1: u64
      var $t2: bool
-     var $t3: u64
+     var $t3: u64 [unused]
+     var $t4: u64
      # live vars: $t0
   0: label L0
      # flush: $t0
      # live vars: $t0
   1: ($t0, $t1) := m::foo($t0)
      # live vars: $t0, $t1
-  2: $t3 := 0
-     # live vars: $t0, $t1, $t3
-  3: $t2 := ==($t1, $t3)
+  2: $t4 := 0
+     # live vars: $t0, $t1, $t4
+  3: $t2 := ==($t1, $t4)
      # live vars: $t0, $t2
   4: if ($t2) goto 5 else goto 0
      # live vars: $t0
@@ -68,7 +73,6 @@ module c0ffee.m {
 
 
 foo(Arg0: u64): u64 * u64 /* def_idx: 0 */ {
-L1:	loc0: u64
 B0:
 	0: CopyLoc[0](Arg0: u64)
 	1: MoveLoc[0](Arg0: u64)

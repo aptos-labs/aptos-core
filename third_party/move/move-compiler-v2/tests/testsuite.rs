@@ -265,7 +265,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::EndStage,
             dump_bytecode: DumpLevel::EndStage,
-            dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE]),
+            dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE, FILE_FORMAT_STAGE]),
         },
         // -- Tests for stages in the bytecode pipeline
         // Live-var tests
@@ -276,10 +276,15 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             exclude: vec![],
             exp_suffix: None,
             options: opts.clone(),
-            stop_after: StopAfter::BytecodePipeline(Some("LiveVarAnalysisProcessor")),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::AllStages,
-            dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE, "LiveVarAnalysisProcessor"]),
+            dump_bytecode_filter: Some(vec![
+                INITIAL_BYTECODE_STAGE,
+                "LiveVarAnalysisProcessor",
+                FILE_FORMAT_STAGE,
+            ]),
         },
         // Reference safety tests, old version (with optimizations on)
         TestConfig {
@@ -386,7 +391,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             exclude: vec![],
             exp_suffix: None,
             options: opts.clone(),
-            stop_after: StopAfter::BytecodePipeline(Some("AbilityProcessor")),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::AllStages,
             dump_bytecode_filter: Some(vec![
@@ -395,6 +401,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 "LiveVarAnalysisProcessor",
                 "ReferenceSafetyProcessor",
                 "AbilityProcessor",
+                FILE_FORMAT_STAGE,
             ]),
         },
         TestConfig {
@@ -541,6 +548,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 INITIAL_BYTECODE_STAGE,
                 "UnreachableCodeProcessor",
                 "UnreachableCodeRemover",
+                FILE_FORMAT_STAGE,
             ]),
         },
         // Uninitialized use checker
@@ -553,10 +561,15 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             options: opts
                 .clone()
                 .set_experiment(Experiment::KEEP_UNINIT_ANNOTATIONS, true),
-            stop_after: StopAfter::BytecodePipeline(Some("uninitialized_use_checker")),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::AllStages,
-            dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE, "uninitialized_use_checker"]),
+            dump_bytecode_filter: Some(vec![
+                INITIAL_BYTECODE_STAGE,
+                "uninitialized_use_checker",
+                FILE_FORMAT_STAGE,
+            ]),
         },
         // -- File Format Generation
         // Test without bytecode optimizations enabled
