@@ -1723,6 +1723,7 @@ dependencies = [
  "clap 4.5.21",
  "deadpool-redis",
  "enum_dispatch",
+ "firebase-token",
  "futures",
  "hex",
  "ipnet",
@@ -8200,6 +8201,18 @@ name = "finl_unicode"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fcfdc7a0362c9f4444381a9e697c79d435fe65b52a37466fc2c1184cee9edc6"
+
+[[package]]
+name = "firebase-token"
+version = "0.3.0"
+source = "git+https://github.com/aptos-labs/firebase-token?rev=34ea512d3d1fad6c11df3e7d82ff72beccc05836#34ea512d3d1fad6c11df3e7d82ff72beccc05836"
+dependencies = [
+ "jsonwebtoken 8.3.0",
+ "reqwest 0.11.23",
+ "serde",
+ "tokio",
+ "tracing",
+]
 
 [[package]]
 name = "firestore"

@@ -593,6 +593,7 @@ fail = "0.5.0"
 ff = { version = "0.13", features = ["derive"] }
 field_count = "0.1.1"
 file_diff = "1.0.0"
+firebase-token = { git = "https://github.com/aptos-labs/firebase-token", rev = "34ea512d3d1fad6c11df3e7d82ff72beccc05836" }
 firestore = "0.43.0"
 fixed = "1.25.1"
 flate2 = "1.0.24"
