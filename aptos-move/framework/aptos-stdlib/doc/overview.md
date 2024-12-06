@@ -33,6 +33,7 @@ This is the reference documentation of the Aptos standard library.
 -  [`0x1::multi_ed25519`](multi_ed25519.md#0x1_multi_ed25519)
 -  [`0x1::pool_u64`](pool_u64.md#0x1_pool_u64)
 -  [`0x1::pool_u64_unbound`](pool_u64_unbound.md#0x1_pool_u64_unbound)
+-  [`0x1::regex`](regex.md#0x1_regex)
 -  [`0x1::ristretto255`](ristretto255.md#0x1_ristretto255)
 -  [`0x1::ristretto255_bulletproofs`](ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs)
 -  [`0x1::ristretto255_elgamal`](ristretto255_elgamal.md#0x1_ristretto255_elgamal)
