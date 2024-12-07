@@ -291,7 +291,7 @@ impl RuntimeEnvironment {
         &self,
         struct_name: StructIdentifier,
     ) -> PartialVMResult<StructNameIndex> {
-        self.struct_name_index_map.struct_name_to_idx(struct_name)
+        self.struct_name_index_map.struct_name_to_idx(&struct_name)
     }
 }
 
