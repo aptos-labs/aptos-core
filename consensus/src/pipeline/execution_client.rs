@@ -42,7 +42,10 @@ use aptos_network::{application::interface::NetworkClient, protocols::network::E
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig},
+    on_chain_config::{
+        FeatureFlag, Features, OnChainConsensusConfig, OnChainExecutionConfig,
+        OnChainRandomnessConfig,
+    },
     validator_signer::ValidatorSigner,
 };
 use fail::fail_point;
@@ -61,6 +64,7 @@ pub trait TExecutionClient: Send + Sync {
         &self,
         maybe_consensus_key: Arc<PrivateKey>,
         epoch_state: Arc<EpochState>,
+        features: &Features,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         payload_manager: Arc<dyn TPayloadManager>,
         onchain_consensus_config: &OnChainConsensusConfig,
@@ -200,6 +204,7 @@ impl ExecutionProxyClient {
         consensus_sk: Arc<PrivateKey>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         epoch_state: Arc<EpochState>,
+        features: &Features,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
         onchain_consensus_config: &OnChainConsensusConfig,
@@ -252,6 +257,7 @@ impl ExecutionProxyClient {
                     reset_rand_manager_rx,
                     self.bounded_executor.clone(),
                     highest_committed_round,
+                    features.is_enabled(FeatureFlag::RAND_MANAGER_V2),
                 ));
 
                 (
@@ -311,6 +317,7 @@ impl TExecutionClient for ExecutionProxyClient {
         &self,
         maybe_consensus_key: Arc<PrivateKey>,
         epoch_state: Arc<EpochState>,
+        features: &Features,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         payload_manager: Arc<dyn TPayloadManager>,
         onchain_consensus_config: &OnChainConsensusConfig,
@@ -325,6 +332,7 @@ impl TExecutionClient for ExecutionProxyClient {
             maybe_consensus_key,
             commit_signer_provider,
             epoch_state.clone(),
+            features,
             rand_config,
             fast_rand_config,
             onchain_consensus_config,
@@ -527,6 +535,7 @@ impl TExecutionClient for DummyExecutionClient {
         &self,
         _maybe_consensus_key: Arc<PrivateKey>,
         _epoch_state: Arc<EpochState>,
+        _features: &Features,
         _commit_signer_provider: Arc<dyn CommitSignerProvider>,
         _payload_manager: Arc<dyn TPayloadManager>,
         _onchain_consensus_config: &OnChainConsensusConfig,

@@ -60,8 +60,8 @@ impl TShare for Share {
             .address_to_validator_index()
             .get(author)
             .ok_or_else(|| anyhow!("Share::verify failed with unknown author"))?;
-        let maybe_apk = &rand_config.keys.certified_apks[index];
-        if let Some(apk) = maybe_apk.get() {
+        let maybe_apk = &rand_config.keys.apks[index].read();
+        if let Some(apk) = maybe_apk.as_ref() {
             WVUF::verify_share(
                 &rand_config.vuf_pp,
                 apk,
@@ -116,15 +116,13 @@ impl TShare for Share {
                         share.author
                     )
                 })?;
-            let apk = rand_config
-                .get_certified_apk(share.author())
-                .ok_or_else(|| {
-                    anyhow!(
-                        "Share::aggregate failed with missing apk for share from {}",
-                        share.author
-                    )
-                })?;
-            apks_and_proofs.push((Player { id }, apk.clone(), share.share().share));
+            let apk = rand_config.get_apk_cloned(share.author()).ok_or_else(|| {
+                anyhow!(
+                    "Share::aggregate failed with missing apk for share from {}",
+                    share.author
+                )
+            })?;
+            apks_and_proofs.push((Player { id }, apk, share.share().share));
         }
 
         let proof = WVUF::aggregate_shares(&rand_config.wconfig, &apks_and_proofs);
@@ -135,7 +133,7 @@ impl TShare for Share {
             &rand_config.wconfig,
             &rand_config.vuf_pp,
             metadata_serialized.as_slice(),
-            &rand_config.get_all_certified_apk(),
+            &rand_config.get_all_apks(),
             &proof,
             THREAD_MANAGER.get_exe_cpu_pool(),
         )
@@ -495,6 +493,10 @@ impl<D: TAugmentedData> AugData<D> {
             .verify(rand_config, fast_rand_config, &self.author)?;
         Ok(())
     }
+
+    pub fn data(&self) -> &D {
+        &self.data
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -635,22 +637,22 @@ impl RandConfig {
             .expect("Peer should be in the index!")
     }
 
-    pub fn get_certified_apk(&self, peer: &Author) -> Option<&APK> {
+    pub fn get_apk_cloned(&self, peer: &Author) -> Option<APK> {
         let index = self.get_id(peer);
-        self.keys.certified_apks[index].get()
+        self.keys.apks[index].read().clone()
     }
 
-    pub fn get_all_certified_apk(&self) -> Vec<Option<APK>> {
+    pub fn get_all_apks(&self) -> Vec<Option<APK>> {
         self.keys
-            .certified_apks
+            .apks
             .iter()
-            .map(|cell| cell.get().cloned())
+            .map(|cell| cell.read().clone())
             .collect()
     }
 
     pub fn add_certified_apk(&self, peer: &Author, apk: APK) -> anyhow::Result<()> {
         let index = self.get_id(peer);
-        self.keys.add_certified_apk(index, apk)
+        self.keys.set_apk(index, apk)
     }
 
     fn derive_apk(&self, peer: &Author, delta: Delta) -> anyhow::Result<APK> {

@@ -748,11 +748,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             });
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn start_round_manager(
         &mut self,
         consensus_key: Arc<PrivateKey>,
         recovery_data: RecoveryData,
         epoch_state: Arc<EpochState>,
+        features: Features,
         onchain_consensus_config: OnChainConsensusConfig,
         onchain_execution_config: OnChainExecutionConfig,
         onchain_randomness_config: OnChainRandomnessConfig,
@@ -814,6 +816,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .start_epoch(
                 consensus_key.clone(),
                 epoch_state.clone(),
+                &features,
                 safety_rules_container.clone(),
                 payload_manager.clone(),
                 &onchain_consensus_config,
@@ -1128,7 +1131,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
 
         self.epoch_state = Some(epoch_state.clone());
-
+        let features = payload.get::<Features>().unwrap_or_default();
         let consensus_config = onchain_consensus_config.unwrap_or_default();
         let execution_config = onchain_execution_config
             .unwrap_or_else(|_| OnChainExecutionConfig::default_if_missing());
@@ -1215,6 +1218,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         if consensus_config.is_dag_enabled() {
             self.start_new_epoch_with_dag(
                 epoch_state,
+                features,
                 loaded_consensus_key.clone(),
                 consensus_config,
                 execution_config,
@@ -1232,6 +1236,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.start_new_epoch_with_joltean(
                 loaded_consensus_key.clone(),
                 epoch_state,
+                features,
                 consensus_config,
                 execution_config,
                 onchain_randomness_config,
@@ -1287,6 +1292,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &mut self,
         consensus_key: Arc<PrivateKey>,
         epoch_state: Arc<EpochState>,
+        features: Features,
         consensus_config: OnChainConsensusConfig,
         execution_config: OnChainExecutionConfig,
         onchain_randomness_config: OnChainRandomnessConfig,
@@ -1305,6 +1311,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     consensus_key,
                     initial_data,
                     epoch_state,
+                    features,
                     consensus_config,
                     execution_config,
                     onchain_randomness_config,
@@ -1334,6 +1341,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     async fn start_new_epoch_with_dag(
         &mut self,
         epoch_state: Arc<EpochState>,
+        features: Features,
         loaded_consensus_key: Arc<PrivateKey>,
         onchain_consensus_config: OnChainConsensusConfig,
         on_chain_execution_config: OnChainExecutionConfig,
@@ -1369,6 +1377,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .start_epoch(
                 loaded_consensus_key,
                 epoch_state.clone(),
+                &features,
                 commit_signer,
                 payload_manager.clone(),
                 &onchain_consensus_config,
