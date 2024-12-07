@@ -276,15 +276,17 @@ B1:
 	2: CopyLoc[3](loc0: u64)
 	3: CopyLoc[0](Arg0: u64)
 	4: Lt
-	5: BrFalse(11)
+	5: BrFalse(13)
 B2:
-	6: MoveLoc[3](loc0: u64)
-	7: LdU64(1)
-	8: Add
-	9: StLoc[3](loc0: u64)
-	10: Branch(2)
+	6: MoveLoc[2](Arg2: u64)
+	7: MoveLoc[3](loc0: u64)
+	8: LdU64(1)
+	9: Add
+	10: StLoc[3](loc0: u64)
+	11: StLoc[2](Arg2: u64)
+	12: Branch(2)
 B3:
-	11: Ret
+	13: Ret
 }
 public test2(Arg0: u64, Arg1: u64) /* def_idx: 1 */ {
 L2:	loc0: u64

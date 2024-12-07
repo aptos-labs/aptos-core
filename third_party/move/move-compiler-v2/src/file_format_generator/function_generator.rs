@@ -285,9 +285,22 @@ impl<'a> FunctionGenerator<'a> {
                     std::slice::from_ref(source),
                 );
                 self.abstract_push_args(ctx, vec![*source], Some(mode));
-                let local = self.temp_to_local(ctx.fun_ctx, Some(ctx.attr_id), *dest);
-                self.emit(FF::Bytecode::StLoc(local));
-                self.abstract_pop(ctx)
+                // TODO: the below conditional check is temporary, the plan is to get rid of the `else`
+                // case if comparison testing is successful.
+                let options = ctx
+                    .fun_ctx
+                    .module
+                    .env
+                    .get_extension::<Options>()
+                    .expect("Options is available");
+                if options.experiment_on(Experiment::AVOID_STORE_IN_ASSIGNS) {
+                    self.abstract_pop(ctx);
+                    self.abstract_push_result(ctx, std::slice::from_ref(dest));
+                } else {
+                    let local = self.temp_to_local(ctx.fun_ctx, Some(ctx.attr_id), *dest);
+                    self.emit(FF::Bytecode::StLoc(local));
+                    self.abstract_pop(ctx);
+                }
             },
             Bytecode::Ret(_, result) => {
                 self.balance_stack_end_of_block(ctx, result);

@@ -70,8 +70,8 @@ use aptos_types::{
         authenticator::AnySignature, signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
         MultisigTransactionPayload, Script, SignedTransaction, Transaction, TransactionArgument,
-        TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
-        VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
+        TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
+        ViewFunctionOutput, WriteSetPayload,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
@@ -186,7 +186,6 @@ pub(crate) fn get_system_transaction_output(
         ModuleWriteSet::empty(),
         FeeStatement::zero(),
         TransactionStatus::Keep(ExecutionStatus::Success),
-        TransactionAuxiliaryData::default(),
     ))
 }
 
@@ -471,11 +470,10 @@ impl AptosVM {
             }
         }
 
-        let (txn_status, txn_aux_data) = TransactionStatus::from_vm_status(
+        let txn_status = TransactionStatus::from_vm_status(
             error_vm_status.clone(),
             self.features()
                 .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
-            self.features(),
         );
 
         match txn_status {
@@ -494,7 +492,6 @@ impl AptosVM {
                         resolver,
                         module_storage,
                         status,
-                        txn_aux_data,
                         log_context,
                         change_set_configs,
                         traversal_context,
@@ -542,7 +539,6 @@ impl AptosVM {
         resolver: &impl AptosMoveResolver,
         module_storage: &impl AptosModuleStorage,
         status: ExecutionStatus,
-        txn_aux_data: TransactionAuxiliaryData,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
         traversal_context: &mut TraversalContext,
@@ -673,13 +669,7 @@ impl AptosVM {
             )
         })?;
 
-        epilogue_session.finish(
-            fee_statement,
-            status,
-            txn_aux_data,
-            change_set_configs,
-            module_storage,
-        )
+        epilogue_session.finish(fee_statement, status, change_set_configs, module_storage)
     }
 
     fn success_transaction_cleanup(
@@ -729,7 +719,6 @@ impl AptosVM {
         let output = epilogue_session.finish(
             fee_statement,
             ExecutionStatus::Success,
-            TransactionAuxiliaryData::default(),
             change_set_configs,
             module_storage,
         )?;
@@ -2308,7 +2297,6 @@ impl AptosVM {
             module_write_set,
             FeeStatement::zero(),
             TransactionStatus::Keep(ExecutionStatus::Success),
-            TransactionAuxiliaryData::default(),
         );
         Ok((VMStatus::Executed, output))
     }
@@ -2792,6 +2780,50 @@ pub struct AptosVMBlockExecutor {
     module_cache_manager: AptosModuleCacheManager,
 }
 
+impl AptosVMBlockExecutor {
+    /// Executes transactions with the specified [BlockExecutorConfig] and returns output for each
+    /// one of them.
+    pub fn execute_block_with_config(
+        &self,
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
+        state_view: &(impl StateView + Sync),
+        config: BlockExecutorConfig,
+        transaction_slice_metadata: TransactionSliceMetadata,
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+        fail_point!("aptos_vm_block_executor::execute_block_with_config", |_| {
+            Err(VMStatus::error(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                None,
+            ))
+        });
+
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let num_txns = txn_provider.num_txns();
+        info!(
+            log_context,
+            "Executing block, transaction count: {}", num_txns
+        );
+
+        let result = AptosVMBlockExecutorWrapper::execute_block::<
+            _,
+            NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+            DefaultTxnProvider<SignatureVerifiedTransaction>,
+        >(
+            txn_provider,
+            state_view,
+            &self.module_cache_manager,
+            config,
+            transaction_slice_metadata,
+            None,
+        );
+        if result.is_ok() {
+            // Record the histogram count for transactions per block.
+            BLOCK_TRANSACTION_COUNT.observe(num_txns as f64);
+        }
+        result
+    }
+}
+
 impl VMBlockExecutor for AptosVMBlockExecutor {
     fn new() -> Self {
         Self {
@@ -2806,45 +2838,16 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
-        fail_point!("move_adapter::execute_block", |_| {
-            Err(VMStatus::error(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                None,
-            ))
-        });
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
-        info!(
-            log_context,
-            "Executing block, transaction count: {}",
-            txn_provider.num_txns()
-        );
-
-        let count = txn_provider.num_txns();
-        let ret = AptosVMBlockExecutorWrapper::execute_block::<
-            _,
-            NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
-            DefaultTxnProvider<SignatureVerifiedTransaction>,
-        >(
-            txn_provider,
-            state_view,
-            &self.module_cache_manager,
-            BlockExecutorConfig {
-                local: BlockExecutorLocalConfig {
-                    concurrency_level: AptosVM::get_concurrency_level(),
-                    allow_fallback: true,
-                    discard_failed_blocks: AptosVM::get_discard_failed_blocks(),
-                    module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
-                },
-                onchain: onchain_config,
+        let config = BlockExecutorConfig {
+            local: BlockExecutorLocalConfig {
+                concurrency_level: AptosVM::get_concurrency_level(),
+                allow_fallback: true,
+                discard_failed_blocks: AptosVM::get_discard_failed_blocks(),
+                module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
             },
-            transaction_slice_metadata,
-            None,
-        );
-        if ret.is_ok() {
-            // Record the histogram count for transactions per block.
-            BLOCK_TRANSACTION_COUNT.observe(count as f64);
-        }
-        ret
+            onchain: onchain_config,
+        };
+        self.execute_block_with_config(txn_provider, state_view, config, transaction_slice_metadata)
     }
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>>(

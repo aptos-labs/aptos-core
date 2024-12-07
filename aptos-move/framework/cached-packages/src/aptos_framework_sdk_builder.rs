@@ -323,6 +323,12 @@ pub enum EntryFunctionCall {
         coin_type: TypeTag,
     },
 
+    /// Migrate to fungible store for `CoinType` if not yet.
+    CoinMigrateCoinStoreToFungibleStore {
+        coin_type: TypeTag,
+        accounts: Vec<AccountAddress>,
+    },
+
     /// Voluntarily migrate to fungible store for `CoinType` if not yet.
     CoinMigrateToFungibleStore {
         coin_type: TypeTag,
@@ -1298,6 +1304,10 @@ impl EntryFunctionCall {
             } => code_publish_package_txn(metadata_serialized, code),
             CoinCreateCoinConversionMap {} => coin_create_coin_conversion_map(),
             CoinCreatePairing { coin_type } => coin_create_pairing(coin_type),
+            CoinMigrateCoinStoreToFungibleStore {
+                coin_type,
+                accounts,
+            } => coin_migrate_coin_store_to_fungible_store(coin_type, accounts),
             CoinMigrateToFungibleStore { coin_type } => coin_migrate_to_fungible_store(coin_type),
             CoinTransfer {
                 coin_type,
@@ -2559,6 +2569,25 @@ pub fn coin_create_pairing(coin_type: TypeTag) -> TransactionPayload {
         ident_str!("create_pairing").to_owned(),
         vec![coin_type],
         vec![],
+    ))
+}
+
+/// Migrate to fungible store for `CoinType` if not yet.
+pub fn coin_migrate_coin_store_to_fungible_store(
+    coin_type: TypeTag,
+    accounts: Vec<AccountAddress>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("coin").to_owned(),
+        ),
+        ident_str!("migrate_coin_store_to_fungible_store").to_owned(),
+        vec![coin_type],
+        vec![bcs::to_bytes(&accounts).unwrap()],
     ))
 }
 
@@ -5398,6 +5427,19 @@ mod decoder {
         }
     }
 
+    pub fn coin_migrate_coin_store_to_fungible_store(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CoinMigrateCoinStoreToFungibleStore {
+                coin_type: script.ty_args().get(0)?.clone(),
+                accounts: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn coin_migrate_to_fungible_store(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -6946,6 +6988,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "coin_create_pairing".to_string(),
             Box::new(decoder::coin_create_pairing),
+        );
+        map.insert(
+            "coin_migrate_coin_store_to_fungible_store".to_string(),
+            Box::new(decoder::coin_migrate_coin_store_to_fungible_store),
         );
         map.insert(
             "coin_migrate_to_fungible_store".to_string(),

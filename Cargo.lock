@@ -3567,6 +3567,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-replay-benchmark"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-block-executor",
+ "aptos-logger",
+ "aptos-move-debugger",
+ "aptos-push-metrics",
+ "aptos-rest-client",
+ "aptos-types",
+ "aptos-vm",
+ "bcs 0.1.4",
+ "claims",
+ "clap 4.5.21",
+ "parking_lot 0.12.1",
+ "serde",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "aptos-resource-viewer"
 version = "0.1.0"
 dependencies = [
@@ -5914,9 +5935,9 @@ version = "0.1.0"
 dependencies = [
  "fail",
  "hex",
- "invalid-mutations",
  "move-binary-format",
  "move-bytecode-verifier",
+ "move-bytecode-verifier-invalid-mutations",
  "move-core-types",
  "petgraph 0.6.5",
  "proptest",
@@ -9927,15 +9948,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "invalid-mutations"
-version = "0.1.0"
-dependencies = [
- "move-binary-format",
- "move-core-types",
- "proptest",
-]
-
-[[package]]
 name = "io-lifetimes"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11058,13 +11070,22 @@ version = "0.1.0"
 dependencies = [
  "fail",
  "hex-literal",
- "invalid-mutations",
  "move-binary-format",
  "move-borrow-graph",
+ "move-bytecode-verifier-invalid-mutations",
  "move-core-types",
  "petgraph 0.6.5",
  "serde",
  "typed-arena",
+]
+
+[[package]]
+name = "move-bytecode-verifier-invalid-mutations"
+version = "0.1.0"
+dependencies = [
+ "move-binary-format",
+ "move-core-types",
+ "proptest",
 ]
 
 [[package]]
