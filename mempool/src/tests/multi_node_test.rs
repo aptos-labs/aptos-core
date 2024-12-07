@@ -342,18 +342,18 @@ impl TestHarness {
         };
         let receiver_id = *self.peer_to_node_id.get(&lookup_peer_network_id).unwrap();
         let receiver = self.mut_node(&receiver_id);
-        let rmsg = ReceivedMessage {
-            message: NetworkMessage::DirectSendMsg(DirectSendMsg {
-                protocol_id: msg.protocol_id(),
-                priority: 0,
-                raw_msg: msg.data().clone().into(),
-            }),
-            sender: PeerNetworkId::new(network_id, sender_peer_id),
-            receive_timestamp_micros: 0,
-            rpc_replier: None,
-        };
+        let network_message = NetworkMessage::DirectSendMsg(DirectSendMsg {
+            protocol_id: msg.protocol_id(),
+            priority: 0,
+            raw_msg: msg.data().clone().into(),
+        });
+        let received_message = ReceivedMessage::new_for_testing(
+            network_message,
+            PeerNetworkId::new(network_id, sender_peer_id),
+            None,
+        );
 
-        receiver.send_network_req(network_id, ProtocolId::MempoolDirectSend, rmsg);
+        receiver.send_network_req(network_id, ProtocolId::MempoolDirectSend, received_message);
         receiver.wait_for_event(SharedMempoolNotification::NewTransactions);
 
         // Verify transaction was inserted into Mempool
@@ -475,18 +475,22 @@ impl TestHarness {
                         let receiver_id =
                             *self.peer_to_node_id.get(&lookup_peer_network_id).unwrap();
                         let receiver = self.mut_node(&receiver_id);
-                        let rmsg = ReceivedMessage {
-                            message: NetworkMessage::DirectSendMsg(DirectSendMsg {
-                                protocol_id: msg.protocol_id(),
-                                priority: 0,
-                                raw_msg: msg.data().clone().into(),
-                            }),
-                            sender: PeerNetworkId::new(network_id, sender_peer_id),
-                            receive_timestamp_micros: 0,
-                            rpc_replier: None,
-                        };
+                        let network_message = NetworkMessage::DirectSendMsg(DirectSendMsg {
+                            protocol_id: msg.protocol_id(),
+                            priority: 0,
+                            raw_msg: msg.data().clone().into(),
+                        });
+                        let received_message = ReceivedMessage::new_for_testing(
+                            network_message,
+                            PeerNetworkId::new(network_id, sender_peer_id),
+                            None,
+                        );
 
-                        receiver.send_network_req(network_id, ProtocolId::MempoolDirectSend, rmsg);
+                        receiver.send_network_req(
+                            network_id,
+                            ProtocolId::MempoolDirectSend,
+                            received_message,
+                        );
                     },
                     request => panic!(
                         "did not receive expected broadcast ACK, instead got {:?}",
