@@ -59,6 +59,10 @@ pub struct ProverDependencyInstaller {
     /// given we will put it in a standard location for your OS.
     #[clap(long)]
     install_dir: Option<PathBuf>,
+
+    /// Assume yes for all yes/no prompts
+    #[clap(long)]
+    pub assume_yes: bool,
 }
 
 impl ProverDependencyInstaller {
@@ -190,6 +194,7 @@ impl ProverDependencyInstaller {
             target_version: version.to_string(),
             install_dir: Some(install_dir.clone()),
             check: false,
+            assume_yes: self.assume_yes,
         };
         let result = update_binary(installer).await?;
 
