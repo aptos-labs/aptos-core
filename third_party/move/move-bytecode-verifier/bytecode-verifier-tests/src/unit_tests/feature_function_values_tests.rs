@@ -12,21 +12,21 @@ use move_core_types::{identifier::Identifier, vm_status::StatusCode};
 fn get_fun_type_bool_to_bool() -> SignatureToken {
     let bool_token = SignatureToken::Bool;
     let abilities = AbilitySet::PUBLIC_FUNCTIONS;
-    SignatureToken::Function {
-        args: vec![bool_token.clone()],
-        results: vec![bool_token.clone()],
+    SignatureToken::Function(
+        vec![bool_token.clone()],
+        vec![bool_token.clone()],
         abilities,
-    }
+    )
 }
 
 fn get_fun_type_nothing_to_bool() -> SignatureToken {
     let bool_token = SignatureToken::Bool;
     let abilities = AbilitySet::PUBLIC_FUNCTIONS;
-    SignatureToken::Function {
-        args: vec![],
-        results: vec![bool_token.clone()],
+    SignatureToken::Function(
+        vec![],
+        vec![bool_token.clone()],
         abilities,
-    }
+    )
 }
 
 #[test]

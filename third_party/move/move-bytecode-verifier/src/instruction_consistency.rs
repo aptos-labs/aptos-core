@@ -289,7 +289,7 @@ impl<'a> InstructionConsistency<'a> {
     ) -> PartialVMResult<()> {
         let signature = self.resolver.signature_at(sig_index);
         if let Some(sig_token) = signature.0.first() {
-            if let SignatureToken::Function { args: params, .. } = sig_token {
+            if let SignatureToken::Function(params, ..) = sig_token {
                 if count as usize > params.len() {
                     return Err(
                         PartialVMError::new(StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH)

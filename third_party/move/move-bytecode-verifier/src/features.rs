@@ -87,7 +87,7 @@ impl<'a> FeatureVerifier<'a> {
         if !self.config.enable_function_values {
             for (idx, signature) in self.code.signatures().iter().enumerate() {
                 for signature_token in signature.0.iter() {
-                    if matches!(signature_token, SignatureToken::Function { .. }) {
+                    if matches!(signature_token, SignatureToken::Function(..)) {
                         return Err(PartialVMError::new(StatusCode::FEATURE_NOT_ENABLED)
                             .at_index(IndexKind::Signature, idx as u16)
                             .with_message("function values feature not enabled".to_string()));

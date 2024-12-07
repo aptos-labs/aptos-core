@@ -369,6 +369,6 @@ fn struct_handle(token: &SignatureToken) -> Option<StructHandleIndex> {
         | Signer
         | Vector(_)
         | TypeParameter(_)
-        | Function { .. } => None,
+        | Function(..) => None,
     }
 }

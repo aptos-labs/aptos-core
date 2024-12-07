@@ -375,7 +375,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             SignatureToken::Vector(ty) => {
                 FatType::Vector(Box::new(self.resolve_signature(module, ty, limit)?))
             },
-            SignatureToken::Function { .. } => {
+            SignatureToken::Function(..) => {
                 bail!("function types NYI by fat types")
             },
             SignatureToken::Struct(idx) => {

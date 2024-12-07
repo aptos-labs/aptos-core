@@ -340,10 +340,12 @@ impl<'a> BinaryIndexedView<'a> {
             Reference(_) | MutableReference(_) => Ok(AbilitySet::REFERENCES),
             Signer => Ok(AbilitySet::SIGNER),
             TypeParameter(idx) => Ok(constraints[*idx as usize]),
-            Vector(ty) => AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
-                self.abilities(ty, constraints)?,
-            ]),
-            Function { abilities, .. } => Ok(*abilities),
+            Vector(ty) => AbilitySet::polymorphic_abilities(
+                AbilitySet::VECTOR,
+                vec![false],
+                vec![self.abilities(ty, constraints)?],
+            ),
+            Function(_, _, abilities) => Ok(*abilities),
             Struct(idx) => {
                 let sh = self.struct_handle_at(*idx);
                 Ok(sh.abilities)

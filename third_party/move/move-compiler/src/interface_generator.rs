@@ -272,6 +272,20 @@ fn write_ability_constraint(abs: AbilitySet) -> String {
     )
 }
 
+fn function_value_abilities_to_str(abs: AbilitySet) -> String {
+    if abs.is_subset(AbilitySet::FUNCTIONS) {
+        return "".to_string();
+    }
+    format!(
+        ": {}",
+        abs.setminus(AbilitySet::FUNCTIONS)
+            .into_iter()
+            .map(write_ability)
+            .collect::<Vec<_>>()
+            .join("+")
+    )
+}
+
 fn write_ability(ab: Ability) -> String {
     use crate::parser::ast::Ability_ as A_;
     match ab {
@@ -365,8 +379,13 @@ fn write_signature_token(ctx: &mut Context, t: &SignatureToken) -> String {
         SignatureToken::Address => "address".to_string(),
         SignatureToken::Signer => "signer".to_string(),
         SignatureToken::Vector(inner) => format!("vector<{}>", write_signature_token(ctx, inner)),
-        SignatureToken::Function { args, results, .. } => {
-            format!("|{}|{}", tok_list(ctx, args), tok_list(ctx, results))
+        SignatureToken::Function(args, results, abilities) => {
+            format!(
+                "|{}|{}{}",
+                tok_list(ctx, args),
+                tok_list(ctx, results),
+                function_value_abilities_to_str(*abilities)
+            )
         },
         SignatureToken::Struct(idx) => write_struct_handle_type(ctx, *idx),
         SignatureToken::StructInstantiation(idx, types) => {

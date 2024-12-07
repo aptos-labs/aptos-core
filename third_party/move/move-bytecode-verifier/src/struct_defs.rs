@@ -123,7 +123,7 @@ impl<'a> StructDefGraphBuilder<'a> {
                 )
             },
             T::Vector(inner) => self.add_signature_token(neighbors, cur_idx, inner)?,
-            T::Function { args, results, .. } => {
+            T::Function(args, results, ..) => {
                 for t in args.iter().chain(results) {
                     self.add_signature_token(neighbors, cur_idx, t)?
                 }

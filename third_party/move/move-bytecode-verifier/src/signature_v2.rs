@@ -173,11 +173,11 @@ fn check_ty<const N: usize>(
                 param_constraints,
             )?;
         },
-        Function {
+        Function(
             args,
             results,
             abilities,
-        } => {
+        ) => {
             assert_abilities(*abilities, required_abilities)?;
             for ty in args.iter().chain(results.iter()) {
                 check_ty(
@@ -275,7 +275,7 @@ fn check_phantom_params(
 
     match ty {
         Vector(ty) => check_phantom_params(struct_handles, context, false, ty)?,
-        Function { args, results, .. } => {
+        Function(args, results, ..) => {
             for ty in args.iter().chain(results) {
                 check_phantom_params(struct_handles, context, false, ty)?
             }
@@ -919,7 +919,7 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                         checked_early_bind_insts.entry((*idx, *count))
                     {
                         // Note non-function case is checked in `verify_fun_sig_idx` above.
-                        if let Some(SignatureToken::Function { args, .. }) =
+                        if let Some(SignatureToken::Function(args, ..)) =
                             self.resolver.signature_at(*idx).0.first()
                         {
                             if *count as usize > args.len() {

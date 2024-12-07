@@ -570,9 +570,6 @@ impl<'a> Disassembler<'a> {
         type_param_context: &[SourceName],
     ) -> Result<String> {
         Ok(match sig_tok {
-            // TODO: function types
-            SignatureToken::Function { .. } => unimplemented!("disassembling function sig tokens"),
-
             SignatureToken::Bool => "bool".to_string(),
             SignatureToken::U8 => "u8".to_string(),
             SignatureToken::U16 => "u16".to_string(),
@@ -632,6 +629,29 @@ impl<'a> Disassembler<'a> {
                 })?
                 .0
                 .to_string(),
+            SignatureToken::Function(args, results, abilities) => {
+                let args_str = args
+                    .into_iter()
+                    .map(|tok| self.disassemble_sig_tok(tok, type_param_context))
+                    .collect::<Result<Vec<_>>>()?
+                    .join(",");
+                let results_str = results
+                    .into_iter()
+                    .map(|tok| self.disassemble_sig_tok(tok, type_param_context))
+                    .collect::<Result<Vec<_>>>()?
+                    .join(",");
+                let abilities_str = if abilities.is_subset(AbilitySet::FUNCTIONS) {
+                    "".to_string()
+                } else {
+                    let ability_vec: Vec<_> = abilities
+                        .setminus(AbilitySet::FUNCTIONS)
+                        .into_iter()
+                        .map(Self::format_ability)
+                        .collect();
+                    format!(" with {}", ability_vec.join("+"))
+                };
+                format!("|{}|{}{}", args_str, results_str, abilities_str)
+            },
         })
     }
 

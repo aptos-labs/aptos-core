@@ -1180,11 +1180,11 @@ fn load_signature_token(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Sign
                     if args.len() >= args_arity as usize {
                         results.push(tok);
                         if results.len() >= res_arity as usize {
-                            T::Saturated(SignatureToken::Function {
+                            T::Saturated(SignatureToken::Function(
                                 args,
                                 results,
                                 abilities,
-                            })
+                            ))
                         } else {
                             T::Function {
                                 args_arity,

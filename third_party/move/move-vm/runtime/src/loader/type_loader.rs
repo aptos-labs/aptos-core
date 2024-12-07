@@ -31,8 +31,8 @@ pub fn intern_type(
             let inner_type = intern_type(module, inner_tok, struct_name_table)?;
             Type::Vector(TriompheArc::new(inner_type))
         },
-        SignatureToken::Function { .. } => {
-            // TODO: implement closures
+        SignatureToken::Function(..) => {
+            // TODO(LAMBDA): implement closures
             return Err(PartialVMError::new(StatusCode::UNIMPLEMENTED_FEATURE)
                 .with_message("function types in the type loader".to_owned()));
         },

@@ -1263,11 +1263,11 @@ pub enum SignatureToken {
     /// Vector
     Vector(Box<SignatureToken>),
     /// Function, with n argument types and m result types, and an associated ability set.
-    Function {
-        args: Vec<SignatureToken>,
-        results: Vec<SignatureToken>,
-        abilities: AbilitySet,
-    },
+    Function(
+        Vec<SignatureToken>, // args
+        Vec<SignatureToken>, // results
+        AbilitySet, // abilities
+    ),
     /// User defined type
     Struct(StructHandleIndex),
     StructInstantiation(StructHandleIndex, Vec<SignatureToken>),
@@ -1310,7 +1310,7 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIter<'a> {
                         self.stack.extend(inner_toks.iter().rev())
                     },
 
-                    Function { args, results, .. } => {
+                    Function( args, results, .. ) => {
                         self.stack.extend(args.iter().rev());
                         self.stack.extend(results.iter().rev());
                     },
@@ -1348,7 +1348,7 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIterWithDepth<'a> {
                         .stack
                         .extend(inner_toks.iter().map(|tok| (tok, depth + 1)).rev()),
 
-                    Function { args, results, .. } => {
+                    Function( args, results, .. ) => {
                         self.stack
                             .extend(args.iter().map(|tok| (tok, depth + 1)).rev());
                         self.stack
@@ -1415,11 +1415,11 @@ impl std::fmt::Debug for SignatureToken {
             SignatureToken::Address => write!(f, "Address"),
             SignatureToken::Signer => write!(f, "Signer"),
             SignatureToken::Vector(boxed) => write!(f, "Vector({:?})", boxed),
-            SignatureToken::Function {
+            SignatureToken::Function (
                 args,
                 results,
                 abilities,
-            } => {
+            ) => {
                 write!(f, "Function({:?}, {:?}, {})", args, results, abilities)
             },
             SignatureToken::Reference(boxed) => write!(f, "Reference({:?})", boxed),
@@ -1443,7 +1443,7 @@ impl SignatureToken {
             | Address
             | Signer
             | Vector(_)
-            | Function { .. }
+            | Function ( .. )
             | Struct(_)
             | StructInstantiation(_, _)
             | Reference(_)
@@ -1482,7 +1482,7 @@ impl SignatureToken {
             Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
             Vector(inner) => inner.is_valid_for_constant(),
             Signer
-            | Function { .. }
+            | Function ( .. )
             | Struct(_)
             | StructInstantiation(_, _)
             | Reference(_)
@@ -1495,7 +1495,7 @@ impl SignatureToken {
     pub fn is_function(&self) -> bool {
         use SignatureToken::*;
 
-        matches!(self, Function { .. })
+        matches!(self, Function ( .. ))
     }
 
     /// Set the index to this one. Useful for random testing.
@@ -1546,15 +1546,15 @@ impl SignatureToken {
             Address => Address,
             Signer => Signer,
             Vector(ty) => Vector(Box::new(ty.instantiate(subst_mapping))),
-            Function {
+            Function (
                 args,
                 results,
                 abilities,
-            } => Function {
-                args: inst_vec(args),
-                results: inst_vec(results),
-                abilities: *abilities,
-            },
+            ) => Function (
+                inst_vec(args),
+                inst_vec(results),
+                *abilities,
+            ),
             Struct(idx) => Struct(*idx),
             StructInstantiation(idx, struct_type_args) => {
                 StructInstantiation(*idx, inst_vec(struct_type_args))

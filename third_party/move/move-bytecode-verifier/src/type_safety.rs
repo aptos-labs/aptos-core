@@ -307,11 +307,11 @@ fn invoke_function(
     offset: CodeOffset,
     expected_ty: &SignatureToken,
 ) -> PartialVMResult<()> {
-    let SignatureToken::Function {
-        args: param_tys,
-        results: ret_tys,
+    let SignatureToken::Function(
+        param_tys,
+        ret_tys,
         abilities,
-    } = expected_ty
+    ) = expected_ty
     else {
         // The signature checker has ensured this is a function
         safe_assert!(false);
@@ -327,10 +327,10 @@ fn invoke_function(
             .with_message("closure type mismatch".to_owned()));
     }
     // Verify that the abilities match
-    let SignatureToken::Function {
-        abilities: closure_abilities,
-        ..
-    } = closure_ty
+    let SignatureToken::Function(
+        _, _,
+        closure_abilities,
+    ) = closure_ty
     else {
         // Ensured above, but never panic
         safe_assert!(false);
@@ -394,11 +394,11 @@ fn ld_function(
     verifier.push(
         meter,
         instantiate(
-            &SignatureToken::Function {
-                args: parameters.0.to_vec(),
-                results: ret_sign.0.to_vec(),
+            &SignatureToken::Function(
+                parameters.0.to_vec(),
+                ret_sign.0.to_vec(),
                 abilities,
-            },
+            ),
             type_actuals,
         ),
     )
@@ -412,11 +412,11 @@ fn early_bind_function(
     count: u8,
 ) -> PartialVMResult<()> {
     let count = count as usize;
-    let SignatureToken::Function {
-        args: param_tys,
-        results: ret_tys,
+    let SignatureToken::Function(
+        param_tys,
+        ret_tys,
         abilities,
-    } = expected_ty
+    ) = expected_ty
     else {
         // The signature checker has ensured this is a function
         safe_assert!(false);
@@ -432,10 +432,10 @@ fn early_bind_function(
             .with_message("closure type mismatch".to_owned()));
     }
     // Verify that the abilities match
-    let SignatureToken::Function {
-        abilities: closure_abilities,
-        ..
-    } = closure_ty
+    let SignatureToken::Function(
+        _, _,
+        closure_abilities
+    ) = closure_ty
     else {
         // Ensured above, but never panic
         safe_assert!(false);
@@ -461,11 +461,11 @@ fn early_bind_function(
             return Err(verifier.error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset));
         }
     }
-    let result_ty = SignatureToken::Function {
-        args: (*remaining_param_tys).to_vec(),
-        results: ret_tys.to_vec(),
-        abilities: *abilities,
-    };
+    let result_ty = SignatureToken::Function(
+        (*remaining_param_tys).to_vec(),
+        ret_tys.to_vec(),
+        *abilities,
+    );
     verifier.push(meter, result_ty)
 }
 
@@ -1343,15 +1343,15 @@ fn instantiate(token: &SignatureToken, subst: &Signature) -> SignatureToken {
         Address => Address,
         Signer => Signer,
         Vector(ty) => Vector(Box::new(instantiate(ty, subst))),
-        Function {
+        Function (
             args,
             results,
             abilities,
-        } => Function {
-            args: inst_vec(args),
-            results: inst_vec(results),
-            abilities: *abilities,
-        },
+        ) => Function (
+            inst_vec(args),
+            inst_vec(results),
+            *abilities,
+        ),
         Struct(idx) => Struct(*idx),
         StructInstantiation(idx, struct_type_args) => {
             StructInstantiation(*idx, inst_vec(struct_type_args))
