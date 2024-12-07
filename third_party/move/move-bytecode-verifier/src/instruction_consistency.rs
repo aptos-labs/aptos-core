@@ -308,8 +308,8 @@ impl<'a> InstructionConsistency<'a> {
     }
 
     fn function_value_disabled_error(&self, offset: usize) -> PartialVMResult<()> {
-        return Err(PartialVMError::new(StatusCode::FEATURE_NOT_ENABLED)
+        Err(PartialVMError::new(StatusCode::FEATURE_NOT_ENABLED)
             .at_code_offset(self.current_function(), offset as CodeOffset)
-            .with_message("function values feature not enabled".to_string()));
+            .with_message("function values feature not enabled".to_string()))
     }
 }
