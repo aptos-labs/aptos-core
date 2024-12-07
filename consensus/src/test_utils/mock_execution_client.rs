@@ -120,7 +120,7 @@ impl TExecutionClient for MockExecutionClient {
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
         assert!(!blocks.is_empty());
-        println!(
+        info!(
             "MockStateComputer commit put on queue {:?}",
             blocks.iter().map(|v| v.round()).collect::<Vec<_>>()
         );
@@ -149,7 +149,7 @@ impl TExecutionClient for MockExecutionClient {
             .await
             .is_err()
         {
-            println!("Failed to send to buffer manager, maybe epoch ends");
+            debug!("Failed to send to buffer manager, maybe epoch ends");
         }
 
         Ok(())
