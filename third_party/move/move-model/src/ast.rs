@@ -3291,7 +3291,7 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                         body.display_cont(self)
                     )?;
                 }
-                if !abilities.is_subset(AbilitySet::FUNCTIONS) {
+                if !abilities.is_subset(AbilitySet::FUNCTIONS_MIN) {
                     let abilities_as_str = abilities
                         .iter()
                         .map(|a| a.to_string())

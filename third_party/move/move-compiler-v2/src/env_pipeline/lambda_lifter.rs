@@ -371,10 +371,11 @@ impl<'a> LambdaLifter<'a> {
     fn get_move_fn_type(&mut self, expr_id: NodeId, module_id: ModuleId, fun_id: FunId) -> Type {
         let env = self.fun_env.module_env.env;
         let fn_env = env.get_function(module_id.qualified(fun_id));
-        let fun_abilities = if fn_env.visibility().is_public() {
-            AbilitySet::PUBLIC_FUNCTIONS
+        let is_generic = fn_env.get_type_parameter_count() != 0;
+        let fun_abilities = if fn_env.visibility().is_public() && !is_generic {
+            AbilitySet::DEFINED_FUNCTIONS_HAS_STORE
         } else {
-            AbilitySet::PRIVATE_FUNCTIONS
+            AbilitySet::DEFINED_FUNCTIONS_NO_STORE
         };
         let params = fn_env.get_parameters_ref();
         let param_types = params.iter().map(|param| param.get_type()).collect();
@@ -619,10 +620,13 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
 
     fn rewrite_assign(&mut self, _node_id: NodeId, lhs: &Pattern, _rhs: &Exp) -> Option<Exp> {
         for (node_id, name) in lhs.vars() {
-            self.free_locals.insert(name, VarInfo {
-                node_id,
-                modified: true,
-            });
+            self.free_locals.insert(
+                name,
+                VarInfo {
+                    node_id,
+                    modified: true,
+                },
+            );
         }
         None
     }
@@ -631,16 +635,22 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         if matches!(oper, Operation::Borrow(ReferenceKind::Mutable)) {
             match args[0].as_ref() {
                 ExpData::LocalVar(node_id, name) => {
-                    self.free_locals.insert(*name, VarInfo {
-                        node_id: *node_id,
-                        modified: true,
-                    });
+                    self.free_locals.insert(
+                        *name,
+                        VarInfo {
+                            node_id: *node_id,
+                            modified: true,
+                        },
+                    );
                 },
                 ExpData::Temporary(node_id, param) => {
-                    self.free_params.insert(*param, VarInfo {
-                        node_id: *node_id,
-                        modified: true,
-                    });
+                    self.free_params.insert(
+                        *param,
+                        VarInfo {
+                            node_id: *node_id,
+                            modified: true,
+                        },
+                    );
                 },
                 _ => {},
             }
@@ -750,7 +760,7 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
             env.error(
                 &loc,
                 // TODO(LAMBDA)
-                "The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call."
+                "The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call."
             );
             return None;
         };

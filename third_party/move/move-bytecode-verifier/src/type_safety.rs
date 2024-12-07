@@ -373,10 +373,13 @@ fn ld_function(
             break;
         }
     }
+    if !type_actuals.is_empty() {
+        is_storable = false;
+    }
     let abilities = if is_storable {
-        AbilitySet::PUBLIC_FUNCTIONS
+        AbilitySet::DEFINED_FUNCTIONS_HAS_STORE
     } else {
-        AbilitySet::PRIVATE_FUNCTIONS
+        AbilitySet::DEFINED_FUNCTIONS_NO_STORE
     };
 
     // Construct the resulting function type

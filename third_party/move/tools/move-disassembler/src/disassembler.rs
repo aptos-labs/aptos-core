@@ -640,11 +640,11 @@ impl<'a> Disassembler<'a> {
                     .map(|tok| self.disassemble_sig_tok(tok, type_param_context))
                     .collect::<Result<Vec<_>>>()?
                     .join(",");
-                let abilities_str = if abilities.is_subset(AbilitySet::FUNCTIONS) {
+                let abilities_str = if abilities.is_subset(AbilitySet::FUNCTIONS_MIN) {
                     "".to_string()
                 } else {
                     let ability_vec: Vec<_> = abilities
-                        .setminus(AbilitySet::FUNCTIONS)
+                        .setminus(AbilitySet::FUNCTIONS_MIN)
                         .into_iter()
                         .map(Self::format_ability)
                         .collect();

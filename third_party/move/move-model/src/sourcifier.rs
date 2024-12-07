@@ -241,15 +241,18 @@ impl<'a> Sourcifier<'a> {
             Value::Number(int) => {
                 emit!(self.writer, "{}", int);
                 if let Some(Type::Primitive(prim)) = ty {
-                    emit!(self.writer, match prim {
-                        PrimitiveType::U8 => "u8",
-                        PrimitiveType::U16 => "u16",
-                        PrimitiveType::U32 => "u32",
-                        PrimitiveType::U64 => "",
-                        PrimitiveType::U128 => "u128",
-                        PrimitiveType::U256 => "u256",
-                        _ => "",
-                    })
+                    emit!(
+                        self.writer,
+                        match prim {
+                            PrimitiveType::U8 => "u8",
+                            PrimitiveType::U16 => "u16",
+                            PrimitiveType::U32 => "u32",
+                            PrimitiveType::U64 => "",
+                            PrimitiveType::U128 => "u128",
+                            PrimitiveType::U256 => "u256",
+                            _ => "",
+                        }
+                    )
                 }
             },
             Value::Bool(b) => emit!(self.writer, "{}", b),
@@ -567,8 +570,12 @@ impl<'a> ExpSourcifier<'a> {
                     self.print_pat(pat);
                     emit!(self.wr(), "| ");
                     self.print_exp(Prio::General, true, body);
-                    if !abilities.is_subset(AbilitySet::FUNCTIONS) {
-                        let abilities_as_str = abilities.iter().map(|a| a.to_string()).join("+");
+                    if !abilities.is_subset(AbilitySet::FUNCTIONS_MIN) {
+                        let abilities_as_str = abilities
+                            .setminus(AbilitySet::FUNCTIONS_MIN)
+                            .iter()
+                            .map(|a| a.to_string())
+                            .join("+");
                         emit!(self.wr(), " with {}", abilities_as_str);
                     }
                 });

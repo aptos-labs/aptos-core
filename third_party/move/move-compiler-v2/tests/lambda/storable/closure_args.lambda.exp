@@ -5173,13 +5173,13 @@ error: Lambda captures free variables with types that do not have some declared 
     │                                   │
     │                                   Captured free value is missing abilities: store
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:178:17
     │
 178 │                 move |x| base_fun(a, x) with store
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:180:17
     │
 180 │                 move |x| base_fun2(x, a) with store
@@ -5193,31 +5193,31 @@ error: Lambda captures free variables with types that do not have some declared 
     │                                   │
     │                                   Captured free value is missing abilities: store
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:182:17
     │
 182 │                 move |x| copy_fun(a_copy, x) with store
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:184:17
     │
 184 │                 move |x| copy_fun2(x, a_copy) with store
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:188:17
     │
 188 │                 move |x| store_fun2(x, a_store) with store
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:192:17
     │
 192 │                 move |x| both_fun2(x, a_both) with store
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:194:17
     │
 194 │                 move |x| x * 2 with store
@@ -5243,13 +5243,13 @@ error: Lambda captures free variables with types that do not have some declared 
     │                                   │
     │                                   Captured free value is missing abilities: store
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:207:17
     │
 207 │                 move |x| base_fun(a, x) with store
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:209:17
     │
 209 │                 move |x| base_fun2(x, a) with store
@@ -5263,31 +5263,31 @@ error: Lambda captures free variables with types that do not have some declared 
     │                                   │
     │                                   Captured free value is missing abilities: store
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:211:17
     │
 211 │                 move |x| copy_fun(a_copy, x) with store
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:213:17
     │
 213 │                 move |x| copy_fun2(x, a_copy) with store
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:217:17
     │
 217 │                 move |x| store_fun2(x, a_store) with store
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:221:17
     │
 221 │                 move |x| both_fun2(x, a_both) with store
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:223:17
     │
 223 │                 move |x| x * 2 with store
@@ -5307,13 +5307,13 @@ error: Lambda captures free variables with types that do not have some declared 
     │                                   │
     │                                   Captured free value is missing abilities: copy + store
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:238:17
     │
 238 │                 move |x| base_fun(a, x) with store+copy
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:240:17
     │
 240 │                 move |x| base_fun2(x, a) with store+copy
@@ -5327,13 +5327,13 @@ error: Lambda captures free variables with types that do not have some declared 
     │                                   │
     │                                   Captured free value is missing abilities: store
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:242:17
     │
 242 │                 move |x| copy_fun(a_copy, x) with store+copy
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:244:17
     │
 244 │                 move |x| copy_fun2(x, a_copy) with store+copy
@@ -5347,25 +5347,25 @@ error: Lambda captures free variables with types that do not have some declared 
     │                                    │
     │                                    Captured free value is missing abilities: copy
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:246:17
     │
 246 │                 move |x| store_fun(a_store, x) with store+copy
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:248:17
     │
 248 │                 move |x| store_fun2(x, a_store) with store+copy
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:252:17
     │
 252 │                 move |x| both_fun2(x, a_both) with store+copy
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:254:17
     │
 254 │                 move |x| x * 2 with store+copy
@@ -5391,13 +5391,13 @@ error: Lambda captures free variables with types that do not have some declared 
     │                                   │
     │                                   Captured free value is missing abilities: copy + store
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:267:17
     │
 267 │                 move |x| base_fun(a, x) with store+copy
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:269:17
     │
 269 │                 move |x| base_fun2(x, a) with store+copy
@@ -5411,13 +5411,13 @@ error: Lambda captures free variables with types that do not have some declared 
     │                                   │
     │                                   Captured free value is missing abilities: store
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:271:17
     │
 271 │                 move |x| copy_fun(a_copy, x) with store+copy
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:273:17
     │
 273 │                 move |x| copy_fun2(x, a_copy) with store+copy
@@ -5431,25 +5431,25 @@ error: Lambda captures free variables with types that do not have some declared 
     │                                    │
     │                                    Captured free value is missing abilities: copy
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:275:17
     │
 275 │                 move |x| store_fun(a_store, x) with store+copy
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:277:17
     │
 277 │                 move |x| store_fun2(x, a_store) with store+copy
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:281:17
     │
 281 │                 move |x| both_fun2(x, a_both) with store+copy
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call.
+error: The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call.
     ┌─ tests/lambda/storable/closure_args.move:283:17
     │
 283 │                 move |x| x * 2 with store+copy
