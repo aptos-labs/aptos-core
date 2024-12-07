@@ -55,7 +55,7 @@ impl StructNameIndexMap {
         let forward_key = struct_name.clone();
         let backward_value = Arc::new(struct_name.clone());
 
-        let (idx, prev_idx) = {
+        let idx = {
             let mut index_map = self.0.write();
 
             if let Some(idx) = index_map.forward_map.get(struct_name) {
@@ -64,15 +64,26 @@ impl StructNameIndexMap {
 
             let idx = index_map.backward_map.len();
             index_map.backward_map.push(backward_value);
-            (idx, index_map.forward_map.insert(forward_key, idx))
+            index_map.forward_map.insert(forward_key, idx);
+            idx
         };
 
-        if prev_idx.is_some() {
-            return Err(panic_error!(
-                "Indexing map should never evict cached entries"
-            ));
-        }
         Ok(StructNameIndex(idx))
+    }
+
+    fn idx_to_struct_name_helper<'a>(
+        index_map: &'a parking_lot::RwLockReadGuard<IndexMap<StructIdentifier>>,
+        idx: StructNameIndex,
+    ) -> PartialVMResult<&'a Arc<StructIdentifier>> {
+        index_map.backward_map.get(idx.0).ok_or_else(|| {
+            let msg = format!(
+                "Index out of bounds when accessing struct name reference \
+                     at index {}, backward map length: {}",
+                idx.0,
+                index_map.backward_map.len()
+            );
+            panic_error!(msg)
+        })
     }
 
     /// Returns the reference of the struct name corresponding to the index. Here, we wrap the
@@ -82,19 +93,7 @@ impl StructNameIndexMap {
         idx: StructNameIndex,
     ) -> PartialVMResult<Arc<StructIdentifier>> {
         let index_map = self.0.read();
-        Ok(index_map
-            .backward_map
-            .get(idx.0)
-            .ok_or_else(|| {
-                let msg = format!(
-                    "Index out of bounds when accessing struct name reference \
-                     at index {}, backward map length: {}",
-                    idx.0,
-                    index_map.backward_map.len()
-                );
-                panic_error!(msg)
-            })?
-            .clone())
+        Ok(Self::idx_to_struct_name_helper(&index_map, idx)?.clone())
     }
 
     /// Returns the clone of the struct name corresponding to the index. The clone ensures that the
@@ -104,18 +103,7 @@ impl StructNameIndexMap {
         idx: StructNameIndex,
     ) -> PartialVMResult<StructIdentifier> {
         let index_map = self.0.read();
-        Ok(index_map
-            .backward_map
-            .get(idx.0)
-            .ok_or_else(|| {
-                let msg = format!(
-                    "Index out of bounds when accessing struct name at index {}, \
-                     backward map length: {}",
-                    idx.0,
-                    index_map.backward_map.len()
-                );
-                panic_error!(msg)
-            })?
+        Ok(Self::idx_to_struct_name_helper(&index_map, idx)?
             .as_ref()
             .clone())
     }
@@ -127,19 +115,7 @@ impl StructNameIndexMap {
         ty_args: Vec<TypeTag>,
     ) -> PartialVMResult<StructTag> {
         let index_map = self.0.read();
-        let struct_name = index_map
-            .backward_map
-            .get(idx.0)
-            .ok_or_else(|| {
-                let msg = format!(
-                    "Index out of bounds when constructing a struct tag \
-                     for struct name at index {}, backward map length: {}",
-                    idx.0,
-                    index_map.backward_map.len()
-                );
-                panic_error!(msg)
-            })?
-            .as_ref();
+        let struct_name = Self::idx_to_struct_name_helper(&index_map, idx)?.as_ref();
         Ok(StructTag {
             address: *struct_name.module.address(),
             module: struct_name.module.name().to_owned(),
@@ -151,10 +127,10 @@ impl StructNameIndexMap {
     /// Returns the number of cached entries. Asserts that the number of cached indices is equal to
     /// the number of cached struct names.
     pub(crate) fn checked_len(&self) -> PartialVMResult<usize> {
-        let index_map = self.0.read();
-        let forward_map_len = index_map.forward_map.len();
-        let backward_map_len = index_map.backward_map.len();
-        drop(index_map);
+        let (forward_map_len, backward_map_len) = {
+            let index_map = self.0.read();
+            (index_map.forward_map.len(), index_map.backward_map.len())
+        };
 
         if forward_map_len != backward_map_len {
             let msg = format!(
