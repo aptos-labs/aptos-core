@@ -1,0 +1,73 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package aptos.indexer.v1;
+
+import "aptos/indexer/v1/raw_data.proto";
+import "aptos/transaction/v1/transaction.proto";
+import "aptos/util/timestamp/timestamp.proto";
+
+message ActiveStream {
+  optional string id = 1;
+  optional uint64 current_version = 2;
+  optional uint64 end_version = 3;
+}
+
+message StreamInfo {
+  repeated ActiveStream active_streams = 1;
+}
+
+message DataServiceInfo {
+    optional aptos.util.timestamp.Timestamp timestamp = 1;
+    optional uint64 known_latest_version = 2;
+    optional StreamInfo stream_info = 3;
+}
+
+message FullnodeInfo {
+    optional aptos.util.timestamp.Timestamp timestamp = 1;
+    optional uint64 known_latest_version = 2;
+}
+
+message GrpcManagerInfo {
+    optional aptos.util.timestamp.Timestamp timestamp = 1;
+    optional uint64 known_latest_version = 2;
+    optional string master_address = 3;
+}
+
+message ServiceInfo {
+  optional string address = 1;
+  oneof service_type {
+      DataServiceInfo live_data_service_info = 2;
+      DataServiceInfo historical_data_service_info = 3;
+      FullnodeInfo fullnode_info = 4;
+      GrpcManagerInfo grpc_manager_info = 5;
+  }
+}
+
+message HeartbeatRequest {
+  optional ServiceInfo service_info = 1;
+}
+
+message HeartbeatResponse {
+  optional uint64 known_latest_version = 1;
+}
+
+message PingDataServiceRequest {
+  optional uint64 known_latest_version = 1;
+}
+
+message PingDataServiceResponse {
+  optional DataServiceInfo info = 1;
+}
+
+service GrpcManager {
+    rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+    rpc GetTransactions(GetTransactionsRequest) returns (TransactionsResponse);
+}
+
+service DataService {
+  rpc Ping(PingDataServiceRequest) returns (PingDataServiceResponse);
+  rpc GetTransactions(GetTransactionsRequest) returns (stream TransactionsResponse);
+}
