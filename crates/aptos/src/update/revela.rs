@@ -47,6 +47,10 @@ pub struct RevelaUpdateTool {
     /// If set, it will check if there are updates for the tool, but not actually update
     #[clap(long, default_value_t = false)]
     check: bool,
+
+    /// Assume yes for all yes/no prompts
+    #[clap(long)]
+    pub assume_yes: bool,
 }
 
 impl BinaryUpdater for RevelaUpdateTool {
@@ -99,6 +103,7 @@ impl BinaryUpdater for RevelaUpdateTool {
             "unknown-linux-gnu",
             "apple-darwin",
             "pc-windows-gnu",
+            self.assume_yes,
         )
     }
 }

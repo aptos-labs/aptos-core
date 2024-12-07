@@ -36,6 +36,9 @@ pub struct DependencyInstaller {
 
     /// Whether to check availability of a newer version
     pub check: bool,
+
+    /// Assume yes for all yes/no prompts
+    pub assume_yes: bool,
 }
 
 impl DependencyInstaller {
@@ -110,6 +113,7 @@ impl BinaryUpdater for DependencyInstaller {
             "unknown-linux-gnu",
             "apple-darwin",
             "windows",
+            self.assume_yes,
         )
     }
 }

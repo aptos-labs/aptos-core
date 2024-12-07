@@ -47,6 +47,10 @@ pub struct FormatterUpdateTool {
     /// If set, it will check if there are updates for the tool, but not actually update
     #[clap(long, default_value_t = false)]
     check: bool,
+
+    /// Assume yes for all yes/no prompts
+    #[clap(long)]
+    pub assume_yes: bool,
 }
 
 fn extract_movefmt_version(input: &str) -> String {
@@ -106,6 +110,7 @@ impl BinaryUpdater for FormatterUpdateTool {
             "unknown-linux-gnu",
             "apple-darwin",
             "windows",
+            self.assume_yes,
         )
     }
 }

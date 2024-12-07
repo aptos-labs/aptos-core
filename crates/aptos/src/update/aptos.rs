@@ -42,6 +42,10 @@ pub struct AptosUpdateTool {
     /// If set, it will check if there are updates for the tool, but not actually update
     #[clap(long, default_value_t = false)]
     check: bool,
+
+    /// Assume yes for all yes/no prompts
+    #[clap(long)]
+    pub assume_yes: bool,
 }
 
 impl BinaryUpdater for AptosUpdateTool {
@@ -165,6 +169,7 @@ impl BinaryUpdater for AptosUpdateTool {
             .current_version(current_version)
             .target_version_tag(&format!("aptos-cli-v{}", info.target_version))
             .target(target)
+            .no_confirm(self.assume_yes)
             .build()
             .map_err(|e| anyhow!("Failed to build self-update configuration: {:#}", e))
     }
