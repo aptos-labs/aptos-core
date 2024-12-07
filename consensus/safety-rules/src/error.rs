@@ -47,6 +47,8 @@ pub enum Error {
     VoteProposalSignatureNotFound,
     #[error("Does not satisfy 2-chain voting rule. Round {0}, Quorum round {1}, TC round {2},  HQC round in TC {3}")]
     NotSafeToVote(u64, u64, u64, u64),
+    #[error("Does not satisfy opt voting rule. Round {0}, highest timeout round {1}")]
+    NotSafeToOptVote(u64, u64),
     #[error("Does not satisfy 2-chain timeout rule. Round {0}, Quorum round {1}, TC round {2}, one-chain round {3}")]
     NotSafeToTimeout(u64, u64, u64, u64),
     #[error("Invalid TC: {0}")]
@@ -61,6 +63,8 @@ pub enum Error {
     InvalidTimeout(String),
     #[error("Incorrect 1-chain Quorum Certificate provided for signing order votes. Quorum Certificate: {0}, block id: {1}")]
     InvalidOneChainQuorumCertificate(HashValue, HashValue),
+    #[error("Already voted for regular blocks in round {0}")]
+    AlreadyVotedForRegularBlock(u64),
 }
 
 impl From<serde_json::Error> for Error {

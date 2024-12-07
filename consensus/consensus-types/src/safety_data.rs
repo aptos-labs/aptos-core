@@ -16,7 +16,9 @@ pub struct SafetyData {
     // highest 1-chain round, used for 2-chain
     #[serde(default)]
     pub one_chain_round: u64,
-    pub last_vote: Option<Vote>,
+    pub last_vote_block_opt: Option<Vote>,
+    pub last_vote_block_with_qc: Option<Vote>,
+    pub last_vote_block_with_tc: Option<Vote>,
     #[serde(default)]
     pub highest_timeout_round: u64,
 }
@@ -27,7 +29,9 @@ impl SafetyData {
         last_voted_round: u64,
         preferred_round: u64,
         one_chain_round: u64,
-        last_vote: Option<Vote>,
+        last_vote_block_opt: Option<Vote>,
+        last_vote_block_with_qc: Option<Vote>,
+        last_vote_block_with_tc: Option<Vote>,
         highest_timeout_round: u64,
     ) -> Self {
         Self {
@@ -35,7 +39,9 @@ impl SafetyData {
             last_voted_round,
             preferred_round,
             one_chain_round,
-            last_vote,
+            last_vote_block_opt,
+            last_vote_block_with_qc,
+            last_vote_block_with_tc,
             highest_timeout_round,
         }
     }

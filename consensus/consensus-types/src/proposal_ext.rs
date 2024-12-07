@@ -21,6 +21,12 @@ pub enum ProposalExt {
 }
 
 impl ProposalExt {
+    pub fn set_failed_authors(&mut self, failed_authors: Vec<(Round, Author)>) {
+        match self {
+            ProposalExt::V0 { failed_authors: fa, .. } => *fa = failed_authors,
+        }
+    }
+
     pub fn author(&self) -> &Author {
         match self {
             ProposalExt::V0 { author, .. } => author,

@@ -9,8 +9,8 @@ use crate::{
     vote_data::VoteData,
 };
 use aptos_bitvec::BitVec;
-use aptos_crypto::hash::HashValue;
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_crypto::{hash::{CryptoHash, CryptoHasher}, HashValue};
+use aptos_crypto_derive::CryptoHasher;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
@@ -63,7 +63,7 @@ pub enum BlockType {
     },
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, CryptoHasher)]
 /// Block has the core data of a consensus block that should be persistent when necessary.
 /// Each block must know the id of its parent and keep the QuorurmCertificate to that parent.
 pub struct BlockData {
@@ -96,7 +96,36 @@ pub struct BlockData {
     block_type: BlockType,
 }
 
+impl CryptoHash for BlockData {
+    type Hasher = BlockDataHasher;
+
+    fn hash(&self) -> HashValue {
+        let mut state = Self::Hasher::default();
+        state.update(&self.epoch.to_be_bytes());
+        state.update(&self.round.to_be_bytes());
+        state.update(&self.timestamp_usecs.to_be_bytes());
+        // skip qc multisig because different nodes may have different multisig
+        state.update(&bcs::to_bytes(self.quorum_cert().vote_data()).expect("Unable to serialize vote data"));
+        state.update(&bcs::to_bytes(self.block_type()).expect("Unable to serialize block type"));
+        state.finish()
+    }
+}
+
 impl BlockData {
+    pub fn set_quorum_cert(&mut self, qc: QuorumCert) {
+        self.quorum_cert = qc;
+    }
+
+    pub fn set_failed_authors(&mut self, fa: Vec<(Round, Author)>) {
+        match &mut self.block_type {
+            BlockType::Proposal { failed_authors, .. }
+            | BlockType::NilBlock { failed_authors, .. }
+            | BlockType::DAGBlock { failed_authors, .. } => *failed_authors = fa,
+            BlockType::ProposalExt(p) => p.set_failed_authors(fa),
+            BlockType::Genesis => (),
+        }
+    }
+
     pub fn author(&self) -> Option<Author> {
         match &self.block_type {
             BlockType::Proposal { author, .. } | BlockType::DAGBlock { author, .. } => {
@@ -313,12 +342,13 @@ impl BlockData {
         payload: Payload,
         author: Author,
         failed_authors: Vec<(Round, Author)>,
+        epoch: u64,
         round: Round,
         timestamp_usecs: u64,
         quorum_cert: QuorumCert,
     ) -> Self {
         Self {
-            epoch: quorum_cert.certified_block().epoch(),
+            epoch,
             round,
             timestamp_usecs,
             quorum_cert,
@@ -335,12 +365,13 @@ impl BlockData {
         payload: Payload,
         author: Author,
         failed_authors: Vec<(Round, Author)>,
+        epoch: u64,
         round: Round,
         timestamp_usecs: u64,
         quorum_cert: QuorumCert,
     ) -> Self {
         Self {
-            epoch: quorum_cert.certified_block().epoch(),
+            epoch,
             round,
             timestamp_usecs,
             quorum_cert,
