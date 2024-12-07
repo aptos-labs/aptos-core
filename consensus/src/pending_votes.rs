@@ -167,11 +167,11 @@ pub struct PendingVotes {
     /// Maps LedgerInfo digest to associated signatures.
     /// This might keep multiple LedgerInfos for the current round: either due to different proposals (byzantine behavior)
     /// or due to different NIL proposals (clients can have a different view of what block to extend).
-    li_digest_to_votes: HashMap<HashValue /* LedgerInfo digest */, (usize, VoteStatus)>,
+    li_digest_to_votes: HashMap<(HashValue, HashValue) /* LedgerInfo digest, block id */, (usize, VoteStatus)>,
     /// Tracks all the signatures of the 2-chain timeout for the given round.
     maybe_2chain_timeout_votes: Option<TwoChainTimeoutVotes>,
     /// Map of Author to (vote, li_digest). This is useful to discard multiple votes.
-    author_to_vote: HashMap<Author, (Vote, HashValue)>,
+    author_to_vote: HashMap<Author, (Vote, HashValue, HashValue)>,
     /// Whether we have echoed timeout for this round.
     echo_timeout: bool,
 }
@@ -285,36 +285,40 @@ impl PendingVotes {
         // 1. Has the author already voted for this round?
         //
 
-        if let Some((previously_seen_vote, previous_li_digest)) =
-            self.author_to_vote.get(&vote.author())
-        {
-            // is it the same vote?
-            if &li_digest == previous_li_digest {
-                // we've already seen an equivalent vote before
-                let new_timeout_vote = vote.is_timeout() && !previously_seen_vote.is_timeout();
-                if !new_timeout_vote {
-                    // it's not a new timeout vote
-                    return VoteReceptionResult::DuplicateVote;
-                }
-            } else {
-                // we have seen a different vote for the same round
-                error!(
-                    SecurityEvent::ConsensusEquivocatingVote,
-                    remote_peer = vote.author(),
-                    vote = vote,
-                    previous_vote = previously_seen_vote
-                );
+        // optimistic proposal hack
+        // double voting can happen, for instance,
+        // one vote for optimistic proposal that is inserted with aggregated qc,
+        // another vote for the regular proposal with high qc and tc.
+        // if let Some((previously_seen_vote, previous_li_digest)) =
+        //     self.author_to_vote.get(&vote.author())
+        // {
+        //     // is it the same vote?
+        //     if &li_digest == previous_li_digest {
+        //         // we've already seen an equivalent vote before
+        //         let new_timeout_vote = vote.is_timeout() && !previously_seen_vote.is_timeout();
+        //         if !new_timeout_vote {
+        //             // it's not a new timeout vote
+        //             return VoteReceptionResult::DuplicateVote;
+        //         }
+        //     } else {
+        //         // we have seen a different vote for the same round
+        //         error!(
+        //             SecurityEvent::ConsensusEquivocatingVote,
+        //             remote_peer = vote.author(),
+        //             vote = vote,
+        //             previous_vote = previously_seen_vote
+        //         );
 
-                return VoteReceptionResult::EquivocateVote;
-            }
-        }
+        //         return VoteReceptionResult::EquivocateVote;
+        //     }
+        // }
 
         //
         // 2. Store new vote (or update, in case it's a new timeout vote)
         //
 
         self.author_to_vote
-            .insert(vote.author(), (vote.clone(), li_digest));
+            .insert(vote.author(), (vote.clone(), li_digest, vote.vote_data().proposed().id()));
 
         //
         // 3. Let's check if we can create a QC
@@ -322,7 +326,7 @@ impl PendingVotes {
 
         let len = self.li_digest_to_votes.len() + 1;
         // obtain the ledger info with signatures associated to the vote's ledger info
-        let (hash_index, status) = self.li_digest_to_votes.entry(li_digest).or_insert_with(|| {
+        let (hash_index, status) = self.li_digest_to_votes.entry((li_digest, vote.vote_data().proposed().id())).or_insert_with(|| {
             (
                 len,
                 VoteStatus::NotEnoughVotes(SignatureAggregator::new(vote.ledger_info().clone())),
@@ -501,7 +505,7 @@ impl PendingVotes {
         (
             self.li_digest_to_votes
                 .drain()
-                .map(|(key, (_, vote_status))| (key, vote_status))
+                .map(|((key, _), (_, vote_status))| (key, vote_status))
                 .collect(),
             self.maybe_2chain_timeout_votes.take(),
         )
@@ -524,7 +528,7 @@ impl fmt::Display for PendingVotes {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "PendingVotes: [")?;
 
-        for (li_digest, (_, status)) in self.li_digest_to_votes.iter() {
+        for ((li_digest, _), (_, status)) in self.li_digest_to_votes.iter() {
             match status {
                 VoteStatus::EnoughVotes(_li) => {
                     write!(f, "LI {} has aggregated QC", li_digest)?;

@@ -379,13 +379,13 @@ impl BatchProofQueue {
         }
 
         let pulled_txns = pulled_proofs.iter().map(|p| p.num_txns()).sum::<u64>();
-        info!(
-            "pulled_proofs: {}, pulled_txns: {}, remaining_proofs: {:?}, remaining_txns: {:?}",
-            pulled_proofs.len(),
-            pulled_txns,
-            num_proofs_remaining_after_pull,
-            num_txns_remaining_after_pull,
-        );
+        // info!(
+        //     "pulled_proofs: {}, pulled_txns: {}, remaining_proofs: {:?}, remaining_txns: {:?}",
+        //     pulled_proofs.len(),
+        //     pulled_txns,
+        //     num_proofs_remaining_after_pull,
+        //     num_txns_remaining_after_pull,
+        // );
         counters::NUM_PROOFS_IN_PROOF_QUEUE_AFTER_PULL
             .observe(num_proofs_remaining_after_pull as f64);
         counters::NUM_TXNS_IN_PROOF_QUEUE_AFTER_PULL.observe(num_txns_remaining_after_pull as f64);
@@ -688,20 +688,20 @@ impl BatchProofQueue {
                 }
             })
         }
-        info!(
-            // before non full check
-            block_total_txns = cur_all_txns,
-            block_unique_txns = cur_unique_txns,
-            max_txns = max_txns,
-            max_txns_after_filtering = max_txns_after_filtering,
-            soft_max_txns_after_filtering = soft_max_txns_after_filtering,
-            max_bytes = max_txns.size_in_bytes(),
-            result_is_proof = !batches_without_proofs,
-            result_count = result.len(),
-            full = full,
-            return_non_full = return_non_full,
-            "Pull payloads from QuorumStore: internal"
-        );
+        // info!(
+        //     // before non full check
+        //     block_total_txns = cur_all_txns,
+        //     block_unique_txns = cur_unique_txns,
+        //     max_txns = max_txns,
+        //     max_txns_after_filtering = max_txns_after_filtering,
+        //     soft_max_txns_after_filtering = soft_max_txns_after_filtering,
+        //     max_bytes = max_txns.size_in_bytes(),
+        //     result_is_proof = !batches_without_proofs,
+        //     result_count = result.len(),
+        //     full = full,
+        //     return_non_full = return_non_full,
+        //     "Pull payloads from QuorumStore: internal"
+        // );
 
         counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns as f64);
 

@@ -8,17 +8,14 @@ use crate::{
         BlockReader, BlockRetriever, BlockStore, NeedFetchResult,
     },
     counters::{
-        self, ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE, ORDER_VOTE_ADDED,
-        ORDER_VOTE_BROADCASTED, ORDER_VOTE_NOT_IN_RANGE, ORDER_VOTE_OTHER_ERRORS,
-        PROPOSAL_VOTE_ADDED, PROPOSAL_VOTE_BROADCASTED, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT,
-        QC_AGGREGATED_FROM_VOTES, SYNC_INFO_RECEIVED_WITH_NEWER_CERT,
+        self, ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE, ORDER_VOTE_ADDED, ORDER_VOTE_BROADCASTED, ORDER_VOTE_NOT_IN_RANGE, ORDER_VOTE_OTHER_ERRORS, PROPOSAL_OPT_VOTE_BROADCASTED, PROPOSAL_VOTE_ADDED, PROPOSAL_VOTE_BROADCASTED, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT, QC_AGGREGATED_FROM_VOTES, SYNC_INFO_RECEIVED_WITH_NEWER_CERT
     },
     error::{error_kind, VerifyError},
     liveness::{
         proposal_generator::ProposalGenerator,
         proposal_status_tracker::TPastProposalStatusTracker,
         proposer_election::ProposerElection,
-        round_state::{NewRoundEvent, NewRoundReason, RoundState, RoundStateLogSchema},
+        round_state::{self, NewRoundEvent, NewRoundReason, RoundState, RoundStateLogSchema},
         unequivocal_proposer_election::UnequivocalProposerElection,
     },
     logging::{LogEvent, LogSchema},
@@ -38,7 +35,7 @@ use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
     block::Block,
-    block_data::BlockType,
+    block_data::{BlockData, BlockType},
     common::{Author, Round},
     order_vote::OrderVote,
     order_vote_msg::OrderVoteMsg,
@@ -72,11 +69,13 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
     PeerId,
 };
+use dashmap::DashMap;
 use fail::fail_point;
 use futures::{channel::oneshot, stream::FuturesUnordered, Future, FutureExt, StreamExt};
 use lru::LruCache;
 use serde::Serialize;
-use std::{mem::Discriminant, pin::Pin, sync::Arc, time::Duration};
+use core::panic;
+use std::{collections::HashMap, mem::Discriminant, pin::Pin, sync::Arc, time::Duration};
 use tokio::{
     sync::oneshot as TokioOneshot,
     time::{sleep, Instant},
@@ -270,6 +269,7 @@ pub struct RoundManager {
         Pin<Box<dyn Future<Output = (anyhow::Result<()>, Block, Instant)> + Send>>,
     >,
     proposal_status_tracker: Arc<dyn TPastProposalStatusTracker>,
+    buffered_opt_proposals: HashMap<Round, Block>,
 }
 
 impl RoundManager {
@@ -321,6 +321,7 @@ impl RoundManager {
             blocks_with_broadcasted_fast_shares: LruCache::new(5),
             futures: FuturesUnordered::new(),
             proposal_status_tracker,
+            buffered_opt_proposals: HashMap::new(),
         }
     }
 
@@ -403,6 +404,14 @@ impl RoundManager {
         self.proposal_status_tracker
             .push(new_round_event.reason.clone());
 
+        // handle buffered opt proposals
+        if new_round_event.reason == NewRoundReason::QCReady && self.buffered_opt_proposals.contains_key(&new_round_event.round) {
+            let opt_proposal = self.buffered_opt_proposals.remove(&new_round_event.round).unwrap();
+            self.process_opt_proposal(opt_proposal).await?;
+            return Ok(());
+        }
+        self.buffered_opt_proposals.retain(|round, _| *round >= new_round_event.round);
+
         if is_current_proposer {
             let epoch_state = self.epoch_state.clone();
             let network = self.network.clone();
@@ -415,12 +424,13 @@ impl RoundManager {
                     "generate_and_send_proposal",
                     Self::generate_and_send_proposal(
                         epoch_state,
-                        new_round_event,
+                        new_round_event.round,
                         network,
                         sync_info,
                         proposal_generator,
                         safety_rules,
                         proposer_election,
+                        None,
                     )
                     .await
                 ) {
@@ -428,29 +438,38 @@ impl RoundManager {
                 }
             });
         }
+
         Ok(())
     }
 
     async fn generate_and_send_proposal(
         epoch_state: Arc<EpochState>,
-        new_round_event: NewRoundEvent,
+        round: Round,
         network: Arc<NetworkSender>,
         sync_info: SyncInfo,
         proposal_generator: Arc<ProposalGenerator>,
         safety_rules: Arc<Mutex<MetricsSafetyRules>>,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
+        parent_id: Option<HashValue>,
     ) -> anyhow::Result<()> {
-        Self::log_collected_vote_stats(epoch_state.clone(), &new_round_event);
+        // Self::log_collected_vote_stats(epoch_state.clone(), &new_round_event);
         let proposal_msg = Self::generate_proposal(
             epoch_state.clone(),
-            new_round_event,
+            round,
             sync_info,
             network.clone(),
             proposal_generator,
             safety_rules,
             proposer_election,
+            parent_id,
         )
         .await?;
+        if proposal_msg.is_none() {
+            return Ok(());
+        }
+        let proposal_msg = proposal_msg.unwrap();
+        info!("[OptProposal] Proposed epoch {} round {} proposal {} is_opt {}: {:?}", epoch_state.epoch, round, proposal_msg.proposal().id(), parent_id.is_some(), proposal_msg.proposal());
+
         #[cfg(feature = "failpoints")]
         {
             if Self::check_whether_to_inject_reconfiguration_error() {
@@ -467,6 +486,7 @@ impl RoundManager {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn log_collected_vote_stats(epoch_state: Arc<EpochState>, new_round_event: &NewRoundEvent) {
         let prev_round_votes_for_li = new_round_event
             .prev_round_votes
@@ -550,25 +570,27 @@ impl RoundManager {
     ) -> anyhow::Result<ProposalMsg> {
         Self::generate_proposal(
             self.epoch_state.clone(),
-            new_round_event,
+            new_round_event.round,
             self.block_store.sync_info(),
             self.network.clone(),
             self.proposal_generator.clone(),
             self.safety_rules.clone(),
             self.proposer_election.clone(),
+            false,
         )
         .await
     }
 
     async fn generate_proposal(
         epoch_state: Arc<EpochState>,
-        new_round_event: NewRoundEvent,
+        round: Round,
         sync_info: SyncInfo,
         network: Arc<NetworkSender>,
         proposal_generator: Arc<ProposalGenerator>,
         safety_rules: Arc<Mutex<MetricsSafetyRules>>,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
-    ) -> anyhow::Result<ProposalMsg> {
+        parent_id: Option<HashValue>,
+    ) -> anyhow::Result<Option<ProposalMsg>> {
         // Proposal generator will ensure that at most one proposal is generated per round
         let callback_sync_info = sync_info.clone();
         let callback = async move {
@@ -577,21 +599,25 @@ impl RoundManager {
         .boxed();
 
         let proposal = proposal_generator
-            .generate_proposal(new_round_event.round, proposer_election, callback)
+            .generate_proposal(epoch_state.epoch, round, proposer_election, callback, parent_id)
             .await?;
+        if proposal.is_none() {
+            return Ok(None);
+        }
+        let proposal = proposal.unwrap();
         let signature = safety_rules.lock().sign_proposal(&proposal)?;
         let signed_proposal =
-            Block::new_proposal_from_block_data_and_signature(proposal, signature);
+            Block::new_proposal_from_block_data_and_signature(proposal, signature, parent_id.is_some());
         observe_block(signed_proposal.timestamp_usecs(), BlockStage::SIGNED);
         info!(
             Self::new_log_with_round_epoch(
                 LogEvent::Propose,
-                new_round_event.round,
+                round,
                 epoch_state.epoch
             ),
             "{}", signed_proposal
         );
-        Ok(ProposalMsg::new(signed_proposal, sync_info))
+        Ok(Some(ProposalMsg::new(signed_proposal, sync_info)))
     }
 
     /// Process the proposal message:
@@ -613,6 +639,16 @@ impl RoundManager {
             block_hash = proposal_msg.proposal().id(),
             block_parent_hash = proposal_msg.proposal().quorum_cert().certified_block().id(),
         );
+
+        // handle opt proposals
+        if proposal_msg.proposal().is_opt() {
+            if self.round_state.current_round() == proposal_msg.proposal().round() && self.block_store.highest_quorum_cert().certified_block().round() + 1 == proposal_msg.proposal().round() {
+                return self.process_opt_proposal(proposal_msg.take_proposal()).await;
+            } else {
+                self.buffered_opt_proposals.insert(proposal_msg.proposal().round(), proposal_msg.take_proposal());
+                return Ok(());
+            }
+        }
 
         let in_correct_round = self
             .ensure_round_and_sync_up(
@@ -878,6 +914,27 @@ impl RoundManager {
         Ok(())
     }
 
+    async fn process_opt_proposal(&mut self, mut opt_proposal: Block) -> anyhow::Result<()> {
+        if self.round_state().vote_sent().is_some() {
+            // ignore the opt proposal if we have already voted
+            return Ok(());
+        }
+        // add qc to the opt block
+        let hqc = self.block_store.highest_quorum_cert().as_ref().clone();
+        ensure!(hqc.certified_block().round() + 1 == opt_proposal.round(), "Opt proposal round {} is not the next round after the highest qc round {}", opt_proposal.round(), hqc.certified_block().round());
+        let failed_authors = self.proposal_generator.compute_failed_authors(
+            opt_proposal.round(),
+            hqc.certified_block().round(),
+            false,
+            self.proposer_election.clone(),
+        );
+        opt_proposal.set_quorum_cert(hqc);
+        opt_proposal.set_failed_authors(failed_authors);
+        opt_proposal.reset_id();
+
+        self.process_proposal(opt_proposal).await
+    }
+
     /// This function processes a proposal for the current round:
     /// 1. Filter if it's proposed by valid proposer.
     /// 2. Execute and add it to a block store.
@@ -1135,16 +1192,50 @@ impl RoundManager {
 
     pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
         let proposal_round = proposal.round();
-        let vote = self.create_vote(proposal).await?;
+        let vote = self.create_vote(proposal.clone()).await?;
         self.round_state.record_vote(vote.clone());
         let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());
+
+        assert!(self.block_store.get_block(proposal.id()).is_some());
+        let proposal_id = proposal.id();
+
+        // fast proposal hack
+        if self
+            .proposer_election
+            .is_valid_proposer(self.proposal_generator.author(), proposal_round + 1)
+        {
+            let epoch_state = self.epoch_state.clone();
+            let network = self.network.clone();
+            let sync_info = self.block_store.sync_info();
+            let proposal_generator = self.proposal_generator.clone();
+            let safety_rules = self.safety_rules.clone();
+            let proposer_election = self.proposer_election.clone();
+            tokio::spawn(async move {
+                if let Err(e) = monitor!(
+                    "generate_and_send_proposal",
+                    Self::generate_and_send_proposal(
+                        epoch_state,
+                        proposal_round + 1,
+                        network,
+                        sync_info,
+                        proposal_generator,
+                        safety_rules,
+                        proposer_election,
+                        Some(proposal_id),
+                    )
+                    .await
+                ) {
+                    warn!("Error generating and sending proposal: {}", e);
+                }
+            });
+        }
 
         self.broadcast_fast_shares(vote.ledger_info().commit_info())
             .await;
 
         if self.local_config.broadcast_vote {
             info!(self.new_log(LogEvent::Vote), "{}", vote);
-            PROPOSAL_VOTE_BROADCASTED.inc();
+            info!("[OptProposal] Voted epoch {} round {} proposal {} is_opt {}: {:?}", proposal.epoch(), proposal.round(), proposal.id(), proposal.is_opt(), proposal);
             self.network.broadcast_vote(vote_msg).await;
         } else {
             let recipient = self
@@ -1172,17 +1263,16 @@ impl RoundManager {
             .context("[RoundManager] Failed to execute_and_insert the block")?;
 
         // Short circuit if already voted.
-        ensure!(
-            self.round_state.vote_sent().is_none(),
-            "[RoundManager] Already vote on this round {}",
-            self.round_state.current_round()
-        );
+        // ensure!(
+        //     self.round_state.vote_sent().is_none(),
+        //     "[RoundManager] Already vote on this round {}",
+        //     self.round_state.current_round()
+        // );
 
         ensure!(
             !self.sync_only(),
             "[RoundManager] sync_only flag is set, stop voting"
         );
-
         let vote_proposal = block_arc.vote_proposal();
         let vote_result = self.safety_rules.lock().construct_and_sign_vote_two_chain(
             &vote_proposal,
@@ -1386,6 +1476,8 @@ impl RoundManager {
                 epoch = vote.vote_data().proposed().epoch(),
                 round = vote.vote_data().proposed().round(),
                 id = vote.vote_data().proposed().id(),
+                ledger_info = vote.ledger_info(),
+                self_id = self.proposal_generator.author(),
             );
         }
 
@@ -1423,6 +1515,7 @@ impl RoundManager {
         result: VoteReceptionResult,
     ) -> anyhow::Result<()> {
         let round = vote.vote_data().proposed().round();
+        info!("Processing vote reception result: {:?}", result);
         match result {
             VoteReceptionResult::NewQuorumCertificate(qc) => {
                 if !vote.is_timeout() {
