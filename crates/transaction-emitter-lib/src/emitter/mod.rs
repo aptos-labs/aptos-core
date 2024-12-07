@@ -227,7 +227,7 @@ impl Default for EmitJobRequest {
             expected_gas_per_account_create: EXPECTED_GAS_PER_ACCOUNT_CREATE,
             prompt_before_spending: false,
             coordination_delay_between_instances: Duration::from_secs(0),
-            latency_polling_interval: Duration::from_millis(300),
+            latency_polling_interval: Duration::from_millis(30),
             tps_wait_after_expiration_secs: None,
             account_minter_seed: None,
             coins_per_account_override: None,
