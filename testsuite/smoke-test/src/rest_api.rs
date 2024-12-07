@@ -9,7 +9,7 @@ use crate::{
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::GasEstimationConfig;
 use aptos_crypto::ed25519::Ed25519Signature;
-use aptos_forge::{LocalSwarm, NodeExt, Swarm, TransactionType};
+use aptos_forge::{LocalSwarm, NodeExt, ReplayProtectionType, Swarm, TransactionType};
 use aptos_global_constants::{DEFAULT_BUCKETS, GAS_UNIT_PRICE};
 use aptos_rest_client::{
     aptos_api_types::{MoveModuleId, TransactionData, ViewFunction, ViewRequest},
@@ -125,6 +125,7 @@ async fn test_gas_estimation_inner(swarm: &mut LocalSwarm) {
                 sender_use_account_pool: false,
                 non_conflicting: false,
                 use_fa_transfer: false,
+                replay_protection: ReplayProtectionType::SequenceNumber,
             },
             100,
         )]],

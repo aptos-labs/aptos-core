@@ -65,7 +65,7 @@ impl PersistedValue {
                 .map(|txn| {
                     TxnSummaryWithExpiration::new(
                         txn.sender(),
-                        txn.sequence_number(),
+                        txn.replay_protector(),
                         txn.expiration_timestamp_secs(),
                         txn.committed_hash(),
                     )

@@ -26,8 +26,9 @@ use aptos_types::{
     transaction::{
         AccountTransactionsWithProof, Transaction, TransactionAuxiliaryData, TransactionInfo,
         TransactionListWithProof, TransactionOutputListWithProof, TransactionToCommit,
-        TransactionWithProof, Version,
+        TransactionWithProof, Version, ReplayProtector,
     },
+    indexer::indexer_db_reader::IndexedTransactionSummary,
     write_set::WriteSet,
 };
 use serde::{Deserialize, Serialize};
@@ -294,21 +295,22 @@ pub trait DbReader: Send + Sync {
             next_version: Version,
         ) -> Result<Option<(Version, HashValue)>>;
 
-        /// Returns a transaction that is the `seq_num`-th one associated with the given account. If
-        /// the transaction with given `seq_num` doesn't exist, returns `None`.
+        /// Returns a transaction that is the `replay_protector`-th one associated with the given account. If
+        /// the transaction with given `replay_protector` doesn't exist, returns `None`.
         fn get_account_transaction(
             &self,
             address: AccountAddress,
-            seq_num: u64,
+            replay_protector: ReplayProtector,
             include_events: bool,
             ledger_version: Version,
         ) -> Result<Option<TransactionWithProof>>;
 
-        /// Returns the list of transactions sent by an account with `address` starting
+        /// Returns the list of ordered transactions (transactions that include a sequence number)
+        /// sent by an account with `address` starting
         /// at sequence number `seq_num`. Will return no more than `limit` transactions.
         /// Will ignore transactions with `txn.version > ledger_version`. Optionally
         /// fetch events for each transaction when `fetch_events` is `true`.
-        fn get_account_transactions(
+        fn get_ordered_account_transactions(
             &self,
             address: AccountAddress,
             seq_num: u64,
@@ -316,6 +318,16 @@ pub trait DbReader: Send + Sync {
             include_events: bool,
             ledger_version: Version,
         ) -> Result<AccountTransactionsWithProof>;
+
+
+        fn get_account_all_transaction_summaries(
+            &self,
+            address: AccountAddress,
+            start_seq_num: Option<u64>,
+            end_seq_num: Option<u64>,
+            limit: u64,
+            ledger_version: Version,
+        ) -> Result<Vec<IndexedTransactionSummary>>;
 
         /// Returns proof of new state for a given ledger info with signatures relative to version known
         /// to client

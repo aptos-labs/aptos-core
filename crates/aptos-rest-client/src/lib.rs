@@ -22,11 +22,7 @@ pub use aptos_api_types::{
     self, IndexResponseBcs, MoveModuleBytecode, PendingTransaction, Transaction,
 };
 use aptos_api_types::{
-    deserialize_from_string,
-    mime_types::{BCS, BCS_SIGNED_TRANSACTION, BCS_VIEW_FUNCTION, JSON},
-    AptosError, AptosErrorCode, BcsBlock, Block, GasEstimation, HexEncodedBytes, IndexResponse,
-    MoveModuleId, TransactionData, TransactionOnChainData, TransactionsBatchSubmissionResult,
-    UserTransaction, VersionedEvent, ViewFunction, ViewRequest,
+    deserialize_from_string, mime_types::{BCS, BCS_SIGNED_TRANSACTION, BCS_VIEW_FUNCTION, JSON}, AptosError, AptosErrorCode, BcsBlock, Block, GasEstimation, HexEncodedBytes, IndexResponse, MoveModuleId, TransactionData, TransactionOnChainData, TransactionSummary, TransactionsBatchSubmissionResult, UserTransaction, VersionedEvent, ViewFunction, ViewRequest
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{debug, info, sample, sample::SampleRate};
@@ -1044,7 +1040,7 @@ impl Client {
         Ok(self.inner.get(url).send().await?)
     }
 
-    pub async fn get_account_transactions(
+    pub async fn get_account_ordered_transactions(
         &self,
         address: AccountAddress,
         start: Option<u64>,
@@ -1066,7 +1062,7 @@ impl Client {
         self.json(response).await
     }
 
-    pub async fn get_account_transactions_bcs(
+    pub async fn get_account_ordered_transactions_bcs(
         &self,
         address: AccountAddress,
         start: Option<u64>,
@@ -1563,6 +1559,43 @@ impl Client {
     ) -> AptosResult<Response<AccountResource>> {
         let url = self.build_path(&format!("accounts/{}", address.to_hex()))?;
         let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
+    pub async fn get_account_transaction_summaries(
+        &self,
+        address: AccountAddress,
+        start_version: Option<u64>,
+        end_version: Option<u64>,
+        start_time: Option<u64>,
+        end_time: Option<u64>,
+        limit: Option<u16>,
+    ) -> AptosResult<Response<Vec<TransactionSummary>>> {
+        let url = self.build_path(&format!("accounts/{}/transaction_summaries", address.to_hex()))?;
+
+        let mut request = self.inner.get(url).header(ACCEPT, BCS);
+        if let Some(start_version) = start_version {
+            request = request.query(&[("start_version", start_version)])
+        }
+
+        if let Some(end_version) = end_version {
+            request = request.query(&[("end_version", end_version)])
+        }
+
+        if let Some(start_time) = start_time {
+            request = request.query(&[("start_time", start_time)])
+        }
+
+        if let Some(end_time) = end_time {
+            request = request.query(&[("end_time", end_time)])
+        }
+
+        if let Some(limit) = limit {
+            request = request.query(&[("limit", limit)])
+        }
+
+        let response = request.send().await?;
+        let response = self.check_and_parse_bcs_response(response).await?;
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
