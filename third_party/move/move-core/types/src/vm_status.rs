@@ -734,12 +734,14 @@ pub enum StatusCode {
     ZERO_VARIANTS_ERROR = 1130,
     // A feature is not enabled.
     FEATURE_NOT_ENABLED = 1131,
+    // InvokeFunction or EarlyBindFunction parameter type is not a function
+    REQUIRES_FUNCTION = 1132,
 
     // Reserved error code for future use
-    RESERVED_VERIFICATION_ERROR_2 = 1132,
-    RESERVED_VERIFICATION_ERROR_3 = 1133,
-    RESERVED_VERIFICATION_ERROR_4 = 1134,
-    RESERVED_VERIFICATION_ERROR_5 = 1135,
+    RESERVED_VERIFICATION_ERROR_2 = 1133,
+    RESERVED_VERIFICATION_ERROR_3 = 1134,
+    RESERVED_VERIFICATION_ERROR_4 = 1135,
+    RESERVED_VERIFICATION_ERROR_5 = 1136,
 
     // These are errors that the VM might raise if a violation of internal
     // invariants takes place.
@@ -780,13 +782,14 @@ pub enum StatusCode {
     // Should never be committed on chain
     SPECULATIVE_EXECUTION_ABORT_ERROR = 2024,
     ACCESS_CONTROL_INVARIANT_VIOLATION = 2025,
+    LD_FUNCTION_NONEMPTY_ACQUIRES = 2026,
 
     // Reserved error code for future use
-    RESERVED_INVARIANT_VIOLATION_ERROR_1 = 2026,
-    RESERVED_INVARIANT_VIOLATION_ERROR_2 = 2027,
-    RESERVED_INVARIANT_VIOLATION_ERROR_3 = 2028,
-    RESERVED_INVARIANT_VIOLATION_ERROR_4 = 2039,
-    RESERVED_INVARIANT_VIOLATION_ERROR_5 = 2040,
+    RESERVED_INVARIANT_VIOLATION_ERROR_1 = 2027,
+    RESERVED_INVARIANT_VIOLATION_ERROR_2 = 2028,
+    RESERVED_INVARIANT_VIOLATION_ERROR_3 = 2039,
+    RESERVED_INVARIANT_VIOLATION_ERROR_4 = 2040,
+    RESERVED_INVARIANT_VIOLATION_ERROR_5 = 2041,
 
     // Errors that can arise from binary decoding (deserialization)
     // Deserialization Errors: 3000-3999
@@ -858,11 +861,14 @@ pub enum StatusCode {
     // Struct variant not matching. This error appears on an attempt to unpack or borrow a
     // field from a value which is not of the expected variant.
     STRUCT_VARIANT_MISMATCH = 4038,
+    // An unimplemented feature in the VM.
+    UNIMPLEMENTED_FEATURE = 4039,
+
     // Reserved error code for future use. Always keep this buffer of well-defined new codes.
-    RESERVED_RUNTIME_ERROR_1 = 4039,
-    RESERVED_RUNTIME_ERROR_2 = 4040,
-    RESERVED_RUNTIME_ERROR_3 = 4041,
-    RESERVED_RUNTIME_ERROR_4 = 4042,
+    RESERVED_RUNTIME_ERROR_1 = 4040,
+    RESERVED_RUNTIME_ERROR_2 = 4041,
+    RESERVED_RUNTIME_ERROR_3 = 4042,
+    RESERVED_RUNTIME_ERROR_4 = 4043,
 
     // A reserved status to represent an unknown vm status.
     // this is std::u64::MAX, but we can't pattern match on that, so put the hardcoded value in

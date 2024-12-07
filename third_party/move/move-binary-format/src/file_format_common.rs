@@ -140,6 +140,7 @@ pub enum SerializedType {
     U16                     = 0xD,
     U32                     = 0xE,
     U256                    = 0xF,
+    FUNCTION                = 0x10,
 }
 
 /// A marker for an option in the serialized output.
@@ -299,6 +300,11 @@ pub enum Opcodes {
     UNPACK_VARIANT_GENERIC      = 0x55,
     TEST_VARIANT                = 0x56,
     TEST_VARIANT_GENERIC        = 0x57,
+    // Closures
+    LD_FUNCTION                 = 0x58,
+    LD_FUNCTION_GENERIC         = 0x59,
+    INVOKE_FUNCTION             = 0x5A,
+    EARLY_BIND_FUNCTION         = 0x5B,
 }
 
 /// Upper limit on the binary size
@@ -789,6 +795,11 @@ pub fn instruction_key(instruction: &Bytecode) -> u8 {
         UnpackVariantGeneric(_) => Opcodes::UNPACK_VARIANT_GENERIC,
         TestVariant(_) => Opcodes::TEST_VARIANT,
         TestVariantGeneric(_) => Opcodes::TEST_VARIANT_GENERIC,
+        // Since bytecode version 8
+        LdFunction(_) => Opcodes::LD_FUNCTION,
+        LdFunctionGeneric(_) => Opcodes::LD_FUNCTION_GENERIC,
+        InvokeFunction(_) => Opcodes::INVOKE_FUNCTION,
+        EarlyBindFunction(..) => Opcodes::EARLY_BIND_FUNCTION,
     };
     opcode as u8
 }

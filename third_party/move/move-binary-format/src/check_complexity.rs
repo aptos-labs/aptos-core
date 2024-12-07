@@ -67,8 +67,20 @@ impl<'a> BinaryComplexityMeter<'a> {
                     cost = cost.saturating_add(struct_name.len() as u64 * COST_PER_IDENT_BYTE);
                     cost = cost.saturating_add(moduel_name.len() as u64 * COST_PER_IDENT_BYTE);
                 },
-                U8 | U16 | U32 | U64 | U128 | U256 | Signer | Address | Bool | Vector(_)
-                | TypeParameter(_) | Reference(_) | MutableReference(_) => (),
+                U8
+                | U16
+                | U32
+                | U64
+                | U128
+                | U256
+                | Signer
+                | Address
+                | Bool
+                | Vector(_)
+                | Function { .. }
+                | TypeParameter(_)
+                | Reference(_)
+                | MutableReference(_) => (),
             }
         }
 
@@ -262,7 +274,7 @@ impl<'a> BinaryComplexityMeter<'a> {
 
         for instr in &code.code {
             match instr {
-                CallGeneric(idx) => {
+                CallGeneric(idx) | LdFunctionGeneric(idx, ..) => {
                     self.meter_function_instantiation(*idx)?;
                 },
                 PackGeneric(idx) | UnpackGeneric(idx) => {
@@ -291,7 +303,9 @@ impl<'a> BinaryComplexityMeter<'a> {
                 | VecPushBack(idx)
                 | VecPopBack(idx)
                 | VecUnpack(idx, _)
-                | VecSwap(idx) => {
+                | VecSwap(idx)
+                | InvokeFunction(idx)
+                | EarlyBindFunction(idx, _) => {
                     self.meter_signature(*idx)?;
                 },
 
@@ -323,6 +337,7 @@ impl<'a> BinaryComplexityMeter<'a> {
                 | PackVariant(_)
                 | UnpackVariant(_)
                 | TestVariant(_)
+                | LdFunction(_)
                 | ReadRef
                 | WriteRef
                 | FreezeRef

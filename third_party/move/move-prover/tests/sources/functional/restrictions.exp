@@ -11,7 +11,7 @@ error: [boogie translator] function result type not yet supported
 12 │         fun f2(): | |num { | | 1 }
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: [boogie translator] Invoke not yet supported
+error: [boogie translator] InvokeFunction not yet supported
    ┌─ tests/sources/functional/restrictions.move:16:13
    │
 16 │             f(1u64)
