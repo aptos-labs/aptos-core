@@ -19,8 +19,8 @@ use std::{
 const UNSTABLE_MARKER: &str = "-unstable";
 pub const LATEST_STABLE_LANGUAGE_VERSION_VALUE: LanguageVersion = LanguageVersion::V2_1;
 pub const LATEST_STABLE_COMPILER_VERSION_VALUE: CompilerVersion = CompilerVersion::V2_0;
-pub const LATEST_STABLE_LANGUAGE_VERSION: &str = "2.1";
-pub const LATEST_STABLE_COMPILER_VERSION: &str = "2.0";
+pub const LATEST_STABLE_LANGUAGE_VERSION: &str = LATEST_STABLE_LANGUAGE_VERSION_VALUE.to_str();
+pub const LATEST_STABLE_COMPILER_VERSION: &str = LATEST_STABLE_COMPILER_VERSION_VALUE.to_str();
 
 pub static COMPILATION_METADATA_KEY: &[u8] = "compilation_metadata".as_bytes();
 
@@ -150,7 +150,7 @@ impl CompilerVersion {
     }
 
     /// The latest compiler version.
-    pub fn latest() -> Self {
+    pub const fn latest() -> Self {
         CompilerVersion::V2_1
     }
 
@@ -180,6 +180,14 @@ impl CompilerVersion {
             LanguageVersion::V1
         } else {
             LanguageVersion::latest_stable()
+        }
+    }
+
+    pub const fn to_str(&self) -> &'static str {
+        match self {
+            CompilerVersion::V1 => "1",
+            CompilerVersion::V2_0 => "2.0",
+            CompilerVersion::V2_1 => "2.1",
         }
     }
 }
@@ -259,7 +267,7 @@ impl From<LanguageVersion> for CompilerLanguageVersion {
 impl LanguageVersion {
     /// Whether the language version is unstable. An unstable version
     /// should not be allowed on production networks.
-    pub fn unstable(self) -> bool {
+    pub const fn unstable(self) -> bool {
         use LanguageVersion::*;
         match self {
             V1 | V2_0 | V2_1 => false,
@@ -268,7 +276,7 @@ impl LanguageVersion {
     }
 
     /// The latest language version.
-    pub fn latest() -> Self {
+    pub const fn latest() -> Self {
         LanguageVersion::V2_2
     }
 
@@ -291,6 +299,15 @@ impl LanguageVersion {
             LanguageVersion::V2_1 => VERSION_DEFAULT_LANG_V2,
             LanguageVersion::V2_2 => VERSION_DEFAULT_LANG_V2, // Update once we have v8 bytecode
         })
+    }
+
+    pub const fn to_str(&self) -> &'static str {
+        match self {
+            LanguageVersion::V1 => "1",
+            LanguageVersion::V2_0 => "2.0",
+            LanguageVersion::V2_1 => "2.1",
+            LanguageVersion::V2_2 => "2.2",
+        }
     }
 }
 
