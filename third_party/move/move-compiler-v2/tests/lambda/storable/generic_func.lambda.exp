@@ -1,0 +1,34 @@
+
+Diagnostics:
+error: function type `|address|bool with copy+store` is not allowed as a type argument (type was inferred)
+   ┌─ tests/lambda/storable/generic_func.move:47:13
+   │
+ 7 │     public fun save_item<F: store+copy>(owner: &signer, f: F) {
+   │                          - declaration of type parameter `F`
+   ·
+47 │             0x42::mod2::save_item(&owner, f1);
+   │             ^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `F:copy + store` of function `save_item`
+
+error: function type `|address|bool with copy+store` is not allowed as a type argument (type was inferred)
+   ┌─ tests/lambda/storable/generic_func.move:49:13
+   │
+ 7 │     public fun save_item<F: store+copy>(owner: &signer, f: F) {
+   │                          - declaration of type parameter `F`
+   ·
+49 │             0x42::mod2::save_item(&owner, f2);
+   │             ^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `F:copy + store` of function `save_item`
+
+error: function type `|address|bool with copy+store` is not allowed as a type argument
+   ┌─ tests/lambda/storable/generic_func.move:53:41
+   │
+11 │     public fun item_exists<F: store+copy>(addr: address): bool {
+   │                            - declaration of type parameter `F`
+   ·
+53 │         assert!(0x42::mod2::item_exists<|address|bool with store+copy>(addr));
+   │                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `F:copy + store` of function `item_exists`
