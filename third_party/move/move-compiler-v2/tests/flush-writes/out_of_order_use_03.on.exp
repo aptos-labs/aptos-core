@@ -24,13 +24,17 @@ fun m::one_one(): (u64, u64) {
 public fun m::test() {
      var $t0: u64
      var $t1: u64
-     # flush: $t0
+     var $t2: u64 [unused]
+     var $t3: u64
+     # flush: $t0, $t1
      # live vars:
   0: ($t0, $t1) := m::one_one()
      # live vars: $t0, $t1
-  1: m::consume($t1, $t0, $t0)
+  1: $t3 := copy($t0)
+     # live vars: $t0, $t1, $t3
+  2: m::consume($t1, $t3, $t0)
      # live vars:
-  2: return ()
+  3: return ()
 }
 
 
@@ -52,15 +56,18 @@ B0:
 public test() /* def_idx: 2 */ {
 L0:	loc0: u64
 L1:	loc1: u64
+L2:	loc2: u64
 B0:
 	0: Call one_one(): u64 * u64
 	1: StLoc[0](loc0: u64)
 	2: StLoc[1](loc1: u64)
-	3: MoveLoc[0](loc0: u64)
-	4: CopyLoc[1](loc1: u64)
-	5: MoveLoc[1](loc1: u64)
-	6: Call consume(u64, u64, u64)
-	7: Ret
+	3: CopyLoc[1](loc1: u64)
+	4: StLoc[2](loc2: u64)
+	5: MoveLoc[0](loc0: u64)
+	6: MoveLoc[2](loc2: u64)
+	7: MoveLoc[1](loc1: u64)
+	8: Call consume(u64, u64, u64)
+	9: Ret
 }
 }
 ============ bytecode verification succeeded ========

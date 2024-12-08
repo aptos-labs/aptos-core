@@ -167,15 +167,17 @@ fun test::bitand_vec_coin_new($t0: vector<0x42::test::Coin>, $t1: u64) {
 [variant baseline]
 fun test::bitor_vec_new($t0: &mut vector<u256>, $t1: u64) {
      var $t2: &mut u256
-     var $t3: u256
+     var $t3: &mut vector<u256>
      var $t4: u256
      var $t5: u256
-  0: $t2 := vector::borrow_mut<u256>($t0, $t1)
-  1: $t4 := read_ref($t2)
-  2: $t5 := 42
-  3: $t3 := |($t4, $t5)
-  4: write_ref($t2, $t3)
-  5: return ()
+     var $t6: u256
+  0: $t3 := infer($t0)
+  1: $t2 := vector::borrow_mut<u256>($t3, $t1)
+  2: $t5 := read_ref($t2)
+  3: $t6 := 42
+  4: $t4 := |($t5, $t6)
+  5: write_ref($t2, $t4)
+  6: return ()
 }
 
 
@@ -331,21 +333,24 @@ fun test::bitand_vec_coin_new($t0: vector<0x42::test::Coin>, $t1: u64) {
 [variant baseline]
 fun test::bitor_vec_new($t0: &mut vector<u256>, $t1: u64) {
      var $t2: &mut u256
-     var $t3: u256 [unused]
-     var $t4: u256
+     var $t3: &mut vector<u256> [unused]
+     var $t4: u256 [unused]
      var $t5: u256
+     var $t6: u256
      # live vars: $t0, $t1
-  0: $t2 := vector::borrow_mut<u256>($t0, $t1)
+  0: $t0 := move($t0)
+     # live vars: $t0, $t1
+  1: $t2 := vector::borrow_mut<u256>($t0, $t1)
      # live vars: $t2
-  1: $t4 := read_ref($t2)
-     # live vars: $t2, $t4
-  2: $t5 := 42
-     # live vars: $t2, $t4, $t5
-  3: $t4 := |($t4, $t5)
-     # live vars: $t2, $t4
-  4: write_ref($t2, $t4)
+  2: $t5 := read_ref($t2)
+     # live vars: $t2, $t5
+  3: $t6 := 42
+     # live vars: $t2, $t5, $t6
+  4: $t5 := |($t5, $t6)
+     # live vars: $t2, $t5
+  5: write_ref($t2, $t5)
      # live vars:
-  5: return ()
+  6: return ()
 }
 
 
@@ -476,15 +481,17 @@ fun test::sub1($t0: &mut u256) {
      var $t3: u256
      var $t4: u256
      # live vars: $t0
-  0: $t3 := read_ref($t0)
+  0: $t0 := move($t0)
+     # live vars: $t0
+  1: $t3 := read_ref($t0)
      # live vars: $t0, $t3
-  1: $t4 := 1
+  2: $t4 := 1
      # live vars: $t0, $t3, $t4
-  2: $t3 := -($t3, $t4)
+  3: $t3 := -($t3, $t4)
      # live vars: $t0, $t3
-  3: write_ref($t0, $t3)
+  4: write_ref($t0, $t3)
      # live vars:
-  4: return ()
+  5: return ()
 }
 
 

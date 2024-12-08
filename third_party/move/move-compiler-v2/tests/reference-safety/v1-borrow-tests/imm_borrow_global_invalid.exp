@@ -18,7 +18,7 @@ error: cannot mutably borrow `Tester::Pair` since it is already borrowed
 36 │         let p2 = freeze(borrow_global_mut<Pair>(addr2));
    │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
 37 │         p1 == p2
-   │         -------- conflicting reference `p1` used here
+   │         -- conflicting reference `p1` used here
 
 error: cannot mutably borrow `Tester::Pair` since it is already borrowed
    ┌─ tests/reference-safety/v1-borrow-tests/imm_borrow_global_invalid.move:42:19
@@ -28,4 +28,4 @@ error: cannot mutably borrow `Tester::Pair` since it is already borrowed
 42 │         let c2 = &borrow_global_mut<Pair>(addr2).x;
    │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
 43 │         c1 == c2
-   │         -------- conflicting reference `c1` used here
+   │         -- conflicting reference `c1` used here
