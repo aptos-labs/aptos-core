@@ -152,12 +152,12 @@ spec aptos_framework::native_bridge_store {
     //     axiom forall x: u256: len(bcs::to_bytes(x)) == 32; 
     // }
 
-    /// req1. never aborts 
-    /// req2. returns a 32-byte vector
-    // spec normalize_u64_to_32_bytes {
-    //     aborts_if false;
-    //     ensures len(result) == 32;
-    // }
+    // req1. never aborts 
+    // req2. returns a 32-byte vector
+    spec normalize_u64_to_32_bytes {
+        aborts_if false;
+        ensures len(result) == 32;
+    }
 
     
     // spec bcs_u64 {

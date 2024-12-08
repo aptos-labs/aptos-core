@@ -388,9 +388,6 @@ module aptos_framework::native_bridge_store {
     use aptos_framework::ethereum;
     use aptos_framework::ethereum::EthereumAddress;
     use aptos_framework::system_addresses;
-    // use std::signer;
-    use std::debug;
-    use std::string::{Self,utf8};
 
     friend aptos_framework::native_bridge;
 
