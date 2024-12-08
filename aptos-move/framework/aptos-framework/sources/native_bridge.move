@@ -166,8 +166,8 @@ module aptos_framework::native_bridge {
 
         // Validate the bridge_transfer_id by reconstructing the hash
         let recipient_bytes = bcs::to_bytes(&recipient);
-        let amount_bytes = native_bridge_store::normalize_to_32_bytes(bcs::to_bytes<u64>(&amount));
-        let nonce_bytes = native_bridge_store::normalize_to_32_bytes(bcs::to_bytes<u64>(&nonce));
+        let amount_bytes = native_bridge_store::normalize_u64_to_32_bytes(&amount);
+        let nonce_bytes = native_bridge_store::normalize_u64_to_32_bytes(&nonce);
 
         let combined_bytes = vector::empty<u8>();
         vector::append(&mut combined_bytes, initiator);
@@ -298,8 +298,8 @@ module aptos_framework::native_bridge {
         let combined_bytes = vector::empty<u8>();
         vector::append(&mut combined_bytes, initiator);
         vector::append(&mut combined_bytes, bcs::to_bytes(&recipient));
-        vector::append(&mut combined_bytes, native_bridge_store::normalize_to_32_bytes(bcs::to_bytes(&amount)));
-        vector::append(&mut combined_bytes, native_bridge_store::normalize_to_32_bytes(bcs::to_bytes(&nonce)));
+        vector::append(&mut combined_bytes, native_bridge_store::normalize_u64_to_32_bytes(&amount));
+        vector::append(&mut combined_bytes, native_bridge_store::normalize_u64_to_32_bytes(&nonce));
         let bridge_transfer_id = keccak256(combined_bytes);
 
         // Create an account for our recipient
@@ -389,6 +389,8 @@ module aptos_framework::native_bridge_store {
     use aptos_framework::ethereum::EthereumAddress;
     use aptos_framework::system_addresses;
     // use std::signer;
+    use std::debug;
+    use std::string::{Self,utf8};
 
     friend aptos_framework::native_bridge;
 
@@ -400,7 +402,7 @@ module aptos_framework::native_bridge_store {
     const EINCORRECT_NONCE : u64 = 0x6;
     const EID_NOT_FOUND : u64 = 0x7;
 
-    const MAX_U64 : u64 = 0xFFFFFFFFFFFFFFFF;
+    // const MAX_U64 : u64 = 0xFFFFFFFFFFFFFFFF;
 
     /// A smart table wrapper
     struct SmartTableWrapper<K, V> has key, store {
@@ -434,39 +436,20 @@ module aptos_framework::native_bridge_store {
         move_to(aptos_framework, ids_to_inbound_nonces);
     }
 
-    /// Takes a vector, removes trailing zeroes, and pads with zeroes on the left until the value is 32 bytes.
-    /// @param value: the vector<u8> to normalize
-    /// @return 32-byte vector left-padded with zeroes, similar to how Ethereum serializes with abi.encodePacked
-    public(friend) fun normalize_to_32_bytes(value: vector<u8>): vector<u8> {
-        let meaningful = vector::empty<u8>();
-        let i = vector::length(&value) - 1;
-
-        // Remove trailing zeroes
-        while (i >= 0 && *vector::borrow(&value, i) == 0x00) {
-            i = i - 1;
-        };
-
-        // Copy the meaningful bytes
-        let j = 0;
-        while (j <= i) {
-            vector::push_back(&mut meaningful, *vector::borrow(&value, j));
-            j = j + 1;
-        };
-
-        let result = vector::empty<u8>();
-
-        // Pad with zeros on the left
-        let padding_length = 32 - vector::length(&meaningful);
-        let k = 0;
-        while (k < padding_length) {
-            vector::push_back(&mut result, 0x00);
-            k = k + 1;
-        };
-
-        // Append the meaningful bytes
-        vector::append(&mut result, meaningful);
-
-        result
+    /// Converts a u64 to a 32-byte vector.
+    /// 
+    /// @param value The u64 value to convert.
+    /// @return A 32-byte vector containing the u64 value in little-endian order.
+    /// 
+    /// How BCS works: https://github.com/zefchain/bcs?tab=readme-ov-file#booleans-and-integers
+    /// 
+    /// @example: a u64 value 0x12_34_56_78_ab_cd_ef_00 is converted to a 32-byte vector:
+    /// [0x00, 0x00, ..., 0x00, 0x12, 0x34, 0x56, 0x78, 0xab, 0xcd, 0xef, 0x00]
+    public(friend) fun normalize_u64_to_32_bytes(value: &u64): vector<u8> {
+        let r = bcs::to_bytes(&(*value as u256));
+        // BCS returns the bytes in reverse order, so we reverse the result.
+        vector::reverse(&mut r);
+        r
     }
 
     /// Checks if a bridge transfer ID is associated with an inbound nonce.
@@ -544,8 +527,8 @@ module aptos_framework::native_bridge_store {
         // Serialize each param
         let initiator_bytes = bcs::to_bytes<address>(&initiator);
         let recipient_bytes = ethereum::get_inner_ethereum_address(recipient);
-        let amount_bytes = normalize_to_32_bytes(bcs::to_bytes<u64>(&amount));
-        let nonce_bytes = normalize_to_32_bytes(bcs::to_bytes<u64>(&nonce));
+        let amount_bytes = normalize_u64_to_32_bytes(&amount);
+        let nonce_bytes = normalize_u64_to_32_bytes(&nonce);
         //Contatenate then hash and return bridge transfer ID
         let combined_bytes = vector::empty<u8>();
         vector::append(&mut combined_bytes, initiator_bytes);
@@ -584,6 +567,28 @@ module aptos_framework::native_bridge_store {
         // If it exists, return the associated nonce
         *smart_table::borrow(&table.inner, bridge_transfer_id)
     }
+
+    // ---------------------------------------------------------
+    //  Tests
+    // ---------------------------------------------------------
+
+    #[test]
+    /// Test normalisation (serialization) of u64 to 32 bytes
+    fun test_normalize_u64_to_32_bytes() {
+        test_normalize_u64_to_32_bytes_helper(0x64, 
+            vector[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0x64]);
+        test_normalize_u64_to_32_bytes_helper(0x6400, 
+            vector[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0x64,0x00]);
+        test_normalize_u64_to_32_bytes_helper(0x00_32_00_00_64_00, 
+            vector[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0x32,0,0,0x64,0x00]);
+    }
+
+    /// Test serialization of u64 to 32 bytes
+    fun test_normalize_u64_to_32_bytes_helper(x: u64, expected: vector<u8>) {
+        let r = normalize_u64_to_32_bytes(&x);
+        assert!(vector::length(&r) == 32, 0);
+        assert!(r == expected, 0);
+    }
 }
 
 module aptos_framework::native_bridge_configuration {
@@ -616,8 +621,6 @@ module aptos_framework::native_bridge_configuration {
         old_bridge_fee: u64,
         new_bridge_fee: u64,
     }
-
-
 
     /// Initializes the bridge configuration with Aptos framework as the bridge relayer.
     ///

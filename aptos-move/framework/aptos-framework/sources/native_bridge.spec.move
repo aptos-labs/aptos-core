@@ -1,7 +1,36 @@
 spec aptos_framework::native_bridge {
 
-    //use std::features;
-    //use aptos_framework::coin;
+    // use std::features;
+    // use aptos_framework::coin;
+
+    // spec plus1 {
+    //     pragma aborts_if_is_partial = false;
+    //     aborts_if !exists<R>(@aptos_framework);
+    //     aborts_if global<R>(@aptos_framework).v + 1 >  MAX_U64;
+
+    //     modifies global<R>(@aptos_framework);
+    //     ensures result == old(global<R>(@aptos_framework).v) + 1;
+    //     ensures global<R>(@aptos_framework).v == old(global<R>(@aptos_framework).v) + 1;
+    // }
+
+    // spec increment_and_get_nonce {
+    //     pragma aborts_if_is_partial = false;
+    //     modifies global<Nonce>(@aptos_framework);
+    //     aborts_if !exists<Nonce>(@aptos_framework);
+    //     aborts_if global<Nonce>(@aptos_framework).value + 1 > MAX_U64;
+    //     ensures result == old(global<Nonce>(@aptos_framework).value) + 1;
+    //     ensures global<Nonce>(@aptos_framework).value == old(global<Nonce>(@aptos_framework).value) + 1;
+    // }
+
+    // spec increment_and_get_nonce_at {  
+    //     // pragma aborts_if_is_partial = true;
+    //     modifies global<Nonce>(a); 
+    //     aborts_if !exists<Nonce>(a);
+    //     aborts_if global<Nonce>(a).value + 1 > MAX_U64;
+
+    //     // aborts_with EXECUTION_FAILURE;
+    //     // ensures  global<Nonce>(a).value == old(global<Nonce>(a).value) + 1;
+    // }  
 
     // spec initialize(aptos_framework: &signer) {
     //     aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
@@ -117,6 +146,28 @@ spec aptos_framework::native_bridge_core {
 }
 
 spec aptos_framework::native_bridge_store {
+
+    // spec module {
+    //     axiom forall x: u64: len(bcs::to_bytes(x)) == 8; 
+    //     axiom forall x: u256: len(bcs::to_bytes(x)) == 32; 
+    // }
+
+    /// req1. never aborts 
+    /// req2. returns a 32-byte vector
+    // spec normalize_u64_to_32_bytes {
+    //     aborts_if false;
+    //     ensures len(result) == 32;
+    // }
+
+    
+    // spec bcs_u64 {
+    //     aborts_if false;
+    //     ensures len(result) == 8;
+    // }
+
+    // spec ascii_hex_to_u8 {
+    //     requires ch >= 0x30 && ch <= 0x39 || ch >= 0x41 && ch <= 0x46 || ch >= 0x61 && ch <= 0x66;
+    // }
 
     // spec initialize(aptos_framework: &signer) {
     //     aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
