@@ -222,10 +222,7 @@ impl BlockTree {
             ledger_info.consensus_block_id()
         };
 
-        let output = PartialStateComputeResult::new_empty(
-            ledger_summary.state().clone(),
-            ledger_summary.txn_accumulator().clone(),
-        );
+        let output = PartialStateComputeResult::new_empty(ledger_summary);
 
         block_lookup.fetch_or_add_block(id, output, None)
     }
@@ -259,10 +256,12 @@ impl BlockTree {
             );
             last_committed_block
         };
+        /* FIXME(aldenhu)
         root.output
             .expect_result_state()
             .current
             .log_generation("block_tree_base");
+         */
         let old_root = std::mem::replace(&mut *self.root.lock(), root);
 
         // send old root to async task to drop it

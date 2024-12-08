@@ -43,7 +43,10 @@ mod metrics;
 pub mod mock;
 pub mod state_store;
 
-use crate::chunk_to_commit::ChunkToCommit;
+use crate::{
+    chunk_to_commit::ChunkToCommit,
+    state_store::{state::State, state_summary::StateSummary},
+};
 use aptos_scratchpad::SparseMerkleTree;
 pub use aptos_types::block_info::BlockHeight;
 use aptos_types::state_store::state_key::prefix::StateKeyPrefix;
@@ -380,6 +383,10 @@ pub trait DbReader: Send + Sync {
 
         /// Get the oldest in memory state tree.
         fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>>;
+
+        fn get_persisted_state(&self) -> Result<State>;
+
+        fn get_persisted_state_summary(&self) -> Result<StateSummary>;
 
         /// Get the ledger info of the epoch that `known_version` belongs to.
         fn get_epoch_ending_ledger_info(

@@ -41,7 +41,7 @@ use aptos_schemadb::SchemaBatch;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     db_ensure as ensure, db_other_bail as bail,
-    state_store::sharded_state_updates::ShardedStateUpdates, AptosDbError, DbReader, DbWriter,
+    state_store::state_update_ref_map::BatchedStateUpdateRefs, AptosDbError, DbReader, DbWriter,
     LedgerSummary, Order, Result, StateSnapshotReceiver, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{

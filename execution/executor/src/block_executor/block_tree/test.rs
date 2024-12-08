@@ -8,7 +8,6 @@ use crate::{
 };
 use aptos_crypto::{hash::PRE_GENESIS_BLOCK_ID, HashValue};
 use aptos_infallible::Mutex;
-use aptos_storage_interface::LedgerSummary;
 use aptos_types::{block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo};
 use std::sync::Arc;
 
@@ -39,11 +38,15 @@ fn id(index: u64) -> HashValue {
 }
 
 fn empty_block() -> PartialStateComputeResult {
+    todo!()
+    /* FIXME(aldenhu)
     let result_view = LedgerSummary::new_empty();
     PartialStateComputeResult::new_empty(
-        result_view.state().clone(),
+        result_view.state.clone(),
         result_view.transaction_accumulator.clone(),
     )
+
+     */
 }
 
 fn gen_ledger_info(block_id: HashValue, reconfig: bool) -> LedgerInfo {

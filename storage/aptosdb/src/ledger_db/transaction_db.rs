@@ -12,6 +12,7 @@ use crate::{
 };
 use aptos_crypto::hash::{CryptoHash, HashValue};
 use aptos_db_indexer_schemas::schema::transaction_by_account::TransactionByAccountSchema;
+use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::transaction::{Transaction, Version};
@@ -83,9 +84,7 @@ impl TransactionDb {
         transactions: &[Transaction],
         skip_index: bool,
     ) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_transactions"])
-            .start_timer();
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_transactions"]);
         let chunk_size = 512;
         let batches = transactions
             .par_chunks(chunk_size)
@@ -114,9 +113,7 @@ impl TransactionDb {
         // it might be acceptable because we are writing the progress, we want to play on the safer
         // side unless this really becomes the bottleneck on production.
         {
-            let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["commit_transactions___commit"])
-                .start_timer();
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_transactions___commit"]);
 
             batches
                 .into_iter()

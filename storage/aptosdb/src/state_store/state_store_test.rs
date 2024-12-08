@@ -35,6 +35,7 @@ fn put_value_set(
     version: Version,
     base_version: Option<Version>,
 ) -> HashValue {
+    /* FIXME(aldenhu)
     let mut sharded_value_set = arr![HashMap::new(); 16];
     let value_set: HashMap<_, _> = value_set
         .iter()
@@ -73,6 +74,8 @@ fn put_value_set(
         .commit(version, state_kv_metadata_batch, sharded_state_kv_batches)
         .unwrap();
     root
+     */
+    todo!()
 }
 
 fn verify_value_and_proof(

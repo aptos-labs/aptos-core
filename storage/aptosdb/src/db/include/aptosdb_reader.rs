@@ -63,7 +63,10 @@ impl DbReader for AptosDB {
 
     fn get_pre_committed_version(&self) -> Result<Option<Version>> {
         gauged_api("get_pre_committed_version", || {
-            Ok(self.state_store.current_state().current_version)
+            todo!()
+
+            // FIXME(aldenhu)
+            // Ok(self.state_store.current_state().current_version)
         })
     }
 
@@ -529,6 +532,9 @@ impl DbReader for AptosDB {
 
     fn get_pre_committed_ledger_summary(&self) -> Result<LedgerSummary> {
         gauged_api("get_pre_committed_ledger_summary", || {
+            todo!()
+            /*
+            FIXME(aldenhu)
             let current_state = self.state_store.current_state_cloned();
             let num_txns = current_state.next_version();
 
@@ -543,6 +549,7 @@ impl DbReader for AptosDB {
                 transaction_accumulator,
             );
             Ok(ledger_summary)
+             */
         })
     }
 
@@ -638,11 +645,15 @@ impl DbReader for AptosDB {
 
     fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
         gauged_api("get_latest_state_checkpoint_version", || {
+            todo!()
+            /*
             Ok(self
                 .state_store
                 .current_state()
                 .base_version
             )
+            FIXME(aldenhu)
+             */
         })
     }
 
