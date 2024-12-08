@@ -790,6 +790,7 @@ impl Execution {
         // Update features if needed to the correct binary format used by V2 compiler.
         let mut features = Features::fetch_config(&state).unwrap_or_default();
         features.enable(FeatureFlag::VM_BINARY_FORMAT_V7);
+        features.enable(FeatureFlag::NATIVE_MEMORY_OPERATIONS);
         // features.enable(FeatureFlag::ENABLE_LOADER_V2);
         // if v2_flag {
         //     features.enable(FeatureFlag::FAKE_FEATURE_FOR_COMPARISON_TESTING);
@@ -882,6 +883,7 @@ impl Execution {
         // Update features if needed to the correct binary format used by V2 compiler.
         let mut features = Features::fetch_config(&state).unwrap_or_default();
         features.enable(FeatureFlag::VM_BINARY_FORMAT_V7);
+        features.enable(FeatureFlag::NATIVE_MEMORY_OPERATIONS);
         // features.enable(FeatureFlag::ENABLE_LOADER_V2);
         if v2_flag {
             features.enable(FeatureFlag::FAKE_FEATURE_FOR_COMPARISON_TESTING);
