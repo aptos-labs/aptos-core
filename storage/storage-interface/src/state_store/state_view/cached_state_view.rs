@@ -85,13 +85,9 @@ impl CachedStateView {
     /// Constructs a [`CachedStateView`] with persistent state view in the DB and the in-memory
     /// speculative state represented by `speculative_state`. The persistent state view is the
     /// latest one preceding `next_version`
-    pub fn new(
-        _id: StateViewId,
-        _reader: Arc<dyn DbReader>,
-        _state: State,
-    ) -> StateViewResult<Self> {
-        // FIXME(aldnehu): get persisted state from db and call `new_impl()`
-        todo!()
+    pub fn new(id: StateViewId, reader: Arc<dyn DbReader>, state: State) -> StateViewResult<Self> {
+        let persisted_state = reader.get_persisted_state()?;
+        Ok(Self::new_impl(id, reader, persisted_state, state))
     }
 
     pub fn new_impl(
@@ -174,6 +170,14 @@ impl CachedStateView {
 
     pub fn next_version(&self) -> Version {
         self.speculative.next_version()
+    }
+
+    pub fn persisted_state(&self) -> &State {
+        &self.speculative.base
+    }
+
+    pub fn state_cache(&self) -> &ShardedStateCache {
+        &self.memorized
     }
 }
 

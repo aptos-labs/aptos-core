@@ -27,7 +27,10 @@ use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeHelper, TimerHelper};
 use aptos_storage_interface::{
-    state_store::state_view::cached_state_view::CachedStateView, DbReaderWriter,
+    state_store::{
+        state_summary::ProvableStateSummary, state_view::cached_state_view::CachedStateView,
+    },
+    DbReaderWriter,
 };
 use aptos_types::{
     block_executor::{
@@ -295,6 +298,7 @@ where
                 output.set_state_checkpoint_output(DoStateCheckpoint::run(
                     &output.execution_output,
                     parent_block.output.expect_result_state_summary(),
+                    &ProvableStateSummary::new_persisted(self.db.reader.clone())?,
                     Option::<Vec<_>>::None,
                 )?);
                 output.set_ledger_update_output(DoLedgerUpdate::run(

@@ -7,9 +7,12 @@
 use crate::types::partial_state_compute_result::PartialStateComputeResult;
 use anyhow::Result;
 use aptos_executor_types::execution_output::ExecutionOutput;
-use aptos_storage_interface::LedgerSummary;
+use aptos_storage_interface::{
+    state_store::state_summary::ProvableStateSummary, DbReader, LedgerSummary,
+};
 use do_ledger_update::DoLedgerUpdate;
 use do_state_checkpoint::DoStateCheckpoint;
+use std::sync::Arc;
 
 pub mod do_get_execution_output;
 pub mod do_ledger_update;
@@ -21,10 +24,12 @@ impl ApplyExecutionOutput {
     pub fn run(
         execution_output: ExecutionOutput,
         base_view: LedgerSummary,
+        reader: Arc<dyn DbReader>,
     ) -> Result<PartialStateComputeResult> {
         let state_checkpoint_output = DoStateCheckpoint::run(
             &execution_output,
             &base_view.state_summary,
+            &ProvableStateSummary::new_persisted(reader)?,
             Option::<Vec<_>>::None, // known_state_checkpoint_hashes
         )?;
         let ledger_update_output = DoLedgerUpdate::run(
