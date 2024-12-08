@@ -15,6 +15,7 @@ use move_binary_format::{
     control_flow_graph::{BlockId, ControlFlowGraph},
     errors::{PartialVMError, PartialVMResult},
     file_format::{Bytecode, CodeUnit, FunctionDefinitionIndex, Signature, SignatureToken},
+    safe_assert,
 };
 use move_core_types::vm_status::StatusCode;
 
@@ -249,6 +250,7 @@ impl<'a> StackUsageVerifier<'a> {
                 } else {
                     // We don't know what it will pop/push, but the signature checker
                     // ensures we never reach this
+                    safe_assert!(false);
                     (0, 0)
                 }
             },
@@ -258,16 +260,18 @@ impl<'a> StackUsageVerifier<'a> {
                 if let Some(SignatureToken::Function(args, ..)) =
                     self.resolver.signature_at(*idx).0.first()
                 {
-                    if args.len() <= *arg_count as usize {
+                    if *arg_count as usize <= args.len() {
                         (1 + *arg_count as u64, 1)
                     } else {
                         // We don't know what it will pop/push, but the signature checker
                         // ensures we never reach this
+                        safe_assert!(false);
                         (0, 0)
                     }
                 } else {
                     // We don't know what it will pop/push, but the signature checker
                     // ensures we never reach this
+                    safe_assert!(false);
                     (0, 0)
                 }
             },

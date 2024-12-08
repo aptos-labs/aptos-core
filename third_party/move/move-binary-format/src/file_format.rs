@@ -50,6 +50,7 @@ use ref_cast::RefCast;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Formatter},
+    iter,
     ops::BitOr,
 };
 use variant_count::VariantCount;
@@ -849,14 +850,9 @@ impl AbilitySet {
             | (Ability::Store as u8)
             | (Ability::Key as u8),
     );
-    /// The empty ability set
-    pub const EMPTY: Self = Self(0);
-    /// Minimal abilities for all `Functions`
-    pub const FUNCTIONS_MIN: AbilitySet = Self(Ability::Drop as u8);
-    /// Maximal abilities for all `Functions`.  This is used for identity when unifying function types.
-    pub const FUNCTIONS_MAX: AbilitySet = Self::DEFINED_FUNCTIONS_HAS_STORE;
-    /// Abilities for `Bool`, `U8`, `U64`, `U128`, and `Address`
-    pub const PRIMITIVES: AbilitySet =
+    /// Abilities for user-defined/"primitive" functions (not closures) which can be stored
+    /// (are public and not generic, see above)
+    pub const DEFINED_FUNCTIONS_HAS_STORE: AbilitySet =
         Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));
     /// Abilities for user-defined/primitive functions (not closures) which
     /// - are private -- can be changed in module upgrades, so should not be stored
@@ -864,9 +860,14 @@ impl AbilitySet {
     /// TODO(LAMBDA) - allow generic functions to be stored
     pub const DEFINED_FUNCTIONS_NO_STORE: AbilitySet =
         Self((Ability::Copy as u8) | (Ability::Drop as u8));
-    /// Abilities for user-defined/"primitive" functions (not closures) which can be stored
-    /// (are public and not generic, see above)
-    pub const DEFINED_FUNCTIONS_HAS_STORE: AbilitySet =
+    /// The empty ability set
+    pub const EMPTY: Self = Self(0);
+    /// Maximal abilities for all `Functions`.  This is used for identity when unifying function types.
+    pub const FUNCTIONS_MAX: AbilitySet = Self::DEFINED_FUNCTIONS_HAS_STORE;
+    /// Minimal abilities for all `Functions`
+    pub const FUNCTIONS_MIN: AbilitySet = Self(Ability::Drop as u8);
+    /// Abilities for `Bool`, `U8`, `U64`, `U128`, and `Address`
+    pub const PRIMITIVES: AbilitySet =
         Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));
     /// Abilities for `Reference` and `MutableReference`
     pub const REFERENCES: AbilitySet = Self((Ability::Copy as u8) | (Ability::Drop as u8));
@@ -1556,6 +1557,30 @@ impl SignatureToken {
             Reference(ty) => Reference(Box::new(ty.instantiate(subst_mapping))),
             MutableReference(ty) => MutableReference(Box::new(ty.instantiate(subst_mapping))),
             TypeParameter(idx) => subst_mapping[*idx as usize].clone(),
+        }
+    }
+
+    /// Can [self] be used in contexts where [other] is expected?
+    /// TODO(LAMBDA): extend beyond very simple function subtyping.
+    pub fn is_subtype_of(&self, other: &Self) -> bool {
+        use SignatureToken::*;
+        if self == other {
+            true
+        } else {
+            match (self, other) {
+                (Function(args, res, abilities), Function(args2, res2, abilities2)) => {
+                    // We need:
+                    // - Other has fewer abilities
+                    // - other's args are a subtypes of self's corresponding args
+                    // - self's results are subtypes of self's results
+                    abilities2.is_subset(*abilities)
+                        && args.len() == args2.len()
+                        && res.len() == res2.len()
+                        && iter::zip(args, args2).all(|(arg, arg2)| arg2.is_subtype_of(arg))
+                        && iter::zip(res, res2).all(|(res, res2)| res.is_subtype_of(res2))
+                },
+                _ => false,
+            }
         }
     }
 }

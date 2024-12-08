@@ -367,17 +367,21 @@ impl ModuleGenerator {
                     ReferenceKind::Mutable => FF::SignatureToken::MutableReference(target_ty),
                 }
             },
-            Fun(_param_ty, _result_ty, _abilities) => {
-                // TODO(LAMBDA)
-                ctx.error(
-                    loc,
-                    format!(
-                        "Unimplemented type: {}",
-                        ty.display(&ctx.env.get_type_display_ctx())
-                    ),
-                );
-                FF::SignatureToken::Bool
-            },
+            Fun(param_ty, result_ty, abilities) => FF::SignatureToken::Function(
+                param_ty
+                    .clone()
+                    .flatten()
+                    .iter()
+                    .map(|t| self.signature_token(ctx, loc, t))
+                    .collect(),
+                result_ty
+                    .clone()
+                    .flatten()
+                    .iter()
+                    .map(|t| self.signature_token(ctx, loc, t))
+                    .collect(),
+                *abilities,
+            ),
             TypeDomain(_) | ResourceDomain(_, _, _) | Error | Var(_) => {
                 ctx.internal_error(
                     loc,

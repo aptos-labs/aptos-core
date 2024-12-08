@@ -1,0 +1,49 @@
+
+Diagnostics:
+error: unsupported language construct
+  ┌─ tests/lambda/move_feature_gating.move:4:34
+  │
+4 │     public fun fn_id(f: |u64|u64 with copy): |u64|u64 with copy {
+  │                                  ^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+  ┌─ tests/lambda/move_feature_gating.move:4:55
+  │
+4 │     public fun fn_id(f: |u64|u64 with copy): |u64|u64 with copy {
+  │                                                       ^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+   ┌─ tests/lambda/move_feature_gating.move:10:32
+   │
+10 │     public fun map(f: |u64|u64 with copy, x: u64): u64 {
+   │                                ^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+   ┌─ tests/lambda/move_feature_gating.move:19:49
+   │
+19 │     public fun build_function(x: u64): |u64|u64 with copy+store {
+   │                                                 ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+   ┌─ tests/lambda/move_feature_gating.move:20:17
+   │
+20 │         let f = move |y| add_func(x, y);
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/move_feature_gating.move:26:25
+   │
+26 │     fun map(f: |u64|u64 with copy, x: u64): u64 {
+   │                         ^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+   ┌─ tests/lambda/move_feature_gating.move:32:42
+   │
+32 │     fun build_function(x: u64): |u64|u64 with copy+store {
+   │                                          ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+   ┌─ tests/lambda/move_feature_gating.move:33:17
+   │
+33 │         let f = move |y| add_func(x, y);
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression

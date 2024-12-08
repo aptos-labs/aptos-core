@@ -1897,7 +1897,7 @@ module 0x42::test {
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+store = test::choose_function1$lambda$1;
+                                        let i: |(u64, u64)|u64 with copy+store = test::choose_function1__lambda_1;
                                         earlybind(i, 15)
                                       }
                                     }
@@ -1954,7 +1954,7 @@ module 0x42::test {
           }
         }
     }
-    private fun choose_function1$lambda$1(x: u64,y: u64): u64 {
+    private fun choose_function1__lambda_1(x: u64,y: u64): u64 {
         {
           let q: u64 = Sub<u64>(y, 1);
           mod3::multiply(x, Add<u64>(q, 1))
@@ -2046,7 +2046,7 @@ module 0x42::test {
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+store = test::choose_function1$lambda$1;
+                                        let i: |(u64, u64)|u64 with copy+store = test::choose_function1__lambda_1;
                                         earlybind(i, 15)
                                       }
                                     }
@@ -2103,7 +2103,7 @@ module 0x42::test {
           }
         }
     }
-    private fun choose_function1$lambda$1(x: u64,y: u64): u64 {
+    private fun choose_function1__lambda_1(x: u64,y: u64): u64 {
         {
           let q: u64 = Sub<u64>(y, 1);
           mod3::multiply(x, Add<u64>(q, 1))
@@ -2195,7 +2195,7 @@ module 0x42::test {
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+store = test::choose_function1$lambda$1;
+                                        let i: |(u64, u64)|u64 with copy+store = test::choose_function1__lambda_1;
                                         earlybind(i, 15)
                                       }
                                     }
@@ -2252,7 +2252,7 @@ module 0x42::test {
           }
         }
     }
-    private fun choose_function1$lambda$1(x: u64,y: u64): u64 {
+    private fun choose_function1__lambda_1(x: u64,y: u64): u64 {
         {
           let q: u64 = Sub<u64>(y, 1);
           mod3::multiply(x, Add<u64>(q, 1))
@@ -2503,7 +2503,7 @@ fun test::choose_function1($t0: u64, $t1: u64): u64 {
 126: $t3 := infer($t59)
 127: goto 132
 128: label L40
-129: $t63 := test::choose_function1$lambda$1
+129: $t63 := test::choose_function1__lambda_1
 130: $t64 := 15
 131: $t3 := earlybind($t63, $t64)
 132: label L41
@@ -2600,7 +2600,7 @@ public fun test::test_functions() {
 
 
 [variant baseline]
-fun test::choose_function1$lambda$1($t0: u64, $t1: u64): u64 {
+fun test::choose_function1__lambda_1($t0: u64, $t1: u64): u64 {
      var $t2: u64
      var $t3: u64
      var $t4: u64
@@ -3003,7 +3003,7 @@ fun test::choose_function1($t0: u64, $t1: u64): u64 {
      # live vars: $t1
 130: label L40
      # live vars: $t1
-131: $t10 := test::choose_function1$lambda$1
+131: $t10 := test::choose_function1__lambda_1
      # live vars: $t1, $t10
 132: $t0 := 15
      # live vars: $t0, $t1, $t10
@@ -3123,7 +3123,7 @@ public fun test::test_functions() {
 
 
 [variant baseline]
-fun test::choose_function1$lambda$1($t0: u64, $t1: u64): u64 {
+fun test::choose_function1__lambda_1($t0: u64, $t1: u64): u64 {
      var $t2: u64 [unused]
      var $t3: u64 [unused]
      var $t4: u64
@@ -3144,27 +3144,354 @@ fun test::choose_function1$lambda$1($t0: u64, $t1: u64): u64 {
 }
 
 
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.mod4 {
+
+
+public alt_multiply(Arg0: u64, Arg1: u64): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: MoveLoc[1](Arg1: u64)
+	2: Mul
+	3: Ret
+}
+}// Move bytecode v7
+module 42.mod3 {
+
+
+public multiply(Arg0: u64, Arg1: u64): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: MoveLoc[1](Arg1: u64)
+	2: Mul
+	3: Ret
+}
+}// Move bytecode v7
+module 42.mod2 {
+
+
+public(friend) double(Arg0: u64): u64 /* def_idx: 0 */ {
+L1:	loc0: u64
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: LdU64(2)
+	2: Mul
+	3: Ret
+}
+}// Move bytecode v7
+module 42.mod1 {
+
+
+public(friend) triple(Arg0: u64): u64 /* def_idx: 0 */ {
+L1:	loc0: u64
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: LdU64(3)
+	2: Mul
+	3: Ret
+}
+}// Move bytecode v7
+module 42.test {
+use 0000000000000000000000000000000000000000000000000000000000000042::mod2;
+use 0000000000000000000000000000000000000000000000000000000000000042::mod1;
+use 0000000000000000000000000000000000000000000000000000000000000042::mod3;
+use 0000000000000000000000000000000000000000000000000000000000000042::mod4;
+
+
+
+
+add_mul(Arg0: u64, Arg1: u64, Arg2: u64): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: MoveLoc[1](Arg1: u64)
+	2: Add
+	3: StLoc[0](Arg0: u64)
+	4: MoveLoc[2](Arg2: u64)
+	5: MoveLoc[0](Arg0: u64)
+	6: Mul
+	7: Ret
+}
+choose_function1(Arg0: u64, Arg1: u64): u64 /* def_idx: 1 */ {
+L2:	loc0: u64
+L3:	loc1: |u64|u64 with copy
+L4:	loc2: |u64,u64|u64 with copy+store
+L5:	loc3: u64
+L6:	loc4: |u64,u64,u64|u64 with copy
+B0:
+	0: CopyLoc[0](Arg0: u64)
+	1: LdU64(0)
+	2: Eq
+	3: BrFalse(10)
+B1:
+	4: LdFunction mod2::double(u64): u64
+	5: StLoc[3](loc1: |u64|u64 with copy)
+B2:
+	6: MoveLoc[1](Arg1: u64)
+	7: MoveLoc[3](loc1: |u64|u64 with copy)
+	8: InvokeFunction(4)
+	9: Ret
+B3:
+	10: CopyLoc[0](Arg0: u64)
+	11: LdU64(1)
+	12: Eq
+	13: BrFalse(17)
+B4:
+	14: LdFunction mod1::triple(u64): u64
+	15: StLoc[3](loc1: |u64|u64 with copy)
+	16: Branch(6)
+B5:
+	17: CopyLoc[0](Arg0: u64)
+	18: LdU64(2)
+	19: Eq
+	20: BrFalse(28)
+B6:
+	21: LdFunction mod3::multiply(u64, u64): u64
+	22: StLoc[4](loc2: |u64,u64|u64 with copy+store)
+	23: LdU64(4)
+	24: MoveLoc[4](loc2: |u64,u64|u64 with copy+store)
+	25: EarlyBindFunction(5, 1)
+	26: StLoc[3](loc1: |u64|u64 with copy)
+	27: Branch(6)
+B7:
+	28: CopyLoc[0](Arg0: u64)
+	29: LdU64(3)
+	30: Eq
+	31: BrFalse(39)
+B8:
+	32: LdFunction mod4::alt_multiply(u64, u64): u64
+	33: StLoc[4](loc2: |u64,u64|u64 with copy+store)
+	34: LdU64(5)
+	35: MoveLoc[4](loc2: |u64,u64|u64 with copy+store)
+	36: EarlyBindFunction(5, 1)
+	37: StLoc[3](loc1: |u64|u64 with copy)
+	38: Branch(6)
+B9:
+	39: CopyLoc[0](Arg0: u64)
+	40: LdU64(4)
+	41: Eq
+	42: BrFalse(50)
+B10:
+	43: LdFunction mod3::multiply(u64, u64): u64
+	44: StLoc[4](loc2: |u64,u64|u64 with copy+store)
+	45: LdU64(6)
+	46: MoveLoc[4](loc2: |u64,u64|u64 with copy+store)
+	47: EarlyBindFunction(5, 1)
+	48: StLoc[3](loc1: |u64|u64 with copy)
+	49: Branch(6)
+B11:
+	50: CopyLoc[0](Arg0: u64)
+	51: LdU64(5)
+	52: Eq
+	53: BrFalse(62)
+B12:
+	54: LdFunction multiply3(u64, u64, u64): u64
+	55: StLoc[6](loc4: |u64,u64,u64|u64 with copy)
+	56: LdU64(3)
+	57: LdU64(2)
+	58: MoveLoc[6](loc4: |u64,u64,u64|u64 with copy)
+	59: EarlyBindFunction(6, 2)
+	60: StLoc[3](loc1: |u64|u64 with copy)
+	61: Branch(6)
+B13:
+	62: CopyLoc[0](Arg0: u64)
+	63: LdU64(6)
+	64: Eq
+	65: BrFalse(73)
+B14:
+	66: LdFunction mod3::multiply(u64, u64): u64
+	67: StLoc[4](loc2: |u64,u64|u64 with copy+store)
+	68: LdU64(7)
+	69: MoveLoc[4](loc2: |u64,u64|u64 with copy+store)
+	70: EarlyBindFunction(5, 1)
+	71: StLoc[3](loc1: |u64|u64 with copy)
+	72: Branch(6)
+B15:
+	73: CopyLoc[0](Arg0: u64)
+	74: LdU64(7)
+	75: Eq
+	76: BrFalse(85)
+B16:
+	77: LdFunction multiply3(u64, u64, u64): u64
+	78: StLoc[6](loc4: |u64,u64,u64|u64 with copy)
+	79: LdU64(4)
+	80: LdU64(2)
+	81: MoveLoc[6](loc4: |u64,u64,u64|u64 with copy)
+	82: EarlyBindFunction(6, 2)
+	83: StLoc[3](loc1: |u64|u64 with copy)
+	84: Branch(6)
+B17:
+	85: CopyLoc[0](Arg0: u64)
+	86: LdU64(8)
+	87: Eq
+	88: BrFalse(97)
+B18:
+	89: LdFunction multiply3(u64, u64, u64): u64
+	90: StLoc[6](loc4: |u64,u64,u64|u64 with copy)
+	91: LdU64(3)
+	92: LdU64(3)
+	93: MoveLoc[6](loc4: |u64,u64,u64|u64 with copy)
+	94: EarlyBindFunction(6, 2)
+	95: StLoc[3](loc1: |u64|u64 with copy)
+	96: Branch(6)
+B19:
+	97: CopyLoc[0](Arg0: u64)
+	98: LdU64(9)
+	99: Eq
+	100: BrFalse(109)
+B20:
+	101: LdFunction multiply3(u64, u64, u64): u64
+	102: StLoc[6](loc4: |u64,u64,u64|u64 with copy)
+	103: LdU64(3)
+	104: LdU64(5)
+	105: MoveLoc[6](loc4: |u64,u64,u64|u64 with copy)
+	106: EarlyBindFunction(6, 2)
+	107: StLoc[3](loc1: |u64|u64 with copy)
+	108: Branch(6)
+B21:
+	109: CopyLoc[0](Arg0: u64)
+	110: LdU64(10)
+	111: Eq
+	112: BrFalse(120)
+B22:
+	113: LdFunction mod4::alt_multiply(u64, u64): u64
+	114: StLoc[4](loc2: |u64,u64|u64 with copy+store)
+	115: LdU64(11)
+	116: MoveLoc[4](loc2: |u64,u64|u64 with copy+store)
+	117: EarlyBindFunction(5, 1)
+	118: StLoc[3](loc1: |u64|u64 with copy)
+	119: Branch(6)
+B23:
+	120: CopyLoc[0](Arg0: u64)
+	121: LdU64(11)
+	122: Eq
+	123: BrFalse(131)
+B24:
+	124: LdFunction mod3::multiply(u64, u64): u64
+	125: StLoc[4](loc2: |u64,u64|u64 with copy+store)
+	126: LdU64(11)
+	127: MoveLoc[4](loc2: |u64,u64|u64 with copy+store)
+	128: EarlyBindFunction(5, 1)
+	129: StLoc[3](loc1: |u64|u64 with copy)
+	130: Branch(6)
+B25:
+	131: CopyLoc[0](Arg0: u64)
+	132: LdU64(12)
+	133: Eq
+	134: BrFalse(142)
+B26:
+	135: LdFunction mod3::multiply(u64, u64): u64
+	136: StLoc[4](loc2: |u64,u64|u64 with copy+store)
+	137: LdU64(12)
+	138: MoveLoc[4](loc2: |u64,u64|u64 with copy+store)
+	139: EarlyBindFunction(5, 1)
+	140: StLoc[3](loc1: |u64|u64 with copy)
+	141: Branch(6)
+B27:
+	142: MoveLoc[0](Arg0: u64)
+	143: LdU64(14)
+	144: Eq
+	145: BrFalse(154)
+B28:
+	146: LdFunction multiply3(u64, u64, u64): u64
+	147: StLoc[6](loc4: |u64,u64,u64|u64 with copy)
+	148: LdU64(2)
+	149: LdU64(2)
+	150: MoveLoc[6](loc4: |u64,u64,u64|u64 with copy)
+	151: EarlyBindFunction(6, 2)
+	152: StLoc[3](loc1: |u64|u64 with copy)
+	153: Branch(6)
+B29:
+	154: LdFunction choose_function1__lambda_1(u64, u64): u64
+	155: StLoc[4](loc2: |u64,u64|u64 with copy+store)
+	156: LdU64(15)
+	157: MoveLoc[4](loc2: |u64,u64|u64 with copy+store)
+	158: EarlyBindFunction(5, 1)
+	159: StLoc[3](loc1: |u64|u64 with copy)
+	160: Branch(6)
+}
+multiply3(Arg0: u64, Arg1: u64, Arg2: u64): u64 /* def_idx: 2 */ {
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: MoveLoc[1](Arg1: u64)
+	2: Mul
+	3: MoveLoc[2](Arg2: u64)
+	4: Mul
+	5: Ret
+}
+public test_functions() /* def_idx: 3 */ {
+L0:	loc0: u64
+L1:	loc1: bool
+L2:	loc2: u64
+L3:	loc3: u64
+B0:
+	0: LdU64(0)
+	1: StLoc[0](loc0: u64)
+	2: LdFalse
+	3: StLoc[1](loc1: bool)
+B1:
+	4: Branch(6)
+B2:
+	5: Branch(30)
+B3:
+	6: CopyLoc[1](loc1: bool)
+	7: BrFalse(31)
+B4:
+	8: MoveLoc[0](loc0: u64)
+	9: LdU64(1)
+	10: Add
+	11: StLoc[0](loc0: u64)
+B5:
+	12: CopyLoc[0](loc0: u64)
+	13: LdU64(15)
+	14: Lt
+	15: BrTrue(17)
+B6:
+	16: Branch(30)
+B7:
+	17: CopyLoc[0](loc0: u64)
+	18: LdU64(3)
+	19: Call choose_function1(u64, u64): u64
+	20: CopyLoc[0](loc0: u64)
+	21: LdU64(2)
+	22: Add
+	23: LdU64(3)
+	24: Mul
+	25: Eq
+	26: BrFalse(28)
+B8:
+	27: Branch(4)
+B9:
+	28: MoveLoc[0](loc0: u64)
+	29: Abort
+B10:
+	30: Ret
+B11:
+	31: LdTrue
+	32: StLoc[1](loc1: bool)
+	33: Branch(12)
+}
+choose_function1__lambda_1(Arg0: u64, Arg1: u64): u64 /* def_idx: 4 */ {
+L2:	loc0: u64
+B0:
+	0: MoveLoc[1](Arg1: u64)
+	1: LdU64(1)
+	2: Sub
+	3: LdU64(1)
+	4: Add
+	5: StLoc[1](Arg1: u64)
+	6: MoveLoc[0](Arg0: u64)
+	7: MoveLoc[1](Arg1: u64)
+	8: Call mod3::multiply(u64, u64): u64
+	9: Ret
+}
+}
+============ bytecode verification failed ========
+
 Diagnostics:
-error: Unimplemented type: |(u64, u64)|u64 with copy+store
-   ┌─ tests/lambda/storable/doable_func.move:36:9
+bug: bytecode verification failed with unexpected status code `STLOC_TYPE_MISMATCH_ERROR`. This is a compiler bug, consider reporting it.
+Error message: none
+   ┌─ tests/lambda/storable/doable_func.move:43:17
    │
-36 │     fun choose_function1(key: u64, x: u64): u64 {
-   │         ^^^^^^^^^^^^^^^^
-
-error: Unimplemented type: |(u64, u64, u64)|u64 with copy
-   ┌─ tests/lambda/storable/doable_func.move:36:9
-   │
-36 │     fun choose_function1(key: u64, x: u64): u64 {
-   │         ^^^^^^^^^^^^^^^^
-
-error: Unimplemented type: |u64|u64 with copy
-   ┌─ tests/lambda/storable/doable_func.move:36:9
-   │
-36 │     fun choose_function1(key: u64, x: u64): u64 {
-   │         ^^^^^^^^^^^^^^^^
-
-bug: invalid identifier choose_function1$lambda$1
-   ┌─ tests/lambda/storable/doable_func.move:36:9
-   │
-36 │     fun choose_function1(key: u64, x: u64): u64 {
-   │         ^^^^^^^^^^^^^^^^
+43 │                 move |x| mod3::multiply(4, x)
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

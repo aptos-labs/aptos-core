@@ -287,12 +287,14 @@ fn call(
     type_actuals: &Signature,
 ) -> PartialVMResult<()> {
     let parameters = verifier.resolver.signature_at(function_handle.parameters);
-    for parameter in parameters.0.iter().rev() {
+    for (i, parameter) in parameters.0.iter().enumerate().rev() {
         let arg = safe_unwrap!(verifier.stack.pop());
-        if (type_actuals.is_empty() && &arg != parameter)
+        if (type_actuals.is_empty() && !arg.is_subtype_of(parameter))
             || (!type_actuals.is_empty() && arg != instantiate(parameter, type_actuals))
         {
-            return Err(verifier.error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset));
+            return Err(verifier
+                .error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset)
+                .with_message(format!("Call parameter {} type mismatch", i)));
         }
     }
     for return_type in &verifier.resolver.signature_at(function_handle.return_).0 {
@@ -307,37 +309,28 @@ fn invoke_function(
     offset: CodeOffset,
     expected_ty: &SignatureToken,
 ) -> PartialVMResult<()> {
-    let SignatureToken::Function(param_tys, ret_tys, abilities) = expected_ty else {
+    // On top of the stack is the closure, pop it.
+    let closure_ty = safe_unwrap!(verifier.stack.pop());
+    // Verify that the closure type matches the expected type
+    if !closure_ty.is_subtype_of(expected_ty) {
+        return Err(verifier
+            .error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset)
+            .with_message("Invoke function type mismatch".to_owned()));
+    }
+
+    let SignatureToken::Function(param_tys, ret_tys, _abilities) = expected_ty else {
         // The signature checker has ensured this is a function
         safe_assert!(false);
         unreachable!()
     };
 
-    // On top of the stack is the closure, pop it.
-    let closure_ty = safe_unwrap!(verifier.stack.pop());
-    // Verify that the closure type matches the expected type
-    if &closure_ty != expected_ty {
-        return Err(verifier
-            .error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset)
-            .with_message("closure type mismatch".to_owned()));
-    }
-    // Verify that the abilities match
-    let SignatureToken::Function(_, _, closure_abilities) = closure_ty else {
-        // Ensured above, but never panic
-        safe_assert!(false);
-        unreachable!()
-    };
-    if !abilities.is_subset(closure_abilities) {
-        return Err(verifier
-            .error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset)
-            .with_message("closure ability mismatch".to_owned()));
-    }
-
     // Pop and verify arguments
-    for param_ty in param_tys.iter().rev() {
+    for (i, param_ty) in param_tys.iter().enumerate().rev() {
         let arg_ty = safe_unwrap!(verifier.stack.pop());
-        if &arg_ty != param_ty {
-            return Err(verifier.error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset));
+        if !arg_ty.is_subtype_of(param_ty) {
+            return Err(verifier
+                .error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset)
+                .with_message(format!("Invoke function argument {} type mismatch", i)));
         }
     }
     for ret_ty in ret_tys {
@@ -402,31 +395,22 @@ fn early_bind_function(
     count: u8,
 ) -> PartialVMResult<()> {
     let count = count as usize;
+
+    // On top of the stack is the closure, pop it.
+    let closure_ty = safe_unwrap!(verifier.stack.pop());
+
+    // Verify that the closure type matches the expected type
+    if !closure_ty.is_subtype_of(expected_ty) {
+        return Err(verifier
+            .error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset)
+            .with_message("Early bind function type mismatch".to_owned()));
+    }
+
     let SignatureToken::Function(param_tys, ret_tys, abilities) = expected_ty else {
         // The signature checker has ensured this is a function
         safe_assert!(false);
         unreachable!()
     };
-
-    // On top of the stack is the closure, pop it.
-    let closure_ty = safe_unwrap!(verifier.stack.pop());
-    // Verify that the closure type matches the expected type
-    if &closure_ty != expected_ty {
-        return Err(verifier
-            .error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset)
-            .with_message("closure type mismatch".to_owned()));
-    }
-    // Verify that the abilities match
-    let SignatureToken::Function(_, _, closure_abilities) = closure_ty else {
-        // Ensured above, but never panic
-        safe_assert!(false);
-        unreachable!()
-    };
-    if !abilities.is_subset(closure_abilities) {
-        return Err(verifier
-            .error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset)
-            .with_message("closure ability mismatch".to_owned()));
-    }
 
     if param_tys.len() < count {
         return Err(verifier.error(StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH, offset));
@@ -436,10 +420,12 @@ fn early_bind_function(
     let remaining_param_tys = &param_tys[count..];
 
     // Pop and verify arguments
-    for param_ty in binding_param_tys.iter().rev() {
+    for (i, param_ty) in binding_param_tys.iter().enumerate().rev() {
         let arg_ty = safe_unwrap!(verifier.stack.pop());
-        if &arg_ty != param_ty {
-            return Err(verifier.error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset));
+        if !arg_ty.is_subtype_of(param_ty) {
+            return Err(verifier
+                .error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset)
+                .with_message(format!("Early bind argument {} type mismatch", i)));
         }
     }
     let result_ty = SignatureToken::Function(
@@ -676,7 +662,7 @@ fn verify_instr(
 
         Bytecode::StLoc(idx) => {
             let operand = safe_unwrap!(verifier.stack.pop());
-            if &operand != verifier.local_at(*idx) {
+            if !operand.is_subtype_of(verifier.local_at(*idx)) {
                 return Err(verifier.error(StatusCode::STLOC_TYPE_MISMATCH_ERROR, offset));
             }
         },
@@ -692,7 +678,7 @@ fn verify_instr(
             let return_ = &verifier.function_view.return_().0;
             for return_type in return_.iter().rev() {
                 let operand = safe_unwrap!(verifier.stack.pop());
-                if &operand != return_type {
+                if !operand.is_subtype_of(return_type) {
                     return Err(verifier.error(StatusCode::RET_TYPE_MISMATCH_ERROR, offset));
                 }
             }
@@ -1078,7 +1064,7 @@ fn verify_instr(
         Bytecode::Shl | Bytecode::Shr => {
             let operand1 = safe_unwrap!(verifier.stack.pop());
             let operand2 = safe_unwrap!(verifier.stack.pop());
-            if operand2.is_integer() && operand1 == ST::U8 {
+            if operand1 == ST::U8 && operand2.is_integer() {
                 verifier.push(meter, operand2)?;
             } else {
                 return Err(verifier.error(StatusCode::INTEGER_OP_TYPE_MISMATCH_ERROR, offset));
@@ -1189,7 +1175,7 @@ fn verify_instr(
             let element_type = &verifier.resolver.signature_at(*idx).0[0];
             for _ in 0..*num {
                 let operand_type = safe_unwrap!(verifier.stack.pop());
-                if element_type != &operand_type {
+                if !operand_type.is_subtype_of(element_type) {
                     return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset));
                 }
             }
@@ -1202,6 +1188,7 @@ fn verify_instr(
             let operand = safe_unwrap!(verifier.stack.pop());
             let declared_element_type = &verifier.resolver.signature_at(*idx).0[0];
             match get_vector_element_type(operand, false) {
+                // TODO: Why do we care about element type here???
                 Some(derived_element_type) if &derived_element_type == declared_element_type => {
                     verifier.push(meter, ST::U64)?;
                 },
@@ -1222,11 +1209,12 @@ fn verify_instr(
             let operand_elem = safe_unwrap!(verifier.stack.pop());
             let operand_vec = safe_unwrap!(verifier.stack.pop());
             let declared_element_type = &verifier.resolver.signature_at(*idx).0[0];
-            if declared_element_type != &operand_elem {
+            if !operand_elem.is_subtype_of(declared_element_type) {
                 return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset));
             }
             match get_vector_element_type(operand_vec, true) {
-                Some(derived_element_type) if &derived_element_type == declared_element_type => {},
+                Some(derived_element_type)
+                    if declared_element_type.is_subtype_of(&derived_element_type) => {},
                 _ => return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset)),
             };
         },
@@ -1235,7 +1223,9 @@ fn verify_instr(
             let operand_vec = safe_unwrap!(verifier.stack.pop());
             let declared_element_type = &verifier.resolver.signature_at(*idx).0[0];
             match get_vector_element_type(operand_vec, true) {
-                Some(derived_element_type) if &derived_element_type == declared_element_type => {
+                Some(derived_element_type)
+                    if derived_element_type.is_subtype_of(declared_element_type) =>
+                {
                     verifier.push(meter, derived_element_type)?;
                 },
                 _ => return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset)),
@@ -1245,12 +1235,16 @@ fn verify_instr(
         Bytecode::VecUnpack(idx, num) => {
             let operand_vec = safe_unwrap!(verifier.stack.pop());
             let declared_element_type = &verifier.resolver.signature_at(*idx).0[0];
-            if operand_vec != ST::Vector(Box::new(declared_element_type.clone())) {
-                return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset));
-            }
-            for _ in 0..*num {
-                verifier.push(meter, declared_element_type.clone())?;
-            }
+            match get_vector_element_type(operand_vec, true) {
+                Some(derived_element_type)
+                    if derived_element_type.is_subtype_of(declared_element_type) =>
+                {
+                    for _ in 0..*num {
+                        verifier.push(meter, declared_element_type.clone())?;
+                    }
+                },
+                _ => return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset)),
+            };
         },
 
         Bytecode::VecSwap(idx) => {
@@ -1261,6 +1255,7 @@ fn verify_instr(
                 return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset));
             }
             let declared_element_type = &verifier.resolver.signature_at(*idx).0[0];
+            // TODO: Why do we need to know Vector element type here?
             match get_vector_element_type(operand_vec, true) {
                 Some(derived_element_type) if &derived_element_type == declared_element_type => {},
                 _ => return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset)),

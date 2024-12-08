@@ -28,7 +28,10 @@ use move_stackless_bytecode::{
     function_target_pipeline::FunctionVariant,
     stackless_bytecode::{AssignKind, AttrId, Bytecode, Constant, Label, Operation},
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    iter,
+};
 
 pub struct FunctionGenerator<'a> {
     /// The underlying module generator.
@@ -705,7 +708,7 @@ impl<'a> FunctionGenerator<'a> {
     fn gen_early_bind(&mut self, ctx: &BytecodeContext, dest: &[TempIndex], source: &[TempIndex]) {
         let fun_ctx = ctx.fun_ctx;
         let arg_count = source.len();
-        if arg_count < 2 || arg_count > 256 {
+        if !(2..=256).contains(&arg_count) {
             fun_ctx.internal_error(
                 "EarlyBind needs at least 2 args (a function value and at least one param).",
             );
@@ -718,10 +721,16 @@ impl<'a> FunctionGenerator<'a> {
         let fun_sign = self
             .gen
             .signature(&fun_ctx.module, &fun_ctx.loc, vec![fun_type.clone()]);
+        // Rotate args to push function arg last.
+        let args: Vec<_> = source[1..]
+            .iter()
+            .chain(iter::once(&source[0]))
+            .copied()
+            .collect();
 
-        self.abstract_push_args(ctx, source, None);
+        self.abstract_push_args(ctx, &args, None);
         self.emit(FF::Bytecode::EarlyBindFunction(fun_sign, bind_args));
-        self.abstract_pop_n(ctx, arg_count);
+        self.abstract_pop_n(ctx, args.len());
         self.abstract_push_result(ctx, dest);
     }
 
@@ -739,10 +748,16 @@ impl<'a> FunctionGenerator<'a> {
         let fun_sign = self
             .gen
             .signature(&fun_ctx.module, &fun_ctx.loc, vec![fun_type.clone()]);
+        // Rotate args to push function arg last.
+        let args: Vec<_> = source[1..]
+            .iter()
+            .chain(iter::once(&source[0]))
+            .copied()
+            .collect();
 
-        self.abstract_push_args(ctx, source, None);
+        self.abstract_push_args(ctx, &args, None);
         self.emit(FF::Bytecode::InvokeFunction(fun_sign));
-        self.abstract_pop_n(ctx, source.len());
+        self.abstract_pop_n(ctx, args.len());
         self.abstract_push_result(ctx, dest);
     }
 

@@ -76,3 +76,165 @@ fn resource_access_control(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>
         assert_vm_status!(result, StatusCode::FEATURE_NOT_ENABLED);
     }
 }
+
+fn lambda_build_options() -> BuildOptions {
+    BuildOptions::move_2_2()
+        .with_experiment("lambda-fields")
+        .with_experiment("lambda-in-params")
+        .with_experiment("lambda-in-returns")
+        .with_experiment("lambda-lifting")
+        .with_experiment("lambda-values")
+}
+
+#[rstest(enabled, disabled,
+         case(vec![], vec![FeatureFlag::ENABLE_FUNCTION_VALUES]),
+         case(vec![FeatureFlag::ENABLE_FUNCTION_VALUES], vec![]),
+)]
+fn function_types_only(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
+    let positive_test = !enabled.is_empty();
+    let mut h = MoveHarness::new_with_features(enabled, disabled);
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap());
+
+    let mut builder = PackageBuilder::new("Package");
+    let source = r#"
+        module 0x815::m {
+            public fun fn_id(f: |u64|u64 with copy): |u64|u64 with copy {
+                f
+            }
+        }
+    "#;
+    builder.add_source("m.move", source);
+    let path = builder.write_to_temp().unwrap();
+    let result = h.publish_package_with_options(&acc, path.path(), lambda_build_options());
+    if positive_test {
+        assert_success!(result);
+    } else {
+        assert_vm_status!(result, StatusCode::FEATURE_NOT_ENABLED)
+    }
+}
+
+#[rstest(enabled, disabled,
+    case(vec![], vec![FeatureFlag::ENABLE_FUNCTION_VALUES]),
+         case(vec![FeatureFlag::ENABLE_FUNCTION_VALUES], vec![]),
+)]
+fn function_values_apply_only(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
+    let positive_test = !enabled.is_empty();
+    let mut h = MoveHarness::new_with_features(enabled, disabled);
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap());
+
+    let mut builder = PackageBuilder::new("Package");
+    let source = r#"
+        module 0x815::m {
+            public fun map(f: |u64|u64 with copy, x: u64): u64 {
+                f(x)
+            }
+        }
+    "#;
+    builder.add_source("m.move", source);
+    let path = builder.write_to_temp().unwrap();
+    let result = h.publish_package_with_options(&acc, path.path(), lambda_build_options());
+    if positive_test {
+        assert_success!(result);
+    } else {
+        assert_vm_status!(result, StatusCode::FEATURE_NOT_ENABLED)
+    }
+}
+
+#[rstest(enabled, disabled,
+    case(vec![], vec![FeatureFlag::ENABLE_FUNCTION_VALUES]),
+          case(vec![FeatureFlag::ENABLE_FUNCTION_VALUES], vec![]),
+)]
+fn function_values_create_only(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
+    let positive_test = !enabled.is_empty();
+    let mut h = MoveHarness::new_with_features(enabled, disabled);
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap());
+
+    let mut builder = PackageBuilder::new("Package");
+    let source = r#"
+        module 0x815::m {
+            public fun add_func(x: u64, y: u64): u64 {
+                x + y
+            }
+            public fun build_function(): |u64, u64|u64 with copy+store {
+                add_func
+            }
+        }
+    "#;
+    builder.add_source("m.move", source);
+    let path = builder.write_to_temp().unwrap();
+    let result = h.publish_package_with_options(&acc, path.path(), lambda_build_options());
+    if positive_test {
+        assert_success!(result);
+    } else {
+        assert_vm_status!(result, StatusCode::FEATURE_NOT_ENABLED)
+    }
+}
+
+#[rstest(enabled, disabled,
+         case(vec![], vec![FeatureFlag::ENABLE_FUNCTION_VALUES]),
+          case(vec![FeatureFlag::ENABLE_FUNCTION_VALUES], vec![]),
+)]
+fn function_values_early_bind_only(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
+    let positive_test = !enabled.is_empty();
+    let mut h = MoveHarness::new_with_features(enabled, disabled);
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap());
+
+    let mut builder = PackageBuilder::new("Package");
+    let source = r#"
+        module 0x815::m {
+            public fun add_func(x: u64, y: u64): u64 {
+                x + y
+            }
+            public fun build_function(x: u64): |u64|u64 with copy+store {
+                let f = move |y| add_func(x, y);
+                f
+            }
+        }
+    "#;
+    builder.add_source("m.move", source);
+    let path = builder.write_to_temp().unwrap();
+    let result = h.publish_package_with_options(&acc, path.path(), lambda_build_options());
+    if positive_test {
+        assert_success!(result);
+    } else {
+        assert_vm_status!(result, StatusCode::FEATURE_NOT_ENABLED)
+    }
+}
+
+#[rstest(enabled, disabled,
+    case(vec![], vec![FeatureFlag::ENABLE_FUNCTION_VALUES]),
+         case(vec![FeatureFlag::ENABLE_FUNCTION_VALUES], vec![]),
+)]
+fn function_values(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
+    let positive_test = !enabled.is_empty();
+    let mut h = MoveHarness::new_with_features(enabled, disabled);
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap());
+
+    let mut builder = PackageBuilder::new("Package");
+    let source = r#"
+        module 0x815::m {
+            fun map(f: |u64|u64 with copy, x: u64): u64 {
+                f(x)
+            }
+            public fun add_func(x: u64, y: u64): u64 {
+                x + y
+            }
+            fun build_function(x: u64): |u64|u64 with copy+store {
+                let f = move |y| add_func(x, y);
+                f
+            }
+            public fun main(x: u64): u64 {
+                let g = build_function(x);
+                map(g, 3)
+            }
+        }
+    "#;
+    builder.add_source("m.move", source);
+    let path = builder.write_to_temp().unwrap();
+    let result = h.publish_package_with_options(&acc, path.path(), lambda_build_options());
+    if positive_test {
+        assert_success!(result);
+    } else {
+        assert_vm_status!(result, StatusCode::FEATURE_NOT_ENABLED)
+    }
+}

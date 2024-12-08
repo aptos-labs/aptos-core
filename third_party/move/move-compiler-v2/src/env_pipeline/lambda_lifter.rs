@@ -174,13 +174,36 @@ impl<'a> LambdaLifter<'a> {
             .make(&format!("param${}", parameter_pos))
     }
 
-    fn gen_closure_function_name(&mut self) -> Symbol {
-        let env = self.fun_env.module_env.env;
-        env.symbol_pool().make(&format!(
-            "{}$lambda${}",
-            self.fun_env.get_name().display(env.symbol_pool()),
-            self.lifted.len() + 1
-        ))
+    fn gen_closure_function_name(&mut self, loc: &Loc) -> Option<Symbol> {
+        let mod_env = &self.fun_env.module_env;
+        let env = mod_env.env;
+        let basename = self
+            .fun_env
+            .get_name()
+            .display(env.symbol_pool())
+            .to_string();
+        let name = format!("{}__lambda_{}", basename, self.lifted.len() + 1);
+        let sym = env.symbol_pool().make(&name);
+        if mod_env.find_function(sym).is_some() {
+            for i in 0..256 {
+                let name2 = format!("{}_{}", name, i);
+                let sym = env.symbol_pool().make(&name2);
+                if !mod_env.find_function(sym).is_some() {
+                    return Some(sym);
+                }
+            }
+            env.error(
+                &loc,
+                &format!(
+                    "Can't find an available function name similar to {} in module {} to use for lambda implementation.",
+                    basename,
+                    mod_env.get_full_name_str()
+                ),
+            );
+            None
+        } else {
+            Some(sym)
+        }
     }
 
     fn bind(&self, mut bindings: Vec<(Pattern, Exp)>, exp: Exp) -> Exp {
@@ -620,13 +643,10 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
 
     fn rewrite_assign(&mut self, _node_id: NodeId, lhs: &Pattern, _rhs: &Exp) -> Option<Exp> {
         for (node_id, name) in lhs.vars() {
-            self.free_locals.insert(
-                name,
-                VarInfo {
-                    node_id,
-                    modified: true,
-                },
-            );
+            self.free_locals.insert(name, VarInfo {
+                node_id,
+                modified: true,
+            });
         }
         None
     }
@@ -635,22 +655,16 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         if matches!(oper, Operation::Borrow(ReferenceKind::Mutable)) {
             match args[0].as_ref() {
                 ExpData::LocalVar(node_id, name) => {
-                    self.free_locals.insert(
-                        *name,
-                        VarInfo {
-                            node_id: *node_id,
-                            modified: true,
-                        },
-                    );
+                    self.free_locals.insert(*name, VarInfo {
+                        node_id: *node_id,
+                        modified: true,
+                    });
                 },
                 ExpData::Temporary(node_id, param) => {
-                    self.free_params.insert(
-                        *param,
-                        VarInfo {
-                            node_id: *node_id,
-                            modified: true,
-                        },
-                    );
+                    self.free_params.insert(*param, VarInfo {
+                        node_id: *node_id,
+                        modified: true,
+                    });
                 },
                 _ => {},
             }
@@ -734,8 +748,8 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         params.append(&mut lambda_params);
 
         // Add new closure function
-        let fun_name = self.gen_closure_function_name();
         let lambda_loc = env.get_node_loc(id).clone();
+        let fun_name = self.gen_closure_function_name(&lambda_loc)?;
         let lambda_type = env.get_node_type(id);
         let lambda_inst_opt = env.get_node_instantiation_opt(id);
         let result_type = if let Type::Fun(_, result_type, _) = &lambda_type {
