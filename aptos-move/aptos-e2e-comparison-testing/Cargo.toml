@@ -36,3 +36,4 @@ serde = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
+aptos-replay-benchmark = { workspace = true }
