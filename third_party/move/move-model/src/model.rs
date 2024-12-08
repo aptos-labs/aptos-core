@@ -1202,7 +1202,13 @@ impl GlobalEnv {
 
     /// Writes accumulated diagnostics of given or higher severity.
     pub fn report_diag<W: WriteColor>(&self, writer: &mut W, severity: Severity) {
-        self.report_diag_with_filter(writer, |d| d.severity >= severity)
+        self.report_diag_with_filter(
+            |files, diag| {
+                emit(writer, &Config::default(), files, diag).expect("emit must not fail")
+            },
+            |d| d.severity >= severity,
+        );
+        // self.report_diag_with_filter(writer, |d| d.severity >= severity)
     }
 
     /// Helper function to report diagnostics, check for errors, and fail with a message on
@@ -1301,11 +1307,11 @@ impl GlobalEnv {
     }
 
     /// Writes accumulated diagnostics that pass through `filter`
-    pub fn report_diag_with_filter<W: WriteColor, F: FnMut(&Diagnostic<FileId>) -> bool>(
-        &self,
-        writer: &mut W,
-        mut filter: F,
-    ) {
+    pub fn report_diag_with_filter<E, F>(&self, mut emitter: E, mut filter: F)
+    where
+        E: FnMut(&Files<String>, &Diagnostic<FileId>),
+        F: FnMut(&Diagnostic<FileId>) -> bool,
+    {
         let mut shown = BTreeSet::new();
         self.diags.borrow_mut().sort_by(|a, b| {
             let reported_ordering = a.1.cmp(&b.1);
@@ -1327,13 +1333,49 @@ impl GlobalEnv {
                 // Avoid showing the same message twice. This can happen e.g. because of
                 // duplication of expressions via schema inclusion.
                 if shown.insert(format!("{:?}", diag)) {
-                    emit(writer, &Config::default(), &self.source_files, diag)
-                        .expect("emit must not fail");
+                    emitter(&self.source_files, diag);
+                    // emit(writer, &Config::default(), &self.source_files, diag)
+                    //     .expect("emit must not fail");
                 }
                 *reported = true;
             }
         }
     }
+
+    // /// Writes accumulated diagnostics that pass through `filter`
+    // pub fn report_diag_with_filter<W: WriteColor, F: FnMut(&Diagnostic<FileId>) -> bool>(
+    //     &self,
+    //     writer: &mut W,
+    //     mut filter: F,
+    // ) {
+    //     let mut shown = BTreeSet::new();
+    //     self.diags.borrow_mut().sort_by(|a, b| {
+    //         let reported_ordering = a.1.cmp(&b.1);
+    //         if Ordering::Equal == reported_ordering {
+    //             GlobalEnv::cmp_diagnostic(&a.0, &b.0)
+    //         } else {
+    //             reported_ordering
+    //         }
+    //     });
+    //     for (diag, reported) in self.diags.borrow_mut().iter_mut().filter(|(d, reported)| {
+    //         !reported
+    //             && filter(d)
+    //             && (d.severity >= Severity::Error
+    //                 || d.labels
+    //                     .iter()
+    //                     .any(|label| self.file_id_is_primary_target.contains(&label.file_id)))
+    //     }) {
+    //         if !*reported {
+    //             // Avoid showing the same message twice. This can happen e.g. because of
+    //             // duplication of expressions via schema inclusion.
+    //             if shown.insert(format!("{:?}", diag)) {
+    //                 emit(writer, &Config::default(), &self.source_files, diag)
+    //                     .expect("emit must not fail");
+    //             }
+    //             *reported = true;
+    //         }
+    //     }
+    // }
 
     /// Adds a global invariant to this environment.
     pub fn add_global_invariant(&mut self, inv: GlobalInvariant) {
