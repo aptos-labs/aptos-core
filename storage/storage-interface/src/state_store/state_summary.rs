@@ -1,18 +1,24 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::{
-    state::{LedgerState, State},
-    state_delta::StateDelta,
+use crate::{
+    metrics::TIMER,
+    state_store::{
+        state::{LedgerState, State},
+        state_update_ref_map::BatchedStateUpdateRefs,
+    },
 };
-use aptos_crypto::HashValue;
+use anyhow::Result;
+use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
 use aptos_types::{
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     transaction::Version,
 };
 use derive_more::Deref;
-use std::sync::Arc;
+use itertools::Itertools;
+use rayon::prelude::*;
 
 /// The data structure through which the entire state at a given
 /// version can be summarized to a concise digest (the root hash).
@@ -61,13 +67,49 @@ impl StateSummary {
 
     pub fn update(
         &self,
-        _persisted: &StateSummary,
-        _base: &StateSummary,
-        _updates: &StateDelta,
-        _proof_reader: Arc<dyn ProofRead>,
-    ) -> Self {
-        // FIXME(aldenhu)
-        todo!()
+        persisted: &StateSummary,
+        // Must read proof at the `persisted` version. TODO(aldenhu): refactor to enforce that.
+        proof_reader: &impl ProofRead,
+        updates: &BatchedStateUpdateRefs,
+    ) -> Result<Self> {
+        let _timer = TIMER.timer_with(&["state_summary__update"]);
+
+        // Persisted must be before or at my version.
+        assert!(persisted.next_version() <= self.next_version());
+        // Updates must start at exactly my version.
+        assert_eq!(updates.first_version(), self.next_version());
+
+        let smt_updates = updates
+            .shards
+            .par_iter() // clone hashes and sort items in parallel
+            // TODO(aldenhu): smt per shard?
+            .flat_map(|shard| {
+                shard
+                    .iter()
+                    .sorted_by(|(k1, _u1), (k2, _u2)| {
+                        k1.crypto_hash_ref().cmp(k2.crypto_hash_ref())
+                    })
+                    .map(|(k, u)| (CryptoHash::hash(*k), u.value))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+
+        // TODO(aldenhu): smt leaf not carry StateValue
+        let smt = self
+            .global_state_summary
+            .freeze(&persisted.global_state_summary)
+            .batch_update(
+                smt_updates,
+                // TODO(aldenhu): smt not carry usage
+                StateStorageUsage::Untracked,
+                proof_reader,
+            )?
+            .unfreeze();
+
+        Ok(Self {
+            next_version: updates.next_version(),
+            global_state_summary: smt,
+        })
     }
 }
 
@@ -80,12 +122,12 @@ pub struct LedgerStateSummary {
 }
 
 impl LedgerStateSummary {
-    pub fn new(last_checkpoint_summary: StateSummary, state_summary: StateSummary) -> Self {
-        assert!(last_checkpoint_summary.next_version() <= state_summary.next_version());
+    pub fn new(last_checkpoint: StateSummary, latest: StateSummary) -> Self {
+        assert!(last_checkpoint.next_version() <= latest.next_version());
 
         Self {
-            last_checkpoint: last_checkpoint_summary,
-            latest: state_summary,
+            last_checkpoint,
+            latest,
         }
     }
 
@@ -114,14 +156,30 @@ impl LedgerStateSummary {
         &self.last_checkpoint
     }
 
-    pub fn update(
+    pub fn update<'kv>(
         &self,
-        _persisted: &LedgerStateSummary,
-        _state_delta: &StateDelta,
-        _proof_reader: Arc<dyn ProofRead>,
-    ) -> Self {
-        // FIXME(aldenhu)
-        todo!()
+        persisted: &StateSummary,
+        // Must read proof at the `persisted` version. TODO(aldenhu): refactor to enforce that.
+        proof_reader: &impl ProofRead,
+        updates_for_last_checkpoint: Option<&BatchedStateUpdateRefs<'kv>>,
+        updates_for_latest: &BatchedStateUpdateRefs<'kv>,
+    ) -> Result<Self> {
+        let _timer = TIMER.timer_with(&["ledger_state_summary__update"]);
+
+        let last_checkpoint = if let Some(updates) = updates_for_last_checkpoint {
+            self.latest.update(persisted, proof_reader, updates)?
+        } else {
+            self.last_checkpoint.clone()
+        };
+
+        let base_of_latest = if updates_for_last_checkpoint.is_none() {
+            self.latest()
+        } else {
+            &last_checkpoint
+        };
+        let latest = base_of_latest.update(persisted, proof_reader, updates_for_latest)?;
+
+        Ok(Self::new(last_checkpoint, latest))
     }
 }
 
