@@ -11,7 +11,10 @@ use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColo
 use log::{debug, info, warn};
 use move_abigen::Abigen;
 use move_compiler::shared::{known_attributes::KnownAttribute, PackagePaths};
-use move_compiler_v2::{env_pipeline::rewrite_target::RewritingScope, Experiment};
+use move_compiler_v2::{
+    diagnostics::message_format::MessageFormat, env_pipeline::rewrite_target::RewritingScope,
+    Experiment,
+};
 use move_docgen::Docgen;
 use move_errmapgen::ErrmapGen;
 use move_model::{
@@ -92,6 +95,7 @@ pub fn run_move_prover_v2<W: WriteColor>(
         compile_test_code: false,
         compile_verify_code: true,
         external_checks: vec![],
+        message_format: MessageFormat::default(),
     };
 
     let mut env = move_compiler_v2::run_move_compiler_for_analysis(error_writer, compiler_options)?;
