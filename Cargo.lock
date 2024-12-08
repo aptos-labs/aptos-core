@@ -834,6 +834,7 @@ dependencies = [
  "aptos-block-executor",
  "aptos-framework",
  "aptos-language-e2e-tests",
+ "aptos-replay-benchmark",
  "aptos-rest-client",
  "aptos-types",
  "aptos-validator-interface",
