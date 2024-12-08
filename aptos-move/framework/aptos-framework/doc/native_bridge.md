@@ -9,8 +9,6 @@
 -  [Struct `OutboundTransfer`](#0x1_native_bridge_store_OutboundTransfer)
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_native_bridge_store_initialize)
--  [Function `hex_to_bytes`](#0x1_native_bridge_store_hex_to_bytes)
--  [Function `ascii_hex_to_u8`](#0x1_native_bridge_store_ascii_hex_to_u8)
 -  [Function `normalize_to_32_bytes`](#0x1_native_bridge_store_normalize_to_32_bytes)
 -  [Function `is_inbound_nonce_set`](#0x1_native_bridge_store_is_inbound_nonce_set)
 -  [Function `create_details`](#0x1_native_bridge_store_create_details)
@@ -215,80 +213,6 @@ Initializes the initiators tables and nonce.
 
 </details>
 
-<a id="0x1_native_bridge_store_hex_to_bytes"></a>
-
-## Function `hex_to_bytes`
-
-Takes an Ethereum address in ASCII hex, and converts to u8 (the raw Ethereum address bytes)
-@param input: the vector<u8> to convert to raw bytes
-@return vector of raw Ethereum address bytes (the human-readable characters of the address)
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_hex_to_bytes">hex_to_bytes</a>(input: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_hex_to_bytes">hex_to_bytes</a>(input: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <b>let</b> result = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
-    <b>let</b> i = 0;
-
-    // Ensure the input length is valid (2 characters per byte)
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&input) % 2 == 0, 1);
-
-    <b>while</b> (i &lt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&input)) {
-        <b>let</b> high_nibble = <a href="native_bridge.md#0x1_native_bridge_store_ascii_hex_to_u8">ascii_hex_to_u8</a>(*<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&input, i));
-        <b>let</b> low_nibble = <a href="native_bridge.md#0x1_native_bridge_store_ascii_hex_to_u8">ascii_hex_to_u8</a>(*<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&input, i + 1));
-        <b>let</b> byte = (high_nibble &lt;&lt; 4) | low_nibble;
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> result, byte);
-        i = i + 2;
-    };
-
-    result
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_native_bridge_store_ascii_hex_to_u8"></a>
-
-## Function `ascii_hex_to_u8`
-
-
-
-<pre><code><b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_ascii_hex_to_u8">ascii_hex_to_u8</a>(ch: u8): u8
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_ascii_hex_to_u8">ascii_hex_to_u8</a>(ch: u8): u8 {
-    <b>if</b> (ch &gt;= 0x30 && ch &lt;= 0x39) { // '0'-'9'
-        ch - 0x30
-    } <b>else</b> <b>if</b> (ch &gt;= 0x41 && ch &lt;= 0x46) { // 'A'-'F'
-        ch - 0x41 + 10
-    } <b>else</b> <b>if</b> (ch &gt;= 0x61 && ch &lt;= 0x66) { // 'a'-'f'
-        ch - 0x61 + 10
-    } <b>else</b> {
-        <b>assert</b>!(<b>false</b>, 2); // Abort <b>with</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a> <a href="code.md#0x1_code">code</a> 2
-        0 // This is unreachable, but <b>ensures</b> type consistency
-    }
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_native_bridge_store_normalize_to_32_bytes"></a>
 
 ## Function `normalize_to_32_bytes`
@@ -309,24 +233,28 @@ Takes a vector, removes trailing zeroes, and pads with zeroes on the left until 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_normalize_to_32_bytes">normalize_to_32_bytes</a>(value: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <b>let</b> meaningful = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
-    <b>let</b> i = 0;
+    <b>let</b> i = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&value) - 1;
 
     // Remove trailing zeroes
-    <b>while</b> (i &lt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&value)) {
-        <b>if</b> (*<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&value, i) != 0x00) {
-            <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> meaningful, *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&value, i));
-        };
-        i = i + 1;
+    <b>while</b> (i &gt;= 0 && *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&value, i) == 0x00) {
+        i = i - 1;
+    };
+
+    // Copy the meaningful bytes
+    <b>let</b> j = 0;
+    <b>while</b> (j &lt;= i) {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> meaningful, *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&value, j));
+        j = j + 1;
     };
 
     <b>let</b> result = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
 
     // Pad <b>with</b> zeros on the left
     <b>let</b> padding_length = 32 - <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&meaningful);
-    <b>let</b> j = 0;
-    <b>while</b> (j &lt; padding_length) {
+    <b>let</b> k = 0;
+    <b>while</b> (k &lt; padding_length) {
         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> result, 0x00);
-        j = j + 1;
+        k = k + 1;
     };
 
     // Append the meaningful bytes
@@ -529,7 +457,7 @@ Generates a unique outbound bridge transfer ID based on transfer details and non
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_bridge_transfer_id">bridge_transfer_id</a>(initiator: <b>address</b>, recipient: EthereumAddress, amount: u64, nonce: u64) : <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     // Serialize each param
     <b>let</b> initiator_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>&lt;<b>address</b>&gt;(&initiator);
-    <b>let</b> recipient_bytes = <a href="native_bridge.md#0x1_native_bridge_store_hex_to_bytes">hex_to_bytes</a>(<a href="atomic_bridge.md#0x1_ethereum_get_inner_ethereum_address">ethereum::get_inner_ethereum_address</a>(recipient));
+    <b>let</b> recipient_bytes = <a href="atomic_bridge.md#0x1_ethereum_get_inner_ethereum_address">ethereum::get_inner_ethereum_address</a>(recipient);
     <b>let</b> amount_bytes = <a href="native_bridge.md#0x1_native_bridge_store_normalize_to_32_bytes">normalize_to_32_bytes</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>&lt;u64&gt;(&amount));
     <b>let</b> nonce_bytes = <a href="native_bridge.md#0x1_native_bridge_store_normalize_to_32_bytes">normalize_to_32_bytes</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>&lt;u64&gt;(&nonce));
     //Contatenate then <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a> and <b>return</b> bridge transfer ID
@@ -1742,7 +1670,6 @@ Completes a bridge transfer on the destination chain.
     <b>assert</b>!(nonce &gt; 0, <a href="native_bridge.md#0x1_native_bridge_EINVALID_NONCE">EINVALID_NONCE</a>);
 
     // Validate the bridge_transfer_id by reconstructing the <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>
-    //<b>let</b> initiator_bytes = <a href="native_bridge.md#0x1_native_bridge_store_hex_to_bytes">native_bridge_store::hex_to_bytes</a>(initiator);
     <b>let</b> recipient_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&recipient);
     <b>let</b> amount_bytes = <a href="native_bridge.md#0x1_native_bridge_store_normalize_to_32_bytes">native_bridge_store::normalize_to_32_bytes</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>&lt;u64&gt;(&amount));
     <b>let</b> nonce_bytes = <a href="native_bridge.md#0x1_native_bridge_store_normalize_to_32_bytes">native_bridge_store::normalize_to_32_bytes</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>&lt;u64&gt;(&nonce));
