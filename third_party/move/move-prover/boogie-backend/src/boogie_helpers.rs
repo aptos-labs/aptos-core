@@ -559,6 +559,10 @@ pub fn boogie_constant(env: &GlobalEnv, _options: &BoogieOptions, val: &Constant
         ),
         Constant::U16(num) => num.to_string(),
         Constant::U32(num) => num.to_string(),
+        Constant::Function(mid, fid, inst) => format!(
+            "<unimplemented boogie_constant Function({:?}, {:?}, {:?}>",
+            mid, fid, inst
+        ), // TODO(LAMBDA)
     }
 }
 
@@ -592,7 +596,10 @@ pub fn boogie_value(env: &GlobalEnv, _options: &BoogieOptions, val: &Value) -> S
                 .collect_vec(),
         ),
         Value::Tuple(vec) => format!("<<unsupported Tuple({:?})>>", vec),
-        Value::Function(mid, fid) => format!("<unimplemented value Function({:?}, {:?}>", mid, fid), // TODO(LAMBDA)
+        Value::Function(mid, fid, inst) => format!(
+            "<unimplemented value Function({:?}, {:?}, {:?}>",
+            mid, fid, inst
+        ), // TODO(LAMBDA)
     }
 }
 

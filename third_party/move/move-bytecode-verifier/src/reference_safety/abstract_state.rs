@@ -579,7 +579,7 @@ impl AbstractState {
             //    InvokeFunction to call to functions defined in the same module.
             return Err(self.error(StatusCode::INVALID_ACQUIRES_ANNOTATION, offset));
         }
-        // TODO(LAMBDA): Double-check that we don't need meter adjustments here.
+        // TODO(LAMBDA): TODO(LAMBDA-MVP) Double-check that we don't need meter adjustments here.
         Ok(AbstractValue::NonReference)
     }
 

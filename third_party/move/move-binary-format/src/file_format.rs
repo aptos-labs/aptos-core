@@ -50,6 +50,7 @@ use ref_cast::RefCast;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Formatter},
+    iter,
     ops::BitOr,
 };
 use variant_count::VariantCount;
@@ -849,20 +850,24 @@ impl AbilitySet {
             | (Ability::Store as u8)
             | (Ability::Key as u8),
     );
+    /// Abilities for user-defined/"primitive" functions (not closures) which can be stored
+    /// (are public and not generic, see above)
+    pub const DEFINED_FUNCTIONS_HAS_STORE: AbilitySet =
+        Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));
+    /// Abilities for user-defined/primitive functions (not closures) which
+    /// - are private -- can be changed in module upgrades, so should not be stored
+    /// - are generic -- are harder to serialize, so deferred for now.
+    /// TODO(LAMBDA) - allow generic functions to be stored
+    pub const DEFINED_FUNCTIONS_NO_STORE: AbilitySet =
+        Self((Ability::Copy as u8) | (Ability::Drop as u8));
     /// The empty ability set
     pub const EMPTY: Self = Self(0);
-    /// Minimal abilities for all `Functions`
-    pub const FUNCTIONS: AbilitySet = Self(Ability::Drop as u8);
     /// Maximal abilities for all `Functions`.  This is used for identity when unifying function types.
-    pub const MAXIMAL_FUNCTIONS: AbilitySet = Self::PUBLIC_FUNCTIONS;
+    pub const FUNCTIONS_MAX: AbilitySet = Self::DEFINED_FUNCTIONS_HAS_STORE;
+    /// Minimal abilities for all `Functions`
+    pub const FUNCTIONS_MIN: AbilitySet = Self(Ability::Drop as u8);
     /// Abilities for `Bool`, `U8`, `U64`, `U128`, and `Address`
     pub const PRIMITIVES: AbilitySet =
-        Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));
-    /// Abilities for `private` user-defined/"primitive" functions (not closures).
-    /// These can be be changed in module upgrades, so should not be stored
-    pub const PRIVATE_FUNCTIONS: AbilitySet = Self((Ability::Copy as u8) | (Ability::Drop as u8));
-    /// Abilities for `public` user-defined/"primitive" functions (not closures)
-    pub const PUBLIC_FUNCTIONS: AbilitySet =
         Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));
     /// Abilities for `Reference` and `MutableReference`
     pub const REFERENCES: AbilitySet = Self((Ability::Copy as u8) | (Ability::Drop as u8));
@@ -1266,7 +1271,7 @@ pub enum SignatureToken {
     Function(
         Vec<SignatureToken>, // args
         Vec<SignatureToken>, // results
-        AbilitySet, // abilities
+        AbilitySet,          // abilities
     ),
     /// User defined type
     Struct(StructHandleIndex),
@@ -1310,7 +1315,7 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIter<'a> {
                         self.stack.extend(inner_toks.iter().rev())
                     },
 
-                    Function( args, results, .. ) => {
+                    Function(args, results, ..) => {
                         self.stack.extend(args.iter().rev());
                         self.stack.extend(results.iter().rev());
                     },
@@ -1348,7 +1353,7 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIterWithDepth<'a> {
                         .stack
                         .extend(inner_toks.iter().map(|tok| (tok, depth + 1)).rev()),
 
-                    Function( args, results, .. ) => {
+                    Function(args, results, ..) => {
                         self.stack
                             .extend(args.iter().map(|tok| (tok, depth + 1)).rev());
                         self.stack
@@ -1415,11 +1420,7 @@ impl std::fmt::Debug for SignatureToken {
             SignatureToken::Address => write!(f, "Address"),
             SignatureToken::Signer => write!(f, "Signer"),
             SignatureToken::Vector(boxed) => write!(f, "Vector({:?})", boxed),
-            SignatureToken::Function (
-                args,
-                results,
-                abilities,
-            ) => {
+            SignatureToken::Function(args, results, abilities) => {
                 write!(f, "Function({:?}, {:?}, {})", args, results, abilities)
             },
             SignatureToken::Reference(boxed) => write!(f, "Reference({:?})", boxed),
@@ -1443,7 +1444,7 @@ impl SignatureToken {
             | Address
             | Signer
             | Vector(_)
-            | Function ( .. )
+            | Function(..)
             | Struct(_)
             | StructInstantiation(_, _)
             | Reference(_)
@@ -1482,7 +1483,7 @@ impl SignatureToken {
             Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
             Vector(inner) => inner.is_valid_for_constant(),
             Signer
-            | Function ( .. )
+            | Function(..)
             | Struct(_)
             | StructInstantiation(_, _)
             | Reference(_)
@@ -1495,7 +1496,7 @@ impl SignatureToken {
     pub fn is_function(&self) -> bool {
         use SignatureToken::*;
 
-        matches!(self, Function ( .. ))
+        matches!(self, Function(..))
     }
 
     /// Set the index to this one. Useful for random testing.
@@ -1546,15 +1547,9 @@ impl SignatureToken {
             Address => Address,
             Signer => Signer,
             Vector(ty) => Vector(Box::new(ty.instantiate(subst_mapping))),
-            Function (
-                args,
-                results,
-                abilities,
-            ) => Function (
-                inst_vec(args),
-                inst_vec(results),
-                *abilities,
-            ),
+            Function(args, results, abilities) => {
+                Function(inst_vec(args), inst_vec(results), *abilities)
+            },
             Struct(idx) => Struct(*idx),
             StructInstantiation(idx, struct_type_args) => {
                 StructInstantiation(*idx, inst_vec(struct_type_args))
@@ -1562,6 +1557,30 @@ impl SignatureToken {
             Reference(ty) => Reference(Box::new(ty.instantiate(subst_mapping))),
             MutableReference(ty) => MutableReference(Box::new(ty.instantiate(subst_mapping))),
             TypeParameter(idx) => subst_mapping[*idx as usize].clone(),
+        }
+    }
+
+    /// Can [self] be used in contexts where [other] is expected?
+    /// TODO(LAMBDA): extend beyond very simple function subtyping.
+    pub fn is_subtype_of(&self, other: &Self) -> bool {
+        use SignatureToken::*;
+        if self == other {
+            true
+        } else {
+            match (self, other) {
+                (Function(args, res, abilities), Function(args2, res2, abilities2)) => {
+                    // We need:
+                    // - Other has fewer abilities
+                    // - other's args are a subtypes of self's corresponding args
+                    // - self's results are subtypes of self's results
+                    abilities2.is_subset(*abilities)
+                        && args.len() == args2.len()
+                        && res.len() == res2.len()
+                        && iter::zip(args, args2).all(|(arg, arg2)| arg2.is_subtype_of(arg))
+                        && iter::zip(res, res2).all(|(res, res2)| res.is_subtype_of(res2))
+                },
+                _ => false,
+            }
         }
     }
 }

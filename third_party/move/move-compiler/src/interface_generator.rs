@@ -273,12 +273,12 @@ fn write_ability_constraint(abs: AbilitySet) -> String {
 }
 
 fn function_value_abilities_to_str(abs: AbilitySet) -> String {
-    if abs.is_subset(AbilitySet::FUNCTIONS) {
+    if abs.is_subset(AbilitySet::FUNCTIONS_MIN) {
         return "".to_string();
     }
     format!(
         ": {}",
-        abs.setminus(AbilitySet::FUNCTIONS)
+        abs.setminus(AbilitySet::FUNCTIONS_MIN)
             .into_iter()
             .map(write_ability)
             .collect::<Vec<_>>()

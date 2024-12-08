@@ -148,6 +148,7 @@ fn invoke_function(
     result_tys: Vec<SignatureToken>,
     meter: &mut impl Meter,
 ) -> PartialVMResult<()> {
+    let _func = verifier.stack.pop().unwrap();
     let arguments = arg_tys
         .iter()
         .map(|_| verifier.stack.pop().unwrap())

@@ -1042,6 +1042,22 @@ impl Generator {
                     srcs,
                 )
             },
+            EarlyBindFunction => {
+                self.gen_call_stm(ctx, None, dests, Operation::EarlyBindFunction, srcs)
+            },
+            InvokeFunction => {
+                assert!(srcs.len() >= 1);
+                let invoke_stm = ExpData::InvokeFunction(
+                    self.new_stm_node_id(ctx),
+                    self.make_temp(ctx, srcs[0]),
+                    self.make_temps(ctx, srcs[1..].iter().copied()),
+                );
+                if !dests.is_empty() {
+                    self.gen_assign(ctx, dests, invoke_stm)
+                } else {
+                    self.add_stm(invoke_stm);
+                }
+            },
             Drop | Release => {
                 // Do nothing
             },

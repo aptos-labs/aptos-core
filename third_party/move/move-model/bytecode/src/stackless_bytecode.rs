@@ -112,6 +112,20 @@ pub enum Constant {
     U16(u16),
     U32(u32),
     U256(U256),
+    Function(ModuleId, FunId, Vec<Type>),
+}
+
+impl Constant {
+    /// Creates a format object for a constant in context of a function target.
+    pub fn display<'env>(
+        &'env self,
+        func_target: &'env FunctionTarget<'env>,
+    ) -> ConstantDisplay<'env> {
+        ConstantDisplay {
+            constant: self,
+            func_target,
+        }
+    }
 }
 
 impl From<&u256::U256> for Constant {
@@ -144,6 +158,10 @@ impl Constant {
                     .collect(),
             ),
             Constant::Vector(v) => MoveValue::Vector(v.iter().map(|x| x.to_move_value()).collect()),
+            Constant::Function(_mid, _fid, _inst) => {
+                // TODO(LAMBDA) TODO(LAMBDA_MVP)
+                unimplemented!("need to do for lambda")
+            },
         }
     }
 
@@ -166,6 +184,7 @@ impl Constant {
             Constant::AddressArray(v) => {
                 Value::Vector(v.iter().map(|x| Value::Address(x.clone())).collect())
             },
+            Constant::Function(mid, fid, inst) => Value::Function(*mid, *fid, inst.to_vec()),
         }
     }
 }
@@ -196,6 +215,10 @@ pub enum Operation {
     PackVariant(ModuleId, StructId, Symbol, Vec<Type>),
     UnpackVariant(ModuleId, StructId, Symbol, Vec<Type>),
     BorrowVariantField(ModuleId, StructId, Vec<Symbol>, Vec<Type>, usize),
+
+    // Lambda
+    EarlyBindFunction,
+    InvokeFunction,
 
     // Borrow
     BorrowLoc,
@@ -295,6 +318,8 @@ impl Operation {
             Operation::PackVariant(_, _, _, _) => false,
             Operation::UnpackVariant(_, _, _, _) => true, // aborts if not given variant
             Operation::BorrowVariantField(_, _, _, _, _) => true, // aborts if not given variant
+            Operation::EarlyBindFunction => false,
+            Operation::InvokeFunction => true,
             Operation::MoveTo(_, _, _) => true,
             Operation::MoveFrom(_, _, _) => true,
             Operation::Exists(_, _, _) => false,
@@ -1021,7 +1046,12 @@ impl<'env> fmt::Display for BytecodeDisplay<'env> {
                 self.fmt_locals(f, srcs, false)?;
             },
             Load(_, dst, cons) => {
-                write!(f, "{} := {}", self.lstr(*dst), cons)?;
+                write!(
+                    f,
+                    "{} := {}",
+                    self.lstr(*dst),
+                    cons.display(self.func_target)
+                )?;
             },
             Branch(_, then_label, else_label, src) => {
                 write!(
@@ -1191,6 +1221,15 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
                     self.struct_str(*mid, *sid, targs),
                     variant.display(self.func_target.symbol_pool())
                 )?;
+            },
+
+            // Lambdas
+            EarlyBindFunction => {
+                write!(f, "earlybind")?;
+            },
+
+            InvokeFunction => {
+                write!(f, "invoke")?;
             },
 
             // Borrow
@@ -1411,20 +1450,24 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
     }
 }
 
+fn fmt_type_args_impl(env: &GlobalEnv, f: &mut Formatter<'_>, targs: &[Type]) -> fmt::Result {
+    if !targs.is_empty() {
+        let tctx = TypeDisplayContext::new(env);
+        write!(f, "<")?;
+        for (i, ty) in targs.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}", ty.display(&tctx))?;
+        }
+        write!(f, ">")?;
+    }
+    Ok(())
+}
+
 impl<'env> OperationDisplay<'env> {
     fn fmt_type_args(&self, f: &mut Formatter<'_>, targs: &[Type]) -> fmt::Result {
-        if !targs.is_empty() {
-            let tctx = TypeDisplayContext::new(self.func_target.global_env());
-            write!(f, "<")?;
-            for (i, ty) in targs.iter().enumerate() {
-                if i > 0 {
-                    write!(f, ", ")?;
-                }
-                write!(f, "{}", ty.display(&tctx))?;
-            }
-            write!(f, ">")?;
-        }
-        Ok(())
+        fmt_type_args_impl(self.func_target.global_env(), f, targs)
     }
 
     fn struct_str(&self, mid: ModuleId, sid: StructId, targs: &[Type]) -> String {
@@ -1434,10 +1477,22 @@ impl<'env> OperationDisplay<'env> {
     }
 }
 
-impl fmt::Display for Constant {
+/// A display object for a constant
+pub struct ConstantDisplay<'env> {
+    constant: &'env Constant,
+    func_target: &'env FunctionTarget<'env>,
+}
+
+impl<'env> ConstantDisplay<'env> {
+    fn fmt_type_args(&self, f: &mut Formatter<'_>, targs: &[Type]) -> fmt::Result {
+        fmt_type_args_impl(self.func_target.global_env(), f, targs)
+    }
+}
+
+impl<'env> fmt::Display for ConstantDisplay<'env> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         use Constant::*;
-        match self {
+        match self.constant {
             Bool(x) => write!(f, "{}", x)?,
             U8(x) => write!(f, "{}", x)?,
             U64(x) => write!(f, "{}", x)?,
@@ -1446,9 +1501,33 @@ impl fmt::Display for Constant {
             Address(x) => write!(f, "{}", address_to_string(x))?,
             ByteArray(x) => write!(f, "{:?}", x)?,
             AddressArray(x) => write!(f, "{:?}", x.iter().map(address_to_string).collect_vec())?,
-            Vector(x) => write!(f, "{:?}", x.iter().map(|v| format!("{}", v)).collect_vec())?,
+            Vector(x) => write!(
+                f,
+                "{:?}",
+                x.iter()
+                    .map(|v| format!("{}", v.display(self.func_target)))
+                    .collect_vec()
+            )?,
             U16(x) => write!(f, "{}", x)?,
             U32(x) => write!(f, "{}", x)?,
+            Function(mid, fid, targs) => {
+                let func_env = self
+                    .func_target
+                    .global_env()
+                    .get_module(*mid)
+                    .into_function(*fid);
+                write!(
+                    f,
+                    "{}::{}",
+                    self.func_target
+                        .func_env
+                        .module_env
+                        .get_name()
+                        .display(func_env.module_env.env),
+                    func_env.get_name().display(func_env.symbol_pool()),
+                )?;
+                self.fmt_type_args(f, targs)?;
+            },
         }
         Ok(())
     }

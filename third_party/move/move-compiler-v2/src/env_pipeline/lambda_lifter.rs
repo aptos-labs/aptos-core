@@ -42,6 +42,7 @@
 //! ```
 
 use itertools::Itertools;
+use log::debug;
 use move_binary_format::file_format::{AbilitySet, Visibility};
 use move_model::{
     ast::{self, Exp, ExpData, LambdaCaptureKind, Operation, Pattern, TempIndex},
@@ -173,13 +174,36 @@ impl<'a> LambdaLifter<'a> {
             .make(&format!("param${}", parameter_pos))
     }
 
-    fn gen_closure_function_name(&mut self) -> Symbol {
-        let env = self.fun_env.module_env.env;
-        env.symbol_pool().make(&format!(
-            "{}$lambda${}",
-            self.fun_env.get_name().display(env.symbol_pool()),
-            self.lifted.len() + 1
-        ))
+    fn gen_closure_function_name(&mut self, loc: &Loc) -> Option<Symbol> {
+        let mod_env = &self.fun_env.module_env;
+        let env = mod_env.env;
+        let basename = self
+            .fun_env
+            .get_name()
+            .display(env.symbol_pool())
+            .to_string();
+        let name = format!("{}__lambda_{}", basename, self.lifted.len() + 1);
+        let sym = env.symbol_pool().make(&name);
+        if mod_env.find_function(sym).is_some() {
+            for i in 0..256 {
+                let name2 = format!("{}_{}", name, i);
+                let sym = env.symbol_pool().make(&name2);
+                if mod_env.find_function(sym).is_none() {
+                    return Some(sym);
+                }
+            }
+            env.error(
+                loc,
+                &format!(
+                    "Can't find an available function name similar to {} in module {} to use for lambda implementation.",
+                    basename,
+                    mod_env.get_full_name_str()
+                ),
+            );
+            None
+        } else {
+            Some(sym)
+        }
     }
 
     fn bind(&self, mut bindings: Vec<(Pattern, Exp)>, exp: Exp) -> Exp {
@@ -357,20 +381,24 @@ impl<'a> LambdaLifter<'a> {
     ) -> Exp {
         let env = self.fun_env.module_env.env;
         let id = env.new_node(loc, fn_type);
-        if let Some(inst) = instantiation {
-            env.set_node_instantiation(id, inst);
-        }
-        let fn_exp = ExpData::Value(id, ast::Value::Function(module_id, fun_id));
+        let inst = if let Some(inst) = instantiation {
+            env.set_node_instantiation(id, inst.clone());
+            inst
+        } else {
+            vec![]
+        };
+        let fn_exp = ExpData::Value(id, ast::Value::Function(module_id, fun_id, inst));
         fn_exp.into_exp()
     }
 
     fn get_move_fn_type(&mut self, expr_id: NodeId, module_id: ModuleId, fun_id: FunId) -> Type {
         let env = self.fun_env.module_env.env;
         let fn_env = env.get_function(module_id.qualified(fun_id));
-        let fun_abilities = if fn_env.visibility().is_public() {
-            AbilitySet::PUBLIC_FUNCTIONS
+        let is_generic = fn_env.get_type_parameter_count() != 0;
+        let fun_abilities = if fn_env.visibility().is_public() && !is_generic {
+            AbilitySet::DEFINED_FUNCTIONS_HAS_STORE
         } else {
-            AbilitySet::PRIVATE_FUNCTIONS
+            AbilitySet::DEFINED_FUNCTIONS_NO_STORE
         };
         let params = fn_env.get_parameters_ref();
         let param_types = params.iter().map(|param| param.get_type()).collect();
@@ -535,9 +563,14 @@ impl<'a> LambdaLifter<'a> {
                     // We have no parameters, just use the function directly.
                     return Some(new_args.pop().unwrap());
                 } else {
-                    return Some(
-                        ExpData::Call(id, Operation::EarlyBindFunction, new_args).into_exp(),
+                    let res = ExpData::Call(id, Operation::EarlyBindFunction, new_args).into_exp();
+                    debug!(
+                        "Creating earlybind 1 `{}` with type `{}`",
+                        res.display_verbose(env),
+                        env.get_node_type(res.node_id())
+                            .display(&env.get_type_display_ctx())
                     );
+                    return Some(res);
                 }
             }
         }
@@ -715,8 +748,8 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         params.append(&mut lambda_params);
 
         // Add new closure function
-        let fun_name = self.gen_closure_function_name();
         let lambda_loc = env.get_node_loc(id).clone();
+        let fun_name = self.gen_closure_function_name(&lambda_loc)?;
         let lambda_type = env.get_node_type(id);
         let lambda_inst_opt = env.get_node_instantiation_opt(id);
         let result_type = if let Type::Fun(_, result_type, _) = &lambda_type {
@@ -741,7 +774,7 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
             env.error(
                 &loc,
                 // TODO(LAMBDA)
-                "The body of a lambdas expression with `store` ability currently must be a simple call to an existing `public` function, with lambda params the same as the *final* arguments to the function call."
+                "The body of a lambdas expression with `store` ability currently must be a simple call to an existing non-generic `public` function, with lambda params the same as the *final* arguments to the function call."
             );
             return None;
         };
@@ -779,7 +812,14 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
                 env.set_node_instantiation(id, inst);
             }
             closure_args.insert(0, fn_exp);
-            Some(ExpData::Call(id, Operation::EarlyBindFunction, closure_args).into_exp())
+            let res = ExpData::Call(id, Operation::EarlyBindFunction, closure_args).into_exp();
+            debug!(
+                "Creating earlybind 2 `{}` with type `{}`",
+                res.display_verbose(env),
+                env.get_node_type(res.node_id())
+                    .display(&env.get_type_display_ctx())
+            );
+            Some(res)
         }
     }
 }

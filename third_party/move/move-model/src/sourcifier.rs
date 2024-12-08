@@ -4,8 +4,8 @@
 
 use crate::{
     ast::{
-        self, AddressSpecifier, Exp, ExpData, LambdaCaptureKind, Operation, Pattern,
-        ResourceSpecifier, TempIndex, Value,
+        AddressSpecifier, Exp, ExpData, LambdaCaptureKind, Operation, Pattern, ResourceSpecifier,
+        TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -241,15 +241,18 @@ impl<'a> Sourcifier<'a> {
             Value::Number(int) => {
                 emit!(self.writer, "{}", int);
                 if let Some(Type::Primitive(prim)) = ty {
-                    emit!(self.writer, match prim {
-                        PrimitiveType::U8 => "u8",
-                        PrimitiveType::U16 => "u16",
-                        PrimitiveType::U32 => "u32",
-                        PrimitiveType::U64 => "",
-                        PrimitiveType::U128 => "u128",
-                        PrimitiveType::U256 => "u256",
-                        _ => "",
-                    })
+                    emit!(
+                        self.writer,
+                        match prim {
+                            PrimitiveType::U8 => "u8",
+                            PrimitiveType::U16 => "u16",
+                            PrimitiveType::U32 => "u32",
+                            PrimitiveType::U64 => "",
+                            PrimitiveType::U128 => "u128",
+                            PrimitiveType::U256 => "u256",
+                            _ => "",
+                        }
+                    )
                 }
             },
             Value::Bool(b) => emit!(self.writer, "{}", b),
@@ -285,7 +288,7 @@ impl<'a> Sourcifier<'a> {
                     emit!(self.writer, "{}", self.env().display(address))
                 })
             },
-            Value::Function(mid, fid) => {
+            Value::Function(mid, fid, type_inst) => {
                 emit!(
                     self.writer,
                     "{}",
@@ -293,6 +296,14 @@ impl<'a> Sourcifier<'a> {
                         .get_function(mid.qualified(*fid))
                         .get_full_name_str()
                 );
+                if !type_inst.is_empty() {
+                    let tctx = TypeDisplayContext::new(self.env());
+                    emit!(
+                        self.writer,
+                        "<{}>",
+                        type_inst.iter().map(|ty| ty.display(&tctx)).join(", ")
+                    );
+                };
             },
         }
     }
@@ -536,21 +547,8 @@ impl<'a> ExpSourcifier<'a> {
             // Following forms are all atomic and do not require parenthesis
             Invalid(_) => emit!(self.wr(), "*invalid*"),
             Value(id, v) => {
-                let ty = self.env().get_node_type(exp.node_id());
+                let ty = self.env().get_node_type(*id);
                 self.parent.print_value(v, Some(&ty));
-                if let ast::Value::Function(..) = v {
-                    let type_inst = self.env().get_node_instantiation(*id);
-                    if !type_inst.is_empty() {
-                        emit!(
-                            self.wr(),
-                            "<{}>",
-                            type_inst
-                                .iter()
-                                .map(|ty| ty.display(&self.type_display_context))
-                                .join(", ")
-                        );
-                    }
-                }
             },
             LocalVar(_, name) => {
                 emit!(self.wr(), "{}", self.sym(*name))
@@ -572,8 +570,12 @@ impl<'a> ExpSourcifier<'a> {
                     self.print_pat(pat);
                     emit!(self.wr(), "| ");
                     self.print_exp(Prio::General, true, body);
-                    if !abilities.is_subset(AbilitySet::FUNCTIONS) {
-                        let abilities_as_str = abilities.iter().map(|a| a.to_string()).join("+");
+                    if !abilities.is_subset(AbilitySet::FUNCTIONS_MIN) {
+                        let abilities_as_str = abilities
+                            .setminus(AbilitySet::FUNCTIONS_MIN)
+                            .iter()
+                            .map(|a| a.to_string())
+                            .join("+");
                         emit!(self.wr(), " with {}", abilities_as_str);
                     }
                 });

@@ -13,7 +13,7 @@ module 0x42::test {
         key: u64
     }
 
-    enum Option<T> has store, copy {
+    enum Option<T> has store, copy, drop {
         None(),
         Some(T)
     }

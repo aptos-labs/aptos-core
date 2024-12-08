@@ -2567,10 +2567,11 @@ fn parse_type(context: &mut Context) -> Result<Type, Box<Diagnostic>> {
 /// Checks whether the next tokens looks like the start of a type. NOTE: must be aligned
 /// with `parse_type`.
 fn is_start_of_type(context: &mut Context) -> bool {
-    matches!(
-        context.tokens.peek(),
-        Tok::LParen | Tok::Amp | Tok::AmpMut | Tok::Pipe | Tok::Identifier
-    )
+    match (context.tokens.peek(), context.tokens.content()) {
+        (Tok::Identifier, "with") => false,
+        (Tok::LParen | Tok::Amp | Tok::AmpMut | Tok::Pipe | Tok::Identifier, _) => true,
+        _ => false,
+    }
 }
 
 // Parse an optional list of type arguments.

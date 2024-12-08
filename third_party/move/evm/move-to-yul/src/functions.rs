@@ -554,6 +554,7 @@ impl<'a> FunctionGenerator<'a> {
                     | BorrowVariantField(..) => {
                         unimplemented!("variants")
                     },
+                    EarlyBindFunction | InvokeFunction => unimplemented!("lambda"),
 
                     // Specification or other operations which can be ignored here
                     Release

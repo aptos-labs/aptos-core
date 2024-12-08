@@ -82,6 +82,13 @@ impl SymbolPool {
         Symbol(new_sym)
     }
 
+    /// Tests for a registered symbol with the given name.
+    pub fn exists(&self, s: &str) -> bool {
+        let pool = self.inner.borrow_mut();
+        let key = Rc::new(s.to_string());
+        pool.lookup.contains_key(&key)
+    }
+
     /// Returns the string representation of this symbol, as an rc'ed string to avoid copies.
     /// If the past symbol was not created from this pool, a runtime error may happen (or a wrong
     /// string will be returned).

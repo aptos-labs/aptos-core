@@ -1093,7 +1093,7 @@ impl ExpData {
         let mut visitor = |e: &ExpData| {
             match e {
                 ExpData::Call(_, Operation::MoveFunction(mid, fid), _)
-                | ExpData::Value(_, Value::Function(mid, fid)) => {
+                | ExpData::Value(_, Value::Function(mid, fid, _)) => {
                     used.insert(mid.qualified(*fid));
                 },
                 _ => {},
@@ -1110,7 +1110,7 @@ impl ExpData {
         let mut visitor = |e: &ExpData| {
             match e {
                 ExpData::Call(node_id, Operation::MoveFunction(mid, fid), _)
-                | ExpData::Value(node_id, Value::Function(mid, fid)) => {
+                | ExpData::Value(node_id, Value::Function(mid, fid, _)) => {
                     used.entry(mid.qualified(*fid))
                         .or_default()
                         .insert(*node_id);
@@ -2486,7 +2486,7 @@ pub enum Value {
     Vector(Vec<Value>),
     Tuple(Vec<Value>),
     /// Represents a reference to a Move Function as a function value.
-    Function(ModuleId, FunId),
+    Function(ModuleId, FunId, Vec<Type>),
 }
 
 impl Value {
@@ -2575,8 +2575,8 @@ impl Value {
                         Some(false)
                     }
                 },
-                (Value::Function(mid1, sid1), Value::Function(mid2, sid2)) => {
-                    Some(mid1 == mid2 && sid1 == sid2)
+                (Value::Function(mid1, sid1, inst1), Value::Function(mid2, sid2, inst2)) => {
+                    Some(mid1 == mid2 && sid1 == sid2 && inst1 == inst2)
                 },
                 _ => Some(false),
             }
@@ -2598,14 +2598,25 @@ impl<'a> fmt::Display for EnvDisplay<'a, Value> {
             Value::AddressArray(array) => write!(f, "a{:?}", array),
             Value::Vector(array) => write!(f, "{:?}", array),
             Value::Tuple(array) => write!(f, "({:?})", array),
-            Value::Function(mid, fid) => write!(
-                f,
-                "{}",
-                self.env
-                    .get_function_opt(mid.qualified(*fid))
-                    .map(|fun| fun.get_full_name_str())
-                    .unwrap_or_else(|| "<?unknown function?>".to_string())
-            ),
+            Value::Function(mid, fid, type_inst) => {
+                write!(
+                    f,
+                    "{}",
+                    self.env
+                        .get_function_opt(mid.qualified(*fid))
+                        .map(|fun| fun.get_full_name_str())
+                        .unwrap_or_else(|| "<?unknown function?>".to_string())
+                )?;
+                if !type_inst.is_empty() {
+                    let tctx = TypeDisplayContext::new(self.env);
+                    write!(
+                        f,
+                        "<{}>",
+                        type_inst.iter().map(|ty| ty.display(&tctx)).join(", ")
+                    )?;
+                };
+                Ok(())
+            },
         }
     }
 }
@@ -3280,7 +3291,7 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                         body.display_cont(self)
                     )?;
                 }
-                if !abilities.is_subset(AbilitySet::FUNCTIONS) {
+                if !abilities.is_subset(AbilitySet::FUNCTIONS_MIN) {
                     let abilities_as_str = abilities
                         .iter()
                         .map(|a| a.to_string())

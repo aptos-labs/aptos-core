@@ -530,16 +530,138 @@ module 0x8675309::M {
 } // end 0x8675309::M
 
 
+============ initial bytecode ================
+
+[variant baseline]
+fun M::imm<#0>($t0: &#0) {
+  0: return ()
+}
+
+
+[variant baseline]
+fun M::imm_imm<#0>($t0: &#0, $t1: &#0) {
+  0: return ()
+}
+
+
+[variant baseline]
+fun M::imm_mut<#0>($t0: &#0, $t1: &mut #0) {
+  0: return ()
+}
+
+
+[variant baseline]
+fun M::mut_imm<#0>($t0: &mut #0, $t1: &#0) {
+  0: return ()
+}
+
+
+[variant baseline]
+fun M::t0() {
+     var $t0: &u64
+     var $t1: &mut u64
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &0x8675309::M::S
+     var $t6: &mut 0x8675309::M::S
+     var $t7: 0x8675309::M::S
+     var $t8: bool
+     var $t9: &0x8675309::M::S
+     var $t10: 0x8675309::M::S
+     var $t11: bool
+  0: $t2 := 0
+  1: $t1 := borrow_local($t2)
+  2: $t0 := freeze_ref(implicit)($t1)
+  3: M::imm<u64>($t0)
+  4: $t4 := 0
+  5: $t3 := borrow_local($t4)
+  6: M::imm<u64>($t3)
+  7: $t8 := false
+  8: $t7 := pack 0x8675309::M::S($t8)
+  9: $t6 := borrow_local($t7)
+ 10: $t5 := freeze_ref(implicit)($t6)
+ 11: M::imm<0x8675309::M::S>($t5)
+ 12: $t11 := false
+ 13: $t10 := pack 0x8675309::M::S($t11)
+ 14: $t9 := borrow_local($t10)
+ 15: M::imm<0x8675309::M::S>($t9)
+ 16: return ()
+}
+
+
+[variant baseline]
+fun M::t1() {
+     var $t0: &u64
+     var $t1: &mut u64
+     var $t2: u64
+     var $t3: &mut u64
+     var $t4: u64
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: &u64
+     var $t8: &mut u64
+     var $t9: u64
+     var $t10: &u64
+     var $t11: &mut u64
+     var $t12: u64
+     var $t13: &u64
+     var $t14: &mut u64
+     var $t15: u64
+  0: $t2 := 0
+  1: $t1 := borrow_local($t2)
+  2: $t0 := freeze_ref(implicit)($t1)
+  3: $t4 := 0
+  4: $t3 := borrow_local($t4)
+  5: M::imm_mut<u64>($t0, $t3)
+  6: $t6 := 0
+  7: $t5 := borrow_local($t6)
+  8: $t9 := 0
+  9: $t8 := borrow_local($t9)
+ 10: $t7 := freeze_ref(implicit)($t8)
+ 11: M::mut_imm<u64>($t5, $t7)
+ 12: $t12 := 0
+ 13: $t11 := borrow_local($t12)
+ 14: $t10 := freeze_ref(implicit)($t11)
+ 15: $t15 := 0
+ 16: $t14 := borrow_local($t15)
+ 17: $t13 := freeze_ref(implicit)($t14)
+ 18: M::imm_imm<u64>($t10, $t13)
+ 19: return ()
+}
+
+
+[variant baseline]
+fun M::t2($t0: |(&u64, &mut u64)|) {
+     var $t1: &u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: &mut u64
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &mut u64
+     var $t9: u64
+  0: $t3 := 0
+  1: $t2 := borrow_local($t3)
+  2: $t1 := freeze_ref(implicit)($t2)
+  3: $t5 := 0
+  4: $t4 := borrow_local($t5)
+  5: invoke($t0, $t1, $t4)
+  6: $t7 := 0
+  7: $t6 := borrow_local($t7)
+  8: $t9 := 0
+  9: $t8 := borrow_local($t9)
+ 10: invoke($t0, $t6, $t8)
+ 11: return ()
+}
+
 
 Diagnostics:
-error: Calls to function values other than inline function parameters not yet implemented
+error: local `f` of type `|(&u64, &mut u64)|` does not have the `copy` ability
    ┌─ tests/lambda/inline-parity/subtype_args.move:24:9
    │
 24 │         f(&mut 0, &mut 0);
-   │         ^^^^^^^^^^^^^^^^^
-
-error: Calls to function values other than inline function parameters not yet implemented
-   ┌─ tests/lambda/inline-parity/subtype_args.move:25:9
-   │
+   │         ^^^^^^^^^^^^^^^^^ copy needed here because value is still in use
 25 │         f(&0, &mut 0);
-   │         ^^^^^^^^^^^^^
+   │         ------------- used here

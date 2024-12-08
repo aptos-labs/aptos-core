@@ -1897,7 +1897,7 @@ module 0x42::test {
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+store = test::choose_function1$lambda$1;
+                                        let i: |(u64, u64)|u64 with copy+store = test::choose_function1__lambda_1;
                                         earlybind(i, 15)
                                       }
                                     }
@@ -1954,7 +1954,7 @@ module 0x42::test {
           }
         }
     }
-    private fun choose_function1$lambda$1(x: u64,y: u64): u64 {
+    private fun choose_function1__lambda_1(x: u64,y: u64): u64 {
         {
           let q: u64 = Sub<u64>(y, 1);
           mod3::multiply(x, Add<u64>(q, 1))
@@ -2046,7 +2046,7 @@ module 0x42::test {
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+store = test::choose_function1$lambda$1;
+                                        let i: |(u64, u64)|u64 with copy+store = test::choose_function1__lambda_1;
                                         earlybind(i, 15)
                                       }
                                     }
@@ -2103,7 +2103,7 @@ module 0x42::test {
           }
         }
     }
-    private fun choose_function1$lambda$1(x: u64,y: u64): u64 {
+    private fun choose_function1__lambda_1(x: u64,y: u64): u64 {
         {
           let q: u64 = Sub<u64>(y, 1);
           mod3::multiply(x, Add<u64>(q, 1))
@@ -2195,7 +2195,7 @@ module 0x42::test {
                                       }
                                     } else {
                                       {
-                                        let i: |(u64, u64)|u64 with copy+store = test::choose_function1$lambda$1;
+                                        let i: |(u64, u64)|u64 with copy+store = test::choose_function1__lambda_1;
                                         earlybind(i, 15)
                                       }
                                     }
@@ -2252,7 +2252,7 @@ module 0x42::test {
           }
         }
     }
-    private fun choose_function1$lambda$1(x: u64,y: u64): u64 {
+    private fun choose_function1__lambda_1(x: u64,y: u64): u64 {
         {
           let q: u64 = Sub<u64>(y, 1);
           mod3::multiply(x, Add<u64>(q, 1))
@@ -2261,112 +2261,1237 @@ module 0x42::test {
 } // end 0x42::test
 
 
+============ initial bytecode ================
+
+[variant baseline]
+public fun mod4::alt_multiply($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := *($t0, $t1)
+  1: return $t2
+}
+
+
+[variant baseline]
+public fun mod3::multiply($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+  0: $t2 := *($t0, $t1)
+  1: return $t2
+}
+
+
+[variant baseline]
+public(friend) fun mod2::double($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+  0: $t2 := 2
+  1: $t1 := *($t0, $t2)
+  2: return $t1
+}
+
+
+[variant baseline]
+public(friend) fun mod1::triple($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+  0: $t2 := 3
+  1: $t1 := *($t0, $t2)
+  2: return $t1
+}
+
+
+[variant baseline]
+fun test::add_mul($t0: u64, $t1: u64, $t2: u64): u64 {
+     var $t3: u64
+     var $t4: u64
+  0: $t4 := +($t0, $t1)
+  1: $t3 := *($t2, $t4)
+  2: return $t3
+}
+
+
+[variant baseline]
+fun test::choose_function1($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: |u64|u64 with copy
+     var $t4: bool
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: |(u64, u64)|u64 with copy+store
+     var $t11: u64
+     var $t12: bool
+     var $t13: u64
+     var $t14: |(u64, u64)|u64 with copy+store
+     var $t15: u64
+     var $t16: bool
+     var $t17: u64
+     var $t18: |(u64, u64)|u64 with copy+store
+     var $t19: u64
+     var $t20: bool
+     var $t21: u64
+     var $t22: |(u64, u64, u64)|u64 with copy
+     var $t23: u64
+     var $t24: u64
+     var $t25: bool
+     var $t26: u64
+     var $t27: |(u64, u64)|u64 with copy+store
+     var $t28: u64
+     var $t29: bool
+     var $t30: u64
+     var $t31: |(u64, u64, u64)|u64 with copy
+     var $t32: u64
+     var $t33: u64
+     var $t34: bool
+     var $t35: u64
+     var $t36: |(u64, u64, u64)|u64 with copy
+     var $t37: u64
+     var $t38: u64
+     var $t39: bool
+     var $t40: u64
+     var $t41: |(u64, u64, u64)|u64 with copy
+     var $t42: u64
+     var $t43: u64
+     var $t44: bool
+     var $t45: u64
+     var $t46: |(u64, u64)|u64 with copy+store
+     var $t47: u64
+     var $t48: bool
+     var $t49: u64
+     var $t50: |(u64, u64)|u64 with copy+store
+     var $t51: u64
+     var $t52: bool
+     var $t53: u64
+     var $t54: |u64|u64 with copy+store
+     var $t55: |(u64, u64)|u64 with copy+store
+     var $t56: u64
+     var $t57: bool
+     var $t58: u64
+     var $t59: |u64|u64 with copy+store
+     var $t60: |(u64, u64, u64)|u64 with copy
+     var $t61: u64
+     var $t62: u64
+     var $t63: |(u64, u64)|u64 with copy+store
+     var $t64: u64
+  0: $t5 := 0
+  1: $t4 := ==($t0, $t5)
+  2: if ($t4) goto 3 else goto 6
+  3: label L0
+  4: $t3 := test::double
+  5: goto 145
+  6: label L1
+  7: $t7 := 1
+  8: $t6 := ==($t0, $t7)
+  9: if ($t6) goto 10 else goto 13
+ 10: label L3
+ 11: $t3 := test::triple
+ 12: goto 144
+ 13: label L4
+ 14: $t9 := 2
+ 15: $t8 := ==($t0, $t9)
+ 16: if ($t8) goto 17 else goto 22
+ 17: label L6
+ 18: $t10 := test::multiply
+ 19: $t11 := 4
+ 20: $t3 := earlybind($t10, $t11)
+ 21: goto 143
+ 22: label L7
+ 23: $t13 := 3
+ 24: $t12 := ==($t0, $t13)
+ 25: if ($t12) goto 26 else goto 31
+ 26: label L9
+ 27: $t14 := test::alt_multiply
+ 28: $t15 := 5
+ 29: $t3 := earlybind($t14, $t15)
+ 30: goto 142
+ 31: label L10
+ 32: $t17 := 4
+ 33: $t16 := ==($t0, $t17)
+ 34: if ($t16) goto 35 else goto 40
+ 35: label L12
+ 36: $t18 := test::multiply
+ 37: $t19 := 6
+ 38: $t3 := earlybind($t18, $t19)
+ 39: goto 141
+ 40: label L13
+ 41: $t21 := 5
+ 42: $t20 := ==($t0, $t21)
+ 43: if ($t20) goto 44 else goto 50
+ 44: label L15
+ 45: $t22 := test::multiply3
+ 46: $t23 := 3
+ 47: $t24 := 2
+ 48: $t3 := earlybind($t22, $t23, $t24)
+ 49: goto 140
+ 50: label L16
+ 51: $t26 := 6
+ 52: $t25 := ==($t0, $t26)
+ 53: if ($t25) goto 54 else goto 59
+ 54: label L18
+ 55: $t27 := test::multiply
+ 56: $t28 := 7
+ 57: $t3 := earlybind($t27, $t28)
+ 58: goto 139
+ 59: label L19
+ 60: $t30 := 7
+ 61: $t29 := ==($t0, $t30)
+ 62: if ($t29) goto 63 else goto 69
+ 63: label L21
+ 64: $t31 := test::multiply3
+ 65: $t32 := 4
+ 66: $t33 := 2
+ 67: $t3 := earlybind($t31, $t32, $t33)
+ 68: goto 138
+ 69: label L22
+ 70: $t35 := 8
+ 71: $t34 := ==($t0, $t35)
+ 72: if ($t34) goto 73 else goto 79
+ 73: label L24
+ 74: $t36 := test::multiply3
+ 75: $t37 := 3
+ 76: $t38 := 3
+ 77: $t3 := earlybind($t36, $t37, $t38)
+ 78: goto 137
+ 79: label L25
+ 80: $t40 := 9
+ 81: $t39 := ==($t0, $t40)
+ 82: if ($t39) goto 83 else goto 89
+ 83: label L27
+ 84: $t41 := test::multiply3
+ 85: $t42 := 3
+ 86: $t43 := 5
+ 87: $t3 := earlybind($t41, $t42, $t43)
+ 88: goto 136
+ 89: label L28
+ 90: $t45 := 10
+ 91: $t44 := ==($t0, $t45)
+ 92: if ($t44) goto 93 else goto 98
+ 93: label L30
+ 94: $t46 := test::alt_multiply
+ 95: $t47 := 11
+ 96: $t3 := earlybind($t46, $t47)
+ 97: goto 135
+ 98: label L31
+ 99: $t49 := 11
+100: $t48 := ==($t0, $t49)
+101: if ($t48) goto 102 else goto 107
+102: label L33
+103: $t50 := test::multiply
+104: $t51 := 11
+105: $t3 := earlybind($t50, $t51)
+106: goto 134
+107: label L34
+108: $t53 := 12
+109: $t52 := ==($t0, $t53)
+110: if ($t52) goto 111 else goto 117
+111: label L36
+112: $t55 := test::multiply
+113: $t56 := 12
+114: $t54 := earlybind($t55, $t56)
+115: $t3 := infer($t54)
+116: goto 133
+117: label L37
+118: $t58 := 14
+119: $t57 := ==($t0, $t58)
+120: if ($t57) goto 121 else goto 128
+121: label L39
+122: $t60 := test::multiply3
+123: $t61 := 2
+124: $t62 := 2
+125: $t59 := earlybind($t60, $t61, $t62)
+126: $t3 := infer($t59)
+127: goto 132
+128: label L40
+129: $t63 := test::choose_function1__lambda_1
+130: $t64 := 15
+131: $t3 := earlybind($t63, $t64)
+132: label L41
+133: label L38
+134: label L35
+135: label L32
+136: label L29
+137: label L26
+138: label L23
+139: label L20
+140: label L17
+141: label L14
+142: label L11
+143: label L8
+144: label L5
+145: label L2
+146: $t2 := invoke($t3, $t1)
+147: return $t2
+}
+
+
+[variant baseline]
+fun test::multiply3($t0: u64, $t1: u64, $t2: u64): u64 {
+     var $t3: u64
+     var $t4: u64
+  0: $t4 := *($t0, $t1)
+  1: $t3 := *($t4, $t2)
+  2: return $t3
+}
+
+
+[variant baseline]
+public fun test::test_functions() {
+     var $t0: u64
+     var $t1: bool
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: bool
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: bool
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+  0: $t0 := 0
+  1: $t1 := false
+  2: label L0
+  3: $t2 := true
+  4: if ($t2) goto 5 else goto 38
+  5: label L2
+  6: if ($t1) goto 7 else goto 12
+  7: label L5
+  8: $t4 := 1
+  9: $t3 := +($t0, $t4)
+ 10: $t0 := infer($t3)
+ 11: goto 15
+ 12: label L6
+ 13: $t5 := true
+ 14: $t1 := infer($t5)
+ 15: label L7
+ 16: $t7 := 15
+ 17: $t6 := <($t0, $t7)
+ 18: if ($t6) goto 19 else goto 34
+ 19: label L8
+ 20: $t9 := 3
+ 21: $t8 := test::choose_function1($t0, $t9)
+ 22: $t13 := 2
+ 23: $t12 := +($t0, $t13)
+ 24: $t14 := 3
+ 25: $t11 := *($t12, $t14)
+ 26: $t10 := ==($t8, $t11)
+ 27: if ($t10) goto 28 else goto 30
+ 28: label L11
+ 29: goto 32
+ 30: label L12
+ 31: abort($t0)
+ 32: label L13
+ 33: goto 36
+ 34: label L9
+ 35: goto 42
+ 36: label L10
+ 37: goto 40
+ 38: label L3
+ 39: goto 42
+ 40: label L4
+ 41: goto 2
+ 42: label L1
+ 43: return ()
+}
+
+
+[variant baseline]
+fun test::choose_function1__lambda_1($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+  0: $t4 := 1
+  1: $t3 := -($t1, $t4)
+  2: $t6 := 1
+  3: $t5 := +($t3, $t6)
+  4: $t2 := mod3::multiply($t0, $t5)
+  5: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun mod4::alt_multiply($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t0 := *($t0, $t1)
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun mod3::multiply($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t0 := *($t0, $t1)
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+public(friend) fun mod2::double($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 2
+     # live vars: $t0, $t2
+  1: $t0 := *($t0, $t2)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+public(friend) fun mod1::triple($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     # live vars: $t0
+  0: $t2 := 3
+     # live vars: $t0, $t2
+  1: $t0 := *($t0, $t2)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun test::add_mul($t0: u64, $t1: u64, $t2: u64): u64 {
+     var $t3: u64 [unused]
+     var $t4: u64 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t0 := +($t0, $t1)
+     # live vars: $t0, $t2
+  1: $t0 := *($t2, $t0)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun test::choose_function1($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: |u64|u64 with copy
+     var $t4: bool
+     var $t5: u64
+     var $t6: bool [unused]
+     var $t7: u64 [unused]
+     var $t8: bool [unused]
+     var $t9: u64 [unused]
+     var $t10: |(u64, u64)|u64 with copy+store
+     var $t11: u64 [unused]
+     var $t12: bool [unused]
+     var $t13: u64 [unused]
+     var $t14: |(u64, u64)|u64 with copy+store [unused]
+     var $t15: u64 [unused]
+     var $t16: bool [unused]
+     var $t17: u64 [unused]
+     var $t18: |(u64, u64)|u64 with copy+store [unused]
+     var $t19: u64 [unused]
+     var $t20: bool [unused]
+     var $t21: u64 [unused]
+     var $t22: |(u64, u64, u64)|u64 with copy
+     var $t23: u64 [unused]
+     var $t24: u64
+     var $t25: bool [unused]
+     var $t26: u64 [unused]
+     var $t27: |(u64, u64)|u64 with copy+store [unused]
+     var $t28: u64 [unused]
+     var $t29: bool [unused]
+     var $t30: u64 [unused]
+     var $t31: |(u64, u64, u64)|u64 with copy [unused]
+     var $t32: u64 [unused]
+     var $t33: u64 [unused]
+     var $t34: bool [unused]
+     var $t35: u64 [unused]
+     var $t36: |(u64, u64, u64)|u64 with copy [unused]
+     var $t37: u64 [unused]
+     var $t38: u64 [unused]
+     var $t39: bool [unused]
+     var $t40: u64 [unused]
+     var $t41: |(u64, u64, u64)|u64 with copy [unused]
+     var $t42: u64 [unused]
+     var $t43: u64 [unused]
+     var $t44: bool [unused]
+     var $t45: u64 [unused]
+     var $t46: |(u64, u64)|u64 with copy+store [unused]
+     var $t47: u64 [unused]
+     var $t48: bool [unused]
+     var $t49: u64 [unused]
+     var $t50: |(u64, u64)|u64 with copy+store [unused]
+     var $t51: u64 [unused]
+     var $t52: bool [unused]
+     var $t53: u64 [unused]
+     var $t54: |u64|u64 with copy+store
+     var $t55: |(u64, u64)|u64 with copy+store [unused]
+     var $t56: u64 [unused]
+     var $t57: bool [unused]
+     var $t58: u64 [unused]
+     var $t59: |u64|u64 with copy+store [unused]
+     var $t60: |(u64, u64, u64)|u64 with copy [unused]
+     var $t61: u64 [unused]
+     var $t62: u64 [unused]
+     var $t63: |(u64, u64)|u64 with copy+store [unused]
+     var $t64: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t5 := 0
+     # live vars: $t0, $t1, $t5
+  1: $t4 := ==($t0, $t5)
+     # live vars: $t0, $t1, $t4
+  2: if ($t4) goto 3 else goto 8
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t1
+  4: $t3 := test::double
+     # live vars: $t1, $t3
+  5: label L2
+     # live vars: $t1, $t3
+  6: $t5 := invoke($t3, $t1)
+     # live vars: $t5
+  7: return $t5
+     # live vars: $t0, $t1
+  8: label L1
+     # live vars: $t0, $t1
+  9: $t5 := 1
+     # live vars: $t0, $t1, $t5
+ 10: $t4 := ==($t0, $t5)
+     # live vars: $t0, $t1, $t4
+ 11: if ($t4) goto 12 else goto 15
+     # live vars: $t0, $t1
+ 12: label L3
+     # live vars: $t1
+ 13: $t3 := test::triple
+     # live vars: $t1, $t3
+ 14: goto 5
+     # live vars: $t0, $t1
+ 15: label L4
+     # live vars: $t0, $t1
+ 16: $t5 := 2
+     # live vars: $t0, $t1, $t5
+ 17: $t4 := ==($t0, $t5)
+     # live vars: $t0, $t1, $t4
+ 18: if ($t4) goto 19 else goto 24
+     # live vars: $t0, $t1
+ 19: label L6
+     # live vars: $t1
+ 20: $t10 := test::multiply
+     # live vars: $t1, $t10
+ 21: $t5 := 4
+     # live vars: $t1, $t5, $t10
+ 22: $t3 := earlybind($t10, $t5)
+     # live vars: $t1, $t3
+ 23: goto 5
+     # live vars: $t0, $t1
+ 24: label L7
+     # live vars: $t0, $t1
+ 25: $t5 := 3
+     # live vars: $t0, $t1, $t5
+ 26: $t4 := ==($t0, $t5)
+     # live vars: $t0, $t1, $t4
+ 27: if ($t4) goto 28 else goto 33
+     # live vars: $t0, $t1
+ 28: label L9
+     # live vars: $t1
+ 29: $t10 := test::alt_multiply
+     # live vars: $t1, $t10
+ 30: $t5 := 5
+     # live vars: $t1, $t5, $t10
+ 31: $t3 := earlybind($t10, $t5)
+     # live vars: $t1, $t3
+ 32: goto 5
+     # live vars: $t0, $t1
+ 33: label L10
+     # live vars: $t0, $t1
+ 34: $t5 := 4
+     # live vars: $t0, $t1, $t5
+ 35: $t4 := ==($t0, $t5)
+     # live vars: $t0, $t1, $t4
+ 36: if ($t4) goto 37 else goto 42
+     # live vars: $t0, $t1
+ 37: label L12
+     # live vars: $t1
+ 38: $t10 := test::multiply
+     # live vars: $t1, $t10
+ 39: $t5 := 6
+     # live vars: $t1, $t5, $t10
+ 40: $t3 := earlybind($t10, $t5)
+     # live vars: $t1, $t3
+ 41: goto 5
+     # live vars: $t0, $t1
+ 42: label L13
+     # live vars: $t0, $t1
+ 43: $t5 := 5
+     # live vars: $t0, $t1, $t5
+ 44: $t4 := ==($t0, $t5)
+     # live vars: $t0, $t1, $t4
+ 45: if ($t4) goto 46 else goto 52
+     # live vars: $t0, $t1
+ 46: label L15
+     # live vars: $t1
+ 47: $t22 := test::multiply3
+     # live vars: $t1, $t22
+ 48: $t5 := 3
+     # live vars: $t1, $t5, $t22
+ 49: $t24 := 2
+     # live vars: $t1, $t5, $t22, $t24
+ 50: $t3 := earlybind($t22, $t5, $t24)
+     # live vars: $t1, $t3
+ 51: goto 5
+     # live vars: $t0, $t1
+ 52: label L16
+     # live vars: $t0, $t1
+ 53: $t5 := 6
+     # live vars: $t0, $t1, $t5
+ 54: $t4 := ==($t0, $t5)
+     # live vars: $t0, $t1, $t4
+ 55: if ($t4) goto 56 else goto 61
+     # live vars: $t0, $t1
+ 56: label L18
+     # live vars: $t1
+ 57: $t10 := test::multiply
+     # live vars: $t1, $t10
+ 58: $t5 := 7
+     # live vars: $t1, $t5, $t10
+ 59: $t3 := earlybind($t10, $t5)
+     # live vars: $t1, $t3
+ 60: goto 5
+     # live vars: $t0, $t1
+ 61: label L19
+     # live vars: $t0, $t1
+ 62: $t5 := 7
+     # live vars: $t0, $t1, $t5
+ 63: $t4 := ==($t0, $t5)
+     # live vars: $t0, $t1, $t4
+ 64: if ($t4) goto 65 else goto 71
+     # live vars: $t0, $t1
+ 65: label L21
+     # live vars: $t1
+ 66: $t22 := test::multiply3
+     # live vars: $t1, $t22
+ 67: $t5 := 4
+     # live vars: $t1, $t5, $t22
+ 68: $t24 := 2
+     # live vars: $t1, $t5, $t22, $t24
+ 69: $t3 := earlybind($t22, $t5, $t24)
+     # live vars: $t1, $t3
+ 70: goto 5
+     # live vars: $t0, $t1
+ 71: label L22
+     # live vars: $t0, $t1
+ 72: $t5 := 8
+     # live vars: $t0, $t1, $t5
+ 73: $t4 := ==($t0, $t5)
+     # live vars: $t0, $t1, $t4
+ 74: if ($t4) goto 75 else goto 81
+     # live vars: $t0, $t1
+ 75: label L24
+     # live vars: $t1
+ 76: $t22 := test::multiply3
+     # live vars: $t1, $t22
+ 77: $t5 := 3
+     # live vars: $t1, $t5, $t22
+ 78: $t24 := 3
+     # live vars: $t1, $t5, $t22, $t24
+ 79: $t3 := earlybind($t22, $t5, $t24)
+     # live vars: $t1, $t3
+ 80: goto 5
+     # live vars: $t0, $t1
+ 81: label L25
+     # live vars: $t0, $t1
+ 82: $t5 := 9
+     # live vars: $t0, $t1, $t5
+ 83: $t4 := ==($t0, $t5)
+     # live vars: $t0, $t1, $t4
+ 84: if ($t4) goto 85 else goto 91
+     # live vars: $t0, $t1
+ 85: label L27
+     # live vars: $t1
+ 86: $t22 := test::multiply3
+     # live vars: $t1, $t22
+ 87: $t5 := 3
+     # live vars: $t1, $t5, $t22
+ 88: $t24 := 5
+     # live vars: $t1, $t5, $t22, $t24
+ 89: $t3 := earlybind($t22, $t5, $t24)
+     # live vars: $t1, $t3
+ 90: goto 5
+     # live vars: $t0, $t1
+ 91: label L28
+     # live vars: $t0, $t1
+ 92: $t5 := 10
+     # live vars: $t0, $t1, $t5
+ 93: $t4 := ==($t0, $t5)
+     # live vars: $t0, $t1, $t4
+ 94: if ($t4) goto 95 else goto 100
+     # live vars: $t0, $t1
+ 95: label L30
+     # live vars: $t1
+ 96: $t10 := test::alt_multiply
+     # live vars: $t1, $t10
+ 97: $t5 := 11
+     # live vars: $t1, $t5, $t10
+ 98: $t3 := earlybind($t10, $t5)
+     # live vars: $t1, $t3
+ 99: goto 5
+     # live vars: $t0, $t1
+100: label L31
+     # live vars: $t0, $t1
+101: $t5 := 11
+     # live vars: $t0, $t1, $t5
+102: $t4 := ==($t0, $t5)
+     # live vars: $t0, $t1, $t4
+103: if ($t4) goto 104 else goto 109
+     # live vars: $t0, $t1
+104: label L33
+     # live vars: $t1
+105: $t10 := test::multiply
+     # live vars: $t1, $t10
+106: $t5 := 11
+     # live vars: $t1, $t5, $t10
+107: $t3 := earlybind($t10, $t5)
+     # live vars: $t1, $t3
+108: goto 5
+     # live vars: $t0, $t1
+109: label L34
+     # live vars: $t0, $t1
+110: $t5 := 12
+     # live vars: $t0, $t1, $t5
+111: $t4 := ==($t0, $t5)
+     # live vars: $t0, $t1, $t4
+112: if ($t4) goto 113 else goto 119
+     # live vars: $t0, $t1
+113: label L36
+     # live vars: $t1
+114: $t10 := test::multiply
+     # live vars: $t1, $t10
+115: $t5 := 12
+     # live vars: $t1, $t5, $t10
+116: $t54 := earlybind($t10, $t5)
+     # live vars: $t1, $t54
+117: $t3 := move($t54)
+     # live vars: $t1, $t3
+118: goto 5
+     # live vars: $t0, $t1
+119: label L37
+     # live vars: $t0, $t1
+120: $t5 := 14
+     # live vars: $t0, $t1, $t5
+121: $t4 := ==($t0, $t5)
+     # live vars: $t1, $t4
+122: if ($t4) goto 123 else goto 130
+     # live vars: $t1
+123: label L39
+     # live vars: $t1
+124: $t22 := test::multiply3
+     # live vars: $t1, $t22
+125: $t0 := 2
+     # live vars: $t0, $t1, $t22
+126: $t5 := 2
+     # live vars: $t0, $t1, $t5, $t22
+127: $t54 := earlybind($t22, $t0, $t5)
+     # live vars: $t1, $t54
+128: $t3 := move($t54)
+     # live vars: $t1, $t3
+129: goto 5
+     # live vars: $t1
+130: label L40
+     # live vars: $t1
+131: $t10 := test::choose_function1__lambda_1
+     # live vars: $t1, $t10
+132: $t0 := 15
+     # live vars: $t0, $t1, $t10
+133: $t3 := earlybind($t10, $t0)
+     # live vars: $t1, $t3
+134: goto 5
+}
+
+
+[variant baseline]
+fun test::multiply3($t0: u64, $t1: u64, $t2: u64): u64 {
+     var $t3: u64 [unused]
+     var $t4: u64 [unused]
+     # live vars: $t0, $t1, $t2
+  0: $t0 := *($t0, $t1)
+     # live vars: $t0, $t2
+  1: $t0 := *($t0, $t2)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+public fun test::test_functions() {
+     var $t0: u64
+     var $t1: bool
+     var $t2: bool
+     var $t3: u64 [unused]
+     var $t4: u64
+     var $t5: bool [unused]
+     var $t6: bool [unused]
+     var $t7: u64 [unused]
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
+     var $t10: bool [unused]
+     var $t11: u64 [unused]
+     var $t12: u64 [unused]
+     var $t13: u64
+     var $t14: u64
+     # live vars:
+  0: $t0 := 0
+     # live vars: $t0
+  1: $t1 := false
+     # live vars: $t0, $t1
+  2: label L0
+     # live vars: $t0, $t1
+  3: $t2 := true
+     # live vars: $t0, $t1, $t2
+  4: if ($t2) goto 7 else goto 5
+     # live vars: $t0, $t1
+  5: label L13
+     # live vars:
+  6: goto 32
+     # live vars: $t0, $t1
+  7: label L2
+     # live vars: $t0, $t1
+  8: if ($t1) goto 9 else goto 34
+     # live vars: $t0, $t1
+  9: label L5
+     # live vars: $t0, $t1
+ 10: $t4 := 1
+     # live vars: $t0, $t1, $t4
+ 11: $t4 := +($t0, $t4)
+     # live vars: $t1, $t4
+ 12: $t0 := move($t4)
+     # live vars: $t0, $t1
+ 13: label L7
+     # live vars: $t0, $t1
+ 14: $t4 := 15
+     # live vars: $t0, $t1, $t4
+ 15: $t2 := <($t0, $t4)
+     # live vars: $t0, $t1, $t2
+ 16: if ($t2) goto 19 else goto 17
+     # live vars: $t0, $t1
+ 17: label L14
+     # live vars:
+ 18: goto 32
+     # live vars: $t0, $t1
+ 19: label L8
+     # live vars: $t0, $t1
+ 20: $t4 := 3
+     # live vars: $t0, $t1, $t4
+ 21: $t4 := test::choose_function1($t0, $t4)
+     # live vars: $t0, $t1, $t4
+ 22: $t13 := 2
+     # live vars: $t0, $t1, $t4, $t13
+ 23: $t13 := +($t0, $t13)
+     # live vars: $t0, $t1, $t4, $t13
+ 24: $t14 := 3
+     # live vars: $t0, $t1, $t4, $t13, $t14
+ 25: $t13 := *($t13, $t14)
+     # live vars: $t0, $t1, $t4, $t13
+ 26: $t2 := ==($t4, $t13)
+     # live vars: $t0, $t1, $t2
+ 27: if ($t2) goto 28 else goto 30
+     # live vars: $t0, $t1
+ 28: label L15
+     # live vars: $t0, $t1
+ 29: goto 2
+     # live vars: $t0, $t1
+ 30: label L12
+     # live vars: $t0
+ 31: abort($t0)
+     # live vars:
+ 32: label L1
+     # live vars:
+ 33: return ()
+     # live vars: $t0, $t1
+ 34: label L6
+     # live vars: $t0
+ 35: $t2 := true
+     # live vars: $t0, $t2
+ 36: $t1 := move($t2)
+     # live vars: $t0, $t1
+ 37: goto 13
+}
+
+
+[variant baseline]
+fun test::choose_function1__lambda_1($t0: u64, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
+     # live vars: $t0, $t1
+  0: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  1: $t1 := -($t1, $t4)
+     # live vars: $t0, $t1
+  2: $t4 := 1
+     # live vars: $t0, $t1, $t4
+  3: $t1 := +($t1, $t4)
+     # live vars: $t0, $t1
+  4: $t0 := mod3::multiply($t0, $t1)
+     # live vars: $t0
+  5: return $t0
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.mod4 {
+
+
+public alt_multiply(Arg0: u64, Arg1: u64): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: MoveLoc[1](Arg1: u64)
+	2: Mul
+	3: Ret
+}
+}// Move bytecode v7
+module 42.mod3 {
+
+
+public multiply(Arg0: u64, Arg1: u64): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: MoveLoc[1](Arg1: u64)
+	2: Mul
+	3: Ret
+}
+}// Move bytecode v7
+module 42.mod2 {
+
+
+public(friend) double(Arg0: u64): u64 /* def_idx: 0 */ {
+L1:	loc0: u64
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: LdU64(2)
+	2: Mul
+	3: Ret
+}
+}// Move bytecode v7
+module 42.mod1 {
+
+
+public(friend) triple(Arg0: u64): u64 /* def_idx: 0 */ {
+L1:	loc0: u64
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: LdU64(3)
+	2: Mul
+	3: Ret
+}
+}// Move bytecode v7
+module 42.test {
+use 0000000000000000000000000000000000000000000000000000000000000042::mod2;
+use 0000000000000000000000000000000000000000000000000000000000000042::mod1;
+use 0000000000000000000000000000000000000000000000000000000000000042::mod3;
+use 0000000000000000000000000000000000000000000000000000000000000042::mod4;
+
+
+
+
+add_mul(Arg0: u64, Arg1: u64, Arg2: u64): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: MoveLoc[1](Arg1: u64)
+	2: Add
+	3: StLoc[0](Arg0: u64)
+	4: MoveLoc[2](Arg2: u64)
+	5: MoveLoc[0](Arg0: u64)
+	6: Mul
+	7: Ret
+}
+choose_function1(Arg0: u64, Arg1: u64): u64 /* def_idx: 1 */ {
+L2:	loc0: u64
+L3:	loc1: |u64|u64 with copy
+L4:	loc2: |u64,u64|u64 with copy+store
+L5:	loc3: u64
+L6:	loc4: |u64,u64,u64|u64 with copy
+B0:
+	0: CopyLoc[0](Arg0: u64)
+	1: LdU64(0)
+	2: Eq
+	3: BrFalse(10)
+B1:
+	4: LdFunction mod2::double(u64): u64
+	5: StLoc[3](loc1: |u64|u64 with copy)
+B2:
+	6: MoveLoc[1](Arg1: u64)
+	7: MoveLoc[3](loc1: |u64|u64 with copy)
+	8: InvokeFunction(4)
+	9: Ret
+B3:
+	10: CopyLoc[0](Arg0: u64)
+	11: LdU64(1)
+	12: Eq
+	13: BrFalse(17)
+B4:
+	14: LdFunction mod1::triple(u64): u64
+	15: StLoc[3](loc1: |u64|u64 with copy)
+	16: Branch(6)
+B5:
+	17: CopyLoc[0](Arg0: u64)
+	18: LdU64(2)
+	19: Eq
+	20: BrFalse(28)
+B6:
+	21: LdFunction mod3::multiply(u64, u64): u64
+	22: StLoc[4](loc2: |u64,u64|u64 with copy+store)
+	23: LdU64(4)
+	24: MoveLoc[4](loc2: |u64,u64|u64 with copy+store)
+	25: EarlyBindFunction(5, 1)
+	26: StLoc[3](loc1: |u64|u64 with copy)
+	27: Branch(6)
+B7:
+	28: CopyLoc[0](Arg0: u64)
+	29: LdU64(3)
+	30: Eq
+	31: BrFalse(39)
+B8:
+	32: LdFunction mod4::alt_multiply(u64, u64): u64
+	33: StLoc[4](loc2: |u64,u64|u64 with copy+store)
+	34: LdU64(5)
+	35: MoveLoc[4](loc2: |u64,u64|u64 with copy+store)
+	36: EarlyBindFunction(5, 1)
+	37: StLoc[3](loc1: |u64|u64 with copy)
+	38: Branch(6)
+B9:
+	39: CopyLoc[0](Arg0: u64)
+	40: LdU64(4)
+	41: Eq
+	42: BrFalse(50)
+B10:
+	43: LdFunction mod3::multiply(u64, u64): u64
+	44: StLoc[4](loc2: |u64,u64|u64 with copy+store)
+	45: LdU64(6)
+	46: MoveLoc[4](loc2: |u64,u64|u64 with copy+store)
+	47: EarlyBindFunction(5, 1)
+	48: StLoc[3](loc1: |u64|u64 with copy)
+	49: Branch(6)
+B11:
+	50: CopyLoc[0](Arg0: u64)
+	51: LdU64(5)
+	52: Eq
+	53: BrFalse(62)
+B12:
+	54: LdFunction multiply3(u64, u64, u64): u64
+	55: StLoc[6](loc4: |u64,u64,u64|u64 with copy)
+	56: LdU64(3)
+	57: LdU64(2)
+	58: MoveLoc[6](loc4: |u64,u64,u64|u64 with copy)
+	59: EarlyBindFunction(6, 2)
+	60: StLoc[3](loc1: |u64|u64 with copy)
+	61: Branch(6)
+B13:
+	62: CopyLoc[0](Arg0: u64)
+	63: LdU64(6)
+	64: Eq
+	65: BrFalse(73)
+B14:
+	66: LdFunction mod3::multiply(u64, u64): u64
+	67: StLoc[4](loc2: |u64,u64|u64 with copy+store)
+	68: LdU64(7)
+	69: MoveLoc[4](loc2: |u64,u64|u64 with copy+store)
+	70: EarlyBindFunction(5, 1)
+	71: StLoc[3](loc1: |u64|u64 with copy)
+	72: Branch(6)
+B15:
+	73: CopyLoc[0](Arg0: u64)
+	74: LdU64(7)
+	75: Eq
+	76: BrFalse(85)
+B16:
+	77: LdFunction multiply3(u64, u64, u64): u64
+	78: StLoc[6](loc4: |u64,u64,u64|u64 with copy)
+	79: LdU64(4)
+	80: LdU64(2)
+	81: MoveLoc[6](loc4: |u64,u64,u64|u64 with copy)
+	82: EarlyBindFunction(6, 2)
+	83: StLoc[3](loc1: |u64|u64 with copy)
+	84: Branch(6)
+B17:
+	85: CopyLoc[0](Arg0: u64)
+	86: LdU64(8)
+	87: Eq
+	88: BrFalse(97)
+B18:
+	89: LdFunction multiply3(u64, u64, u64): u64
+	90: StLoc[6](loc4: |u64,u64,u64|u64 with copy)
+	91: LdU64(3)
+	92: LdU64(3)
+	93: MoveLoc[6](loc4: |u64,u64,u64|u64 with copy)
+	94: EarlyBindFunction(6, 2)
+	95: StLoc[3](loc1: |u64|u64 with copy)
+	96: Branch(6)
+B19:
+	97: CopyLoc[0](Arg0: u64)
+	98: LdU64(9)
+	99: Eq
+	100: BrFalse(109)
+B20:
+	101: LdFunction multiply3(u64, u64, u64): u64
+	102: StLoc[6](loc4: |u64,u64,u64|u64 with copy)
+	103: LdU64(3)
+	104: LdU64(5)
+	105: MoveLoc[6](loc4: |u64,u64,u64|u64 with copy)
+	106: EarlyBindFunction(6, 2)
+	107: StLoc[3](loc1: |u64|u64 with copy)
+	108: Branch(6)
+B21:
+	109: CopyLoc[0](Arg0: u64)
+	110: LdU64(10)
+	111: Eq
+	112: BrFalse(120)
+B22:
+	113: LdFunction mod4::alt_multiply(u64, u64): u64
+	114: StLoc[4](loc2: |u64,u64|u64 with copy+store)
+	115: LdU64(11)
+	116: MoveLoc[4](loc2: |u64,u64|u64 with copy+store)
+	117: EarlyBindFunction(5, 1)
+	118: StLoc[3](loc1: |u64|u64 with copy)
+	119: Branch(6)
+B23:
+	120: CopyLoc[0](Arg0: u64)
+	121: LdU64(11)
+	122: Eq
+	123: BrFalse(131)
+B24:
+	124: LdFunction mod3::multiply(u64, u64): u64
+	125: StLoc[4](loc2: |u64,u64|u64 with copy+store)
+	126: LdU64(11)
+	127: MoveLoc[4](loc2: |u64,u64|u64 with copy+store)
+	128: EarlyBindFunction(5, 1)
+	129: StLoc[3](loc1: |u64|u64 with copy)
+	130: Branch(6)
+B25:
+	131: CopyLoc[0](Arg0: u64)
+	132: LdU64(12)
+	133: Eq
+	134: BrFalse(142)
+B26:
+	135: LdFunction mod3::multiply(u64, u64): u64
+	136: StLoc[4](loc2: |u64,u64|u64 with copy+store)
+	137: LdU64(12)
+	138: MoveLoc[4](loc2: |u64,u64|u64 with copy+store)
+	139: EarlyBindFunction(5, 1)
+	140: StLoc[3](loc1: |u64|u64 with copy)
+	141: Branch(6)
+B27:
+	142: MoveLoc[0](Arg0: u64)
+	143: LdU64(14)
+	144: Eq
+	145: BrFalse(154)
+B28:
+	146: LdFunction multiply3(u64, u64, u64): u64
+	147: StLoc[6](loc4: |u64,u64,u64|u64 with copy)
+	148: LdU64(2)
+	149: LdU64(2)
+	150: MoveLoc[6](loc4: |u64,u64,u64|u64 with copy)
+	151: EarlyBindFunction(6, 2)
+	152: StLoc[3](loc1: |u64|u64 with copy)
+	153: Branch(6)
+B29:
+	154: LdFunction choose_function1__lambda_1(u64, u64): u64
+	155: StLoc[4](loc2: |u64,u64|u64 with copy+store)
+	156: LdU64(15)
+	157: MoveLoc[4](loc2: |u64,u64|u64 with copy+store)
+	158: EarlyBindFunction(5, 1)
+	159: StLoc[3](loc1: |u64|u64 with copy)
+	160: Branch(6)
+}
+multiply3(Arg0: u64, Arg1: u64, Arg2: u64): u64 /* def_idx: 2 */ {
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: MoveLoc[1](Arg1: u64)
+	2: Mul
+	3: MoveLoc[2](Arg2: u64)
+	4: Mul
+	5: Ret
+}
+public test_functions() /* def_idx: 3 */ {
+L0:	loc0: u64
+L1:	loc1: bool
+L2:	loc2: u64
+L3:	loc3: u64
+B0:
+	0: LdU64(0)
+	1: StLoc[0](loc0: u64)
+	2: LdFalse
+	3: StLoc[1](loc1: bool)
+B1:
+	4: Branch(6)
+B2:
+	5: Branch(30)
+B3:
+	6: CopyLoc[1](loc1: bool)
+	7: BrFalse(31)
+B4:
+	8: MoveLoc[0](loc0: u64)
+	9: LdU64(1)
+	10: Add
+	11: StLoc[0](loc0: u64)
+B5:
+	12: CopyLoc[0](loc0: u64)
+	13: LdU64(15)
+	14: Lt
+	15: BrTrue(17)
+B6:
+	16: Branch(30)
+B7:
+	17: CopyLoc[0](loc0: u64)
+	18: LdU64(3)
+	19: Call choose_function1(u64, u64): u64
+	20: CopyLoc[0](loc0: u64)
+	21: LdU64(2)
+	22: Add
+	23: LdU64(3)
+	24: Mul
+	25: Eq
+	26: BrFalse(28)
+B8:
+	27: Branch(4)
+B9:
+	28: MoveLoc[0](loc0: u64)
+	29: Abort
+B10:
+	30: Ret
+B11:
+	31: LdTrue
+	32: StLoc[1](loc1: bool)
+	33: Branch(12)
+}
+choose_function1__lambda_1(Arg0: u64, Arg1: u64): u64 /* def_idx: 4 */ {
+L2:	loc0: u64
+B0:
+	0: MoveLoc[1](Arg1: u64)
+	1: LdU64(1)
+	2: Sub
+	3: LdU64(1)
+	4: Add
+	5: StLoc[1](Arg1: u64)
+	6: MoveLoc[0](Arg0: u64)
+	7: MoveLoc[1](Arg1: u64)
+	8: Call mod3::multiply(u64, u64): u64
+	9: Ret
+}
+}
+============ bytecode verification failed ========
 
 Diagnostics:
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:39:17
-   │
-39 │                 mod2::double
-   │                 ^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:41:17
-   │
-41 │                 mod1::triple
-   │                 ^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
+bug: bytecode verification failed with unexpected status code `STLOC_TYPE_MISMATCH_ERROR`. This is a compiler bug, consider reporting it.
+Error message: none
    ┌─ tests/lambda/storable/doable_func.move:43:17
    │
 43 │                 move |x| mod3::multiply(4, x)
    │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:46:17
-   │
-46 │                 move |y| alt_multiply(x, y)
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:49:17
-   │
-49 │                 move |y| mod3::multiply(x, y)
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:51:17
-   │
-51 │                 move |x| multiply3(3, 2, x)
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:53:17
-   │
-53 │                 move |x| mod3::multiply(7, x)
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:55:17
-   │
-55 │                 move |x| { multiply3(4, 2, x) }
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:57:17
-   │
-57 │                 move |x| multiply3(3, 3, x)
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:61:17
-   │
-61 │                 move |z| multiply3(x + 1, y, z)
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:64:17
-   │
-64 │                 move |x| alt_multiply(z, x) with copy
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:66:37
-   │
-66 │                 let g = move |x, y| mod3::multiply(x, y) with copy+drop;
-   │                                     ^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:67:17
-   │
-67 │                 move |x| g(11, x)
-   │                 ^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:69:25
-   │
-69 │                 let h = move |x| mod3::multiply(12, x) with copy;
-   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:72:25
-   │
-72 │                 let i = move |x| multiply3(2, 2, x);
-   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:75:25
-   │
-75 │                 let i = move |x, y| { let q = y - 1; 0x42::mod3::multiply(x, q + 1)  };
-   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Function-typed values not yet implemented except as parameters to calls to inline functions
-   ┌─ tests/lambda/storable/doable_func.move:76:17
-   │
-76 │                 move |x| i(15, x)
-   │                 ^^^^^^^^^^^^^^^^^
-
-error: Calls to function values other than inline function parameters not yet implemented
-   ┌─ tests/lambda/storable/doable_func.move:78:9
-   │
-78 │         f(x)
-   │         ^^^^

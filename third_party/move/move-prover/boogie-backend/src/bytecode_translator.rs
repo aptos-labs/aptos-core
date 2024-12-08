@@ -1324,6 +1324,9 @@ impl<'env> FunctionTranslator<'env> {
                     Constant::Vector(val) => boogie_constant_blob(env, options, val),
                     Constant::U16(num) => boogie_num_literal(&num.to_string(), 16, bv_flag),
                     Constant::U32(num) => boogie_num_literal(&num.to_string(), 32, bv_flag),
+                    Constant::Function(..) => {
+                        unimplemented!("Function");
+                    },
                 };
                 let dest_str = str_local(*dest);
                 emitln!(writer, "{} := {};", dest_str, value);
@@ -2549,6 +2552,8 @@ impl<'env> FunctionTranslator<'env> {
                         self.track_global_mem(mem, node_id);
                     },
                     Vector => unimplemented!("vector"),
+                    EarlyBindFunction => unimplemented!("earlybind"), // TODO(LAMBDA)
+                    InvokeFunction => unimplemented!("invoke"),       // TODO(LAMBDA)
                 }
                 if let Some(AbortAction(target, code)) = aa {
                     emitln!(writer, "if ($abort_flag) {");
