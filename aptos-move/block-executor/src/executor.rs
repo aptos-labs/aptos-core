@@ -81,6 +81,34 @@ pub struct BlockExecutor<T, E, S, L, X, TP> {
     phantom: PhantomData<(T, E, S, L, X, TP)>,
 }
 
+// If the first transaction in the block is a "block metadata transaction", then such a txn
+// is expected to produce writes that all subsequent transactions read (e.g. block timestamp).
+// Hence, for efficiency, workers for any other execution tasks will wait below on a barrier
+// to avoid costly invalidation aborts and re-executions.
+//
+// IMPORTANT: Implemented as a macro for standalone testing - defers barrier signal to the
+// end of surrounding scope by returning a guard. The surrounding scope should execute the
+// block metadata transaction.
+//
+// TODO: Use BlockSynchronizationView barrier infrastructure, once available.
+macro_rules! block_metadata_barrier_wait {
+    ($idx_to_execute:expr, $is_block_metadata_txn:expr, $barrier:expr) => {
+        if $idx_to_execute == 0 {
+            if $is_block_metadata_txn {
+                Some(scopeguard::guard((), |_| {
+                    $barrier.store(true, Ordering::Release);
+                }))
+            } else {
+                $barrier.store(true, Ordering::Release);
+                None
+            }
+        } else {
+            while !$barrier.load(Ordering::Acquire) {}
+            None
+        }
+    };
+}
+
 impl<T, E, S, L, X, TP> BlockExecutor<T, E, S, L, X, TP>
 where
     T: Transaction,
@@ -126,9 +154,16 @@ where
         >,
         runtime_environment: &RuntimeEnvironment,
         parallel_state: ParallelState<T, X>,
+        block_metadata_barrier: &AtomicBool,
     ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = signature_verified_block.get_txn(idx_to_execute);
+
+        let _maybe_guard = block_metadata_barrier_wait!(
+            idx_to_execute,
+            txn.is_block_metadata_txn(),
+            block_metadata_barrier
+        );
 
         // VM execution.
         let sync_view = LatestView::new(
@@ -618,6 +653,7 @@ where
                         start_shared_counter,
                         shared_counter,
                     ),
+                    &AtomicBool::new(true),
                 )?;
 
                 // Publish modules before we decrease validation index so that validations observe
@@ -968,6 +1004,7 @@ where
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
         num_workers: usize,
+        block_metadata_barrier: &AtomicBool,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let num_txns = block.num_txns();
@@ -1073,6 +1110,7 @@ where
                             start_shared_counter,
                             shared_counter,
                         ),
+                        block_metadata_barrier,
                     )?;
                     scheduler.finish_execution(txn_idx, incarnation, needs_suffix_validation)?
                 },
@@ -1144,6 +1182,8 @@ where
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
 
+        let block_metadata_barrier = AtomicBool::new(false);
+
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
             for _ in 0..num_workers {
@@ -1161,6 +1201,7 @@ where
                         &shared_commit_state,
                         &final_results,
                         num_workers,
+                        &block_metadata_barrier,
                     ) {
                         // If there are multiple errors, they all get logged:
                         // ModulePathReadWriteError and FatalVMError variant is logged at construction,
@@ -1808,5 +1849,74 @@ where
         }
 
         Err(sequential_error)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    // use super::*;
+    use claims::{assert_none, assert_some};
+    use std::{
+        sync::atomic::{AtomicBool, Ordering},
+        thread::sleep,
+        time::Duration,
+    };
+
+    #[test]
+    fn block_metadata_barrier() {
+        let barrier = AtomicBool::new(false);
+        {
+            let maybe_guard = block_metadata_barrier_wait!(0, false, &barrier);
+            assert_none!(&maybe_guard);
+
+            // Txn 0 signals the barrier immediately if it is not block metadata txn.
+            assert!(barrier.load(Ordering::Relaxed));
+        }
+        let barrier = AtomicBool::new(false);
+        {
+            let maybe_guard = block_metadata_barrier_wait!(0, true, &barrier);
+            assert_some!(&maybe_guard);
+
+            // Conversely, block metadata txn 0 defers signaling till surrounding scope.
+            assert!(!barrier.load(Ordering::Relaxed));
+        }
+        assert!(barrier.load(Ordering::Relaxed));
+
+        let executor_thread_pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(4)
+            .build()
+            .unwrap();
+
+        let barrier = AtomicBool::new(false);
+        let mock_block_metadata_set = AtomicBool::new(false);
+
+        executor_thread_pool.scope(|s| {
+            s.spawn(|_| {
+                let maybe_guard = block_metadata_barrier_wait!(0, true, &barrier);
+                assert_some!(&maybe_guard);
+
+                sleep(Duration::from_millis(100));
+                // Barrier signal deferred to after setting mock block metadata.
+                mock_block_metadata_set.store(true, Ordering::Relaxed);
+            });
+            s.spawn(|_| {
+                let maybe_guard = block_metadata_barrier_wait!(1, false, &barrier);
+                assert_none!(&maybe_guard);
+
+                // Barrier cleared. Acquire-Release semantics on the barrier
+                // must ensure the metadata is already set.
+                assert!(mock_block_metadata_set.load(Ordering::Relaxed));
+                assert!(barrier.load(Ordering::Relaxed));
+            });
+            s.spawn(|_| {
+                // Only for txn 0 whether it is block metadata matters.
+                let maybe_guard = block_metadata_barrier_wait!(2, true, &barrier);
+                assert_none!(&maybe_guard);
+
+                // Barrier cleared.
+                assert!(barrier.load(Ordering::Relaxed));
+                assert!(mock_block_metadata_set.load(Ordering::Relaxed));
+            });
+        });
     }
 }
