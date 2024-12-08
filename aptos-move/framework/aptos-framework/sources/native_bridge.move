@@ -399,8 +399,6 @@ module aptos_framework::native_bridge_store {
     const EINCORRECT_NONCE : u64 = 0x6;
     const EID_NOT_FOUND : u64 = 0x7;
 
-    // const MAX_U64 : u64 = 0xFFFFFFFFFFFFFFFF;
-
     /// A smart table wrapper
     struct SmartTableWrapper<K, V> has key, store {
         inner: SmartTable<K, V>,
