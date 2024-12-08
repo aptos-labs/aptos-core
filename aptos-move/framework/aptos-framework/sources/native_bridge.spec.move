@@ -147,10 +147,10 @@ spec aptos_framework::native_bridge_core {
 
 spec aptos_framework::native_bridge_store {
 
-    // spec module {
-    //     axiom forall x: u64: len(bcs::to_bytes(x)) == 8; 
-    //     axiom forall x: u256: len(bcs::to_bytes(x)) == 32; 
-    // }
+    spec module {
+        axiom forall x: u64: len(bcs::to_bytes(x)) == 8; 
+        axiom forall x: u256: len(bcs::to_bytes(x)) == 32; 
+    }
 
     // req1. never aborts 
     // req2. returns a 32-byte vector
