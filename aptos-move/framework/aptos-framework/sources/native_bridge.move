@@ -50,6 +50,7 @@ module aptos_framework::native_bridge {
         bridge_transfer_completed_events: EventHandle<BridgeTransferCompletedEvent>,
     }
 
+    /// A nonce to ensure the uniqueness of bridge transfers
     struct Nonce has key {
         value: u64
     }
