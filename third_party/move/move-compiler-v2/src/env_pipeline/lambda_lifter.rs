@@ -188,12 +188,12 @@ impl<'a> LambdaLifter<'a> {
             for i in 0..256 {
                 let name2 = format!("{}_{}", name, i);
                 let sym = env.symbol_pool().make(&name2);
-                if !mod_env.find_function(sym).is_some() {
+                if mod_env.find_function(sym).is_none() {
                     return Some(sym);
                 }
             }
             env.error(
-                &loc,
+                loc,
                 &format!(
                     "Can't find an available function name similar to {} in module {} to use for lambda implementation.",
                     basename,
