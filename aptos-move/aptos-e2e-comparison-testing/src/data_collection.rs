@@ -12,12 +12,10 @@ use aptos_framework::natives::code::PackageMetadata;
 use aptos_language_e2e_tests::data_store::FakeDataStore;
 use aptos_rest_client::Client;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValue, TStateView},
-    transaction::{
+    on_chain_config::{Features, FeatureFlag}, state_store::{state_key::StateKey, state_value::StateValue, TStateView}, transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
         TransactionOutput, Version,
-    },
-    write_set::TOTAL_SUPPLY_STATE_KEY,
+    }, write_set::TOTAL_SUPPLY_STATE_KEY
 };
 use aptos_validator_interface::{AptosValidatorInterface, FilterCondition, RestDebuggerInterface};
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
@@ -222,6 +220,8 @@ impl DataCollection {
                     let index = index_writer.clone();
 
                     let mut data_state = FakeDataStore::default();
+                    let mut features_to_enable = vec![FeatureFlag::VM_BINARY_FORMAT_V7, FeatureFlag::NATIVE_MEMORY_OPERATIONS];
+
                     let cache_v1 = compilation_cache
                         .lock()
                         .unwrap()
@@ -232,6 +232,8 @@ impl DataCollection {
                         self.debugger.clone(),
                         version,
                         data_state,
+                        features_to_enable,
+                        vec![]
                     );
 
                     let txn_execution_thread = tokio::task::spawn_blocking(move || {

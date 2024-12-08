@@ -30,7 +30,7 @@ impl OverrideConfig {
         }
     }
 
-    pub(crate) fn get_state_override(
+    pub fn get_state_override(
         &self,
         state_view: &impl StateView,
     ) -> HashMap<StateKey, StateValue> {
