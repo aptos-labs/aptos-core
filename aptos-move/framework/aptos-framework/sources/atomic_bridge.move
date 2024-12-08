@@ -8,6 +8,10 @@ module aptos_framework::ethereum {
     const ASCII_A_LOWERCASE: u8 = 0x61;
     const ASCII_F_LOWERCASE: u8 = 0x66;
 
+    // Error codes
+
+    const EINVALID_LENGTH: u64 = 1;
+
     /// Represents an Ethereum address within Aptos smart contracts.
     /// Provides structured handling, storage, and validation of Ethereum addresses.
     struct EthereumAddress has store, copy, drop {
@@ -31,6 +35,16 @@ module aptos_framework::ethereum {
     /// @abort If the address does not conform to EIP-55 standards.
     public fun ethereum_address_no_eip55(ethereum_address: vector<u8>): EthereumAddress {
         assert_40_char_hex(&ethereum_address);
+        EthereumAddress { inner: ethereum_address }
+    }
+
+    /// Returns a new 20-byte `EthereumAddress` without EIP-55 validation.
+    ///
+    /// @param ethereum_address A 20-byte vector of unsigned 8-bit bytes.
+    /// @return An `EthereumAddress` struct.
+    /// @abort If the address does not conform to EIP-55 standards.
+    public fun ethereum_address_20_bytes(ethereum_address: vector<u8>): EthereumAddress {
+        assert!(vector::length(&ethereum_address) == 20, EINVALID_LENGTH);
         EthereumAddress { inner: ethereum_address }
     }
 
@@ -144,6 +158,11 @@ module aptos_framework::ethereum {
         // Abort if the address is all zeros
         assert!(!is_zero, 3);
     }
+
+    #[test_only]
+    public fun eth_address_20_bytes(): vector<u8> {
+        vector[0x32, 0xBe, 0x34, 0x3B, 0x94, 0xf8, 0x60, 0x12, 0x4d, 0xC4, 0xfE, 0xE2, 0x78, 0xFD, 0xCB, 0xD3, 0x8C, 0x10, 0x2D, 0x88]
+}
 
     #[test_only]
     public fun valid_eip55(): vector<u8> {

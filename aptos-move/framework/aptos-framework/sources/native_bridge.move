@@ -95,7 +95,7 @@ module aptos_framework::native_bridge {
         amount: u64  
     ) acquires BridgeEvents, Nonce {
         let initiator_address = signer::address_of(initiator);  
-        let ethereum_address = ethereum::ethereum_address_no_eip55(recipient);  
+        let ethereum_address = ethereum::ethereum_address_20_bytes(recipient);  
 
         // Ensure the amount is enough for the bridge fee and charge for it
         let new_amount = charge_bridge_fee(amount);
@@ -237,7 +237,7 @@ module aptos_framework::native_bridge {
         native_bridge_core::mint(sender_address, account_balance);
 
         // Specify the recipient and transfer amount
-        let recipient = b"5B38Da6a701c568545dCfcB03FcB875f56beddC4";
+        let recipient = ethereum::eth_address_20_bytes();
 
         // Perform the bridge transfer
         initiate_bridge_transfer(
@@ -256,7 +256,7 @@ module aptos_framework::native_bridge {
     }
 
     #[test(aptos_framework = @aptos_framework, sender = @0xdaff, relayer = @0xcafe)]
-    #[expected_failure(abort_code = 0x10006, location = 0x1::coin)] //EINSUFFICIENT_BALANCE
+    #[expected_failure(abort_code = 0x10006, location = 0x1::coin)] 
     fun test_initiate_bridge_transfer_insufficient_balance(
         sender: &signer,
         aptos_framework: &signer,
@@ -268,7 +268,7 @@ module aptos_framework::native_bridge {
         initialize(aptos_framework);
         aptos_account::create_account(sender_address);
 
-        let recipient = valid_eip55();
+        let recipient = ethereum::eth_address_20_bytes();
         let amount = 1000;
         let bridge_fee = 40;
         update_bridge_fee(aptos_framework, bridge_fee);
