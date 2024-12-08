@@ -65,7 +65,7 @@ pub struct CachedStateView {
     id: StateViewId,
 
     /// The persisted state is readable from the persist storage, at the version of
-    /// `self.speculative.parent_version()`
+    /// `self.speculative.base_version()`
     reader: Arc<dyn DbReader>,
 
     /// The in-memory state on top of known persisted state

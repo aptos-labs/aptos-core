@@ -581,7 +581,7 @@ pub trait ProofRead: Sync {
     fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt>;
 
     fn next_version(&self) -> Version {
-        // FIXME(aldenhu): impl
+        // FIXME(aldenhu): remove
         unimplemented!()
     }
 }

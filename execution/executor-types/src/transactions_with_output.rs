@@ -3,9 +3,16 @@
 
 use crate::metrics::TIMER;
 use aptos_metrics_core::TimerHelper;
-use aptos_storage_interface::state_store::per_version_state_update_refs::PerVersionStateUpdateRefs;
-use aptos_types::transaction::{Transaction, TransactionOutput, Version};
-use itertools::izip;
+use aptos_storage_interface::state_store::{
+    per_version_state_update_refs::PerVersionStateUpdateRefs, state_update::StateUpdateRef,
+    state_update_ref_map::BatchedStateUpdateRefs,
+};
+use aptos_types::{
+    state_store::state_key::StateKey,
+    transaction::{Transaction, TransactionOutput, Version},
+    write_set::WriteSet,
+};
+use itertools::{izip, Itertools};
 use std::{
     fmt::{Debug, Formatter},
     ops::Deref,
@@ -57,7 +64,7 @@ pub struct TransactionsToKeep {
     is_reconfig: bool,
     #[borrows(transactions_with_output)]
     #[covariant]
-    state_update_refs: PerVersionStateUpdateRefs<'this>,
+    state_update_refs: StateUpdateRefs<'this>,
 }
 
 impl TransactionsToKeep {
@@ -76,10 +83,15 @@ impl TransactionsToKeep {
                     .transaction_outputs
                     .iter()
                     .map(TransactionOutput::write_set);
-                PerVersionStateUpdateRefs::index_write_sets(
+                let last_checkpoint_index = Self::get_last_checkpoint_index(
+                    is_reconfig,
+                    &transactions_with_output.transactions,
+                );
+                StateUpdateRefs::index_write_sets(
                     first_version,
                     write_sets,
                     transactions_with_output.len(),
+                    last_checkpoint_index,
                 )
             },
         }
@@ -105,8 +117,16 @@ impl TransactionsToKeep {
         Self::make(0, txns, txn_outputs, false)
     }
 
-    pub fn state_update_refs(&self) -> &PerVersionStateUpdateRefs {
-        self.borrow_state_update_refs()
+    pub fn per_version_state_update_refs(&self) -> &PerVersionStateUpdateRefs {
+        &self.borrow_state_update_refs().per_version
+    }
+
+    pub fn state_update_refs_for_last_checkpoint(&self) -> Option<&BatchedStateUpdateRefs> {
+        self.borrow_state_update_refs().for_last_checkpoint.as_ref()
+    }
+
+    pub fn state_update_refs_for_latest(&self) -> &BatchedStateUpdateRefs {
+        &self.borrow_state_update_refs().for_latest
     }
 
     pub fn is_reconfig(&self) -> bool {
@@ -129,14 +149,14 @@ impl TransactionsToKeep {
         }
     }
 
-    fn get_last_checkpoint_index(&self) -> Option<usize> {
+    fn get_last_checkpoint_index(is_reconfig: bool, transactions: &[Transaction]) -> Option<usize> {
         let _timer = TIMER.timer_with(&["get_last_checkpoint_index"]);
 
-        if self.is_reconfig() {
-            return Some(self.transactions.len() - 1);
+        if is_reconfig {
+            return Some(transactions.len() - 1);
         }
 
-        self.transactions
+        transactions
             .iter()
             .rposition(Transaction::is_non_reconfig_block_ending)
     }
@@ -159,5 +179,80 @@ impl Debug for TransactionsToKeep {
             )
             .field("is_reconfig", &self.is_reconfig())
             .finish()
+    }
+}
+
+struct StateUpdateRefs<'kv> {
+    per_version: PerVersionStateUpdateRefs<'kv>,
+    for_last_checkpoint: Option<BatchedStateUpdateRefs<'kv>>,
+    for_latest: BatchedStateUpdateRefs<'kv>,
+}
+
+impl<'kv> StateUpdateRefs<'kv> {
+    pub fn index_write_sets(
+        first_version: Version,
+        write_sets: impl IntoIterator<Item = &'kv WriteSet>,
+        num_write_sets: usize,
+        last_checkpoint_index: Option<usize>,
+    ) -> Self {
+        let per_version =
+            PerVersionStateUpdateRefs::index_write_sets(first_version, write_sets, num_write_sets);
+        let (for_last_checkpoint, for_latest) =
+            Self::collect_updates(&per_version, last_checkpoint_index);
+        Self {
+            per_version,
+            for_last_checkpoint,
+            for_latest,
+        }
+    }
+
+    fn collect_updates(
+        per_version_updates: &PerVersionStateUpdateRefs<'kv>,
+        last_checkpoint_index: Option<usize>,
+    ) -> (
+        Option<BatchedStateUpdateRefs<'kv>>,
+        BatchedStateUpdateRefs<'kv>,
+    ) {
+        let _timer = TIMER.timer_with(&["txns_to_keep__collect_updates"]);
+
+        let mut shard_iters = per_version_updates
+            .shards
+            .iter()
+            .map(|shard| shard.iter().cloned())
+            .collect::<Vec<_>>();
+
+        let mut first_version = per_version_updates.first_version;
+        let mut num_versions = per_version_updates.num_versions;
+        let updates_for_last_checkpoint = last_checkpoint_index.map(|idx| {
+            let ret = Self::collect_some_updates(first_version, idx + 1, &mut shard_iters);
+            first_version += idx as Version + 1;
+            num_versions -= idx + 1;
+            ret
+        });
+        let updates_for_latest =
+            Self::collect_some_updates(first_version, num_versions, &mut shard_iters);
+
+        // Assert that all updates are consumed.
+        assert!(shard_iters.iter_mut().all(|iter| iter.next().is_none()));
+
+        (updates_for_last_checkpoint, updates_for_latest)
+    }
+
+    fn collect_some_updates(
+        first_version: Version,
+        num_versions: usize,
+        shard_iters: &mut [impl Iterator<Item = (&'kv StateKey, StateUpdateRef<'kv>)> + Clone],
+    ) -> BatchedStateUpdateRefs<'kv> {
+        let mut ret = BatchedStateUpdateRefs::new_empty(first_version, num_versions);
+        // exclusive
+        let end_version = first_version + num_versions as Version;
+        izip!(shard_iters, &mut ret.shards).for_each(|(shard_iter, dedupped)| {
+            dedupped.extend(
+                shard_iter
+                    // n.b. take_while_ref so that in the next step we can process the rest of the entries from the iters.
+                    .take_while_ref(|(_k, u)| u.version < end_version),
+            )
+        });
+        ret
     }
 }

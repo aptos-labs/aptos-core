@@ -36,6 +36,10 @@ impl<'kv> BatchedStateUpdateRefs<'kv> {
         todo!()
     }
 
+    pub fn first_version(&self) -> Version {
+        self.first_version
+    }
+
     pub fn next_version(&self) -> Version {
         self.first_version + self.num_versions as Version
     }

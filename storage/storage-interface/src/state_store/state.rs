@@ -4,7 +4,6 @@
 use crate::{
     metrics::TIMER,
     state_store::{
-        per_version_state_update_refs::PerVersionStateUpdateRefs,
         state_delta::StateDelta,
         state_update::{StateUpdate, StateUpdateRef},
         state_update_ref_map::BatchedStateUpdateRefs,
@@ -19,7 +18,7 @@ use aptos_types::{
     transaction::Version,
 };
 use derive_more::Deref;
-use itertools::{izip, Itertools};
+use itertools::Itertools;
 use rayon::prelude::*;
 use std::{collections::HashMap, sync::Arc};
 
@@ -120,7 +119,7 @@ impl State {
         updates: &BatchedStateUpdateRefs,
         state_cache: &ShardedStateCache,
     ) -> Self {
-        let _timer = TIMER.timer_with(&["state_delta__update"]);
+        let _timer = TIMER.timer_with(&["state__update"]);
 
         // 1. The update batch must begin at self.next_version().
         assert_eq!(self.next_version(), updates.first_version);
@@ -236,19 +235,16 @@ impl LedgerState {
         self.latest.is_the_same(&self.last_checkpoint)
     }
 
-    pub fn update(
+    pub fn update<'kv>(
         &self,
         persisted_snapshot: &State,
-        per_version_updates: &PerVersionStateUpdateRefs,
-        last_checkpoint_index: Option<usize>,
+        updates_for_last_checkpoint: Option<&BatchedStateUpdateRefs<'kv>>,
+        updates_for_latest: &BatchedStateUpdateRefs<'kv>,
         state_cache: &ShardedStateCache,
     ) -> LedgerState {
         let _timer = TIMER.timer_with(&["ledger_state__update"]);
 
-        let (updates_for_last_checkpoint, updates_for_latest) =
-            Self::collect_updates(per_version_updates, last_checkpoint_index);
-
-        let last_checkpoint = if let Some(updates) = &updates_for_last_checkpoint {
+        let last_checkpoint = if let Some(updates) = updates_for_last_checkpoint {
             self.latest()
                 .update(persisted_snapshot, updates, state_cache)
         } else {
@@ -260,58 +256,8 @@ impl LedgerState {
         } else {
             &last_checkpoint
         };
-        let latest = base_of_latest.update(persisted_snapshot, &updates_for_latest, state_cache);
+        let latest = base_of_latest.update(persisted_snapshot, updates_for_latest, state_cache);
 
         LedgerState::new(latest, last_checkpoint)
-    }
-
-    fn collect_updates<'kv>(
-        state_update_refs: &PerVersionStateUpdateRefs<'kv>,
-        last_checkpoint_index: Option<usize>,
-    ) -> (
-        Option<BatchedStateUpdateRefs<'kv>>,
-        BatchedStateUpdateRefs<'kv>,
-    ) {
-        let _timer = TIMER.timer_with(&["ledger_state__collect_updates"]);
-
-        let mut shard_iters = state_update_refs
-            .shards
-            .iter()
-            .map(|shard| shard.iter().cloned())
-            .collect::<Vec<_>>();
-
-        let mut first_version = state_update_refs.first_version;
-        let mut num_versions = state_update_refs.num_versions;
-        let updates_for_last_checkpoint = last_checkpoint_index.map(|idx| {
-            let ret = Self::collect_some_updates(first_version, idx + 1, &mut shard_iters);
-            first_version += idx as Version + 1;
-            num_versions -= idx + 1;
-            ret
-        });
-        let updates_for_latest =
-            Self::collect_some_updates(first_version, num_versions, &mut shard_iters);
-
-        // Assert that all updates are consumed.
-        assert!(shard_iters.iter_mut().all(|iter| iter.next().is_none()));
-
-        (updates_for_last_checkpoint, updates_for_latest)
-    }
-
-    fn collect_some_updates<'kv>(
-        first_version: Version,
-        num_versions: usize,
-        shard_iters: &mut [impl Iterator<Item = (&'kv StateKey, StateUpdateRef<'kv>)> + Clone],
-    ) -> BatchedStateUpdateRefs<'kv> {
-        let mut ret = BatchedStateUpdateRefs::new_empty(first_version, num_versions);
-        // exclusive
-        let end_version = first_version + num_versions as Version;
-        izip!(shard_iters, &mut ret.shards).for_each(|(shard_iter, dedupped)| {
-            dedupped.extend(
-                shard_iter
-                    // n.b. take_while_ref so that in the next step we can process the rest of the entries from the iters.
-                    .take_while_ref(|(_k, u)| u.version < end_version),
-            )
-        });
-        ret
     }
 }
