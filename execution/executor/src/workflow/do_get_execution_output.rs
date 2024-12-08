@@ -346,8 +346,8 @@ impl Parser {
                 .transpose()?
         };
 
+        let result_state = Self::update_state(&to_commit, parent_state, &base_state_view);
         let state_cache = base_state_view.into_state_cache();
-        let result_state = Self::update_state(&to_commit, parent_state, &state_cache);
 
         let out = ExecutionOutput::new(
             is_block,
@@ -495,12 +495,16 @@ impl Parser {
     }
 
     fn update_state(
-        _to_commit: &TransactionsToKeep,
-        _base_state: &LedgerState,
-        _state_cache: &ShardedStateCache,
+        to_commit: &TransactionsToKeep,
+        base_state: &LedgerState,
+        state_view: &CachedStateView,
     ) -> LedgerState {
-        // FIXME(aldenhu):
-        todo!()
+        base_state.update(
+            state_view.persisted_state(),
+            to_commit.state_update_refs_for_last_checkpoint(),
+            to_commit.state_update_refs_for_latest(),
+            state_view.state_cache(),
+        )
     }
 }
 

@@ -98,7 +98,6 @@ use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble},
     proof::SparseMerkleProofExt,
     state_store::state_storage_usage::StateStorageUsage,
-    transaction::Version,
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -579,11 +578,6 @@ where
 pub trait ProofRead: Sync {
     /// Gets verified proof for this key in persistent storage.
     fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt>;
-
-    fn next_version(&self) -> Version {
-        // FIXME(aldenhu): remove
-        unimplemented!()
-    }
 }
 
 /// All errors `update` can possibly return.

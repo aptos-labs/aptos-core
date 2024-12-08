@@ -7,18 +7,21 @@ use crate::{
         state::{LedgerState, State},
         state_update_ref_map::BatchedStateUpdateRefs,
     },
+    DbReader,
 };
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
 use aptos_types::{
+    proof::SparseMerkleProofExt,
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     transaction::Version,
 };
 use derive_more::Deref;
 use itertools::Itertools;
 use rayon::prelude::*;
+use std::sync::Arc;
 
 /// The data structure through which the entire state at a given
 /// version can be summarized to a concise digest (the root hash).
@@ -67,9 +70,7 @@ impl StateSummary {
 
     pub fn update(
         &self,
-        persisted: &StateSummary,
-        // Must read proof at the `persisted` version. TODO(aldenhu): refactor to enforce that.
-        proof_reader: &impl ProofRead,
+        persisted: &ProvableStateSummary,
         updates: &BatchedStateUpdateRefs,
     ) -> Result<Self> {
         let _timer = TIMER.timer_with(&["state_summary__update"]);
@@ -102,7 +103,7 @@ impl StateSummary {
                 smt_updates,
                 // TODO(aldenhu): smt not carry usage
                 StateStorageUsage::Untracked,
-                proof_reader,
+                persisted,
             )?
             .unfreeze();
 
@@ -158,16 +159,14 @@ impl LedgerStateSummary {
 
     pub fn update<'kv>(
         &self,
-        persisted: &StateSummary,
-        // Must read proof at the `persisted` version. TODO(aldenhu): refactor to enforce that.
-        proof_reader: &impl ProofRead,
+        persisted: &ProvableStateSummary,
         updates_for_last_checkpoint: Option<&BatchedStateUpdateRefs<'kv>>,
         updates_for_latest: &BatchedStateUpdateRefs<'kv>,
     ) -> Result<Self> {
         let _timer = TIMER.timer_with(&["ledger_state_summary__update"]);
 
         let last_checkpoint = if let Some(updates) = updates_for_last_checkpoint {
-            self.latest.update(persisted, proof_reader, updates)?
+            self.latest.update(persisted, updates)?
         } else {
             self.last_checkpoint.clone()
         };
@@ -177,9 +176,32 @@ impl LedgerStateSummary {
         } else {
             &last_checkpoint
         };
-        let latest = base_of_latest.update(persisted, proof_reader, updates_for_latest)?;
+        let latest = base_of_latest.update(persisted, updates_for_latest)?;
 
         Ok(Self::new(last_checkpoint, latest))
+    }
+}
+
+#[derive(Deref)]
+pub struct ProvableStateSummary {
+    #[deref]
+    state_summary: StateSummary,
+    _db: Arc<dyn DbReader>,
+}
+
+impl ProvableStateSummary {
+    pub fn new_persisted(db: Arc<dyn DbReader>) -> Result<Self> {
+        Ok(Self {
+            state_summary: db.get_persisted_state_summary()?,
+            _db: db,
+        })
+    }
+}
+
+impl ProofRead for ProvableStateSummary {
+    fn get_proof(&self, _key: HashValue) -> Option<&SparseMerkleProofExt> {
+        // FIXME(change interface to return non-ref)
+        todo!()
     }
 }
 
