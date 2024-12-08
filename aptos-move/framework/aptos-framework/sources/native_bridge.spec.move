@@ -13,14 +13,14 @@ spec aptos_framework::native_bridge {
     //     ensures global<R>(@aptos_framework).v == old(global<R>(@aptos_framework).v) + 1;
     // }
 
-    // spec increment_and_get_nonce {
-    //     pragma aborts_if_is_partial = false;
-    //     modifies global<Nonce>(@aptos_framework);
-    //     aborts_if !exists<Nonce>(@aptos_framework);
-    //     aborts_if global<Nonce>(@aptos_framework).value + 1 > MAX_U64;
-    //     ensures result == old(global<Nonce>(@aptos_framework).value) + 1;
-    //     ensures global<Nonce>(@aptos_framework).value == old(global<Nonce>(@aptos_framework).value) + 1;
-    // }
+    spec increment_and_get_nonce {
+        pragma aborts_if_is_partial = true;
+        modifies global<Nonce>(@aptos_framework);
+        aborts_if !exists<Nonce>(@aptos_framework);
+        aborts_if global<Nonce>(@aptos_framework).value + 1 > MAX_U64;
+        ensures result == old(global<Nonce>(@aptos_framework).value) + 1;
+        ensures global<Nonce>(@aptos_framework).value == old(global<Nonce>(@aptos_framework).value) + 1;
+    }
 
     // spec increment_and_get_nonce_at {  
     //     // pragma aborts_if_is_partial = true;
