@@ -346,7 +346,7 @@ fn find_possibly_modified_vars(
                     },
                 };
             },
-            Invoke(..) | Return(..) | Quant(..) | Loop(..) | Mutate(..) | SpecBlock(..) => {
+            InvokeFunction(..) | Return(..) | Quant(..) | Loop(..) | Mutate(..) | SpecBlock(..) => {
                 // We don't modify top-level variables here.
                 match pos {
                     VisitorPosition::Pre => {

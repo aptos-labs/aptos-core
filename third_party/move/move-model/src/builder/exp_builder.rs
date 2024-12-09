@@ -1552,7 +1552,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 );
                 let fexp = self.translate_exp(efexp, &fun_t);
                 let id = self.new_node_id_with_type_loc(expected_type, &loc);
-                ExpData::Invoke(id, fexp.into_exp(), args)
+                ExpData::InvokeFunction(id, fexp.into_exp(), args)
             },
             EA::Exp_::Pack(maccess, generics, fields) => self
                 .translate_pack(
@@ -3226,7 +3226,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         if let EA::ModuleAccess_::Name(n) = &maccess.value {
             let sym = self.symbol_pool().make(&n.value);
 
-            // Check whether this is an Invoke on a function value.
+            // Check whether this is an InvokeFunction on a function value.
             if let Some(entry) = self.lookup_local(sym, false) {
                 // Check whether the local has the expected function type.
                 let sym_ty = entry.type_.clone();
@@ -3246,7 +3246,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let local_id = self.new_node_id_with_type_loc(&sym_ty, &self.to_loc(&n.loc));
                 let local_var = ExpData::LocalVar(local_id, sym);
                 let id = self.new_node_id_with_type_loc(expected_type, loc);
-                return Some(ExpData::Invoke(id, local_var.into_exp(), args));
+                return Some(ExpData::InvokeFunction(id, local_var.into_exp(), args));
             }
 
             if self.is_spec_mode() {

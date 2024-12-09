@@ -100,6 +100,66 @@ fn call(
     Ok(())
 }
 
+fn ld_function(
+    verifier: &mut ReferenceSafetyAnalysis,
+    state: &mut AbstractState,
+    offset: CodeOffset,
+    function_handle: &FunctionHandle,
+    meter: &mut impl Meter,
+) -> PartialVMResult<()> {
+    let _parameters = verifier.resolver.signature_at(function_handle.parameters);
+    let acquired_resources = match verifier.name_def_map.get(&function_handle.name) {
+        Some(idx) => {
+            let func_def = verifier.resolver.function_def_at(*idx)?;
+            let fh = verifier.resolver.function_handle_at(func_def.function);
+            if function_handle == fh {
+                func_def.acquires_global_resources.iter().cloned().collect()
+            } else {
+                BTreeSet::new()
+            }
+        },
+        None => BTreeSet::new(),
+    };
+    let value = state.ld_function(offset, &acquired_resources, meter)?;
+    verifier.stack.push(value);
+    Ok(())
+}
+
+fn early_bind_function(
+    verifier: &mut ReferenceSafetyAnalysis,
+    _arg_tys: Vec<SignatureToken>,
+    k: u8,
+) -> PartialVMResult<()> {
+    safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
+    for _ in 0..k {
+        // Currently closures require captured arguments to be values. This is verified
+        // by type safety.
+        safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value());
+    }
+    verifier.stack.push(AbstractValue::NonReference);
+    Ok(())
+}
+
+fn invoke_function(
+    verifier: &mut ReferenceSafetyAnalysis,
+    state: &mut AbstractState,
+    offset: CodeOffset,
+    arg_tys: Vec<SignatureToken>,
+    result_tys: Vec<SignatureToken>,
+    meter: &mut impl Meter,
+) -> PartialVMResult<()> {
+    let arguments = arg_tys
+        .iter()
+        .map(|_| verifier.stack.pop().unwrap())
+        .rev()
+        .collect();
+    let values = state.invoke_function(offset, arguments, &result_tys, meter)?;
+    for value in values {
+        verifier.stack.push(value)
+    }
+    Ok(())
+}
+
 fn num_fields(struct_def: &StructDefinition) -> usize {
     struct_def.field_information.field_count(None)
 }
@@ -180,6 +240,18 @@ fn vec_element_type(
     match verifier.resolver.signature_at(idx).0.first() {
         Some(ty) => Ok(ty.clone()),
         None => Err(PartialVMError::new(
+            StatusCode::VERIFIER_INVARIANT_VIOLATION,
+        )),
+    }
+}
+
+fn fun_type(
+    verifier: &mut ReferenceSafetyAnalysis,
+    idx: SignatureIndex,
+) -> PartialVMResult<(Vec<SignatureToken>, Vec<SignatureToken>)> {
+    match verifier.resolver.signature_at(idx).0.first() {
+        Some(SignatureToken::Function(args, results, ..)) => Ok((args.clone(), results.clone())),
+        _ => Err(PartialVMError::new(
             StatusCode::VERIFIER_INVARIANT_VIOLATION,
         )),
     }
@@ -497,6 +569,24 @@ fn execute_inner(
             unpack_variant(verifier, handle)?
         },
 
+        Bytecode::LdFunction(idx) => {
+            let function_handle = verifier.resolver.function_handle_at(*idx);
+            ld_function(verifier, state, offset, function_handle, meter)?
+        },
+        Bytecode::LdFunctionGeneric(idx) => {
+            let func_inst = verifier.resolver.function_instantiation_at(*idx);
+            let function_handle = verifier.resolver.function_handle_at(func_inst.handle);
+            ld_function(verifier, state, offset, function_handle, meter)?
+        },
+        Bytecode::EarlyBindFunction(sig_idx, k) => {
+            let (arg_tys, _result_tys) = fun_type(verifier, *sig_idx)?;
+            early_bind_function(verifier, arg_tys, *k)?
+        },
+        Bytecode::InvokeFunction(sig_idx) => {
+            let (arg_tys, result_tys) = fun_type(verifier, *sig_idx)?;
+            invoke_function(verifier, state, offset, arg_tys, result_tys, meter)?
+        },
+
         Bytecode::VecPack(idx, num) => {
             for _ in 0..*num {
                 safe_assert!(safe_unwrap!(verifier.stack.pop()).is_value())
@@ -559,7 +649,6 @@ fn execute_inner(
     };
     Ok(())
 }
-
 impl<'a> TransferFunctions for ReferenceSafetyAnalysis<'a> {
     type State = AbstractState;
 

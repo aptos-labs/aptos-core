@@ -353,7 +353,7 @@ impl FunctionTargetPipeline {
 
     /// Build the call graph.
     /// Nodes of this call graph are qualified function ids.
-    /// An edge A -> B in the call graph means that function A calls function B.
+    /// An edge A -> B in the call graph means that function A calls function B or refers to function B.
     fn build_call_graph(
         env: &GlobalEnv,
         targets: &FunctionTargetsHolder,
@@ -369,7 +369,7 @@ impl FunctionTargetPipeline {
             let fun_env = env.get_function(fun_id);
             for callee in fun_env
                 .get_used_functions()
-                .expect("called functions must be computed")
+                .expect("used functions must be computed")
             {
                 let dst_idx = nodes
                     .get(callee)

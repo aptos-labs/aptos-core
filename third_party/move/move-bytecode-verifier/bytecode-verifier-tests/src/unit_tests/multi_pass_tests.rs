@@ -14,7 +14,7 @@ proptest! {
     fn check_verifier_passes(module in CompiledModule::valid_strategy(20)) {
         DuplicationChecker::verify_module(&module).expect("DuplicationChecker failure");
         SignatureChecker::verify_module(&module).expect("SignatureChecker failure");
-        InstructionConsistency::verify_module(&module).expect("InstructionConsistency failure");
+        InstructionConsistency::verify_module(&Default::default(), &module).expect("InstructionConsistency failure");
         constants::verify_module(&module).expect("constants failure");
         ability_field_requirements::verify_module(&module).expect("ability_field_requirements failure");
         RecursiveStructDefChecker::verify_module(&module).expect("RecursiveStructDefChecker failure");

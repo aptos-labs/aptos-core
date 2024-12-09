@@ -500,7 +500,17 @@ impl AbstractState {
                 return Err(self.error(StatusCode::GLOBAL_REFERENCE_ERROR, offset));
             }
         }
+        // Check arguments and return, and abstract value transition
+        self.core_call(offset, arguments, &return_.0, meter)
+    }
 
+    fn core_call(
+        &mut self,
+        offset: CodeOffset,
+        arguments: Vec<AbstractValue>,
+        result_tys: &[SignatureToken],
+        meter: &mut impl Meter,
+    ) -> PartialVMResult<Vec<AbstractValue>> {
         // Check mutable references can be transfered
         let mut all_references_to_borrow_from = BTreeSet::new();
         let mut mutable_references_to_borrow_from = BTreeSet::new();
@@ -518,8 +528,7 @@ impl AbstractState {
 
         // Track borrow relationships of return values on inputs
         let mut returned_refs = 0;
-        let return_values = return_
-            .0
+        let return_values = result_tys
             .iter()
             .map(|return_type| match return_type {
                 SignatureToken::MutableReference(_) => {
@@ -557,6 +566,31 @@ impl AbstractState {
             self.release(id)
         }
         Ok(return_values)
+    }
+
+    pub fn ld_function(
+        &mut self,
+        offset: CodeOffset,
+        acquired_resources: &BTreeSet<StructDefinitionIndex>,
+        _meter: &mut impl Meter,
+    ) -> PartialVMResult<AbstractValue> {
+        if !acquired_resources.is_empty() {
+            // TODO(LAMBDA): Currently acquires must be empty unless we disallow
+            //    InvokeFunction to call to functions defined in the same module.
+            return Err(self.error(StatusCode::INVALID_ACQUIRES_ANNOTATION, offset));
+        }
+        // TODO(LAMBDA): Double-check that we don't need meter adjustments here.
+        Ok(AbstractValue::NonReference)
+    }
+
+    pub fn invoke_function(
+        &mut self,
+        offset: CodeOffset,
+        arguments: Vec<AbstractValue>,
+        result_tys: &[SignatureToken],
+        meter: &mut impl Meter,
+    ) -> PartialVMResult<Vec<AbstractValue>> {
+        self.core_call(offset, arguments, result_tys, meter)
     }
 
     pub fn ret(&mut self, offset: CodeOffset, values: Vec<AbstractValue>) -> PartialVMResult<()> {
