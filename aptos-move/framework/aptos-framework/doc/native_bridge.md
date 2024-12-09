@@ -9,7 +9,7 @@
 -  [Struct `OutboundTransfer`](#0x1_native_bridge_store_OutboundTransfer)
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_native_bridge_store_initialize)
--  [Function `normalize_to_32_bytes`](#0x1_native_bridge_store_normalize_to_32_bytes)
+-  [Function `normalize_u64_to_32_bytes`](#0x1_native_bridge_store_normalize_u64_to_32_bytes)
 -  [Function `is_inbound_nonce_set`](#0x1_native_bridge_store_is_inbound_nonce_set)
 -  [Function `create_details`](#0x1_native_bridge_store_create_details)
 -  [Function `add`](#0x1_native_bridge_store_add)
@@ -18,6 +18,9 @@
 -  [Function `bridge_transfer_id`](#0x1_native_bridge_store_bridge_transfer_id)
 -  [Function `get_bridge_transfer_details_from_nonce`](#0x1_native_bridge_store_get_bridge_transfer_details_from_nonce)
 -  [Function `get_inbound_nonce_from_bridge_transfer_id`](#0x1_native_bridge_store_get_inbound_nonce_from_bridge_transfer_id)
+-  [Function `test_normalize_u64_to_32_bytes_helper`](#0x1_native_bridge_store_test_normalize_u64_to_32_bytes_helper)
+-  [Specification](#@Specification_1)
+    -  [Function `normalize_u64_to_32_bytes`](#@Specification_1_normalize_u64_to_32_bytes)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_aptos_hash">0x1::aptos_hash</a>;
@@ -108,15 +111,6 @@ Details on the outbound transfer
 <a id="@Constants_0"></a>
 
 ## Constants
-
-
-<a id="0x1_native_bridge_store_MAX_U64"></a>
-
-
-
-<pre><code><b>const</b> <a href="native_bridge.md#0x1_native_bridge_store_MAX_U64">MAX_U64</a>: u64 = 18446744073709551615;
-</code></pre>
-
 
 
 <a id="0x1_native_bridge_store_ENATIVE_BRIDGE_NOT_ENABLED"></a>
@@ -213,16 +207,22 @@ Initializes the initiators tables and nonce.
 
 </details>
 
-<a id="0x1_native_bridge_store_normalize_to_32_bytes"></a>
+<a id="0x1_native_bridge_store_normalize_u64_to_32_bytes"></a>
 
-## Function `normalize_to_32_bytes`
+## Function `normalize_u64_to_32_bytes`
 
-Takes a vector, removes trailing zeroes, and pads with zeroes on the left until the value is 32 bytes.
-@param value: the vector<u8> to normalize
-@return 32-byte vector left-padded with zeroes, similar to how Ethereum serializes with abi.encodePacked
+Converts a u64 to a 32-byte vector.
+
+@param value The u64 value to convert.
+@return A 32-byte vector containing the u64 value in little-endian order.
+
+How BCS works: https://github.com/zefchain/bcs?tab=readme-ov-file#booleans-and-integers
+
+@example: a u64 value 0x12_34_56_78_ab_cd_ef_00 is converted to a 32-byte vector:
+[0x00, 0x00, ..., 0x00, 0x12, 0x34, 0x56, 0x78, 0xab, 0xcd, 0xef, 0x00]
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_normalize_to_32_bytes">normalize_to_32_bytes</a>(value: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_normalize_u64_to_32_bytes">normalize_u64_to_32_bytes</a>(value: &u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -231,36 +231,11 @@ Takes a vector, removes trailing zeroes, and pads with zeroes on the left until 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_normalize_to_32_bytes">normalize_to_32_bytes</a>(value: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <b>let</b> meaningful = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
-    <b>let</b> i = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&value) - 1;
-
-    // Remove trailing zeroes
-    <b>while</b> (i &gt;= 0 && *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&value, i) == 0x00) {
-        i = i - 1;
-    };
-
-    // Copy the meaningful bytes
-    <b>let</b> j = 0;
-    <b>while</b> (j &lt;= i) {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> meaningful, *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&value, j));
-        j = j + 1;
-    };
-
-    <b>let</b> result = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
-
-    // Pad <b>with</b> zeros on the left
-    <b>let</b> padding_length = 32 - <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&meaningful);
-    <b>let</b> k = 0;
-    <b>while</b> (k &lt; padding_length) {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> result, 0x00);
-        k = k + 1;
-    };
-
-    // Append the meaningful bytes
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> result, meaningful);
-
-    result
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_normalize_u64_to_32_bytes">normalize_u64_to_32_bytes</a>(value: &u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <b>let</b> r = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&(*value <b>as</b> u256));
+    // BCS returns the bytes in reverse order, so we reverse the result.
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_reverse">vector::reverse</a>(&<b>mut</b> r);
+    r
 }
 </code></pre>
 
@@ -458,8 +433,8 @@ Generates a unique outbound bridge transfer ID based on transfer details and non
     // Serialize each param
     <b>let</b> initiator_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>&lt;<b>address</b>&gt;(&initiator);
     <b>let</b> recipient_bytes = <a href="atomic_bridge.md#0x1_ethereum_get_inner_ethereum_address">ethereum::get_inner_ethereum_address</a>(recipient);
-    <b>let</b> amount_bytes = <a href="native_bridge.md#0x1_native_bridge_store_normalize_to_32_bytes">normalize_to_32_bytes</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>&lt;u64&gt;(&amount));
-    <b>let</b> nonce_bytes = <a href="native_bridge.md#0x1_native_bridge_store_normalize_to_32_bytes">normalize_to_32_bytes</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>&lt;u64&gt;(&nonce));
+    <b>let</b> amount_bytes = <a href="native_bridge.md#0x1_native_bridge_store_normalize_u64_to_32_bytes">normalize_u64_to_32_bytes</a>(&amount);
+    <b>let</b> nonce_bytes = <a href="native_bridge.md#0x1_native_bridge_store_normalize_u64_to_32_bytes">normalize_u64_to_32_bytes</a>(&nonce);
     //Contatenate then <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a> and <b>return</b> bridge transfer ID
     <b>let</b> combined_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, initiator_bytes);
@@ -543,6 +518,60 @@ Gets inbound <code>nonce</code> from <code>bridge_transfer_id</code>
 
 
 </details>
+
+<a id="0x1_native_bridge_store_test_normalize_u64_to_32_bytes_helper"></a>
+
+## Function `test_normalize_u64_to_32_bytes_helper`
+
+Test serialization of u64 to 32 bytes
+
+
+<pre><code><b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_test_normalize_u64_to_32_bytes_helper">test_normalize_u64_to_32_bytes_helper</a>(x: u64, expected: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_test_normalize_u64_to_32_bytes_helper">test_normalize_u64_to_32_bytes_helper</a>(x: u64, expected: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
+    <b>let</b> r = <a href="native_bridge.md#0x1_native_bridge_store_normalize_u64_to_32_bytes">normalize_u64_to_32_bytes</a>(&x);
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&r) == 32, 0);
+    <b>assert</b>!(r == expected, 0);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>axiom</b> <b>forall</b> x: u64: len(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(x)) == 8;
+<b>axiom</b> <b>forall</b> x: u256: len(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(x)) == 32;
+</code></pre>
+
+
+
+<a id="@Specification_1_normalize_u64_to_32_bytes"></a>
+
+### Function `normalize_u64_to_32_bytes`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_store_normalize_u64_to_32_bytes">normalize_u64_to_32_bytes</a>(value: &u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> len(result) == 32;
+</code></pre>
 
 
 
@@ -1251,11 +1280,14 @@ Burns a specified amount of AptosCoin from an address.
 -  [Function `initiate_bridge_transfer`](#0x1_native_bridge_initiate_bridge_transfer)
 -  [Function `complete_bridge_transfer`](#0x1_native_bridge_complete_bridge_transfer)
 -  [Function `charge_bridge_fee`](#0x1_native_bridge_charge_bridge_fee)
+-  [Specification](#@Specification_1)
+    -  [Function `increment_and_get_nonce`](#@Specification_1_increment_and_get_nonce)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_aptos_hash">0x1::aptos_hash</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
+<b>use</b> <a href="../../aptos-stdlib/doc/debug.md#0x1_debug">0x1::debug</a>;
 <b>use</b> <a href="atomic_bridge.md#0x1_ethereum">0x1::ethereum</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="native_bridge.md#0x1_native_bridge_configuration">0x1::native_bridge_configuration</a>;
@@ -1412,6 +1444,7 @@ This struct will store the event handles for bridge events.
 
 ## Resource `Nonce`
 
+A nonce to ensure the uniqueness of bridge transfers
 
 
 <pre><code><b>struct</b> <a href="native_bridge.md#0x1_native_bridge_Nonce">Nonce</a> <b>has</b> key
@@ -1580,7 +1613,7 @@ The amount is burnt from the initiator and the module-level nonce is incremented
     amount: u64
 ) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_BridgeEvents">BridgeEvents</a>, <a href="native_bridge.md#0x1_native_bridge_Nonce">Nonce</a> {
     <b>let</b> initiator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(initiator);
-    <b>let</b> ethereum_address = <a href="atomic_bridge.md#0x1_ethereum_ethereum_address_no_eip55">ethereum::ethereum_address_no_eip55</a>(recipient);
+    <b>let</b> ethereum_address = <a href="atomic_bridge.md#0x1_ethereum_ethereum_address_20_bytes">ethereum::ethereum_address_20_bytes</a>(recipient);
 
     // Ensure the amount is enough for the bridge fee and charge for it
     <b>let</b> new_amount = <a href="native_bridge.md#0x1_native_bridge_charge_bridge_fee">charge_bridge_fee</a>(amount);
@@ -1671,14 +1704,23 @@ Completes a bridge transfer on the destination chain.
 
     // Validate the bridge_transfer_id by reconstructing the <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>
     <b>let</b> recipient_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&recipient);
-    <b>let</b> amount_bytes = <a href="native_bridge.md#0x1_native_bridge_store_normalize_to_32_bytes">native_bridge_store::normalize_to_32_bytes</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>&lt;u64&gt;(&amount));
-    <b>let</b> nonce_bytes = <a href="native_bridge.md#0x1_native_bridge_store_normalize_to_32_bytes">native_bridge_store::normalize_to_32_bytes</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>&lt;u64&gt;(&nonce));
+    <b>let</b> amount_bytes = <a href="native_bridge.md#0x1_native_bridge_store_normalize_u64_to_32_bytes">native_bridge_store::normalize_u64_to_32_bytes</a>(&amount);
+    <b>let</b> nonce_bytes = <a href="native_bridge.md#0x1_native_bridge_store_normalize_u64_to_32_bytes">native_bridge_store::normalize_u64_to_32_bytes</a>(&nonce);
+
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&initiator);
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&recipient_bytes);
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&amount_bytes);
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&nonce_bytes);
 
     <b>let</b> combined_bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, initiator);
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, recipient_bytes);
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, amount_bytes);
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> combined_bytes, nonce_bytes);
+
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&combined_bytes);
+
+    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&bridge_transfer_id);
 
     <b>assert</b>!(keccak256(combined_bytes) == bridge_transfer_id, <a href="native_bridge.md#0x1_native_bridge_EINVALID_BRIDGE_TRANSFER_ID">EINVALID_BRIDGE_TRANSFER_ID</a>);
 
@@ -1740,6 +1782,30 @@ Charge bridge fee to the initiate bridge transfer.
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+<a id="@Specification_1_increment_and_get_nonce"></a>
+
+### Function `increment_and_get_nonce`
+
+
+<pre><code><b>fun</b> <a href="native_bridge.md#0x1_native_bridge_increment_and_get_nonce">increment_and_get_nonce</a>(): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial = <b>true</b>;
+<b>modifies</b> <b>global</b>&lt;<a href="native_bridge.md#0x1_native_bridge_Nonce">Nonce</a>&gt;(@aptos_framework);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="native_bridge.md#0x1_native_bridge_Nonce">Nonce</a>&gt;(@aptos_framework);
+<b>aborts_if</b> <b>global</b>&lt;<a href="native_bridge.md#0x1_native_bridge_Nonce">Nonce</a>&gt;(@aptos_framework).value + 1 &gt; MAX_U64;
+<b>ensures</b> result == <b>old</b>(<b>global</b>&lt;<a href="native_bridge.md#0x1_native_bridge_Nonce">Nonce</a>&gt;(@aptos_framework).value) + 1;
+<b>ensures</b> <b>global</b>&lt;<a href="native_bridge.md#0x1_native_bridge_Nonce">Nonce</a>&gt;(@aptos_framework).value == <b>old</b>(<b>global</b>&lt;<a href="native_bridge.md#0x1_native_bridge_Nonce">Nonce</a>&gt;(@aptos_framework).value) + 1;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

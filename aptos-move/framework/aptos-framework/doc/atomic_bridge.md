@@ -9,6 +9,7 @@
 -  [Constants](#@Constants_0)
 -  [Function `ethereum_address`](#0x1_ethereum_ethereum_address)
 -  [Function `ethereum_address_no_eip55`](#0x1_ethereum_ethereum_address_no_eip55)
+-  [Function `ethereum_address_20_bytes`](#0x1_ethereum_ethereum_address_20_bytes)
 -  [Function `get_inner_ethereum_address`](#0x1_ethereum_get_inner_ethereum_address)
 -  [Function `to_lowercase`](#0x1_ethereum_to_lowercase)
 -  [Function `to_eip55_checksumed_address`](#0x1_ethereum_to_eip55_checksumed_address)
@@ -93,6 +94,15 @@ Constants for ASCII character codes
 
 
 
+<a id="0x1_ethereum_EINVALID_LENGTH"></a>
+
+
+
+<pre><code><b>const</b> <a href="atomic_bridge.md#0x1_ethereum_EINVALID_LENGTH">EINVALID_LENGTH</a>: u64 = 1;
+</code></pre>
+
+
+
 <a id="0x1_ethereum_ethereum_address"></a>
 
 ## Function `ethereum_address`
@@ -145,6 +155,36 @@ Returns a new <code><a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">Ethe
 
 <pre><code><b>public</b> <b>fun</b> <a href="atomic_bridge.md#0x1_ethereum_ethereum_address_no_eip55">ethereum_address_no_eip55</a>(ethereum_address: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">EthereumAddress</a> {
     <a href="atomic_bridge.md#0x1_ethereum_assert_40_char_hex">assert_40_char_hex</a>(&ethereum_address);
+    <a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">EthereumAddress</a> { inner: ethereum_address }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_ethereum_ethereum_address_20_bytes"></a>
+
+## Function `ethereum_address_20_bytes`
+
+Returns a new 20-byte <code><a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">EthereumAddress</a></code> without EIP-55 validation.
+
+@param ethereum_address A 20-byte vector of unsigned 8-bit bytes.
+@return An <code><a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">EthereumAddress</a></code> struct.
+@abort If the address does not conform to EIP-55 standards.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="atomic_bridge.md#0x1_ethereum_ethereum_address_20_bytes">ethereum_address_20_bytes</a>(ethereum_address: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">ethereum::EthereumAddress</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="atomic_bridge.md#0x1_ethereum_ethereum_address_20_bytes">ethereum_address_20_bytes</a>(ethereum_address: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">EthereumAddress</a> {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&ethereum_address) == 20, <a href="atomic_bridge.md#0x1_ethereum_EINVALID_LENGTH">EINVALID_LENGTH</a>);
     <a href="atomic_bridge.md#0x1_ethereum_EthereumAddress">EthereumAddress</a> { inner: ethereum_address }
 }
 </code></pre>

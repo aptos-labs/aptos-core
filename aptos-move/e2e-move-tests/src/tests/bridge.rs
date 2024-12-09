@@ -1,4 +1,5 @@
 use bcs;
+use ethabi;
 use std::collections::BTreeMap;
 use std::str::FromStr;
 use once_cell::sync::Lazy;
@@ -228,55 +229,11 @@ struct NativeBridgeTransferCompletedEvent {
     nonce: u64,
 }
 
-fn hex_to_bytes(input: Vec<u8>) -> Vec<u8> {
-    let mut result = Vec::new();
-    assert!(input.len() % 2 == 0, "Input length must be even for valid hex");
+fn normalize_to_32_bytes(value: u64) -> Vec<u8> {
+    // Convert the u64 value to a u256 (as bytes)
+    let bytes = ethabi::encode(&[ethabi::Token::Uint(ethabi::Uint::from(value as u128))]);
 
-    let mut i = 0;
-    while i < input.len() {
-        let high_nibble = ascii_hex_to_u8(input[i]);
-        let low_nibble = ascii_hex_to_u8(input[i + 1]);
-        let byte = (high_nibble << 4) | low_nibble;
-        result.push(byte);
-        i += 2;
-    }
-
-    result
-}
-
-fn ascii_hex_to_u8(ch: u8) -> u8 {
-    match ch {
-        b'0'..=b'9' => ch - b'0',
-        b'A'..=b'F' => ch - b'A' + 10,
-        b'a'..=b'f' => ch - b'a' + 10,
-        _ => panic!("Invalid hex character: {}", ch),
-    }
-}
-
-fn normalize_to_32_bytes(value: Vec<u8>) -> Vec<u8> {
-    let mut meaningful = Vec::new();
-    let mut i = 0;
-
-    // Remove trailing zeroes
-    while i < value.len() {
-        if value[i] != 0 {
-            meaningful.push(value[i]);
-        }
-        i += 1;
-    }
-
-    let mut result = Vec::with_capacity(32);
-    let padding_length = 32 - meaningful.len();
-
-    // Pad with zeros on the left
-    for _ in 0..padding_length {
-        result.push(0);
-    }
-
-    // Append the meaningful bytes
-    result.extend_from_slice(&meaningful);
-
-    result
+    bytes
 }
 
 #[test]
@@ -334,7 +291,11 @@ fn test_native_bridge_initiate() {
     );
 
     // Specify the recipient and perform the bridge transfer
-    let recipient = b"5B38Da6a701c568545dCfcB03FcB875f56beddC4".to_vec();
+    let recipient = 
+        vec![
+            0x32, 0xBe, 0x34, 0x3B, 0x94, 0xF8, 0x60, 0x12, 0x4D, 0xC4, 0xFE, 0xE2, 
+            0x78, 0xFD, 0xCB, 0xD3, 0x8C, 0x10, 0x2D, 0x88,
+        ];
 
     let original_balance = harness.read_aptos_balance(initiator.address());
     let gas_used = harness.evaluate_entry_function_gas(
@@ -380,7 +341,11 @@ fn test_native_bridge_complete() {
 
     let relayer = harness.new_account_at(AccountAddress::from_hex_literal("0x1").unwrap());
 
-    let initiator = b"5B38Da6a701c568545dCfcB03FcB875f56beddC4".to_vec();
+    let initiator = 
+    vec![
+        0x32, 0xBe, 0x34, 0x3B, 0x94, 0xF8, 0x60, 0x12, 0x4D, 0xC4, 0xFE, 0xE2, 
+        0x78, 0xFD, 0xCB, 0xD3, 0x8C, 0x10, 0x2D, 0x88,
+    ];
     let recipient = harness.new_account_at(AccountAddress::from_hex_literal("0x726563697069656e740000000000000000000000000000000000000000000000").unwrap());
     let amount = 100_000_000_000;
     let nonce = 1;
@@ -389,13 +354,10 @@ fn test_native_bridge_complete() {
 
     // Append serialized values to `combined_bytes`
     
-    // Convert recipient from hex to bytes
-    let initiator_bytes = hex::decode(String::from_utf8(initiator.clone()).expect("Invalid UTF-8 recipient"))
-    .expect("Failed to decode recipient hex");
     combined_bytes.extend(&initiator);
     combined_bytes.extend(bcs::to_bytes(&recipient.address()).expect("Failed to serialize recipient"));
-    combined_bytes.extend(normalize_to_32_bytes(bcs::to_bytes(&amount).expect("Failed to serialize amount")));
-    combined_bytes.extend(normalize_to_32_bytes(bcs::to_bytes(&nonce).expect("Failed to serialize nonce")));
+    combined_bytes.extend(normalize_to_32_bytes(amount));
+    combined_bytes.extend(normalize_to_32_bytes(nonce));
     // Compute keccak256 hash using tiny-keccak
     let mut hasher = Keccak::v256();
     hasher.update(&combined_bytes);

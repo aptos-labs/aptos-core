@@ -26,6 +26,7 @@ aptos-types = { workspace = true, features = ["testing"] }
 aptos-vm = { workspace = true, features = ["testing"] }
 bcs = { workspace = true }
 claims = { workspace = true }
+ethabi = { workspace = true }
 hex = { workspace = true }
 move-binary-format = { workspace = true }
 move-command-line-common = { workspace = true }
