@@ -199,6 +199,14 @@ impl PipelineBuilder {
         let (order_vote_tx, order_vote_rx) = oneshot::channel();
         let (order_proof_tx, order_proof_fut) = oneshot::channel();
         let (commit_proof_tx, commit_proof_fut) = oneshot::channel();
+        let order_vote_fut = spawn_shared_fut(
+            async move {
+                order_vote_rx
+                    .await
+                    .map_err(|_| TaskError::from(anyhow!("order vote tx cancelled")))
+            },
+            abort_handles,
+        );
         let order_proof_fut = spawn_shared_fut(
             async move {
                 order_proof_fut
@@ -224,7 +232,7 @@ impl PipelineBuilder {
             },
             PipelineInputRx {
                 rand_rx,
-                order_vote_rx,
+                order_vote_fut,
                 order_proof_fut,
                 commit_proof_fut,
             },
@@ -289,7 +297,7 @@ impl PipelineBuilder {
         let (tx, rx) = Self::channel(&mut abort_handles);
         let PipelineInputRx {
             rand_rx,
-            order_vote_rx,
+            order_vote_fut,
             order_proof_fut,
             commit_proof_fut,
         } = rx;
@@ -327,7 +335,7 @@ impl PipelineBuilder {
         let commit_vote_fut = spawn_shared_fut(
             Self::sign_commit_vote(
                 ledger_update_fut.clone(),
-                order_vote_rx,
+                order_vote_fut.clone(),
                 order_proof_fut.clone(),
                 commit_proof_fut.clone(),
                 self.signer.clone(),
@@ -339,7 +347,8 @@ impl PipelineBuilder {
             Self::pre_commit(
                 ledger_update_fut.clone(),
                 parent.pre_commit_fut.clone(),
-                order_proof_fut,
+                order_vote_fut,
+                order_proof_fut.clone(),
                 commit_proof_fut.clone(),
                 self.executor.clone(),
                 block.clone(),
@@ -577,7 +586,7 @@ impl PipelineBuilder {
     /// What it does: Sign the commit vote with execution result, it needs to update the timestamp for reconfig suffix blocks
     async fn sign_commit_vote(
         ledger_update_phase: TaskFuture<LedgerUpdateResult>,
-        order_vote_rx: oneshot::Receiver<()>,
+        order_vote_fut: TaskFuture<()>,
         order_proof_fut: TaskFuture<()>,
         commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
         signer: Arc<ValidatorSigner>,
@@ -587,7 +596,7 @@ impl PipelineBuilder {
         let (compute_result, _, epoch_end_timestamp) = ledger_update_phase.await?;
         // either order_vote_rx or order_proof_fut can trigger the next phase
         select! {
-            Ok(_) = order_vote_rx => {
+            Ok(_) = order_vote_fut => {
             }
             Ok(_) = order_proof_fut => {
             }
@@ -629,6 +638,7 @@ impl PipelineBuilder {
         ledger_update_phase: TaskFuture<LedgerUpdateResult>,
         // TODO bound parent_commit_ledger too
         parent_block_pre_commit_phase: TaskFuture<PreCommitResult>,
+        order_vote_fut: TaskFuture<()>,
         order_proof_fut: TaskFuture<()>,
         commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
         executor: Arc<dyn BlockExecutorTrait>,
@@ -638,7 +648,15 @@ impl PipelineBuilder {
         let (compute_result, _, _) = ledger_update_phase.await?;
         parent_block_pre_commit_phase.await?;
 
-        order_proof_fut.await?;
+        select! {
+            Ok(_) = order_vote_fut => {
+            }
+            Ok(_) = order_proof_fut => {
+            }
+            else => {
+                return Err(anyhow!("all receivers dropped"))?;
+            }
+        }
 
         if compute_result.has_reconfiguration() {
             commit_proof_fut.await?;
