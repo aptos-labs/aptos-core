@@ -35,13 +35,13 @@ module 0xABCD::vector_example {
         };
     }
 
-    // public entry fun test_middle_range_move(vec_len: u64, element_len: u64, index: u64, move_len: u64, repeats: u64) {
-    //     let vec1 = generate_vec(vec_len, element_len);
-    //     let vec2 = generate_vec(vec_len, element_len);
+    public entry fun test_middle_move_range(vec_len: u64, element_len: u64, index: u64, move_len: u64, repeats: u64) {
+        let vec1 = generate_vec(vec_len, element_len);
+        let vec2 = generate_vec(vec_len, element_len);
 
-    //     for (i in 0..repeats) {
-    //         vector::move_range(&mut vec1, index, move_len, &mut vec2, index);
-    //         vector::move_range(&mut vec2, index, move_len, &mut vec1, index);
-    //     };
-    // }
+        for (i in 0..repeats) {
+            vector::move_range(&mut vec1, index, move_len, &mut vec2, index);
+            vector::move_range(&mut vec2, index, move_len, &mut vec1, index);
+        };
+    }
 }
