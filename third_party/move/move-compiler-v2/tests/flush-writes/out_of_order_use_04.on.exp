@@ -21,15 +21,20 @@ fun m::one(): u64 {
 public fun m::test() {
      var $t0: u64
      var $t1: u64
+     var $t2: u64
+     var $t3: u64 [unused]
      # flush: $t0
      # live vars:
   0: $t0 := m::one()
+     # flush: $t1
      # live vars: $t0
   1: $t1 := m::one()
      # live vars: $t0, $t1
-  2: m::consume($t0, $t1, $t0)
+  2: $t2 := copy($t0)
+     # live vars: $t0, $t1, $t2
+  3: m::consume($t2, $t1, $t0)
      # live vars:
-  3: return ()
+  4: return ()
 }
 
 
