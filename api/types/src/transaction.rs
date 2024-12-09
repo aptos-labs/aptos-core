@@ -1510,6 +1510,7 @@ pub enum Signature {
     Secp256k1Ecdsa(Secp256k1Ecdsa),
     WebAuthn(WebAuthn),
     Keyless(Keyless),
+    InnerMulti(InnerMulti),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
@@ -1577,6 +1578,17 @@ impl FederatedKeyless {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct InnerMulti {
+    pub value: HexEncodedBytes,
+}
+
+impl InnerMulti {
+    pub fn new(value: HexEncodedBytes) -> Self {
+        Self { value }
+    }
+}
+
 impl TryFrom<Signature> for AnySignature {
     type Error = anyhow::Error;
 
@@ -1588,6 +1600,7 @@ impl TryFrom<Signature> for AnySignature {
             },
             Signature::WebAuthn(s) => AnySignature::webauthn(s.value.inner().try_into()?),
             Signature::Keyless(s) => AnySignature::keyless(s.value.inner().try_into()?),
+            Signature::InnerMulti(s) => AnySignature::inner_multi(s.value.inner().try_into()?),
         })
     }
 }
@@ -1607,6 +1620,9 @@ impl From<AnySignature> for Signature {
             AnySignature::Keyless { signature } => {
                 Signature::Keyless(Keyless::new(signature.to_bytes().into()))
             },
+            AnySignature::InnerMulti { signature: _ } => {
+                Signature::InnerMulti(InnerMulti::new(signature.to_bytes().into()))
+            },
         }
     }
 }
@@ -1620,6 +1636,7 @@ pub enum PublicKey {
     Secp256r1Ecdsa(Secp256r1Ecdsa),
     Keyless(Keyless),
     FederatedKeyless(FederatedKeyless),
+    InnerMulti(InnerMulti),
 }
 
 impl TryFrom<PublicKey> for AnyPublicKey {
@@ -1638,6 +1655,7 @@ impl TryFrom<PublicKey> for AnyPublicKey {
             PublicKey::FederatedKeyless(p) => {
                 AnyPublicKey::federated_keyless(p.value.inner().try_into()?)
             },
+            PublicKey::InnerMulti(p) => AnyPublicKey::inner_multi(p.value.inner().try_into()?),
         })
     }
 }
@@ -1659,6 +1677,9 @@ impl From<AnyPublicKey> for PublicKey {
             },
             AnyPublicKey::FederatedKeyless { public_key } => {
                 PublicKey::FederatedKeyless(FederatedKeyless::new(public_key.to_bytes().into()))
+            },
+            AnyPublicKey::InnerMulti { public_key } => {
+                PublicKey::InnerMulti(InnerMulti::new(public_key.to_bytes().into()))
             },
         }
     }
@@ -1752,6 +1773,12 @@ impl TryFrom<SingleKeySignature> for AccountAuthenticator {
                     )?;
                     AnyPublicKey::keyless(key)
                 },
+                PublicKey::InnerMulti(p) => {
+                    let key = p.value.inner().try_into().context(
+                        "Failed to parse given public_key bytes as AnyPublicKey::InnerMulti",
+                    )?;
+                    AnyPublicKey::inner_multi(key)
+                },
             };
 
         let signature = match value.signature {
@@ -1784,6 +1811,12 @@ impl TryFrom<SingleKeySignature> for AccountAuthenticator {
                         "Failed to parse given signature bytes as AnySignature::Keyless",
                     )?;
                 AnySignature::keyless(signature)
+            },
+            Signature::InnerMulti(inner_multi) => {
+                let signature = inner_multi.value.inner().try_into().context(
+                    "Failed to parse given signature bytes as AnySignature::InnerMulti",
+                )?;
+                AnySignature::inner_multi(signature)
             },
         };
 
@@ -1860,6 +1893,12 @@ impl TryFrom<MultiKeySignature> for AccountAuthenticator {
                     )?;
                     AnyPublicKey::federated_keyless(key)
                 },
+                PublicKey::InnerMulti(p) => {
+                    let key = p.value.inner().try_into().context(
+                        "Failed to parse given public_key bytes as AnyPublicKey::InnerMulti",
+                    )?;
+                    AnyPublicKey::inner_multi(key)
+                },
             };
             public_keys.push(key);
         }
@@ -1892,6 +1931,12 @@ impl TryFrom<MultiKeySignature> for AccountAuthenticator {
                                 "Failed to parse given signature as AnySignature::Keyless",
                             )?;
                         AnySignature::keyless(signature)
+                    },
+                    Signature::InnerMulti(s) => {
+                        let signature = s.value.inner().try_into().context(
+                            "Failed to parse given signature as AnySignature::InnerMulti",
+                        )?;
+                        AnySignature::inner_multi(signature)
                     },
                 };
             signatures.push((indexed_signature.index, signature));
