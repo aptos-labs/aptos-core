@@ -2,9 +2,11 @@
 module aptos_framework::ten_x_token_tests {
     use aptos_framework::fungible_asset::{Self, Metadata, TestToken};
     use aptos_framework::dispatchable_fungible_asset;
-    use 0xcafe::ten_x_token;
+    use aptos_framework::primary_fungible_store;
     use aptos_framework::object;
+    use 0xcafe::ten_x_token;
     use std::option;
+    use std::signer;
 
     #[test(creator = @0xcafe)]
     fun test_ten_x(
@@ -31,5 +33,25 @@ module aptos_framework::ten_x_token_tests {
 
         // The derived supply is 10x
         assert!(dispatchable_fungible_asset::derived_supply(metadata) == option::some(1000), 5);
+    }
+
+    #[test(creator = @0xcafe)]
+    fun test_ten_x_pfs(
+        creator: &signer,
+    ) {
+        let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
+        let (mint, _, _) = primary_fungible_store::init_test_metadata_with_primary_store_enabled(&creator_ref);
+        let metadata = object::convert<TestToken, Metadata>(token_object);
+
+        ten_x_token::initialize(creator, &creator_ref);
+        let creator_address = signer::address_of(creator);
+
+        // Deposit will cause an re-entrant call into dispatchable_fungible_asset
+        let fa = fungible_asset::mint(&mint, 100);
+        primary_fungible_store::deposit(creator_address, fa);
+
+        // The derived value is 10x
+        assert!(primary_fungible_store::balance(creator_address, metadata) == 1000, 4);
+        assert!(primary_fungible_store::is_balance_at_least(creator_address, metadata, 1000), 4);
     }
 }
