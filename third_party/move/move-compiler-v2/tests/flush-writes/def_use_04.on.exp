@@ -31,15 +31,18 @@ fun m::take2($t0: u64, $t1: u64) {
 public fun m::test() {
      var $t0: u64
      var $t1: u64
+     var $t2: u64 [unused]
      # flush: $t1
      # live vars:
   0: ($t0, $t1) := m::one_one()
      # live vars: $t0, $t1
   1: m::take1($t0)
      # live vars: $t1
-  2: m::take2($t1, $t1)
+  2: $t0 := copy($t1)
+     # live vars: $t0, $t1
+  3: m::take2($t0, $t1)
      # live vars:
-  3: return ()
+  4: return ()
 }
 
 

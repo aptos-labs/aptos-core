@@ -1110,7 +1110,14 @@ impl<'env> Generator<'env> {
     fn gen_arg_list(&mut self, exps: &[Exp]) -> Vec<TempIndex> {
         // If all args are side-effect free, we don't need to force temporary generation
         // to get left-to-right evaluation.
-        let with_forced_temp = !exps.iter().all(is_definitely_pure);
+        // TODO: after comparison testing, remove depending on the experiment and always
+        // have `with_forced_temp` be true.
+        let options = self
+            .env()
+            .get_extension::<Options>()
+            .expect("Options is available");
+        let with_forced_temp = options.experiment_on(Experiment::RETAIN_TEMPS_FOR_ARGS)
+            || !exps.iter().all(is_definitely_pure);
         let len = exps.len();
         // Generate code with (potentially) forced creation of temporaries for all except last arg.
         let mut args = exps
