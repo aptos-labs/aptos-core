@@ -212,7 +212,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             max_execution_gas_gov: InternalGas,
             { RELEASE_V1_13.. => "max_execution_gas.gov" },
-            4_000_000_000,
+            4_300_000_000,
         ],
         [
             max_io_gas: InternalGas,
