@@ -199,7 +199,7 @@ impl CompiledUnit {
                 .serialize_for_version(bytecode_version, &mut serialized)
                 .unwrap(),
             Self::Script(NamedCompiledScript { script, .. }) => script
-                .serialize_for_version(bytecode_version, &mut serialized)
+                .serialize_for_version(bytecode_version, &mut serialized, "compiled_unit")
                 .unwrap(),
         };
         serialized
