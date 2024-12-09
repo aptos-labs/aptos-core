@@ -84,6 +84,7 @@ move-prover-boogie-backend = { workspace = true }
 move-symbol-pool = { workspace = true }
 move-unit-test = { workspace = true, features = ["debugging"] }
 move-vm-runtime = { workspace = true, features = ["testing"] }
+open = { workspace = true }
 pathsearch = { workspace = true }
 poem = { workspace = true }
 # We set default-features to false so we don't onboard the libpq dep. See more here:
