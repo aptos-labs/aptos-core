@@ -5,7 +5,7 @@ use aptos_aggregator::resolver::{AggregatorV1Resolver, DelayedFieldResolver};
 use aptos_table_natives::TableResolver;
 use aptos_types::{on_chain_config::ConfigStorage, state_store::state_key::StateKey};
 use aptos_vm_types::resolver::{
-    ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView,
+    BlockSynchronizationView, ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView,
 };
 use bytes::Bytes;
 use move_binary_format::errors::PartialVMResult;
@@ -51,6 +51,9 @@ pub trait ResourceGroupResolver {
 
 pub trait AsExecutorView {
     fn as_executor_view(&self) -> &dyn ExecutorView;
+
+    // TODO: remove once trait upcasting coercion is stabilized (rust issue #65991).
+    fn as_block_synchronization_view(&self) -> &dyn BlockSynchronizationView;
 }
 
 pub trait AsResourceGroupView {
