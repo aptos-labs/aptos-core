@@ -133,6 +133,9 @@ jobs:
       COMMENT_HEADER: forge-indexer
       FORGE_TEST_SUITE: indexer_test
       FORGE_ENABLE_INDEXER: true
+      # FORGE_RUNNER_DURATION_SECS: <num_workloads> * <duration_secs_per_workload>
+      # e.g. 9 workloads, each taking 5 mins, would be 9 * 5 * 60 = 2700
+      FORGE_RUNNER_DURATION_SECS: 2700
   forge-indexer-sdk:
     if: ${{ github.event_name != 'pull_request' }}
     needs: determine-test-metadata
@@ -145,3 +148,6 @@ jobs:
       FORGE_TEST_SUITE: indexer_test
       FORGE_DEPLOYER_PROFILE: forge_indexer_sdk
       FORGE_ENABLE_INDEXER: true
+      # FORGE_RUNNER_DURATION_SECS: <num_workloads> * <duration_secs_per_workload>
+      # e.g. 9 workloads, each taking 5 mins, would be 9 * 5 * 60 = 2700
+      FORGE_RUNNER_DURATION_SECS: 2700
