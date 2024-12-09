@@ -98,6 +98,13 @@ pub struct BlockTree {
 }
 
 impl BlockTree {
+    pub fn all_blocks(&self) -> Vec<Arc<PipelinedBlock>> {
+        self.id_to_block
+            .values()
+            .map(|lb| lb.executed_block.clone())
+            .collect()
+    }
+
     pub(super) fn new(
         root: PipelinedBlock,
         root_quorum_cert: QuorumCert,

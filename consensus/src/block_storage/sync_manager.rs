@@ -259,6 +259,13 @@ impl BlockStore {
         if !self.need_sync_for_ledger_info(highest_commit_cert.ledger_info()) {
             return Ok(());
         }
+        // release executor before going to state sync
+        let blocks = self.inner.read().all_blocks();
+        for b in blocks {
+            if let Some(fut) = b.abort_pipeline() {
+                fut.wait_until_executor_finishes().await;
+            }
+        }
         let (root, root_metadata, blocks, quorum_certs) = Self::fast_forward_sync(
             &highest_quorum_cert,
             &highest_commit_cert,

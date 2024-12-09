@@ -9,6 +9,10 @@ use crate::{
         tracing::{observe_block, BlockStage},
         BlockReader,
     },
+    consensus_observer::{
+        network::observer_message::ConsensusObserverMessage,
+        publisher::consensus_publisher::ConsensusPublisher,
+    },
     counters,
     payload_manager::TPayloadManager,
     persistent_liveness_storage::{
@@ -90,6 +94,7 @@ pub struct BlockStore {
     order_vote_enabled: bool,
     pending_blocks: Arc<Mutex<PendingBlocks>>,
     pipeline_builder: Option<PipelineBuilder>,
+    publisher: Option<Arc<ConsensusPublisher>>,
 }
 
 impl BlockStore {
@@ -104,6 +109,7 @@ impl BlockStore {
         order_vote_enabled: bool,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
         pipeline_builder: Option<PipelineBuilder>,
+        publisher: Option<Arc<ConsensusPublisher>>,
     ) -> Self {
         let highest_2chain_tc = initial_data.highest_2chain_timeout_certificate();
         let (root, root_metadata, blocks, quorum_certs) = initial_data.take();
@@ -123,6 +129,7 @@ impl BlockStore {
             pending_blocks,
             pipeline_builder,
             None,
+            publisher,
         ));
         block_on(block_store.try_send_for_execution());
         block_store
@@ -164,6 +171,7 @@ impl BlockStore {
         pending_blocks: Arc<Mutex<PendingBlocks>>,
         pipeline_builder: Option<PipelineBuilder>,
         tree_to_replace: Option<Arc<RwLock<BlockTree>>>,
+        publisher: Option<Arc<ConsensusPublisher>>,
     ) -> Self {
         let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_cert) = root;
 
@@ -234,6 +242,7 @@ impl BlockStore {
             order_vote_enabled,
             pending_blocks,
             pipeline_builder,
+            publisher,
         };
 
         for block in blocks {
@@ -347,6 +356,7 @@ impl BlockStore {
             self.pending_blocks.clone(),
             self.pipeline_builder.clone(),
             Some(self.inner.clone()),
+            self.publisher.clone(),
         )
         .await;
 
@@ -400,11 +410,15 @@ impl BlockStore {
             });
             pipeline_builder.build(
                 &pipelined_block,
-                parent_block
-                    .pipeline_futs()
-                    .expect("Futures should exist when pipeline enabled"),
+                parent_block.pipeline_futs().ok_or_else(|| {
+                    anyhow::anyhow!("Parent future doesn't exist, potentially epoch ended")
+                })?,
                 callback,
             );
+        }
+        if let Some(publisher) = self.publisher.as_ref() {
+            let message = ConsensusObserverMessage::new_block(block.clone());
+            publisher.publish_message(message);
         }
 
         // ensure local time past the block time
