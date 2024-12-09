@@ -48,7 +48,7 @@ use aptos_types::{
 };
 use aptos_vm_types::output::VMOutput;
 use async_trait::async_trait;
-use clap::{Parser, ValueEnum};
+use clap::{ArgGroup, Parser, ValueEnum};
 use hex::FromHexError;
 use move_core_types::{
     account_address::AccountAddress, language_storage::TypeTag, vm_status::VMStatus,
@@ -1097,6 +1097,7 @@ impl FromStr for OptimizationLevel {
 
 /// Options for compiling a move package dir
 #[derive(Debug, Clone, Parser)]
+#[clap(group = ArgGroup::new("move-version").args(&["move_1", "move_2"]).required(false))]
 pub struct MovePackageDir {
     /// Path to a move package (the folder with a Move.toml file).  Defaults to current directory.
     #[clap(long, value_parser)]
@@ -1166,25 +1167,33 @@ pub struct MovePackageDir {
 
     /// ...or --compiler COMPILER_VERSION
     /// Specify the version of the compiler.
-    /// Defaults to `1`, unless `--move-2` is selected.
+    /// Defaults to the latest stable compiler version (at least 2)
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
            alias = "compiler",
+           default_value = LATEST_STABLE_COMPILER_VERSION,
            default_value_if("move_2", "true", LATEST_STABLE_COMPILER_VERSION),
+           default_value_if("move_1", "true", "1"),
            verbatim_doc_comment)]
     pub compiler_version: Option<CompilerVersion>,
 
     /// ...or --language LANGUAGE_VERSION
     /// Specify the language version to be supported.
-    /// Defaults to `1`, unless `--move-2` is selected.
+    /// Defaults to the latest stable language version (at least 2)
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
            alias = "language",
+           default_value = LATEST_STABLE_LANGUAGE_VERSION,
            default_value_if("move_2", "true", LATEST_STABLE_LANGUAGE_VERSION),
+           default_value_if("move_1", "true", "1"),
            verbatim_doc_comment)]
     pub language_version: Option<LanguageVersion>,
 
     /// Select bytecode, language, and compiler versions to support the latest Move 2.
     #[clap(long, verbatim_doc_comment)]
     pub move_2: bool,
+
+    /// Select bytecode, language, and compiler versions for Move 1.
+    #[clap(long, verbatim_doc_comment)]
+    pub move_1: bool,
 }
 
 impl Default for MovePackageDir {
@@ -1203,11 +1212,12 @@ impl MovePackageDir {
             override_std: None,
             skip_fetch_latest_git_deps: true,
             bytecode_version: None,
-            compiler_version: None,
-            language_version: None,
+            compiler_version: Some(CompilerVersion::latest_stable()),
+            language_version: Some(LanguageVersion::latest_stable()),
             skip_attribute_checks: false,
             check_test_code: false,
-            move_2: false,
+            move_2: true,
+            move_1: false,
             optimize: None,
             experiments: vec![],
         }
