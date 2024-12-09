@@ -133,6 +133,7 @@ pub enum FeatureFlag {
     CollectionOwner,
     NativeMemoryOperations,
     EnableLoaderV2,
+    EnableFunctionValues,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
