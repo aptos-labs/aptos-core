@@ -8,7 +8,7 @@ use crate::{
     transaction_filter::TransactionFilter,
     transaction_shuffler::TransactionShuffler,
 };
-use aptos_consensus_types::block::Block;
+use aptos_consensus_types::{block::Block, quorum_cert::QuorumCert};
 use aptos_executor_types::ExecutorResult;
 use aptos_types::transaction::SignedTransaction;
 use fail::fail_point;
@@ -36,7 +36,11 @@ impl BlockPreparer {
         }
     }
 
-    pub async fn prepare_block(&self, block: &Block) -> ExecutorResult<Vec<SignedTransaction>> {
+    pub async fn prepare_block(
+        &self,
+        block: &Block,
+        block_qc: Option<Arc<QuorumCert>>,
+    ) -> ExecutorResult<Vec<SignedTransaction>> {
         fail_point!("consensus::prepare_block", |_| {
             use aptos_executor_types::ExecutorError;
             use std::{thread, time::Duration};
@@ -44,8 +48,11 @@ impl BlockPreparer {
             Err(ExecutorError::CouldNotGetData)
         });
         let start_time = Instant::now();
-        let (txns, max_txns_from_block_to_execute) =
-            self.payload_manager.get_transactions(block).await?;
+        let signers = block_qc.map(|proof| proof.ledger_info().get_voters_bitvec().clone());
+        let (txns, max_txns_from_block_to_execute) = self
+            .payload_manager
+            .get_transactions(block, signers)
+            .await?;
         let txn_filter = self.txn_filter.clone();
         let txn_deduper = self.txn_deduper.clone();
         let txn_shuffler = self.txn_shuffler.clone();
