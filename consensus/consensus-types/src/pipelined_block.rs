@@ -121,7 +121,7 @@ pub struct PipelineInputTx {
 
 pub struct PipelineInputRx {
     pub rand_rx: oneshot::Receiver<Option<Randomness>>,
-    pub order_vote_rx: oneshot::Receiver<()>,
+    pub order_vote_fut: TaskFuture<()>,
     pub order_proof_fut: TaskFuture<()>,
     pub commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
 }
