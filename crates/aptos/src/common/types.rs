@@ -250,8 +250,11 @@ pub struct ProfileConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub network: Option<Network>,
     /// Private key for commands.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(deserialize_with = "deserialize_private_key_with_prefix")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        default,
+        deserialize_with = "deserialize_private_key_with_prefix"
+    )]
     pub private_key: Option<Ed25519PrivateKey>,
     /// Public key for commands
     #[serde(skip_serializing_if = "Option::is_none")]
