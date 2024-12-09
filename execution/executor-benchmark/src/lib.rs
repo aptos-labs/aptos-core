@@ -53,7 +53,10 @@ use std::{
     collections::HashMap,
     fs,
     path::Path,
-    sync::{atomic::AtomicUsize, Arc},
+    sync::{
+        atomic::{AtomicU64, AtomicUsize},
+        Arc,
+    },
     time::Instant,
 };
 use tokio::runtime::Runtime;
@@ -132,6 +135,7 @@ pub fn run_benchmark<V>(
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
     config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
+    let txn_counter = Arc::new(AtomicU64::new(0));
     let db = init_db(&config);
     let root_account = TransactionGenerator::read_root_account(genesis_key, &db);
     let root_account = Arc::new(root_account);
@@ -181,7 +185,7 @@ pub fn run_benchmark<V>(
         // need to initialize all workers and finish with all transactions before we start the timer:
         Some((
             (0..pipeline_config.num_generator_workers)
-                .map(|_| transaction_generator_creator.create_transaction_generator())
+                .map(|_| transaction_generator_creator.create_transaction_generator(txn_counter.clone()))
                 .collect::<Vec<_>>(),
             phase,
         ))
@@ -647,6 +651,7 @@ struct OverallMeasuring {
     start_time: Instant,
     start_execution: ExecutionTimeMeasurement,
     start_gas: GasMeasurement,
+    event_summary: HashMap<String, usize>,
 }
 
 impl OverallMeasuring {
@@ -655,7 +660,12 @@ impl OverallMeasuring {
             start_time: Instant::now(),
             start_execution: ExecutionTimeMeasurement::now(),
             start_gas: GasMeasurement::now(),
+            event_summary: HashMap::new(),
         }
+    }
+
+    pub fn event_summary_mut(&mut self) -> &mut HashMap<String, usize> {
+        &mut self.event_summary
     }
 
     pub fn print_end(self, prefix: &str, num_txns: u64) {
@@ -770,6 +780,18 @@ impl OverallMeasuring {
             delta_execution.commit_total_time / elapsed,
             num_txns / delta_execution.commit_total_time
         );
+
+        info!("Summary of events emitted during the execution");
+        for (key, value) in self.event_summary {
+            println!(
+                "event : {}, #generated : {}",
+                key.replace(
+                    "0000000000000000000000000000000000000000000000000000000000000001",
+                    "0x1"
+                ),
+                value
+            );
+        }
     }
 }
 
@@ -1062,6 +1084,7 @@ mod tests {
         println!("run_benchmark");
 
         super::run_benchmark::<E>(
+
             10, /* block_size */
             30, /* num_blocks */
             transaction_type.map_or_else(

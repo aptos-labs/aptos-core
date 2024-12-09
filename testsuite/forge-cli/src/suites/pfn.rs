@@ -5,8 +5,9 @@
 use super::ungrouped::RELIABLE_PROGRESS_THRESHOLD;
 use aptos_config::config::NodeConfig;
 use aptos_forge::{
+    args::TransactionTypeArg,
     success_criteria::{LatencyType, SuccessCriteria},
-    EmitJobMode, EmitJobRequest, ForgeConfig, OverrideNodeConfigFn,
+    EmitJobMode, EmitJobRequest, ForgeConfig, OverrideNodeConfigFn, TransactionType,
 };
 use aptos_testcases::public_fullnode_performance::PFNPerformance;
 use std::{num::NonZeroUsize, sync::Arc, time::Duration};
@@ -14,9 +15,23 @@ use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 /// Attempts to match the test name to a PFN test
 pub fn get_pfn_test(test_name: &str, duration: Duration) -> Option<ForgeConfig> {
     let test = match test_name {
-        "pfn_const_tps" => pfn_const_tps(duration, false, false, true),
-        "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, false, true, false),
-        "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true, false),
+        "pfn_const_tps" => pfn_const_tps(duration, false, false, true, TransactionType::default(), 10000),
+        "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, false, true, false, TransactionType::default(), 10000),
+        "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true, false, TransactionType::default(), 10000),
+
+        "pfn_const_tps_with_realistic_env_econia_basic_1market" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaBasic1MarketReuseAccounts.materialize_default(), 10000),
+        
+        "pfn_const_tps_with_realistic_env_econia_mixed_1market" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaMixed1MarketReuseAccounts.materialize_default(), 10000),
+        "pfn_const_tps_with_realistic_env_econia_mixed_5market" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaMixed5MarketReuseAccounts.materialize_default(), 10000),
+        "pfn_const_tps_with_realistic_env_econia_mixed_10market" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaMixed10MarketReuseAccounts.materialize_default(), 10000),
+        "pfn_const_tps_with_realistic_env_econia_mixed_15market" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaMixed15MarketReuseAccounts.materialize_default(), 10000),
+        
+        "pfn_const_tps_with_realistic_env_econia_market_1market" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaMarket1MarketReuseAccounts.materialize_default(), 10000),
+        "pfn_const_tps_with_realistic_env_econia_market_5market" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaMarket5MarketReuseAccounts.materialize_default(), 10000),
+        "pfn_const_tps_with_realistic_env_econia_market_10market" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaMarket10MarketReuseAccounts.materialize_default(), 10000),
+        "pfn_const_tps_with_realistic_env_econia_market_15market" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaMarket15MarketReuseAccounts.materialize_default(), 10000),
+        "pfn_const_tps_with_realistic_env_econia_real" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaReal.materialize_default(), 10000),
+        
         "pfn_performance" => pfn_performance(duration, false, false, true, 7, 1, false),
         "pfn_performance_with_network_chaos" => {
             pfn_performance(duration, false, true, false, 7, 1, false)
@@ -36,11 +51,13 @@ pub fn get_pfn_test(test_name: &str, duration: Duration) -> Option<ForgeConfig> 
 ///
 /// Note: If `add_cpu_chaos` is true, CPU chaos is enabled on the entire swarm.
 /// Likewise, if `add_network_emulation` is true, network chaos is enabled.
-fn pfn_const_tps(
+pub fn pfn_const_tps(
     duration: Duration,
     add_cpu_chaos: bool,
     add_network_emulation: bool,
     epoch_changes: bool,
+    transaction_type: TransactionType,
+    mempool_backlog: usize,
 ) -> ForgeConfig {
     let epoch_duration_secs = if epoch_changes {
         300 // 5 minutes
@@ -51,7 +68,12 @@ fn pfn_const_tps(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
+        .with_emit_job(EmitJobRequest::default()
+            .mode(EmitJobMode::MaxLoad { mempool_backlog })
+            .transaction_type(transaction_type)
+            .coins_per_account_override(1_0000_0000_0000)
+            .num_accounts_mode(aptos_forge::emitter::NumAccountsMode::NumAccounts(2_500)),
+        )
         .add_network_test(PFNPerformance::new(
             7,
             add_cpu_chaos,

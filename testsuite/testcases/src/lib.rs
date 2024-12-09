@@ -348,6 +348,7 @@ pub async fn create_buffered_load(
     mut inner_test_and_report: Option<(&dyn NetworkLoadTest, &mut TestReport)>,
     mut synchronized_with_job: Option<&mut EmitJob>,
 ) -> Result<Vec<LoadTestPhaseStats>> {
+    // let duration = Duration::from_secs(1500);
     // Generate some traffic
     let (mut emitter, emit_job_request) = create_emitter_and_request(
         swarm.clone(),
