@@ -384,11 +384,11 @@ impl PipelineBuilder {
             match preparer.prepare_block(&block).await {
                 Ok(input_txns) => break input_txns,
                 Err(e) => {
-                    warn!(
-                        "[BlockPreparer] failed to prepare block {}, retrying: {}",
-                        block.id(),
-                        e
-                    );
+                    // warn!(
+                    //     "[BlockPreparer] failed to prepare block {}, retrying: {}",
+                    //     block.id(),
+                    //     e
+                    // );
                     tokio::time::sleep(Duration::from_millis(100)).await;
                 },
             }
