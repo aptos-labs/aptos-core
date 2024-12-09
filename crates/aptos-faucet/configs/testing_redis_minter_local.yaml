@@ -8,7 +8,9 @@ bypasser_configs: []
 checker_configs:
   - type: "RedisRatelimit"
     database_address: "127.0.0.1"
-    max_requests_per_ip_per_day: 50000
+    max_requests_per_day: 50000
+    ratelimit_key_provider_config:
+      type: "Ip"
 funder_config:
   type: "MintFunder"
   node_url: "http://127.0.0.1:8080"
