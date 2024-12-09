@@ -270,8 +270,12 @@ impl<'env> SpecTranslator<'env> {
             // so we don't need to translate it.
             return;
         }
-        if let Type::Tuple(..) | Type::Fun(..) = fun.result_type {
-            self.error(&fun.loc, "function or tuple result type not yet supported");
+        if let Type::Tuple(..) = fun.result_type {
+            self.error(&fun.loc, "tuple result type not yet supported");
+            return;
+        }
+        if let Type::Fun(..) = fun.result_type {
+            self.error(&fun.loc, "function result type not yet supported"); // TODO(LAMBDA)
             return;
         }
         let qid = module_env.get_id().qualified(id);
@@ -684,6 +688,7 @@ impl<'env> SpecTranslator<'env> {
             },
             ExpData::Invoke(node_id, ..) => {
                 self.error(&self.env.get_node_loc(*node_id), "Invoke not yet supported");
+                // TODO(LAMBDA)
             },
             ExpData::Lambda(node_id, ..) => self.error(
                 &self.env.get_node_loc(*node_id),
@@ -1020,8 +1025,7 @@ impl<'env> SpecTranslator<'env> {
                 self.env.error(
                     &self.env.get_node_loc(node_id),
                     &format!(
-                        "bug: operation {} is not supported \
-                in the current context",
+                        "bug: operation {} is not supported in the current context",
                         oper.display(self.env, node_id)
                     ),
                 );

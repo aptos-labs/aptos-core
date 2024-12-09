@@ -271,6 +271,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
                 .to_string(),
             default: Given(false),
         },
+        Experiment {
+            name: Experiment::AVOID_STORE_IN_ASSIGNS.to_string(),
+            description: "Avoid storing to a local during assigns".to_string(),
+            default: Inherited(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string()),
+        },
     ];
     experiments
         .into_iter()
@@ -286,6 +291,7 @@ impl Experiment {
     pub const AST_SIMPLIFY: &'static str = "ast-simplify";
     pub const AST_SIMPLIFY_FULL: &'static str = "ast-simplify-full";
     pub const ATTACH_COMPILED_MODULE: &'static str = "attach-compiled-module";
+    pub const AVOID_STORE_IN_ASSIGNS: &'static str = "avoid-store-in-assigns";
     pub const CFG_SIMPLIFICATION: &'static str = "cfg-simplification";
     pub const CHECKS: &'static str = "checks";
     pub const COPY_PROPAGATION: &'static str = "copy-propagation";

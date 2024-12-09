@@ -1,0 +1,10 @@
+[package]
+name = "pack_token_objects"
+version = "0.0.0"
+
+[dependencies]
+AptosFramework = { local = "../../../../../aptos-move/framework/aptos-framework" }
+AptosTokenObjects = { local = "../../../../../aptos-move/framework/aptos-token-objects" }
+
+[addresses]
+addr = "_"

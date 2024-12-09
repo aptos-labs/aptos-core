@@ -119,29 +119,24 @@ B0:
 }
 public foo(Arg0: &mut u64, Arg1: u64) /* def_idx: 1 */ {
 L2:	loc0: u64
-L3:	loc1: &mut u64
 B0:
 	0: CopyLoc[1](Arg1: u64)
 	1: LdU64(0)
 	2: Gt
-	3: BrFalse(16)
+	3: BrFalse(12)
 B1:
 	4: CopyLoc[0](Arg0: &mut u64)
-	5: StLoc[3](loc1: &mut u64)
-	6: Call one(): u64
-	7: StLoc[2](loc0: u64)
-	8: MoveLoc[3](loc1: &mut u64)
-	9: MoveLoc[2](loc0: u64)
-	10: Call bar(&mut u64, u64)
-	11: MoveLoc[1](Arg1: u64)
-	12: LdU64(1)
-	13: Sub
-	14: StLoc[1](Arg1: u64)
-	15: Branch(0)
+	5: Call one(): u64
+	6: Call bar(&mut u64, u64)
+	7: MoveLoc[1](Arg1: u64)
+	8: LdU64(1)
+	9: Sub
+	10: StLoc[1](Arg1: u64)
+	11: Branch(0)
 B2:
-	16: MoveLoc[0](Arg0: &mut u64)
-	17: Pop
-	18: Ret
+	12: MoveLoc[0](Arg0: &mut u64)
+	13: Pop
+	14: Ret
 }
 one(): u64 /* def_idx: 2 */ {
 B0:

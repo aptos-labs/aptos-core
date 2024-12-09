@@ -1,42 +1,10 @@
 
 Diagnostics:
-error: function type `|u64|u64 with copy+store` is not allowed as a field type
-   ┌─ tests/lambda/storable/registry_ok.move:10:12
-   │
-10 │         f: |u64| u64 with store+copy,
-   │            ^^^^^^^^^^^^^^^^^^^^^^^^^
-   │
-   = required by declaration of field `f`
-
-error: function type `|u64|u64 with copy+store` is not allowed as a type argument (type was inferred)
-   ┌─ tests/lambda/storable/registry_ok.move:23:21
-   │
-14 │     enum Option<T> {
-   │                 - declaration of type parameter `T`
-   ·
-23 │                 x = Option::Some(f.f)
-   │                     ^^^^^^^^^^^^
-   │
-   = required by instantiating type parameter `T` of struct `Option`
-
-error: function type `|u64|u64 with copy+store` is not allowed as a type argument
-   ┌─ tests/lambda/storable/registry_ok.move:29:109
-   │
-14 │     enum Option<T> {
-   │                 - declaration of type parameter `T`
-   ·
-29 │     fun replace_or_add_function(v: &mut vector<Function>, k: u64, new_f: |u64| u64 with store+copy): Option<|u64| u64 with store+copy> {
-   │                                                                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^
-   │
-   = required by instantiating type parameter `T` of struct `Option`
-
-error: function type `|u64|u64 with copy+store` is not allowed as a type argument (type was inferred)
-   ┌─ tests/lambda/storable/registry_ok.move:33:26
-   │
-14 │     enum Option<T> {
-   │                 - declaration of type parameter `T`
-   ·
-33 │                 result = Option::Some(f.f);
-   │                          ^^^^^^^^^^^^
-   │
-   = required by instantiating type parameter `T` of struct `Option`
+error: duplicate declaration, item, or annotation
+  ┌─ tests/lambda/storable/registry_ok.move:4:14
+  │
+2 │     use std::signer;
+  │              ------ Alias previously defined here
+3 │     use std::vector;
+4 │     use std::signer;
+  │              ^^^^^^ Duplicate module alias 'signer'. Module aliases must be unique within a given namespace

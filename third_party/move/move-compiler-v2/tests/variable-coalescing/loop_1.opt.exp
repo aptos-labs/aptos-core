@@ -189,11 +189,11 @@ B1:
 	7: BrFalse(15)
 B2:
 	8: CopyLoc[0](Arg0: u64)
-	9: StLoc[1](loc0: u64)
-	10: MoveLoc[2](loc1: u64)
-	11: LdU64(1)
-	12: Add
-	13: StLoc[2](loc1: u64)
+	9: MoveLoc[2](loc1: u64)
+	10: LdU64(1)
+	11: Add
+	12: StLoc[2](loc1: u64)
+	13: StLoc[1](loc0: u64)
 	14: Branch(4)
 B3:
 	15: MoveLoc[1](loc0: u64)

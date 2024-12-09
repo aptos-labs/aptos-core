@@ -176,6 +176,66 @@ fn main() {
         EntryPoints::IncGlobalMilestoneAggV2 { milestone_every: 1 },
         EntryPoints::IncGlobalMilestoneAggV2 { milestone_every: 2 },
         EntryPoints::EmitEvents { count: 1000 },
+        // long vectors with small elements
+        EntryPoints::VectorTrimAppend {
+            // baseline, only vector creation
+            vec_len: 3000,
+            element_len: 1,
+            index: 0,
+            repeats: 0,
+        },
+        EntryPoints::VectorTrimAppend {
+            vec_len: 3000,
+            element_len: 1,
+            index: 100,
+            repeats: 1000,
+        },
+        EntryPoints::VectorTrimAppend {
+            vec_len: 3000,
+            element_len: 1,
+            index: 2990,
+            repeats: 1000,
+        },
+        EntryPoints::VectorRemoveInsert {
+            vec_len: 3000,
+            element_len: 1,
+            index: 100,
+            repeats: 1000,
+        },
+        EntryPoints::VectorRemoveInsert {
+            vec_len: 3000,
+            element_len: 1,
+            index: 2998,
+            repeats: 1000,
+        },
+        // EntryPoints::VectorRangeMove {
+        //     vec_len: 3000,
+        //     element_len: 1,
+        //     index: 1000,
+        //     move_len: 500,
+        //     repeats: 1000,
+        // },
+        // vectors with large elements
+        EntryPoints::VectorTrimAppend {
+            // baseline, only vector creation
+            vec_len: 100,
+            element_len: 100,
+            index: 0,
+            repeats: 0,
+        },
+        EntryPoints::VectorTrimAppend {
+            vec_len: 100,
+            element_len: 100,
+            index: 10,
+            repeats: 1000,
+        },
+        // EntryPoints::VectorRangeMove {
+        //     vec_len: 100,
+        //     element_len: 100,
+        //     index: 50,
+        //     move_len: 10,
+        //     repeats: 1000,
+        // },
     ];
 
     let mut failures = Vec::new();

@@ -164,9 +164,6 @@ pub enum Constraint {
     /// a pseudo constraint which never fails, but used to generate a default for
     /// inference.
     WithDefault(Type),
-    /// The type must not be function because it is used as the type of some field or
-    /// as a type argument.
-    NoFunction,
 }
 
 /// Scope of ability checking.
@@ -409,10 +406,7 @@ impl Constraint {
     /// for internal constraints which would be mostly confusing to users.
     pub fn hidden(&self) -> bool {
         use Constraint::*;
-        matches!(
-            self,
-            NoPhantom | NoReference | NoTuple | NoFunction | WithDefault(..)
-        )
+        matches!(self, NoPhantom | NoReference | NoTuple | WithDefault(..))
     }
 
     /// Returns true if this context is accumulating. When adding a new constraint
@@ -430,7 +424,6 @@ impl Constraint {
                 | Constraint::NoPhantom
                 | Constraint::NoTuple
                 | Constraint::NoReference
-                | Constraint::NoFunction
         )
     }
 
@@ -449,10 +442,7 @@ impl Constraint {
     /// the same type.
     pub fn report_only_once(&self) -> bool {
         use Constraint::*;
-        matches!(
-            self,
-            HasAbilities(..) | NoReference | NoFunction | NoPhantom | NoTuple
-        )
+        matches!(self, HasAbilities(..) | NoReference | NoPhantom | NoTuple)
     }
 
     /// Joins the two constraints. If they are incompatible, produces a type unification error.
@@ -539,7 +529,6 @@ impl Constraint {
                     ))
                 }
             },
-            (Constraint::NoFunction, Constraint::NoFunction) => Ok(true),
             (Constraint::NoReference, Constraint::NoReference) => Ok(true),
             (Constraint::NoTuple, Constraint::NoTuple) => Ok(true),
             (Constraint::NoPhantom, Constraint::NoPhantom) => Ok(true),
@@ -590,14 +579,10 @@ impl Constraint {
     }
 
     /// Returns the constraints which need to be satisfied to instantiate the given type
-    /// parameter. This creates NoReference, NoFunction, NoTuple, NoPhantom unless the type
+    /// parameter. This creates NoReference, NoTuple, NoPhantom unless the type
     /// parameter is phantom, and HasAbilities if any abilities need to be met.
     pub fn for_type_parameter(param: &TypeParameter) -> Vec<Constraint> {
-        let mut result = vec![
-            Constraint::NoReference,
-            Constraint::NoTuple,
-            Constraint::NoFunction, // TODO(LAMBDA) - remove when implement LAMBDA_AS_TYPE_PARAMETERS
-        ];
+        let mut result = vec![Constraint::NoReference, Constraint::NoTuple];
         let TypeParameter(
             _,
             TypeParameterKind {
@@ -624,7 +609,6 @@ impl Constraint {
             Constraint::NoPhantom,
             Constraint::NoReference,
             Constraint::NoTuple,
-            Constraint::NoFunction, // TODO(LAMBDA) - remove when we implement LAMBDA_IN_VECTORS
         ]
     }
 
@@ -635,7 +619,6 @@ impl Constraint {
             Constraint::NoPhantom,
             Constraint::NoTuple,
             Constraint::NoReference,
-            Constraint::NoFunction,
         ];
         let abilities = if struct_abilities.has_ability(Ability::Key) {
             struct_abilities.remove(Ability::Key).add(Ability::Store)
@@ -705,7 +688,6 @@ impl Constraint {
                 )
             },
             Constraint::NoReference => "no-ref".to_string(),
-            Constraint::NoFunction => "no-func".to_string(),
             Constraint::NoTuple => "no-tuple".to_string(),
             Constraint::NoPhantom => "no-phantom".to_string(),
             Constraint::HasAbilities(required_abilities, _) => {
@@ -1920,13 +1902,6 @@ impl Substitution {
                     ),
                 (Constraint::NoReference, ty) => {
                     if ty.is_reference() {
-                        constraint_unsatisfied_error()
-                    } else {
-                        Ok(())
-                    }
-                },
-                (Constraint::NoFunction, ty) => {
-                    if ty.is_function() {
                         constraint_unsatisfied_error()
                     } else {
                         Ok(())
@@ -3171,13 +3146,6 @@ impl TypeUnificationError {
                     Constraint::NoReference => {
                         format!(
                             "reference type `{}` is not allowed {}",
-                            ty.display(display_context),
-                            item_name()
-                        )
-                    },
-                    Constraint::NoFunction => {
-                        format!(
-                            "function type `{}` is not allowed {}",
                             ty.display(display_context),
                             item_name()
                         )
