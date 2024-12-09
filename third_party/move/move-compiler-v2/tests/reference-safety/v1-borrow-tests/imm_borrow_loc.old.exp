@@ -16,7 +16,7 @@ error: cannot immutably borrow since mutable references exist
    │                 immutable borrow attempted here
 28 │         assert!(b2.f != 0, 42);
 29 │         assert!((returned_ref == &b1.f) != (returned_ref == &b2.f), 42);
-   │                 ----------------------- conflicting reference `returned_ref` used here
+   │                  ------------ conflicting reference `returned_ref` used here
 
 error: cannot immutably borrow since mutable references exist
    ┌─ tests/reference-safety/v1-borrow-tests/imm_borrow_loc.move:28:17
@@ -33,7 +33,7 @@ error: cannot immutably borrow since mutable references exist
    │                 requirement enforced here
    │                 immutable borrow attempted here
 29 │         assert!((returned_ref == &b1.f) != (returned_ref == &b2.f), 42);
-   │                 ----------------------- conflicting reference `returned_ref` used here
+   │                  ------------ conflicting reference `returned_ref` used here
 
 error: cannot immutably borrow since mutable references exist
    ┌─ tests/reference-safety/v1-borrow-tests/imm_borrow_loc.move:29:35
@@ -45,7 +45,7 @@ error: cannot immutably borrow since mutable references exist
    │                            used by call result
    ·
 29 │         assert!((returned_ref == &b1.f) != (returned_ref == &b2.f), 42);
-   │                 ------------------^^---    ----------------------- conflicting reference `returned_ref` used here
+   │                 ------------------^^---     ------------ conflicting reference `returned_ref` used here
    │                 │                 │
    │                 │                 immutable borrow attempted here
    │                 requirement enforced here

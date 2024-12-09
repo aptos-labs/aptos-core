@@ -5,9 +5,9 @@ error: cannot transfer mutable local `x` since it is borrowed
    │
 41 │         some2(x, x); // expected error because multiple use
    │         ^^^^^^^^^^^
-   │         │
+   │         │     │
+   │         │     previously mutably borrowed here
    │         transfer attempted here
-   │         previously mutably borrowed here
 
 error: cannot transfer mutable local `x` since it is borrowed
    ┌─ tests/more-v1/liveness/mut_ref.move:64:13

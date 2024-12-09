@@ -7,4 +7,4 @@ error: cannot move local `x` since it is still in use
   │                       ^^^^^^ attempted to move here
 5 │     y;
 6 │     assert!(x == 0, 42);
-  │             ------ used here
+  │             - used here

@@ -5,7 +5,7 @@ use crate::{AptosValidatorInterface, FilterCondition};
 use anyhow::{anyhow, Result};
 use aptos_api_types::{AptosError, AptosErrorCode};
 use aptos_framework::{
-    natives::code::{PackageMetadata, PackageRegistry},
+    natives::{code::{PackageMetadata, PackageRegistry}, function_info},
     APTOS_PACKAGES,
 };
 use aptos_rest_client::{
@@ -258,6 +258,7 @@ impl AptosValidatorInterface for RestDebuggerInterface {
                 HashMap<(AccountAddress, String), PackageMetadata>,
             ),
         >,
+        handled_function_vec: &mut Vec<(AccountAddress, String)>,
     ) -> Result<
         Vec<(
             u64,
@@ -308,6 +309,12 @@ impl AptosValidatorInterface for RestDebuggerInterface {
                         && filter_condition.target_account.unwrap() != *addr
                     {
                         continue;
+                    }
+                    let function_name = entry_function.function().as_str().to_string();
+                    if handled_function_vec.contains(&(*addr, function_name.clone())) {
+                        continue;
+                    } else {
+                        handled_function_vec.push((*addr, function_name));
                     }
                     if entry_function.function().as_str() == "publish_package_txn" {
                         if filter_condition.skip_publish_txns {

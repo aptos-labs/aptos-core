@@ -161,7 +161,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string(),
             description: "Turns on optimizations waiting for comparison testing".to_string(),
-            default: Given(false),
+            default: Given(true),
         },
         Experiment {
             name: Experiment::CFG_SIMPLIFICATION.to_string(),
@@ -276,6 +276,14 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             description: "Avoid storing to a local during assigns".to_string(),
             default: Inherited(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string()),
         },
+        Experiment {
+            name: Experiment::RETAIN_TEMPS_FOR_ARGS.to_string(),
+            description:
+                "Create temps for each argument of a function call during stackless bytecode \
+                 generation and retain them until file format bytecode generation"
+                    .to_string(),
+            default: Inherited(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string()),
+        },
     ];
     experiments
         .into_iter()
@@ -316,6 +324,7 @@ impl Experiment {
     pub const RECURSIVE_TYPE_CHECK: &'static str = "recursive-type-check";
     pub const REFERENCE_SAFETY: &'static str = "reference-safety";
     pub const REFERENCE_SAFETY_V3: &'static str = "reference-safety-v3";
+    pub const RETAIN_TEMPS_FOR_ARGS: &'static str = "retain-temps-for-args";
     pub const SEQS_IN_BINOPS_CHECK: &'static str = "seqs-in-binops-check";
     pub const SPEC_CHECK: &'static str = "spec-check";
     pub const SPEC_REWRITE: &'static str = "spec-rewrite";

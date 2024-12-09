@@ -22,4 +22,15 @@ fun vector::create(): vector<u64> {
 }
 
 
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.vector {
+
+
+create(): vector<u64> /* def_idx: 0 */ {
+B0:
+	0: LdConst[0](Vector(U64): [3, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0])
+	1: Ret
+}
+}
 ============ bytecode verification succeeded ========
