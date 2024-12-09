@@ -2,9 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{quorum_cert::QuorumCert, vote_data::VoteData};
+use crate::vote_data::VoteData;
 use anyhow::{ensure, Context};
-use aptos_crypto::hash::CryptoHash;
 use aptos_types::{
     block_info::BlockInfo, ledger_info::LedgerInfoWithSignatures,
     validator_verifier::ValidatorVerifier,
@@ -49,24 +48,6 @@ impl WrappedLedgerInfo {
                 aptos_types::aggregate_signature::AggregateSignature::empty(),
             ),
         }
-    }
-
-    fn verify_consensus_data_hash(&self) -> anyhow::Result<()> {
-        let vote_hash = self.vote_data.hash();
-        ensure!(
-            self.ledger_info().ledger_info().consensus_data_hash() == vote_hash,
-            "WrappedLedgerInfo's vote data hash mismatch LedgerInfo"
-        );
-        Ok(())
-    }
-
-    pub fn certified_block(&self, order_vote_enabled: bool) -> anyhow::Result<&BlockInfo> {
-        ensure!(
-            !order_vote_enabled,
-            "wrapped_ledger_info.certified_block should not be called when order votes are enabled"
-        );
-        self.verify_consensus_data_hash()?;
-        Ok(self.vote_data.proposed())
     }
 
     pub fn ledger_info(&self) -> &LedgerInfoWithSignatures {
@@ -119,17 +100,5 @@ impl WrappedLedgerInfo {
             executed_commit_info
         );
         Ok(Self::new(self.vote_data.clone(), executed_ledger_info))
-    }
-
-    pub fn into_quorum_cert(self, order_vote_enabled: bool) -> anyhow::Result<QuorumCert> {
-        ensure!(
-            !order_vote_enabled,
-            "wrapped_ledger_info.into_quorum_cert should not be called when order votes are enabled"
-        );
-        self.verify_consensus_data_hash()?;
-        Ok(QuorumCert::new(
-            self.vote_data.clone(),
-            self.signed_ledger_info.clone(),
-        ))
     }
 }
