@@ -39,3 +39,4 @@ runs:
         CVC5_EXE: /home/runner/bin/cvc5
         DOTNET_ROOT: /home/runner/.dotnet
         BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
+        RUSTFLAGS: -D warnings
