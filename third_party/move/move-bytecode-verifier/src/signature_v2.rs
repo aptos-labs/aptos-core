@@ -173,11 +173,7 @@ fn check_ty<const N: usize>(
                 param_constraints,
             )?;
         },
-        Function(
-            args,
-            results,
-            abilities,
-        ) => {
+        Function(args, results, abilities) => {
             assert_abilities(*abilities, required_abilities)?;
             for ty in args.iter().chain(results.iter()) {
                 check_ty(

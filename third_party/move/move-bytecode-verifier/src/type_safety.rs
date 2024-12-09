@@ -307,12 +307,7 @@ fn invoke_function(
     offset: CodeOffset,
     expected_ty: &SignatureToken,
 ) -> PartialVMResult<()> {
-    let SignatureToken::Function(
-        param_tys,
-        ret_tys,
-        abilities,
-    ) = expected_ty
-    else {
+    let SignatureToken::Function(param_tys, ret_tys, abilities) = expected_ty else {
         // The signature checker has ensured this is a function
         safe_assert!(false);
         unreachable!()
@@ -327,11 +322,7 @@ fn invoke_function(
             .with_message("closure type mismatch".to_owned()));
     }
     // Verify that the abilities match
-    let SignatureToken::Function(
-        _, _,
-        closure_abilities,
-    ) = closure_ty
-    else {
+    let SignatureToken::Function(_, _, closure_abilities) = closure_ty else {
         // Ensured above, but never panic
         safe_assert!(false);
         unreachable!()
@@ -394,11 +385,7 @@ fn ld_function(
     verifier.push(
         meter,
         instantiate(
-            &SignatureToken::Function(
-                parameters.0.to_vec(),
-                ret_sign.0.to_vec(),
-                abilities,
-            ),
+            &SignatureToken::Function(parameters.0.to_vec(), ret_sign.0.to_vec(), abilities),
             type_actuals,
         ),
     )
@@ -412,12 +399,7 @@ fn early_bind_function(
     count: u8,
 ) -> PartialVMResult<()> {
     let count = count as usize;
-    let SignatureToken::Function(
-        param_tys,
-        ret_tys,
-        abilities,
-    ) = expected_ty
-    else {
+    let SignatureToken::Function(param_tys, ret_tys, abilities) = expected_ty else {
         // The signature checker has ensured this is a function
         safe_assert!(false);
         unreachable!()
@@ -432,11 +414,7 @@ fn early_bind_function(
             .with_message("closure type mismatch".to_owned()));
     }
     // Verify that the abilities match
-    let SignatureToken::Function(
-        _, _,
-        closure_abilities
-    ) = closure_ty
-    else {
+    let SignatureToken::Function(_, _, closure_abilities) = closure_ty else {
         // Ensured above, but never panic
         safe_assert!(false);
         unreachable!()
@@ -1343,15 +1321,9 @@ fn instantiate(token: &SignatureToken, subst: &Signature) -> SignatureToken {
         Address => Address,
         Signer => Signer,
         Vector(ty) => Vector(Box::new(instantiate(ty, subst))),
-        Function (
-            args,
-            results,
-            abilities,
-        ) => Function (
-            inst_vec(args),
-            inst_vec(results),
-            *abilities,
-        ),
+        Function(args, results, abilities) => {
+            Function(inst_vec(args), inst_vec(results), *abilities)
+        },
         Struct(idx) => Struct(*idx),
         StructInstantiation(idx, struct_type_args) => {
             StructInstantiation(*idx, inst_vec(struct_type_args))

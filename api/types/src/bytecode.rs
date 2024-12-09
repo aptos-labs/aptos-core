@@ -105,7 +105,7 @@ pub trait Bytecode {
                 mutable: true,
                 to: Box::new(self.new_move_type(t.borrow())),
             },
-            SignatureToken::Function( .. ) => {
+            SignatureToken::Function(..) => {
                 // TODO(LAMBDA)
                 unimplemented!("signature token function to API MoveType")
             },

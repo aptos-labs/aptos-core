@@ -22,11 +22,7 @@ fn get_fun_type_bool_to_bool() -> SignatureToken {
 fn get_fun_type_nothing_to_bool() -> SignatureToken {
     let bool_token = SignatureToken::Bool;
     let abilities = AbilitySet::PUBLIC_FUNCTIONS;
-    SignatureToken::Function(
-        vec![],
-        vec![bool_token.clone()],
-        abilities,
-    )
+    SignatureToken::Function(vec![], vec![bool_token.clone()], abilities)
 }
 
 #[test]
