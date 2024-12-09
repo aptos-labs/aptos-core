@@ -663,9 +663,7 @@ By default, this returns true if an account has not explicitly set whether the c
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_register_apt">register_apt</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_new_accounts_default_to_fa_apt_store_enabled">features::new_accounts_default_to_fa_apt_store_enabled</a>()) {
-        <a href="aptos_account.md#0x1_aptos_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(account_signer));
-    } <b>else</b> {
+    <b>if</b> (!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_new_accounts_default_to_fa_apt_store_enabled">features::new_accounts_default_to_fa_apt_store_enabled</a>()) {
         <a href="coin.md#0x1_coin_register">coin::register</a>&lt;AptosCoin&gt;(account_signer);
     }
 }

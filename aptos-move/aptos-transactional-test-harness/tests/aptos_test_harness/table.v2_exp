@@ -7,6 +7,10 @@ Events:
     data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b7300006400000000000000"
 }
 {
+    type:    0x1::fungible_asset::Withdraw
+    data:    "8fa793b2930c0b9158c16a41f496e34b567b3128a59f48ee5c73f5ab896661e9888a010000000000"
+}
+{
     type:    0x1::transaction_fee::FeeStatement
     data:    "65000000000000000400000000000000030000000000000028720100000000000000000000000000"
 }mutable inputs after call: local#0: 0
@@ -27,6 +31,10 @@ Events:
     data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e00000000000000000a00000000000000"
 }
 {
+    type:    0x1::fungible_asset::Withdraw
+    data:    "8fa793b2930c0b9158c16a41f496e34b567b3128a59f48ee5c73f5ab896661e96061020000000000"
+}
+{
     type:    0x1::transaction_fee::FeeStatement
     data:    "9c0000000000000006000000000000000400000000000000c83a0200000000000000000000000000"
 }mutable inputs after call: local#0: 0
@@ -44,7 +52,7 @@ key 0x3::token::Collections {
         counter: 0
         guid: drop store 0x1::guid::GUID {
             id: copy drop store 0x1::guid::ID {
-                creation_num: 4
+                creation_num: 2
                 addr: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
             }
         }
@@ -53,7 +61,7 @@ key 0x3::token::Collections {
         counter: 0
         guid: drop store 0x1::guid::GUID {
             id: copy drop store 0x1::guid::ID {
-                creation_num: 5
+                creation_num: 3
                 addr: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
             }
         }
@@ -62,7 +70,7 @@ key 0x3::token::Collections {
         counter: 0
         guid: drop store 0x1::guid::GUID {
             id: copy drop store 0x1::guid::ID {
-                creation_num: 6
+                creation_num: 4
                 addr: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
             }
         }
@@ -83,6 +91,10 @@ Events:
     data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb69c3b634ac05d0af393e0f93b9b19b61e7cac1c519f566276aa0c6fd15dac12aaf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e00000000000000000100000000000000"
 }
 {
+    type:    0x1::fungible_asset::Withdraw
+    data:    "8fa793b2930c0b9158c16a41f496e34b567b3128a59f48ee5c73f5ab896661e9e0a5010000000000"
+}
+{
     type:    0x1::transaction_fee::FeeStatement
     data:    "6c000000000000000500000000000000040000000000000018820100000000000000000000000000"
 }mutable inputs after call: local#0: 0
@@ -97,6 +109,10 @@ Events:
 {
     type:    0x3::token_transfers::Claim
     data:    "f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb69c3b634ac05d0af393e0f93b9b19b61e7cac1c519f566276aa0c6fd15dac12aaf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb60b6170746f735f70756e6b730a6765656b5f746f6b656e00000000000000000100000000000000"
+}
+{
+    type:    0x1::fungible_asset::Withdraw
+    data:    "3496809472e07c22211ea9dd73e08c7805fdaf9feb2edaf77257f1b3361a5f5988ea000000000000"
 }
 {
     type:    0x1::transaction_fee::FeeStatement

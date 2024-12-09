@@ -268,6 +268,7 @@ async fn test_event_v2_translation_account_coin_register_event() {
 
     // Make sure that the MODULE_EVENT_MIGRATION feature is enabled
     context.enable_feature(MODULE_EVENT_MIGRATION).await;
+    context.disable_feature(MODULE_EVENT_MIGRATION).await;
 
     // Create two accounts
     let account1 = &mut context.api_create_account().await;
