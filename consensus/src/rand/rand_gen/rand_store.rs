@@ -405,7 +405,7 @@ mod tests {
                 dealer_validator_set: consensus_info_move_structs.clone(),
                 target_validator_set: consensus_info_move_structs.clone(),
             };
-            let dkg_pub_params = DefaultDKG::new_public_params(&dkg_session_metadata);
+            let dkg_pub_params = DefaultDKG::new_public_params(&dkg_session_metadata, None);
             let input_secret = <DefaultDKG as DKGTrait>::InputSecret::generate_for_testing();
             let transcript = DefaultDKG::generate_transcript(
                 &mut rng,

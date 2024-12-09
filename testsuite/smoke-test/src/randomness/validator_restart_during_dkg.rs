@@ -4,12 +4,11 @@
 use crate::{
     randomness::{decrypt_key_map, verify_dkg_transcript, wait_for_dkg_finish},
     smoke_test_environment::SwarmBuilder,
-    utils::get_on_chain_resource,
 };
 use aptos_forge::{NodeExt, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
-use aptos_types::{dkg::DKGState, on_chain_config::OnChainRandomnessConfig};
+use aptos_types::on_chain_config::OnChainRandomnessConfig;
 use futures::future::join_all;
 use std::{sync::Arc, time::Duration};
 
@@ -46,7 +45,8 @@ async fn validator_restart_during_dkg() {
     info!("Wait for an epoch start.");
     let validator_clients: Vec<Client> =
         swarm.validators().map(|node| node.rest_client()).collect();
-    let dkg_session_1 = wait_for_dkg_finish(&validator_clients[3], None, time_limit_secs).await;
+    let (dkg_session_1, _rounding_1) =
+        wait_for_dkg_finish(&validator_clients[3], None, time_limit_secs).await;
 
     info!(
         "Current epoch is {}.",
@@ -86,17 +86,11 @@ async fn validator_restart_during_dkg() {
         dkg_session_1.target_epoch() + 1
     );
 
-    swarm
-        .wait_for_all_nodes_to_catchup_to_epoch(
-            dkg_session_1.target_epoch() + 1,
-            Duration::from_secs(time_limit_secs),
-        )
-        .await
-        .unwrap();
-    let dkg_session_2 = get_on_chain_resource::<DKGState>(&validator_clients[3])
-        .await
-        .last_completed
-        .clone()
-        .unwrap();
-    assert!(verify_dkg_transcript(&dkg_session_2, &decrypt_key_map).is_ok());
+    let (dkg_session_2, rounding_2) = wait_for_dkg_finish(
+        &validator_clients[3],
+        Some(dkg_session_1.target_epoch() + 1),
+        60,
+    )
+    .await;
+    assert!(verify_dkg_transcript(&dkg_session_2, rounding_2, &decrypt_key_map).is_ok());
 }

@@ -10,6 +10,7 @@ pub mod create_signer;
 pub mod cryptography;
 pub mod debug;
 pub mod dispatchable_fungible_asset;
+pub mod dkg_rounding;
 pub mod event;
 pub mod function_info;
 pub mod hash;
@@ -60,6 +61,7 @@ pub fn all_natives(
     add_natives_from_module!("bls12381", cryptography::bls12381::make_all(builder));
     add_natives_from_module!("secp256k1", cryptography::secp256k1::make_all(builder));
     add_natives_from_module!("aptos_hash", hash::make_all(builder));
+    add_natives_from_module!("dkg_rounding", dkg_rounding::make_all(builder));
     add_natives_from_module!(
         "ristretto255",
         cryptography::ristretto255::make_all(builder)

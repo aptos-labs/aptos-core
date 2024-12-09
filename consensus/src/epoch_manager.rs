@@ -92,6 +92,7 @@ use aptos_types::{
     randomness::{RandKeys, WvufPP, WVUF},
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
+    CurEpochRounding, RoundingResult,
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
 use fail::fail_point;
@@ -958,6 +959,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         onchain_randomness_config: &OnChainRandomnessConfig,
         maybe_dkg_state: anyhow::Result<DKGState>,
         consensus_config: &OnChainConsensusConfig,
+        rounding_result: Option<RoundingResult>,
     ) -> Result<(RandConfig, Option<RandConfig>), NoRandomnessReason> {
         if !consensus_config.is_vtxn_enabled() {
             return Err(NoRandomnessReason::VTxnDisabled);
@@ -974,7 +976,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         if dkg_session.metadata.dealer_epoch + 1 != new_epoch_state.epoch {
             return Err(NoRandomnessReason::CompletedSessionTooOld);
         }
-        let dkg_pub_params = DefaultDKG::new_public_params(&dkg_session.metadata);
+        let dkg_pub_params = DefaultDKG::new_public_params(&dkg_session.metadata, rounding_result);
         let my_index = new_epoch_state
             .verifier
             .address_to_validator_index()
@@ -1114,6 +1116,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             payload.get();
         let onchain_jwk_consensus_config: anyhow::Result<OnChainJWKConsensusConfig> = payload.get();
         let dkg_state = payload.get::<DKGState>();
+        let rounding_result = payload
+            .get::<CurEpochRounding>()
+            .ok()
+            .map(|CurEpochRounding { rounding }| rounding);
 
         if let Err(error) = &onchain_consensus_config {
             warn!("Failed to read on-chain consensus config {}", error);
@@ -1169,6 +1175,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             &onchain_randomness_config,
             dkg_state,
             &consensus_config,
+            rounding_result,
         );
 
         let (rand_config, fast_rand_config) = match rand_configs {

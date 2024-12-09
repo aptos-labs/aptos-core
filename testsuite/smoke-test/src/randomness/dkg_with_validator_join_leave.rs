@@ -35,7 +35,7 @@ async fn dkg_with_validator_join_leave() {
     println!("Wait for a moment when DKG is not running.");
     let client_endpoint = swarm.validators().nth(1).unwrap().rest_api_endpoint();
     let client = aptos_rest_client::Client::new(client_endpoint.clone());
-    let dkg_session_1 = wait_for_dkg_finish(&client, None, time_limit_secs).await;
+    let (dkg_session_1, _rounding_1) = wait_for_dkg_finish(&client, None, time_limit_secs).await;
     println!(
         "Current epoch is {}. Number of validators: {}.",
         dkg_session_1.target_epoch(),
@@ -46,7 +46,7 @@ async fn dkg_with_validator_join_leave() {
         "Wait until we fully entered epoch {}.",
         dkg_session_1.target_epoch() + 1
     );
-    let dkg_session_2 = wait_for_dkg_finish(
+    let (dkg_session_2, _rounding_2) = wait_for_dkg_finish(
         &client,
         Some(dkg_session_1.target_epoch() + 1),
         time_limit_secs,
@@ -94,7 +94,7 @@ async fn dkg_with_validator_join_leave() {
         "Wait until we fully entered epoch {}.",
         dkg_session_2.target_epoch() + 1
     );
-    let dkg_session_3 = wait_for_dkg_finish(
+    let (dkg_session_3, rounding_3) = wait_for_dkg_finish(
         &client,
         Some(dkg_session_2.target_epoch() + 1),
         time_limit_secs,
@@ -107,7 +107,7 @@ async fn dkg_with_validator_join_leave() {
         num_validators(&dkg_session_3)
     );
 
-    assert!(verify_dkg_transcript(&dkg_session_3, &decrypt_key_map).is_ok());
+    assert!(verify_dkg_transcript(&dkg_session_3, rounding_3, &decrypt_key_map).is_ok());
     assert_eq!(
         num_validators(&dkg_session_3),
         num_validators(&dkg_session_2) - 1
@@ -120,7 +120,7 @@ async fn dkg_with_validator_join_leave() {
         "Wait until we fully entered epoch {}.",
         dkg_session_3.target_epoch() + 1
     );
-    let dkg_session_4 = wait_for_dkg_finish(
+    let (dkg_session_4, rounding_4) = wait_for_dkg_finish(
         &client,
         Some(dkg_session_3.target_epoch() + 1),
         time_limit_secs,
@@ -133,7 +133,7 @@ async fn dkg_with_validator_join_leave() {
         num_validators(&dkg_session_4)
     );
 
-    assert!(verify_dkg_transcript(&dkg_session_4, &decrypt_key_map).is_ok());
+    assert!(verify_dkg_transcript(&dkg_session_4, rounding_4, &decrypt_key_map).is_ok());
     assert_eq!(
         num_validators(&dkg_session_4),
         num_validators(&dkg_session_3) + 1

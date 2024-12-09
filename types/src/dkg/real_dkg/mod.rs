@@ -3,11 +3,12 @@
 
 use crate::{
     dkg::{
-        real_dkg::rounding::DKGRounding, DKGSessionMetadata, DKGTrait, MayHaveRoundingSummary,
-        RoundingSummary,
+        real_dkg::rounding::{DKGRounding, DKGRoundingProfile},
+        DKGSessionMetadata, DKGTrait, MayHaveRoundingSummary, RoundingSummary,
     },
     on_chain_config::OnChainRandomnessConfig,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
+    RoundingResult,
 };
 use anyhow::{anyhow, ensure};
 use aptos_crypto::{bls12381, bls12381::PrivateKey};
@@ -15,14 +16,18 @@ use aptos_dkg::{
     pvss,
     pvss::{
         traits::{Convert, Reconstructable, Transcript},
-        Player,
+        Player, WeightedConfig,
     },
 };
 use fixed::types::U64F64;
 use num_traits::Zero;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeSet, sync::Arc, time::Instant};
+use std::{
+    collections::BTreeSet,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 pub mod rounding;
 
@@ -91,22 +96,54 @@ pub fn build_dkg_pvss_config(
     reconstruct_threshold: U64F64,
     maybe_fast_path_secrecy_threshold: Option<U64F64>,
     next_validators: &[ValidatorConsensusInfo],
+    rounding_result: Option<RoundingResult>,
 ) -> DKGPvssConfig {
     let validator_stakes: Vec<u64> = next_validators.iter().map(|vi| vi.voting_power).collect();
-    let timer = Instant::now();
-    let DKGRounding {
-        profile,
-        wconfig,
-        fast_wconfig,
-        rounding_error,
-        rounding_method,
-    } = DKGRounding::new(
-        &validator_stakes,
-        secrecy_threshold,
-        reconstruct_threshold,
-        maybe_fast_path_secrecy_threshold,
-    );
-    let rounding_time = timer.elapsed();
+    let (wconfig, fast_wconfig, rounding_summary) = if let Some(rounding_result) = rounding_result {
+        let weights_u64 = rounding_result
+            .weights
+            .iter()
+            .map(|w| *w as usize)
+            .collect::<Vec<_>>();
+        let wconfig = WeightedConfig::new(
+            rounding_result.reconstruct_threshold_default_path as usize,
+            weights_u64.clone(),
+        )
+        .unwrap();
+        let fast_wconfig = rounding_result
+            .reconstruct_threshold_fast_path
+            .map(|t| WeightedConfig::new(t as usize, weights_u64).unwrap());
+
+        let rounding_summary = RoundingSummary {
+            method: "binary_search, framework".to_string(),
+            output: DKGRoundingProfile::default(),
+            exec_time: Duration::from_micros(0),
+            error: None,
+        };
+        (wconfig, fast_wconfig, rounding_summary)
+    } else {
+        let timer = Instant::now();
+        let DKGRounding {
+            profile,
+            wconfig,
+            fast_wconfig,
+            rounding_error,
+            rounding_method,
+        } = DKGRounding::new(
+            &validator_stakes,
+            secrecy_threshold,
+            reconstruct_threshold,
+            maybe_fast_path_secrecy_threshold,
+        );
+        let rounding_time = timer.elapsed();
+        let rounding_summary = RoundingSummary {
+            method: rounding_method,
+            output: profile,
+            exec_time: rounding_time,
+            error: rounding_error,
+        };
+        (wconfig, fast_wconfig, rounding_summary)
+    };
     let validator_consensus_keys: Vec<bls12381::PublicKey> = next_validators
         .iter()
         .map(|vi| vi.public_key.clone())
@@ -118,13 +155,6 @@ pub fn build_dkg_pvss_config(
         .collect::<Vec<_>>();
 
     let pp = DkgPP::default_with_bls_base();
-
-    let rounding_summary = RoundingSummary {
-        method: rounding_method,
-        output: profile,
-        exec_time: rounding_time,
-        error: rounding_error,
-    };
 
     DKGPvssConfig::new(
         cur_epoch,
@@ -186,7 +216,10 @@ impl DKGTrait for RealDKG {
     type PublicParams = RealDKGPublicParams;
     type Transcript = Transcripts;
 
-    fn new_public_params(dkg_session_metadata: &DKGSessionMetadata) -> RealDKGPublicParams {
+    fn new_public_params(
+        dkg_session_metadata: &DKGSessionMetadata,
+        rounding_result: Option<RoundingResult>,
+    ) -> RealDKGPublicParams {
         let randomness_config = dkg_session_metadata
             .randomness_config_derived()
             .unwrap_or_else(OnChainRandomnessConfig::default_enabled);
@@ -204,6 +237,7 @@ impl DKGTrait for RealDKG {
             reconstruct_threshold,
             maybe_fast_path_secrecy_threshold,
             &dkg_session_metadata.target_validator_consensus_infos_cloned(),
+            rounding_result,
         );
         let verifier = ValidatorVerifier::new(dkg_session_metadata.dealer_consensus_infos_cloned());
         RealDKGPublicParams {
