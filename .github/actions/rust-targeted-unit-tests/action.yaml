@@ -32,6 +32,8 @@ runs:
       shell: bash
       env:
         INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+        MOVE_COMPILER_V2: true
+        MOVE_LANGUAGE_V2: true
         RUST_MIN_STACK: "4297152"
         MVP_TEST_ON_CI: "true"
         SOLC_EXE: /home/runner/bin/solc
