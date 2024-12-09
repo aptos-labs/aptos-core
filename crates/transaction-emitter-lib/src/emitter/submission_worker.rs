@@ -251,7 +251,11 @@ impl SubmissionWorker {
         let mut sum_of_completion_timestamps_millis = 0;
         let mut num_committed = 0;
         let mut num_expired = 0;
+        let mut counter = 0;
+        let start = Instant::now();
         loop {
+            let loop_start_time = Instant::now();
+            counter += 1;
             let start_version_by_address: Vec<_> = self.account_data.iter().flat_map(|(address, data)| {
                 // Fetch txn summary for the account only if there are some outstanding submitted transactions from the account
                 if !data.submitted_replay_protectors.is_empty() {
@@ -330,9 +334,12 @@ impl SubmissionWorker {
                 break;
             }
 
+            info!("Sleeping for {:?}. wait_for_account_txn_summaries loop took {:?}", sleep_between_cycles, loop_start_time.elapsed());
             sleep(sleep_between_cycles).await;
         }
 
+        info!("wait_for_account_txn_summaries took {} cycles, {:?}", counter, start.elapsed());
+        info!("num_committed: {}, num_expired: {}, sum_of_completion_timestamps_millis: {}", num_committed, num_expired, sum_of_completion_timestamps_millis);
         (num_committed, num_expired, sum_of_completion_timestamps_millis)
     }
 
@@ -467,7 +474,11 @@ impl SubmissionWorker {
 
         let (num_committed, num_expired, sum_of_completion_timestamps_millis) = if has_submitted_orderless_txns {
             // Some of the submitted transactions are orderless transactions.
-            self.wait_for_account_txn_summaries(check_account_sleep_duration).await
+            let start = Instant::now();
+            let (num_committed, num_expired, sum_of_completion_timestamps_millis) = self.wait_for_account_txn_summaries(check_account_sleep_duration).await;
+            info!("wait_for_account_txn_summaries took {:?}", start.elapsed());
+            (num_committed, num_expired, sum_of_completion_timestamps_millis)
+            // TODO: Need to update account sequence numbers here as well in case the account has sent sequence number based transactions.
         } else {
             let (num_committed, num_expired, sum_of_completion_timestamps_millis, latest_fetched_counts) = self.wait_for_account_sequence_numbers(
                 check_account_sleep_duration,
@@ -475,13 +486,8 @@ impl SubmissionWorker {
             .await;
 
             self.update_account_seq_num(
-                // Arc::get_mut(account).unwrap(),
                 &latest_fetched_counts,
             );
-
-            // for account in self.accounts.iter_mut() {
-                
-            // }
             (num_committed, num_expired, sum_of_completion_timestamps_millis)
         };
 
@@ -549,7 +555,6 @@ impl SubmissionWorker {
 
     fn update_account_seq_num(
         &mut self,
-        // account: &mut LocalAccount,
         latest_fetched_counts: &HashMap<AccountAddress, u64>,
     ) {
         for account in self.accounts.iter_mut() {

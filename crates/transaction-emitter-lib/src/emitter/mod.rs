@@ -1001,6 +1001,7 @@ pub async fn query_sequence_numbers(
     client: &RestClient,
     addresses: Vec<AccountAddress>,
 ) -> Result<(Vec<(AccountAddress, u64)>, u64)> {
+    let start = Instant::now();
     let futures = addresses.iter().map(|address| {
         FETCH_ACCOUNT_RETRY_POLICY.retry(move || get_account_address_and_seq_num(client, *address))
     });
@@ -1011,6 +1012,7 @@ pub async fn query_sequence_numbers(
         .into_iter()
         .unzip();
 
+    info!("query_sequence_numbers took {:?}", start.elapsed());
     // return min for the timestamp, to make sure
     // all sequence numbers were <= to return values at that timestamp
     Ok((seq_nums, timestamps.into_iter().min().unwrap()))
@@ -1059,6 +1061,7 @@ pub async fn query_txn_summaries(
 // where
 //     I: Iterator<Item = (AccountAddress, Version)>,
 {
+    let start = Instant::now();
     let futures = start_version_by_address.iter().map(|(address, start_version)| {
         FETCH_ACCOUNT_RETRY_POLICY.retry(move || {
             get_account_txn_summmaries(
@@ -1074,6 +1077,7 @@ pub async fn query_txn_summaries(
             .map_err(|e| format_err!("Get account txn summaries failed: {:?}", e))?
             .into_iter()
             .unzip();
+    info!("query_txn_summaries took {:?}", start.elapsed());
     Ok((account_txn_summaries.into_iter().collect(), timestamps.into_iter().min().unwrap()))
 }
 
@@ -1082,6 +1086,7 @@ async fn get_account_txn_summmaries(
     address: AccountAddress,
     start_version: Version,
 ) -> Result<((AccountAddress, Vec<IndexedTransactionSummary>), u64)> {
+    let start = Instant::now();
     let result = client.get_account_transaction_summaries(
         address,
         Some(start_version),
@@ -1109,6 +1114,7 @@ async fn get_account_txn_summmaries(
                     }
                 )
                 .collect();
+            info!("get_account_txn_summmaries took {:?}", start.elapsed());
             Ok((
                 (
                     address,
