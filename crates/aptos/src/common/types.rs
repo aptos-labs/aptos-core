@@ -1511,12 +1511,12 @@ pub struct ChangeSummary {
 pub struct FaucetOptions {
     /// URL for the faucet endpoint e.g. `https://faucet.devnet.aptoslabs.com`
     #[clap(long)]
-    faucet_url: Option<reqwest::Url>,
+    pub faucet_url: Option<reqwest::Url>,
 
     /// Auth token to bypass faucet ratelimits. You can also set this as an environment
     /// variable with FAUCET_AUTH_TOKEN.
     #[clap(long, env)]
-    faucet_auth_token: Option<String>,
+    pub faucet_auth_token: Option<String>,
 }
 
 impl FaucetOptions {
@@ -1527,19 +1527,38 @@ impl FaucetOptions {
         }
     }
 
-    fn faucet_url(&self, profile: &ProfileOptions) -> CliTypedResult<reqwest::Url> {
+    fn faucet_url(&self, profile_options: &ProfileOptions) -> CliTypedResult<reqwest::Url> {
         if let Some(ref faucet_url) = self.faucet_url {
-            Ok(faucet_url.clone())
-        } else if let Some(Some(url)) = CliConfig::load_profile(
-            profile.profile_name(),
+            return Ok(faucet_url.clone());
+        }
+        let profile = CliConfig::load_profile(
+            profile_options.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
-        )?
-        .map(|profile| profile.faucet_url)
-        {
-            reqwest::Url::parse(&url)
-                .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string()))
-        } else {
-            Err(CliError::CommandArgumentError("No faucet given. Please add --faucet-url or add a faucet URL to the .aptos/config.yaml for the current profile".to_string()))
+        )?;
+        let profile = match profile {
+            Some(profile) => profile,
+            None => {
+                return Err(CliError::CommandArgumentError(format!(
+                    "Profile \"{}\" not found.",
+                    profile_options.profile_name().unwrap_or(DEFAULT_PROFILE)
+                )))
+            },
+        };
+
+        match profile.faucet_url {
+            Some(url) => reqwest::Url::parse(&url)
+                .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string())),
+            None => match profile.network {
+                Some(Network::Mainnet) => {
+                    Err(CliError::CommandArgumentError("There is no faucet for mainnet. Please create and fund the account by transferring funds from another account. If you are confident you want to use a faucet, set --faucet-url or add a faucet URL to .aptos/config.yaml for the current profile".to_string()))
+                },
+                Some(Network::Testnet) => {
+                    Err(CliError::CommandArgumentError("To get testnet APT you must visit https://learn.aptoslabs.com/faucet. If you are confident you want to use a faucet programmatically, set --faucet-url or add a faucet URL to .aptos/config.yaml for the current profile".to_string()))
+                },
+                _ => {
+                    Err(CliError::CommandArgumentError("No faucet given. Please set --faucet-url or add a faucet URL to .aptos/config.yaml for the current profile".to_string()))
+                },
+            },
         }
     }
 
