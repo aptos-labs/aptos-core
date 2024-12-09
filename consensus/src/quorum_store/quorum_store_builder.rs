@@ -5,6 +5,7 @@ use super::quorum_store_db::QuorumStoreStorage;
 use crate::{
     consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
     error::error_kind,
+    monitor,
     network::{IncomingBatchRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
     payload_manager::{DirectMempoolPayloadManager, QuorumStorePayloadManager, TPayloadManager},
@@ -128,7 +129,7 @@ pub struct InnerBuilder {
     network_sender: NetworkSender,
     verifier: Arc<ValidatorVerifier>,
     proof_cache: ProofCache,
-    backend: SecureBackend,
+    _backend: SecureBackend,
     coordinator_tx: Sender<CoordinatorCommand>,
     coordinator_rx: Option<Receiver<CoordinatorCommand>>,
     batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
@@ -204,7 +205,7 @@ impl InnerBuilder {
             network_sender,
             verifier,
             proof_cache,
-            backend,
+            _backend: backend,
             coordinator_tx,
             coordinator_rx: Some(coordinator_rx),
             batch_generator_cmd_tx,
@@ -235,6 +236,7 @@ impl InnerBuilder {
             .get_latest_ledger_info()
             .expect("could not get latest ledger info");
         let last_committed_timestamp = latest_ledger_info_with_sigs.commit_info().timestamp_usecs();
+        let is_new_epoch = latest_ledger_info_with_sigs.ledger_info().ends_epoch();
 
         let batch_requester = BatchRequester::new(
             self.epoch,
@@ -248,6 +250,7 @@ impl InnerBuilder {
         );
         let batch_store = Arc::new(BatchStore::new(
             self.epoch,
+            is_new_epoch,
             last_committed_timestamp,
             self.quorum_store_storage.clone(),
             self.config.memory_quota,
@@ -434,7 +437,7 @@ impl InnerBuilder {
         Arc<dyn TPayloadManager>,
         Option<aptos_channel::Sender<AccountAddress, (Author, VerifiedEvent)>>,
     ) {
-        let batch_reader = self.create_batch_store();
+        let batch_reader = monitor!("qs_create_batch_store", self.create_batch_store());
 
         (
             Arc::from(QuorumStorePayloadManager::new(

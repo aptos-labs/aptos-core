@@ -4,7 +4,7 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    db_options::gen_state_kv_cfds,
+    db_options::gen_state_kv_shard_cfds,
     metrics::OTHER_TIMERS_SECONDS,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -25,6 +25,7 @@ use aptos_types::{
     transaction::Version,
 };
 use arr_macro::arr;
+use rayon::prelude::*;
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -56,19 +57,13 @@ impl StateKvDb {
             });
         }
 
-        Self::open(
-            db_paths,
-            rocksdb_configs.state_kv_db_config,
-            readonly,
-            sharding,
-        )
+        Self::open_sharded(db_paths, rocksdb_configs.state_kv_db_config, readonly)
     }
 
-    pub(crate) fn open(
+    pub(crate) fn open_sharded(
         db_paths: &StorageDirPaths,
         state_kv_db_config: RocksdbConfig,
         readonly: bool,
-        enable_sharding: bool,
     ) -> Result<Self> {
         let state_kv_metadata_db_path =
             Self::metadata_db_path(db_paths.state_kv_db_metadata_root_path());
@@ -78,7 +73,6 @@ impl StateKvDb {
             STATE_KV_METADATA_DB_NAME,
             &state_kv_db_config,
             readonly,
-            enable_sharding,
         )?);
 
         info!(
@@ -86,15 +80,22 @@ impl StateKvDb {
             "Opened state kv metadata db!"
         );
 
-        let mut shard_id: usize = 0;
-        let state_kv_db_shards = {
-            arr![{
+        let state_kv_db_shards = (0..NUM_STATE_SHARDS)
+            .into_par_iter()
+            .map(|shard_id| {
                 let shard_root_path = db_paths.state_kv_db_shard_root_path(shard_id as u8);
-                let db = Self::open_shard(shard_root_path, shard_id as u8, &state_kv_db_config, readonly, enable_sharding)?;
-                shard_id += 1;
+                let db = Self::open_shard(
+                    shard_root_path,
+                    shard_id as u8,
+                    &state_kv_db_config,
+                    readonly,
+                )
+                .unwrap_or_else(|e| panic!("Failed to open state kv db shard {shard_id}: {e:?}."));
                 Arc::new(db)
-            }; 16]
-        };
+            })
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
 
         let state_kv_db = Self {
             state_kv_metadata_db,
@@ -171,11 +172,10 @@ impl StateKvDb {
         cp_root_path: impl AsRef<Path>,
     ) -> Result<()> {
         // TODO(grao): Support path override here.
-        let state_kv_db = Self::open(
+        let state_kv_db = Self::open_sharded(
             &StorageDirPaths::from_path(db_root_path),
             RocksdbConfig::default(),
             false,
-            true,
         )?;
         let cp_state_kv_db_path = cp_root_path.as_ref().join(STATE_KV_DB_FOLDER_NAME);
 
@@ -247,7 +247,6 @@ impl StateKvDb {
         shard_id: u8,
         state_kv_db_config: &RocksdbConfig,
         readonly: bool,
-        enable_sharding: bool,
     ) -> Result<DB> {
         let db_name = format!("state_kv_db_shard_{}", shard_id);
         Self::open_db(
@@ -255,7 +254,6 @@ impl StateKvDb {
             &db_name,
             state_kv_db_config,
             readonly,
-            enable_sharding,
         )
     }
 
@@ -264,21 +262,20 @@ impl StateKvDb {
         name: &str,
         state_kv_db_config: &RocksdbConfig,
         readonly: bool,
-        enable_sharding: bool,
     ) -> Result<DB> {
         Ok(if readonly {
             DB::open_cf_readonly(
                 &gen_rocksdb_options(state_kv_db_config, true),
                 path,
                 name,
-                gen_state_kv_cfds(state_kv_db_config, enable_sharding),
+                gen_state_kv_shard_cfds(state_kv_db_config),
             )?
         } else {
             DB::open_cf(
                 &gen_rocksdb_options(state_kv_db_config, false),
                 path,
                 name,
-                gen_state_kv_cfds(state_kv_db_config, enable_sharding),
+                gen_state_kv_shard_cfds(state_kv_db_config),
             )?
         })
     }

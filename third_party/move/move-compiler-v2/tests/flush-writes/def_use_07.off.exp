@@ -18,7 +18,6 @@ B0:
 	1: Ret
 }
 public test(): u64 /* def_idx: 2 */ {
-L0:	loc0: u64
 B0:
 	0: Call one(): u64
 	1: Call foo(u64): u64

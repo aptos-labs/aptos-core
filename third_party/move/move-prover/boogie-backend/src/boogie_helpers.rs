@@ -592,7 +592,7 @@ pub fn boogie_value(env: &GlobalEnv, _options: &BoogieOptions, val: &Value) -> S
                 .collect_vec(),
         ),
         Value::Tuple(vec) => format!("<<unsupported Tuple({:?})>>", vec),
-        Value::Function(mid, fid) => format!("<unsupported Function({:?}, {:?}>", mid, fid), // TODO(LAMBDA)
+        Value::Function(mid, fid) => format!("<unimplemented value Function({:?}, {:?}>", mid, fid), // TODO(LAMBDA)
     }
 }
 
