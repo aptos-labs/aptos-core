@@ -477,6 +477,13 @@ impl PipelinedBlock {
             .await
             .expect("Commit ledger should succeed");
     }
+
+    pub async fn wait_for_commit_vote(&self) -> TaskResult<CommitVote> {
+        self.pipeline_futs()
+            .expect("Pipeline needs to be enabled")
+            .commit_vote_fut
+            .await
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
