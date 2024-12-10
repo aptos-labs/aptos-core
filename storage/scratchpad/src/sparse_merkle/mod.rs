@@ -198,6 +198,7 @@ where
     /// Constructs a Sparse Merkle Tree with a root hash. This is often used when we restart and
     /// the scratch pad and the storage have identical state, so we use a single root hash to
     /// represent the entire state.
+    /// FIXME(aldenhu): remove usage
     pub fn new(root_hash: HashValue, usage: StateStorageUsage) -> Self {
         let root = if root_hash != *SPARSE_MERKLE_PLACEHOLDER_HASH {
             SubTree::new_unknown(root_hash)
@@ -269,6 +270,10 @@ where
 
     pub fn is_family(&self, other: &Self) -> bool {
         self.inner.family == other.inner.family
+    }
+
+    pub fn is_descendant_of(&self, other: &Self) -> bool {
+        self.is_family(other) && self.generation() >= other.generation()
     }
 
     pub fn usage(&self) -> StateStorageUsage {

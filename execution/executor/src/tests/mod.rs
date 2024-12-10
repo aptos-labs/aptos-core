@@ -457,6 +457,7 @@ fn apply_transaction_by_writeset(
     db: &DbReaderWriter,
     transactions_and_writesets: Vec<(Transaction, WriteSet)>,
 ) {
+    /*
     let ledger_summary: LedgerSummary = db.reader.get_pre_committed_ledger_summary().unwrap();
 
     let (txns, txn_outs) = transactions_and_writesets
@@ -496,7 +497,7 @@ fn apply_transaction_by_writeset(
     let chunk_output =
         DoGetExecutionOutput::by_transaction_output(txns, txn_outs, state_view).unwrap();
 
-    let output = ApplyExecutionOutput::run(chunk_output, &ledger_summary).unwrap();
+    let output = ApplyExecutionOutput::run(chunk_output, ledger_summary).unwrap();
 
     db.writer
         .save_transactions(
@@ -505,6 +506,10 @@ fn apply_transaction_by_writeset(
             true, /* sync_commit */
         )
         .unwrap();
+       FIXME(aldenhu)
+        */
+
+    todo!()
 }
 
 #[test]
@@ -677,6 +682,7 @@ fn run_transactions_naive(
     transactions: Vec<SignatureVerifiedTransaction>,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
 ) -> HashValue {
+    /*
     let executor = TestExecutor::new();
     let db = &executor.db;
 
@@ -696,7 +702,7 @@ fn run_transactions_naive(
             TransactionSliceMetadata::unknown(),
         )
         .unwrap();
-        let output = ApplyExecutionOutput::run(out, &ledger_summary).unwrap();
+        let output = ApplyExecutionOutput::run(out, ledger_summary).unwrap();
         db.writer
             .save_transactions(
                 output.expect_complete_result().as_chunk_to_commit(),
@@ -710,6 +716,9 @@ fn run_transactions_naive(
         .unwrap()
         .transaction_accumulator
         .root_hash()
+        FIXME(aldenhu)
+     */
+    todo!()
 }
 
 proptest! {

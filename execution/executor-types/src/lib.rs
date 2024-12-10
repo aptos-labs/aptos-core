@@ -2,6 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 #![forbid(unsafe_code)]
+// FIXME(aldenhu): remove
+#![allow(dead_code)]
 
 use anyhow::Result;
 use aptos_crypto::HashValue;
@@ -135,12 +137,12 @@ pub trait BlockExecutorTrait: Send + Sync {
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<StateComputeResult> {
         let block_id = block.block_id;
-        self.execute_and_state_checkpoint(block, parent_block_id, onchain_config)?;
+        self.execute_and_update_state(block, parent_block_id, onchain_config)?;
         self.ledger_update(block_id, parent_block_id)
     }
 
     /// Executes a block and returns the state checkpoint output.
-    fn execute_and_state_checkpoint(
+    fn execute_and_update_state(
         &self,
         block: ExecutableBlock,
         parent_block_id: HashValue,

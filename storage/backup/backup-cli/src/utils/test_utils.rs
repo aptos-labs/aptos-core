@@ -33,13 +33,13 @@ pub fn tmp_db_with_random_content() -> (
     Arc<AptosDB>,
     Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>,
 ) {
+    /* FIXME(aldenhu)
     let (tmpdir, db) = tmp_db_empty();
     let mut cur_ver: Version = 0;
     let mut in_memory_state = db
         .get_pre_committed_ledger_summary()
         .unwrap()
         .state
-        .as_ref()
         .clone();
     let _ancestor = in_memory_state.base.clone();
     let blocks = ValueGenerator::new().generate(arb_blocks_to_commit());
@@ -58,6 +58,8 @@ pub fn tmp_db_with_random_content() -> (
     }
 
     (tmpdir, db, blocks)
+     */
+    todo!()
 }
 
 pub fn start_local_backup_service(db: Arc<AptosDB>) -> (Runtime, u16) {

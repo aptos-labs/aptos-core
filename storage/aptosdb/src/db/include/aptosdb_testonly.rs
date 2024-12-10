@@ -7,7 +7,7 @@ use aptos_storage_interface::state_store::state_view::cached_state_view::Sharded
 use aptos_storage_interface::state_store::state_delta::StateDelta;
 use aptos_types::transaction::{TransactionStatus, TransactionToCommit};
 use aptos_executor_types::transactions_with_output::TransactionsToKeep;
-use aptos_storage_interface::state_store::sharded_state_update_refs::ShardedStateUpdateRefs;
+use aptos_storage_interface::state_store::per_version_state_update_refs::PerVersionStateUpdateRefs;
 
 impl AptosDB {
     /// This opens db in non-readonly mode, without the pruner.
@@ -125,8 +125,6 @@ pub struct ChunkToCommitOwned {
     transactions_to_keep: TransactionsToKeep,
     transaction_infos: Vec<TransactionInfo>,
     base_state_version: Option<Version>,
-    latest_in_memory_state: Arc<StateDelta>,
-    state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
     sharded_state_cache: Option<ShardedStateCache>,
     is_reconfig: bool,
 }
@@ -138,6 +136,7 @@ impl ChunkToCommitOwned {
         base_state_version: Option<Version>,
         latest_in_memory_state: &StateDelta,
     ) -> Self {
+        /*
         let (transactions, transaction_outputs, transaction_infos) = Self::disassemble_txns_to_commit(txns_to_commit);
 
         let is_reconfig = transaction_outputs
@@ -165,9 +164,13 @@ impl ChunkToCommitOwned {
             sharded_state_cache: None,
             is_reconfig,
         }
+        FIXME(aldenhu)
+         */
+        todo!()
     }
 
     pub fn as_ref(&self) -> ChunkToCommit {
+        /*
         ChunkToCommit {
             first_version: self.first_version,
             transactions: &self.transactions_to_keep.transactions,
@@ -177,9 +180,12 @@ impl ChunkToCommitOwned {
             latest_in_memory_state: &self.latest_in_memory_state,
             state_update_refs: self.transactions_to_keep.state_update_refs(),
             state_updates_until_last_checkpoint: self.state_updates_until_last_checkpoint.as_ref(),
-            sharded_state_cache: self.sharded_state_cache.as_ref(),
+            state_reads: self.sharded_state_cache.as_ref(),
             is_reconfig: self.is_reconfig,
         }
+        FIXME(aldenhu)
+         */
+        todo!()
     }
 
     fn disassemble_txns_to_commit(txns_to_commit: &[TransactionToCommit]) -> (
@@ -202,12 +208,13 @@ impl ChunkToCommitOwned {
         }).multiunzip()
     }
 
-    pub fn gather_state_updates_until_last_checkpoint(
-        first_version: Version,
-        latest_in_memory_state: &StateDelta,
-        state_update_refs: &ShardedStateUpdateRefs,
-        transaction_infos: &[TransactionInfo],
-    ) -> Option<ShardedStateUpdates> {
+    pub fn gather_state_updates_until_last_checkpoint<'kv>(
+        _first_version: Version,
+        _latest_in_memory_state: &StateDelta,
+        _state_update_refs: &PerVersionStateUpdateRefs<'kv>,
+        _transaction_infos: &[TransactionInfo],
+    ) -> Option<BatchedStateUpdateRefs<'kv>> {
+        /* FIXME(aldenhu)
         if let Some(latest_checkpoint_version) = latest_in_memory_state.base_version {
             if latest_checkpoint_version >= first_version {
                 let idx = (latest_checkpoint_version - first_version) as usize;
@@ -236,5 +243,7 @@ impl ChunkToCommitOwned {
         }
 
         None
+         */
+        todo!()
     }
 }

@@ -4,11 +4,12 @@
 use crate::metrics::OTHER_TIMERS_SECONDS;
 use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::{SparseMerkleTree, SUBTREE_DROPPER};
+use aptos_storage_interface::state_store::state_summary::StateWithSummary;
 use aptos_types::state_store::state_value::StateValue;
 use std::ops::Deref;
 
 pub struct PersistedState {
-    smt: SparseMerkleTree<StateValue>,
+    persisted: StateWithSummary,
 }
 
 impl PersistedState {
@@ -16,27 +17,27 @@ impl PersistedState {
 
     pub fn new_dummy() -> Self {
         Self {
-            smt: SparseMerkleTree::new_empty(),
+            persisted: StateWithSummary::new_empty(),
         }
     }
 
-    pub fn get(&self) -> &SparseMerkleTree<StateValue> {
+    pub fn get(&self) -> &StateWithSummary {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["get_persisted_state"]);
 
         // The back pressure is on the getting side (which is the execution side) so that it's less
         // likely for a lot of blocks locking the same old base SMT.
         SUBTREE_DROPPER.wait_for_backlog_drop(Self::MAX_PENDING_DROPS);
 
-        &self.smt
+        &self.persisted
     }
 
-    pub fn set(&mut self, smt: SparseMerkleTree<StateValue>) {
-        self.smt = smt
+    pub fn set(&mut self, persisted: StateWithSummary) {
+        self.persisted = persisted;
     }
 }
 
 impl Deref for PersistedState {
-    type Target = SparseMerkleTree<StateValue>;
+    type Target = StateWithSummary;
 
     fn deref(&self) -> &Self::Target {
         self.get()
