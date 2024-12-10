@@ -15,10 +15,10 @@ pub static ACCOUNT_MODULE: Lazy<ModuleId> = Lazy::new(|| {
     )
 });
 
-pub static LITE_ACCOUNT_MODULE: Lazy<ModuleId> = Lazy::new(|| {
+pub static ACCOUNT_ABSTRACTION_MODULE: Lazy<ModuleId> = Lazy::new(|| {
     ModuleId::new(
         account_config::CORE_CODE_ADDRESS,
-        ident_str!("lite_account").to_owned(),
+        ident_str!("account_abstraction").to_owned(),
     )
 });
 

@@ -135,7 +135,6 @@ pub enum FeatureFlag {
     EnableLoaderV2,
     DisallowInitModuleToPublishModules,
     AccountAbstraction,
-    PassGasPayerSignerToPrologueAndEpilogue,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -360,7 +359,6 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES
             },
             FeatureFlag::AccountAbstraction => AptosFeatureFlag::ACCOUNT_ABSTRACTION,
-            FeatureFlag::PassGasPayerSignerToPrologueAndEpilogue => AptosFeatureFlag::PASS_GAS_PAYER_SIGNER_TO_PROLOGUE_AND_EPILOGUE
         }
     }
 }
@@ -512,7 +510,6 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::DisallowInitModuleToPublishModules
             },
             AptosFeatureFlag::ACCOUNT_ABSTRACTION => FeatureFlag::AccountAbstraction,
-            AptosFeatureFlag::PASS_GAS_PAYER_SIGNER_TO_PROLOGUE_AND_EPILOGUE => FeatureFlag::PassGasPayerSignerToPrologueAndEpilogue,
         }
     }
 }

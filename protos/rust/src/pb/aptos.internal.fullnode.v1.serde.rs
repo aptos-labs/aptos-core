@@ -18,11 +18,9 @@ impl serde::Serialize for GetTransactionsFromNodeRequest {
         }
         let mut struct_ser = serializer.serialize_struct("aptos.internal.fullnode.v1.GetTransactionsFromNodeRequest", len)?;
         if let Some(v) = self.starting_version.as_ref() {
-            #[allow(clippy::needless_borrow)]
             struct_ser.serialize_field("startingVersion", ToString::to_string(&v).as_str())?;
         }
         if let Some(v) = self.transactions_count.as_ref() {
-            #[allow(clippy::needless_borrow)]
             struct_ser.serialize_field("transactionsCount", ToString::to_string(&v).as_str())?;
         }
         struct_ser.end()
@@ -83,20 +81,20 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsFromNodeRequest {
                 formatter.write_str("struct aptos.internal.fullnode.v1.GetTransactionsFromNodeRequest")
             }
 
-            fn visit_map<V>(self, mut map_: V) -> std::result::Result<GetTransactionsFromNodeRequest, V::Error>
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<GetTransactionsFromNodeRequest, V::Error>
                 where
                     V: serde::de::MapAccess<'de>,
             {
                 let mut starting_version__ = None;
                 let mut transactions_count__ = None;
-                while let Some(k) = map_.next_key()? {
+                while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::StartingVersion => {
                             if starting_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("startingVersion"));
                             }
                             starting_version__ =
-                                map_.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
+                                map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
                         GeneratedField::TransactionsCount => {
@@ -104,7 +102,7 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsFromNodeRequest {
                                 return Err(serde::de::Error::duplicate_field("transactionsCount"));
                             }
                             transactions_count__ =
-                                map_.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
+                                map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
                     }
@@ -299,16 +297,14 @@ impl serde::Serialize for StreamStatus {
         }
         let mut struct_ser = serializer.serialize_struct("aptos.internal.fullnode.v1.StreamStatus", len)?;
         if self.r#type != 0 {
-            let v = stream_status::StatusType::try_from(self.r#type)
-                .map_err(|_| serde::ser::Error::custom(format!("Invalid variant {}", self.r#type)))?;
+            let v = stream_status::StatusType::from_i32(self.r#type)
+                .ok_or_else(|| serde::ser::Error::custom(format!("Invalid variant {}", self.r#type)))?;
             struct_ser.serialize_field("type", &v)?;
         }
         if self.start_version != 0 {
-            #[allow(clippy::needless_borrow)]
             struct_ser.serialize_field("startVersion", ToString::to_string(&self.start_version).as_str())?;
         }
         if let Some(v) = self.end_version.as_ref() {
-            #[allow(clippy::needless_borrow)]
             struct_ser.serialize_field("endVersion", ToString::to_string(&v).as_str())?;
         }
         struct_ser.end()
@@ -372,27 +368,27 @@ impl<'de> serde::Deserialize<'de> for StreamStatus {
                 formatter.write_str("struct aptos.internal.fullnode.v1.StreamStatus")
             }
 
-            fn visit_map<V>(self, mut map_: V) -> std::result::Result<StreamStatus, V::Error>
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<StreamStatus, V::Error>
                 where
                     V: serde::de::MapAccess<'de>,
             {
                 let mut r#type__ = None;
                 let mut start_version__ = None;
                 let mut end_version__ = None;
-                while let Some(k) = map_.next_key()? {
+                while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::Type => {
                             if r#type__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("type"));
                             }
-                            r#type__ = Some(map_.next_value::<stream_status::StatusType>()? as i32);
+                            r#type__ = Some(map.next_value::<stream_status::StatusType>()? as i32);
                         }
                         GeneratedField::StartVersion => {
                             if start_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("startVersion"));
                             }
                             start_version__ =
-                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
                         GeneratedField::EndVersion => {
@@ -400,7 +396,7 @@ impl<'de> serde::Deserialize<'de> for StreamStatus {
                                 return Err(serde::de::Error::duplicate_field("endVersion"));
                             }
                             end_version__ =
-                                map_.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
+                                map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
                     }
@@ -454,9 +450,10 @@ impl<'de> serde::Deserialize<'de> for stream_status::StatusType {
             where
                 E: serde::de::Error,
             {
+                use std::convert::TryFrom;
                 i32::try_from(v)
                     .ok()
-                    .and_then(|x| x.try_into().ok())
+                    .and_then(stream_status::StatusType::from_i32)
                     .ok_or_else(|| {
                         serde::de::Error::invalid_value(serde::de::Unexpected::Signed(v), &self)
                     })
@@ -466,9 +463,10 @@ impl<'de> serde::Deserialize<'de> for stream_status::StatusType {
             where
                 E: serde::de::Error,
             {
+                use std::convert::TryFrom;
                 i32::try_from(v)
                     .ok()
-                    .and_then(|x| x.try_into().ok())
+                    .and_then(stream_status::StatusType::from_i32)
                     .ok_or_else(|| {
                         serde::de::Error::invalid_value(serde::de::Unexpected::Unsigned(v), &self)
                     })
@@ -577,34 +575,34 @@ impl<'de> serde::Deserialize<'de> for TransactionsFromNodeResponse {
                 formatter.write_str("struct aptos.internal.fullnode.v1.TransactionsFromNodeResponse")
             }
 
-            fn visit_map<V>(self, mut map_: V) -> std::result::Result<TransactionsFromNodeResponse, V::Error>
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<TransactionsFromNodeResponse, V::Error>
                 where
                     V: serde::de::MapAccess<'de>,
             {
                 let mut chain_id__ = None;
                 let mut response__ = None;
-                while let Some(k) = map_.next_key()? {
+                while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::ChainId => {
                             if chain_id__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("chainId"));
                             }
                             chain_id__ =
-                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
                         GeneratedField::Status => {
                             if response__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("status"));
                             }
-                            response__ = map_.next_value::<::std::option::Option<_>>()?.map(transactions_from_node_response::Response::Status)
+                            response__ = map.next_value::<::std::option::Option<_>>()?.map(transactions_from_node_response::Response::Status)
 ;
                         }
                         GeneratedField::Data => {
                             if response__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("data"));
                             }
-                            response__ = map_.next_value::<::std::option::Option<_>>()?.map(transactions_from_node_response::Response::Data)
+                            response__ = map.next_value::<::std::option::Option<_>>()?.map(transactions_from_node_response::Response::Data)
 ;
                         }
                     }
@@ -686,18 +684,18 @@ impl<'de> serde::Deserialize<'de> for TransactionsOutput {
                 formatter.write_str("struct aptos.internal.fullnode.v1.TransactionsOutput")
             }
 
-            fn visit_map<V>(self, mut map_: V) -> std::result::Result<TransactionsOutput, V::Error>
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<TransactionsOutput, V::Error>
                 where
                     V: serde::de::MapAccess<'de>,
             {
                 let mut transactions__ = None;
-                while let Some(k) = map_.next_key()? {
+                while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::Transactions => {
                             if transactions__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("transactions"));
                             }
-                            transactions__ = Some(map_.next_value()?);
+                            transactions__ = Some(map.next_value()?);
                         }
                     }
                 }

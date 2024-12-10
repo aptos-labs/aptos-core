@@ -74,6 +74,7 @@ This module provides the foundation for typesafe Coins.
 -  [Function `burn`](#0x1_coin_burn)
 -  [Function `burn_from`](#0x1_coin_burn_from)
 -  [Function `deposit`](#0x1_coin_deposit)
+-  [Function `deposit_with_signer`](#0x1_coin_deposit_with_signer)
 -  [Function `can_receive_paired_fungible_asset`](#0x1_coin_can_receive_paired_fungible_asset)
 -  [Function `force_deposit`](#0x1_coin_force_deposit)
 -  [Function `destroy_zero`](#0x1_coin_destroy_zero)
@@ -2690,6 +2691,43 @@ Deposit the coin balance into the recipient's account and emit an event.
 
 </details>
 
+<a id="0x1_coin_deposit_with_signer"></a>
+
+## Function `deposit_with_signer`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_deposit_with_signer">deposit_with_signer</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_deposit_with_signer">deposit_with_signer</a>&lt;CoinType&gt;(
+    <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;
+) <b>acquires</b> <a href="coin.md#0x1_coin_CoinStore">CoinStore</a>, <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>, <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a> {
+    <b>let</b> metadata = <a href="coin.md#0x1_coin_ensure_paired_metadata">ensure_paired_metadata</a>&lt;CoinType&gt;();
+    <b>let</b> account_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <a href="fungible_asset.md#0x1_fungible_asset_refill_permission">fungible_asset::refill_permission</a>(
+        <a href="account.md#0x1_account">account</a>,
+        <a href="coin.md#0x1_coin">coin</a>.value,
+        <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address_inlined">primary_fungible_store::primary_store_address_inlined</a>(
+            account_address,
+            metadata,
+        )
+    );
+    <a href="coin.md#0x1_coin_deposit">deposit</a>(account_address, <a href="coin.md#0x1_coin">coin</a>);
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_coin_can_receive_paired_fungible_asset"></a>
 
 ## Function `can_receive_paired_fungible_asset`
@@ -3262,16 +3300,12 @@ Withdraw specified <code>amount</code> of coin <code>CoinType</code> from the si
         amount
     );
     <b>let</b> withdrawn_coin = <b>if</b> (coin_amount_to_withdraw &gt; 0) {
-        <b>let</b> metadata = <a href="coin.md#0x1_coin_paired_metadata">paired_metadata</a>&lt;CoinType&gt;();
-        <b>if</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&metadata)) {
-            <a href="fungible_asset.md#0x1_fungible_asset_withdraw_permission_check_by_address">fungible_asset::withdraw_permission_check_by_address</a>(
-                <a href="account.md#0x1_account">account</a>,
-                <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address">primary_fungible_store::primary_store_address</a>(account_addr, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(metadata)),
-                coin_amount_to_withdraw
-            );
-        } <b>else</b> {
-            <a href="permissioned_signer.md#0x1_permissioned_signer_assert_master_signer">permissioned_signer::assert_master_signer</a>(<a href="account.md#0x1_account">account</a>);
-        };
+        <b>let</b> metadata = <a href="coin.md#0x1_coin_ensure_paired_metadata">ensure_paired_metadata</a>&lt;CoinType&gt;();
+        <a href="fungible_asset.md#0x1_fungible_asset_withdraw_permission_check_by_address">fungible_asset::withdraw_permission_check_by_address</a>(
+            <a href="account.md#0x1_account">account</a>,
+            <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address">primary_fungible_store::primary_store_address</a>(account_addr, metadata),
+            coin_amount_to_withdraw
+        );
 
         <b>let</b> coin_store = <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
         <b>assert</b>!(

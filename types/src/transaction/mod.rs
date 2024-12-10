@@ -332,7 +332,7 @@ impl RawTransaction {
 
     pub fn sign_aa_transaction(
         self,
-        sender_auth: &Auth,
+        sender_auth: Auth,
         secondary_signers: Vec<AccountAddress>,
         secondary_auths: Vec<Auth>,
         fee_payer: Option<(AccountAddress, Auth)>,
@@ -346,25 +346,7 @@ impl RawTransaction {
         } else {
             RawTransactionWithData::new_multi_agent(self.clone(), secondary_signers.clone())
         };
-        let sender_authenticator = match sender_auth {
-            Auth::Ed25519(sender_private_key) => {
-                let sender_signature = sender_private_key.sign(&user_signed_message)?;
-                AccountAuthenticator::ed25519(
-                    Ed25519PublicKey::from(*sender_private_key),
-                    sender_signature,
-                )
-            },
-            Auth::Abstraction(function_info, sign_function) => {
-                let digest =
-                    HashValue::sha3_256_of(signing_message(&user_signed_message)?.as_slice())
-                        .to_vec();
-                AccountAuthenticator::abstraction(
-                    function_info.clone(),
-                    digest.clone(),
-                    sign_function(digest.as_ref()),
-                )
-            },
-        };
+        let sender_authenticator = gen_auth(sender_auth, &user_signed_message)?;
 
         if secondary_auths.len() != secondary_signers.len() {
             return Err(format_err!(
@@ -373,22 +355,7 @@ impl RawTransaction {
         }
         let mut secondary_authenticators = vec![];
         for auth in secondary_auths {
-            let secondary_authenticator = match auth {
-                Auth::Ed25519(private_key) => {
-                    let signature = private_key.sign(&user_signed_message)?;
-                    AccountAuthenticator::ed25519(Ed25519PublicKey::from(private_key), signature)
-                },
-                Auth::Abstraction(function_info, sign_function) => {
-                    let digest =
-                        HashValue::sha3_256_of(signing_message(&user_signed_message)?.as_slice())
-                            .to_vec();
-                    AccountAuthenticator::abstraction(
-                        function_info.clone(),
-                        digest.clone(),
-                        sign_function(digest.as_ref()),
-                    )
-                },
-            };
+            let secondary_authenticator = gen_auth(auth, &user_signed_message)?;
             secondary_authenticators.push(secondary_authenticator);
         }
 
@@ -398,25 +365,7 @@ impl RawTransaction {
                 secondary_signers.clone(),
                 fee_payer_address,
             );
-            let fee_payer_authenticator = match fee_payer_auth {
-                Auth::Ed25519(fee_payer_private_key) => {
-                    let sender_signature = fee_payer_private_key.sign(&user_signed_message)?;
-                    AccountAuthenticator::ed25519(
-                        Ed25519PublicKey::from(fee_payer_private_key),
-                        sender_signature,
-                    )
-                },
-                Auth::Abstraction(function_info, sign_function) => {
-                    let digest =
-                        HashValue::sha3_256_of(signing_message(&user_signed_message)?.as_slice())
-                            .to_vec();
-                    AccountAuthenticator::abstraction(
-                        function_info.clone(),
-                        digest.clone(),
-                        sign_function(digest.as_ref()),
-                    )
-                },
-            };
+            let fee_payer_authenticator = gen_auth(fee_payer_auth, &user_signed_message)?;
             Ok(SignatureCheckedTransaction(
                 SignedTransaction::new_fee_payer(
                     self,
@@ -479,6 +428,27 @@ impl RawTransaction {
     pub fn signing_message(&self) -> Result<Vec<u8>, CryptoMaterialError> {
         signing_message(self)
     }
+}
+
+fn gen_auth(
+    auth: Auth,
+    user_signed_message: &RawTransactionWithData,
+) -> Result<AccountAuthenticator> {
+    Ok(match auth {
+        Auth::Ed25519(private_key) => {
+            let sender_signature = private_key.sign(user_signed_message)?;
+            AccountAuthenticator::ed25519(Ed25519PublicKey::from(private_key), sender_signature)
+        },
+        Auth::Abstraction(function_info, sign_function) => {
+            let digest =
+                HashValue::sha3_256_of(signing_message(user_signed_message)?.as_slice()).to_vec();
+            AccountAuthenticator::abstraction(
+                function_info.clone(),
+                digest.clone(),
+                sign_function(digest.as_ref()),
+            )
+        },
+    })
 }
 
 #[derive(
