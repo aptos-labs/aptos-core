@@ -5,7 +5,7 @@ PR: https://github.com/aptos-labs/aptos-core/pull/5918
 
 *Quoted from product specification*
 
-Currently there are no easy ways for projects in the ecosystem to engage with their communities post mint. A key part of building a vibrant NFT community (as well as community of other web3 verticals) is to empower holders and supporters to be included in the decision making process of a project via a DAO. To do this, we must provide easy to use DAO management tooling for projects on Aptos to build a DAO where entry is gated by the ownership of a token in a NFT collection.
+Currently there are no easy ways for projects in the ecosystem to engage with their communities post mint. A key part of building a vibrant NFT community (as well as community of other web3 verticals) is to empower holders and supporters to be included in the decision-making process of a project via a DAO. To do this, we must provide easy to use DAO management tooling for projects on Aptos to build a DAO where entry is gated by the ownership of a token in a NFT collection.
 
 With the NFT DAO, token holders can 
 
