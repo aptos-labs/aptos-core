@@ -112,8 +112,14 @@ pub(crate) fn realistic_env_load_sweep_test() -> ForgeConfig {
 pub(crate) fn bcho_test() -> ForgeConfig {
     realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
+        // Sequential workloads
         workloads: Workloads::TRANSACTIONS(vec![
-            // Sequential workload
+            TransactionWorkload::new(TransactionTypeArg::ModifyGlobalFlagAggV2, 20)
+                .with_gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+                .with_transactions_per_account(20),
+            TransactionWorkload::new(TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB, 20)
+                .with_gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+                .with_transactions_per_account(20),
             TransactionWorkload::new(TransactionTypeArg::SmartTablePicture1MWith256Change, 20)
                 .with_gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
                 .with_transactions_per_account(20),
