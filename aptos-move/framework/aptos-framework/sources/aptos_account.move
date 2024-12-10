@@ -322,7 +322,6 @@ module aptos_framework::aptos_account {
         use aptos_framework::permissioned_signer;
 
         let bob = from_bcs::to_address(x"0000000000000000000000000000000000000000000000000000000000000b0b");
-        let carol = from_bcs::to_address(x"00000000000000000000000000000000000000000000000000000000000ca501");
 
         let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(core);
         create_account(signer::address_of(alice));
