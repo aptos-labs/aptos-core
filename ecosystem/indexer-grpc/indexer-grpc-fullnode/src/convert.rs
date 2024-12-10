@@ -2,23 +2,30 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_api_types::{
-    transaction::ValidatorTransaction as ApiValidatorTransactionEnum, AccountSignature,
-    DeleteModule, DeleteResource, Ed25519Signature, EntryFunctionId, EntryFunctionPayload, Event,
-    GenesisPayload, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam,
-    MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveScriptBytecode,
-    MoveStruct, MoveStructField, MoveStructTag, MoveType, MultiEd25519Signature, MultiKeySignature,
-    MultisigPayload, MultisigTransactionPayload, PublicKey, ScriptPayload, Signature,
-    SingleKeySignature, Transaction, TransactionInfo, TransactionPayload, TransactionSignature,
-    WriteSet, WriteSetChange,
+    transaction::{
+        TransactionExecutable, TransactionExtraConfig, TransactionExtraConfigV1,
+        TransactionPayloadV2, TransactionPayloadV2V1,
+        ValidatorTransaction as ApiValidatorTransactionEnum,
+    },
+    AccountSignature, DeleteModule, DeleteResource, Ed25519Signature, EntryFunctionId,
+    EntryFunctionPayload, Event, GenesisPayload, MoveAbility, MoveFunction,
+    MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule, MoveModuleBytecode,
+    MoveModuleId, MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveType,
+    MultiEd25519Signature, MultiKeySignature, MultisigPayload, MultisigTransactionPayload,
+    PublicKey, ScriptPayload, Signature, SingleKeySignature, Transaction, TransactionInfo,
+    TransactionPayload, TransactionSignature, WriteSet, WriteSetChange,
 };
 use aptos_bitvec::BitVec;
 use aptos_logger::warn;
 use aptos_protos::{
     transaction::v1::{
-        self as transaction, any_signature, validator_transaction,
-        validator_transaction::observed_jwk_update::exported_provider_jw_ks::{
-            jwk::{JwkType, Rsa, UnsupportedJwk},
-            Jwk as ProtoJwk,
+        self as transaction, any_signature,
+        validator_transaction::{
+            self,
+            observed_jwk_update::exported_provider_jw_ks::{
+                jwk::{JwkType, Rsa, UnsupportedJwk},
+                Jwk as ProtoJwk,
+            },
         },
         Ed25519, Keyless, Secp256k1Ecdsa, TransactionSizeInfo, WebAuthn,
     },
@@ -164,18 +171,51 @@ pub fn convert_transaction_payload(
                     convert_entry_function_payload(sfp),
                 ),
             ),
+            extra_config: None,
         },
         TransactionPayload::ScriptPayload(sp) => transaction::TransactionPayload {
             r#type: transaction::transaction_payload::Type::ScriptPayload as i32,
             payload: Some(transaction::transaction_payload::Payload::ScriptPayload(
                 convert_script_payload(sp),
             )),
+            extra_config: None,
         },
+        // TODO: Convert this into the new format. (i.e., put the multisig_address in extra_config, and use transaction::transaction_payload::Type::EntryFunction payload type)
+        // Do this after the indexer can handle the new format.
         TransactionPayload::MultisigPayload(mp) => transaction::TransactionPayload {
             r#type: transaction::transaction_payload::Type::MultisigPayload as i32,
             payload: Some(transaction::transaction_payload::Payload::MultisigPayload(
                 convert_multisig_payload(mp),
             )),
+            extra_config: None,
+        },
+
+        // Question:: If extra_config.multisig_address is Some(_), should we convert this to a MultisigPayload?
+        // or should we use consider this as an EntryFunctionPayload, and use the multisig_address in extra_config?
+        TransactionPayload::V2(TransactionPayloadV2::V1(TransactionPayloadV2V1 {
+            executable,
+            extra_config,
+        })) => match executable {
+            TransactionExecutable::EntryFunctionPayload(sfp) => transaction::TransactionPayload {
+                r#type: transaction::transaction_payload::Type::EntryFunctionPayload as i32,
+                payload: Some(
+                    transaction::transaction_payload::Payload::EntryFunctionPayload(
+                        convert_entry_function_payload(sfp),
+                    ),
+                ),
+                extra_config: Some(convert_extra_config(extra_config)),
+            },
+            TransactionExecutable::ScriptPayload(sp) => transaction::TransactionPayload {
+                r#type: transaction::transaction_payload::Type::ScriptPayload as i32,
+                payload: Some(transaction::transaction_payload::Payload::ScriptPayload(
+                    convert_script_payload(sp),
+                )),
+                extra_config: Some(convert_extra_config(extra_config)),
+            },
+            // Question: What should we do here? Should we introduce a new Empty payload type in protobuf?
+            TransactionExecutable::Empty(_) => {
+                unimplemented!("Empty transaction payload is not yet supported")
+            },
         },
 
         // Deprecated.
@@ -489,6 +529,23 @@ pub fn convert_multisig_payload(
     transaction::MultisigPayload {
         multisig_address: multisig_payload.multisig_address.to_string(),
         transaction_payload,
+    }
+}
+
+pub fn convert_extra_config(
+    extra_config: &TransactionExtraConfig,
+) -> transaction::transaction_payload::ExtraConfig {
+    match extra_config {
+        TransactionExtraConfig::V1(TransactionExtraConfigV1 {
+            multisig_address,
+            replay_protection_nonce,
+        }) => transaction::transaction_payload::ExtraConfig::ExtraConfigV1(
+            transaction::ExtraConfigV1 {
+                multisig_address: multisig_address
+                    .map(|multisig_address| multisig_address.to_string()),
+                replay_protection_nonce: *replay_protection_nonce,
+            },
+        ),
     }
 }
 
