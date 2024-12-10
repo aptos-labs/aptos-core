@@ -114,9 +114,9 @@ pub(crate) fn bcho_test() -> ForgeConfig {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TRANSACTIONS(vec![
             // Sequential workload
-            TransactionWorkload::new(TransactionTypeArg::SmartTablePicture1MWith256Change, 50)
+            TransactionWorkload::new(TransactionTypeArg::SmartTablePicture1MWith256Change, 20)
                 .with_gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
-                .with_transactions_per_account(50),
+                .with_transactions_per_account(20),
         ]),
         criteria: Vec::new(),
         background_traffic: background_traffic_for_sweep_with_latency(&[
