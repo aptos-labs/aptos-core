@@ -27,7 +27,7 @@ impl<T> AggregatorResource<T> {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AggregatorSnapshotResource<T> {
-    value: T,
+    pub value: T,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

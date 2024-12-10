@@ -42,6 +42,8 @@ deserialize-u256	1	VM	60	0.869	1.021	37002.8
 no-op-fee-payer	1	VM	60	0.952	1.026	2058.3
 no-op-fee-payer	100	VM	60	0.828	1.016	32284.2
 simple-script	1	VM	60	0.830	1.024	37707.7
+vector-trim-append-len3000-size1	1	VM	60	0.830	1.024	535
+vector-remove-insert-len3000-size1	1	VM	60	0.830	1.024	514
 no_commit_apt-fa-transfer	1	VM	60	0.927	1.015	29357.5
 no_commit_apt-fa-transfer	1	NativeVM	60	0.922	1.021	44946.3
 no_commit_apt-fa-transfer	1	AptosVMSpeculative	60	0.953	1.010	1851.9

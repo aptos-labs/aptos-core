@@ -67,6 +67,11 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--skip-node",
+        action="store_true",
+        help="Skip running the node. You must run it yourself and copy the mint key yourself.",
+    )
+    parser.add_argument(
         "--tag",
         help=(
             'If --base-network is set to "custom", this must be set to the image tag'
@@ -114,20 +119,22 @@ def main():
     # something is listening at the expected port.
     check_redis_is_running()
 
-    # Run a node and wait for it to start up.
-    container_name = run_node(
-        network, args.image_repo_with_project, args.external_test_dir
-    )
-    wait_for_startup(container_name, args.base_startup_timeout)
+    if not args.skip_node:
+        # Run a node and wait for it to start up.
+        container_name = run_node(
+            network, args.image_repo_with_project, args.external_test_dir
+        )
+        wait_for_startup(container_name, args.base_startup_timeout)
 
-    # Copy the mint key from the node to where the integration tests expect it to be.
-    copy_mint_key(args.external_test_dir)
+        # Copy the mint key from the node to where the integration tests expect it to be.
+        copy_mint_key(args.external_test_dir)
 
     # Build and run the faucet integration tests.
     run_faucet_integration_tests()
 
-    # Stop the localnet.
-    stop_node(container_name)
+    if not args.skip_node:
+        # Stop the localnet.
+        stop_node(container_name)
 
     return True
 
