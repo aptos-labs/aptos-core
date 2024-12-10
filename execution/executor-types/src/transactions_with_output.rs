@@ -129,8 +129,8 @@ impl TransactionsToKeep {
         self.borrow_state_update_refs().for_last_checkpoint.as_ref()
     }
 
-    pub fn state_update_refs_for_latest(&self) -> &BatchedStateUpdateRefs {
-        &self.borrow_state_update_refs().for_latest
+    pub fn state_update_refs_for_latest(&self) -> Option<&BatchedStateUpdateRefs> {
+        self.borrow_state_update_refs().for_latest.as_ref()
     }
 
     pub fn ends_with_sole_checkpoint(&self) -> bool {
@@ -186,7 +186,7 @@ impl Debug for TransactionsToKeep {
 pub struct StateUpdateRefs<'kv> {
     pub per_version: PerVersionStateUpdateRefs<'kv>,
     pub for_last_checkpoint: Option<BatchedStateUpdateRefs<'kv>>,
-    pub for_latest: BatchedStateUpdateRefs<'kv>,
+    pub for_latest: Option<BatchedStateUpdateRefs<'kv>>,
 }
 
 impl<'kv> StateUpdateRefs<'kv> {
@@ -212,7 +212,7 @@ impl<'kv> StateUpdateRefs<'kv> {
         last_checkpoint_index: Option<usize>,
     ) -> (
         Option<BatchedStateUpdateRefs<'kv>>,
-        BatchedStateUpdateRefs<'kv>,
+        Option<BatchedStateUpdateRefs<'kv>>,
     ) {
         let _timer = TIMER.timer_with(&["index_state_updates__collect_batch"]);
 
@@ -230,8 +230,15 @@ impl<'kv> StateUpdateRefs<'kv> {
             num_versions -= idx + 1;
             ret
         });
-        let updates_for_latest =
-            Self::collect_some_updates(first_version, num_versions, &mut shard_iters);
+        let updates_for_latest = if num_versions == 0 {
+            None
+        } else {
+            Some(Self::collect_some_updates(
+                first_version,
+                num_versions,
+                &mut shard_iters,
+            ))
+        };
 
         // Assert that all updates are consumed.
         assert!(shard_iters.iter_mut().all(|iter| iter.next().is_none()));

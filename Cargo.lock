@@ -3949,6 +3949,7 @@ dependencies = [
  "derive_more",
  "itertools 0.13.0",
  "once_cell",
+ "once_map",
  "parking_lot 0.12.1",
  "proptest",
  "proptest-derive",
@@ -4428,6 +4429,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml 0.8.26",
+ "stable_deref_trait",
  "strum 0.24.1",
  "strum_macros 0.24.3",
  "thiserror",
@@ -12444,6 +12446,18 @@ name = "once_cell"
 version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3fdb12b2476b595f9358c5161aa467c2438859caa136dec86c26fdd2efe17b92"
+
+[[package]]
+name = "once_map"
+version = "0.4.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7bd2cae3bec3936bbed1ccc5a3343b3738858182419f9c0522c7260c80c430b0"
+dependencies = [
+ "ahash 0.8.11",
+ "hashbrown 0.15.1",
+ "parking_lot 0.12.1",
+ "stable_deref_trait",
+]
 
 [[package]]
 name = "oorandom"

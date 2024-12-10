@@ -112,7 +112,12 @@ impl State {
         // 2. The cache must be at a version equal or newer than `persisted`, otherwise
         //    updates between the cached version and the persisted version are potentially
         //    missed during the usage calculation.
-        assert!(persisted.next_version() <= state_cache.next_version());
+        assert!(
+            persisted.next_version() <= state_cache.next_version(),
+            "persisted: {}, cache: {}",
+            persisted.next_version(),
+            state_cache.next_version(),
+        );
         // 3. `self` must be at a version equal or newer than the cache, because we assume
         //    it is overlayed on top of the cache.
         assert!(self.next_version() >= state_cache.next_version());
@@ -225,7 +230,7 @@ impl LedgerState {
         &self,
         persisted_snapshot: &State,
         updates_for_last_checkpoint: Option<&BatchedStateUpdateRefs<'kv>>,
-        updates_for_latest: &BatchedStateUpdateRefs<'kv>,
+        updates_for_latest: Option<&BatchedStateUpdateRefs<'kv>>,
         state_cache: &ShardedStateCache,
     ) -> LedgerState {
         let _timer = TIMER.timer_with(&["ledger_state__update"]);
@@ -242,7 +247,11 @@ impl LedgerState {
         } else {
             &last_checkpoint
         };
-        let latest = base_of_latest.update(persisted_snapshot, updates_for_latest, state_cache);
+        let latest = if let Some(updates) = updates_for_latest {
+            base_of_latest.update(persisted_snapshot, updates, state_cache)
+        } else {
+            base_of_latest.clone()
+        };
 
         LedgerState::new(latest, last_checkpoint)
     }

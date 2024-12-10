@@ -657,14 +657,14 @@ impl StateStore {
         let new_ledger_state = state.ledger_state().update(
             state.state(),
             state_update_refs.for_last_checkpoint.as_ref(),
-            &state_update_refs.for_latest,
+            state_update_refs.for_latest.as_ref(),
             &state_view.into_state_cache(),
         );
 
         let new_ledger_state_summary = state.ledger_state_summary().update(
             &ProvableStateSummary::new(state.summary().clone(), state_db.clone()),
             state_update_refs.for_last_checkpoint.as_ref(),
-            &state_update_refs.for_latest,
+            state_update_refs.for_latest.as_ref(),
         )?;
 
         Ok(LedgerStateWithSummary::from_state_and_summary(
@@ -840,7 +840,7 @@ impl StateStore {
             cache
         } else {
             // If no cache is provided, we load the old values of all keys inline.
-            _state_cache = ShardedStateCache::default();
+            _state_cache = ShardedStateCache::new_empty(current_state.next_version());
             self.prime_state_cache(current_state, latest_state, &_state_cache);
             &_state_cache
         };

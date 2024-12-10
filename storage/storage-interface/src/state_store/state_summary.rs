@@ -20,6 +20,7 @@ use aptos_types::{
 };
 use derive_more::Deref;
 use itertools::Itertools;
+use once_map::sync::OnceMap;
 use rayon::prelude::*;
 use std::sync::Arc;
 
@@ -56,6 +57,10 @@ impl StateSummary {
 
     pub fn next_version(&self) -> Version {
         self.next_version
+    }
+
+    pub fn version(&self) -> Option<Version> {
+        self.next_version.checked_sub(1)
     }
 
     pub fn is_descendant_of(&self, other: &Self) -> bool {
@@ -156,7 +161,7 @@ impl LedgerStateSummary {
         &self,
         persisted: &ProvableStateSummary,
         updates_for_last_checkpoint: Option<&BatchedStateUpdateRefs<'kv>>,
-        updates_for_latest: &BatchedStateUpdateRefs<'kv>,
+        updates_for_latest: Option<&BatchedStateUpdateRefs<'kv>>,
     ) -> Result<Self> {
         let _timer = TIMER.timer_with(&["ledger_state_summary__update"]);
 
@@ -171,7 +176,11 @@ impl LedgerStateSummary {
         } else {
             &last_checkpoint
         };
-        let latest = base_of_latest.update(persisted, updates_for_latest)?;
+        let latest = if let Some(updates) = updates_for_latest {
+            base_of_latest.update(persisted, updates)?
+        } else {
+            base_of_latest.clone()
+        };
 
         Ok(Self::new(last_checkpoint, latest))
     }
@@ -181,7 +190,9 @@ impl LedgerStateSummary {
 pub struct ProvableStateSummary {
     #[deref]
     state_summary: StateSummary,
-    _db: Arc<dyn DbReader>,
+    db: Arc<dyn DbReader>,
+    // FIXME(aldenhu): avoid lock conflicts
+    memorized: OnceMap<HashValue, Box<SparseMerkleProofExt>>,
 }
 
 impl ProvableStateSummary {
@@ -192,15 +203,26 @@ impl ProvableStateSummary {
     pub fn new(state_summary: StateSummary, db: Arc<dyn DbReader>) -> Self {
         Self {
             state_summary,
-            _db: db,
+            db,
+            memorized: OnceMap::new(),
         }
     }
 }
 
 impl ProofRead for ProvableStateSummary {
-    fn get_proof(&self, _key: HashValue) -> Option<&SparseMerkleProofExt> {
-        // FIXME(change interface to return non-ref)
-        todo!()
+    // FIXME(aldenhu): return error
+    // FIXME(aldenhu): partial proof
+    // FIXME(aldenhu): ref
+    fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt> {
+        self.version().map(|ver| {
+            self.memorized.insert(key, |key| {
+                Box::new(
+                    self.db
+                        .get_state_proof_by_version_ext(key, ver, 0)
+                        .expect("Failed to get account state with proof by version."),
+                )
+            })
+        })
     }
 }
 

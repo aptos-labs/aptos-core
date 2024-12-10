@@ -107,7 +107,7 @@ impl BufferedState {
     /// If a commit is needed, it sends a CommitMessage::Data message to the StateSnapshotCommitter thread to commit the data.
     /// If sync_commit is true, it also sends a CommitMessage::Sync message to ensure that the commit is completed before returning.
     fn maybe_commit(&mut self, sync_commit: bool) {
-        if sync_commit
+        if sync_commit && self.estimated_items > 0
             || self.estimated_items >= self.target_items
             || self.buffered_versions() >= TARGET_SNAPSHOT_INTERVAL_IN_VERSION
         {
@@ -170,10 +170,11 @@ impl BufferedState {
             .last_checkpoint()
             .make_delta(old_state.last_checkpoint())
             .count_updates_costly();
+        let version = new_state.last_checkpoint().version();
 
-        self.maybe_commit(sync_commit);
-        Self::report_last_checkpoint_version(new_state.last_checkpoint().version());
         self.current_state.lock().set(new_state);
+        self.maybe_commit(sync_commit);
+        Self::report_last_checkpoint_version(version);
         Ok(())
     }
 

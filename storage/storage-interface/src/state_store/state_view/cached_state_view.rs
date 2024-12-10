@@ -38,13 +38,20 @@ static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
         .unwrap()
 });
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ShardedStateCache {
     next_version: Version,
     pub shards: [StateCacheShard; 16],
 }
 
 impl ShardedStateCache {
+    pub fn new_empty(next_version: Version) -> Self {
+        Self {
+            next_version,
+            shards: Default::default(),
+        }
+    }
+
     fn shard(&self, shard_id: u8) -> &StateCacheShard {
         &self.shards[shard_id as usize]
     }
@@ -102,8 +109,8 @@ impl CachedStateView {
         Self {
             id,
             reader,
+            memorized: ShardedStateCache::new_empty(state.next_version()),
             speculative: state.into_delta(persisted_state),
-            memorized: ShardedStateCache::default(),
         }
     }
 

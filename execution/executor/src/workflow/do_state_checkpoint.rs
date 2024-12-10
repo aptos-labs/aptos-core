@@ -79,7 +79,7 @@ impl DoStateCheckpoint {
                 .to_commit
                 .state_update_refs_for_last_checkpoint()
             {
-                let index = (updates.next_version() - 1) as usize;
+                let index = updates.num_versions - 1;
                 out[index] = Some(state_summary.last_checkpoint().root_hash());
             }
             out[num_txns - 1] = Some(state_summary.root_hash());
