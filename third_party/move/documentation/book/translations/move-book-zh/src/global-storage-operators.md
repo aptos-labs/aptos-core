@@ -103,7 +103,7 @@ module counter {
 
     /// 给定账户下发布带有 `i` 值的 `Counter` 资源 /// Publish a `Counter` resource with value `i` under the given `account`
     public fun publish(account: &signer, i: u64) {
-      // “打包"（创建）Counter 资源。这是需要授权的操作，只能在声明 `Counter` 资源的此模块内执行。 // "Pack" (create) a Counter resource. This is a privileged operation that can only be done inside the module that declares the `Counter` resource
+      // “打包”（创建）Counter 资源。这是需要授权的操作，只能在声明 `Counter` 资源的此模块内执行。 // "Pack" (create) a Counter resource. This is a privileged operation that can only be done inside the module that declares the `Counter` resource
       move_to(account, Counter { i })
     }
 

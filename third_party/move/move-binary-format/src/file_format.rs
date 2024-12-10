@@ -1715,7 +1715,7 @@ pub enum Bytecode {
     #[group = "stack_and_local"]
     #[description = r#"
         Push a constant value onto the stack.
-        The value is loaded and deserialized (according to its type) from the the file format.
+        The value is loaded and deserialized (according to its type) from the file format.
     "#]
     #[static_operands = "[const_idx]"]
     #[semantics = "stack << constants[const_idx]"]
