@@ -177,7 +177,7 @@ public fun M::fun_result_lambda_not_allowed(): |u64| {
 
 
 Diagnostics:
-error: Unexpected type: |u64|
+error: Unimplemented type: |u64|
    ┌─ tests/lambda/lambda4.move:89:16
    │
 89 │     public fun fun_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed

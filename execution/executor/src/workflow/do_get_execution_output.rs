@@ -15,20 +15,24 @@ use aptos_executor_service::{
     remote_executor_client::{get_remote_addresses, REMOTE_SHARDED_BLOCK_EXECUTOR},
 };
 use aptos_executor_types::{
-    execution_output::ExecutionOutput, planned::Planned, should_forward_to_subscription_service,
-    transactions_with_output::TransactionsWithOutput,
+    execution_output::ExecutionOutput,
+    planned::Planned,
+    should_forward_to_subscription_service,
+    transactions_with_output::{TransactionsToKeep, TransactionsWithOutput},
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
-use aptos_storage_interface::cached_state_view::{CachedStateView, StateCache};
+use aptos_storage_interface::state_store::state_view::cached_state_view::{
+    CachedStateView, StateCache,
+};
 #[cfg(feature = "consensus-only-perf-test")]
 use aptos_types::transaction::ExecutionStatus;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain,
-        execution_state::TransactionSliceMetadata,
         partitioner::{ExecutableTransactions, PartitionedTransactions},
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     contract_event::ContractEvent,
     epoch_state::EpochState,
@@ -311,13 +315,15 @@ impl Parser {
         // The rest is to be committed, attach block epilogue as needed and optionally get next EpochState.
         let to_commit = {
             let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__to_commit"]);
-            let to_commit =
-                TransactionsWithOutput::new(transactions, transaction_outputs, has_reconfig);
-            Self::maybe_add_block_epilogue(
-                to_commit,
+            let to_commit = TransactionsWithOutput::new(transactions, transaction_outputs);
+            TransactionsToKeep::index(
+                Self::maybe_add_block_epilogue(
+                    to_commit,
+                    has_reconfig,
+                    block_end_info.as_ref(),
+                    append_state_checkpoint_to_block,
+                ),
                 has_reconfig,
-                block_end_info.as_ref(),
-                append_state_checkpoint_to_block,
             )
         };
         let next_epoch_state = {
@@ -376,7 +382,6 @@ impl Parser {
         let to_retry = TransactionsWithOutput::new(
             transactions.drain(first_retry..).collect(),
             transaction_outputs.drain(first_retry..).collect(),
-            false, // is_reconfig
         );
 
         (to_retry, is_reconfig)
@@ -392,11 +397,7 @@ impl Parser {
             let mut res = TransactionsWithOutput::new_empty();
             for idx in 0..transactions.len() {
                 if transaction_outputs[idx].status().is_discarded() {
-                    res.push(
-                        transactions[idx].clone(),
-                        transaction_outputs[idx].clone(),
-                        false,
-                    );
+                    res.push(transactions[idx].clone(), transaction_outputs[idx].clone());
                 } else if !res.is_empty() {
                     transactions[idx - res.len()] = transactions[idx].clone();
                     transaction_outputs[idx - res.len()] = transaction_outputs[idx].clone();
@@ -447,11 +448,7 @@ impl Parser {
                     },
                 };
 
-                to_commit.push(
-                    state_checkpoint_txn,
-                    TransactionOutput::new_empty_success(),
-                    false,
-                );
+                to_commit.push(state_checkpoint_txn, TransactionOutput::new_empty_success());
             }
         }; // else: not adding block epilogue at epoch ending.
 
@@ -460,7 +457,7 @@ impl Parser {
 
     fn ensure_next_epoch_state(to_commit: &TransactionsWithOutput) -> Result<EpochState> {
         let last_write_set = to_commit
-            .transaction_outputs()
+            .transaction_outputs
             .last()
             .ok_or_else(|| anyhow!("to_commit is empty."))?
             .write_set();
@@ -491,21 +488,21 @@ impl<'a> TStateView for WriteSetStateView<'a> {
     fn get_state_value(
         &self,
         state_key: &Self::Key,
-    ) -> aptos_types::state_store::Result<Option<StateValue>> {
+    ) -> aptos_types::state_store::StateViewResult<Option<StateValue>> {
         Ok(self
             .write_set
             .get(state_key)
             .and_then(|write_op| write_op.as_state_value()))
     }
 
-    fn get_usage(&self) -> aptos_types::state_store::Result<StateStorageUsage> {
+    fn get_usage(&self) -> aptos_types::state_store::StateViewResult<StateStorageUsage> {
         unreachable!("Not supposed to be called on WriteSetStateView.")
     }
 }
 #[cfg(test)]
 mod tests {
     use super::Parser;
-    use aptos_storage_interface::cached_state_view::StateCache;
+    use aptos_storage_interface::state_store::state_view::cached_state_view::StateCache;
     use aptos_types::{
         contract_event::ContractEvent,
         transaction::{

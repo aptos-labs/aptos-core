@@ -139,14 +139,11 @@ impl LoaderV2 {
             .iter()
             .map(|ty_tag| self.load_ty(code_storage, ty_tag))
             .collect::<PartialVMResult<Vec<_>>>()
-            // TODO(loader_v2):
-            //   Loader V1 implementation returns undefined here, causing some tests to fail. We
-            //   should probably map this to script.
-            .map_err(|e| e.finish(Location::Undefined))?;
+            .map_err(|err| err.finish(Location::Script))?;
 
         let main = script.entry_point();
         Type::verify_ty_arg_abilities(main.ty_param_abilities(), &ty_args)
-            .map_err(|e| e.finish(Location::Script))?;
+            .map_err(|err| err.finish(Location::Script))?;
 
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Script(script),
@@ -205,7 +202,7 @@ impl LoaderV2 {
     ) -> PartialVMResult<Arc<StructType>> {
         let module = self
             .load_module(module_storage, address, module_name)
-            .map_err(|e| e.to_partial())?;
+            .map_err(|err| err.to_partial())?;
         Ok(module
             .struct_map
             .get(struct_name)
@@ -239,9 +236,9 @@ impl LoaderV2 {
                     st.module.as_ident_str(),
                     st.name.as_ident_str(),
                 )
-                .map_err(|e| e.finish(Location::Undefined))
+                .map_err(|err| err.finish(Location::Undefined))
             })
-            .map_err(|e| e.to_partial())
+            .map_err(|err| err.to_partial())
     }
 }
 

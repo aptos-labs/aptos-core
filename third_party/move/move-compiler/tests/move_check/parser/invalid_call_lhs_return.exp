@@ -1,9 +1,12 @@
-error[E01002]: unexpected token
-  ┌─ tests/move_check/parser/invalid_call_lhs_return.move:3:20
+error[E02004]: invalid 'module' declaration
+  ┌─ tests/move_check/parser/invalid_call_lhs_return.move:1:8
+  │
+1 │ module M {
+  │        ^ Invalid module declaration. The module does not have a specified address. Either declare it inside of an 'address <address> {' block or declare it with an address 'module <address>::M''
+
+error[E01013]: unsupported language construct
+  ┌─ tests/move_check/parser/invalid_call_lhs_return.move:3:9
   │
 3 │         (return ())(0, 1);
-  │                    ^
-  │                    │
-  │                    Unexpected '('
-  │                    Expected ';'
+  │         ^^^^^^^^^^^ Calls through computed functions not supported by this compiler
 

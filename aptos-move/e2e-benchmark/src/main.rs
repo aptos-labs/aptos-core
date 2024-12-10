@@ -15,7 +15,11 @@ use aptos_transaction_generator_lib::{
 use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
 use rand::{rngs::StdRng, SeedableRng};
 use serde_json::json;
-use std::{collections::HashMap, process::exit};
+use std::{collections::HashMap, fs, process::exit};
+
+// bump after a bigger test or perf change, so you can easily distinguish runs
+// that are on top of this commit
+const CODE_PERF_VERSION: &str = "v1";
 
 pub fn execute_txn(
     executor: &mut FakeExecutor,
@@ -81,42 +85,16 @@ const ALLOWED_REGRESSION: f64 = 0.15;
 const ALLOWED_IMPROVEMENT: f64 = 0.15;
 const ABSOLUTE_BUFFER_US: f64 = 2.0;
 
-const CALIBRATION_VALUES: &str = "
-Loop { loop_count: Some(100000), loop_type: NoOp }	6	0.988	1.039	41212.4
-Loop { loop_count: Some(10000), loop_type: Arithmetic }	6	0.977	1.038	25868.8
-CreateObjects { num_objects: 10, object_payload_size: 0 }	6	0.940	1.026	152.1
-CreateObjects { num_objects: 10, object_payload_size: 10240 }	6	0.934	1.051	9731.3
-CreateObjects { num_objects: 100, object_payload_size: 0 }	6	0.966	1.051	1458.3
-CreateObjects { num_objects: 100, object_payload_size: 10240 }	6	0.969	1.077	11196.4
-InitializeVectorPicture { length: 128 }	6	0.973	1.066	170.3
-VectorPicture { length: 128 }	6	0.955	1.092	46.2
-VectorPictureRead { length: 128 }	6	0.952	1.047	45.1
-InitializeVectorPicture { length: 30720 }	6	0.969	1.071	27295.8
-VectorPicture { length: 30720 }	6	0.957	1.066	6560.2
-VectorPictureRead { length: 30720 }	6	0.948	1.053	6642.8
-SmartTablePicture { length: 30720, num_points_per_txn: 200 }	6	0.972	1.024	42660.4
-SmartTablePicture { length: 1048576, num_points_per_txn: 300 }	6	0.961	1.020	73725.5
-ResourceGroupsSenderWriteTag { string_length: 1024 }	6	0.867	1.001	15.0
-ResourceGroupsSenderMultiChange { string_length: 1024 }	6	0.966	1.069	29.0
-TokenV1MintAndTransferFT	6	0.972	1.045	356.8
-TokenV1MintAndTransferNFTSequential	6	0.991	1.067	543.7
-TokenV2AmbassadorMint { numbered: true }	6	0.987	1.052	474.4
-LiquidityPoolSwap { is_stable: true }	6	0.970	1.042	555.4
-LiquidityPoolSwap { is_stable: false }	6	0.925	1.001	535.3
-CoinInitAndMint	6	0.925	1.001	197.1
-FungibleAssetMint	6	0.925	1.001	231.6
-IncGlobalMilestoneAggV2 { milestone_every: 1 }	6	0.925	1.001	33.3
-IncGlobalMilestoneAggV2 { milestone_every: 2 }	6	0.925	1.001	19.1
-EmitEvents { count: 1000 }	6	0.925	1.001	8493.7
-";
-
 struct CalibrationInfo {
     // count: usize,
     expected_time_micros: f64,
 }
 
 fn get_parsed_calibration_values() -> HashMap<String, CalibrationInfo> {
-    CALIBRATION_VALUES
+    let calibration_values =
+        fs::read_to_string("aptos-move/e2e-benchmark/data/calibration_values.tsv")
+            .expect("Unable to read file");
+    calibration_values
         .trim()
         .split('\n')
         .map(|line| {
@@ -198,6 +176,66 @@ fn main() {
         EntryPoints::IncGlobalMilestoneAggV2 { milestone_every: 1 },
         EntryPoints::IncGlobalMilestoneAggV2 { milestone_every: 2 },
         EntryPoints::EmitEvents { count: 1000 },
+        // long vectors with small elements
+        EntryPoints::VectorTrimAppend {
+            // baseline, only vector creation
+            vec_len: 3000,
+            element_len: 1,
+            index: 0,
+            repeats: 0,
+        },
+        EntryPoints::VectorTrimAppend {
+            vec_len: 3000,
+            element_len: 1,
+            index: 100,
+            repeats: 1000,
+        },
+        EntryPoints::VectorTrimAppend {
+            vec_len: 3000,
+            element_len: 1,
+            index: 2990,
+            repeats: 1000,
+        },
+        EntryPoints::VectorRemoveInsert {
+            vec_len: 3000,
+            element_len: 1,
+            index: 100,
+            repeats: 1000,
+        },
+        EntryPoints::VectorRemoveInsert {
+            vec_len: 3000,
+            element_len: 1,
+            index: 2998,
+            repeats: 1000,
+        },
+        // EntryPoints::VectorRangeMove {
+        //     vec_len: 3000,
+        //     element_len: 1,
+        //     index: 1000,
+        //     move_len: 500,
+        //     repeats: 1000,
+        // },
+        // vectors with large elements
+        EntryPoints::VectorTrimAppend {
+            // baseline, only vector creation
+            vec_len: 100,
+            element_len: 100,
+            index: 0,
+            repeats: 0,
+        },
+        EntryPoints::VectorTrimAppend {
+            vec_len: 100,
+            element_len: 100,
+            index: 10,
+            repeats: 1000,
+        },
+        // EntryPoints::VectorRangeMove {
+        //     vec_len: 100,
+        //     element_len: 100,
+        //     index: 50,
+        //     move_len: 10,
+        //     repeats: 1000,
+        // },
     ];
 
     let mut failures = Vec::new();
@@ -276,6 +314,7 @@ fn main() {
             "execution_gas_units": execution_gas_units,
             "io_gas_units": io_gas_units,
             "expected_wall_time_us": expected_time_micros,
+            "code_perf_version": CODE_PERF_VERSION,
             "test_index": index,
         }));
 

@@ -127,8 +127,12 @@ pub struct BufferManager {
     commit_proof_rb_handle: Option<DropGuard>,
 
     // message received from the network
-    commit_msg_rx:
-        Option<aptos_channels::aptos_channel::Receiver<AccountAddress, IncomingCommitRequest>>,
+    commit_msg_rx: Option<
+        aptos_channels::aptos_channel::Receiver<
+            AccountAddress,
+            (AccountAddress, IncomingCommitRequest),
+        >,
+    >,
 
     persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
     persisting_phase_rx: Receiver<ExecutorResult<Round>>,
@@ -185,7 +189,7 @@ impl BufferManager {
         commit_msg_tx: Arc<NetworkSender>,
         commit_msg_rx: aptos_channels::aptos_channel::Receiver<
             AccountAddress,
-            IncomingCommitRequest,
+            (AccountAddress, IncomingCommitRequest),
         >,
         persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
         persisting_phase_rx: Receiver<ExecutorResult<Round>>,
@@ -940,12 +944,12 @@ impl BufferManager {
         let epoch_state = self.epoch_state.clone();
         let bounded_executor = self.bounded_executor.clone();
         spawn_named!("buffer manager verification", async move {
-            while let Some(commit_msg) = commit_msg_rx.next().await {
+            while let Some((sender, commit_msg)) = commit_msg_rx.next().await {
                 let tx = verified_commit_msg_tx.clone();
                 let epoch_state_clone = epoch_state.clone();
                 bounded_executor
                     .spawn(async move {
-                        match commit_msg.req.verify(&epoch_state_clone.verifier) {
+                        match commit_msg.req.verify(sender, &epoch_state_clone.verifier) {
                             Ok(_) => {
                                 let _ = tx.unbounded_send(commit_msg);
                             },

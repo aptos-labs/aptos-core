@@ -5,6 +5,7 @@ use super::quorum_store_db::QuorumStoreStorage;
 use crate::{
     consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
     error::error_kind,
+    monitor,
     network::{IncomingBatchRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
     payload_manager::{DirectMempoolPayloadManager, QuorumStorePayloadManager, TPayloadManager},
@@ -28,10 +29,9 @@ use aptos_config::config::{QuorumStoreConfig, SecureBackend};
 use aptos_consensus_types::{
     common::Author, proof_of_store::ProofCache, request_response::GetPayloadCommand,
 };
-use aptos_global_constants::CONSENSUS_KEY;
+use aptos_crypto::bls12381::PrivateKey;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_secure_storage::{KVStorage, Storage};
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     account_address::AccountAddress, validator_signer::ValidatorSigner,
@@ -129,7 +129,7 @@ pub struct InnerBuilder {
     network_sender: NetworkSender,
     verifier: Arc<ValidatorVerifier>,
     proof_cache: ProofCache,
-    backend: SecureBackend,
+    _backend: SecureBackend,
     coordinator_tx: Sender<CoordinatorCommand>,
     coordinator_rx: Option<Receiver<CoordinatorCommand>>,
     batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
@@ -148,9 +148,11 @@ pub struct InnerBuilder {
     batch_store: Option<Arc<BatchStore>>,
     batch_reader: Option<Arc<dyn BatchReader>>,
     broadcast_proofs: bool,
+    consensus_key: Arc<PrivateKey>,
 }
 
 impl InnerBuilder {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         epoch: u64,
         author: Author,
@@ -166,6 +168,7 @@ impl InnerBuilder {
         backend: SecureBackend,
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
         broadcast_proofs: bool,
+        consensus_key: Arc<PrivateKey>,
     ) -> Self {
         let (coordinator_tx, coordinator_rx) = futures_channel::mpsc::channel(config.channel_size);
         let (batch_generator_cmd_tx, batch_generator_cmd_rx) =
@@ -202,7 +205,7 @@ impl InnerBuilder {
             network_sender,
             verifier,
             proof_cache,
-            backend,
+            _backend: backend,
             coordinator_tx,
             coordinator_rx: Some(coordinator_rx),
             batch_generator_cmd_tx,
@@ -221,26 +224,19 @@ impl InnerBuilder {
             batch_store: None,
             batch_reader: None,
             broadcast_proofs,
+            consensus_key,
         }
     }
 
     fn create_batch_store(&mut self) -> Arc<BatchReaderImpl<NetworkSender>> {
-        let backend = &self.backend;
-        let storage: Storage = backend.into();
-        if let Err(error) = storage.available() {
-            panic!("Storage is not available: {:?}", error);
-        }
-        let private_key = storage
-            .get(CONSENSUS_KEY)
-            .map(|v| v.value)
-            .expect("Unable to get private key");
-        let signer = ValidatorSigner::new(self.author, private_key);
+        let signer = ValidatorSigner::new(self.author, self.consensus_key.clone());
 
         let latest_ledger_info_with_sigs = self
             .aptos_db
             .get_latest_ledger_info()
             .expect("could not get latest ledger info");
         let last_committed_timestamp = latest_ledger_info_with_sigs.commit_info().timestamp_usecs();
+        let is_new_epoch = latest_ledger_info_with_sigs.ledger_info().ends_epoch();
 
         let batch_requester = BatchRequester::new(
             self.epoch,
@@ -254,12 +250,14 @@ impl InnerBuilder {
         );
         let batch_store = Arc::new(BatchStore::new(
             self.epoch,
+            is_new_epoch,
             last_committed_timestamp,
             self.quorum_store_storage.clone(),
             self.config.memory_quota,
             self.config.db_quota,
             self.config.batch_quota,
             signer,
+            Duration::from_secs(60).as_micros() as u64,
         ));
         self.batch_store = Some(batch_store.clone());
         let batch_reader = Arc::new(BatchReaderImpl::new(batch_store.clone(), batch_requester));
@@ -439,7 +437,7 @@ impl InnerBuilder {
         Arc<dyn TPayloadManager>,
         Option<aptos_channel::Sender<AccountAddress, (Author, VerifiedEvent)>>,
     ) {
-        let batch_reader = self.create_batch_store();
+        let batch_reader = monitor!("qs_create_batch_store", self.create_batch_store());
 
         (
             Arc::from(QuorumStorePayloadManager::new(

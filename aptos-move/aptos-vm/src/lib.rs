@@ -129,8 +129,8 @@ use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBloc
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorConfigFromOnchain, execution_state::TransactionSliceMetadata,
-        partitioner::PartitionedTransactions,
+        config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     state_store::StateView,
     transaction::{
@@ -194,9 +194,11 @@ pub trait VMBlockExecutor: Send + Sync {
 
     /// Executes a block of transactions using a sharded block executor and returns the results.
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(
-        sharded_block_executor: &ShardedBlockExecutor<S, E>,
-        transactions: PartitionedTransactions,
-        state_view: Arc<S>,
-        onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<Vec<TransactionOutput>, VMStatus>;
+        _sharded_block_executor: &ShardedBlockExecutor<S, E>,
+        _transactions: PartitionedTransactions,
+        _state_view: Arc<S>,
+        _onchain_config: BlockExecutorConfigFromOnchain,
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        unimplemented!("sharded not supported")
+    }
 }

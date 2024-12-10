@@ -3,15 +3,15 @@ kind: Job
 metadata:  
   name: self-deleting-job  
 spec:  
-  ttlSecondsAfterFinished: 60  
+  ttlSecondsAfterFinished: 60 
   template:  
     metadata:  
       name: self-deleting-job  
     spec:  
       containers:  
       - name: self-deleting-container  
-        image: busybox  
-        command: ["sh", "-c", "ls /mnt/* && sleep 30"]  
+        image: gcr.io/google.com/cloudsdktool/google-cloud-cli:latest  
+        command: ["sh", "-c", "ls /mnt/* && sync && sleep 10"]  
         volumeMounts:  
         - name: my-volume
           mountPath: /mnt  

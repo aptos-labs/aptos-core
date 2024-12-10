@@ -7,7 +7,7 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::{
     execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
 };
-use aptos_storage_interface::state_delta::StateDelta;
+use aptos_storage_interface::state_store::state_delta::StateDelta;
 use std::sync::Arc;
 
 pub struct DoStateCheckpoint;

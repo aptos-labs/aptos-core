@@ -3,5 +3,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod config;
-pub mod execution_state;
 pub mod partitioner;
+pub mod transaction_slice_metadata;

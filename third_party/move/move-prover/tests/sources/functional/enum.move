@@ -1,5 +1,13 @@
 module 0x815::m {
 
+    enum TestNoField has copy, drop {
+        NoField
+    }
+
+    fun test_no_field(): TestNoField {
+        TestNoField::NoField
+    }
+
     enum CommonFields has copy, drop {
         Foo{x: u64, y: u8},
         Bar{x: u64, y: u8, z: u32}

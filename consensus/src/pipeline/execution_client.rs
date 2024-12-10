@@ -59,7 +59,7 @@ pub trait TExecutionClient: Send + Sync {
     /// Initialize the execution phase for a new epoch.
     async fn start_epoch(
         &self,
-        maybe_consensus_key: Option<Arc<PrivateKey>>,
+        maybe_consensus_key: Arc<PrivateKey>,
         epoch_state: Arc<EpochState>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -112,7 +112,8 @@ pub trait TExecutionClient: Send + Sync {
 
 struct BufferManagerHandle {
     pub execute_tx: Option<UnboundedSender<OrderedBlocks>>,
-    pub commit_tx: Option<aptos_channel::Sender<AccountAddress, IncomingCommitRequest>>,
+    pub commit_tx:
+        Option<aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingCommitRequest)>>,
     pub reset_tx_to_buffer_manager: Option<UnboundedSender<ResetRequest>>,
     pub reset_tx_to_rand_manager: Option<UnboundedSender<ResetRequest>>,
 }
@@ -130,7 +131,7 @@ impl BufferManagerHandle {
     pub fn init(
         &mut self,
         execute_tx: UnboundedSender<OrderedBlocks>,
-        commit_tx: aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
+        commit_tx: aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingCommitRequest)>,
         reset_tx_to_buffer_manager: UnboundedSender<ResetRequest>,
         reset_tx_to_rand_manager: Option<UnboundedSender<ResetRequest>>,
     ) {
@@ -196,7 +197,7 @@ impl ExecutionProxyClient {
 
     fn spawn_decoupled_execution(
         &self,
-        maybe_consensus_key: Option<Arc<PrivateKey>>,
+        consensus_sk: Arc<PrivateKey>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         epoch_state: Arc<EpochState>,
         rand_config: Option<RandConfig>,
@@ -217,7 +218,7 @@ impl ExecutionProxyClient {
         let (reset_buffer_manager_tx, reset_buffer_manager_rx) = unbounded::<ResetRequest>();
 
         let (commit_msg_tx, commit_msg_rx) =
-            aptos_channel::new::<AccountAddress, IncomingCommitRequest>(
+            aptos_channel::new::<AccountAddress, (AccountAddress, IncomingCommitRequest)>(
                 QueueStyle::FIFO,
                 100,
                 Some(&counters::BUFFER_MANAGER_MSGS),
@@ -229,8 +230,6 @@ impl ExecutionProxyClient {
                 let (rand_ready_block_tx, rand_ready_block_rx) = unbounded::<OrderedBlocks>();
 
                 let (reset_tx_to_rand_manager, reset_rand_manager_rx) = unbounded::<ResetRequest>();
-                let consensus_sk = maybe_consensus_key
-                    .expect("consensus key unavailable for ExecutionProxyClient");
                 let signer = Arc::new(ValidatorSigner::new(self.author, consensus_sk));
 
                 let rand_manager = RandManager::<Share, AugmentedData>::new(
@@ -308,7 +307,7 @@ impl ExecutionProxyClient {
 impl TExecutionClient for ExecutionProxyClient {
     async fn start_epoch(
         &self,
-        maybe_consensus_key: Option<Arc<PrivateKey>>,
+        maybe_consensus_key: Arc<PrivateKey>,
         epoch_state: Arc<EpochState>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -399,7 +398,7 @@ impl TExecutionClient for ExecutionProxyClient {
         commit_msg: IncomingCommitRequest,
     ) -> Result<()> {
         if let Some(tx) = &self.handle.read().commit_tx {
-            tx.push(peer_id, commit_msg)
+            tx.push(peer_id, (peer_id, commit_msg))
         } else {
             counters::EPOCH_MANAGER_ISSUES_DETAILS
                 .with_label_values(&["buffer_manager_not_started"])
@@ -523,7 +522,7 @@ pub struct DummyExecutionClient;
 impl TExecutionClient for DummyExecutionClient {
     async fn start_epoch(
         &self,
-        _maybe_consensus_key: Option<Arc<PrivateKey>>,
+        _maybe_consensus_key: Arc<PrivateKey>,
         _epoch_state: Arc<EpochState>,
         _commit_signer_provider: Arc<dyn CommitSignerProvider>,
         _payload_manager: Arc<dyn TPayloadManager>,

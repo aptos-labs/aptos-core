@@ -34,7 +34,7 @@ use aptos_types::{
             BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
             BlockExecutorModuleCacheLocalConfig,
         },
-        execution_state::TransactionSliceMetadata,
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -54,7 +54,7 @@ use aptos_types::{
     AptosCoinType, CoinType,
 };
 use aptos_vm::{
-    block_executor::{AptosTransactionOutput, BlockAptosVM},
+    block_executor::{AptosTransactionOutput, AptosVMBlockExecutorWrapper},
     data_cache::AsMoveResolver,
     gas::make_prod_gas_meter,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
@@ -678,7 +678,7 @@ impl FakeExecutor {
             onchain: onchain_config,
         };
         let txn_provider = DefaultTxnProvider::new(txn_block);
-        BlockAptosVM::execute_block_on_thread_pool::<
+        AptosVMBlockExecutorWrapper::execute_block_on_thread_pool::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
             _,
@@ -805,11 +805,9 @@ impl FakeExecutor {
         let mut outputs = self
             .execute_block(txn_block)
             .expect("The VM should not fail to startup");
-        let mut txn_output = outputs
+        outputs
             .pop()
-            .expect("A block with one transaction should have one output");
-        txn_output.fill_error_status();
-        txn_output
+            .expect("A block with one transaction should have one output")
     }
 
     pub fn execute_transaction_with_gas_profiler(

@@ -24,6 +24,7 @@
 ///     }
 /// }
 /// ```
+
 pub trait AstDebug {
     fn ast_debug(&self, w: &mut AstWriter);
 }

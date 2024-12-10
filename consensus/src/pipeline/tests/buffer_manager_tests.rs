@@ -63,7 +63,7 @@ pub fn prepare_buffer_manager(
     BufferManager,
     Sender<OrderedBlocks>,
     Sender<ResetRequest>,
-    aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
+    aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingCommitRequest)>,
     aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>,
     PipelinePhase<ExecutionSchedulePhase>,
     PipelinePhase<ExecutionWaitPhase>,
@@ -122,11 +122,10 @@ pub fn prepare_buffer_manager(
         validators.clone(),
     );
 
-    let (msg_tx, msg_rx) = aptos_channel::new::<AccountAddress, IncomingCommitRequest>(
-        QueueStyle::FIFO,
-        channel_size,
-        None,
-    );
+    let (msg_tx, msg_rx) = aptos_channel::new::<
+        AccountAddress,
+        (AccountAddress, IncomingCommitRequest),
+    >(QueueStyle::FIFO, channel_size, None);
 
     let (result_tx, result_rx) = create_channel::<OrderedBlocks>();
     let state_computer = Arc::new(EmptyStateComputer::new(result_tx));
@@ -184,7 +183,7 @@ pub fn prepare_buffer_manager(
 pub fn launch_buffer_manager() -> (
     Sender<OrderedBlocks>,
     Sender<ResetRequest>,
-    aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
+    aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingCommitRequest)>,
     aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>,
     HashValue,
     Runtime,
@@ -232,20 +231,20 @@ pub fn launch_buffer_manager() -> (
 
 async fn loopback_commit_vote(
     msg: Event<ConsensusMsg>,
-    msg_tx: &aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
+    msg_tx: &aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingCommitRequest)>,
     verifier: &ValidatorVerifier,
 ) {
     match msg {
         Event::RpcRequest(author, msg, protocol, callback) => {
             if let ConsensusMsg::CommitMessage(msg) = msg {
-                msg.verify(verifier).unwrap();
+                msg.verify(author, verifier).unwrap();
                 let request = IncomingCommitRequest {
                     req: *msg,
                     protocol,
                     response_sender: callback,
                 };
                 // verify the message and send the message into self loop
-                msg_tx.push(author, request).ok();
+                msg_tx.push(author, (author, request)).ok();
             }
         },
         _ => {

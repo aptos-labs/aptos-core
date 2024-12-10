@@ -1590,7 +1590,6 @@ module aptos_framework::account {
         create_account_unchecked(addr);
         register_coin<FakeCoin>(addr);
 
-        let eventhandle = &borrow_global<Account>(addr).coin_register_events;
         let event = CoinRegister { account: addr, type_info: type_info::type_of<FakeCoin>() };
 
         let events = event::emitted_events<CoinRegister>();
