@@ -1930,6 +1930,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
+        info!("execute_user_transaction_impl (address: {:?}, replay_protector: {:?}, expiration_timestamp_secs: {:?}", txn.sender(), txn.replay_protector(), txn.expiration_timestamp_secs());
         let _timer = VM_TIMER.timer_with_label("AptosVM::execute_user_transaction_impl");
 
         let traversal_storage = TraversalStorage::new();

@@ -122,6 +122,7 @@ pub(crate) async fn process_client_transaction_submission<NetworkClient, Transac
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation + 'static,
 {
+    info!("process_client_transaction_submission (address: {:?}, replay_protector: {:?}, expiration_timestamp_secs: {:?})", transaction.sender(), transaction.replay_protector(), transaction.expiration_timestamp_secs());
     timer.stop_and_record();
     let _timer = counters::process_txn_submit_latency_timer_client();
     let ineligible_for_broadcast =
@@ -212,6 +213,9 @@ pub(crate) async fn process_transaction_broadcast<NetworkClient, TransactionVali
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation,
 {
+    for txn in &transactions {
+        info!("process_transaction_broadcast (address: {:?}, replay_protector: {:?}, expiration_timestamp_secs: {:?})", txn.0.sender(), txn.0.replay_protector(), txn.0.expiration_timestamp_secs());
+    }
     timer.stop_and_record();
     let _timer = counters::process_txn_submit_latency_timer(peer.network_id());
     let results = process_incoming_transactions(&smp, transactions, timeline_state, false);
@@ -302,6 +306,9 @@ where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation,
 {
+    for txn in &transactions {
+        info!("process_incoming_transactions client_submitted {:?} (address: {:?}, replay_protector: {:?}, expiration_timestamp_secs: {:?})", client_submitted, txn.0.sender(), txn.0.replay_protector(), txn.0.expiration_timestamp_secs());
+    }
     let mut statuses = vec![];
 
     let start_storage_read = Instant::now();
@@ -420,6 +427,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
             .par_iter()
             .map(|t| {
                 let result = smp.validator.read().validate_transaction(t.0.clone());
+                info!("validate_and_add_transactions client_submitted {:?} (address: {:?}, replay_protector: {:?}, expiration_timestamp_secs: {:?}), result: {:?}", client_submitted, t.0.sender(), t.0.replay_protector(), t.0.expiration_timestamp_secs(), result);
                 // Pre-compute the hash and length if the transaction is valid, before locking mempool
                 if result.is_ok() {
                     t.0.committed_hash();
