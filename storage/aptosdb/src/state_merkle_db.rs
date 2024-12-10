@@ -583,13 +583,24 @@ impl StateMerkleDb {
             "Opened state merkle metadata db!"
         );
 
-        let mut shard_id: usize = 0;
-        let state_merkle_db_shards = arr![{
-            let shard_root_path = db_paths.state_merkle_db_shard_root_path(shard_id as u8);
-            let db = Self::open_shard(shard_root_path, shard_id as u8, &state_merkle_db_config, readonly)?;
-            shard_id += 1;
-            Arc::new(db)
-        }; 16];
+        let state_merkle_db_shards = (0..NUM_STATE_SHARDS)
+            .into_par_iter()
+            .map(|shard_id| {
+                let shard_root_path = db_paths.state_merkle_db_shard_root_path(shard_id as u8);
+                let db = Self::open_shard(
+                    shard_root_path,
+                    shard_id as u8,
+                    &state_merkle_db_config,
+                    readonly,
+                )
+                .unwrap_or_else(|e| {
+                    panic!("Failed to open state merkle db shard {shard_id}: {e:?}.")
+                });
+                Arc::new(db)
+            })
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
 
         let state_merkle_db = Self {
             state_merkle_metadata_db,

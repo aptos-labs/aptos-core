@@ -9,6 +9,8 @@ metadata:
     forge-image-tag: {FORGE_IMAGE_TAG}
     forge-test-suite: {FORGE_TEST_SUITE}
     forge-username: {FORGE_USERNAME}
+  annotations:
+    "cluster-autoscaler.kubernetes.io/safe-to-evict": "false"
 spec:
   restartPolicy: Never
   serviceAccountName: forge

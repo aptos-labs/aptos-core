@@ -275,7 +275,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "4.6.0"
+version = "4.7.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -1723,6 +1723,7 @@ dependencies = [
  "clap 4.5.21",
  "deadpool-redis",
  "enum_dispatch",
+ "firebase-token",
  "futures",
  "hex",
  "ipnet",
@@ -3564,6 +3565,27 @@ dependencies = [
  "futures-channel",
  "tokio",
  "tokio-retry",
+]
+
+[[package]]
+name = "aptos-replay-benchmark"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-block-executor",
+ "aptos-logger",
+ "aptos-move-debugger",
+ "aptos-push-metrics",
+ "aptos-rest-client",
+ "aptos-types",
+ "aptos-vm",
+ "bcs 0.1.4",
+ "claims",
+ "clap 4.5.21",
+ "parking_lot 0.12.1",
+ "serde",
+ "tokio",
+ "url",
 ]
 
 [[package]]
@@ -5914,9 +5936,9 @@ version = "0.1.0"
 dependencies = [
  "fail",
  "hex",
- "invalid-mutations",
  "move-binary-format",
  "move-bytecode-verifier",
+ "move-bytecode-verifier-invalid-mutations",
  "move-core-types",
  "petgraph 0.6.5",
  "proptest",
@@ -8202,6 +8224,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fcfdc7a0362c9f4444381a9e697c79d435fe65b52a37466fc2c1184cee9edc6"
 
 [[package]]
+name = "firebase-token"
+version = "0.3.0"
+source = "git+https://github.com/aptos-labs/firebase-token?rev=34ea512d3d1fad6c11df3e7d82ff72beccc05836#34ea512d3d1fad6c11df3e7d82ff72beccc05836"
+dependencies = [
+ "jsonwebtoken 8.3.0",
+ "reqwest 0.11.23",
+ "serde",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "firestore"
 version = "0.43.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9927,15 +9961,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "invalid-mutations"
-version = "0.1.0"
-dependencies = [
- "move-binary-format",
- "move-core-types",
- "proptest",
-]
-
-[[package]]
 name = "io-lifetimes"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11058,13 +11083,22 @@ version = "0.1.0"
 dependencies = [
  "fail",
  "hex-literal",
- "invalid-mutations",
  "move-binary-format",
  "move-borrow-graph",
+ "move-bytecode-verifier-invalid-mutations",
  "move-core-types",
  "petgraph 0.6.5",
  "serde",
  "typed-arena",
+]
+
+[[package]]
+name = "move-bytecode-verifier-invalid-mutations"
+version = "0.1.0"
+dependencies = [
+ "move-binary-format",
+ "move-core-types",
+ "proptest",
 ]
 
 [[package]]

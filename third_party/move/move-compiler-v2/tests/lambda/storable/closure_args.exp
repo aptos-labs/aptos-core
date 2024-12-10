@@ -1,0 +1,781 @@
+
+Diagnostics:
+error: unsupported language construct
+   ┌─ tests/lambda/storable/closure_args.move:59:17
+   │
+59 │                 move |x| base_fun(a, x)
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/closure_args.move:61:17
+   │
+61 │                 move |x| base_fun2(x, a)
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/closure_args.move:63:17
+   │
+63 │                 move |x| copy_fun(a_copy, x)
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/closure_args.move:65:17
+   │
+65 │                 move |x| copy_fun2(x, a_copy)
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/closure_args.move:67:17
+   │
+67 │                 move |x| store_fun(a_store, x)
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/closure_args.move:69:17
+   │
+69 │                 move |x| store_fun2(x, a_store)
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/closure_args.move:71:17
+   │
+71 │                 move |x| both_fun(a_both, x)
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/closure_args.move:73:17
+   │
+73 │                 move |x| both_fun2(x, a_both)
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/closure_args.move:75:17
+   │
+75 │                 move |x| x * 2
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/closure_args.move:88:17
+   │
+88 │                 move |x| base_fun(a, x)
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/closure_args.move:90:17
+   │
+90 │                 move |x| base_fun2(x, a)
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/closure_args.move:92:17
+   │
+92 │                 move |x| copy_fun(a_copy, x)
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/closure_args.move:94:17
+   │
+94 │                 move |x| copy_fun2(x, a_copy)
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/closure_args.move:96:17
+   │
+96 │                 move |x| store_fun(a_store, x)
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/closure_args.move:98:17
+   │
+98 │                 move |x| store_fun2(x, a_store)
+   │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:100:17
+    │
+100 │                 move |x| both_fun(a_both, x)
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:102:17
+    │
+102 │                 move |x| both_fun2(x, a_both)
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:104:17
+    │
+104 │                 move |x| x * 2 with copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:104:32
+    │
+104 │                 move |x| x * 2 with copy
+    │                                ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:119:17
+    │
+119 │                 move |x| base_fun(a, x) with copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:119:41
+    │
+119 │                 move |x| base_fun(a, x) with copy
+    │                                         ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:121:17
+    │
+121 │                 move |x| base_fun2(x, a) with copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:121:42
+    │
+121 │                 move |x| base_fun2(x, a) with copy
+    │                                          ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:123:17
+    │
+123 │                 move |x| copy_fun(a_copy, x) with copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:123:46
+    │
+123 │                 move |x| copy_fun(a_copy, x) with copy
+    │                                              ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:125:17
+    │
+125 │                 move |x| copy_fun2(x, a_copy) with copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:125:47
+    │
+125 │                 move |x| copy_fun2(x, a_copy) with copy
+    │                                               ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:127:17
+    │
+127 │                 move |x| store_fun(a_store, x) with copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:127:48
+    │
+127 │                 move |x| store_fun(a_store, x) with copy
+    │                                                ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:129:17
+    │
+129 │                 move |x| store_fun2(x, a_store) with copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:129:49
+    │
+129 │                 move |x| store_fun2(x, a_store) with copy
+    │                                                 ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:131:17
+    │
+131 │                 move |x| both_fun(a_both, x) with copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:131:46
+    │
+131 │                 move |x| both_fun(a_both, x) with copy
+    │                                              ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:133:17
+    │
+133 │                 move |x| both_fun2(x, a_both) with copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:133:47
+    │
+133 │                 move |x| both_fun2(x, a_both) with copy
+    │                                               ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:135:17
+    │
+135 │                 move |x| x * 2 with copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:135:32
+    │
+135 │                 move |x| x * 2 with copy
+    │                                ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:140:65
+    │
+140 │     public fun return_function_copy(key: u64, x: u64): |u64|u64 with copy {
+    │                                                                 ^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:148:17
+    │
+148 │                 move |x| base_fun(a, x) with copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:148:41
+    │
+148 │                 move |x| base_fun(a, x) with copy
+    │                                         ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:150:17
+    │
+150 │                 move |x| base_fun2(x, a) with copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:150:42
+    │
+150 │                 move |x| base_fun2(x, a) with copy
+    │                                          ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:152:17
+    │
+152 │                 move |x| copy_fun(a_copy, x) with copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:152:46
+    │
+152 │                 move |x| copy_fun(a_copy, x) with copy
+    │                                              ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:154:17
+    │
+154 │                 move |x| copy_fun2(x, a_copy) with copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:154:47
+    │
+154 │                 move |x| copy_fun2(x, a_copy) with copy
+    │                                               ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:156:17
+    │
+156 │                 move |x| store_fun(a_store, x) with copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:156:48
+    │
+156 │                 move |x| store_fun(a_store, x) with copy
+    │                                                ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:158:17
+    │
+158 │                 move |x| store_fun2(x, a_store) with copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:158:49
+    │
+158 │                 move |x| store_fun2(x, a_store) with copy
+    │                                                 ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:160:17
+    │
+160 │                 move |x| both_fun(a_both, x) with copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:160:46
+    │
+160 │                 move |x| both_fun(a_both, x) with copy
+    │                                              ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:162:17
+    │
+162 │                 move |x| both_fun2(x, a_both) with copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:162:47
+    │
+162 │                 move |x| both_fun2(x, a_both) with copy
+    │                                               ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:164:17
+    │
+164 │                 move |x| x * 2 with copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:164:32
+    │
+164 │                 move |x| x * 2 with copy
+    │                                ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:178:17
+    │
+178 │                 move |x| base_fun(a, x) with store
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:178:41
+    │
+178 │                 move |x| base_fun(a, x) with store
+    │                                         ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:180:17
+    │
+180 │                 move |x| base_fun2(x, a) with store
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:180:42
+    │
+180 │                 move |x| base_fun2(x, a) with store
+    │                                          ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:182:17
+    │
+182 │                 move |x| copy_fun(a_copy, x) with store
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:182:46
+    │
+182 │                 move |x| copy_fun(a_copy, x) with store
+    │                                              ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:184:17
+    │
+184 │                 move |x| copy_fun2(x, a_copy) with store
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:184:47
+    │
+184 │                 move |x| copy_fun2(x, a_copy) with store
+    │                                               ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:186:17
+    │
+186 │                 move |x| store_fun(a_store, x) with store
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:186:48
+    │
+186 │                 move |x| store_fun(a_store, x) with store
+    │                                                ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:188:17
+    │
+188 │                 move |x| store_fun2(x, a_store) with store
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:188:49
+    │
+188 │                 move |x| store_fun2(x, a_store) with store
+    │                                                 ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:190:17
+    │
+190 │                 move |x| both_fun(a_both, x) with store
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:190:46
+    │
+190 │                 move |x| both_fun(a_both, x) with store
+    │                                              ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:192:17
+    │
+192 │                 move |x| both_fun2(x, a_both) with store
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:192:47
+    │
+192 │                 move |x| both_fun2(x, a_both) with store
+    │                                               ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:194:17
+    │
+194 │                 move |x| x * 2 with store
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:194:32
+    │
+194 │                 move |x| x * 2 with store
+    │                                ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:199:66
+    │
+199 │     public fun return_function_store(key: u64, x: u64): |u64|u64 with store {
+    │                                                                  ^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:207:17
+    │
+207 │                 move |x| base_fun(a, x) with store
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:207:41
+    │
+207 │                 move |x| base_fun(a, x) with store
+    │                                         ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:209:17
+    │
+209 │                 move |x| base_fun2(x, a) with store
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:209:42
+    │
+209 │                 move |x| base_fun2(x, a) with store
+    │                                          ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:211:17
+    │
+211 │                 move |x| copy_fun(a_copy, x) with store
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:211:46
+    │
+211 │                 move |x| copy_fun(a_copy, x) with store
+    │                                              ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:213:17
+    │
+213 │                 move |x| copy_fun2(x, a_copy) with store
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:213:47
+    │
+213 │                 move |x| copy_fun2(x, a_copy) with store
+    │                                               ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:215:17
+    │
+215 │                 move |x| store_fun(a_store, x) with store
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:215:48
+    │
+215 │                 move |x| store_fun(a_store, x) with store
+    │                                                ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:217:17
+    │
+217 │                 move |x| store_fun2(x, a_store) with store
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:217:49
+    │
+217 │                 move |x| store_fun2(x, a_store) with store
+    │                                                 ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:219:17
+    │
+219 │                 move |x| both_fun(a_both, x) with store
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:219:46
+    │
+219 │                 move |x| both_fun(a_both, x) with store
+    │                                              ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:221:17
+    │
+221 │                 move |x| both_fun2(x, a_both) with store
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:221:47
+    │
+221 │                 move |x| both_fun2(x, a_both) with store
+    │                                               ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:223:17
+    │
+223 │                 move |x| x * 2 with store
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:223:32
+    │
+223 │                 move |x| x * 2 with store
+    │                                ^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:238:17
+    │
+238 │                 move |x| base_fun(a, x) with store+copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:238:41
+    │
+238 │                 move |x| base_fun(a, x) with store+copy
+    │                                         ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:240:17
+    │
+240 │                 move |x| base_fun2(x, a) with store+copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:240:42
+    │
+240 │                 move |x| base_fun2(x, a) with store+copy
+    │                                          ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:242:17
+    │
+242 │                 move |x| copy_fun(a_copy, x) with store+copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:242:46
+    │
+242 │                 move |x| copy_fun(a_copy, x) with store+copy
+    │                                              ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:244:17
+    │
+244 │                 move |x| copy_fun2(x, a_copy) with store+copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:244:47
+    │
+244 │                 move |x| copy_fun2(x, a_copy) with store+copy
+    │                                               ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:246:17
+    │
+246 │                 move |x| store_fun(a_store, x) with store+copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:246:48
+    │
+246 │                 move |x| store_fun(a_store, x) with store+copy
+    │                                                ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:248:17
+    │
+248 │                 move |x| store_fun2(x, a_store) with store+copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:248:49
+    │
+248 │                 move |x| store_fun2(x, a_store) with store+copy
+    │                                                 ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:250:17
+    │
+250 │                 move |x| both_fun(a_both, x) with store+copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:250:46
+    │
+250 │                 move |x| both_fun(a_both, x) with store+copy
+    │                                              ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:252:17
+    │
+252 │                 move |x| both_fun2(x, a_both) with store+copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:252:47
+    │
+252 │                 move |x| both_fun2(x, a_both) with store+copy
+    │                                               ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:254:17
+    │
+254 │                 move |x| x * 2 with store+copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:254:32
+    │
+254 │                 move |x| x * 2 with store+copy
+    │                                ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:259:65
+    │
+259 │     public fun return_function_both(key: u64, x: u64): |u64|u64 with store+copy {
+    │                                                                 ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:267:17
+    │
+267 │                 move |x| base_fun(a, x) with store+copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:267:41
+    │
+267 │                 move |x| base_fun(a, x) with store+copy
+    │                                         ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:269:17
+    │
+269 │                 move |x| base_fun2(x, a) with store+copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:269:42
+    │
+269 │                 move |x| base_fun2(x, a) with store+copy
+    │                                          ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:271:17
+    │
+271 │                 move |x| copy_fun(a_copy, x) with store+copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:271:46
+    │
+271 │                 move |x| copy_fun(a_copy, x) with store+copy
+    │                                              ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:273:17
+    │
+273 │                 move |x| copy_fun2(x, a_copy) with store+copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:273:47
+    │
+273 │                 move |x| copy_fun2(x, a_copy) with store+copy
+    │                                               ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:275:17
+    │
+275 │                 move |x| store_fun(a_store, x) with store+copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:275:48
+    │
+275 │                 move |x| store_fun(a_store, x) with store+copy
+    │                                                ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:277:17
+    │
+277 │                 move |x| store_fun2(x, a_store) with store+copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:277:49
+    │
+277 │                 move |x| store_fun2(x, a_store) with store+copy
+    │                                                 ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:279:17
+    │
+279 │                 move |x| both_fun(a_both, x) with store+copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:279:46
+    │
+279 │                 move |x| both_fun(a_both, x) with store+copy
+    │                                              ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:281:17
+    │
+281 │                 move |x| both_fun2(x, a_both) with store+copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:281:47
+    │
+281 │                 move |x| both_fun2(x, a_both) with store+copy
+    │                                               ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:283:17
+    │
+283 │                 move |x| x * 2 with store+copy
+    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+    ┌─ tests/lambda/storable/closure_args.move:283:32
+    │
+283 │                 move |x| x * 2 with store+copy
+    │                                ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions

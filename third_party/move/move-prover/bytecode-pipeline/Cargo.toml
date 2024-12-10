@@ -9,22 +9,18 @@ license = "Apache-2.0"
 [dependencies]
 abstract-domain-derive = { path = "../../move-model/bytecode/abstract_domain_derive" }
 anyhow = { workspace = true }
-move-binary-format = { path = "../../move-binary-format" }
-move-core-types = { path = "../../move-core/types" }
-move-model = { path = "../../move-model" }
-
-# move dependencies
-move-stackless-bytecode = { path = "../../move-model/bytecode" }
-
-# external dependencies
 codespan-reporting = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true, features = ["serde"] }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+move-model = { workspace = true }
+move-stackless-bytecode = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
 datatest-stable = { workspace = true }
-move-stackless-bytecode-test-utils = { path = "../../move-model/bytecode-test-utils" }
+move-stackless-bytecode-test-utils = { workspace = true }
 shell-words = { workspace = true }
 tempfile = { workspace = true }
 walkdir = { workspace = true }

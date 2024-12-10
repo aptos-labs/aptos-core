@@ -1,12 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{bail, format_err, Result};
-use aptos_block_executor::{
-    code_cache_global_manager::AptosModuleCacheManager,
-    txn_commit_hook::NoOpTransactionCommitHook,
-    txn_provider::{default::DefaultTxnProvider, TxnProvider},
-};
+use anyhow::{bail, format_err};
+use aptos_block_executor::txn_provider::{default::DefaultTxnProvider, TxnProvider};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_rest_client::Client;
 use aptos_types::{
@@ -28,9 +24,7 @@ use aptos_validator_interface::{
     AptosValidatorInterface, DBDebuggerInterface, DebuggerStateView, RestDebuggerInterface,
 };
 use aptos_vm::{
-    block_executor::{AptosTransactionOutput, AptosVMBlockExecutorWrapper},
-    data_cache::AsMoveResolver,
-    AptosVM,
+    aptos_vm::AptosVMBlockExecutor, data_cache::AsMoveResolver, AptosVM, VMBlockExecutor,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -47,14 +41,22 @@ impl AptosDebugger {
         Self { debugger }
     }
 
-    pub fn rest_client(rest_client: Client) -> Result<Self> {
+    pub fn rest_client(rest_client: Client) -> anyhow::Result<Self> {
         Ok(Self::new(Arc::new(RestDebuggerInterface::new(rest_client))))
     }
 
-    pub fn db<P: AsRef<Path> + Clone>(db_root_path: P) -> Result<Self> {
+    pub fn db<P: AsRef<Path> + Clone>(db_root_path: P) -> anyhow::Result<Self> {
         Ok(Self::new(Arc::new(DBDebuggerInterface::open(
             db_root_path,
         )?)))
+    }
+
+    pub async fn get_committed_transactions(
+        &self,
+        begin: Version,
+        limit: u64,
+    ) -> anyhow::Result<(Vec<Transaction>, Vec<TransactionInfo>)> {
+        self.debugger.get_committed_transactions(begin, limit).await
     }
 
     pub fn execute_transactions_at_version(
@@ -63,7 +65,7 @@ impl AptosDebugger {
         txns: Vec<Transaction>,
         repeat_execution_times: u64,
         concurrency_levels: &[usize],
-    ) -> Result<Vec<TransactionOutput>> {
+    ) -> anyhow::Result<Vec<TransactionOutput>> {
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
             txns.into_iter().map(|x| x.into()).collect::<Vec<_>>();
         let txn_provider = DefaultTxnProvider::new(sig_verified_txns);
@@ -114,7 +116,7 @@ impl AptosDebugger {
         &self,
         version: Version,
         txn: SignedTransaction,
-    ) -> Result<(VMStatus, VMOutput, TransactionGasLog)> {
+    ) -> anyhow::Result<(VMStatus, VMOutput, TransactionGasLog)> {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         let txn = txn
@@ -166,11 +168,8 @@ impl AptosDebugger {
         use_same_block_boundaries: bool,
         repeat_execution_times: u64,
         concurrency_levels: &[usize],
-    ) -> Result<Vec<TransactionOutput>> {
-        let (txns, txn_infos) = self
-            .debugger
-            .get_committed_transactions(begin, limit)
-            .await?;
+    ) -> anyhow::Result<Vec<TransactionOutput>> {
+        let (txns, txn_infos) = self.get_committed_transactions(begin, limit).await?;
 
         if use_same_block_boundaries {
             // when going block by block, no need to worry about epoch boundaries
@@ -238,7 +237,7 @@ impl AptosDebugger {
         txns: Vec<Transaction>,
         repeat_execution_times: u64,
         concurrency_levels: &[usize],
-    ) -> Result<Vec<TransactionOutput>> {
+    ) -> anyhow::Result<Vec<TransactionOutput>> {
         let results = self.execute_transactions_at_version(
             begin,
             txns,
@@ -268,7 +267,7 @@ impl AptosDebugger {
         repeat_execution_times: u64,
         concurrency_levels: &[usize],
         mut txn_infos: Vec<TransactionInfo>,
-    ) -> Result<Vec<TransactionOutput>> {
+    ) -> anyhow::Result<Vec<TransactionOutput>> {
         let mut ret = vec![];
         while limit != 0 {
             println!(
@@ -301,7 +300,7 @@ impl AptosDebugger {
         txns: Vec<Transaction>,
         repeat_execution_times: u64,
         concurrency_levels: &[usize],
-    ) -> Result<Vec<TransactionOutput>> {
+    ) -> anyhow::Result<Vec<TransactionOutput>> {
         let mut ret = vec![];
         let mut cur = vec![];
         let mut cur_version = begin;
@@ -336,7 +335,7 @@ impl AptosDebugger {
         &self,
         account: AccountAddress,
         seq: u64,
-    ) -> Result<Option<Version>> {
+    ) -> anyhow::Result<Option<Version>> {
         self.debugger
             .get_version_by_account_sequence(account, seq)
             .await
@@ -345,7 +344,7 @@ impl AptosDebugger {
     pub async fn get_committed_transaction_at_version(
         &self,
         version: Version,
-    ) -> Result<(Transaction, TransactionInfo)> {
+    ) -> anyhow::Result<(Transaction, TransactionInfo)> {
         let (mut txns, mut info) = self.debugger.get_committed_transactions(version, 1).await?;
 
         let txn = txns.pop().expect("there must be exactly 1 txn in the vec");
@@ -434,20 +433,16 @@ fn execute_block_no_limit(
     state_view: &DebuggerStateView,
     concurrency_level: usize,
 ) -> Result<Vec<TransactionOutput>, VMStatus> {
-    AptosVMBlockExecutorWrapper::execute_block::<
-        _,
-        NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
-        DefaultTxnProvider<SignatureVerifiedTransaction>,
-    >(
-        txn_provider,
-        state_view,
-        &AptosModuleCacheManager::new(),
-        BlockExecutorConfig {
-            local: BlockExecutorLocalConfig::default_with_concurrency_level(concurrency_level),
-            onchain: BlockExecutorConfigFromOnchain::new_no_block_limit(),
-        },
-        TransactionSliceMetadata::unknown(),
-        None,
-    )
-    .map(BlockOutput::into_transaction_outputs_forced)
+    let executor = AptosVMBlockExecutor::new();
+    executor
+        .execute_block_with_config(
+            txn_provider,
+            state_view,
+            BlockExecutorConfig {
+                local: BlockExecutorLocalConfig::default_with_concurrency_level(concurrency_level),
+                onchain: BlockExecutorConfigFromOnchain::new_no_block_limit(),
+            },
+            TransactionSliceMetadata::unknown(),
+        )
+        .map(BlockOutput::into_transaction_outputs_forced)
 }
