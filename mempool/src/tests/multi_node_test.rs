@@ -23,7 +23,7 @@ use aptos_network::{
     peer_manager::PeerManagerRequest,
     protocols::{
         direct_send::Message,
-        network::ReceivedMessage,
+        network::{ReceivedMessage, SerializedRequest},
         wire::messaging::v1::{DirectSendMsg, NetworkMessage},
     },
     ProtocolId,
@@ -344,9 +344,9 @@ impl TestHarness {
         let receiver = self.mut_node(&receiver_id);
         let rmsg = ReceivedMessage {
             message: NetworkMessage::DirectSendMsg(DirectSendMsg {
-                protocol_id: msg.protocol_id,
+                protocol_id: msg.protocol_id(),
                 priority: 0,
-                raw_msg: msg.mdata.into(),
+                raw_msg: msg.data().clone().into(),
             }),
             sender: PeerNetworkId::new(network_id, sender_peer_id),
             receive_timestamp_micros: 0,
@@ -400,7 +400,7 @@ impl TestHarness {
         // Handle outgoing message
         match network_req {
             PeerManagerRequest::SendDirectSend(remote_peer_id, msg) => {
-                let mempool_message = common::decompress_and_deserialize(&msg.mdata.to_vec());
+                let mempool_message = common::decompress_and_deserialize(&msg.data().to_vec());
                 match mempool_message {
                     MempoolSyncMsg::BroadcastTransactionsRequest {
                         transactions,
@@ -456,7 +456,7 @@ impl TestHarness {
 
         match network_req {
             PeerManagerRequest::SendDirectSend(remote_peer_id, msg) => {
-                let mempool_message = common::decompress_and_deserialize(&msg.mdata.to_vec());
+                let mempool_message = common::decompress_and_deserialize(&msg.data().to_vec());
                 match mempool_message {
                     MempoolSyncMsg::BroadcastTransactionsResponse { .. } => {
                         // send it to peer
@@ -477,9 +477,9 @@ impl TestHarness {
                         let receiver = self.mut_node(&receiver_id);
                         let rmsg = ReceivedMessage {
                             message: NetworkMessage::DirectSendMsg(DirectSendMsg {
-                                protocol_id: msg.protocol_id,
+                                protocol_id: msg.protocol_id(),
                                 priority: 0,
-                                raw_msg: msg.mdata.into(),
+                                raw_msg: msg.data().clone().into(),
                             }),
                             sender: PeerNetworkId::new(network_id, sender_peer_id),
                             receive_timestamp_micros: 0,
