@@ -11,6 +11,8 @@ validator:
         enable_storage_sharding: true
     indexer_db_config:
       enable_event: true
+  podAnnotations:
+    "cluster-autoscaler.kubernetes.io/safe-to-evict": "false"
 
 fullnode:
   # at most one VFN per validator, depending on numFullnodeGroups
@@ -28,6 +30,8 @@ fullnode:
         enable_storage_sharding: true
     indexer_db_config:
       enable_event: true
+  podAnnotations:
+    "cluster-autoscaler.kubernetes.io/safe-to-evict": "false"
 
 service:
   validator:
