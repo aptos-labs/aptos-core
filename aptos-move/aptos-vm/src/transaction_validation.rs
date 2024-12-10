@@ -18,6 +18,7 @@ use aptos_types::{
     on_chain_config::Features,
     transaction::{MultisigTransactionPayload, ReplayProtector, TransactionExecutable},
 };
+use aptos_logger::info;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use fail::fail_point;
@@ -117,6 +118,7 @@ pub(crate) fn run_script_prologue(
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> Result<(), VMStatus> {
+    info!("prologue (address: {:?}, replay_protector: {:?}, expiration_timestamp_secs: {:?})", txn_data.sender, txn_data.replay_protector(), txn_data.expiration_timestamp_secs());
     let txn_replay_protector = txn_data.replay_protector();
     let txn_authentication_key = txn_data.authentication_key().to_vec();
     let txn_gas_price = txn_data.gas_unit_price();

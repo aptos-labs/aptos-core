@@ -327,13 +327,13 @@ pub fn update_counters_for_processed_chunk<T>(
                         "discard_transaction_expired"
                     } else {
                         // Only log if it is an interesting discard
-                        sample!(
-                            SampleRate::Duration(Duration::from_secs(15)),
+                        // sample!(
+                        //     SampleRate::Duration(Duration::from_secs(15)),
                             warn!(
                                 "[sampled] Txn being discarded is {:?} with status code {:?}",
                                 txn, discard_status_code
-                            )
-                        );
+                            );
+                        // );
                         "discard"
                     },
                     "error_code",
