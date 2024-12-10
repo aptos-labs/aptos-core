@@ -323,8 +323,7 @@ impl NodeSetup {
 
         let (round_manager_tx, _) = aptos_channel::new(QueueStyle::LIFO, 1, None);
 
-        let mut local_config = local_consensus_config.clone();
-        local_config.enable_broadcast_vote(true);
+        let local_config = local_consensus_config.clone();
 
         let mut round_manager = RoundManager::new(
             epoch_state,
