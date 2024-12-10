@@ -163,9 +163,12 @@ pub fn trace_transaction_using_debugger(
         })?;
 
     let mut w = std::io::BufWriter::new(std::io::stdout());
-    let trace = execution_trace.dump_trace();
-    let env = &execution_trace.env;
-    trace.debug_with_loc(&mut w, env.as_ref().unwrap()).unwrap();
+    let response_handler = execution_trace.get_response_handler_mut();
+    let trace = response_handler.dump_trace();
+    let env = execution_trace.env.as_ref().unwrap();
+
+
+    trace.debug_with_loc(&mut w, env).unwrap();
 
     Ok((vm_status, vm_output))
 }

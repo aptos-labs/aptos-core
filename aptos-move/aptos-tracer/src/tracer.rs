@@ -13,8 +13,7 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
 };
-use move_ir_types::location::Loc;
-use move_model::model::GlobalEnv;
+use move_model::model::{GlobalEnv, Loc};
 use move_package::{BuildConfig, ModelConfig};
 use move_vm_types::{
     gas::{GasMeter, InterpreterView, SimpleInstruction},
@@ -22,13 +21,10 @@ use move_vm_types::{
     views::{TypeView, ValueView, ValueVisitor},
 };
 use std::{
-    env,
-    fmt::Display,
-    io::{BufRead, Read, Write},
-    path::Path,
+    collections::VecDeque, env, fmt::Display, io::{BufRead, Write}, path::Path
 };
-#[derive(Debug)]
-pub struct ExecutionTrace<Value>(CallFrame<Value>);
+#[derive(Debug, Clone)]
+pub struct ExecutionTrace<Value>(CallFrame1<Value>);
 
 impl<Value: Display> ExecutionTrace<Value> {
     pub fn debug_with_loc(
@@ -45,143 +41,195 @@ impl<Value: Display> ExecutionTrace<Value> {
 }
 
 #[derive(Debug)]
-pub struct ExecutionTracer<G, Value, Reader> {
+pub struct ExecutionTracer<G, RequestReceiver, ResponseHandler> {
     base: G,
-    frames: Vec<CallFrame<Value>>,
-    collect_trace: bool,
-    command_reader: Reader,
+    frames: Vec<CallFrame>,
+    request_receiver: RequestReceiver,
+    response_handler: ResponseHandler,
     step_counter: usize,
+    queue: VecDeque<Request>,
     pub env: Option<GlobalEnv>,
 }
 
-impl<G, Value, Reader> ExecutionTracer<G, Value, Reader> {
+pub type Tracer<G, Value> = ExecutionTracer<G, IncrementalStepper, TraceCollector<Value>>;
+
+pub fn new_tracer_from_entry_fun<G, Value>(
+    base: G,
+    module_id: ModuleId,
+    function: Identifier,
+    ty_args: Vec<TypeTag>,
+    env: Option<GlobalEnv>,
+) -> ExecutionTracer<G, IncrementalStepper, TraceCollector<Value>> {
+    ExecutionTracer::from_entry_fun(
+        base,
+        module_id.clone(),
+        function.clone(),
+        ty_args.clone(),
+        IncrementalStepper,
+        TraceCollector::new_from_entry_fun(module_id, function, ty_args),
+        env,
+    )
+}
+
+pub fn debugger_from_entry_fun<G>(
+    base: G,
+    module_id: ModuleId,
+    function: Identifier,
+    ty_args: Vec<TypeTag>,
+    env: Option<GlobalEnv>,
+) -> ExecutionTracer<G, StandardIOCommandReader, ResponsePrinter> {
+    ExecutionTracer::from_entry_fun(
+        base,
+        module_id,
+        function,
+        ty_args,
+        new_standard_io_command_reader(),
+        ResponsePrinter,
+        env,
+    )
+}
+
+impl<G, RequestReceiver, ResponseHandler> ExecutionTracer<G, RequestReceiver, ResponseHandler> {
     pub fn from_entry_fun(
         base: G,
         module_id: ModuleId,
         function: Identifier,
         ty_args: Vec<TypeTag>,
-        command_reader: Reader,
+        request_receiver: RequestReceiver,
+        response_handler: ResponseHandler,
         env: Option<GlobalEnv>,
     ) -> Self {
         Self {
             base,
             frames: vec![CallFrame::new_function(module_id, function, ty_args)],
-            collect_trace: false,
-            command_reader,
-            step_counter: 0,
+            request_receiver,
+            response_handler,
+            queue: VecDeque::new(),
+            step_counter: 1,
             env,
         }
     }
 
     pub fn from_script(base: G) -> Self {
-        Self {
-            base,
-            frames: vec![CallFrame::new_script()],
-            collect_trace: false,
-            command_reader: todo!(),
-            step_counter: 0,
-            env: None,
-        }
+        todo!()
     }
 
-    fn get_top_frame(&self) -> &CallFrame<Value> {
+    fn get_top_frame(&self) -> &CallFrame {
         self.frames.last().expect("non-empty stack of frames")
     }
 
-    fn get_top_frame_mut(&mut self) -> &mut CallFrame<Value> {
+    fn get_cur_frame_name(&self) -> &FrameName {
+        &self.get_top_frame().name
+    }
+
+    fn get_top_frame_mut(&mut self) -> &mut CallFrame {
         self.frames.last_mut().expect("non-empty stack of frames")
     }
 
-    fn get_top_events_mut(&mut self) -> &mut Vec<Event<Value>> {
-        &mut self.get_top_frame_mut().events
-    }
+    // fn get_top_events_mut(&mut self) -> &mut Vec<Event<Value>> {
+    //     &mut self.get_top_frame_mut().events
+    // }
 
     fn gen_new_frame(&mut self, name: FrameName) {
-        self.frames.push(CallFrame {
-            name,
-            events: Vec::new(),
-            pc: 0,
-        });
+        self.frames.push(CallFrame { name, pc: 0 });
     }
 
-    pub fn dump_trace(&mut self) -> ExecutionTrace<Value> {
-        // debug_assert!(self.frames.len() == 1);
-        // TODO: fix for abort
-        ExecutionTrace(self.frames.pop().expect("non-empty stack of frames"))
+    pub fn get_response_handler(&self) -> &ResponseHandler {
+        &self.response_handler
     }
+
+    pub fn get_response_handler_mut(&mut self) -> &mut ResponseHandler {
+        &mut self.response_handler
+    }
+
+    // fn push_instr(&mut self, instr: Instruction<Value>) {
+    //     self.get_top_events_mut().push(Event::Instruction(instr));
+    // }
+
+    // pub fn dump_trace(&mut self) -> ExecutionTrace<Value> {
+    //     // debug_assert!(self.frames.len() == 1);
+    //     // TODO: fix for abort
+    //     ExecutionTrace(self.frames.pop().expect("non-empty stack of frames"))
+    // }
 }
 
-impl<G, Reader: GetCommand> ExecutionTracer<G, String, Reader> {
-    fn emit_instr(&mut self, instr: &Instruction<String>) {
-        print!("{}[{}]: ", self.get_top_frame().name, instr.offset);
-        print!("{} ", instr.display_qualified_instr());
-        for arg in &instr.args {
-            print!("{} ", arg);
-        }
+impl<G, R: RequestReceiver, W: ResponseHandler<String>> ExecutionTracer<G, R, W> {
+    /// Gets the location of the bytecode at the given offset of the current function.
+    fn get_loc(&self, offset: CodeOffset) -> Option<Loc> {
         if let FrameName::Function {
-            module_id,
-            name,
-            ty_args,
+            module_id, name, ..
         } = &self.get_top_frame().name
         {
-            let fun_env = self
-                .env
-                .as_ref()
-                .unwrap()
-                .find_function_by_language_storage_id_name(module_id, name)
-                .unwrap();
-            let loc = fun_env.get_bytecode_loc(instr.offset).unwrap();
-            print!(
-                "{}: ",
-                loc.display_file_name_and_line(self.env.as_ref().unwrap())
-            );
+            let env = self.env.as_ref()?;
+            let fun_env = env.find_function_by_language_storage_id_name(module_id, name)?;
+            let loc = fun_env.get_bytecode_loc(offset)?;
+            return Some(loc);
+        } else {
+            None
         }
-        println!();
     }
 
-    fn record_instr(
+    fn handle_instr(
         &mut self,
         op: Opcodes,
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
     ) {
-        self.record_generic_instr(op, vec![], args);
+        self.handle_generic_instr(op, vec![], args);
     }
 
-    fn record_generic_instr(
+    fn handle_generic_instr(
         &mut self,
         op: Opcodes,
         ty_args: Vec<TypeTag>,
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
     ) {
+        let instr = self.gen_instr(op, ty_args, args);
+        if self.step_counter == 1 {
+            self.response_handler
+                .handle_response(Response::InstructionExecuted(instr));
+        }
+        if self.step_counter == 0 {
+            println!("impossible");
+        } else {
+            self.step_counter -= 1;
+        }
+    }
+
+    fn handle_instr_and_inc_pc(
+        &mut self,
+        op: Opcodes,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+    ) {
+        self.handle_generic_instr_and_inc_pc(op, vec![], args)
+    }
+
+    fn handle_generic_instr_and_inc_pc(
+        &mut self,
+        op: Opcodes,
+        ty_args: Vec<TypeTag>,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+    ) {
+        self.handle_generic_instr(op, ty_args, args);
+        self.inc_pc();
+    }
+
+    fn gen_instr(
+        &self,
+        op: Opcodes,
+        ty_args: Vec<TypeTag>,
+        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
+    ) -> Instruction<String> {
         let pc = self.get_pc();
-        let instr = Instruction {
+        Instruction {
             op,
             ty_args,
             args: args
                 .map(|v| format!("{:?}", Into::<TValue>::into(v)))
                 .collect(),
+            frame_name: Some(self.get_cur_frame_name().clone()),
             offset: pc,
-        };
-        self.emit_instr(&instr);
-        self.get_top_events_mut().push(Event::Instruction(instr));
-    }
-
-    fn record_generic_instr_and_inc_pc(
-        &mut self,
-        op: Opcodes,
-        ty_args: Vec<TypeTag>,
-        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
-    ) {
-        self.record_generic_instr(op, ty_args, args);
-        self.inc_pc();
-    }
-
-    fn record_instr_and_inc_pc(
-        &mut self,
-        op: Opcodes,
-        args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
-    ) {
-        self.record_generic_instr_and_inc_pc(op, vec![], args)
+            loc: self.get_loc(pc),
+        }
     }
 
     fn get_pc(&self) -> CodeOffset {
@@ -196,44 +244,43 @@ impl<G, Reader: GetCommand> ExecutionTracer<G, String, Reader> {
         *self.get_pc_mut() += 1;
     }
 
-    fn step(&mut self) {
-        if self.step_counter > 0 {
-            self.step_counter -= 1;
-        } else {
-            loop {
-                let command = self.command_reader.get_command();
-                match command {
-                    Command::Step(n) => {
-                        self.step_counter = n - 1;
-                        break;
-                    },
-                    Command::Continue => todo!(),
-                    Command::Help => {
-                        println!("Usage:");
-                        println!("step <n>: step n instructions");
-                        println!("continue: continue execution");
-                        println!("break <module_id> <function_name>: break at function");
-                        println!("backtrace: print backtrace");
-                    },
-                    Command::Break(module_id, name) => todo!(),
-                    Command::Backtrace(_) => {
-                        for (i, frame) in self.frames.iter().rev().enumerate() {
-                            println!("{:2}: {}", i, frame.name);
-                        }
-                    },
-                }
+    fn handle_new_requests(&mut self) {
+        debug_assert!(self.step_counter == 0);
+        loop {
+            let command = self.request_receiver.get_request();
+            match command {
+                Request::Step(n) => {
+                    self.step_counter = n;
+                    break;
+                },
+                Request::Continue => todo!(),
+                Request::Help => {
+                    println!("Usage:");
+                    println!("step <n>: step n instructions");
+                    println!("continue: continue execution");
+                    println!("break <module_id> <function_name>: break at function");
+                    println!("backtrace: print backtrace");
+                },
+                Request::Break(module_id, name) => todo!(),
+                Request::Backtrace(_) => {
+                    for (i, frame) in self.frames.iter().rev().enumerate() {
+                        println!("{:2}: {}", i, frame.name);
+                    }
+                },
             }
         }
     }
 }
 
 /// Records the execution of an instruction
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Instruction<Value> {
     pub op: Opcodes,
     pub ty_args: Vec<TypeTag>,
     pub args: Vec<Value>,
+    pub frame_name: Option<FrameName>,
     pub offset: CodeOffset,
+    pub loc: Option<Loc>,
 }
 
 impl<Value: Display> Instruction<Value> {
@@ -269,14 +316,14 @@ impl<Value: Display> Instruction<Value> {
 }
 
 /// Records the execution of a function call
-#[derive(Debug)]
-pub struct CallFrame<Value> {
+#[derive(Debug, Clone)]
+pub struct CallFrame {
     pub name: FrameName,
-    pub events: Vec<Event<Value>>,
+    // pub events: Vec<Event<Value>>,
     pub pc: CodeOffset,
 }
 
-impl<Value> CallFrame<Value> {
+impl CallFrame {
     fn new_function(module_id: ModuleId, name: Identifier, ty_args: Vec<TypeTag>) -> Self {
         Self {
             name: FrameName::Function {
@@ -284,7 +331,7 @@ impl<Value> CallFrame<Value> {
                 name,
                 ty_args,
             },
-            events: Vec::new(),
+            // events: Vec::new(),
             pc: 0,
         }
     }
@@ -292,18 +339,18 @@ impl<Value> CallFrame<Value> {
     fn new_script() -> Self {
         Self {
             name: FrameName::Script,
-            events: Vec::new(),
+            // events: Vec::new(),
             pc: 0,
         }
     }
 }
 
-impl<Value: Display> CallFrame<Value> {
+impl<Value: Display> CallFrame1<Value> {
     pub fn simple_debug(&self, w: &mut impl Write, depth: usize) -> Result<(), std::io::Error> {
         writeln!(w, "{}{}", " ".repeat(depth * 4), self.name)?;
         for event in &self.events {
             match event {
-                Event::Instruction(instr) => {
+                Event1::Instruction(instr) => {
                     write!(w, "{}", " ".repeat(depth * 4 + 2))?;
                     write!(w, "{}: ", instr.offset)?;
                     write!(w, "{} ", instr.display_qualified_instr())?;
@@ -312,7 +359,7 @@ impl<Value: Display> CallFrame<Value> {
                     }
                     writeln!(w)?;
                 },
-                Event::Call(frame) => frame.simple_debug(w, depth + 1)?,
+                Event1::Call(frame) => frame.simple_debug(w, depth + 1)?,
             }
         }
         Ok(())
@@ -327,41 +374,30 @@ impl<Value: Display> CallFrame<Value> {
         writeln!(w, "{}{}", " ".repeat(depth * 4), self.name)?;
         for event in &self.events {
             match event {
-                Event::Instruction(instr) => {
+                Event1::Instruction(instr) => {
                     write!(w, "{}", " ".repeat(depth * 4 + 2))?;
                     write!(w, "{}: ", instr.offset)?;
                     write!(w, "{} ", instr.display_qualified_instr())?;
                     for arg in &instr.args {
                         write!(w, "{} ", arg)?;
                     }
-                    if let FrameName::Function {
-                        module_id,
-                        name,
-                        ty_args,
-                    } = &self.name
-                    {
-                        let fun_env = env
-                            .find_function_by_language_storage_id_name(module_id, name)
-                            .unwrap();
-                        let loc = fun_env.get_bytecode_loc(instr.offset).unwrap();
-                        write!(w, "{}: ", loc.display_file_name_and_line(env))?;
-                    }
+                    write!(w, "{}: ", instr.loc.as_ref().unwrap().display_file_name_and_line(env))?;
                     writeln!(w)?;
                 },
-                Event::Call(frame) => frame.simple_debug1(w, depth + 1, env)?,
+                Event1::Call(frame) => frame.simple_debug1(w, depth + 1, env)?,
             }
         }
         Ok(())
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Event<Value> {
-    Call(CallFrame<Value>),
+    Call(CallFrame),
     Instruction(Instruction<Value>),
 }
 
-impl<G, Reader: GetCommand> GasMeter for ExecutionTracer<G, String, Reader>
+impl<G, R: RequestReceiver, W: ResponseHandler<String>> GasMeter for ExecutionTracer<G, R, W>
 where
     G: AptosGasMeter,
 {
@@ -377,155 +413,154 @@ where
         match instr {
             SimpleInstruction::Nop => (),
             SimpleInstruction::Ret => {
-                self.record_instr_and_inc_pc(Opcodes::RET, std::iter::empty::<&Value>());
+                self.handle_instr_and_inc_pc(Opcodes::RET, std::iter::empty::<&Value>());
+                self.response_handler.handle_response(Response::Ret);
                 if self.frames.len() > 1 {
-                    let cur_frame = self.frames.pop().expect("frame must exist");
-                    let last_frame = self.frames.last_mut().expect("frame must exist");
-                    last_frame.events.push(Event::Call(cur_frame));
+                    let _cur_frame = self.frames.pop().expect("frame must exist");
                 }
             },
             SimpleInstruction::LdU8 => {
-                self.record_instr_and_inc_pc(Opcodes::LD_U8, std::iter::empty::<&Value>())
+                self.handle_instr_and_inc_pc(Opcodes::LD_U8, std::iter::empty::<&Value>())
             },
             SimpleInstruction::LdU64 => {
-                self.record_instr_and_inc_pc(Opcodes::LD_U64, std::iter::empty::<&Value>())
+                self.handle_instr_and_inc_pc(Opcodes::LD_U64, std::iter::empty::<&Value>())
             },
             SimpleInstruction::LdU128 => {
-                self.record_instr_and_inc_pc(Opcodes::LD_U128, std::iter::empty::<&Value>())
+                self.handle_instr_and_inc_pc(Opcodes::LD_U128, std::iter::empty::<&Value>())
             },
             SimpleInstruction::LdTrue => {
-                self.record_instr_and_inc_pc(Opcodes::LD_TRUE, std::iter::empty::<&Value>())
+                self.handle_instr_and_inc_pc(Opcodes::LD_TRUE, std::iter::empty::<&Value>())
             },
             SimpleInstruction::LdFalse => {
-                self.record_instr_and_inc_pc(Opcodes::LD_FALSE, std::iter::empty::<&Value>())
+                self.handle_instr_and_inc_pc(Opcodes::LD_FALSE, std::iter::empty::<&Value>())
             },
             SimpleInstruction::FreezeRef => {
-                self.record_instr_and_inc_pc(Opcodes::FREEZE_REF, std::iter::empty::<&Value>())
+                self.handle_instr_and_inc_pc(Opcodes::FREEZE_REF, std::iter::empty::<&Value>())
             },
             SimpleInstruction::MutBorrowLoc => {
-                self.record_instr_and_inc_pc(Opcodes::MUT_BORROW_LOC, std::iter::empty::<&Value>())
+                self.handle_instr_and_inc_pc(Opcodes::MUT_BORROW_LOC, std::iter::empty::<&Value>())
             },
             SimpleInstruction::ImmBorrowLoc => {
-                self.record_instr_and_inc_pc(Opcodes::IMM_BORROW_LOC, std::iter::empty::<&Value>())
+                self.handle_instr_and_inc_pc(Opcodes::IMM_BORROW_LOC, std::iter::empty::<&Value>())
             },
-            SimpleInstruction::ImmBorrowField => self.record_instr_and_inc_pc(
+            SimpleInstruction::ImmBorrowField => self.handle_instr_and_inc_pc(
                 Opcodes::IMM_BORROW_FIELD,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::MutBorrowField => self.record_instr_and_inc_pc(
+            SimpleInstruction::MutBorrowField => self.handle_instr_and_inc_pc(
                 Opcodes::MUT_BORROW_FIELD,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::ImmBorrowFieldGeneric => self.record_instr_and_inc_pc(
+            SimpleInstruction::ImmBorrowFieldGeneric => self.handle_instr_and_inc_pc(
                 Opcodes::IMM_BORROW_FIELD_GENERIC,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::MutBorrowFieldGeneric => self.record_instr_and_inc_pc(
+            SimpleInstruction::MutBorrowFieldGeneric => self.handle_instr_and_inc_pc(
                 Opcodes::MUT_BORROW_FIELD_GENERIC,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::ImmBorrowVariantField => self.record_instr_and_inc_pc(
+            SimpleInstruction::ImmBorrowVariantField => self.handle_instr_and_inc_pc(
                 Opcodes::IMM_BORROW_VARIANT_FIELD,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::MutBorrowVariantField => self.record_instr_and_inc_pc(
+            SimpleInstruction::MutBorrowVariantField => self.handle_instr_and_inc_pc(
                 Opcodes::MUT_BORROW_VARIANT_FIELD,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::ImmBorrowVariantFieldGeneric => self.record_instr_and_inc_pc(
+            SimpleInstruction::ImmBorrowVariantFieldGeneric => self.handle_instr_and_inc_pc(
                 Opcodes::IMM_BORROW_VARIANT_FIELD_GENERIC,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::MutBorrowVariantFieldGeneric => self.record_instr_and_inc_pc(
+            SimpleInstruction::MutBorrowVariantFieldGeneric => self.handle_instr_and_inc_pc(
                 Opcodes::MUT_BORROW_VARIANT_FIELD_GENERIC,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::TestVariant => self.record_instr_and_inc_pc(
+            SimpleInstruction::TestVariant => self.handle_instr_and_inc_pc(
                 Opcodes::TEST_VARIANT,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::TestVariantGeneric => self.record_instr_and_inc_pc(
+            SimpleInstruction::TestVariantGeneric => self.handle_instr_and_inc_pc(
                 Opcodes::TEST_VARIANT_GENERIC,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::CastU8 => self.record_instr_and_inc_pc(
+            SimpleInstruction::CastU8 => self.handle_instr_and_inc_pc(
                 Opcodes::CAST_U8,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::CastU64 => self.record_instr_and_inc_pc(
+            SimpleInstruction::CastU64 => self.handle_instr_and_inc_pc(
                 Opcodes::CAST_U64,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::CastU128 => self.record_instr_and_inc_pc(
+            SimpleInstruction::CastU128 => self.handle_instr_and_inc_pc(
                 Opcodes::CAST_U128,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
             SimpleInstruction::Add => self
-                .record_instr_and_inc_pc(Opcodes::ADD, interpreter.view_last_n_values(2).unwrap()),
+                .handle_instr_and_inc_pc(Opcodes::ADD, interpreter.view_last_n_values(2).unwrap()),
             SimpleInstruction::Sub => self
-                .record_instr_and_inc_pc(Opcodes::SUB, interpreter.view_last_n_values(2).unwrap()),
+                .handle_instr_and_inc_pc(Opcodes::SUB, interpreter.view_last_n_values(2).unwrap()),
             SimpleInstruction::Mul => self
-                .record_instr_and_inc_pc(Opcodes::MUL, interpreter.view_last_n_values(2).unwrap()),
+                .handle_instr_and_inc_pc(Opcodes::MUL, interpreter.view_last_n_values(2).unwrap()),
             SimpleInstruction::Mod => self
-                .record_instr_and_inc_pc(Opcodes::MOD, interpreter.view_last_n_values(2).unwrap()),
+                .handle_instr_and_inc_pc(Opcodes::MOD, interpreter.view_last_n_values(2).unwrap()),
             SimpleInstruction::Div => self
-                .record_instr_and_inc_pc(Opcodes::DIV, interpreter.view_last_n_values(2).unwrap()),
-            SimpleInstruction::BitOr => self.record_instr_and_inc_pc(
+                .handle_instr_and_inc_pc(Opcodes::DIV, interpreter.view_last_n_values(2).unwrap()),
+            SimpleInstruction::BitOr => self.handle_instr_and_inc_pc(
                 Opcodes::BIT_OR,
                 interpreter.view_last_n_values(2).unwrap(),
             ),
-            SimpleInstruction::BitAnd => self.record_instr_and_inc_pc(
+            SimpleInstruction::BitAnd => self.handle_instr_and_inc_pc(
                 Opcodes::BIT_AND,
                 interpreter.view_last_n_values(2).unwrap(),
             ),
             SimpleInstruction::Xor => self
-                .record_instr_and_inc_pc(Opcodes::XOR, interpreter.view_last_n_values(2).unwrap()),
+                .handle_instr_and_inc_pc(Opcodes::XOR, interpreter.view_last_n_values(2).unwrap()),
             SimpleInstruction::Shl => self
-                .record_instr_and_inc_pc(Opcodes::SHL, interpreter.view_last_n_values(2).unwrap()),
+                .handle_instr_and_inc_pc(Opcodes::SHL, interpreter.view_last_n_values(2).unwrap()),
             SimpleInstruction::Shr => self
-                .record_instr_and_inc_pc(Opcodes::SHR, interpreter.view_last_n_values(2).unwrap()),
+                .handle_instr_and_inc_pc(Opcodes::SHR, interpreter.view_last_n_values(2).unwrap()),
             SimpleInstruction::Or => self
-                .record_instr_and_inc_pc(Opcodes::OR, interpreter.view_last_n_values(2).unwrap()),
+                .handle_instr_and_inc_pc(Opcodes::OR, interpreter.view_last_n_values(2).unwrap()),
             SimpleInstruction::And => self
-                .record_instr_and_inc_pc(Opcodes::AND, interpreter.view_last_n_values(2).unwrap()),
+                .handle_instr_and_inc_pc(Opcodes::AND, interpreter.view_last_n_values(2).unwrap()),
             SimpleInstruction::Not => self
-                .record_instr_and_inc_pc(Opcodes::NOT, interpreter.view_last_n_values(1).unwrap()),
+                .handle_instr_and_inc_pc(Opcodes::NOT, interpreter.view_last_n_values(1).unwrap()),
             SimpleInstruction::Lt => self
-                .record_instr_and_inc_pc(Opcodes::LT, interpreter.view_last_n_values(2).unwrap()),
+                .handle_instr_and_inc_pc(Opcodes::LT, interpreter.view_last_n_values(2).unwrap()),
             SimpleInstruction::Gt => self
-                .record_instr_and_inc_pc(Opcodes::GT, interpreter.view_last_n_values(2).unwrap()),
+                .handle_instr_and_inc_pc(Opcodes::GT, interpreter.view_last_n_values(2).unwrap()),
             SimpleInstruction::Le => self
-                .record_instr_and_inc_pc(Opcodes::LE, interpreter.view_last_n_values(2).unwrap()),
+                .handle_instr_and_inc_pc(Opcodes::LE, interpreter.view_last_n_values(2).unwrap()),
             SimpleInstruction::Ge => self
-                .record_instr_and_inc_pc(Opcodes::GE, interpreter.view_last_n_values(2).unwrap()),
-            SimpleInstruction::Abort => self.record_instr_and_inc_pc(
+                .handle_instr_and_inc_pc(Opcodes::GE, interpreter.view_last_n_values(2).unwrap()),
+            SimpleInstruction::Abort => self.handle_instr_and_inc_pc(
                 Opcodes::ABORT,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
             SimpleInstruction::LdU16 => {
-                self.record_instr_and_inc_pc(Opcodes::LD_U16, std::iter::empty::<&Value>())
+                self.handle_instr_and_inc_pc(Opcodes::LD_U16, std::iter::empty::<&Value>())
             },
             SimpleInstruction::LdU32 => {
-                self.record_instr_and_inc_pc(Opcodes::LD_U32, std::iter::empty::<&Value>())
+                self.handle_instr_and_inc_pc(Opcodes::LD_U32, std::iter::empty::<&Value>())
             },
             SimpleInstruction::LdU256 => {
-                self.record_instr_and_inc_pc(Opcodes::LD_U256, std::iter::empty::<&Value>())
+                self.handle_instr_and_inc_pc(Opcodes::LD_U256, std::iter::empty::<&Value>())
             },
-            SimpleInstruction::CastU16 => self.record_instr_and_inc_pc(
+            SimpleInstruction::CastU16 => self.handle_instr_and_inc_pc(
                 Opcodes::CAST_U16,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::CastU32 => self.record_instr_and_inc_pc(
+            SimpleInstruction::CastU32 => self.handle_instr_and_inc_pc(
                 Opcodes::CAST_U32,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
-            SimpleInstruction::CastU256 => self.record_instr_and_inc_pc(
+            SimpleInstruction::CastU256 => self.handle_instr_and_inc_pc(
                 Opcodes::CAST_U256,
                 interpreter.view_last_n_values(1).unwrap(),
             ),
         }
         let res = self.base.charge_simple_instr(instr, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -534,14 +569,14 @@ where
         target_offset: Option<CodeOffset>,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_instr(Opcodes::BR_TRUE, Vec::<&Value>::new().into_iter());
+        self.handle_instr(Opcodes::BR_TRUE, Vec::<&Value>::new().into_iter());
         if let Some(offset) = target_offset {
             *self.get_pc_mut() = offset;
         } else {
             *self.get_pc_mut() += 1;
         }
         let res = self.base.charge_br_true(target_offset, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -550,14 +585,14 @@ where
         target_offset: Option<CodeOffset>,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_instr(Opcodes::BR_FALSE, Vec::<&Value>::new().into_iter());
+        self.handle_instr(Opcodes::BR_FALSE, Vec::<&Value>::new().into_iter());
         if let Some(offset) = target_offset {
             *self.get_pc_mut() = offset;
         } else {
             *self.get_pc_mut() += 1;
         }
         let res = self.base.charge_br_false(target_offset, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -566,10 +601,10 @@ where
         target_offset: CodeOffset,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_instr(Opcodes::BRANCH, Vec::<&Value>::new().into_iter());
+        self.handle_instr(Opcodes::BRANCH, Vec::<&Value>::new().into_iter());
         *self.get_pc_mut() = target_offset;
         let res = self.base.charge_branch(target_offset, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -578,9 +613,9 @@ where
         popped_val: impl ValueView,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_generic_instr_and_inc_pc(Opcodes::POP, vec![], [&popped_val].into_iter());
+        self.handle_generic_instr_and_inc_pc(Opcodes::POP, vec![], [&popped_val].into_iter());
         let res = self.base.charge_pop(popped_val, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -592,16 +627,18 @@ where
         num_locals: aptos_gas_algebra::NumArgs,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_instr_and_inc_pc(Opcodes::CALL, args.clone().into_iter());
-        self.gen_new_frame(FrameName::Function {
+        self.handle_instr_and_inc_pc(Opcodes::CALL, args.clone().into_iter());
+        let new_frame = FrameName::Function {
             module_id: module_id.clone(),
             name: Identifier::new(func_name).unwrap(),
             ty_args: vec![],
-        });
+        };
+        self.gen_new_frame(new_frame.clone());
+        self.response_handler.handle_response(Response::NewFrame(new_frame));
         let res = self
             .base
             .charge_call(module_id, func_name, args, num_locals, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -619,7 +656,7 @@ where
             .map(|ty| ty.to_type_tag())
             .collect::<Vec<_>>();
 
-        self.record_generic_instr_and_inc_pc(
+        self.handle_generic_instr_and_inc_pc(
             Opcodes::CALL,
             ty_tags.clone(),
             args.clone().into_iter(),
@@ -637,7 +674,7 @@ where
             num_locals,
             interpreter,
         );
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -646,9 +683,9 @@ where
         size: aptos_gas_algebra::NumBytes,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_instr_and_inc_pc(Opcodes::LD_CONST, std::iter::empty::<&Value>());
+        self.handle_instr_and_inc_pc(Opcodes::LD_CONST, std::iter::empty::<&Value>());
         let res = self.base.charge_ld_const(size, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -657,7 +694,7 @@ where
         val: impl ValueView,
     ) -> PartialVMResult<()> {
         let res = self.base.charge_ld_const_after_deserialization(val);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -666,9 +703,9 @@ where
         val: impl ValueView,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_instr_and_inc_pc(Opcodes::COPY_LOC, std::iter::empty::<&Value>());
+        self.handle_instr_and_inc_pc(Opcodes::COPY_LOC, std::iter::empty::<&Value>());
         let res = self.base.charge_copy_loc(val, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -677,9 +714,9 @@ where
         val: impl ValueView,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_instr_and_inc_pc(Opcodes::MOVE_LOC, std::iter::empty::<&Value>());
+        self.handle_instr_and_inc_pc(Opcodes::MOVE_LOC, std::iter::empty::<&Value>());
         let res = self.base.charge_move_loc(val, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -688,9 +725,9 @@ where
         val: impl ValueView,
         interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_instr_and_inc_pc(Opcodes::ST_LOC, std::iter::once(&val));
+        self.handle_instr_and_inc_pc(Opcodes::ST_LOC, std::iter::once(&val));
         let res = self.base.charge_store_loc(val, interpreter_view);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -700,9 +737,9 @@ where
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
         interpreter_view: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_instr_and_inc_pc(Opcodes::PACK, args.clone().into_iter());
+        self.handle_instr_and_inc_pc(Opcodes::PACK, args.clone().into_iter());
         let res = self.base.charge_pack(is_generic, args, interpreter_view);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -713,9 +750,9 @@ where
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         // TODO: this is technically wrong, the argument should be the struct value instead of the fields
-        self.record_instr_and_inc_pc(Opcodes::UNPACK, args.clone());
+        self.handle_instr_and_inc_pc(Opcodes::UNPACK, args.clone());
         let res = self.base.charge_unpack(is_generic, args, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -724,9 +761,9 @@ where
         val: impl ValueView,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_instr_and_inc_pc(Opcodes::READ_REF, std::iter::once(&val));
+        self.handle_instr_and_inc_pc(Opcodes::READ_REF, std::iter::once(&val));
         let res = self.base.charge_read_ref(val, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -736,13 +773,13 @@ where
         old_val: impl ValueView,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_instr_and_inc_pc(
+        self.handle_instr_and_inc_pc(
             Opcodes::WRITE_REF,
             // TODO
             std::iter::empty::<&Value>(),
         );
         let res = self.base.charge_write_ref(new_val, old_val, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -752,13 +789,13 @@ where
         rhs: impl ValueView,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_instr_and_inc_pc(
+        self.handle_instr_and_inc_pc(
             Opcodes::EQ,
             // TODO
             std::iter::empty::<&Value>(),
         );
         let res = self.base.charge_eq(lhs, rhs, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -768,13 +805,13 @@ where
         rhs: impl ValueView,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_instr_and_inc_pc(
+        self.handle_instr_and_inc_pc(
             Opcodes::NEQ,
             // TODO
             std::iter::empty::<&Value>(),
         );
         let res = self.base.charge_neq(lhs, rhs, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -786,7 +823,7 @@ where
         is_success: bool,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_generic_instr_and_inc_pc(
+        self.handle_generic_instr_and_inc_pc(
             if is_mut {
                 Opcodes::MUT_BORROW_GLOBAL
             } else {
@@ -799,7 +836,7 @@ where
         let res = self
             .base
             .charge_borrow_global(is_mut, is_generic, ty, is_success, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -811,13 +848,13 @@ where
         exists: bool,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_generic_instr_and_inc_pc(
+        self.handle_generic_instr_and_inc_pc(
             Opcodes::EXISTS,
             vec![ty.to_type_tag()],
             Vec::<&Value>::new().into_iter(),
         );
         let res = self.base.charge_exists(is_generic, ty, exists, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -829,14 +866,14 @@ where
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
         let ty_args = vec![ty.to_type_tag()];
-        self.record_generic_instr_and_inc_pc(
+        self.handle_generic_instr_and_inc_pc(
             Opcodes::MOVE_FROM,
             ty_args,
             // TODO
             std::iter::empty::<&Value>(),
         );
         let res = self.base.charge_move_from(is_generic, ty, val, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -848,7 +885,7 @@ where
         is_success: bool,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_generic_instr_and_inc_pc(
+        self.handle_generic_instr_and_inc_pc(
             Opcodes::MOVE_TO,
             vec![ty.to_type_tag()],
             std::iter::once(&val),
@@ -856,7 +893,7 @@ where
         let res = self
             .base
             .charge_move_to(is_generic, ty, val, is_success, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -866,13 +903,13 @@ where
         args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_generic_instr_and_inc_pc(
+        self.handle_generic_instr_and_inc_pc(
             Opcodes::VEC_PACK,
             vec![ty.to_type_tag()],
             args.clone().into_iter(),
         );
         let res = self.base.charge_vec_pack(ty, args, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -881,14 +918,14 @@ where
         ty: impl TypeView,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_generic_instr_and_inc_pc(
+        self.handle_generic_instr_and_inc_pc(
             Opcodes::VEC_LEN,
             vec![ty.to_type_tag()],
             // TODO
             std::iter::empty::<&Value>(),
         );
         let res = self.base.charge_vec_len(ty, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -899,7 +936,7 @@ where
         is_success: bool,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_generic_instr_and_inc_pc(
+        self.handle_generic_instr_and_inc_pc(
             if is_mut {
                 Opcodes::VEC_MUT_BORROW
             } else {
@@ -912,7 +949,7 @@ where
         let res = self
             .base
             .charge_vec_borrow(is_mut, ty, is_success, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -922,13 +959,13 @@ where
         val: impl ValueView,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_generic_instr_and_inc_pc(
+        self.handle_generic_instr_and_inc_pc(
             Opcodes::VEC_PUSH_BACK,
             vec![ty.to_type_tag()],
             std::iter::once(&val),
         );
         let res = self.base.charge_vec_push_back(ty, val, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -938,14 +975,14 @@ where
         val: Option<impl ValueView>,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_generic_instr_and_inc_pc(
+        self.handle_generic_instr_and_inc_pc(
             Opcodes::VEC_POP_BACK,
             vec![ty.to_type_tag()],
             // TODO
             std::iter::empty::<&Value>(),
         );
         let res = self.base.charge_vec_pop_back(ty, val, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -956,7 +993,7 @@ where
         elems: impl ExactSizeIterator<Item = impl ValueView> + Clone,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_generic_instr_and_inc_pc(
+        self.handle_generic_instr_and_inc_pc(
             Opcodes::VEC_UNPACK,
             vec![ty.to_type_tag()],
             elems.clone().into_iter(),
@@ -964,7 +1001,7 @@ where
         let res = self
             .base
             .charge_vec_unpack(ty, expect_num_elements, elems, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -973,14 +1010,14 @@ where
         ty: impl TypeView,
         interpreter: impl InterpreterView,
     ) -> PartialVMResult<()> {
-        self.record_generic_instr_and_inc_pc(
+        self.handle_generic_instr_and_inc_pc(
             Opcodes::VEC_SWAP,
             vec![ty.to_type_tag()],
             // TODO
             std::iter::empty::<&Value>(),
         );
         let res = self.base.charge_vec_swap(ty, interpreter);
-        self.step();
+        self.handle_new_requests();
         res
     }
 
@@ -1042,7 +1079,7 @@ where
     }
 }
 
-impl<G, Reader: GetCommand> AptosGasMeter for ExecutionTracer<G, String, Reader>
+impl<G, R: RequestReceiver, W: ResponseHandler<String>> AptosGasMeter for ExecutionTracer<G, R, W>
 where
     G: AptosGasMeter,
 {
@@ -1098,7 +1135,8 @@ where
     }
 }
 
-enum Command {
+#[derive(Debug)]
+pub enum Request {
     Step(usize),
     Continue,
     Help,
@@ -1106,15 +1144,37 @@ enum Command {
     Backtrace(Option<usize>),
 }
 
-pub trait GetCommand {
-    fn get_command(&mut self) -> Command;
+pub enum Response<Value> {
+    InstructionExecuted(Instruction<Value>),
+    NewFrame(FrameName),
+    Ret,
 }
 
-pub struct AlwaysContinue;
+pub trait RequestReceiver {
+    fn get_request(&mut self) -> Request;
+}
 
-impl GetCommand for AlwaysContinue {
-    fn get_command(&mut self) -> Command {
-        Command::Step(1)
+pub trait ResponseHandler<Value> {
+    fn handle_response(&mut self, response: Response<Value>);
+}
+
+pub struct PrintResponse;
+
+// impl<Value: Display> ResponseHandler<Value> for PrintResponse {
+//     fn handle_response(&mut self, response: Response<Value>) {
+//         match response {
+
+//         }
+//     }
+// }
+
+// pub trait Client<Value>: RequestReceiver + ResponseHandler<Value=Value> {}
+
+pub struct IncrementalStepper;
+
+impl RequestReceiver for IncrementalStepper {
+    fn get_request(&mut self) -> Request {
+        Request::Step(1)
     }
 }
 
@@ -1123,30 +1183,31 @@ pub struct CommandReader<R, W> {
     writer: W,
 }
 
-impl<R: BufRead, W: Write> GetCommand for CommandReader<R, W> {
-    fn get_command(&mut self) -> Command {
+impl<R: BufRead, W: Write> RequestReceiver for CommandReader<R, W> {
+    fn get_request(&mut self) -> Request {
         let mut line = String::new();
         write!(self.writer, "> ").expect("Failed to write");
         self.writer.flush().expect("Failed to flush");
         self.reader.read_line(&mut line).expect("Invalid character");
         match line.trim() {
-            "s" | "step" => Command::Step(1),
-            "c" | "continue" => Command::Continue,
-            "h" | "help" => Command::Help,
-            "b" | "backtrace" => Command::Backtrace(None),
+            "s" | "step" => Request::Step(1),
+            "c" | "continue" => Request::Continue,
+            "h" | "help" => Request::Help,
+            "b" | "backtrace" => Request::Backtrace(None),
             x => {
                 if x.starts_with("step") {
-                    Command::Step(x[4..].trim().parse().expect("Invalid step count"))
+                    Request::Step(x[4..].trim().parse().expect("Invalid step count"))
                 } else {
-                    self.get_command()
+                    self.get_request()
                 }
             },
         }
     }
 }
 
-pub fn standard_io_command_reader(
-) -> CommandReader<std::io::BufReader<std::io::Stdin>, std::io::Stdout> {
+pub type StandardIOCommandReader = CommandReader<std::io::BufReader<std::io::Stdin>, std::io::Stdout>;
+
+pub fn new_standard_io_command_reader() -> StandardIOCommandReader {
     CommandReader {
         reader: std::io::BufReader::new(std::io::stdin()),
         writer: std::io::stdout(),
@@ -1287,5 +1348,111 @@ impl ValueVisitor for Visitor {
         self.return_to(depth);
         self.stack.push(TValue::Ref(Vec::new()));
         true
+    }
+}
+
+struct ResponsePrinter;
+
+impl<T: Display> ResponseHandler<T> for ResponsePrinter {
+
+    fn handle_response(&mut self, response: Response<T>) {
+        match response {
+            Response::InstructionExecuted(instruction) => {
+                print!(
+                    "{}[{}]: ",
+                    instruction.frame_name.as_ref().unwrap(),
+                    instruction.offset
+                );
+                print!("{} ", instruction.display_qualified_instr());
+                for arg in &instruction.args {
+                    print!("{} ", arg);
+                }
+                println!();
+            },
+            Response::NewFrame(_frame_name) => (),
+            Response::Ret => (),
+        }
+    }
+}
+
+/// Records the execution of a function call
+#[derive(Debug, Clone)]
+pub struct CallFrame1<Value> {
+    pub name: FrameName,
+    pub events: Vec<Event1<Value>>,
+}
+
+impl<Value> CallFrame1<Value> {
+    pub fn new_function(module_id: ModuleId, name: Identifier, ty_args: Vec<TypeTag>) -> Self {
+        Self { name: FrameName::Function { module_id, name, ty_args }, events: Vec::new() }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Event1<Value> {
+    Call(CallFrame1<Value>),
+    Instruction(Instruction<Value>),
+}
+
+pub struct TraceCollector<Value> {
+    frames: Vec<CallFrame1<Value>>,
+}
+
+impl<Value> TraceCollector<Value> {
+    pub fn new_from_entry_fun(module_id: ModuleId, function: Identifier, ty_args: Vec<TypeTag>) -> Self {
+        Self { frames: vec![CallFrame1::new_function(module_id, function, ty_args)] }
+    }
+
+    pub fn new() -> Self {
+        Self { frames: Vec::new() }
+    }
+
+    fn get_cur_frame_mut(&mut self) -> &mut CallFrame1<Value> {
+        self.frames.last_mut().unwrap()
+    }
+
+    fn get_cur_events_mut(&mut self) -> &mut Vec<Event1<Value>> {
+        self.get_cur_frame_mut().events.as_mut()
+    }
+
+    fn record_instr(&mut self, instr: Instruction<Value>) {
+        self.get_cur_events_mut().push(Event1::Instruction(instr));
+    }
+
+    fn gen_new_frame(&mut self, name: FrameName) {
+        self.frames.push(CallFrame1 {
+            name,
+            events: Vec::new(),
+        });
+    }
+
+    fn ret(&mut self) {
+        if self.frames.len() == 1 {
+            return;
+        }
+        let frame = self.frames.pop().unwrap();
+        self.get_cur_events_mut().push(Event1::Call(frame));
+    }
+
+    pub fn dump_trace(&mut self) -> ExecutionTrace<Value> {
+        // debug_assert!(self.frames.len() == 1);
+        // TODO: fix for abort
+        ExecutionTrace(self.frames.pop().expect("non-empty stack of frames"))
+    }
+}
+
+impl<Value> ResponseHandler<Value> for TraceCollector<Value> {
+    fn handle_response(&mut self, response: Response<Value>) {
+        match response {
+            Response::InstructionExecuted(instruction) => {
+                self.record_instr(instruction);
+            },
+            Response::NewFrame(frame_name) => {
+                self.gen_new_frame(frame_name);
+            },
+            Response::Ret => {
+                self.ret();
+            },
+        }
     }
 }

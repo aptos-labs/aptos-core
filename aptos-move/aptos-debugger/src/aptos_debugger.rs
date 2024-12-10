@@ -8,7 +8,7 @@ use aptos_block_executor::{
     txn_provider::{default::DefaultTxnProvider, TxnProvider},
 };
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
-use aptos_tracer::{get_env, standard_io_command_reader, AlwaysContinue, CommandReader, ExecutionTrace, ExecutionTracer};
+use aptos_tracer::{get_env, new_standard_io_command_reader, new_tracer_from_entry_fun, CommandReader, ExecutionTrace, ExecutionTracer, IncrementalStepper, Tracer};
 use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
@@ -162,7 +162,7 @@ impl AptosDebugger {
         &self,
         version: Version,
         txn: SignedTransaction,
-    ) -> Result<(VMStatus, VMOutput, ExecutionTracer<ProdGasMeter, String, CommandReader<std::io::BufReader<std::io::Stdin>, std::io::Stdout>>)> {
+    ) -> Result<(VMStatus, VMOutput, Tracer<ProdGasMeter, String>)> {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         let txn = txn
@@ -179,8 +179,6 @@ impl AptosDebugger {
         let resolver = state_view.as_move_resolver();
         let code_storage = state_view.as_aptos_code_storage(env);
 
-        let env = get_env();
-
         let (status, output, execution_tracer) = vm.execute_user_transaction_with_modified_gas_meter(
             &resolver,
             &code_storage,
@@ -190,13 +188,12 @@ impl AptosDebugger {
                 let execution_tracer = match txn.payload() {
                     TransactionPayload::Script(_) => ExecutionTracer::from_script(gas_meter),
                     TransactionPayload::EntryFunction(entry_func) => {
-                        // let env = get_env();
-                        ExecutionTracer::from_entry_fun(
+                        let env = get_env();
+                        new_tracer_from_entry_fun(
                             gas_meter,
                             entry_func.module().clone(),
                             entry_func.function().to_owned(),
                             entry_func.ty_args().to_vec(),
-                            standard_io_command_reader(),
                             Some(env),
                         )
                     },
