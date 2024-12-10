@@ -17,6 +17,13 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
+#[derive(Clone)]
+pub(crate) enum PerInstructionCache {
+    Nothing,
+    PackGeneric,
+    Pack(u16),
+}
+
 #[derive(Default)]
 pub(crate) struct FrameTypeCache {
     struct_field_type_instantiation:
@@ -39,6 +46,7 @@ pub(crate) struct FrameTypeCache {
         BTreeMap<FunctionInstantiationIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
     pub(crate) sub_frame_cache:
         BTreeMap<FunctionHandleIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
+    pub(crate) per_instruction_cache: Vec<PerInstructionCache>,
 }
 
 impl FrameTypeCache {

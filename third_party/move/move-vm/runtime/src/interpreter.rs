@@ -5,7 +5,7 @@
 use crate::{
     access_control::AccessControlState,
     data_cache::TransactionDataCache,
-    frame_type_cache::FrameTypeCache,
+    frame_type_cache::{FrameTypeCache, PerInstructionCache},
     loader::{LegacyModuleStorageAdapter, Loader, Resolver},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
@@ -42,7 +42,7 @@ use move_vm_types::{
 };
 use std::{
     cmp::min,
-    collections::{HashSet, VecDeque},
+    collections::{BTreeSet, VecDeque},
     fmt::Write,
 };
 
@@ -79,7 +79,7 @@ pub(crate) struct InterpreterImpl {
     /// The access control state.
     access_control: AccessControlState,
     /// Set of modules that exists on call stack.
-    active_modules: HashSet<ModuleId>,
+    active_modules: BTreeSet<ModuleId>,
 }
 
 struct TypeWithLoader<'a, 'b, 'c> {
@@ -143,7 +143,7 @@ impl InterpreterImpl {
             call_stack: CallStack::new(),
             paranoid_type_checks: loader.vm_config().paranoid_type_checks,
             access_control: AccessControlState::default(),
-            active_modules: HashSet::new(),
+            active_modules: BTreeSet::new(),
         };
 
         let function = std::rc::Rc::new(function);
@@ -243,6 +243,13 @@ impl InterpreterImpl {
 
         let frame_cache = std::rc::Rc::new(std::cell::RefCell::new(Default::default()));
 
+        if !function.is_native() {
+            let f_cache: &mut FrameTypeCache = &mut frame_cache.borrow_mut();
+            f_cache
+                .per_instruction_cache
+                .resize(function.code_size(), PerInstructionCache::Nothing);
+        }
+
         let mut current_frame = self
             .make_new_frame(gas_meter, loader, function, locals, frame_cache)
             .map_err(|err| self.set_location(err))?;
@@ -308,6 +315,14 @@ impl InterpreterImpl {
                                 );
                                 let frame_cache =
                                     std::rc::Rc::new(std::cell::RefCell::new(Default::default()));
+
+                                if !function.is_native() {
+                                    let f_cache: &mut FrameTypeCache =
+                                        &mut frame_cache.borrow_mut();
+                                    f_cache
+                                        .per_instruction_cache
+                                        .resize(function.code_size(), PerInstructionCache::Nothing);
+                                }
 
                                 entry.insert((
                                     std::rc::Rc::clone(&function),
@@ -379,6 +394,14 @@ impl InterpreterImpl {
                                 );
                                 let frame_cache =
                                     std::rc::Rc::new(std::cell::RefCell::new(Default::default()));
+
+                                if !function.is_native() {
+                                    let f_cache: &mut FrameTypeCache =
+                                        &mut frame_cache.borrow_mut();
+                                    f_cache
+                                        .per_instruction_cache
+                                        .resize(function.code_size(), PerInstructionCache::Nothing);
+                                }
 
                                 entry.insert((
                                     std::rc::Rc::clone(&function),
@@ -562,7 +585,7 @@ impl InterpreterImpl {
             locals,
             function,
             local_tys,
-            ty_cache: frame_cache, // std::rc::Rc::new(std::cell::RefCell::new(FrameTypeCache::default())),
+            ty_cache: frame_cache,
         })
     }
 
@@ -784,7 +807,14 @@ impl InterpreterImpl {
                     }
                 }
 
-                let frame_cache = std::rc::Rc::new(Default::default());
+                let frame_cache = std::rc::Rc::new(std::cell::RefCell::new(Default::default()));
+
+                if !target_func.is_native() {
+                    let f_cache: &mut FrameTypeCache = &mut frame_cache.borrow_mut();
+                    f_cache
+                        .per_instruction_cache
+                        .resize(target_func.code_size(), PerInstructionCache::Nothing);
+                }
 
                 self.set_new_call_frame::<RTTCheck>(
                     current_frame,
@@ -1378,6 +1408,12 @@ impl Stack {
             .ok_or_else(|| PartialVMError::new(StatusCode::EMPTY_VALUE_STACK))
     }
 
+    pub(crate) fn top_ty(&mut self) -> PartialVMResult<&Type> {
+        self.types
+            .last()
+            .ok_or_else(|| PartialVMError::new(StatusCode::EMPTY_VALUE_STACK))
+    }
+
     /// Pop n types off the stack.
     pub(crate) fn popn_tys(&mut self, n: u16) -> PartialVMResult<Vec<Type>> {
         let remaining_stack_size = self
@@ -1850,9 +1886,20 @@ impl Frame {
                         interpreter.operand_stack.push(field_ref)?;
                     },
                     Bytecode::Pack(sd_idx) => {
-                        let field_count = resolver.field_count(*sd_idx);
-                        let struct_type = resolver.get_struct_ty(*sd_idx);
-                        check_depth_of_type(resolver, &struct_type)?;
+                        let field_count = {
+                            let cached_field_count =
+                                &ty_cache.per_instruction_cache[self.pc as usize];
+                            if let PerInstructionCache::Pack(ref field_count) = cached_field_count {
+                                *field_count
+                            } else {
+                                let field_count = resolver.field_count(*sd_idx);
+                                let struct_type = resolver.get_struct_ty(*sd_idx);
+                                check_depth_of_type(resolver, &struct_type)?;
+                                ty_cache.per_instruction_cache[self.pc as usize] =
+                                    PerInstructionCache::Pack(field_count);
+                                field_count
+                            }
+                        };
                         gas_meter.charge_pack(
                             false,
                             interpreter.operand_stack.last_n(field_count as usize)?,
