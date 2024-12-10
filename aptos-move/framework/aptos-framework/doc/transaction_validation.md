@@ -395,8 +395,12 @@ Only called during genesis to initialize system resources for this module.
     is_simulation: bool,
 ) {
     // Question: Is this logic correct?
-    <b>let</b> success = <a href="nonce_validation.md#0x1_nonce_validation_check_and_insert_nonce">nonce_validation::check_and_insert_nonce</a>(sender, nonce, txn_expiration_time);
-    <b>assert</b>!(success, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_NONCE_ALREADY_USED">PROLOGUE_NONCE_ALREADY_USED</a>));
+    <b>if</b> (is_simulation) {
+        <b>assert</b>!(<a href="nonce_validation.md#0x1_nonce_validation_check_nonce">nonce_validation::check_nonce</a>(sender, nonce, txn_expiration_time), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_NONCE_ALREADY_USED">PROLOGUE_NONCE_ALREADY_USED</a>));
+    }
+    <b>else</b> {
+        <b>assert</b>!(<a href="nonce_validation.md#0x1_nonce_validation_check_and_insert_nonce">nonce_validation::check_and_insert_nonce</a>(sender, nonce, txn_expiration_time), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_NONCE_ALREADY_USED">PROLOGUE_NONCE_ALREADY_USED</a>));
+    };
 
     <b>if</b> (!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_simulation_enhancement_enabled">features::transaction_simulation_enhancement_enabled</a>() ||
         !<a href="transaction_validation.md#0x1_transaction_validation_skip_auth_key_check">skip_auth_key_check</a>(is_simulation, &txn_authentication_key)) {

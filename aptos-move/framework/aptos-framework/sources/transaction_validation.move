@@ -141,8 +141,12 @@ module aptos_framework::transaction_validation {
         is_simulation: bool,
     ) {
         // Question: Is this logic correct?
-        let success = nonce_validation::check_and_insert_nonce(sender, nonce, txn_expiration_time);
-        assert!(success, error::invalid_argument(PROLOGUE_NONCE_ALREADY_USED));
+        if (is_simulation) {
+            assert!(nonce_validation::check_nonce(sender, nonce, txn_expiration_time), error::invalid_argument(PROLOGUE_NONCE_ALREADY_USED));
+        }
+        else {
+            assert!(nonce_validation::check_and_insert_nonce(sender, nonce, txn_expiration_time), error::invalid_argument(PROLOGUE_NONCE_ALREADY_USED));
+        };
 
         if (!features::transaction_simulation_enhancement_enabled() ||
             !skip_auth_key_check(is_simulation, &txn_authentication_key)) {

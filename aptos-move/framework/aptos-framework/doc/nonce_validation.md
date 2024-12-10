@@ -11,6 +11,7 @@
 -  [Resource `NonceHistory`](#0x1_nonce_validation_NonceHistory)
 -  [Function `initialize`](#0x1_nonce_validation_initialize)
 -  [Function `check_and_insert_nonce`](#0x1_nonce_validation_check_and_insert_nonce)
+-  [Function `check_nonce`](#0x1_nonce_validation_check_nonce)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_aptos_hash">0x1::aptos_hash</a>;
@@ -252,6 +253,51 @@
         *<a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> nonce_history.nonce_table, index) = new_bucket;
     };
     <b>return</b> <b>true</b>
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_nonce_validation_check_nonce"></a>
+
+## Function `check_nonce`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="nonce_validation.md#0x1_nonce_validation_check_nonce">check_nonce</a>(sender_address: <b>address</b>, nonce: u64, txn_expiration_time: u64): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="nonce_validation.md#0x1_nonce_validation_check_nonce">check_nonce</a>(
+    sender_address: <b>address</b>,
+    nonce: u64,
+    txn_expiration_time: u64,
+): bool <b>acquires</b> <a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a> {
+    <b>let</b> nonce_entry = <a href="nonce_validation.md#0x1_nonce_validation_NonceEntry">NonceEntry</a> {
+        sender_address,
+        nonce,
+        txn_expiration_time,
+    };
+    <b>let</b> nonce_key = <a href="nonce_validation.md#0x1_nonce_validation_NonceKey">NonceKey</a> {
+        sender_address,
+        nonce,
+    };
+    <b>let</b> <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a> = sip_hash_from_value(&nonce_key);
+    <b>let</b> index = <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a> % 200000;
+    <b>let</b> nonce_history = <b>borrow_global</b>&lt;<a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a>&gt;(@aptos_framework);
+    <b>if</b> (<a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(&nonce_history.nonce_table, index)) {
+        <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_contains">vector::contains</a>(&<a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&nonce_history.nonce_table, index).nonces, &nonce_entry)) {
+            <b>return</b> <b>false</b>
+        }
+    };
+    <b>true</b>
 }
 </code></pre>
 

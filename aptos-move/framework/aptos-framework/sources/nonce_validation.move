@@ -116,28 +116,30 @@ module aptos_framework::nonce_validation {
     //     vector::push_back(table::borrow_mut(&mut nonce_history.nonce_table, index), nonce_entry);
     // }
 
-    // public(friend) fun nonce_exists(
-    //     sender_address: address,
-    //     nonce: u64,
-    //     txn_expiration_time: u64,
-    // ): bool acquires NonceHistory {
-    //     let nonce_entry = NonceEntry {
-    //         sender_address,
-    //         nonce,
-    //         txn_expiration_time,
-    //     };
-    //     let nonce_key = NonceKey {
-    //         sender_address,
-    //         nonce,
-    //     };
-    //     let hash = sip_hash_from_value(&nonce_key);
-    //     let index = hash % 200000;
-    //     let nonce_history = borrow_global<NonceHistory>(@aptos_framework);
-    //     if (table::contains(&nonce_history.nonce_table, index)) {
-    //         if (vector::contains(&table::borrow(&nonce_history.nonce_table, index).nonces, &nonce_entry)) {
-    //             return true
-    //         }
-    //     };
-    //     false
-    // }
+    // returns true if the nonce is valid (not present in the table)
+    // returns false if the nonce is duplicate
+    public(friend) fun check_nonce(
+        sender_address: address,
+        nonce: u64,
+        txn_expiration_time: u64,
+    ): bool acquires NonceHistory {
+        let nonce_entry = NonceEntry {
+            sender_address,
+            nonce,
+            txn_expiration_time,
+        };
+        let nonce_key = NonceKey {
+            sender_address,
+            nonce,
+        };
+        let hash = sip_hash_from_value(&nonce_key);
+        let index = hash % 200000;
+        let nonce_history = borrow_global<NonceHistory>(@aptos_framework);
+        if (table::contains(&nonce_history.nonce_table, index)) {
+            if (vector::contains(&table::borrow(&nonce_history.nonce_table, index).nonces, &nonce_entry)) {
+                return false
+            }
+        };
+        true
+    }
 }
