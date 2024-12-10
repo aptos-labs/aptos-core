@@ -4,6 +4,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+## [4.7.0] - 2024/12/10
 - [`Fix`] CLI config should not always require a private key field to be present.
 
 ## [4.6.0] - 2024/11/29
