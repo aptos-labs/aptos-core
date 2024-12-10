@@ -978,7 +978,11 @@ pub async fn create_management_configmap(
     Ok(())
 }
 
-pub async fn cleanup_cluster_with_management() -> Result<()> {
+pub async fn cleanup_cluster_with_management(dry_run: bool) -> Result<()> {
+    if dry_run {
+        info!("Dry run mode, skipping actual cleanup");
+    }
+
     let kube_client = create_k8s_client().await?;
     let start = SystemTime::now();
     let time_since_the_epoch = start
@@ -1014,7 +1018,10 @@ pub async fn cleanup_cluster_with_management() -> Result<()> {
         .collect::<Vec<ConfigMap>>();
     for configmap in old_forge_management_configmaps_to_delete {
         let namespace = configmap.namespace().unwrap();
-        uninstall_testnet_resources(namespace).await?;
+        info!("Deleting old namespace {}", namespace);
+        if !dry_run {
+            uninstall_testnet_resources(namespace).await?;
+        }
     }
 
     // delete all orphan forge test pods older than a threshold
@@ -1027,6 +1034,10 @@ pub async fn cleanup_cluster_with_management() -> Result<()> {
         .into_iter()
         .filter(|namespace| namespace.name().contains("forge"))
         .collect::<Vec<Namespace>>();
+    // print all namespace names
+    for namespace in &forge_namespaces {
+        info!("Found forge namespace: {}", namespace.name());
+    }
     let pods_api: Api<Pod> = Api::namespaced(kube_client.clone(), "default");
     let lp = ListParams::default().labels("app.kubernetes.io/name=forge");
     let orphan_forge_test_runner_pods_to_delete =
@@ -1036,19 +1047,23 @@ pub async fn cleanup_cluster_with_management() -> Result<()> {
             if let Some(time) = &pod.metadata.creation_timestamp {
                 let pod_creation_time = time.0.timestamp() as u64;
                 let pod_uptime = time_since_the_epoch - pod_creation_time;
-                // If it's older than 5 min continue. There might be a race where the test runner is created and is in the process of creating the namespace.
-                if pod_uptime > ORPHAN_POD_CLEANUP_THRESHOLD_SECS {
-                    return true;
+                // If it's not older than the threshold time, it's not elegible for deletion
+                if pod_uptime < ORPHAN_POD_CLEANUP_THRESHOLD_SECS {
+                    return false;
                 }
             }
+            // If there is no namespace that matches the pod name, it's an orphan pod
             !forge_namespaces
                 .iter()
                 .any(|namespace| pod_name.contains(namespace.metadata.name.as_ref().unwrap()))
         });
     for pod in orphan_forge_test_runner_pods_to_delete {
         let pod_name = pod.name();
-        info!("Deleting pod {}", pod_name);
-        pods_api.delete(&pod_name, &DeleteParams::default()).await?;
+        let pod_age = time_since_the_epoch - pod.metadata.creation_timestamp.unwrap().0.timestamp() as u64;
+        info!("Deleting orphaned pod {} with age {} without any corresponding namespace", pod_name, pod_age);
+        if !dry_run {
+            pods_api.delete(&pod_name, &DeleteParams::default()).await?;
+        }
     }
 
     Ok(())
