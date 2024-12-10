@@ -10,8 +10,8 @@ use crate::{
     DEFAULT_TEST_SUITE_NAME, DEFAULT_USERNAME, FORGE_KEY_SEED,
     FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO, FULLNODE_HAPROXY_SERVICE_SUFFIX,
     FULLNODE_SERVICE_SUFFIX, HELM_BIN, KUBECTL_BIN, MANAGEMENT_CONFIGMAP_PREFIX,
-    NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS, VALIDATOR_HAPROXY_SERVICE_SUFFIX,
-    VALIDATOR_SERVICE_SUFFIX,
+    NAMESPACE_CLEANUP_THRESHOLD_SECS, ORPHAN_POD_CLEANUP_THRESHOLD_SECS,
+    VALIDATOR_HAPROXY_SERVICE_SUFFIX, VALIDATOR_SERVICE_SUFFIX,
 };
 use again::RetryPolicy;
 use anyhow::{anyhow, bail, format_err};
@@ -986,43 +986,11 @@ pub async fn cleanup_cluster_with_management() -> Result<()> {
         .expect("Time went backwards")
         .as_secs();
 
-    let pods_api: Api<Pod> = Api::namespaced(kube_client.clone(), "default");
-    let lp = ListParams::default().labels("app.kubernetes.io/name=forge");
-
-    // delete all forge test pods over a threshold age
-    let pods = pods_api
-        .list(&lp)
-        .await?
-        .items
-        .into_iter()
-        .filter(|pod| {
-            let pod_name = pod.name();
-            info!("Got pod {}", pod_name);
-            if let Some(time) = &pod.metadata.creation_timestamp {
-                let pod_creation_time = time.0.timestamp() as u64;
-                let pod_uptime = time_since_the_epoch - pod_creation_time;
-                info!(
-                    "Pod {} has lived for {}/{} seconds",
-                    pod_name, pod_uptime, POD_CLEANUP_THRESHOLD_SECS
-                );
-                if pod_uptime > POD_CLEANUP_THRESHOLD_SECS {
-                    return true;
-                }
-            }
-            false
-        })
-        .collect::<Vec<Pod>>();
-    for pod in pods {
-        let pod_name = pod.name();
-        info!("Deleting pod {}", pod_name);
-        pods_api.delete(&pod_name, &DeleteParams::default()).await?;
-    }
-
     // delete all forge testnets over a threshold age using their management configmaps
     // unless they are explicitly set with "keep = true"
     let configmaps_api: Api<ConfigMap> = Api::all(kube_client.clone());
     let lp = ListParams::default();
-    let configmaps = configmaps_api
+    let old_forge_management_configmaps_to_delete = configmaps_api
         .list(&lp)
         .await?
         .items
@@ -1044,9 +1012,43 @@ pub async fn cleanup_cluster_with_management() -> Result<()> {
             false
         })
         .collect::<Vec<ConfigMap>>();
-    for configmap in configmaps {
+    for configmap in old_forge_management_configmaps_to_delete {
         let namespace = configmap.namespace().unwrap();
         uninstall_testnet_resources(namespace).await?;
+    }
+
+    // delete all orphan forge test pods older than a threshold
+    let namespace_api: Api<Namespace> = Api::all(kube_client.clone());
+    let lp = ListParams::default();
+    let forge_namespaces = namespace_api
+        .list(&lp)
+        .await?
+        .items
+        .into_iter()
+        .filter(|namespace| namespace.name().contains("forge"))
+        .collect::<Vec<Namespace>>();
+    let pods_api: Api<Pod> = Api::namespaced(kube_client.clone(), "default");
+    let lp = ListParams::default().labels("app.kubernetes.io/name=forge");
+    let orphan_forge_test_runner_pods_to_delete =
+        pods_api.list(&lp).await?.items.into_iter().filter(|pod| {
+            let pod_name = pod.name();
+            // check if the pod is older than 5min
+            if let Some(time) = &pod.metadata.creation_timestamp {
+                let pod_creation_time = time.0.timestamp() as u64;
+                let pod_uptime = time_since_the_epoch - pod_creation_time;
+                // If it's older than 5 min continue. There might be a race where the test runner is created and is in the process of creating the namespace.
+                if pod_uptime > ORPHAN_POD_CLEANUP_THRESHOLD_SECS {
+                    return true;
+                }
+            }
+            !forge_namespaces
+                .iter()
+                .any(|namespace| pod_name.contains(namespace.metadata.name.as_ref().unwrap()))
+        });
+    for pod in orphan_forge_test_runner_pods_to_delete {
+        let pod_name = pod.name();
+        info!("Deleting pod {}", pod_name);
+        pods_api.delete(&pod_name, &DeleteParams::default()).await?;
     }
 
     Ok(())
