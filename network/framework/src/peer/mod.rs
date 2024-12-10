@@ -524,8 +524,10 @@ where
                         );
 
                         // Create a new received message and forward it to the handler
+                        let message_metadata =
+                            MessageMetadata::new_received_metadata(received_message_metadata);
                         let received_message =
-                            ReceivedMessage::new(message, received_message_metadata, sender);
+                            ReceivedMessage::new(message, message_metadata, sender);
                         match handler.push(key, received_message) {
                             Err(_err) => {
                                 // NOTE: aptos_channel never returns other than Ok(()), but we might switch to tokio::sync::mpsc and then this would work
@@ -582,8 +584,10 @@ where
                         );
 
                         // Create a new received message and forward it to the handler
+                        let message_metadata =
+                            MessageMetadata::new_received_metadata(received_message_metadata);
                         let received_message =
-                            ReceivedMessage::new(message, received_message_metadata, sender);
+                            ReceivedMessage::new(message, message_metadata, sender);
                         if let Err(err) = self
                             .inbound_rpcs
                             .handle_inbound_request(handler, received_message)

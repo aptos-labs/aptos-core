@@ -24,7 +24,7 @@ use aptos_network::{
     protocols::{
         direct_send::Message,
         network::{ReceivedMessage, SerializedRequest},
-        wire::messaging::v1::{DirectSendMsg, NetworkMessage},
+        wire::messaging::v1::NetworkMessage,
     },
     ProtocolId,
 };
@@ -342,11 +342,8 @@ impl TestHarness {
         };
         let receiver_id = *self.peer_to_node_id.get(&lookup_peer_network_id).unwrap();
         let receiver = self.mut_node(&receiver_id);
-        let network_message = NetworkMessage::DirectSendMsg(DirectSendMsg {
-            protocol_id: msg.protocol_id(),
-            priority: 0,
-            raw_msg: msg.data().clone().into(),
-        });
+        let network_message =
+            NetworkMessage::new_direct_send(msg.protocol_id(), msg.data().clone().into());
         let received_message = ReceivedMessage::new_for_testing(
             network_message,
             PeerNetworkId::new(network_id, sender_peer_id),
@@ -475,11 +472,10 @@ impl TestHarness {
                         let receiver_id =
                             *self.peer_to_node_id.get(&lookup_peer_network_id).unwrap();
                         let receiver = self.mut_node(&receiver_id);
-                        let network_message = NetworkMessage::DirectSendMsg(DirectSendMsg {
-                            protocol_id: msg.protocol_id(),
-                            priority: 0,
-                            raw_msg: msg.data().clone().into(),
-                        });
+                        let network_message = NetworkMessage::new_direct_send(
+                            msg.protocol_id(),
+                            msg.data().clone().into(),
+                        );
                         let received_message = ReceivedMessage::new_for_testing(
                             network_message,
                             PeerNetworkId::new(network_id, sender_peer_id),

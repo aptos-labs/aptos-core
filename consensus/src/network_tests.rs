@@ -24,10 +24,7 @@ use aptos_network::{
     peer_manager::{ConnectionRequestSender, PeerManagerRequest, PeerManagerRequestSender},
     protocols::{
         network::{NewNetworkEvents, ReceivedMessage, RpcError, SerializedRequest},
-        wire::{
-            handshake::v1::ProtocolIdSet,
-            messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest},
-        },
+        wire::{handshake::v1::ProtocolIdSet, messaging::v1::NetworkMessage},
     },
     ProtocolId,
 };
@@ -167,12 +164,8 @@ impl NetworkPlayground {
                     let node_consensus_tx =
                         node_consensus_txs.lock().get(dst_twin_id).unwrap().clone();
 
-                    let network_message = NetworkMessage::RpcRequest(RpcRequest {
-                        protocol_id,
-                        request_id: 123,
-                        priority: 0,
-                        raw_request: data.clone().into(),
-                    });
+                    let network_message =
+                        NetworkMessage::new_rpc_request(protocol_id, 123, data.into());
                     let received_message = ReceivedMessage::new_for_testing(
                         network_message,
                         PeerNetworkId::new(NetworkId::Validator, src_twin_id.author),
@@ -294,16 +287,16 @@ impl NetworkPlayground {
 
                 // Deliver and copy message if it's not dropped
                 if !self.is_message_dropped(&src_twin_id, dst_twin_id, consensus_msg) {
-                    let network_message = NetworkMessage::DirectSendMsg(DirectSendMsg {
-                        protocol_id: msg.protocol_id(),
-                        priority: 0,
-                        raw_msg: msg.data().clone().into(),
-                    });
+                    let network_message = NetworkMessage::new_direct_send(
+                        msg.protocol_id(),
+                        msg.data().clone().into(),
+                    );
                     let received_message = ReceivedMessage::new_for_testing(
                         network_message,
                         PeerNetworkId::new(NetworkId::Validator, src_twin_id.author),
                         None,
                     );
+
                     let msg_copy = self
                         .deliver_message(src_twin_id, *dst_twin_id, received_message)
                         .await;
@@ -418,11 +411,8 @@ impl NetworkPlayground {
             let dst_twin_ids = self.get_twin_ids(dst);
 
             for dst_twin_id in dst_twin_ids.iter() {
-                let network_message = NetworkMessage::DirectSendMsg(DirectSendMsg {
-                    protocol_id: msg.protocol_id(),
-                    priority: 0,
-                    raw_msg: msg.data().clone().into(),
-                });
+                let network_message =
+                    NetworkMessage::new_direct_send(msg.protocol_id(), msg.data().clone().into());
                 let received_message = ReceivedMessage::new_for_testing(
                     network_message,
                     PeerNetworkId::new(NetworkId::Validator, src_twin_id.author),
@@ -866,11 +856,10 @@ mod tests {
 
         let peer_id = PeerId::random();
         let protocol_id = ProtocolId::ConsensusDirectSendBcs;
-        let network_message = NetworkMessage::DirectSendMsg(DirectSendMsg {
+        let network_message = NetworkMessage::new_direct_send(
             protocol_id,
-            priority: 0,
-            raw_msg: Bytes::from_static(b"\xde\xad\xbe\xef").into(),
-        });
+            Bytes::from_static(b"\xde\xad\xbe\xef").into(),
+        );
         let bad_msg = ReceivedMessage::new_for_testing(
             network_message,
             PeerNetworkId::new(NetworkId::Validator, peer_id),
@@ -887,12 +876,10 @@ mod tests {
 
         let protocol_id = ProtocolId::ConsensusRpcJson;
         let (res_tx, _res_rx) = oneshot::channel();
-        let network_message = NetworkMessage::RpcRequest(RpcRequest {
+        let network_message = NetworkMessage::rpc_request_for_testing(
             protocol_id,
-            request_id: 0, // TODO: seq?
-            priority: 0,
-            raw_request: Bytes::from(serde_json::to_vec(&liveness_check_msg).unwrap()).into(),
-        });
+            Bytes::from(serde_json::to_vec(&liveness_check_msg).unwrap()).into(),
+        );
         let liveness_check_msg = ReceivedMessage::new_for_testing(
             network_message,
             PeerNetworkId::new(NetworkId::Validator, peer_id),

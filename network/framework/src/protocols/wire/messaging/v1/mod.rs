@@ -63,6 +63,50 @@ impl NetworkMessage {
             NetworkMessage::DirectSendMsg(message) => message.raw_msg.len(),
         }
     }
+
+    /// Creates a direct send message with the default priority
+    pub fn new_direct_send(protocol_id: ProtocolId, raw_msg: Vec<u8>) -> Self {
+        NetworkMessage::DirectSendMsg(DirectSendMsg {
+            protocol_id,
+            priority: Priority::default(),
+            raw_msg,
+        })
+    }
+
+    /// Creates an RPC response message with the default priority
+    pub fn new_rpc_response(request_id: RequestId, raw_response: Vec<u8>) -> Self {
+        NetworkMessage::RpcResponse(RpcResponse {
+            request_id,
+            priority: Priority::default(),
+            raw_response,
+        })
+    }
+
+    /// Creates an RPC response message for testing.
+    /// Note: this cannot be marked as `#[cfg(test)]` because of several non-wrapped test utils.
+    pub fn rpc_response_for_testing(raw_response: Vec<u8>) -> Self {
+        Self::new_rpc_response(0, raw_response)
+    }
+
+    /// Creates an RPC request message with the default priority
+    pub fn new_rpc_request(
+        protocol_id: ProtocolId,
+        request_id: RequestId,
+        raw_request: Vec<u8>,
+    ) -> Self {
+        NetworkMessage::RpcRequest(RpcRequest {
+            protocol_id,
+            request_id,
+            priority: Priority::default(),
+            raw_request,
+        })
+    }
+
+    /// Creates an RPC request message for testing.
+    /// Note: this cannot be marked as `#[cfg(test)]` because of several non-wrapped test utils.
+    pub fn rpc_request_for_testing(protocol_id: ProtocolId, raw_request: Vec<u8>) -> Self {
+        Self::new_rpc_request(protocol_id, 0, raw_request)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]

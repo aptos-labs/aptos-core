@@ -31,10 +31,7 @@ use aptos_network::{
             NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender, ReceivedMessage,
             SerializedRequest,
         },
-        wire::{
-            handshake::v1::ProtocolId::MempoolDirectSend,
-            messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest},
-        },
+        wire::{handshake::v1::ProtocolId::MempoolDirectSend, messaging::v1::NetworkMessage},
     },
     testutils::{
         builder::TestFrameworkBuilder,
@@ -273,11 +270,7 @@ impl MempoolNode {
         let data = protocol_id.to_bytes(&msg).unwrap();
         let (notif, maybe_receiver) = match protocol_id {
             ProtocolId::MempoolDirectSend => {
-                let network_message = NetworkMessage::DirectSendMsg(DirectSendMsg {
-                    protocol_id,
-                    priority: 0,
-                    raw_msg: data,
-                });
+                let network_message = NetworkMessage::new_direct_send(protocol_id, data);
                 let received_message = ReceivedMessage::new_for_testing(
                     network_message,
                     PeerNetworkId::new(network_id, remote_peer_id),
@@ -287,12 +280,7 @@ impl MempoolNode {
             },
             ProtocolId::MempoolRpc => {
                 let (res_tx, res_rx) = oneshot::channel();
-                let network_message = NetworkMessage::RpcRequest(RpcRequest {
-                    protocol_id,
-                    request_id: 0,
-                    priority: 0,
-                    raw_request: data,
-                });
+                let network_message = NetworkMessage::rpc_request_for_testing(protocol_id, data);
                 let received_message = ReceivedMessage::new_for_testing(
                     network_message,
                     PeerNetworkId::new(network_id, remote_peer_id),
@@ -445,11 +433,7 @@ impl MempoolNode {
         if let Some(rpc_sender) = maybe_rpc_sender {
             rpc_sender.send(Ok(bytes.into())).unwrap();
         } else {
-            let network_message = NetworkMessage::DirectSendMsg(DirectSendMsg {
-                protocol_id,
-                priority: 0,
-                raw_msg: bytes,
-            });
+            let network_message = NetworkMessage::new_direct_send(protocol_id, bytes);
             let received_message = ReceivedMessage::new_for_testing(
                 network_message,
                 PeerNetworkId::new(network_id, expected_peer_id),

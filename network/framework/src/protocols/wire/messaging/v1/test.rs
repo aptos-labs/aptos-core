@@ -59,11 +59,8 @@ fn rpc_request() -> bcs::Result<()> {
 
 #[test]
 fn stream_message() {
-    let message = NetworkMessage::DirectSendMsg(DirectSendMsg {
-        protocol_id: ProtocolId::MempoolDirectSend,
-        priority: 0,
-        raw_msg: Vec::from("hello world"),
-    });
+    let message =
+        NetworkMessage::new_direct_send(ProtocolId::MempoolDirectSend, Vec::from("hello world"));
     let stream_header = StreamHeader {
         request_id: 42,
         num_fragments: 10,
@@ -84,11 +81,10 @@ fn stream_message() {
 
 #[test]
 fn aptosnet_wire_test_vectors() {
-    let message = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
-        protocol_id: ProtocolId::MempoolDirectSend,
-        priority: 0,
-        raw_msg: Vec::from("hello world"),
-    }));
+    let message = MultiplexMessage::Message(NetworkMessage::new_direct_send(
+        ProtocolId::MempoolDirectSend,
+        Vec::from("hello world"),
+    ));
     let message_bytes = [
         // [0, 0, 0, 16] -> frame length
         // [0] -> multiplex message type
@@ -131,11 +127,10 @@ fn send_fails_when_larger_than_frame_limit() {
 
     // attempting to send an outbound message larger than your frame size will
     // return an Err
-    let message = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
-        protocol_id: ProtocolId::ConsensusRpcBcs,
-        priority: 0,
-        raw_msg: vec![0; 123],
-    }));
+    let message = MultiplexMessage::Message(NetworkMessage::new_direct_send(
+        ProtocolId::ConsensusRpcBcs,
+        vec![0; 80],
+    ));
     block_on(message_tx.send(&message)).unwrap_err();
 }
 
@@ -147,11 +142,10 @@ fn recv_fails_when_larger_than_frame_limit() {
     // receiver will reject the message b/c the frame size is > 64 bytes max
     let mut message_rx = MultiplexMessageStream::new(memsocket_rx, 64);
 
-    let message = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
-        protocol_id: ProtocolId::ConsensusRpcBcs,
-        priority: 0,
-        raw_msg: vec![0; 80],
-    }));
+    let message = MultiplexMessage::Message(NetworkMessage::new_direct_send(
+        ProtocolId::ConsensusRpcBcs,
+        vec![0; 80],
+    ));
     let f_send = message_tx.send(&message);
     let f_recv = message_rx.next();
 

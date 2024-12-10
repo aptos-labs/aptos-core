@@ -7,7 +7,7 @@ use crate::{
     peer_manager::PeerManagerRequest,
     protocols::{
         network::{ReceivedMessage, SerializedRequest},
-        wire::messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest},
+        wire::messaging::v1::NetworkMessage,
     },
     transport::ConnectionMetadata,
     ProtocolId,
@@ -308,12 +308,8 @@ pub trait TestNode: ApplicationNode + Sync {
                 let (_, protocol_id, data, res_tx, _) = msg.into_parts();
 
                 // Create the received message
-                let network_message = NetworkMessage::RpcRequest(RpcRequest {
-                    protocol_id,
-                    request_id: 0,
-                    priority: 0,
-                    raw_request: data.into(),
-                });
+                let network_message =
+                    NetworkMessage::rpc_request_for_testing(protocol_id, data.into());
                 let received_message = ReceivedMessage::new_for_testing(
                     network_message,
                     self.peer_network_id(network_id),
@@ -322,11 +318,8 @@ pub trait TestNode: ApplicationNode + Sync {
                 (peer_id, protocol_id, received_message)
             },
             PeerManagerRequest::SendDirectSend(peer_id, msg) => {
-                let network_message = NetworkMessage::DirectSendMsg(DirectSendMsg {
-                    protocol_id: msg.protocol_id(),
-                    priority: 0,
-                    raw_msg: msg.data().clone().into(),
-                });
+                let network_message =
+                    NetworkMessage::new_direct_send(msg.protocol_id(), msg.data().clone().into());
                 let received_message = ReceivedMessage::new_for_testing(
                     network_message,
                     self.peer_network_id(network_id),

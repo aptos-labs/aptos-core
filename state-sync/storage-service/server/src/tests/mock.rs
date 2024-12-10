@@ -16,10 +16,7 @@ use aptos_network::{
     application::{interface::NetworkServiceEvents, storage::PeersAndMetadata},
     protocols::{
         network::{NetworkEvents, NewNetworkEvents, ReceivedMessage},
-        wire::{
-            handshake::v1::ProtocolId,
-            messaging::v1::{NetworkMessage, RpcRequest},
-        },
+        wire::{handshake::v1::ProtocolId, messaging::v1::NetworkMessage},
     },
 };
 use aptos_storage_interface::{DbReader, LedgerSummary, Order};
@@ -162,12 +159,7 @@ impl MockClient {
             .to_bytes(&StorageServiceMessage::Request(request))
             .unwrap();
         let (res_tx, res_rx) = oneshot::channel();
-        let network_message = NetworkMessage::RpcRequest(RpcRequest {
-            protocol_id,
-            request_id: 0,
-            priority: 0,
-            raw_request: data,
-        });
+        let network_message = NetworkMessage::rpc_request_for_testing(protocol_id, data);
         let received_message = ReceivedMessage::new_for_testing(
             network_message,
             PeerNetworkId::new(network_id, peer_id),

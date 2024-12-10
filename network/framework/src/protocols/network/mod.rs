@@ -10,7 +10,8 @@ use crate::{
     peer::DisconnectReason,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::wire::messaging::v1::{
-        metadata::ReceivedMessageMetadata, IncomingRequest, NetworkMessage,
+        metadata::{MessageMetadata, ReceivedMessageMetadata},
+        IncomingRequest, NetworkMessage,
     },
     ProtocolId,
 };
@@ -146,7 +147,7 @@ impl NetworkApplicationConfig {
 #[derive(Debug, Clone)]
 pub struct ReceivedMessage {
     network_message: NetworkMessage,
-    received_message_metadata: ReceivedMessageMetadata,
+    message_metadata: MessageMetadata,
     sender: PeerNetworkId,
     rpc_replier: Option<Arc<oneshot::Sender<Result<Bytes, RpcError>>>>,
 }
@@ -154,12 +155,12 @@ pub struct ReceivedMessage {
 impl ReceivedMessage {
     pub fn new(
         network_message: NetworkMessage,
-        received_message_metadata: ReceivedMessageMetadata,
+        message_metadata: MessageMetadata,
         sender: PeerNetworkId,
     ) -> Self {
         Self {
             network_message,
-            received_message_metadata,
+            message_metadata,
             sender,
             rpc_replier: None,
         }
@@ -174,13 +175,14 @@ impl ReceivedMessage {
         rpc_replier: Option<Arc<oneshot::Sender<Result<Bytes, RpcError>>>>,
     ) -> Self {
         // Create a dummy received message metadata
-        let received_message_metadata =
-            ReceivedMessageMetadata::new(NetworkId::Validator, SystemTime::now());
+        let message_metadata = MessageMetadata::new_received_metadata(
+            ReceivedMessageMetadata::new(NetworkId::Validator, SystemTime::now()),
+        );
 
         // Return the new received message
         Self {
             network_message,
-            received_message_metadata,
+            message_metadata,
             sender,
             rpc_replier,
         }
@@ -191,13 +193,13 @@ impl ReceivedMessage {
         self,
     ) -> (
         NetworkMessage,
-        ReceivedMessageMetadata,
+        MessageMetadata,
         PeerNetworkId,
         Option<Arc<oneshot::Sender<Result<Bytes, RpcError>>>>,
     ) {
         (
             self.network_message,
-            self.received_message_metadata,
+            self.message_metadata,
             self.sender,
             self.rpc_replier,
         )
@@ -208,11 +210,6 @@ impl ReceivedMessage {
         &self.network_message
     }
 
-    /// Returns a copy of the RPC replier channel
-    pub fn rpc_replier(&self) -> Option<Arc<oneshot::Sender<Result<Bytes, RpcError>>>> {
-        self.rpc_replier.clone()
-    }
-
     /// Returns the sender of the received message
     pub fn sender(&self) -> PeerNetworkId {
         self.sender
@@ -221,6 +218,12 @@ impl ReceivedMessage {
     /// Sets the RPC replier channel to the given value
     pub fn set_rpc_replier(&mut self, rpc_replier: Arc<oneshot::Sender<Result<Bytes, RpcError>>>) {
         self.rpc_replier = Some(rpc_replier);
+    }
+
+    #[cfg(test)]
+    /// Takes the RPC replier channel. Note: this is only used for testing.
+    pub fn take_rpc_replier(&mut self) -> Option<Arc<oneshot::Sender<Result<Bytes, RpcError>>>> {
+        self.rpc_replier.take()
     }
 }
 
@@ -308,10 +311,16 @@ fn received_message_to_event<TMessage: Message>(
     received_message: ReceivedMessage,
 ) -> Option<Event<TMessage>> {
     // Unpack the received message
-    let (message, mut received_message_metadata, sender, rpc_replier) =
-        received_message.into_parts();
+    let (message, message_metadata, sender, rpc_replier) = received_message.into_parts();
 
     // Update the metadata as having sent the message to the application
+    let mut received_message_metadata = match message_metadata.into_received_metadata() {
+        Some(metadata) => metadata,
+        None => {
+            error!("Failed to transform message into event! Metadata is not a received message!");
+            return None;
+        },
+    };
     received_message_metadata.mark_message_as_application_received();
 
     // Transform the message based on its type

@@ -263,7 +263,7 @@ mod test {
             },
             wire::{
                 handshake::v1::{ProtocolId, ProtocolIdSet},
-                messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest},
+                messaging::v1::NetworkMessage,
             },
         },
         transport::ConnectionMetadata,
@@ -791,12 +791,7 @@ mod test {
                         assert_eq!(timeout, Duration::from_millis(RPC_REQUEST_TIMEOUT_MS));
 
                         // Create and return the received message
-                        let network_message = NetworkMessage::RpcRequest(RpcRequest{
-                            protocol_id,
-                            request_id: 0,
-                            priority: 0,
-                            raw_request: data.into(),
-                        });
+                        let network_message = NetworkMessage::rpc_request_for_testing(protocol_id, data.into());
                         let received_message = ReceivedMessage::new_for_testing(network_message, PeerNetworkId::new(expected_network_id, peer_id), Some(Arc::new(res_tx)));
                         (protocol_id, received_message)
                     }
@@ -810,11 +805,7 @@ mod test {
                         assert_eq!(Some(protocol_id), expected_direct_send_protocol);
 
                         // Create and return the received message
-                        let network_message = NetworkMessage::DirectSendMsg(DirectSendMsg{
-                            protocol_id,
-                            priority: 0,
-                            raw_msg: data.into(),
-                        });
+                        let network_message = NetworkMessage::new_direct_send(protocol_id, data.into());
                         let received_message = ReceivedMessage::new_for_testing(network_message, PeerNetworkId::new(expected_network_id, peer_id), None);
                         (protocol_id, received_message)
                     }

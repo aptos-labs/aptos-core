@@ -20,7 +20,7 @@ use crate::{
         },
         wire::{
             handshake::v1::{ProtocolId, ProtocolIdSet},
-            messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest},
+            messaging::v1::NetworkMessage,
         },
     },
     transport::ConnectionMetadata,
@@ -1213,12 +1213,10 @@ async fn wait_for_network_event(
                     assert_eq!(timeout, message_wait_time);
 
                     // Create and return the peer manager notification
-                    let network_message = NetworkMessage::RpcRequest(RpcRequest{
+                    let network_message = NetworkMessage::rpc_request_for_testing(
                         protocol_id,
-                        request_id: 0,
-                        priority: 0,
-                        raw_request: data.into(),
-                    });
+                        data.into(),
+                    );
                     let received_message = ReceivedMessage::new_for_testing(
                         network_message,
                         PeerNetworkId::new(expected_network_id, peer_id),
@@ -1236,11 +1234,10 @@ async fn wait_for_network_event(
                     assert_eq!(Some(protocol_id), expected_direct_send_protocol_id);
 
                     // Create and return the peer manager notification
-                    let network_message = NetworkMessage::DirectSendMsg(DirectSendMsg{
+                    let network_message = NetworkMessage::new_direct_send(
                         protocol_id,
-                        priority: 0,
-                        raw_msg: data.into(),
-                    });
+                        data.into(),
+                    );
                     let received_message = ReceivedMessage::new_for_testing(
                         network_message,
                         PeerNetworkId::new(expected_network_id, peer_id),
