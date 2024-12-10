@@ -117,6 +117,10 @@ impl TransactionsToKeep {
         Self::make(0, txns, txn_outputs, false)
     }
 
+    pub fn is_reconfig(&self) -> bool {
+        *self.borrow_is_reconfig()
+    }
+
     pub fn per_version_state_update_refs(&self) -> &PerVersionStateUpdateRefs {
         &self.borrow_state_update_refs().per_version
     }
@@ -127,10 +131,6 @@ impl TransactionsToKeep {
 
     pub fn state_update_refs_for_latest(&self) -> &BatchedStateUpdateRefs {
         &self.borrow_state_update_refs().for_latest
-    }
-
-    pub fn is_reconfig(&self) -> bool {
-        *self.borrow_is_reconfig()
     }
 
     pub fn ends_with_sole_checkpoint(&self) -> bool {
@@ -182,10 +182,11 @@ impl Debug for TransactionsToKeep {
     }
 }
 
-struct StateUpdateRefs<'kv> {
-    per_version: PerVersionStateUpdateRefs<'kv>,
-    for_last_checkpoint: Option<BatchedStateUpdateRefs<'kv>>,
-    for_latest: BatchedStateUpdateRefs<'kv>,
+/// FIXME(aldenhu): move
+pub struct StateUpdateRefs<'kv> {
+    pub per_version: PerVersionStateUpdateRefs<'kv>,
+    pub for_last_checkpoint: Option<BatchedStateUpdateRefs<'kv>>,
+    pub for_latest: BatchedStateUpdateRefs<'kv>,
 }
 
 impl<'kv> StateUpdateRefs<'kv> {
@@ -213,7 +214,7 @@ impl<'kv> StateUpdateRefs<'kv> {
         Option<BatchedStateUpdateRefs<'kv>>,
         BatchedStateUpdateRefs<'kv>,
     ) {
-        let _timer = TIMER.timer_with(&["txns_to_keep__collect_updates"]);
+        let _timer = TIMER.timer_with(&["index_state_updates__collect_batch"]);
 
         let mut shard_iters = per_version_updates
             .shards

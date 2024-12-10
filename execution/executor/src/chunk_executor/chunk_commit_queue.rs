@@ -77,11 +77,6 @@ impl ChunkCommitQueue {
     ) -> Result<()> {
         let _timer = CHUNK_OTHER_TIMERS.timer_with(&["enqueue_for_ledger_update"]);
 
-        ensure!(
-            self.to_update_ledger.is_empty() || self.to_update_ledger.back().unwrap().is_some(),
-            "Last chunk to update ledger has not been processed."
-        );
-
         self.latest_state = chunk_to_update_ledger.output.result_state().clone();
         self.to_update_ledger
             .push_back(Some(chunk_to_update_ledger));
@@ -95,8 +90,6 @@ impl ChunkCommitQueue {
         Arc<InMemoryTransactionAccumulator>,
         ChunkToUpdateLedger,
     )> {
-        let _timer = CHUNK_OTHER_TIMERS.timer_with(&["next_chunk_to_update_ledger"]);
-
         let chunk_opt = self
             .to_update_ledger
             .front_mut()
@@ -112,8 +105,6 @@ impl ChunkCommitQueue {
     }
 
     pub(crate) fn save_ledger_update_output(&mut self, chunk: ExecutedChunk) -> Result<()> {
-        let _timer = CHUNK_OTHER_TIMERS.timer_with(&["save_ledger_update_output"]);
-
         ensure!(
             !self.to_update_ledger.is_empty(),
             "to_update_ledger is empty."
@@ -150,8 +141,6 @@ impl ChunkCommitQueue {
     }
 
     pub(crate) fn dequeue_committed(&mut self) -> Result<()> {
-        let _timer = CHUNK_OTHER_TIMERS.timer_with(&["deque_committed"]);
-
         ensure!(!self.to_commit.is_empty(), "to_commit is empty.");
         ensure!(
             self.to_commit.front().unwrap().is_none(),

@@ -72,9 +72,7 @@ impl PartialStateComputeResult {
     }
 
     pub fn expect_result_state_summary(&self) -> &LedgerStateSummary {
-        // FIXME(aldenhu):
-        // &self.expect_state_checkpoint_output().result_state_summary
-        todo!()
+        &self.expect_state_checkpoint_output().state_summary
     }
 
     pub fn set_state_checkpoint_output(&self, state_checkpoint_output: StateCheckpointOutput) {

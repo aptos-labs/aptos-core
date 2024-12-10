@@ -256,12 +256,11 @@ impl BlockTree {
             );
             last_committed_block
         };
-        /* FIXME(aldenhu)
         root.output
-            .expect_result_state()
-            .current
+            .expect_state_checkpoint_output()
+            .state_summary
+            .global_state_summary
             .log_generation("block_tree_base");
-         */
         let old_root = std::mem::replace(&mut *self.root.lock(), root);
 
         // send old root to async task to drop it

@@ -223,7 +223,7 @@ impl AptosDB {
 
         ensure!(!chunk.is_empty(), "chunk is empty, nothing to save.");
 
-        let next_version = self.state_store.current_state().next_version();
+        let next_version = self.state_store.current_state_locked().next_version();
         // Ensure the incoming committing requests are always consecutive and the version in
         // buffered state is consistent with that in db.
         ensure!(
@@ -501,7 +501,7 @@ impl AptosDB {
         version_to_commit: Version,
     ) -> Result<Option<Version>> {
         let old_committed_ver = self.ledger_db.metadata_db().get_synced_version()?;
-        let pre_committed_ver = self.state_store.current_state().version();
+        let pre_committed_ver = self.state_store.current_state_locked().version();
         ensure!(
             old_committed_ver.is_none() || version_to_commit >= old_committed_ver.unwrap(),
             "Version too old to commit. Committed: {:?}; Trying to commit with LI: {}",

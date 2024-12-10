@@ -156,24 +156,19 @@ impl StateComputeResult {
     }
 
     pub fn as_chunk_to_commit(&self) -> ChunkToCommit {
-        todo!()
-
-        /* FIXME(aldenhu): sharded_state_cache
         ChunkToCommit {
             first_version: self.ledger_update_output.first_version(),
             transactions: &self.execution_output.to_commit.transactions,
             transaction_outputs: &self.execution_output.to_commit.transaction_outputs,
             transaction_infos: &self.ledger_update_output.transaction_infos,
-            base_state_version: self.state_checkpoint_output.parent_state.base_version,
-            latest_in_memory_state: &self.state_checkpoint_output.result_state,
-            state_update_refs: self.execution_output.to_commit.state_update_refs(),
-            state_updates_until_last_checkpoint: self
-                .state_checkpoint_output
-                .state_updates_before_last_checkpoint
-                .as_ref(),
-            sharded_state_cache,
+            state: &self.execution_output.result_state,
+            state_summary: &self.state_checkpoint_output.state_summary,
+            state_update_refs: self
+                .execution_output
+                .to_commit
+                .per_version_state_update_refs(),
+            state_reads: Some(&self.execution_output.state_reads),
             is_reconfig: self.execution_output.next_epoch_state.is_some(),
         }
-         */
     }
 }

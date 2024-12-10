@@ -124,10 +124,10 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
     // In the very extreme and sad situation of losing quorum among validators, we refer to the
     // second use case said above.
     let genesis_version = ledger_summary.version().map_or(0, |v| v + 1);
-    let base_state_view = ledger_summary.verified_state_view(
+    let base_state_view = CachedStateView::new(
         StateViewId::Miscellaneous,
         Arc::clone(&db.reader),
-        Arc::new(AsyncProofFetcher::new(db.reader.clone())),
+        ledger_summary.state.latest().clone(),
     )?;
 
     let epoch = if genesis_version == 0 {

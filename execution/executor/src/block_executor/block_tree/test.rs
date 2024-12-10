@@ -45,7 +45,6 @@ fn empty_block() -> PartialStateComputeResult {
         result_view.state.clone(),
         result_view.transaction_accumulator.clone(),
     )
-
      */
 }
 

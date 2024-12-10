@@ -179,8 +179,9 @@ impl DoGetExecutionOutput {
             .map(|o| o.write_set())
             .collect::<Vec<_>>();
 
+        // TODO(aldenhu): optimize: state updates are gone through here once and again in the parser
         // prime the state cache by fetching all touched accounts
-        state_view.prime_cache_by_write_set(write_set)?;
+        state_view.prime_cache_by_write_sets(write_set)?;
 
         let out = Parser::parse(
             state_view.next_version(),
@@ -346,7 +347,12 @@ impl Parser {
                 .transpose()?
         };
 
-        let result_state = Self::update_state(&to_commit, parent_state, &base_state_view);
+        let result_state = parent_state.update(
+            base_state_view.persisted_state(),
+            to_commit.state_update_refs_for_last_checkpoint(),
+            to_commit.state_update_refs_for_latest(),
+            base_state_view.state_cache(),
+        );
         let state_cache = base_state_view.into_state_cache();
 
         let out = ExecutionOutput::new(
@@ -492,19 +498,6 @@ impl Parser {
             configuration.epoch(),
             (&validator_set).into(),
         ))
-    }
-
-    fn update_state(
-        to_commit: &TransactionsToKeep,
-        base_state: &LedgerState,
-        state_view: &CachedStateView,
-    ) -> LedgerState {
-        base_state.update(
-            state_view.persisted_state(),
-            to_commit.state_update_refs_for_last_checkpoint(),
-            to_commit.state_update_refs_for_latest(),
-            state_view.state_cache(),
-        )
     }
 }
 

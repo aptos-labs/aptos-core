@@ -43,7 +43,7 @@ impl<'kv> PerVersionStateUpdateRefs<'kv> {
         updates_by_version: VersionIter,
         num_versions: usize,
     ) -> Self {
-        let _timer = TIMER.timer_with(&["index_state_updates"]);
+        let _timer = TIMER.timer_with(&["index_state_updates__per_version"]);
 
         // Over-allocate a bit to minimize re-allocation.
         let mut shards = arr![Vec::with_capacity(num_versions / 8); 16];

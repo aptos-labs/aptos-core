@@ -860,10 +860,6 @@ impl DbReader for FakeAptosDB {
         })
     }
 
-    fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>> {
-        self.inner.get_buffered_state_base()
-    }
-
     fn get_latest_block_events(&self, num_events: usize) -> Result<Vec<EventWithVersion>> {
         self.inner.get_latest_block_events(num_events)
     }

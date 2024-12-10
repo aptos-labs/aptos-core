@@ -1,9 +1,23 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_storage_interface::state_store::state::State;
+use aptos_storage_interface::state_store::state_summary::StateSummary;
 use aptos_types::block_info::BlockHeight;
 
 impl DbReader for AptosDB {
+    fn get_persisted_state(&self) -> Result<State> {
+        gauged_api("get_persisted_state", || {
+            self.state_store.get_persisted_state()
+        })
+    }
+
+    fn get_persisted_state_summary(&self) -> Result<StateSummary> {
+        gauged_api("get_persisted_state_summary", || {
+            self.state_store.get_persisted_state_summary()
+        })
+    }
+
     fn get_epoch_ending_ledger_infos(
         &self,
         start_epoch: u64,
@@ -63,10 +77,7 @@ impl DbReader for AptosDB {
 
     fn get_pre_committed_version(&self) -> Result<Option<Version>> {
         gauged_api("get_pre_committed_version", || {
-            todo!()
-
-            // FIXME(aldenhu)
-            // Ok(self.state_store.current_state().current_version)
+            Ok(self.state_store.current_state_locked().version())
         })
     }
 
@@ -553,12 +564,6 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>> {
-        gauged_api("get_buffered_state_base", || {
-            self.state_store.get_buffered_state_base()
-        })
-    }
-
     fn get_block_timestamp(&self, version: u64) -> Result<u64> {
         gauged_api("get_block_timestamp", || {
             self.error_if_ledger_pruned("NewBlockEvent", version)?;
@@ -645,15 +650,7 @@ impl DbReader for AptosDB {
 
     fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
         gauged_api("get_latest_state_checkpoint_version", || {
-            todo!()
-            /*
-            Ok(self
-                .state_store
-                .current_state()
-                .base_version
-            )
-            FIXME(aldenhu)
-             */
+            Ok(self.state_store.current_state_locked().last_checkpoint().version())
         })
     }
 
