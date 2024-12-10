@@ -1,14 +1,14 @@
+/// This module enables the deserialization of BCS-formatted byte arrays into Move primitive types.
+/// Deserialization Strategies:
+/// - Per-Byte Deserialization: Employed for most types to ensure lower gas consumption, this method processes each byte
+///   individually to match the length and type requirements of target Move types.
+/// - Exception: For the `deserialize_address` function, the function-based approach from `aptos_std::from_bcs` is used
+///   due to type constraints, even though it is generally more gas-intensive.
+/// - This can be optimized further by introducing native vector slices.
+/// Application:
+/// - This deserializer is particularly valuable for processing BCS serialized data within Move modules,
+///   especially useful for systems requiring cross-chain message interpretation or off-chain data verification.
 module aptos_framework::bcs_stream {
-    /// This module enables the deserialization of BCS-formatted byte arrays into Move primitive types.
-    /// Deserialization Strategies:
-    /// - Per-Byte Deserialization: Employed for most types to ensure lower gas consumption, this method processes each byte
-    ///   individually to match the length and type requirements of target Move types.
-    /// - Exception: For the `deserialize_address` function, the function-based approach from `aptos_std::from_bcs` is used
-    ///   due to type constraints, even though it is generally more gas-intensive.
-    /// - This can be optimized further by introducing native vector slices.
-    /// Application:
-    /// - This deserializer is particularly valuable for processing BCS serialized data within Move modules,
-    ///   especially useful for systems requiring cross-chain message interpretation or off-chain data verification.
     use std::error;
     use std::vector;
     use std::option::{Self, Option};

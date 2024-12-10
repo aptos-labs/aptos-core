@@ -382,7 +382,7 @@ impl LocalAccount {
             .build();
         raw_txn
             .sign_aa_transaction(
-                &self.auth(),
+                self.auth(),
                 secondary_signer_addresses,
                 secondary_signer_auths,
                 fee_payer_signer.map(|fee_payer| (fee_payer.address(), fee_payer.auth())),
