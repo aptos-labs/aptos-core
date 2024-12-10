@@ -97,13 +97,11 @@ async fn test_account_abstraction_single_signer() {
             .account_transfer(other.address(), 4)
             .expiration_timestamp_secs(u64::MAX),
     );
-    // Todo: bug in loader v2
-    context.try_commit_block(&vec![aa_txn]).await;
-    // context
-    //     .expect_status_code(202)
-    //     .post_bcs_txn("/transactions", bcs::to_bytes(&aa_txn).unwrap())
-    //     .await;
-    // context.commit_mempool_txns(1).await;
+    context
+        .expect_status_code(202)
+        .post_bcs_txn("/transactions", bcs::to_bytes(&aa_txn).unwrap())
+        .await;
+    context.commit_mempool_txns(1).await;
     assert_eq!(
         balance_start + 4,
         context.get_apt_balance(other.address()).await
@@ -141,15 +139,7 @@ async fn test_account_abstraction_multi_agent_with_abstracted_sender() {
         .commit_block(&vec![context.mint_user_account(&c).await])
         .await;
 
-    // Convert a and c to aa
-    context
-        .api_execute_entry_function(
-            &mut a,
-            &format!("0x{}::single_key::update_public_key", a_addr.to_hex()),
-            json!([]),
-            json!([hex::encode(key_pair.public_key.to_bytes())]),
-        )
-        .await;
+    // Convert c to aa
     context
         .api_execute_entry_function(
             &mut c,
@@ -159,13 +149,10 @@ async fn test_account_abstraction_multi_agent_with_abstracted_sender() {
         )
         .await;
     let func_info = FunctionInfo::new(a_addr, "single_key".to_string(), "authenticate".to_string());
-    let txn1 = context
-        .add_dispatchable_authentication_function(&a, func_info.clone())
-        .await;
-    let txn2 = context
+    let txn = context
         .add_dispatchable_authentication_function(&c, func_info.clone())
         .await;
-    context.commit_block(&vec![txn1, txn2]).await;
+    context.commit_block(&vec![txn]).await;
 
     let sign_func = Arc::new(move |x: &[u8]| {
         key_pair
@@ -174,7 +161,6 @@ async fn test_account_abstraction_multi_agent_with_abstracted_sender() {
             .to_bytes()
             .to_vec()
     });
-    a.set_abstraction_auth(func_info.clone(), sign_func.clone());
     c.set_abstraction_auth(func_info, sign_func);
 
     let factory = context.transaction_factory();
@@ -191,13 +177,11 @@ async fn test_account_abstraction_multi_agent_with_abstracted_sender() {
             ))
             .expiration_timestamp_secs(u64::MAX),
     );
-    // Todo: bug in loader v2
-    context.try_commit_block(&vec![aa_txn]).await;
-    // context
-    //     .expect_status_code(202)
-    //     .post_bcs_txn("/transactions", bcs::to_bytes(&aa_txn).unwrap())
-    //     .await;
-    // context.commit_mempool_txns(1).await;
+    context
+        .expect_status_code(202)
+        .post_bcs_txn("/transactions", bcs::to_bytes(&aa_txn).unwrap())
+        .await;
+    context.commit_mempool_txns(1).await;
     assert_eq!(
         balance_start + 3,
         context.get_apt_balance(d.address()).await

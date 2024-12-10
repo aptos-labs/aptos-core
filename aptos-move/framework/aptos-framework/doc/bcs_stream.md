@@ -21,6 +21,7 @@
 -  [Function `deserialize_vector`](#0x1_bcs_stream_deserialize_vector)
 -  [Function `deserialize_string`](#0x1_bcs_stream_deserialize_string)
 -  [Function `deserialize_option`](#0x1_bcs_stream_deserialize_option)
+-  [Specification](#@Specification_1)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -638,6 +639,15 @@ The <code>elem_deserializer</code> lambda expression is used to deserialize the 
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

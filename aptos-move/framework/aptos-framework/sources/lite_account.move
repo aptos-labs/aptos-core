@@ -10,7 +10,7 @@ module aptos_framework::lite_account {
     use aptos_framework::event;
     use aptos_framework::function_info::{Self, FunctionInfo};
     use aptos_framework::object;
-    use aptos_framework::signing_data::SigningData;
+    use aptos_framework::auth_data::AbstractionAuthData;
     #[test_only]
     use aptos_framework::account::create_account_for_test;
 
@@ -40,8 +40,8 @@ module aptos_framework::lite_account {
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// The dispatchable authenticator that defines how to authenticates this account in the specified module.
     /// An integral part of Account Abstraction.
-    struct DispatchableAuthenticator has key, copy, drop {
-        auth_functions: SimpleMap<FunctionInfo, bool>
+    enum DispatchableAuthenticator has key, copy, drop {
+        V1 { auth_functions: SimpleMap<FunctionInfo, bool> }
     }
 
     /// Update dispatchable authenticator that enables account abstraction.
@@ -94,47 +94,54 @@ module aptos_framework::lite_account {
         object::create_user_derived_object_address(source, @aptos_fungible_asset)
     }
 
-    public(friend) fun update_dispatchable_authenticator_impl(
+    fun update_dispatchable_authenticator_impl(
         account: &signer,
         auth_function: FunctionInfo,
         is_add: bool,
     ) acquires DispatchableAuthenticator {
         let addr = signer::address_of(account);
         let resource_addr = resource_addr(addr);
-            let dispatcher_auth_function_info = function_info::new_function_info_from_address(
-                @aptos_framework,
-                string::utf8(b"lite_account"),
-                string::utf8(b"dispatchable_authenticate"),
-            );
-            assert!(
-                function_info::check_dispatch_type_compatibility(&dispatcher_auth_function_info, &auth_function),
-                error::invalid_argument(EAUTH_FUNCTION_SIGNATURE_MISMATCH)
-            );
+        let dispatcher_auth_function_info = function_info::new_function_info_from_address(
+            @aptos_framework,
+            string::utf8(b"lite_account"),
+            string::utf8(b"dispatchable_authenticate"),
+        );
+        assert!(
+            function_info::check_dispatch_type_compatibility(&dispatcher_auth_function_info, &auth_function),
+            error::invalid_argument(EAUTH_FUNCTION_SIGNATURE_MISMATCH)
+        );
         if (is_add && !exists<DispatchableAuthenticator>(resource_addr)) {
-                move_to(&create_signer::create_signer(resource_addr), DispatchableAuthenticator {
-                    auth_functions: simple_map::new()
-                });
-            };
-            if (exists<DispatchableAuthenticator>(resource_addr)) {
-                let current_map = &mut borrow_global_mut<DispatchableAuthenticator>(resource_addr).auth_functions;
-                if (is_add) {
-                    assert!(!simple_map::contains_key(current_map, &auth_function), error::already_exists(EFUNCTION_INFO_EXISTENCE));
-                    simple_map::add(current_map, auth_function, true);
-                } else {
-                    assert!(simple_map::contains_key(current_map, &auth_function), error::not_found(EFUNCTION_INFO_EXISTENCE));
-                    simple_map::remove(current_map, &auth_function);
-                };
-                event::emit(
-                    UpdateDispatchableAuthenticator {
-                        account: addr,
-                        update: if (is_add) {b"add"} else {b"remove"},
-                        auth_function,
-                    }
+            move_to(
+                &create_signer::create_signer(resource_addr),
+                DispatchableAuthenticator::V1 { auth_functions: simple_map::new() }
+            );
+        };
+        if (exists<DispatchableAuthenticator>(resource_addr)) {
+            let current_map = &mut borrow_global_mut<DispatchableAuthenticator>(resource_addr).auth_functions;
+            if (is_add) {
+                assert!(
+                    !simple_map::contains_key(current_map, &auth_function),
+                    error::already_exists(EFUNCTION_INFO_EXISTENCE)
                 );
-                if (simple_map::length(current_map) == 0) {
-                    remove_dispatchable_authenticator(account);
-                }
+                simple_map::add(current_map, auth_function, true);
+            } else {
+                assert!(
+                    simple_map::contains_key(current_map, &auth_function),
+                    error::not_found(EFUNCTION_INFO_EXISTENCE)
+                );
+                simple_map::remove(current_map, &auth_function);
             };
+            event::emit(
+                UpdateDispatchableAuthenticator {
+                    account: addr,
+                    update: if (is_add) { b"add" } else { b"remove" },
+                    auth_function,
+                }
+            );
+            if (simple_map::length(current_map) == 0) {
+                remove_dispatchable_authenticator(account);
+            }
+        };
     }
 
     #[view]
@@ -162,7 +169,7 @@ module aptos_framework::lite_account {
     fun authenticate(
         account: signer,
         func_info: FunctionInfo,
-        signing_data: SigningData,
+        signing_data: AbstractionAuthData,
     ): signer acquires DispatchableAuthenticator {
         let func_infos = dispatchable_authenticator_internal(signer::address_of(&account));
         assert!(simple_map::contains_key(func_infos, &func_info), error::not_found(EFUNCTION_INFO_EXISTENCE));
@@ -173,7 +180,7 @@ module aptos_framework::lite_account {
     /// The native function to dispatch customized move authentication function.
     native fun dispatchable_authenticate(
         account: signer,
-        signing_data: SigningData,
+        signing_data: AbstractionAuthData,
         function: &FunctionInfo
     ): signer;
 

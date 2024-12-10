@@ -1938,14 +1938,14 @@ module aptos_framework::coin {
         maybe_convert_to_fungible_store<FakeMoney>(aaron_addr);
         deposit(aaron_addr, mint<FakeMoney>(1, &mint_cap));
 
-        force_deposit(account_addr, mint<FakeMoney>(100, &mint_cap));
-        force_deposit(aaron_addr, mint<FakeMoney>(50, &mint_cap));
+        force_deposit(account, mint<FakeMoney>(100, &mint_cap));
+        force_deposit(aaron, mint<FakeMoney>(50, &mint_cap));
         assert!(
             primary_fungible_store::balance(aaron_addr, option::extract(&mut paired_metadata<FakeMoney>())) == 51,
             0
         );
         assert!(coin_balance<FakeMoney>(account_addr) == 100, 0);
-        force_deposit(bob_addr, mint<FakeMoney>(1, &mint_cap));
+        force_deposit(bob, mint<FakeMoney>(1, &mint_cap));
         move_to(account, FakeMoneyCapabilities {
             burn_cap,
             freeze_cap,

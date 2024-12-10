@@ -162,9 +162,7 @@ impl LoaderV2 {
         module_storage
             .fetch_verified_module(address, module_name)
             .map_err(expect_no_verification_errors)?
-            .ok_or_else(|| {
-                module_linker_error!(address, module_name)
-            })
+            .ok_or_else(|| module_linker_error!(address, module_name))
     }
 
     /// Returns the function definition corresponding to the specified name, as well as the module
