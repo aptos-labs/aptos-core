@@ -25,12 +25,19 @@ pub(crate) fn native_dispatch(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let (module_name, func_name) = extract_function_info(&mut arguments)?;
     // Check if the module is already properly charged in this transaction.
-    if !module_name.address().is_special()
-        && !context
+    let is_err = if context.get_feature_flags().is_account_abstraction_enabled() {
+        !module_name.address().is_special()
+            && !context
+                .traversal_context()
+                .visited
+                .contains_key(&(module_name.address(), module_name.name()))
+    } else {
+        !context
             .traversal_context()
             .visited
             .contains_key(&(module_name.address(), module_name.name()))
-    {
+    };
+    if is_err {
         return Err(SafeNativeError::Abort { abort_code: 4 });
     }
 

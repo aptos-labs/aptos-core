@@ -2229,7 +2229,6 @@ impl TryFrom<FeePayerSignature> for TransactionAuthenticator {
     type Error = anyhow::Error;
 
     fn try_from(value: FeePayerSignature) -> Result<Self, Self::Error> {
-        print!("SIG_DEBUG {:?}", value);
         let FeePayerSignature {
             sender,
             secondary_signer_addresses,

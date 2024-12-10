@@ -7,7 +7,7 @@
 use crate::{
     gas_schedule::VMGasParameters,
     ver::gas_feature_versions::{
-        RELEASE_V1_11, RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_15, RELEASE_V1_21,
+        RELEASE_V1_11, RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_15, RELEASE_V1_27,
     },
 };
 use aptos_gas_algebra::{
@@ -273,7 +273,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         ],
         [
             max_aa_gas: Gas,
-            { RELEASE_V1_21.. => "max_aa_gas" },
+            { RELEASE_V1_27.. => "max_aa_gas" },
             60,
         ]
     ]

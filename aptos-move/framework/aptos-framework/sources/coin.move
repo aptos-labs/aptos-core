@@ -889,10 +889,9 @@ module aptos_framework::coin {
     /// Deposit the coin balance into the recipient's account without checking if the account is frozen.
     /// This is for internal use only and doesn't emit an DepositEvent.
     public(friend) fun force_deposit<CoinType>(
-        account: &signer,
+        account_addr: address,
         coin: Coin<CoinType>
     ) acquires CoinStore, CoinConversionMap, CoinInfo {
-        let account_addr = signer::address_of(account);
         if (exists<CoinStore<CoinType>>(account_addr)) {
             let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
             merge(&mut coin_store.coin, coin);

@@ -18,7 +18,6 @@ impl serde::Serialize for Timestamp {
         }
         let mut struct_ser = serializer.serialize_struct("aptos.util.timestamp.Timestamp", len)?;
         if self.seconds != 0 {
-            #[allow(clippy::needless_borrow)]
             struct_ser.serialize_field("seconds", ToString::to_string(&self.seconds).as_str())?;
         }
         if self.nanos != 0 {
@@ -80,20 +79,20 @@ impl<'de> serde::Deserialize<'de> for Timestamp {
                 formatter.write_str("struct aptos.util.timestamp.Timestamp")
             }
 
-            fn visit_map<V>(self, mut map_: V) -> std::result::Result<Timestamp, V::Error>
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<Timestamp, V::Error>
                 where
                     V: serde::de::MapAccess<'de>,
             {
                 let mut seconds__ = None;
                 let mut nanos__ = None;
-                while let Some(k) = map_.next_key()? {
+                while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::Seconds => {
                             if seconds__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("seconds"));
                             }
                             seconds__ =
-                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
                         GeneratedField::Nanos => {
@@ -101,7 +100,7 @@ impl<'de> serde::Deserialize<'de> for Timestamp {
                                 return Err(serde::de::Error::duplicate_field("nanos"));
                             }
                             nanos__ =
-                                Some(map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
                     }

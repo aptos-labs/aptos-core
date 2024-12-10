@@ -83,6 +83,9 @@ pub trait GasAlgebra {
 
     /// Returns the amount of storage fee used.
     fn storage_fee_used(&self) -> Fee;
+
+    /// Resets the initial balance and recalculates the balance based on existing gas usage.
+    fn adjust_initial_gas(&mut self, new_initial_gas: impl Into<Gas>) -> PartialVMResult<()>;
 }
 
 /// Trait representing a gas meter used inside the Aptos VM.
@@ -247,5 +250,12 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// Return the total fee used for storage.
     fn storage_fee_used(&self) -> Fee {
         self.algebra().storage_fee_used()
+    }
+
+    /// Resets the initial balance and recalculates the balance based on existing gas usage.
+    fn adjust_initial_gas(&mut self, new_initial_gas: impl Into<Gas>) -> VMResult<()> {
+        self.algebra_mut()
+            .adjust_initial_gas(new_initial_gas)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 }

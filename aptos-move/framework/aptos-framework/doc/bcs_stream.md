@@ -3,6 +3,16 @@
 
 # Module `0x1::bcs_stream`
 
+This module enables the deserialization of BCS-formatted byte arrays into Move primitive types.
+Deserialization Strategies:
+- Per-Byte Deserialization: Employed for most types to ensure lower gas consumption, this method processes each byte
+individually to match the length and type requirements of target Move types.
+- Exception: For the <code>deserialize_address</code> function, the function-based approach from <code>aptos_std::from_bcs</code> is used
+due to type constraints, even though it is generally more gas-intensive.
+- This can be optimized further by introducing native vector slices.
+Application:
+- This deserializer is particularly valuable for processing BCS serialized data within Move modules,
+especially useful for systems requiring cross-chain message interpretation or off-chain data verification.
 
 
 -  [Struct `BCSStream`](#0x1_bcs_stream_BCSStream)
@@ -21,6 +31,7 @@
 -  [Function `deserialize_vector`](#0x1_bcs_stream_deserialize_vector)
 -  [Function `deserialize_string`](#0x1_bcs_stream_deserialize_string)
 -  [Function `deserialize_option`](#0x1_bcs_stream_deserialize_option)
+-  [Specification](#@Specification_1)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -638,6 +649,15 @@ The <code>elem_deserializer</code> lambda expression is used to deserialize the 
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY
