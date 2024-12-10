@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+/* FIXME(aldenhu)
 use crate::{metrics::TIMER, DbReader};
 use anyhow::{anyhow, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -197,3 +198,4 @@ mod tests {
         assert_eq_unordered!(proofs.into_keys().collect::<Vec<_>>(), expected_key_hashes);
     }
 }
+*/

@@ -240,7 +240,7 @@ impl StateMerkleDb {
 
     pub fn get_with_proof_ext(
         &self,
-        state_key: &StateKey,
+        key: &HashValue,
         version: Version,
         root_depth: usize,
     ) -> Result<(
@@ -248,7 +248,7 @@ impl StateMerkleDb {
         SparseMerkleProofExt,
     )> {
         JellyfishMerkleTree::new(self)
-            .get_with_proof_ext(state_key.hash(), version, root_depth)
+            .get_with_proof_ext(key, version, root_depth)
             .map_err(Into::into)
     }
 

@@ -3,11 +3,6 @@
 
 //! This file defines state store buffered state that has been committed.
 
-// FIXME(aldenhu)
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
-
 use crate::{
     metrics::{LATEST_CHECKPOINT_VERSION, OTHER_TIMERS_SECONDS},
     state_store::{
@@ -123,16 +118,16 @@ impl BufferedState {
         }
     }
 
-    fn current_state(&self) -> MutexGuard<LedgerStateWithSummary> {
+    fn current_state_locked(&self) -> MutexGuard<LedgerStateWithSummary> {
         self.current_state.lock()
     }
 
     fn buffered_versions(&self) -> u64 {
-        self.current_state().next_version() - self.last_snapshot.next_version()
+        self.current_state_locked().next_version() - self.last_snapshot.next_version()
     }
 
     fn last_checkpoint(&self) -> StateWithSummary {
-        self.current_state().last_checkpoint().clone()
+        self.current_state_locked().last_checkpoint().clone()
     }
 
     fn enqueue_commit(&mut self) {
@@ -168,20 +163,17 @@ impl BufferedState {
     pub fn update(&mut self, new_state: LedgerStateWithSummary, sync_commit: bool) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___update"]);
 
-        let old_state = self.current_state.lock().clone();
-        assert!(new_state.follows(&old_state));
-        self.current_state.lock().set(new_state.clone());
+        let old_state = self.current_state_locked().clone();
+        assert!(new_state.is_descendant_of(&old_state));
 
-        self.estimated_items += {
-            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___count_items_heavy"]);
-            new_state
-                .last_checkpoint()
-                .make_delta(old_state.last_checkpoint())
-                .count_items_heavy()
-        };
+        self.estimated_items += new_state
+            .last_checkpoint()
+            .make_delta(old_state.last_checkpoint())
+            .count_updates_costly();
 
         self.maybe_commit(sync_commit);
         Self::report_last_checkpoint_version(new_state.last_checkpoint().version());
+        self.current_state.lock().set(new_state);
         Ok(())
     }
 

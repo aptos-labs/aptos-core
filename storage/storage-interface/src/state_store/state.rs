@@ -82,35 +82,21 @@ impl State {
         &self.shards
     }
 
-    pub fn into_delta(self, _base: State) -> StateDelta {
-        // FIXME(aldenhu)
-        todo!()
+    pub fn make_delta(&self, base: &State) -> StateDelta {
+        self.clone().into_delta(base.clone())
     }
 
-    pub fn make_delta(&self, _base: &State) -> StateDelta {
-        // FIXME(aldenhu)
-        todo!()
+    pub fn into_delta(self, base: State) -> StateDelta {
+        StateDelta::new(base, self)
     }
 
-    pub fn is_the_same(&self, _rhs: &Self) -> bool {
-        // FIXME(aldenhu)
-        todo!()
-    }
-
-    pub fn is_family(&self, _rhs: &State) -> bool {
-        // FIXME(aldenhu)
-        todo!()
+    pub fn is_the_same(&self, rhs: &Self) -> bool {
+        Arc::ptr_eq(&self.shards, &rhs.shards)
     }
 
     // FIXME(aldenhu): check call sites, are we doing duplicate checks?
-    pub fn follows(&self, _rhs: &State) -> bool {
-        // FIXME(aldenhu)
-        todo!()
-    }
-
-    pub fn count_items_heavy(&self) -> usize {
-        // FIXME(aldenhu)
-        todo!()
+    pub fn is_descendant_of(&self, rhs: &State) -> bool {
+        self.shards[0].is_descendant_of(&rhs.shards[0])
     }
 
     pub fn update(
@@ -210,7 +196,7 @@ pub struct LedgerState {
 
 impl LedgerState {
     pub fn new(latest: State, last_checkpoint: State) -> Self {
-        assert!(latest.follows(&latest));
+        assert!(latest.is_descendant_of(&latest));
 
         Self {
             latest,

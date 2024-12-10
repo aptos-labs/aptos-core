@@ -47,7 +47,6 @@ use crate::{
     chunk_to_commit::ChunkToCommit,
     state_store::{state::State, state_summary::StateSummary},
 };
-use aptos_scratchpad::SparseMerkleTree;
 pub use aptos_types::block_info::BlockHeight;
 use aptos_types::state_store::state_key::prefix::StateKeyPrefix;
 pub use errors::AptosDbError;
@@ -357,7 +356,7 @@ pub trait DbReader: Send + Sync {
         /// Returns the proof of the given state key and version.
         fn get_state_proof_by_version_ext(
             &self,
-            state_key: &StateKey,
+            key: &HashValue,
             version: Version,
             root_depth: usize,
         ) -> Result<SparseMerkleProofExt>;
@@ -380,9 +379,6 @@ pub trait DbReader: Send + Sync {
         /// Gets the latest LedgerView no matter if db has been bootstrapped.
         /// Used by the Db-bootstrapper.
         fn get_pre_committed_ledger_summary(&self) -> Result<LedgerSummary>;
-
-        /// Get the oldest in memory state tree.
-        fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>>;
 
         fn get_persisted_state(&self) -> Result<State>;
 

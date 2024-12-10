@@ -1,9 +1,23 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_storage_interface::state_store::state::State;
+use aptos_storage_interface::state_store::state_summary::StateSummary;
 use aptos_types::block_info::BlockHeight;
 
 impl DbReader for AptosDB {
+    fn get_persisted_state(&self) -> Result<State> {
+        gauged_api("get_persisted_state", || {
+            self.state_store.get_persisted_state()
+        })
+    }
+
+    fn get_persisted_state_summary(&self) -> Result<StateSummary> {
+        gauged_api("get_persisted_state_summary", || {
+            self.state_store.get_persisted_state_summary()
+        })
+    }
+
     fn get_epoch_ending_ledger_infos(
         &self,
         start_epoch: u64,
@@ -63,10 +77,7 @@ impl DbReader for AptosDB {
 
     fn get_pre_committed_version(&self) -> Result<Option<Version>> {
         gauged_api("get_pre_committed_version", || {
-            todo!()
-
-            // FIXME(aldenhu)
-            // Ok(self.state_store.current_state().current_version)
+            Ok(self.state_store.current_state_locked().version())
         })
     }
 
@@ -488,7 +499,7 @@ impl DbReader for AptosDB {
     /// Returns the proof of the given state key and version.
     fn get_state_proof_by_version_ext(
         &self,
-        state_key: &StateKey,
+        key: &HashValue,
         version: Version,
         root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
@@ -496,7 +507,7 @@ impl DbReader for AptosDB {
             self.error_if_state_merkle_pruned("State merkle", version)?;
 
             self.state_store
-                .get_state_proof_by_version_ext(state_key, version, root_depth)
+                .get_state_proof_by_version_ext(key, version, root_depth)
         })
     }
 
@@ -532,11 +543,8 @@ impl DbReader for AptosDB {
 
     fn get_pre_committed_ledger_summary(&self) -> Result<LedgerSummary> {
         gauged_api("get_pre_committed_ledger_summary", || {
-            todo!()
-            /*
-            FIXME(aldenhu)
-            let current_state = self.state_store.current_state_cloned();
-            let num_txns = current_state.next_version();
+            let (state, state_summary) = self.state_store.current_state_locked().transpose();
+            let num_txns = state.next_version();
 
             let frozen_subtrees = self
                 .ledger_db
@@ -544,18 +552,11 @@ impl DbReader for AptosDB {
                 .get_frozen_subtree_hashes(num_txns)?;
             let transaction_accumulator =
                 Arc::new(InMemoryAccumulator::new(frozen_subtrees, num_txns)?);
-            let ledger_summary = LedgerSummary::new(
-                Arc::new(current_state),
+            Ok(LedgerSummary {
+                state,
+                state_summary,
                 transaction_accumulator,
-            );
-            Ok(ledger_summary)
-             */
-        })
-    }
-
-    fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>> {
-        gauged_api("get_buffered_state_base", || {
-            self.state_store.get_buffered_state_base()
+            })
         })
     }
 
@@ -645,15 +646,7 @@ impl DbReader for AptosDB {
 
     fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
         gauged_api("get_latest_state_checkpoint_version", || {
-            todo!()
-            /*
-            Ok(self
-                .state_store
-                .current_state()
-                .base_version
-            )
-            FIXME(aldenhu)
-             */
+            Ok(self.state_store.current_state_locked().last_checkpoint().version())
         })
     }
 

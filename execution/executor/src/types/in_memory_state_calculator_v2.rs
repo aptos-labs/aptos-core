@@ -14,7 +14,7 @@ use aptos_storage_interface::state_store::{
     per_version_state_update_refs::PerVersionStateUpdateRefs,
     state_delta::StateDelta,
     state_update_ref_map::BatchedStateUpdateRefs,
-    state_view::cached_state_view::{ShardedStateCache, StateCache, StateCacheShard},
+    state_view::cached_state_view::{ShardedStateCache, StateCacheShard},
 };
 use aptos_types::{
     state_store::{
@@ -52,10 +52,11 @@ impl InMemoryStateCalculatorV2 {
 
     pub fn calculate_for_write_sets_after_snapshot(
         parent_state: &Arc<StateDelta>,
-        state_cache: &StateCache,
+        // state_cache: &StateCache,
         last_checkpoint_index: Option<usize>,
         write_sets: &[WriteSet],
     ) -> Result<StateCheckpointOutput> {
+        /*
         let state_update_refs = PerVersionStateUpdateRefs::index_write_sets(
             parent_state.next_version(),
             write_sets,
@@ -70,11 +71,13 @@ impl InMemoryStateCalculatorV2 {
             false,
             Option::<Vec<_>>::None,
         )
+         */
+        todo!()
     }
 
     fn calculate_impl(
         _parent_state: &Arc<StateDelta>,
-        _state_cache: &StateCache,
+        // _state_cache: &StateCache,
         _state_update_refs: &PerVersionStateUpdateRefs,
         _last_checkpoint_index: Option<usize>,
         _is_block: bool,

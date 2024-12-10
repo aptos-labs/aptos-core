@@ -815,12 +815,12 @@ impl DbReader for FakeAptosDB {
 
     fn get_state_proof_by_version_ext(
         &self,
-        state_key: &StateKey,
+        key: &HashValue,
         version: Version,
         root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
         self.inner
-            .get_state_proof_by_version_ext(state_key, version, root_depth)
+            .get_state_proof_by_version_ext(key, version, root_depth)
     }
 
     fn get_state_value_with_proof_by_version_ext(
@@ -858,10 +858,6 @@ impl DbReader for FakeAptosDB {
             );
             Ok(ledger_summary)
         })
-    }
-
-    fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>> {
-        self.inner.get_buffered_state_base()
     }
 
     fn get_latest_block_events(&self, num_events: usize) -> Result<Vec<EventWithVersion>> {

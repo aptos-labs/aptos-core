@@ -17,7 +17,8 @@ use crate::{
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_executor_types::{
-    ChunkCommitNotification, ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode,
+    state_checkpoint_output, ChunkCommitNotification, ChunkExecutorTrait, TransactionReplayer,
+    VerifyExecutionMode,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::{Mutex, RwLock};
@@ -337,7 +338,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             chunk_verifier,
         } = chunk;
 
-        output.set_state_checkpoint_output(DoStateCheckpoint::run(
+        let state_checkpoint_output = DoStateCheckpoint::run(
             &output.execution_output,
             &parent_state_summary,
             &ProvableStateSummary::new_persisted(self.db.reader.clone())?,
@@ -347,11 +348,11 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
                     .iter()
                     .map(|t| t.state_checkpoint_hash()),
             ),
-        )?);
+        )?;
 
         let ledger_update_output = DoLedgerUpdate::run(
             &output.execution_output,
-            output.expect_state_checkpoint_output(),
+            &state_checkpoint_output,
             parent_accumulator.clone(),
         )?;
 
@@ -361,6 +362,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             &ledger_update_output,
             output.execution_output.next_epoch_state.as_ref(),
         )?;
+        output.set_state_checkpoint_output(state_checkpoint_output);
         output.set_ledger_update_output(ledger_update_output);
 
         let first_version = output.execution_output.first_version;

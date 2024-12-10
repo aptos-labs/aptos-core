@@ -272,6 +272,10 @@ where
         self.inner.family == other.inner.family
     }
 
+    pub fn is_descendant_of(&self, other: &Self) -> bool {
+        self.is_family(other) && self.generation() >= other.generation()
+    }
+
     pub fn usage(&self) -> StateStorageUsage {
         self.inner.usage
     }

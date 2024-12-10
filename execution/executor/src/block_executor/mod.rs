@@ -309,7 +309,7 @@ where
                         .transaction_accumulator
                         .clone(),
                 )?);
-                Ok(())
+                Result::<_>::Ok(())
             })?;
         }
 

@@ -22,20 +22,6 @@ impl<'kv> BatchedStateUpdateRefs<'kv> {
         }
     }
 
-    pub fn all_shards_empty(&self) -> bool {
-        /* FIXME(aldenhu)
-        self.shards.iter().all(|shard| shard.is_empty())
-         */
-        todo!()
-    }
-
-    pub fn total_len(&self) -> usize {
-        /* FIXME(aldenhu)
-        self.shards.iter().map(|shard| shard.len()).sum()
-         */
-        todo!()
-    }
-
     pub fn first_version(&self) -> Version {
         self.first_version
     }
@@ -43,28 +29,4 @@ impl<'kv> BatchedStateUpdateRefs<'kv> {
     pub fn next_version(&self) -> Version {
         self.first_version + self.num_versions as Version
     }
-
-    /* FIXME(aldenhu): remove
-    pub fn merge(&mut self, other: Self) {
-        THREAD_MANAGER.get_exe_cpu_pool().install(|| {
-            self.shards
-                .par_iter_mut()
-                .zip_eq(other.shards.into_par_iter())
-                .for_each(|(l, r)| {
-                    l.extend(r);
-                })
-        })
-    }
-
-    pub fn clone_merge(&mut self, other: &Self) {
-        THREAD_MANAGER.get_exe_cpu_pool().install(|| {
-            self.shards
-                .par_iter_mut()
-                .zip_eq(other.shards.par_iter())
-                .for_each(|(l, r)| {
-                    l.extend(r.clone());
-                })
-        })
-    }
-     */
 }

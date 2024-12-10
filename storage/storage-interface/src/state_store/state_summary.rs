@@ -58,14 +58,9 @@ impl StateSummary {
         self.next_version
     }
 
-    pub fn is_the_same(&self, _rhs: &Self) -> bool {
-        // FIXME(aldenhu)
-        todo!()
-    }
-
-    pub fn is_family(&self, _rhs: &Self) -> bool {
-        // FIXME(aldenhu)
-        todo!()
+    pub fn is_descendant_of(&self, other: &Self) -> bool {
+        self.global_state_summary
+            .is_descendant_of(&other.global_state_summary)
     }
 
     pub fn update(
@@ -191,10 +186,14 @@ pub struct ProvableStateSummary {
 
 impl ProvableStateSummary {
     pub fn new_persisted(db: Arc<dyn DbReader>) -> Result<Self> {
-        Ok(Self {
-            state_summary: db.get_persisted_state_summary()?,
+        Ok(Self::new(db.get_persisted_state_summary()?, db))
+    }
+
+    pub fn new(state_summary: StateSummary, db: Arc<dyn DbReader>) -> Self {
+        Self {
+            state_summary,
             _db: db,
-        })
+        }
     }
 }
 
@@ -246,5 +245,9 @@ impl StateWithSummary {
 
     pub fn summary(&self) -> &StateSummary {
         &self.summary
+    }
+
+    pub fn is_descendant_of(&self, other: &Self) -> bool {
+        self.state.is_descendant_of(&other.state) && self.summary.is_descendant_of(&other.summary)
     }
 }

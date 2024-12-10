@@ -10,7 +10,6 @@ use crate::{
     DbReader,
 };
 use anyhow::Result;
-use aptos_scratchpad::SparseMerkleTree;
 use aptos_types::{
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
@@ -21,14 +20,23 @@ use aptos_types::{
 };
 use core::fmt;
 use dashmap::DashMap;
+use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt::{Debug, Formatter},
     sync::Arc,
 };
 
 pub type StateCacheShard = DashMap<StateKey, StateCacheEntry>;
+
+static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(32)
+        .thread_name(|index| format!("kv_reader_{}", index))
+        .build()
+        .unwrap()
+});
 
 #[derive(Debug, Default)]
 pub struct ShardedStateCache {
@@ -37,12 +45,7 @@ pub struct ShardedStateCache {
 }
 
 impl ShardedStateCache {
-    pub fn combine(&mut self, _rhs: Self) {
-        // FIXME(aldenhu): remove?
-        todo!()
-    }
-
-    pub fn shard(&self, shard_id: u8) -> &StateCacheShard {
+    fn shard(&self, shard_id: u8) -> &StateCacheShard {
         &self.shards[shard_id as usize]
     }
 
@@ -99,21 +102,21 @@ impl CachedStateView {
         Self {
             id,
             reader,
-            speculative: StateDelta::new(persisted_state, state),
+            speculative: state.into_delta(persisted_state),
             memorized: ShardedStateCache::default(),
         }
     }
 
-    pub fn new_dummy() -> Self {
-        // FIXME(aldenhu)
-        todo!()
-    }
-
-    pub fn prime_cache_by_write_set<'a, T: IntoIterator<Item = &'a WriteSet> + Send>(
+    // TODO(aldenhu): combine with StateStore::prime_state_cache
+    pub fn prime_cache_by_write_sets<'a, T: IntoIterator<Item = &'a WriteSet> + Send>(
         &self,
-        _write_sets: T,
+        write_sets: T,
     ) -> StateViewResult<()> {
-        /*
+        let _timer = TIMER
+            .with_label_values(&["prime_cache_by_write_sets"])
+            .start_timer();
+
+        // TODO(aldenhu): avoid collecting to the same hashset
         IO_POOL.scope(|s| {
             write_sets
                 .into_iter()
@@ -123,29 +126,23 @@ impl CachedStateView {
                 .into_iter()
                 .for_each(|key| {
                     s.spawn(move |_| {
-                        self.get_state_value_bytes(key).expect("Must succeed.");
+                        self.get_state_value(key).expect("Must succeed.");
                     })
                 });
         });
         Ok(())
-         */
-        // FIXME(aldenhu): remove
-        todo!()
     }
 
     /// Consumes `Self` and returns the state and all the memorized state reads.
     pub fn into_state_cache(self) -> ShardedStateCache {
-        todo!()
-        /* FIXME(aldenhu)
         let Self {
             id: _,
-            persisted: _,
-            speculative,
+            reader: _,
+            speculative: _,
             memorized,
         } = self;
 
-        (speculative.current, memorized)
-         */
+        memorized
     }
 
     fn parent_version(&self) -> Option<Version> {
@@ -178,32 +175,6 @@ impl CachedStateView {
 
     pub fn state_cache(&self) -> &ShardedStateCache {
         &self.memorized
-    }
-}
-
-// FIXME(aldenhu): remove unnecessary fields, probably remove entirely and use ShardedStateCache directly
-#[derive(Debug)]
-pub struct StateCache {
-    pub speculative: StateDelta,
-    pub memorized: ShardedStateCache,
-}
-
-impl StateCache {
-    pub fn new_empty(_smt: SparseMerkleTree<StateValue>) -> Self {
-        /*
-        let frozen_base = smt.freeze(&smt);
-        Self {
-            frozen_base,
-            sharded_state_cache: ShardedStateCache::default(),
-            proofs: HashMap::new(),
-        }
-        FIXME(aldenhu)
-         */
-        todo!()
-    }
-
-    pub fn new_dummy() -> Self {
-        Self::new_empty(SparseMerkleTree::new_empty())
     }
 }
 

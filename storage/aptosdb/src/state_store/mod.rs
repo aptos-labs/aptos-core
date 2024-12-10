@@ -53,6 +53,7 @@ use aptos_executor::{
     types::in_memory_state_calculator_v2::InMemoryStateCalculatorV2,
     workflow::do_state_checkpoint::DoStateCheckpoint,
 };
+use aptos_executor_types::transactions_with_output::StateUpdateRefs;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
@@ -66,12 +67,9 @@ use aptos_storage_interface::{
         per_version_state_update_refs::PerVersionStateUpdateRefs,
         state::{LedgerState, State},
         state_delta::StateDelta,
-        state_summary::{StateSummary, StateWithSummary},
+        state_summary::{ProvableStateSummary, StateSummary, StateWithSummary},
         state_update::{StateCacheEntry, StateUpdateRef},
-        state_view::{
-            async_proof_fetcher::AsyncProofFetcher,
-            cached_state_view::{CachedStateView, ShardedStateCache, StateCacheShard},
-        },
+        state_view::cached_state_view::{CachedStateView, ShardedStateCache, StateCacheShard},
         NUM_STATE_SHARDS,
     },
     AptosDbError, DbReader, Result, StateSnapshotReceiver,
@@ -194,13 +192,13 @@ impl DbReader for StateDb {
     /// Returns the proof of the given state key and version.
     fn get_state_proof_by_version_ext(
         &self,
-        state_key: &StateKey,
+        key: &HashValue,
         version: Version,
         root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
         let (_, proof) = self
             .state_merkle_db
-            .get_with_proof_ext(state_key, version, root_depth)?;
+            .get_with_proof_ext(key, version, root_depth)?;
         Ok(proof)
     }
 
@@ -211,9 +209,11 @@ impl DbReader for StateDb {
         version: Version,
         root_depth: usize,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
-        let (leaf_data, proof) = self
-            .state_merkle_db
-            .get_with_proof_ext(state_key, version, root_depth)?;
+        let (leaf_data, proof) = self.state_merkle_db.get_with_proof_ext(
+            state_key.crypto_hash_ref(),
+            version,
+            root_depth,
+        )?;
         Ok((
             match leaf_data {
                 Some((_, (key, version))) => Some(self.expect_value_by_version(&key, version)?),
@@ -237,9 +237,12 @@ impl DbReader for StateDb {
 }
 
 impl DbReader for StateStore {
-    fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>> {
-        // FIXME(aldenhu)
-        todo!()
+    fn get_persisted_state(&self) -> Result<State> {
+        Ok(self.persisted_state_locked().state().clone())
+    }
+
+    fn get_persisted_state_summary(&self) -> Result<StateSummary> {
+        Ok(self.persisted_state_locked().summary().clone())
     }
 
     /// Returns the latest state snapshot strictly before `next_version` if any.
@@ -275,12 +278,12 @@ impl DbReader for StateStore {
     /// Returns the proof of the given state key and version.
     fn get_state_proof_by_version_ext(
         &self,
-        state_key: &StateKey,
+        key: &HashValue,
         version: Version,
         root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
         self.deref()
-            .get_state_proof_by_version_ext(state_key, version, root_depth)
+            .get_state_proof_by_version_ext(key, version, root_depth)
     }
 
     /// Get the state value with proof extension given the state key and version
@@ -608,9 +611,11 @@ impl StateStore {
                 .map(|(idx, _)| idx);
 
             let new_state = Self::update_ledger_state_with_write_sets(
+                state_db,
                 out_current_state.lock().clone(),
                 &write_sets,
-            );
+                last_checkpoint_index,
+            )?;
 
             // synchronously commit the snapshot at the last checkpoint here if not committed to disk yet.
             buffered_state.update(new_state, true /* sync_commit */)?;
@@ -630,11 +635,42 @@ impl StateStore {
     }
 
     pub fn update_ledger_state_with_write_sets(
-        _state: LedgerStateWithSummary,
-        _write_sets: &[WriteSet],
-    ) -> LedgerStateWithSummary {
-        // FIXME(aldenhu)
-        todo!()
+        state_db: &Arc<StateDb>,
+        state: LedgerStateWithSummary,
+        write_sets: &[WriteSet],
+        last_checkpoint_index: Option<usize>,
+    ) -> Result<LedgerStateWithSummary> {
+        let state_view = CachedStateView::new(
+            StateViewId::Miscellaneous,
+            state_db.clone(),
+            state.state().clone(),
+        )?;
+        state_view.prime_cache_by_write_sets(write_sets)?;
+
+        let state_update_refs = StateUpdateRefs::index_write_sets(
+            state.next_version(),
+            write_sets,
+            write_sets.len(),
+            last_checkpoint_index,
+        );
+
+        let new_ledger_state = state.ledger_state().update(
+            state.state(),
+            state_update_refs.for_last_checkpoint.as_ref(),
+            &state_update_refs.for_latest,
+            &state_view.into_state_cache(),
+        );
+
+        let new_ledger_state_summary = state.ledger_state_summary().update(
+            &ProvableStateSummary::new(state.summary().clone(), state_db.clone()),
+            state_update_refs.for_last_checkpoint.as_ref(),
+            &state_update_refs.for_latest,
+        )?;
+
+        Ok(LedgerStateWithSummary::from_state_and_summary(
+            new_ledger_state,
+            new_ledger_state_summary,
+        ))
     }
 
     pub fn reset(&self) {
@@ -654,11 +690,11 @@ impl StateStore {
         &self.buffered_state
     }
 
-    pub fn current_state(&self) -> MutexGuard<LedgerStateWithSummary> {
+    pub fn current_state_locked(&self) -> MutexGuard<LedgerStateWithSummary> {
         self.current_state.lock()
     }
 
-    pub fn persisted_state(&self) -> MutexGuard<PersistedState> {
+    pub fn persisted_state_locked(&self) -> MutexGuard<PersistedState> {
         self.persisted_state.lock()
     }
 
@@ -699,7 +735,7 @@ impl StateStore {
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
         enable_sharding: bool,
     ) -> Result<()> {
-        /*
+        /* FIXME(aldenhu): for restore tool
         self.put_value_sets(
             first_version,
             &ShardedStateUpdateRefs::index_write_sets(&write_sets, write_sets.len()),
@@ -710,7 +746,6 @@ impl StateStore {
             enable_sharding,
             None, // last_checkpoint_index
         )
-        FIXME(aldenhu): need to calculate state, last checkpoint, etc
          */
         todo!()
     }
@@ -726,7 +761,7 @@ impl StateStore {
         enable_sharding: bool,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["put_value_sets"]);
-        let current_state = self.current_state().state().clone();
+        let current_state = self.current_state_locked().state().clone();
 
         self.put_stats_and_indices(
             &current_state,
@@ -844,8 +879,7 @@ impl StateStore {
                 OTHER_TIMERS_SECONDS.timer_with(&["put_stats_and_indices__prime_state_cache"]);
 
             latest_state
-                .clone()
-                .into_delta(current_state.clone())
+                .make_delta(current_state)
                 .shards
                 .par_iter()
                 .zip_eq(state_cache.shards.par_iter())

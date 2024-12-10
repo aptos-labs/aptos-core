@@ -12,10 +12,7 @@ use aptos_db::AptosDB;
 use aptos_executor_types::{
     BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode,
 };
-use aptos_storage_interface::{
-    state_store::state_view::async_proof_fetcher::AsyncProofFetcher, DbReaderWriter, LedgerSummary,
-    Result,
-};
+use aptos_storage_interface::{DbReaderWriter, LedgerSummary, Result};
 use aptos_types::{
     account_address::AccountAddress,
     aggregate_signature::AggregateSignature,
