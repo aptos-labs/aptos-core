@@ -63,6 +63,37 @@ impl NetworkMessage {
             NetworkMessage::DirectSendMsg(message) => message.raw_msg.len(),
         }
     }
+
+    /// Creates a direct send message for testing (i.e., some internal fields contain dummy values).
+    /// Note: this cannot be marked as `#[cfg(test)]` because of several non-wrapped test utils.
+    pub fn direct_send_for_testing(protocol_id: ProtocolId, raw_msg: Vec<u8>) -> Self {
+        NetworkMessage::DirectSendMsg(DirectSendMsg {
+            protocol_id,
+            priority: 0,
+            raw_msg,
+        })
+    }
+
+    /// Creates an RPC response message for testing (i.e., some internal fields contain dummy values).
+    /// Note: this cannot be marked as `#[cfg(test)]` because of several non-wrapped test utils.
+    pub fn rpc_response_for_testing(raw_response: Vec<u8>) -> Self {
+        NetworkMessage::RpcResponse(RpcResponse {
+            request_id: 0,
+            priority: 0,
+            raw_response,
+        })
+    }
+
+    /// Creates an RPC request message for testing (i.e., some internal fields contain dummy values).
+    /// Note: this cannot be marked as `#[cfg(test)]` because of several non-wrapped test utils.
+    pub fn rpc_request_for_testing(protocol_id: ProtocolId, raw_request: Vec<u8>) -> Self {
+        NetworkMessage::RpcRequest(RpcRequest {
+            protocol_id,
+            request_id: 0,
+            priority: 0,
+            raw_request,
+        })
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]

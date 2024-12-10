@@ -13,7 +13,7 @@ use crate::{
         network::{NetworkSender, NewNetworkEvents, NewNetworkSender, ReceivedMessage},
         wire::{
             handshake::v1::{ProtocolId::HealthCheckerRpc, ProtocolIdSet},
-            messaging::v1::{NetworkMessage, RpcRequest},
+            messaging::v1::NetworkMessage,
         },
     },
     transport::ConnectionMetadata,
@@ -136,12 +136,7 @@ impl TestHarness {
         let (res_tx, res_rx) = oneshot::channel();
         let key = (peer_id, ProtocolId::HealthCheckerRpc);
         let (delivered_tx, delivered_rx) = oneshot::channel();
-        let network_message = NetworkMessage::RpcRequest(RpcRequest {
-            protocol_id,
-            request_id: 0,
-            priority: 0,
-            raw_request: data,
-        });
+        let network_message = NetworkMessage::rpc_request_for_testing(protocol_id, data);
         let received_message = ReceivedMessage::new_for_testing(
             network_message,
             PeerNetworkId::new(NetworkId::Validator, peer_id),
