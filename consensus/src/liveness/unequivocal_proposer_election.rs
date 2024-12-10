@@ -67,19 +67,21 @@ impl UnequivocalProposerElection {
                     true
                 },
                 Ordering::Equal => {
-                    if already_proposed.1 != block.id() {
-                        error!(
-                            SecurityEvent::InvalidConsensusProposal,
-                            "Multiple proposals from {} for round {}: {} and {}",
-                            author,
-                            block.round(),
-                            already_proposed.1,
-                            block.id()
-                        );
-                        false
-                    } else {
-                        true
-                    }
+                    // if already_proposed.1 != block.id() {
+                    //     error!(
+                    //         SecurityEvent::InvalidConsensusProposal,
+                    //         "Multiple proposals from {} for round {}: {} and {}",
+                    //         author,
+                    //         block.round(),
+                    //         already_proposed.1,
+                    //         block.id()
+                    //     );
+                    //     false
+                    // } else {
+                    //     true
+                    // }
+                    // optimistic proposal hack
+                    true
                 },
                 Ordering::Less => false,
             }

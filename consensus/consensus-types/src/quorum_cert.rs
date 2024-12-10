@@ -52,6 +52,20 @@ impl QuorumCert {
         }
     }
 
+    pub fn empty() -> Self {
+        Self {
+            vote_data: VoteData::dummy(),
+            signed_ledger_info: LedgerInfoWithSignatures::new(
+                LedgerInfo::dummy(),
+                AggregateSignature::empty(),
+            ),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.vote_data == VoteData::dummy()
+    }
+
     pub fn vote_data(&self) -> &VoteData {
         &self.vote_data
     }
@@ -118,6 +132,10 @@ impl QuorumCert {
     }
 
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        if self.is_empty() {
+            // optimistic proposal hack
+            return Ok(());
+        }
         let vote_hash = self.vote_data.hash();
         ensure!(
             self.ledger_info().ledger_info().consensus_data_hash() == vote_hash,

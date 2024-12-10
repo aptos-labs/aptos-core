@@ -210,12 +210,12 @@ impl SafetyRules {
         round: Round,
         safety_data: &mut SafetyData,
     ) -> Result<(), Error> {
-        if round <= safety_data.last_voted_round {
-            return Err(Error::IncorrectLastVotedRound(
-                round,
-                safety_data.last_voted_round,
-            ));
-        }
+        // if round <= safety_data.last_voted_round {
+        //     return Err(Error::IncorrectLastVotedRound(
+        //         round,
+        //         safety_data.last_voted_round,
+        //     ));
+        // }
 
         safety_data.last_voted_round = round;
         trace!(
@@ -292,6 +292,8 @@ impl SafetyRules {
                     0,
                     0,
                     None,
+                    None,
+                    None,
                     0,
                 ))?;
 
@@ -349,16 +351,19 @@ impl SafetyRules {
         let mut safety_data = self.persistent_storage.safety_data()?;
         self.verify_epoch(block_data.epoch(), &safety_data)?;
 
-        if block_data.round() <= safety_data.last_voted_round {
+        // optimistic proposal hack
+        if block_data.round() < safety_data.last_voted_round {
             return Err(Error::InvalidProposal(format!(
                 "Proposed round {} is not higher than last voted round {}",
                 block_data.round(),
                 safety_data.last_voted_round
             )));
         }
-
-        self.verify_qc(block_data.quorum_cert())?;
-        self.verify_and_update_preferred_round(block_data.quorum_cert(), &mut safety_data)?;
+        if !block_data.quorum_cert().is_empty() {
+            // regular proposal
+            self.verify_qc(block_data.quorum_cert())?;
+            self.verify_and_update_preferred_round(block_data.quorum_cert(), &mut safety_data)?;
+        }
         // we don't persist the updated preferred round to save latency (it'd be updated upon voting)
 
         let signature = self.sign(block_data)?;

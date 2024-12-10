@@ -43,7 +43,7 @@ impl PersistentSafetyStorage {
             .expect("Unable to initialize keys and accounts in storage");
 
         // Create the new persistent safety storage
-        let safety_data = SafetyData::new(1, 0, 0, 0, None, 0);
+        let safety_data = SafetyData::new(1, 0, 0, 0, None, None, None, 0);
         let mut persisent_safety_storage = Self {
             enable_cached_safety_data,
             cached_safety_data: Some(safety_data.clone()),
