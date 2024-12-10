@@ -4,6 +4,7 @@ from typing import Mapping as _Mapping
 from typing import Optional as _Optional
 from typing import Union as _Union
 
+from aptos.indexer.v1 import grpc_pb2 as _grpc_pb2
 from aptos.transaction.v1 import transaction_pb2 as _transaction_pb2
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
@@ -74,4 +75,16 @@ class TransactionsFromNodeResponse(_message.Message):
         status: _Optional[_Union[StreamStatus, _Mapping]] = ...,
         data: _Optional[_Union[TransactionsOutput, _Mapping]] = ...,
         chain_id: _Optional[int] = ...,
+    ) -> None: ...
+
+class PingFullnodeRequest(_message.Message):
+    __slots__ = []
+    def __init__(self) -> None: ...
+
+class PingFullnodeResponse(_message.Message):
+    __slots__ = ["info"]
+    INFO_FIELD_NUMBER: _ClassVar[int]
+    info: _grpc_pb2.FullnodeInfo
+    def __init__(
+        self, info: _Optional[_Union[_grpc_pb2.FullnodeInfo, _Mapping]] = ...
     ) -> None: ...

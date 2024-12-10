@@ -43,6 +43,26 @@ impl Default for IndexerGrpcFileStoreConfig {
 }
 
 impl IndexerGrpcFileStoreConfig {
+    pub async fn create_filestore(self) -> Box<dyn crate::file_store_operator_v2::FileStore> {
+        match self {
+            IndexerGrpcFileStoreConfig::GcsFileStore(gcs_file_store) => Box::new(
+                crate::file_store_operator_v2::gcs::GcsFileStore::new(
+                    gcs_file_store.gcs_file_store_bucket_name,
+                    gcs_file_store.gcs_file_store_bucket_sub_dir,
+                    gcs_file_store
+                        .gcs_file_store_service_account_key_path
+                        .clone(),
+                )
+                .await,
+            ),
+            IndexerGrpcFileStoreConfig::LocalFileStore(local_file_store) => {
+                Box::new(crate::file_store_operator_v2::local::LocalFileStore::new(
+                    local_file_store.local_file_store_path,
+                ))
+            },
+        }
+    }
+
     pub fn create(&self) -> Box<dyn crate::file_store_operator::FileStoreOperator> {
         match self {
             IndexerGrpcFileStoreConfig::GcsFileStore(gcs_file_store) => {
