@@ -189,14 +189,11 @@ impl PipelineBackpressureConfig {
                 .sorted()
                 .collect::<Vec<_>>();
             if computed_target_block_gas_limits.len() >= config.min_blocks_to_activate {
-                let computed_target_block_gas_limit = (*computed_target_block_gas_limits
-                    .get(
-                        ((config.percentile * computed_target_block_gas_limits.len() as f64)
-                            as usize)
-                            .min(computed_target_block_gas_limits.len() - 1),
-                    )
-                    .expect("guaranteed to be within vector size"))
-                .max(config.min_calibrated_block_gas_limit);
+                // TODO: this replaces percentile with mean
+                let sum: u64 = computed_target_block_gas_limits.iter().sum();
+                let average = (sum as f64 / computed_target_block_gas_limits.len() as f64) as u64;
+                let computed_target_block_gas_limit =
+                    average.max(config.min_calibrated_block_gas_limit);
                 PROPOSER_ESTIMATED_CALIBRATED_BLOCK_TXNS
                     .observe(computed_target_block_gas_limit as f64);
                 // Check if calibrated block gas limit is a reduction, to turn on backpressure.
