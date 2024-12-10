@@ -196,13 +196,11 @@ impl Default for ConsensusConfig {
             min_max_txns_in_block_after_filtering_from_backpressure: MIN_BLOCK_TXNS_AFTER_FILTERING,
             execution_backpressure: Some(ExecutionBackpressureConfig {
                 num_blocks_to_look_at: 20,
-                // TODO: also adjust this?
                 min_blocks_to_activate: 4,
-                percentile: 0.5,
+                percentile: 0.25,
                 target_block_time_ms: 200,
-                min_block_time_ms_to_activate: 100,
-                // TODO: appropriate value?
-                min_calibrated_block_gas_limit: 1000,
+                min_block_time_ms_to_activate: 10,
+                min_calibrated_block_gas_limit: 2000,
             }),
             pipeline_backpressure: vec![
                 PipelineBackpressureValues {
