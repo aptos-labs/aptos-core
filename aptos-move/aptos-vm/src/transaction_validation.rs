@@ -118,7 +118,7 @@ pub(crate) fn run_script_prologue(
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> Result<(), VMStatus> {
-    info!("prologue (address: {:?}, replay_protector: {:?}, expiration_timestamp_secs: {:?})", txn_data.sender, txn_data.replay_protector(), txn_data.expiration_timestamp_secs());
+    info!("prologue is_simulation {:?} (address: {:?}, replay_protector: {:?}, expiration_timestamp_secs: {:?})", is_simulation, txn_data.sender, txn_data.replay_protector(), txn_data.expiration_timestamp_secs());
     let txn_replay_protector = txn_data.replay_protector();
     let txn_authentication_key = txn_data.authentication_key().to_vec();
     let txn_gas_price = txn_data.gas_unit_price();

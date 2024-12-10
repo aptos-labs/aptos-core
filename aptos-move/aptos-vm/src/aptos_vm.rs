@@ -1845,6 +1845,7 @@ impl AptosVM {
         traversal_context: &mut TraversalContext,
     ) -> Result<(), VMStatus> {
         // Check transaction format.
+        info!("validate_signed_transaction (address: {:?}, replay_protector: {:?}, expiration_timestamp_secs: {:?}", transaction.sender(), transaction.replay_protector(), transaction.expiration_timestamp_secs());
         if transaction.contains_duplicate_signers() {
             return Err(VMStatus::error(
                 StatusCode::SIGNERS_CONTAIN_DUPLICATES,
@@ -2964,6 +2965,11 @@ impl VMValidator for AptosVM {
         state_view: &impl StateView,
         module_storage: &impl AptosCodeStorage,
     ) -> VMValidatorResult {
+        info!("validate_transaction (address: {:?}, replay_protector: {:?}, expiration_timestamp_secs: {:?})",
+            transaction.sender(),
+            transaction.replay_protector(),
+            transaction.expiration_timestamp_secs(),
+        );
         let _timer = TXN_VALIDATION_SECONDS.start_timer();
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
