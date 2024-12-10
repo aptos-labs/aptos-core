@@ -55,8 +55,8 @@ use crate::{
         network::{ReceivedMessage, SerializedRequest},
         wire::messaging::v1::{
             metadata::{
-                MessageMetadata, MessageSendType, NetworkMessageWithMetadata,
-                RpcResponseWithMetadata,
+                MessageMetadata, MessageReceiveType, MessageSendType, NetworkMessageWithMetadata,
+                ReceivedMessageMetadata, RpcResponseWithMetadata, SentMessageMetadata,
             },
             NetworkMessage, Priority, RequestId, RpcRequest, RpcResponse,
         },
@@ -191,12 +191,13 @@ impl OutboundRpcRequest {
         });
 
         // Create the network message with metadata
-        let message_metadata = MessageMetadata::new(
+        let sent_message_metadata = SentMessageMetadata::new(
             network_id,
             Some(self.protocol_id),
             MessageSendType::RpcRequest,
             Some(self.application_send_time),
         );
+        let message_metadata = MessageMetadata::new_sent_metadata(sent_message_metadata);
         let message_with_metadata =
             NetworkMessageWithMetadata::new(message_metadata, network_message);
 
@@ -323,8 +324,8 @@ impl InboundRpcs {
             return Err(RpcError::TooManyPending(self.max_concurrent_inbound_rpcs));
         }
 
-        let peer_id = request.sender.peer_id();
-        let NetworkMessage::RpcRequest(rpc_request) = &request.message else {
+        let peer_id = request.sender().peer_id();
+        let NetworkMessage::RpcRequest(rpc_request) = request.network_message() else {
             return Err(RpcError::InvalidRpcResponse);
         };
         let protocol_id = rpc_request.protocol_id;
@@ -346,7 +347,7 @@ impl InboundRpcs {
 
         // Forward request to PeerManager for handling.
         let (response_tx, response_rx) = oneshot::channel();
-        request.rpc_replier = Some(Arc::new(response_tx));
+        request.set_rpc_replier(Arc::new(response_tx));
         if let Err(err) = peer_notifs_tx.push((peer_id, protocol_id), request) {
             counters::rpc_messages(network_context, REQUEST_LABEL, INBOUND_LABEL, FAILED_LABEL)
                 .inc();
@@ -363,12 +364,14 @@ impl InboundRpcs {
                 let maybe_response = match result {
                     Ok(Ok(Ok(response_bytes))) => {
                         // Create a new message metadata
-                        let message_metadata = MessageMetadata::new(
+                        let sent_message_metadata = SentMessageMetadata::new(
                             network_id,
                             Some(protocol_id),
                             MessageSendType::RpcResponse,
                             Some(SystemTime::now()),
                         );
+                        let message_metadata =
+                            MessageMetadata::new_sent_metadata(sent_message_metadata);
 
                         // Create an RPC response with metadata
                         let rpc_response = RpcResponse {
@@ -520,7 +523,13 @@ pub struct OutboundRpcs {
     /// Maps a `RequestId` into a handle to a task in the `outbound_rpc_tasks`
     /// completion queue. When a new `RpcResponse` message comes in, we will use
     /// this map to notify the corresponding task that its response has arrived.
-    pending_outbound_rpcs: HashMap<RequestId, (ProtocolId, oneshot::Sender<RpcResponse>)>,
+    pending_outbound_rpcs: HashMap<
+        RequestId,
+        (
+            ProtocolId,
+            oneshot::Sender<(RpcResponse, ReceivedMessageMetadata)>,
+        ),
+    >,
     /// Only allow this many concurrent outbound rpcs at one time from this remote
     /// peer. New outbound requests exceeding this limit will be dropped.
     max_concurrent_outbound_rpcs: u32,
@@ -613,7 +622,8 @@ impl OutboundRpcs {
         self.update_outbound_rpc_request_metrics(protocol_id, request_length);
 
         // Create channel over which response is delivered to outbound_rpc_task.
-        let (response_tx, response_rx) = oneshot::channel::<RpcResponse>();
+        let (response_tx, response_rx) =
+            oneshot::channel::<(RpcResponse, ReceivedMessageMetadata)>();
 
         // Store send-side in the pending map so we can notify outbound_rpc_task
         // when the rpc response has arrived.
@@ -629,7 +639,10 @@ impl OutboundRpcs {
             .map(|result| {
                 // Flatten errors.
                 match result {
-                    Ok(Ok(response)) => Ok(Bytes::from(response.raw_response)),
+                    Ok(Ok((response, received_message_metadata))) => {
+                        let raw_response = Bytes::from(response.raw_response);
+                        Ok((raw_response, received_message_metadata))
+                    },
                     Ok(Err(oneshot::Canceled)) => Err(RpcError::UnexpectedResponseChannelCancel),
                     Err(timeout::Elapsed) => Err(RpcError::TimedOut),
                 }
@@ -644,16 +657,31 @@ impl OutboundRpcs {
 
             futures::select! {
                 maybe_response = wait_for_response => {
-                    // TODO(philiphayes): Clean up RpcError. Effectively need to
-                    // clone here to pass the result up to application layer, but
-                    // RpcError is not currently cloneable.
-                    let result_copy = match &maybe_response {
-                        Ok(response) => Ok(response.len() as u64),
-                        Err(err) => Err(RpcError::Error(anyhow!(err.to_string()))),
-                    };
-                    // Notify the application of the results.
-                    application_response_tx.send(maybe_response).map_err(|_| RpcError::UnexpectedResponseChannelCancel)?;
-                    result_copy
+                    match maybe_response {
+                        Ok((response, mut received_message_metadata)) => {
+                            // Notify the application of the response
+                            let response_length = response.len() as u64;
+                            application_response_tx.send(Ok(response)).map_err(|_| RpcError::UnexpectedResponseChannelCancel)?;
+
+                            // Update the metadata as having sent the message to the application
+                            received_message_metadata.mark_message_as_application_received();
+
+                            // Return the response length
+                            Ok(response_length)
+                        },
+                        Err(error) => {
+                            // TODO(philiphayes): Clean up RpcError. Effectively need to
+                            // clone here to pass the result up to application layer, but
+                            // RpcError is not currently cloneable.
+                            let error_copy = Err(RpcError::Error(anyhow!(error.to_string())));
+
+                            // Notify the application of the error
+                            application_response_tx.send(Err(error)).map_err(|_| RpcError::UnexpectedResponseChannelCancel)?;
+
+                            // Return the error
+                            error_copy
+                        }
+                    }
                 }
                 _ = cancellation => Err(RpcError::UnexpectedResponseChannelCancel),
             }
@@ -796,7 +824,11 @@ impl OutboundRpcs {
     /// with a matching request id in the `pending_outbound_rpcs` map, this will
     /// trigger that corresponding task to wake up and complete in
     /// `handle_completed_request`.
-    pub fn handle_inbound_response(&mut self, response: RpcResponse) {
+    pub fn handle_inbound_response(
+        &mut self,
+        response: RpcResponse,
+        mut received_message_metadata: ReceivedMessageMetadata,
+    ) {
         let network_context = &self.network_context;
         let peer_id = &self.remote_peer_id;
         let request_id = response.request_id;
@@ -804,11 +836,20 @@ impl OutboundRpcs {
         let is_canceled = if let Some((protocol_id, response_tx)) =
             self.pending_outbound_rpcs.remove(&request_id)
         {
+            // Update the inbound RPC response metrics
             self.update_inbound_rpc_response_metrics(
                 protocol_id,
                 response.raw_response.len() as u64,
             );
-            response_tx.send(response).is_err()
+
+            // Update the received message metadata
+            received_message_metadata
+                .update_protocol_id_and_message_type(protocol_id, MessageReceiveType::RpcResponse);
+
+            // Send the response and metadata to the listener
+            response_tx
+                .send((response, received_message_metadata))
+                .is_err()
         } else {
             true
         };

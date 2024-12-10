@@ -7,7 +7,7 @@ use crate::{
     protocols::{
         stream::{InboundStreamBuffer, OutboundStream, StreamFragment, StreamHeader},
         wire::messaging::v1::metadata::{
-            MessageMetadata, MessageSendType, NetworkMessageWithMetadata,
+            MessageMetadata, MessageSendType, NetworkMessageWithMetadata, SentMessageMetadata,
         },
     },
     testutils::fake_socket::{ReadOnlyTestSocket, ReadWriteTestSocket},
@@ -59,11 +59,10 @@ fn rpc_request() -> bcs::Result<()> {
 
 #[test]
 fn stream_message() {
-    let message = NetworkMessage::DirectSendMsg(DirectSendMsg {
-        protocol_id: ProtocolId::MempoolDirectSend,
-        priority: 0,
-        raw_msg: Vec::from("hello world"),
-    });
+    let message = NetworkMessage::direct_send_for_testing(
+        ProtocolId::MempoolDirectSend,
+        Vec::from("hello world"),
+    );
     let stream_header = StreamHeader {
         request_id: 42,
         num_fragments: 10,
@@ -84,11 +83,11 @@ fn stream_message() {
 
 #[test]
 fn aptosnet_wire_test_vectors() {
-    let message = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
-        protocol_id: ProtocolId::MempoolDirectSend,
-        priority: 0,
-        raw_msg: Vec::from("hello world"),
-    }));
+    let network_message = NetworkMessage::direct_send_for_testing(
+        ProtocolId::MempoolDirectSend,
+        Vec::from("hello world"),
+    );
+    let message = MultiplexMessage::Message(network_message);
     let message_bytes = [
         // [0, 0, 0, 16] -> frame length
         // [0] -> multiplex message type
@@ -131,11 +130,10 @@ fn send_fails_when_larger_than_frame_limit() {
 
     // attempting to send an outbound message larger than your frame size will
     // return an Err
-    let message = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
-        protocol_id: ProtocolId::ConsensusRpcBcs,
-        priority: 0,
-        raw_msg: vec![0; 123],
-    }));
+    let message = MultiplexMessage::Message(NetworkMessage::direct_send_for_testing(
+        ProtocolId::ConsensusRpcBcs,
+        vec![0; 80],
+    ));
     block_on(message_tx.send(&message)).unwrap_err();
 }
 
@@ -147,11 +145,10 @@ fn recv_fails_when_larger_than_frame_limit() {
     // receiver will reject the message b/c the frame size is > 64 bytes max
     let mut message_rx = MultiplexMessageStream::new(memsocket_rx, 64);
 
-    let message = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
-        protocol_id: ProtocolId::ConsensusRpcBcs,
-        priority: 0,
-        raw_msg: vec![0; 80],
-    }));
+    let message = MultiplexMessage::Message(NetworkMessage::direct_send_for_testing(
+        ProtocolId::ConsensusRpcBcs,
+        vec![0; 80],
+    ));
     let f_send = message_tx.send(&message);
     let f_recv = message_rx.next();
 
@@ -248,7 +245,8 @@ proptest! {
         let messages_clone = messages.clone();
         let f_stream_all = async move {
             for message in messages_clone {
-                let message_metadata = MessageMetadata::new(NetworkId::Validator, None, MessageSendType::DirectSend, None);
+                let sent_message_metadata = SentMessageMetadata::new(NetworkId::Validator, None, MessageSendType::DirectSend, None);
+                let message_metadata = MessageMetadata::new_sent_metadata(sent_message_metadata);
                 let message_with_metadata = NetworkMessageWithMetadata::new(message_metadata, message);
                 if outbound_stream.should_stream(&message_with_metadata) {
                     outbound_stream.stream_message(message_with_metadata).await.unwrap();
@@ -281,7 +279,7 @@ proptest! {
                     match msg {
                         StreamMessage::Header(header) => inbound_stream.new_stream(header).unwrap(),
                         StreamMessage::Fragment(fragment) => {
-                            if let Some(network_msg) = inbound_stream.append_fragment(fragment).unwrap() {
+                            if let Some((_, network_msg)) = inbound_stream.append_fragment(fragment).unwrap() {
                                 recv.push(network_msg);
                             }
                         }

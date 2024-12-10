@@ -142,6 +142,24 @@ impl MessageSendType {
     }
 }
 
+/// A simple enum to track the message receive type
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum MessageReceiveType {
+    DirectSend,  // A direct send message from another peer
+    RpcRequest,  // An RPC request from another peer
+    RpcResponse, // An RPC response to a request sent by this peer
+}
+
+impl MessageReceiveType {
+    pub fn get_label(&self) -> &'static str {
+        match self {
+            MessageReceiveType::DirectSend => "DirectSend",
+            MessageReceiveType::RpcRequest => "RpcRequest",
+            MessageReceiveType::RpcResponse => "RpcResponse",
+        }
+    }
+}
+
 /// A simple enum to track the message stream type
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MessageStreamType {
@@ -162,10 +180,48 @@ impl MessageStreamType {
     }
 }
 
-/// A struct holding metadata about each message.
+/// An enum representing metadata about each message type.
 /// Note: this is not sent along the wire, it is only used internally.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MessageMetadata {
+pub enum MessageMetadata {
+    SentMessageMetadata(SentMessageMetadata),
+    ReceivedMessageMetadata(ReceivedMessageMetadata),
+}
+
+impl MessageMetadata {
+    /// Creates and returns new metadata for a sent message
+    pub fn new_sent_metadata(metadata: SentMessageMetadata) -> Self {
+        MessageMetadata::SentMessageMetadata(metadata)
+    }
+
+    /// Creates and returns new metadata for a received message
+    pub fn new_received_metadata(metadata: ReceivedMessageMetadata) -> Self {
+        MessageMetadata::ReceivedMessageMetadata(metadata)
+    }
+
+    /// Transforms the metadata into a sent message metadata.
+    /// Note: if the metadata is for another message type, this will return None.
+    pub fn into_sent_metadata(self) -> Option<SentMessageMetadata> {
+        match self {
+            MessageMetadata::SentMessageMetadata(metadata) => Some(metadata),
+            _ => None,
+        }
+    }
+
+    /// Transforms the metadata into a received message metadata.
+    /// Note: if the metadata is for another message type, this will return None.
+    pub fn into_received_metadata(self) -> Option<ReceivedMessageMetadata> {
+        match self {
+            MessageMetadata::ReceivedMessageMetadata(metadata) => Some(metadata),
+            _ => None,
+        }
+    }
+}
+
+/// A struct holding metadata about a sent message.
+/// Note: this is not sent along the wire, it is only used internally.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SentMessageMetadata {
     /// The network ID for the message
     network_id: NetworkId,
 
@@ -186,7 +242,7 @@ pub struct MessageMetadata {
     wire_send_start_time: Option<SystemTime>,
 }
 
-impl MessageMetadata {
+impl SentMessageMetadata {
     pub fn new(
         network_id: NetworkId,
         protocol_id: Option<ProtocolId>,
@@ -234,7 +290,6 @@ impl MessageMetadata {
 
                 // Update the application to wire latency metrics
                 counters::observe_message_send_latency(
-                    &counters::APTOS_NETWORK_MESSAGE_SEND_LATENCY,
                     &self.network_id,
                     &self.protocol_id,
                     &self.message_send_type,
@@ -245,7 +300,6 @@ impl MessageMetadata {
 
                 // Update the wire send latency metrics
                 counters::observe_message_send_latency(
-                    &counters::APTOS_NETWORK_MESSAGE_SEND_LATENCY,
                     &self.network_id,
                     &self.protocol_id,
                     &self.message_send_type,
@@ -275,5 +329,86 @@ impl MessageMetadata {
     /// Updates the time at which the message started being sent over the wire
     pub fn update_wire_send_start_time(&mut self) {
         self.wire_send_start_time = Some(SystemTime::now());
+    }
+}
+
+/// A struct holding metadata about a received message.
+/// Note: this is not sent along the wire, it is only used internally.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ReceivedMessageMetadata {
+    /// The network ID for the message
+    network_id: NetworkId,
+
+    /// The protocol ID for the message. This may not always be known (e.g.,
+    /// when we first receive a message, or if we fail to deserialize a message).
+    protocol_id: Option<ProtocolId>,
+
+    /// The type of message being received. This may not always be known (e.g.,
+    /// when we first receive a message, or if we fail to deserialize a message).
+    message_receive_type: Option<MessageReceiveType>,
+
+    /// The stream type of the message being received
+    message_stream_type: MessageStreamType,
+
+    /// The time at which the message was received over the wire
+    wire_receive_time: SystemTime,
+}
+
+impl ReceivedMessageMetadata {
+    pub fn new(network_id: NetworkId, wire_receive_time: SystemTime) -> Self {
+        Self {
+            network_id,
+            protocol_id: None, // The protocol ID is not known at this point
+            message_receive_type: None, // The message receive type is not known at this point
+            message_stream_type: MessageStreamType::NonStreamedMessage, // Default to non-streamed messages
+            wire_receive_time,
+        }
+    }
+
+    /// Marks the message as having been received by the application,
+    /// and emits the relevant latency metrics.
+    pub fn mark_message_as_application_received(&mut self) {
+        if let Some(message_receive_type) = &self.message_receive_type {
+            // Calculate the application receive latency
+            let application_receive_latency = self
+                .wire_receive_time
+                .elapsed()
+                .unwrap_or_default()
+                .as_secs_f64();
+
+            // Update the wire to application receive latency metrics
+            counters::observe_message_receive_latency(
+                &self.network_id,
+                &self.protocol_id,
+                message_receive_type,
+                &self.message_stream_type,
+                application_receive_latency,
+            );
+        }
+    }
+
+    /// Returns a reference to the network ID
+    pub fn network_id(&self) -> &NetworkId {
+        &self.network_id
+    }
+
+    /// Returns a reference to the protocol ID
+    pub fn protocol_id(&self) -> &Option<ProtocolId> {
+        &self.protocol_id
+    }
+
+    /// Updates the message stream type
+    pub fn update_message_stream_type(&mut self, message_stream_type: MessageStreamType) {
+        self.message_stream_type = message_stream_type;
+    }
+
+    /// Updates the protocol ID and message receive type
+    pub fn update_protocol_id_and_message_type(
+        &mut self,
+        protocol_id: ProtocolId,
+        message_receive_type: MessageReceiveType,
+    ) {
+        self.protocol_id = Some(protocol_id);
+        self.message_receive_type = Some(message_receive_type);
     }
 }

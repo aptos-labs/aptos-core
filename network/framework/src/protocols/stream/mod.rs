@@ -4,7 +4,10 @@
 use crate::{
     counters,
     protocols::wire::messaging::v1::{
-        metadata::{MessageStreamType, MultiplexMessageWithMetadata, NetworkMessageWithMetadata},
+        metadata::{
+            MessageMetadata, MessageStreamType, MultiplexMessageWithMetadata,
+            NetworkMessageWithMetadata,
+        },
         MultiplexMessage, NetworkMessage,
     },
 };
@@ -15,7 +18,7 @@ use futures_util::SinkExt;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{fmt::Debug, time::SystemTime};
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
@@ -91,14 +94,17 @@ impl InboundStreamBuffer {
     pub fn append_fragment(
         &mut self,
         fragment: StreamFragment,
-    ) -> anyhow::Result<Option<NetworkMessage>> {
+    ) -> anyhow::Result<Option<(SystemTime, NetworkMessage)>> {
         let stream = self
             .stream
             .as_mut()
             .ok_or_else(|| anyhow::anyhow!("No stream exist"))?;
         let stream_end = stream.append_fragment(fragment)?;
         if stream_end {
-            Ok(Some(self.stream.take().unwrap().message))
+            let stream = self.stream.take().unwrap();
+            let message = stream.message;
+            let stream_start_time = stream.stream_start_time;
+            Ok(Some((stream_start_time, message)))
         } else {
             Ok(None)
         }
@@ -110,6 +116,7 @@ pub struct InboundStream {
     num_fragments: u8,
     current_fragment_id: u8,
     message: NetworkMessage,
+    stream_start_time: SystemTime, // The time the stream started (i.e., the time the header was received)
 }
 
 impl InboundStream {
@@ -127,6 +134,7 @@ impl InboundStream {
             num_fragments: header.num_fragments,
             current_fragment_id: 0,
             message: header.message,
+            stream_start_time: SystemTime::now(),
         })
     }
 
@@ -192,7 +200,12 @@ impl OutboundStream {
         &mut self,
         message_with_metadata: NetworkMessageWithMetadata,
     ) -> anyhow::Result<()> {
+        // Extract the message and metadata
         let (message_metadata, mut message) = message_with_metadata.into_parts();
+        let sent_message_metadata = match message_metadata.into_sent_metadata() {
+            Some(sent_message_metadata) => sent_message_metadata,
+            None => bail!("Message metadata has the incorrect type! Expected a sent message!"),
+        };
 
         ensure!(
             message.data_len() <= self.max_message_size,
@@ -230,8 +243,8 @@ impl OutboundStream {
 
         // Update the metrics for the number of fragments
         counters::observe_message_stream_fragment_count(
-            message_metadata.network_id(),
-            message_metadata.protocol_id(),
+            sent_message_metadata.network_id(),
+            sent_message_metadata.protocol_id(),
             num_chunks,
         );
 
@@ -244,12 +257,14 @@ impl OutboundStream {
             }));
 
         // Create the stream header metadata
-        let mut header_message_metadata = message_metadata.clone();
+        let mut header_message_metadata = sent_message_metadata.clone();
         header_message_metadata.update_message_stream_type(MessageStreamType::StreamedMessageHead);
 
         // Send the header of the stream across the wire
-        let message_with_metadata =
-            MultiplexMessageWithMetadata::new(header_message_metadata, header_multiplex_message);
+        let message_with_metadata = MultiplexMessageWithMetadata::new(
+            MessageMetadata::new_sent_metadata(header_message_metadata),
+            header_multiplex_message,
+        );
         self.stream_tx.send(message_with_metadata).await?;
 
         // Send each of the fragments across the wire
@@ -263,7 +278,7 @@ impl OutboundStream {
                 }));
 
             // Create the stream fragment metadata
-            let mut fragment_message_metadata = message_metadata.clone();
+            let mut fragment_message_metadata = sent_message_metadata.clone();
             let message_stream_type = if index == num_chunks - 1 {
                 MessageStreamType::StreamedMessageTail
             } else {
@@ -273,7 +288,7 @@ impl OutboundStream {
 
             // Send the fragment across the wire
             let message_with_metadata = MultiplexMessageWithMetadata::new(
-                fragment_message_metadata,
+                MessageMetadata::new_sent_metadata(fragment_message_metadata),
                 fragment_multiplex_message,
             );
             self.stream_tx.send(message_with_metadata).await?;

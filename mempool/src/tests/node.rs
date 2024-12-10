@@ -477,7 +477,7 @@ impl NodeNetworkInterface {
     }
 
     fn send_network_req(&mut self, protocol: ProtocolId, message: ReceivedMessage) {
-        let remote_peer_id = message.sender.peer_id();
+        let remote_peer_id = message.sender().peer_id();
 
         self.network_notifs_tx
             .push((remote_peer_id, protocol), message)

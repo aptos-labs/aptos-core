@@ -16,8 +16,7 @@ use crate::{
         wire::{
             handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
             messaging::v1::{
-                DirectSendMsg, MultiplexMessage, MultiplexMessageSink, MultiplexMessageStream,
-                NetworkMessage, RpcRequest, RpcResponse,
+                MultiplexMessage, MultiplexMessageSink, MultiplexMessageStream, NetworkMessage,
             },
         },
     },
@@ -210,11 +209,9 @@ fn peer_send_message() {
     let (mut client_sink, mut client_stream) = build_network_sink_stream(&mut connection);
 
     let send_msg = Message::new(PROTOCOL, Bytes::from("hello world"));
-    let recv_msg = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
-        protocol_id: PROTOCOL,
-        priority: 0,
-        raw_msg: Vec::from("hello world"),
-    }));
+    let receive_network_message =
+        NetworkMessage::direct_send_for_testing(PROTOCOL, Vec::from("hello world"));
+    let recv_msg = MultiplexMessage::Message(receive_network_message);
 
     let client = async {
         // Client should receive the direct send messages.
@@ -260,16 +257,10 @@ fn peer_recv_message() {
         upstream_handlers,
     );
 
-    let send_msg = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
-        protocol_id: PROTOCOL,
-        priority: 0,
-        raw_msg: Vec::from("hello world"),
-    }));
-    let recv_msg = NetworkMessage::DirectSendMsg(DirectSendMsg {
-        protocol_id: PROTOCOL,
-        priority: 0,
-        raw_msg: Vec::from("hello world"),
-    });
+    let send_network_message =
+        NetworkMessage::direct_send_for_testing(PROTOCOL, Vec::from("hello world"));
+    let send_msg = MultiplexMessage::Message(send_network_message);
+    let recv_msg = NetworkMessage::direct_send_for_testing(PROTOCOL, Vec::from("hello world"));
 
     let client = async move {
         info!("client start");
@@ -289,7 +280,7 @@ fn peer_recv_message() {
         for _ in 0..30 {
             // Wait to receive notification of DirectSendMsg from Peer.
             let received = receiver.next().await.unwrap();
-            assert_eq!(recv_msg, received.message);
+            assert_eq!(recv_msg, received.network_message().clone());
         }
         info!("server exiting");
     };
@@ -332,20 +323,12 @@ fn peers_send_message_concurrent() {
         let notif_a = prot_a_rx.next().await;
         let notif_b = prot_b_rx.next().await;
         assert_eq!(
-            notif_a.unwrap().message,
-            NetworkMessage::DirectSendMsg(DirectSendMsg {
-                protocol_id: PROTOCOL,
-                priority: 0,
-                raw_msg: msg_b.data().clone().into(),
-            })
+            notif_a.unwrap().network_message().clone(),
+            NetworkMessage::direct_send_for_testing(PROTOCOL, msg_b.data().clone().into())
         );
         assert_eq!(
-            notif_b.unwrap().message,
-            NetworkMessage::DirectSendMsg(DirectSendMsg {
-                protocol_id: PROTOCOL,
-                priority: 0,
-                raw_msg: msg_a.data().clone().into(),
-            })
+            notif_b.unwrap().network_message().clone(),
+            NetworkMessage::direct_send_for_testing(PROTOCOL, msg_a.data().clone().into())
         );
 
         // Shut one peers and the other should shutdown due to ConnectionLost
@@ -382,17 +365,12 @@ fn peer_recv_rpc() {
     );
     let (mut client_sink, mut client_stream) = build_network_sink_stream(&mut connection);
 
-    let send_msg = MultiplexMessage::Message(NetworkMessage::RpcRequest(RpcRequest {
-        request_id: 123,
-        protocol_id: PROTOCOL,
-        priority: 0,
-        raw_request: Vec::from("hello world"),
-    }));
-    let resp_msg = MultiplexMessage::Message(NetworkMessage::RpcResponse(RpcResponse {
-        request_id: 123,
-        priority: 0,
-        raw_response: Vec::from("goodbye world"),
-    }));
+    let request_message =
+        NetworkMessage::rpc_request_for_testing(PROTOCOL, Vec::from("hello world"));
+    let send_msg = MultiplexMessage::Message(request_message);
+
+    let response_message = NetworkMessage::rpc_response_for_testing(Vec::from("goodbye world"));
+    let resp_msg = MultiplexMessage::Message(response_message);
 
     let client = async move {
         for _ in 0..30 {
@@ -408,21 +386,11 @@ fn peer_recv_rpc() {
     let server = async move {
         for _ in 0..30 {
             // Wait to receive RpcRequest from Peer.
-            let received = prot_rx.next().await.unwrap();
-            let ReceivedMessage {
-                message,
-                sender: _sender,
-                receive_timestamp_micros: _rx_at,
-                rpc_replier,
-            } = received;
+            let received_message = prot_rx.next().await.unwrap();
+            let (message, _, _, rpc_replier) = received_message.into_parts();
             assert_eq!(
                 message,
-                NetworkMessage::RpcRequest(RpcRequest {
-                    protocol_id: PROTOCOL,
-                    request_id: 123,
-                    priority: 0,
-                    raw_request: Vec::from("hello world"),
-                })
+                NetworkMessage::rpc_request_for_testing(PROTOCOL, Vec::from("hello world"))
             );
 
             // Send response to rpc.
@@ -453,17 +421,11 @@ fn peer_recv_rpc_concurrent() {
     );
     let (mut client_sink, mut client_stream) = build_network_sink_stream(&mut connection);
 
-    let send_msg = MultiplexMessage::Message(NetworkMessage::RpcRequest(RpcRequest {
-        request_id: 123,
-        protocol_id: PROTOCOL,
-        priority: 0,
-        raw_request: Vec::from("hello world"),
-    }));
-    let resp_msg = MultiplexMessage::Message(NetworkMessage::RpcResponse(RpcResponse {
-        request_id: 123,
-        priority: 0,
-        raw_response: Vec::from("goodbye world"),
-    }));
+    let request_message =
+        NetworkMessage::rpc_request_for_testing(PROTOCOL, Vec::from("hello world"));
+    let send_msg = MultiplexMessage::Message(request_message);
+    let response_message = NetworkMessage::rpc_response_for_testing(Vec::from("goodbye world"));
+    let resp_msg = MultiplexMessage::Message(response_message);
 
     let client = async move {
         // The client should send many rpc requests.
@@ -486,10 +448,10 @@ fn peer_recv_rpc_concurrent() {
         // Wait to receive RpcRequests from Peer.
         for _ in 0..30 {
             let received = prot_rx.next().await.unwrap();
-            match &received.message {
+            match received.network_message() {
                 NetworkMessage::RpcRequest(req) => {
                     assert_eq!(Vec::from("hello world"), req.raw_request);
-                    let arcsender = received.rpc_replier.unwrap();
+                    let arcsender = received.rpc_replier().unwrap();
                     let sender = Arc::into_inner(arcsender).unwrap();
                     res_txs.push(sender)
                 },
@@ -520,12 +482,9 @@ fn peer_recv_rpc_timeout() {
     );
     let (mut client_sink, client_stream) = build_network_sink_stream(&mut connection);
 
-    let send_msg = MultiplexMessage::Message(NetworkMessage::RpcRequest(RpcRequest {
-        request_id: 123,
-        protocol_id: PROTOCOL,
-        priority: 0,
-        raw_request: Vec::from("hello world"),
-    }));
+    let network_message =
+        NetworkMessage::rpc_request_for_testing(PROTOCOL, Vec::from("hello world"));
+    let send_msg = MultiplexMessage::Message(network_message);
 
     let test = async move {
         // Client sends the rpc request.
@@ -535,10 +494,10 @@ fn peer_recv_rpc_timeout() {
         let received = prot_rx.next().await.unwrap();
 
         // Pull out the request completion handle.
-        let mut res_tx = match &received.message {
+        let mut res_tx = match received.network_message() {
             NetworkMessage::RpcRequest(req) => {
                 assert_eq!(Vec::from("hello world"), req.raw_request);
-                let arcsender = received.rpc_replier.unwrap();
+                let arcsender = received.rpc_replier().unwrap();
                 Arc::into_inner(arcsender).unwrap()
             },
             _ => panic!("Unexpected NetworkMessage: {:?}", received),
@@ -577,12 +536,9 @@ fn peer_recv_rpc_cancel() {
     );
     let (mut client_sink, client_stream) = build_network_sink_stream(&mut connection);
 
-    let send_msg = MultiplexMessage::Message(NetworkMessage::RpcRequest(RpcRequest {
-        request_id: 123,
-        protocol_id: PROTOCOL,
-        priority: 0,
-        raw_request: Vec::from("hello world"),
-    }));
+    let network_message =
+        NetworkMessage::rpc_request_for_testing(PROTOCOL, Vec::from("hello world"));
+    let send_msg = MultiplexMessage::Message(network_message);
 
     let test = async move {
         // Client sends the rpc request.
@@ -592,10 +548,10 @@ fn peer_recv_rpc_cancel() {
         let received = prot_rx.next().await.unwrap();
 
         // Pull out the request completion handle.
-        let res_tx = match &received.message {
+        let res_tx = match received.network_message() {
             NetworkMessage::RpcRequest(req) => {
                 assert_eq!(Vec::from("hello world"), req.raw_request);
-                let arcsender = received.rpc_replier.unwrap();
+                let arcsender = received.rpc_replier().unwrap();
                 Arc::into_inner(arcsender).unwrap()
             },
             _ => panic!("Unexpected NetworkMessage: {:?}", received),
@@ -663,11 +619,9 @@ fn peer_send_rpc() {
                 received.request_id,
             );
 
-            let response = MultiplexMessage::Message(NetworkMessage::RpcResponse(RpcResponse {
-                request_id: received.request_id,
-                priority: 0,
-                raw_response: Vec::from(&b"goodbye world"[..]),
-            }));
+            let network_message =
+                NetworkMessage::rpc_response_for_testing(Vec::from(&b"goodbye world"[..]));
+            let response = MultiplexMessage::Message(network_message);
 
             // Server should send the rpc request.
             server_sink.send(&response).await.unwrap();
@@ -733,11 +687,9 @@ fn peer_send_rpc_concurrent() {
                 received.request_id,
             );
 
-            let response = MultiplexMessage::Message(NetworkMessage::RpcResponse(RpcResponse {
-                request_id: received.request_id,
-                priority: 0,
-                raw_response: Vec::from(&b"goodbye world"[..]),
-            }));
+            let network_message =
+                NetworkMessage::rpc_response_for_testing(Vec::from(&b"goodbye world"[..]));
+            let response = MultiplexMessage::Message(network_message);
 
             // Server should send the rpc request.
             server_sink.send(&response).await.unwrap();
@@ -792,11 +744,9 @@ fn peer_send_rpc_cancel() {
         drop(response_rx);
 
         // Server sending an expired response is fine.
-        let response = MultiplexMessage::Message(NetworkMessage::RpcResponse(RpcResponse {
-            request_id: received.request_id,
-            priority: 0,
-            raw_response: Vec::from(&b"goodbye world"[..]),
-        }));
+        let network_message =
+            NetworkMessage::rpc_response_for_testing(Vec::from(&b"goodbye world"[..]));
+        let response = MultiplexMessage::Message(network_message);
         server_sink.send(&response).await.unwrap();
 
         // Make sure the peer actor actually saw the message.
@@ -858,11 +808,10 @@ fn peer_send_rpc_timeout() {
         assert!(matches!(response_rx.await, Ok(Err(RpcError::TimedOut))));
 
         // Server sending an expired response is fine.
-        let response = MultiplexMessage::Message(NetworkMessage::RpcResponse(RpcResponse {
-            request_id: received.request_id,
-            priority: 0,
-            raw_response: Vec::from(&b"goodbye world"[..]),
-        }));
+        let network_message =
+            NetworkMessage::rpc_response_for_testing(Vec::from(&b"goodbye world"[..]));
+        let response = MultiplexMessage::Message(network_message);
+
         server_sink.send(&response).await.unwrap();
 
         // Make sure the peer actor actually saw the message.
@@ -985,20 +934,12 @@ fn peers_send_multiplex() {
         let notif_a = prot_a_rx.next().await;
         let notif_b = prot_b_rx.next().await;
         assert_eq!(
-            notif_a.unwrap().message,
-            NetworkMessage::DirectSendMsg(DirectSendMsg {
-                protocol_id: PROTOCOL,
-                priority: 0,
-                raw_msg: msg_b.data().clone().into(),
-            })
+            notif_a.unwrap().network_message().clone(),
+            NetworkMessage::direct_send_for_testing(PROTOCOL, msg_b.data().clone().into())
         );
         assert_eq!(
-            notif_b.unwrap().message,
-            NetworkMessage::DirectSendMsg(DirectSendMsg {
-                protocol_id: PROTOCOL,
-                priority: 0,
-                raw_msg: msg_a.data().clone().into(),
-            })
+            notif_b.unwrap().network_message().clone(),
+            NetworkMessage::direct_send_for_testing(PROTOCOL, msg_a.data().clone().into())
         );
 
         // Shut one peers and the other should shutdown due to ConnectionLost
