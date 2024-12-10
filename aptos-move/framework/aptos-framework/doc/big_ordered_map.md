@@ -363,26 +363,6 @@ The BigOrderedMap data structure.
 ## Constants
 
 
-<a id="0x1_big_ordered_map_EKEY_ALREADY_EXISTS"></a>
-
-Map key already exists
-
-
-<pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_EKEY_ALREADY_EXISTS">EKEY_ALREADY_EXISTS</a>: u64 = 1;
-</code></pre>
-
-
-
-<a id="0x1_big_ordered_map_EKEY_NOT_FOUND"></a>
-
-Map key is not found
-
-
-<pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_EKEY_NOT_FOUND">EKEY_NOT_FOUND</a>: u64 = 2;
-</code></pre>
-
-
-
 <a id="0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN"></a>
 
 Internal errors.
@@ -408,6 +388,26 @@ Trying to do an operation on an IteratorPtr that would go out of bounds
 
 
 <pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_EITER_OUT_OF_BOUNDS">EITER_OUT_OF_BOUNDS</a>: u64 = 3;
+</code></pre>
+
+
+
+<a id="0x1_big_ordered_map_EKEY_ALREADY_EXISTS"></a>
+
+Map key already exists
+
+
+<pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_EKEY_ALREADY_EXISTS">EKEY_ALREADY_EXISTS</a>: u64 = 1;
+</code></pre>
+
+
+
+<a id="0x1_big_ordered_map_EKEY_NOT_FOUND"></a>
+
+Map key is not found
+
+
+<pre><code><b>const</b> <a href="big_ordered_map.md#0x1_big_ordered_map_EKEY_NOT_FOUND">EKEY_NOT_FOUND</a>: u64 = 2;
 </code></pre>
 
 
