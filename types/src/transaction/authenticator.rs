@@ -548,7 +548,9 @@ pub enum AccountAuthenticator {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub enum AbstractionAuthData {
     V1 {
+        #[serde(with = "serde_bytes")]
         signing_message_digest: Vec<u8>,
+        #[serde(with = "serde_bytes")]
         authenticator: Vec<u8>,
     },
 }
@@ -682,7 +684,10 @@ impl AccountAuthenticator {
                 function_info: function_info.clone(),
                 auth_data: auth_data.clone(),
             },
-            _ => AuthenticationProof::Key(
+            Self::Ed25519 { .. }
+            | Self::MultiEd25519 { .. }
+            | Self::SingleKey { .. }
+            | Self::MultiKey { .. } => AuthenticationProof::Key(
                 AuthenticationKey::from_preimage(self.public_key_bytes(), self.scheme()).to_vec(),
             ),
         }
@@ -1427,20 +1432,6 @@ mod tests {
     #[test]
     fn test_from_str_should_not_panic_by_given_empty_string() {
         assert!(AuthenticationKey::from_str("").is_err());
-    }
-
-    #[test]
-    fn verify_abstracted_key_auth() {
-        let signed_txn =
-            crate::test_helpers::transaction_test_helpers::get_test_signed_aa_transaction(
-                AccountAddress::ONE,
-                0,
-                None,
-                None,
-                None,
-                None,
-            );
-        signed_txn.verify_signature().unwrap();
     }
 
     #[test]

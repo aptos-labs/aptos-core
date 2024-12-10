@@ -12,7 +12,6 @@ async fn test_mint_transfer() {
     let swarm = new_local_swarm_with_aptos(1).await;
     let mut info = swarm.aptos_public_info();
 
-    println!("1");
     let account1 = info.random_account();
     info.create_user_account(account1.public_key())
         .await
@@ -22,7 +21,6 @@ async fn test_mint_transfer() {
         .await
         .unwrap();
 
-    println!("2");
     // NOTE(Gas): For some reason, there needs to be a lot of funds in the account in order for the
     //            test to pass.
     //            Is this caused by us increasing the default max gas amount in
@@ -36,7 +34,6 @@ async fn test_mint_transfer() {
             .payload(aptos_stdlib::aptos_coin_transfer(account2.address(), 40000)),
     );
     info.client().submit_and_wait(&transfer_txn).await.unwrap();
-    println!("3");
     assert_eq!(
         info.client()
             .view_apt_account_balance(account2.address())
@@ -46,7 +43,6 @@ async fn test_mint_transfer() {
         40000
     );
 
-    println!("4");
     // test delegation
     let txn_factory = info.transaction_factory();
     let delegate_txn1 = info
@@ -56,7 +52,6 @@ async fn test_mint_transfer() {
         ));
     info.client().submit_and_wait(&delegate_txn1).await.unwrap();
 
-    println!("5");
     // Test delegating more than one at a time: faucet startup stampeding herd
     let delegate_txn2 = info
         .root_account()

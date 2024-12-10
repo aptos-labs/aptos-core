@@ -104,6 +104,20 @@ impl StandardGasAlgebra {
             },
         }
     }
+
+    fn adjust_initial_balance(
+        &mut self,
+        reset_initial_balance_to: impl Into<Gas>,
+    ) -> PartialVMResult<()> {
+        self.initial_balance = reset_initial_balance_to
+            .into()
+            .to_unit_with_params(&self.vm_gas_params.txn);
+        self.balance = self.initial_balance;
+        let total_calculated =
+            self.execution_gas_used + self.io_gas_used + self.storage_fee_in_internal_units;
+        let (_actual, res) = self.charge(total_calculated);
+        res
+    }
 }
 
 impl GasAlgebra for StandardGasAlgebra {
@@ -289,5 +303,9 @@ impl GasAlgebra for StandardGasAlgebra {
 
     fn storage_fee_used(&self) -> Fee {
         self.storage_fee_used
+    }
+
+    fn adjust_initial_gas(&mut self, new_initial_gas: impl Into<Gas>) -> PartialVMResult<()> {
+        self.adjust_initial_balance(new_initial_gas)
     }
 }

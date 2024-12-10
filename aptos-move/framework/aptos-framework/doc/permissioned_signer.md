@@ -353,16 +353,6 @@ Types of permission capacity stored on chain.
 ## Constants
 
 
-<a id="0x1_permissioned_signer_ENOT_MASTER_SIGNER"></a>
-
-Trying to grant permission using non-master signer.
-
-
-<pre><code><b>const</b> <a href="permissioned_signer.md#0x1_permissioned_signer_ENOT_MASTER_SIGNER">ENOT_MASTER_SIGNER</a>: u64 = 1;
-</code></pre>
-
-
-
 <a id="0x1_permissioned_signer_ECANNOT_AUTHORIZE"></a>
 
 Cannot authorize a permission.
@@ -379,6 +369,16 @@ signer doesn't have enough capacity to extract permission.
 
 
 <pre><code><b>const</b> <a href="permissioned_signer.md#0x1_permissioned_signer_ECANNOT_EXTRACT_PERMISSION">ECANNOT_EXTRACT_PERMISSION</a>: u64 = 4;
+</code></pre>
+
+
+
+<a id="0x1_permissioned_signer_ENOT_MASTER_SIGNER"></a>
+
+Trying to grant permission using non-master signer.
+
+
+<pre><code><b>const</b> <a href="permissioned_signer.md#0x1_permissioned_signer_ENOT_MASTER_SIGNER">ENOT_MASTER_SIGNER</a>: u64 = 1;
 </code></pre>
 
 

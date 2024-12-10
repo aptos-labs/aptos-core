@@ -2,7 +2,7 @@ module aa::single_key {
     use std::option;
     use std::signer;
     use aptos_std::bls12381::{Self, PublicKey};
-    use aptos_framework::signing_data::{Self, SigningData};
+    use aptos_framework::auth_data::{Self, AbstractionAuthData};
 
     /// Only fungible asset metadata owner can make changes.
     const EINVALID_PUBLIC_KEY: u64 = 1;
@@ -32,16 +32,16 @@ module aa::single_key {
     /// Authorization function for account abstraction.
     public fun authenticate(
         account: signer,
-        signing_data: SigningData,
+        signing_data: AbstractionAuthData,
     ): signer acquires BLSPublicKey {
         let addr = signer::address_of(&account);
         assert!(exists<BLSPublicKey>(addr), EPUBLIC_KEY_NOT_FOUND);
         let pubkey = &borrow_global<BLSPublicKey>(addr).key;
         assert!(
             bls12381::verify_normal_signature(
-                &bls12381::signature_from_bytes(*signing_data::authenticator(&signing_data)),
+                &bls12381::signature_from_bytes(*auth_data::authenticator(&signing_data)),
                 pubkey,
-                *signing_data::digest(&signing_data)
+                *auth_data::digest(&signing_data)
             ),
             EINVALID_SIGNATURE
         );
