@@ -63,7 +63,7 @@ class ForgeCluster:
 
     @property
     def kubectl_create_context_arg(self) -> List[str]:
-        return ["--context=karmada-apiserver"] if self.is_multiregion else []
+        return [] if self.is_multiregion else []
 
     async def write(self, shell: Shell) -> None:
         assert self.kubeconf is not None, "kubeconf must be set"
