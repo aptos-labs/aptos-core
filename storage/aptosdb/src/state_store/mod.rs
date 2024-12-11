@@ -728,25 +728,42 @@ impl StateStore {
     /// Put the write sets on top of current state
     pub fn put_write_sets(
         &self,
-        write_sets: Vec<WriteSet>,
+        write_sets: &[WriteSet],
         first_version: Version,
         batch: &SchemaBatch,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
         enable_sharding: bool,
     ) -> Result<()> {
-        /*
-        self.put_value_sets(
+        let current_state = self.current_state_locked().ledger_state();
+        let persisted = self.persisted_state_locked().state().clone();
+        let state_view = CachedStateView::new(
+            StateViewId::Miscellaneous,
+            self.state_db.clone(),
+            current_state.latest().clone(),
+        )?;
+        state_view.prime_cache_by_write_sets(write_sets)?;
+        let state_update_refs = StateUpdateRefs::index_write_sets(
             first_version,
-            &ShardedStateUpdateRefs::index_write_sets(&write_sets, write_sets.len()),
-            StateStorageUsage::new_untracked(),
-            None, // state cache
+            write_sets,
+            write_sets.len(),
+            None, // last_checkpoint_index
+        );
+
+        let state = current_state.update(
+            &persisted,
+            state_update_refs.for_last_checkpoint.as_ref(),
+            state_update_refs.for_latest.as_ref(),
+            state_view.state_cache(),
+        );
+
+        self.put_value_sets(
+            &state,
+            &state_update_refs.per_version,
+            Some(state_view.state_cache()),
             batch,
             sharded_state_kv_batches,
             enable_sharding,
-            None, // last_checkpoint_index
-        ) FIXME(aldenhu)
-         */
-        todo!()
+        )
     }
 
     /// Put the `value_state_sets` into its own CF.

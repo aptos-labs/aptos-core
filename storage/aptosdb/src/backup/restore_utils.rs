@@ -203,7 +203,6 @@ pub(crate) fn save_transactions_impl(
     state_kv_batches: &mut ShardedStateKvSchemaBatch,
     kv_replay: bool,
 ) -> Result<()> {
-    /*
     for (idx, txn) in txns.iter().enumerate() {
         ledger_db.transaction_db().put_transaction(
             first_version + idx as Version,
@@ -245,7 +244,7 @@ pub(crate) fn save_transactions_impl(
 
     if kv_replay && first_version > 0 && state_store.get_usage(Some(first_version - 1)).is_ok() {
         state_store.put_write_sets(
-            write_sets.to_vec(),
+            write_sets,
             first_version,
             &ledger_db_batch.ledger_metadata_db_batches, // used for storing the storage usage
             state_kv_batches,
@@ -268,9 +267,6 @@ pub(crate) fn save_transactions_impl(
         )?;
 
     Ok(())
-    FIXME(aldenhu):
-     */
-    todo!()
 }
 
 /// A helper function that confirms or saves the frozen subtrees to the given change set
