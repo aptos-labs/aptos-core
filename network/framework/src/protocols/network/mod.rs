@@ -326,13 +326,28 @@ fn received_message_to_event<TMessage: Message>(
     // Transform the message based on its type
     let peer_id = sender.peer_id();
     match message {
+        NetworkMessage::DirectSendMsg(request) => {
+            request_to_network_event(peer_id, &request).map(|msg| Event::Message(peer_id, msg))
+        },
+        NetworkMessage::DirectSendAndMetadata(message_and_metadata) => {
+            request_to_network_event(peer_id, &message_and_metadata)
+                .map(|msg| Event::Message(peer_id, msg))
+        },
         NetworkMessage::RpcRequest(rpc_req) => {
             let rpc_replier = Arc::into_inner(rpc_replier.unwrap()).unwrap();
             request_to_network_event(peer_id, &rpc_req)
                 .map(|msg| Event::RpcRequest(peer_id, msg, rpc_req.protocol_id, rpc_replier))
         },
-        NetworkMessage::DirectSendMsg(request) => {
-            request_to_network_event(peer_id, &request).map(|msg| Event::Message(peer_id, msg))
+        NetworkMessage::RpcRequestAndMetadata(request_and_metadata) => {
+            let rpc_replier = Arc::into_inner(rpc_replier.unwrap()).unwrap();
+            request_to_network_event(peer_id, &request_and_metadata).map(|msg| {
+                Event::RpcRequest(
+                    peer_id,
+                    msg,
+                    request_and_metadata.message_wire_metadata.protocol_id,
+                    rpc_replier,
+                )
+            })
         },
         _ => None,
     }
