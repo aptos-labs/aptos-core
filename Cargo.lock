@@ -275,7 +275,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "4.6.0"
+version = "5.0.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -347,6 +347,7 @@ dependencies = [
  "move-symbol-pool",
  "move-unit-test",
  "move-vm-runtime",
+ "open",
  "pathsearch",
  "poem",
  "processor",
@@ -1723,6 +1724,7 @@ dependencies = [
  "clap 4.5.21",
  "deadpool-redis",
  "enum_dispatch",
+ "firebase-token",
  "futures",
  "hex",
  "ipnet",
@@ -8223,6 +8225,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fcfdc7a0362c9f4444381a9e697c79d435fe65b52a37466fc2c1184cee9edc6"
 
 [[package]]
+name = "firebase-token"
+version = "0.3.0"
+source = "git+https://github.com/aptos-labs/firebase-token?rev=34ea512d3d1fad6c11df3e7d82ff72beccc05836#34ea512d3d1fad6c11df3e7d82ff72beccc05836"
+dependencies = [
+ "jsonwebtoken 8.3.0",
+ "reqwest 0.11.23",
+ "serde",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "firestore"
 version = "0.43.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9974,6 +9988,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "is-docker"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "928bae27f42bc99b60d9ac7334e3a21d10ad8f1835a4e12ec3ec0464765ed1b3"
+dependencies = [
+ "once_cell",
+]
+
+[[package]]
 name = "is-terminal"
 version = "0.4.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9982,6 +10005,16 @@ dependencies = [
  "hermit-abi 0.3.9",
  "rustix 0.38.28",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "is-wsl"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "173609498df190136aa7dea1a91db051746d339e18476eed5ca40521f02d7aa5"
+dependencies = [
+ "is-docker",
+ "once_cell",
 ]
 
 [[package]]
@@ -12426,6 +12459,17 @@ name = "opaque-debug"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
+
+[[package]]
+name = "open"
+version = "5.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ecd52f0b8d15c40ce4820aa251ed5de032e5d91fab27f7db2f40d42a8bdf69c"
+dependencies = [
+ "is-wsl",
+ "libc",
+ "pathdiff",
+]
 
 [[package]]
 name = "openssl"

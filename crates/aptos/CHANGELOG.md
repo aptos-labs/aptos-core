@@ -4,6 +4,11 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+## [5.0.0] - 2024/12/11
+- [**Breaking Change**] `aptos init` and `aptos account fund-with-faucet` no longer work directly with testnet, you must now use the minting page at the [Aptos dev docs](https://aptos.dev/network/faucet). 
+## [4.7.0] - 2024/12/10
+- [`Fix`] CLI config should not always require a private key field to be present.
+
 ## [4.6.0] - 2024/11/29
 - Add `--node-api-key` flag to `aptos move replay` to allow for querying the fullnode with an API key.
 - Add `--chunk-size` flag to allow configuring chunk size for chunked publish mode.
