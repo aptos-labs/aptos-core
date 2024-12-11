@@ -126,6 +126,7 @@ impl FeatureFlag {
             FeatureFlag::SIGNATURE_CHECKER_V2,
             FeatureFlag::STORAGE_SLOT_METADATA,
             FeatureFlag::CHARGE_INVARIANT_VIOLATION,
+            FeatureFlag::DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING,
             FeatureFlag::APTOS_UNIQUE_IDENTIFIERS,
             FeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::BULLETPROOFS_NATIVES,
