@@ -75,27 +75,20 @@ into the pending_inactive one on A's behalf</li>
 <li></li>
 <ol>
 <li>A requests <code>reactivate_stake</code> for 100 stake</li>
-<li>
-Synchronization detects 600 - 300 active and 200 - 100 pending_inactive rewards which are both entirely
-distributed to their corresponding pools
-</li>
-<li>
-100 coins = (100 * 100) / 200 = 50 shares are redeemed from the pending_inactive pool and exchanged for
-(100 * 150) / 600 = 25 shares into the active one on A's behalf
-</li>
+<li>Synchronization detects 600 - 300 active and 200 - 100 pending_inactive rewards which are both entirely
+distributed to their corresponding pools</li>
+<li>100 coins = (100 * 100) / 200 = 50 shares are redeemed from the pending_inactive pool and exchanged for
+(100 * 150) / 600 = 25 shares into the active one on A's behalf</li>
 </ol>
 <li>The lockup expires on the stake pool, inactivating the entire pending_inactive stake</li>
 <li></li>
 <ol>
 <li>B requests <code>unlock</code> for 100 stake</li>
-<li>
-Synchronization detects no active or pending_inactive rewards, but 0 -> 100 inactive stake on the stake pool,
+<li>Synchronization detects no active or pending_inactive rewards, but 0 -> 100 inactive stake on the stake pool,
 so it advances the observed lockup cycle and creates a pool_u64 for the new lockup, hence allowing previous
 pending_inactive shares to be redeemed</li>
-<li>
-100 coins = (100 * 175) / 700 = 25 shares are redeemed from the active pool and exchanged for 100 shares
-into the new pending_inactive one on B's behalf
-</li>
+<li>100 coins = (100 * 175) / 700 = 25 shares are redeemed from the active pool and exchanged for 100 shares
+into the new pending_inactive one on B's behalf</li>
 </ol>
 <li>The stake pool earned rewards and now has some pending_inactive rewards.</li>
 <li></li>
@@ -103,12 +96,9 @@ into the new pending_inactive one on B's behalf
 <li>A requests <code>withdraw</code> for its entire inactive stake</li>
 <li>
 Synchronization detects no new inactive stake, but some pending_inactive rewards which are distributed
-to the (2nd) pending_inactive pool
-</li>
-<li>
-A's 50 shares = (50 * 100) / 50 = 100 coins are redeemed from the (1st) inactive pool and 100 stake is
-transferred to A
-</li>
+to the (2nd) pending_inactive pool</li>
+<li>A's 50 shares = (50 * 100) / 50 = 100 coins are redeemed from the (1st) inactive pool and 100 stake is
+transferred to A</li>
 </ol>
 </ol>
 
