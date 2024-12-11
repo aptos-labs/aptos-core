@@ -5,7 +5,7 @@ use crate::{db_indexer::DBIndexer, db_v2::IndexerAsyncV2};
 use anyhow::anyhow;
 use aptos_types::{
     account_address::AccountAddress,
-    contract_event::EventWithVersion,
+    contract_event::{ContractEventV1, ContractEventV2, EventWithVersion},
     event::EventKey,
     indexer::indexer_db_reader::{IndexerReader, Order},
     state_store::{
@@ -40,6 +40,10 @@ impl IndexerReaders {
 }
 
 impl IndexerReader for IndexerReaders {
+    fn is_internal_indexer_enabled(&self) -> bool {
+        self.db_indexer_reader.is_some()
+    }
+
     fn get_table_info(&self, handle: TableHandle) -> anyhow::Result<Option<TableInfo>> {
         if let Some(table_info_reader) = &self.table_info_reader {
             return Ok(table_info_reader.get_table_info_with_retry(handle)?);
@@ -52,6 +56,13 @@ impl IndexerReader for IndexerReaders {
             return Ok(db_indexer.indexer_db.get_persisted_version()?);
         }
         anyhow::bail!("DB indexer reader is not available")
+    }
+
+    fn get_latest_table_info_ledger_version(&self) -> anyhow::Result<Option<Version>> {
+        if let Some(table_info_reader) = &self.table_info_reader {
+            return Ok(Some(table_info_reader.next_version()));
+        }
+        anyhow::bail!("Table info reader is not available")
     }
 
     fn get_events(
@@ -149,6 +160,37 @@ impl IndexerReader for IndexerReaders {
                     >);
             } else {
                 anyhow::bail!("Internal statekeys index is not enabled")
+            }
+        }
+        anyhow::bail!("DB indexer reader is not available")
+    }
+
+    fn get_translated_v1_event_by_version_and_index(
+        &self,
+        version: Version,
+        index: u64,
+    ) -> anyhow::Result<ContractEventV1> {
+        if let Some(db_indexer_reader) = &self.db_indexer_reader {
+            if db_indexer_reader.indexer_db.event_v2_translation_enabled() {
+                return Ok(db_indexer_reader
+                    .indexer_db
+                    .get_translated_v1_event_by_version_and_index(version, index)?);
+            } else {
+                anyhow::bail!("Event translation is not enabled")
+            }
+        }
+        anyhow::bail!("DB indexer reader is not available")
+    }
+
+    fn translate_event_v2_to_v1(
+        &self,
+        v2: &ContractEventV2,
+    ) -> anyhow::Result<Option<ContractEventV1>> {
+        if let Some(db_indexer_reader) = &self.db_indexer_reader {
+            if db_indexer_reader.indexer_db.event_v2_translation_enabled() {
+                return Ok(db_indexer_reader.translate_event_v2_to_v1(v2)?);
+            } else {
+                anyhow::bail!("Event translation is not enabled")
             }
         }
         anyhow::bail!("DB indexer reader is not available")

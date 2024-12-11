@@ -17,6 +17,10 @@ use tokio::time::Instant;
 static AUTH_0_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^https://[a-zA-Z0-9-]+\.us\.auth0\.com/$").unwrap());
 
+static COGNITO_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^https://cognito-idp\.[a-zA-Z0-9-_]+\.amazonaws\.com/[a-zA-Z0-9-_]+$").unwrap()
+});
+
 /// The JWK in-mem cache.
 pub static DECODING_KEY_CACHE: Lazy<DashMap<Issuer, DashMap<KeyID, Arc<RSA_JWK>>>> =
     Lazy::new(DashMap::new);
@@ -35,6 +39,9 @@ pub async fn get_federated_jwk(jwt: &str) -> Result<Arc<RSA_JWK>> {
         parse_jwks(test_jwk).expect("test jwk should parse")
     } else if AUTH_0_REGEX.is_match(&payload.claims.iss) {
         let jwk_url = format!("{}.well-known/jwks.json", &payload.claims.iss);
+        fetch_jwks(&jwk_url).await?
+    } else if COGNITO_REGEX.is_match(&payload.claims.iss) {
+        let jwk_url = format!("{}/.well-known/jwks.json", &payload.claims.iss);
         fetch_jwks(&jwk_url).await?
     } else {
         return Err(anyhow!("not a federated iss"));

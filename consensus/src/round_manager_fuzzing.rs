@@ -20,14 +20,13 @@ use crate::{
     persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
     pipeline::execution_client::DummyExecutionClient,
     round_manager::RoundManager,
-    test_utils::{MockPayloadManager, MockStorage},
+    test_utils::{
+        MockOptQSPayloadProvider, MockPastProposalStatusTracker, MockPayloadManager, MockStorage,
+    },
     util::{mock_time_service::SimulatedTimeService, time_service::TimeService},
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
-use aptos_config::{
-    config::{ConsensusConfig, QcAggregatorType},
-    network_id::NetworkId,
-};
+use aptos_config::{config::ConsensusConfig, network_id::NetworkId};
 use aptos_consensus_types::{proposal_msg::ProposalMsg, utils::PayloadTxnsSize};
 use aptos_infallible::Mutex;
 use aptos_network::{
@@ -50,7 +49,6 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use futures::{channel::mpsc, executor::block_on};
-use futures_channel::mpsc::unbounded;
 use maplit::hashmap;
 use once_cell::sync::Lazy;
 use std::{sync::Arc, time::Duration};
@@ -95,6 +93,7 @@ fn build_empty_store(
         Arc::from(DirectMempoolPayloadManager::new()),
         false,
         Arc::new(Mutex::new(PendingBlocks::new())),
+        None,
     ))
 }
 
@@ -113,16 +112,9 @@ fn create_round_state() -> RoundState {
     let base_timeout = std::time::Duration::new(60, 0);
     let time_interval = Box::new(ExponentialTimeInterval::fixed(base_timeout));
     let (round_timeout_sender, _) = aptos_channels::new_test(1_024);
-    let (delayed_qc_tx, _) = unbounded();
     let time_service = Arc::new(SimulatedTimeService::new());
 
-    RoundState::new(
-        time_interval,
-        time_service,
-        round_timeout_sender,
-        delayed_qc_tx,
-        QcAggregatorType::NoDelay,
-    )
+    RoundState::new(time_interval, time_service, round_timeout_sender)
 }
 
 // Creates an RoundManager for fuzzing
@@ -159,10 +151,7 @@ fn create_node_for_fuzzing() -> RoundManager {
 
     let (self_sender, _self_receiver) = aptos_channels::new_unbounded_test();
 
-    let epoch_state = Arc::new(EpochState {
-        epoch: 1,
-        verifier: storage.get_validator_set().into(),
-    });
+    let epoch_state = Arc::new(EpochState::new(1, storage.get_validator_set().into()));
     let network = Arc::new(NetworkSender::new(
         signer.author(),
         consensus_network_client,
@@ -194,6 +183,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         false,
         ValidatorTxnConfig::default_disabled(),
         true,
+        Arc::new(MockOptQSPayloadProvider {}),
     );
 
     //
@@ -223,6 +213,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         OnChainRandomnessConfig::default_enabled(),
         OnChainJWKConsensusConfig::default_enabled(),
         None,
+        Arc::new(MockPastProposalStatusTracker {}),
     )
 }
 

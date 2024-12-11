@@ -115,114 +115,114 @@ error: type `Cup<u8>` is missing required abilities `copy + drop + store`
    = required by instantiating type parameter `T:copy + drop + store` of function `cds`
 
 error: type `signer` is missing required ability `copy`
-   ┌─ tests/checking/abilities/v1/ability_constraint_prims_invalid.move:45:24
+   ┌─ tests/checking/abilities/v1/ability_constraint_prims_invalid.move:35:24
    │
 13 │     struct Sc<phantom T: copy> {}
    │                       - declaration of type parameter `T`
    ·
-45 │         let Sc {} = Sc<signer> {};
+35 │         let Sc {} = Sc<signer> {};
    │                        ^^^^^^
    │
    = required by instantiating type parameter `phantom T:copy` of struct `Sc`
 
 error: type `signer` is missing required ability `copy`
-   ┌─ tests/checking/abilities/v1/ability_constraint_prims_invalid.move:46:24
+   ┌─ tests/checking/abilities/v1/ability_constraint_prims_invalid.move:36:24
    │
 13 │     struct Sc<phantom T: copy> {}
    │                       - declaration of type parameter `T`
    ·
-46 │         let Sc {} = Sc<vector<signer>> {};
+36 │         let Sc {} = Sc<vector<signer>> {};
    │                        ^^^^^^^^^^^^^^
    │
    = required by instantiating vector type parameter
    = required by instantiating type parameter `phantom T:copy` of struct `Sc`
 
 error: type `NoC` is missing required ability `copy`
-   ┌─ tests/checking/abilities/v1/ability_constraint_prims_invalid.move:47:24
+   ┌─ tests/checking/abilities/v1/ability_constraint_prims_invalid.move:37:24
    │
 13 │     struct Sc<phantom T: copy> {}
    │                       - declaration of type parameter `T`
    ·
-47 │         let Sc {} = Sc<vector<NoC>> {};
+37 │         let Sc {} = Sc<vector<NoC>> {};
    │                        ^^^^^^^^^^^
    │
    = required by instantiating vector type parameter
    = required by instantiating type parameter `phantom T:copy` of struct `Sc`
 
 error: type `u64` is missing required ability `key`
-   ┌─ tests/checking/abilities/v1/ability_constraint_prims_invalid.move:48:24
+   ┌─ tests/checking/abilities/v1/ability_constraint_prims_invalid.move:38:24
    │
 14 │     struct Sk<phantom T: key> {}
    │                       - declaration of type parameter `T`
    ·
-48 │         let Sk {} = Sk<u64> {};
+38 │         let Sk {} = Sk<u64> {};
    │                        ^^^
    │
    = required by instantiating type parameter `phantom T:key` of struct `Sk`
 
 error: type `signer` is missing required ability `key`
-   ┌─ tests/checking/abilities/v1/ability_constraint_prims_invalid.move:49:24
+   ┌─ tests/checking/abilities/v1/ability_constraint_prims_invalid.move:39:24
    │
 14 │     struct Sk<phantom T: key> {}
    │                       - declaration of type parameter `T`
    ·
-49 │         let Sk {} = Sk<signer> {};
+39 │         let Sk {} = Sk<signer> {};
    │                        ^^^^^^
    │
    = required by instantiating type parameter `phantom T:key` of struct `Sk`
 
 error: type `vector<NoC>` is missing required ability `key`
-   ┌─ tests/checking/abilities/v1/ability_constraint_prims_invalid.move:50:24
+   ┌─ tests/checking/abilities/v1/ability_constraint_prims_invalid.move:40:24
    │
 14 │     struct Sk<phantom T: key> {}
    │                       - declaration of type parameter `T`
    ·
-50 │         let Sk {} = Sk<vector<NoC>> {};
+40 │         let Sk {} = Sk<vector<NoC>> {};
    │                        ^^^^^^^^^^^
    │
    = required by instantiating type parameter `phantom T:key` of struct `Sk`
 
 error: type `vector<NoK>` is missing required ability `key`
-   ┌─ tests/checking/abilities/v1/ability_constraint_prims_invalid.move:51:24
+   ┌─ tests/checking/abilities/v1/ability_constraint_prims_invalid.move:41:24
    │
 14 │     struct Sk<phantom T: key> {}
    │                       - declaration of type parameter `T`
    ·
-51 │         let Sk {} = Sk<vector<NoK>> {};
+41 │         let Sk {} = Sk<vector<NoK>> {};
    │                        ^^^^^^^^^^^
    │
    = required by instantiating type parameter `phantom T:key` of struct `Sk`
 
 error: type `signer` is missing required abilities `copy + store`
-   ┌─ tests/checking/abilities/v1/ability_constraint_prims_invalid.move:52:28
+   ┌─ tests/checking/abilities/v1/ability_constraint_prims_invalid.move:42:28
    │
 15 │     struct Scds<phantom T: copy + drop + store> {}
    │                         - declaration of type parameter `T`
    ·
-52 │         let Scds {} = Scds<signer> {};
+42 │         let Scds {} = Scds<signer> {};
    │                            ^^^^^^
    │
    = required by instantiating type parameter `phantom T:copy + drop + store` of struct `Scds`
 
 error: type `NoC` is missing required ability `copy`
-   ┌─ tests/checking/abilities/v1/ability_constraint_prims_invalid.move:53:28
+   ┌─ tests/checking/abilities/v1/ability_constraint_prims_invalid.move:43:28
    │
 15 │     struct Scds<phantom T: copy + drop + store> {}
    │                         - declaration of type parameter `T`
    ·
-53 │         let Scds {} = Scds<vector<NoC>> {};
+43 │         let Scds {} = Scds<vector<NoC>> {};
    │                            ^^^^^^^^^^^
    │
    = required by instantiating vector type parameter
    = required by instantiating type parameter `phantom T:copy + drop + store` of struct `Scds`
 
 error: type `Cup<u8>` is missing required abilities `copy + drop + store`
-   ┌─ tests/checking/abilities/v1/ability_constraint_prims_invalid.move:54:28
+   ┌─ tests/checking/abilities/v1/ability_constraint_prims_invalid.move:44:28
    │
 15 │     struct Scds<phantom T: copy + drop + store> {}
    │                         - declaration of type parameter `T`
    ·
-54 │         let Scds {} = Scds<vector<Cup<u8>>> {};
+44 │         let Scds {} = Scds<vector<Cup<u8>>> {};
    │                            ^^^^^^^^^^^^^^^
    │
    = required by instantiating vector type parameter

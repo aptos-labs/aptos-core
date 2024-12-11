@@ -1,0 +1,99 @@
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+use 0000000000000000000000000000000000000000000000000000000000000001::option;
+use 0000000000000000000000000000000000000000000000000000000000000001::vector;
+
+
+struct T has copy, drop, store {
+	issuer: vector<u8>,
+	version: u64
+}
+struct J has copy, drop, store {
+	variant: u64
+}
+struct S has copy, drop, store {
+	entries: vector<T>
+}
+
+test(Arg0: &mut S, Arg1: vector<u8>): Option<T> /* def_idx: 0 */ {
+L2:	loc0: &vector<T>
+L3:	loc1: bool
+L4:	loc2: u64
+L5:	loc3: u64
+L6:	loc4: u64
+L7:	loc5: u64
+L8:	loc6: bool
+L9:	loc7: Option<T>
+B0:
+	0: CopyLoc[0](Arg0: &mut S)
+	1: ImmBorrowField[0](S.entries: vector<T>)
+	2: StLoc[2](loc0: &vector<T>)
+	3: LdFalse
+	4: StLoc[3](loc1: bool)
+	5: LdU64(0)
+	6: StLoc[4](loc2: u64)
+	7: LdU64(0)
+	8: StLoc[5](loc3: u64)
+	9: CopyLoc[2](loc0: &vector<T>)
+	10: VecLen(2)
+	11: StLoc[6](loc4: u64)
+B1:
+	12: CopyLoc[5](loc3: u64)
+	13: CopyLoc[6](loc4: u64)
+	14: Lt
+	15: BrTrue(17)
+B2:
+	16: Branch(29)
+B3:
+	17: CopyLoc[2](loc0: &vector<T>)
+	18: CopyLoc[5](loc3: u64)
+	19: VecImmBorrow(2)
+	20: ImmBorrowField[1](T.issuer: vector<u8>)
+	21: ReadRef
+	22: CopyLoc[1](Arg1: vector<u8>)
+	23: Eq
+	24: BrFalse(51)
+B4:
+	25: LdTrue
+	26: StLoc[3](loc1: bool)
+	27: MoveLoc[5](loc3: u64)
+	28: StLoc[4](loc2: u64)
+B5:
+	29: Nop
+	30: MoveLoc[2](loc0: &vector<T>)
+	31: Pop
+	32: MoveLoc[3](loc1: bool)
+	33: MoveLoc[4](loc2: u64)
+	34: StLoc[7](loc5: u64)
+	35: StLoc[8](loc6: bool)
+	36: MoveLoc[8](loc6: bool)
+	37: BrFalse(46)
+B6:
+	38: MoveLoc[0](Arg0: &mut S)
+	39: MutBorrowField[0](S.entries: vector<T>)
+	40: MoveLoc[7](loc5: u64)
+	41: Call vector::remove<T>(&mut vector<T>, u64): T
+	42: Call option::some<T>(T): Option<T>
+	43: StLoc[9](loc7: Option<T>)
+B7:
+	44: MoveLoc[9](loc7: Option<T>)
+	45: Ret
+B8:
+	46: MoveLoc[0](Arg0: &mut S)
+	47: Pop
+	48: Call option::none<T>(): Option<T>
+	49: StLoc[9](loc7: Option<T>)
+	50: Branch(44)
+B9:
+	51: LdU64(1)
+	52: StLoc[7](loc5: u64)
+	53: MoveLoc[5](loc3: u64)
+	54: MoveLoc[7](loc5: u64)
+	55: Add
+	56: StLoc[5](loc3: u64)
+	57: Branch(12)
+}
+}
+============ bytecode verification succeeded ========

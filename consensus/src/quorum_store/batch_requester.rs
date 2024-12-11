@@ -114,7 +114,7 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
         retry_interval_ms: usize,
         rpc_timeout_ms: usize,
         network_sender: T,
-        validator_verifier: ValidatorVerifier,
+        validator_verifier: Arc<ValidatorVerifier>,
     ) -> Self {
         Self {
             epoch,
@@ -124,7 +124,7 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
             retry_interval_ms,
             rpc_timeout_ms,
             network_sender,
-            validator_verifier: Arc::new(validator_verifier),
+            validator_verifier,
         }
     }
 

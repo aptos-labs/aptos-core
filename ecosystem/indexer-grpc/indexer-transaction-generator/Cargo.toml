@@ -15,19 +15,19 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 # used for localnode.
-# aptos = { workspace = true }
-# aptos-config = { workspace = true }
+aptos = { workspace = true }
+aptos-config = { workspace = true }
+aptos-faucet-core = { workspace = true }
 aptos-indexer-grpc-utils = { workspace = true }
 aptos-protos ={ workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
-# rand = { workspace = true }
-# regex = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 tokio = { workspace = true }
-# toml = { workspace = true }
+toml = { workspace = true }
 tonic = { workspace = true }
 url = { workspace = true }
 

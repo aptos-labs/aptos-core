@@ -2,7 +2,58 @@
 
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## Unreleased
+# Unreleased
+
+## [5.0.0] - 2024/12/11
+- [**Breaking Change**] `aptos init` and `aptos account fund-with-faucet` no longer work directly with testnet, you must now use the minting page at the [Aptos dev docs](https://aptos.dev/network/faucet). 
+## [4.7.0] - 2024/12/10
+- [`Fix`] CLI config should not always require a private key field to be present.
+
+## [4.6.0] - 2024/11/29
+- Add `--node-api-key` flag to `aptos move replay` to allow for querying the fullnode with an API key.
+- Add `--chunk-size` flag to allow configuring chunk size for chunked publish mode.
+- Lower the default chunk size for chunked publish mode (`CHUNK_SIZE_IN_BYTES`) from 60,000 to 55,000.
+
+## [4.5.0] - 2024/11/15
+- Determine network from URL to make explorer links better for legacy users
+- Add support for AIP-80 compliant strings when importing using the CLI arguments or manual input.
+- Add option `--print-metadata-only` to `aptos move decompile` and `aptos move disassemble` to print out the metadata attached to the bytecode.
+- Add `--existing-hasura-url` flag to localnet to tell it to use an existing Hasura instance instead of run Hasura itself. See https://github.com/aptos-labs/aptos-core/pull/15313.
+- Add `--skip-metadata-apply` flag to localnet, in which case we won't try to apply the Hasura metadata.
+- Upgrade Hasura image we use from 2.40.2 to 2.44.0.
+
+## [4.4.0] - 2024/11/06
+- Fix typos in `aptos move compile` help text.
+- Update the default version of `movefmt` to be installed from 1.0.5 to 1.0.6
+- Add `--host-postgres-host` flag: https://github.com/aptos-labs/aptos-core/pull/15216.
+
+## [4.3.0] - 2024/10/30
+- Allow for setting large-packages module for chunking publish mode with `--large-packages-module-address`
+- [`Fix`] Remove unwraps to make outputs go through regular error handling
+
+## [4.2.6] - 2024/10/23
+- Fixing issue with `--move-2` flag which was still selecting language version 2.0 instead of 2.1.
+
+## [4.2.5] - 2024/10/23
+- Bump to resolve issue with release version inconsistency.
+
+## [4.2.4] - 2024/10/21
+- Releasing Move 2.1, which adds compound assignments (`x += 1`) and loop labels to the language. See [Move 2 Release Notes](https://aptos.dev/en/build/smart-contracts/book/move-2).
+- multiple bug fixes in the Move 2 compilation chain.
+- `aptos move fmt` formats move files inside the `tests` and `examples` directory of a package.
+- Added `aptos update prover-dependencies`, which installs the dependency of Move prover, boogie, z3 and cvc5.
+- Update the default version of `movefmt` to be installed from 1.0.4 to 1.0.5
+- Update the local-testnet logs to use `println` for regular output and reserve `eprintln` for errors.
+- Set compiler V2 as default when using `aptos move prove`.
+
+## [4.2.3] - 2024/09/20
+- Fix the broken indexer in localnet in 4.2.2, which migrates table info from sycn to async ways.
+
+## [4.2.2] - 2024/09/20
+- Fix localnet indexer processors that were emitting spamming logs in 4.2.1.
+
+## [4.2.1] - 2024/09/19
+- Fix localnet indexer processors that were failing to startup in 4.2.0
 
 ## [4.2.0] - 2024/09/16
 - Update latest VM and associated changes

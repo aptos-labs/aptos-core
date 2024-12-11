@@ -1,6 +1,7 @@
 # A wrapper around git operations
 
 import re
+from datetime import datetime
 from dataclasses import dataclass
 from typing import Generator, Optional
 from .shell import Shell, RunResult
@@ -23,7 +24,11 @@ class Git:
         return self.run(["rev-parse", "--abbrev-ref", "HEAD"]).unwrap().decode().strip()
 
     def branch_exists(self, branch: str) -> bool:
-        return self.run(["rev-parse", "--verify", branch]).succeeded()
+        # Check local branch
+        if self.run(["rev-parse", "--verify", branch]).succeeded():
+            return True
+        # Check remote branch
+        return self.run(["rev-parse", "--verify", f"origin/{branch}"]).succeeded()
 
     def status(self) -> bool:
         """Check if the git working directory is clean, using git status --porcelain"""
@@ -74,3 +79,73 @@ class Git:
         if remote_match is None:
             raise Exception(f"Could not parse remote {remote_name}")
         return f"{remote_match.group('org_name')}/{remote_match.group('repo_name')}"
+
+    def get_remote_branches_matching_pattern(
+        self, remote: str, pattern: str, regex: str
+    ) -> list[str]:
+        """
+        Get remote branches that match a specific pattern (e.g. aptos-release-v*).
+        This uses ls-remote and a user-specified regex pattern to filter branches.
+        """
+        result = self.run(["ls-remote", "--heads", remote, pattern])
+
+        if not result.succeeded():
+            raise Exception(
+                f"Failed to fetch remote branches: {result.unwrap().decode()}"
+            )
+
+        # Use the user-provided regex pattern to find branches
+        branches = re.findall(regex, result.unwrap().decode(), re.MULTILINE)
+        return branches
+
+    def get_commit_hashes(self, branch: str, max_commits: int = 100) -> list[str]:
+        """
+        Get commit hashes from the given branch, up to max_commits.
+        This retrieves the hashes from the 'git log'.
+        """
+        log.info(f"Fetching up to {max_commits} commits from branch {branch}")
+        result = self.run(["log", "-n", str(max_commits), "--format=%H", branch])
+
+        if not result.succeeded():
+            raise Exception(
+                f"Failed to fetch commit hashes: {result.unwrap().decode()}"
+            )
+
+        return result.unwrap().decode().strip().split("\n")
+
+    def get_branch_creation_time(self, branch: str) -> datetime:
+        """
+        Get the creation time of a branch by retrieving the timestamp of its first commit.
+
+        Args:
+            branch (str): The name of the branch to retrieve the creation time for.
+
+        Returns:
+            datetime: The creation time of the branch.
+        """
+        try:
+            # Ensure the branch exists locally or remotely
+            if self.run(["rev-parse", "--verify", branch]).succeeded():
+                branch_ref = branch
+            elif self.run(["rev-parse", "--verify", f"origin/{branch}"]).succeeded():
+                branch_ref = f"origin/{branch}"
+            else:
+                raise ValueError(f"Branch {branch} not found locally or remotely")
+
+            # Get the first commit hash for the branch
+            first_commit_cmd = [
+                "rev-list",
+                "--first-parent",
+                "--max-count=1",
+                branch_ref,
+            ]
+            first_commit_hash = self.run(first_commit_cmd).unwrap().decode().strip()
+
+            # Get the committer date of the first commit
+            commit_time_cmd = ["show", "-s", "--format=%ci", first_commit_hash]
+            output = self.run(commit_time_cmd).unwrap().decode().strip()
+
+            # Convert the output to a datetime object
+            return datetime.strptime(output, "%Y-%m-%d %H:%M:%S %z")
+        except Exception as e:
+            raise ValueError(f"Failed to get creation time for branch {branch}: {e}")

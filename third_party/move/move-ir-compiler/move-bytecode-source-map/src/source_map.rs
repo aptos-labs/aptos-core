@@ -83,7 +83,7 @@ pub struct SourceMap {
     // A mapping of `StructDefinitionIndex` to source map for each struct/resource.
     struct_map: BTreeMap<TableIndex, StructSourceMap>,
 
-    // A mapping of `FunctionDefinitionIndex` to the soure map for that function.
+    // A mapping of `FunctionDefinitionIndex` to the source map for that function.
     // For scripts, this map has a single element that points to a source map corresponding to the
     // script's "main" function.
     function_map: BTreeMap<TableIndex, FunctionSourceMap>,
@@ -200,6 +200,31 @@ impl FunctionSourceMap {
             },
             _ => (),
         };
+    }
+
+    /// Remap the code map based on the given `remap`.
+    /// If `remap[i] == j`, then the code location associated with code offset `j`
+    /// will now be associated with code offset `i`.
+    pub fn remap_code_map(&mut self, remap: Vec<CodeOffset>) {
+        let mut prev_loc = None;
+        let new_code_map = remap
+            .iter()
+            .map(|old_offset| self.get_code_location(*old_offset))
+            .enumerate()
+            .filter_map(|(new_offset, loc)| {
+                if prev_loc == loc {
+                    // optimization: if a series of instructions map to the same location, we only need
+                    // to add code mapping for the first one, because the code map is a segment map.
+                    None
+                } else if let Some(loc) = loc {
+                    prev_loc = Some(loc);
+                    Some((new_offset as CodeOffset, loc))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        self.code_map = new_code_map;
     }
 
     /// Record the code offset for an Nop label
@@ -359,6 +384,22 @@ impl SourceMap {
             .get_mut(&fdef_idx.0)
             .ok_or_else(|| format_err!("Tried to add code mapping to undefined function index"))?;
         func_entry.add_code_mapping(start_offset, location);
+        Ok(())
+    }
+
+    /// Remap the code map for the function given by `fdef_idx`, according to `remap`.
+    /// If `remap[i] == j`, then the code location associated with code offset `j`
+    /// will now be associated with code offset `i`.
+    pub fn remap_code_map(
+        &mut self,
+        fdef_idx: FunctionDefinitionIndex,
+        remap: Vec<CodeOffset>,
+    ) -> Result<()> {
+        let func_entry = self
+            .function_map
+            .get_mut(&fdef_idx.0)
+            .ok_or_else(|| format_err!("Tried to remap code map of undefined function index"))?;
+        func_entry.remap_code_map(remap);
         Ok(())
     }
 

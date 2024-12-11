@@ -6,7 +6,9 @@
 
 use crate::{
     account_address::{self, AccountAddress},
-    account_config::{AccountResource, CoinStoreResource},
+    account_config::{
+        AccountResource, CoinStoreResource, NewEpochEvent, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
+    },
     aggregate_signature::PartialSignatures,
     block_info::{BlockInfo, Round},
     block_metadata::BlockMetadata,
@@ -17,9 +19,9 @@ use crate::{
     epoch_state::EpochState,
     event::{EventHandle, EventKey},
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
-    on_chain_config::{Features, ValidatorSet},
+    on_chain_config::ValidatorSet,
     proof::TransactionInfoListWithProof,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::state_key::StateKey,
     transaction::{
         block_epilogue::BlockEndInfo, ChangeSet, ExecutionStatus, Module, RawTransaction, Script,
         SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
@@ -41,8 +43,6 @@ use aptos_crypto::{
     traits::*,
     HashValue,
 };
-use arr_macro::arr;
-use bytes::Bytes;
 use move_core_types::language_storage::TypeTag;
 use proptest::{
     collection::{vec, SizeRange},
@@ -53,7 +53,7 @@ use proptest::{
 use proptest_derive::Arbitrary;
 use serde_json::Value;
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet},
     iter::Iterator,
     sync::Arc,
 };
@@ -497,8 +497,7 @@ impl TransactionPayload {
 
 prop_compose! {
     fn arb_transaction_status()(vm_status in any::<VMStatus>()) -> TransactionStatus {
-        let (txn_status, _) = TransactionStatus::from_vm_status(vm_status, true, &Features::default());
-        txn_status
+        TransactionStatus::from_vm_status(vm_status, true)
     }
 }
 
@@ -596,7 +595,7 @@ impl Arbitrary for LedgerInfoWithSignatures {
                 LedgerInfoWithSignatures::new(
                     ledger_info,
                     validator_verifier
-                        .aggregate_signatures(&partial_sig)
+                        .aggregate_signatures(partial_sig.signatures_iter())
                         .unwrap(),
                 )
             })
@@ -793,33 +792,22 @@ impl TransactionToCommitGen {
             .map(|(index, event_gen)| event_gen.materialize(index, universe))
             .collect();
 
-        let (state_updates, write_set): (HashMap<_, _>, BTreeMap<_, _>) = self
+        let write_set: BTreeMap<_, _> = self
             .account_state_gens
             .into_iter()
             .flat_map(|(index, account_gen)| {
                 account_gen.materialize(index, universe).into_iter().map(
                     move |(state_key, value)| {
-                        (
-                            (
-                                state_key.clone(),
-                                Some(StateValue::new_legacy(Bytes::copy_from_slice(&value))),
-                            ),
-                            (state_key, WriteOp::legacy_modification(value.into())),
-                        )
+                        (state_key, WriteOp::legacy_modification(value.into()))
                     },
                 )
             })
-            .unzip();
-        let mut sharded_state_updates = arr![HashMap::new(); 16];
-        state_updates.into_iter().for_each(|(k, v)| {
-            sharded_state_updates[k.get_shard_id() as usize].insert(k, v);
-        });
+            .collect();
 
         TransactionToCommit::new(
             Transaction::UserTransaction(transaction),
             TransactionInfo::new_placeholder(self.gas_used, None, self.status),
-            sharded_state_updates,
-            WriteSetMut::new(write_set).freeze().expect("Cannot fail"),
+            WriteSet::new(write_set).unwrap(),
             events,
             false, /* event_gen never generates reconfig events */
             TransactionAuxiliaryData::default(),
@@ -1068,9 +1056,10 @@ impl BlockInfoGen {
                     )
                 })
                 .collect();
+            let verifier: ValidatorVerifier = (&ValidatorSet::new(next_validator_infos)).into();
             let next_epoch_state = EpochState {
                 epoch: current_epoch + 1,
-                verifier: (&ValidatorSet::new(next_validator_infos)).into(),
+                verifier: verifier.into(),
             };
 
             universe.get_and_bump_epoch();
@@ -1162,6 +1151,11 @@ impl BlockGen {
         self,
         universe: &mut AccountInfoUniverse,
     ) -> (Vec<TransactionToCommit>, LedgerInfo) {
+        let num_txns = self.txn_gens.len() + 1;
+
+        // materialize ledger info
+        let ledger_info = self.ledger_info_gen.materialize(universe, num_txns);
+
         let mut txns_to_commit = Vec::new();
 
         // materialize user transactions
@@ -1176,17 +1170,18 @@ impl BlockGen {
                 Some(HashValue::random()),
                 ExecutionStatus::Success,
             ),
-            arr_macro::arr![HashMap::new(); 16],
             WriteSet::default(),
-            Vec::new(),
-            false,
+            if ledger_info.ends_epoch() {
+                vec![ContractEvent::new_v2(
+                    NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(),
+                    bcs::to_bytes(&NewEpochEvent::dummy()).unwrap(),
+                )]
+            } else {
+                vec![]
+            },
+            ledger_info.ends_epoch(),
             TransactionAuxiliaryData::default(),
         ));
-
-        // materialize ledger info
-        let ledger_info = self
-            .ledger_info_gen
-            .materialize(universe, txns_to_commit.len());
 
         (txns_to_commit, ledger_info)
     }

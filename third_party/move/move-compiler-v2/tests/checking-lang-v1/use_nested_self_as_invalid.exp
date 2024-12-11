@@ -1,0 +1,19 @@
+
+Diagnostics:
+warning: unused alias
+  ┌─ tests/checking-lang-v1/use_nested_self_as_invalid.move:8:26
+  │
+8 │     use 0x2::X::{Self as B, foo, S};
+  │                          ^ Unused 'use' of alias 'B'. Consider removing it
+
+error: unbound module
+   ┌─ tests/checking-lang-v1/use_nested_self_as_invalid.move:10:19
+   │
+10 │     struct X { f: X::S, f2: S }
+   │                   ^ Unbound module or type alias 'X'
+
+error: unbound module
+   ┌─ tests/checking-lang-v1/use_nested_self_as_invalid.move:12:9
+   │
+12 │         X::foo();
+   │         ^ Unbound module or type alias 'X'

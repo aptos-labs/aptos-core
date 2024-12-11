@@ -807,7 +807,7 @@ fn type_(context: &mut Context, sp!(loc, ety_): E::Type) -> N::Type {
                 }
             },
         },
-        ET::Fun(args, result) => {
+        ET::Fun(args, result, _abilities) => {
             let mut args = types(context, args);
             args.push(type_(context, *result));
             NT::builtin_(sp(loc, N::BuiltinTypeName_::Fun), args)
@@ -938,11 +938,11 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
         EE::IfElse(eb, et, ef) => {
             NE::IfElse(exp(context, *eb), exp(context, *et), exp(context, *ef))
         },
-        EE::While(eb, el) => NE::While(exp(context, *eb), exp(context, *el)),
-        EE::Loop(el) => NE::Loop(exp(context, *el)),
+        EE::While(_, eb, el) => NE::While(exp(context, *eb), exp(context, *el)),
+        EE::Loop(_, el) => NE::Loop(exp(context, *el)),
         EE::Block(seq) => NE::Block(sequence(context, seq)),
-        EE::Lambda(args, body) => {
-            let bind_opt = bind_list(context, args);
+        EE::Lambda(args, body, _lambda_capture_kind, _abilities) => {
+            let bind_opt = bind_typed_list(context, args);
             match bind_opt {
                 None => {
                     assert!(context.env.has_errors());
@@ -981,8 +981,8 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
 
         EE::Return(es) => NE::Return(exp(context, *es)),
         EE::Abort(es) => NE::Abort(exp(context, *es)),
-        EE::Break => NE::Break,
-        EE::Continue => NE::Continue,
+        EE::Break(_) => NE::Break,
+        EE::Continue(_) => NE::Continue,
 
         EE::Dereference(e) => NE::Dereference(exp(context, *e)),
         EE::UnaryExp(uop, e) => NE::UnaryExp(uop, exp(context, *e)),
@@ -1085,6 +1085,23 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
                     Some(_) => {
                         NE::ModuleCall(m, FunctionName(n), kind == CallKind::Macro, ty_args, nes)
                     },
+                },
+            }
+        },
+        EE::ExpCall(efunc, eargs, ..) => {
+            let nfunc = exp(context, *efunc);
+            let nargs = call_args(context, eargs);
+            match *nfunc {
+                sp!(_loc, NE::Use(Var(v))) => NE::VarCall(Var(v), nargs),
+                sp!(loc, _) => {
+                    context.env.add_diag(diag!(
+                        Syntax::UnsupportedLanguageItem,
+                        (
+                            loc,
+                            "Calls through computed functions not supported by this compiler"
+                        )
+                    ));
+                    NE::UnresolvedError
                 },
             }
         },
@@ -1201,6 +1218,10 @@ fn bind_list(context: &mut Context, ls: E::LValueList) -> Option<N::LValueList> 
     lvalue_list(context, LValueCase::Bind, ls)
 }
 
+fn bind_typed_list(context: &mut Context, ls: E::TypedLValueList) -> Option<N::LValueList> {
+    typed_lvalue_list(context, ls)
+}
+
 fn assign_list(context: &mut Context, ls: E::LValueList) -> Option<N::LValueList> {
     lvalue_list(context, LValueCase::Assign, ls)
 }
@@ -1214,6 +1235,30 @@ fn lvalue_list(
         loc,
         b_.into_iter()
             .map(|inner| lvalue(context, case, inner))
+            .collect::<Option<_>>()?,
+    ))
+}
+
+fn typed_lvalue_list(
+    context: &mut Context,
+    sp!(loc, b_): E::TypedLValueList,
+) -> Option<N::LValueList> {
+    let case = LValueCase::Bind;
+    Some(sp(
+        loc,
+        b_.into_iter()
+            .map(|sp!(loc, E::TypedLValue_(inner, opt_ty))| {
+                if opt_ty.is_some() {
+                    context.env.add_diag(diag!(
+                        Syntax::UnsupportedLanguageItem,
+                        (
+                            loc,
+                            "Explicit type annotations for lambda parameters are only allowed in Move 2 and beyond"
+                        )
+                    ))
+                }
+                lvalue(context, case, inner)
+            })
             .collect::<Option<_>>()?,
     ))
 }

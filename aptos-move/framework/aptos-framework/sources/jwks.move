@@ -317,7 +317,7 @@ module aptos_framework::jwks {
         let provider_set = if (config_buffer::does_exist<SupportedOIDCProviders>()) {
             config_buffer::extract<SupportedOIDCProviders>()
         } else {
-            *borrow_global_mut<SupportedOIDCProviders>(@aptos_framework)
+            *borrow_global<SupportedOIDCProviders>(@aptos_framework)
         };
 
         let old_config_url = remove_oidc_provider_internal(&mut provider_set, name);
@@ -352,7 +352,7 @@ module aptos_framework::jwks {
         let provider_set = if (config_buffer::does_exist<SupportedOIDCProviders>()) {
             config_buffer::extract<SupportedOIDCProviders>()
         } else {
-            *borrow_global_mut<SupportedOIDCProviders>(@aptos_framework)
+            *borrow_global<SupportedOIDCProviders>(@aptos_framework)
         };
         let ret = remove_oidc_provider_internal(&mut provider_set, name);
         config_buffer::upsert(provider_set);

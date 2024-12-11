@@ -69,7 +69,7 @@ target "debian-base" {
   dockerfile = "docker/builder/debian-base.Dockerfile"
   contexts = {
     # Run `docker buildx imagetools inspect debian:bullseye` to find the latest multi-platform hash
-    debian = "docker-image://debian:bullseye@sha256:8ccc486c29a3ad02ad5af7f1156e2152dff3ba5634eec9be375269ef123457d8"
+    debian = "docker-image://debian:bullseye@sha256:01559430c84e6bc864bed554345d1bfbfa94ac108ab68f39915cae34604b15c3"
   }
 }
 
@@ -145,6 +145,7 @@ target "_common" {
     GIT_TAG    = "${GIT_TAG}"
     BUILD_DATE = "${BUILD_DATE}"
   }
+  output     = ["type=image,compression=zstd,force-compression=true"]
 }
 
 target "validator-testing" {

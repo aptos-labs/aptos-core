@@ -3,67 +3,120 @@
 
 //! This module contains setup for basic block peephole optimizers.
 
-use move_binary_format::file_format::Bytecode;
+use move_binary_format::file_format::{Bytecode, CodeOffset};
+
+/// A contiguous chunk of bytecode that may have been transformed from some
+/// other "original" contiguous chunk of bytecode.
+pub struct TransformedCodeChunk {
+    /// The transformed bytecode.
+    pub code: Vec<Bytecode>,
+    /// Mapping to the original offsets.
+    /// The instruction in `code[i]` corresponds to the instruction at
+    /// `original_offsets[i]` in the original bytecode.
+    pub original_offsets: Vec<CodeOffset>,
+}
+
+impl TransformedCodeChunk {
+    /// Create an instance of `TransformedCodeChunk` from the given `code`
+    /// and `original_offsets`.
+    pub fn new(code: Vec<Bytecode>, original_offsets: Vec<CodeOffset>) -> Self {
+        debug_assert_eq!(code.len(), original_offsets.len());
+        Self {
+            code,
+            original_offsets,
+        }
+    }
+
+    /// Create an empty chunk.
+    pub fn empty() -> Self {
+        Self::new(vec![], vec![])
+    }
+
+    /// Extend this chunk with another `other` chunk.
+    /// The `original_offsets` for the `other` chunk are incremented by `adjust`.
+    pub fn extend(&mut self, other: TransformedCodeChunk, adjust: CodeOffset) {
+        self.code.extend(other.code);
+        self.original_offsets
+            .extend(other.original_offsets.into_iter().map(|off| off + adjust));
+    }
+
+    /// Make a new chunk from the given `code`.
+    pub fn make_from(code: &[Bytecode]) -> Self {
+        Self::new(code.to_vec(), Vec::from_iter(0..code.len() as CodeOffset))
+    }
+
+    /// Remap the original offsets using the given `previous_offsets`.
+    pub fn remap(self, previous_offsets: Vec<CodeOffset>) -> Self {
+        Self::new(
+            self.code,
+            self.original_offsets
+                .into_iter()
+                .map(|off| previous_offsets[off as usize])
+                .collect(),
+        )
+    }
+}
 
 /// A basic block optimizer that optimizes a basic block of bytecode.
 pub trait BasicBlockOptimizer {
-    /// Given a basic `block`, return its optimized version.
-    fn optimize(&self, block: &[Bytecode]) -> Vec<Bytecode>;
+    /// Given a basic `block`, return its optimized version [*].
+    ///
+    /// [*] The optimized version returned via `TransformedCodeChunk` maintains a
+    /// mapping to the original offsets in `block`.
+    fn optimize(&self, block: &[Bytecode]) -> TransformedCodeChunk;
 }
 
-/// An optimizer for a fixed window of bytecode.
-/// The fixed window can be assumed to be within a basic block.
-pub trait FixedWindowOptimizer {
-    /// The fixed window size for this optimizer.
-    fn fixed_window_size(&self) -> usize;
-
-    /// Given a fixed `window` of bytecode of size `self.fixed_window_size()`,
-    /// optionally return its optimized version.
+/// An optimizer for a window of bytecode within a basic block.
+/// The window is always a suffix of a basic block.
+pub trait WindowOptimizer {
+    /// Given a `window` of bytecode, return a tuple containing:
+    ///   1. an optimized version of a non-empty prefix of the `window`. [*]
+    ///   2. size of this prefix (should be non-zero).
     /// If `None` is returned, the `window` is not optimized.
-    fn optimize_fixed_window(&self, window: &[Bytecode]) -> Option<Vec<Bytecode>>;
+    ///
+    /// [*] When an optimized version is returned, the corresponding `TransformedCodeChunk`
+    /// maintains a mapping to the original offsets of `window`.
+    fn optimize_window(&self, window: &[Bytecode]) -> Option<(TransformedCodeChunk, usize)>;
 }
 
-/// A processor to perform fixed window optimizations of a particular style on a basic block.
-pub struct FixedWindowProcessor<T: FixedWindowOptimizer>(T);
+/// A processor to perform window optimizations of a particular style on a basic block.
+pub struct WindowProcessor<T: WindowOptimizer>(T);
 
-impl<T: FixedWindowOptimizer> BasicBlockOptimizer for FixedWindowProcessor<T> {
-    fn optimize(&self, block: &[Bytecode]) -> Vec<Bytecode> {
-        let mut old_block = block.to_vec();
+impl<T: WindowOptimizer> BasicBlockOptimizer for WindowProcessor<T> {
+    fn optimize(&self, block: &[Bytecode]) -> TransformedCodeChunk {
+        let mut old_block = TransformedCodeChunk::make_from(block);
         // Run single passes until code stops changing.
-        while let Some(new_block) = self.optimize_single_pass(&old_block) {
-            old_block = new_block;
+        while let Some(new_chunk) = self.optimize_single_pass(&old_block.code) {
+            old_block = new_chunk.remap(old_block.original_offsets);
         }
         old_block
     }
 }
 
-impl<T: FixedWindowOptimizer> FixedWindowProcessor<T> {
-    /// Create a new `FixedWindowProcessor` with the given `optimizer`.
+impl<T: WindowOptimizer> WindowProcessor<T> {
+    /// Create a new `WindowProcessor` with the given `optimizer`.
     pub fn new(optimizer: T) -> Self {
         Self(optimizer)
     }
 
-    /// Run a single pass of fixed window peephole optimization on the given basic `block`.
+    /// Run a single pass of the window peephole optimization on the given basic `block`.
     /// If the block cannot be optimized further, return `None`.
-    fn optimize_single_pass(&self, block: &[Bytecode]) -> Option<Vec<Bytecode>> {
-        let window_size = self.0.fixed_window_size();
+    fn optimize_single_pass(&self, block: &[Bytecode]) -> Option<TransformedCodeChunk> {
         let mut changed = false;
-        let mut new_block: Vec<Bytecode> = vec![];
+        let mut new_block = TransformedCodeChunk::empty();
         let mut left = 0;
         while left < block.len() {
-            let right = left + window_size;
-            if right > block.len() {
-                // At the end, not enough instructions to form a fixed window.
-                new_block.extend(block[left..].to_vec());
-                break;
-            }
-            let window = &block[left..right];
-            if let Some(optimized_window) = self.0.optimize_fixed_window(window) {
-                new_block.extend(optimized_window);
-                left = right;
+            let window = &block[left..];
+            if let Some((optimized_window, consumed)) = self.0.optimize_window(window) {
+                debug_assert!(consumed != 0);
+                new_block.extend(optimized_window, left as CodeOffset);
+                left += consumed;
                 changed = true;
             } else {
-                new_block.push(block[left].clone());
+                new_block.extend(
+                    TransformedCodeChunk::make_from(&block[left..left + 1]),
+                    left as CodeOffset,
+                );
                 left += 1;
             }
         }

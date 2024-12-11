@@ -52,6 +52,7 @@ pub mod ast;
 mod builder;
 pub mod code_writer;
 pub mod constant_folder;
+pub mod exp_builder;
 pub mod exp_generator;
 pub mod exp_rewriter;
 pub mod intrinsics;
@@ -60,11 +61,16 @@ pub mod model;
 pub mod options;
 pub mod pragmas;
 pub mod pureness_checker;
+pub mod sourcifier;
 pub mod spec_translator;
 pub mod symbol;
 pub mod ty;
 pub mod well_known;
 
+pub use builder::binary_module_loader;
+use move_binary_format::access::ScriptAccess;
+
+//
 // =================================================================================================
 // Entry Point V2
 
@@ -118,7 +124,7 @@ pub fn run_model_builder_in_compiler_mode(
             .set_skip_attribute_checks(skip_attribute_checks)
             .set_verify(compile_verify_code)
             .set_keep_testing_functions(compile_test_code)
-            .set_lang_v2(language_version != LanguageVersion::V1)
+            .set_language_version(language_version.into())
             .set_compiler_v2(true),
         known_attributes,
     )
@@ -324,12 +330,14 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     let mut expansion_ast = {
         let E::Program { modules, scripts } = expansion_ast;
         let modules = modules.filter_map(|mident, mut mdef| {
-            // Always need to include the vector module because it can be implicitly used.
-            // TODO(#12492): we can remove this once this bug is fixed
+            // We need to always include the `vector` module (only for compiler v2),
+            // to handle cases of implicit usage.
+            // E.g., index operation on a vector results in a call to `vector::borrow`.
+            // TODO(#15483): consider refactoring code to avoid this special case.
             let is_vector = mident.value.address.into_addr_bytes().into_inner()
                 == AccountAddress::ONE
                 && mident.value.module.0.value.as_str() == "vector";
-            (is_vector || visited_modules.contains(&mident.value)).then(|| {
+            (is_vector && compile_via_model || visited_modules.contains(&mident.value)).then(|| {
                 mdef.is_source_module = true;
                 mdef
             })
@@ -571,6 +579,20 @@ pub fn add_move_lang_diagnostics(env: &mut GlobalEnv, diags: Diagnostics) {
             .with_notes(notes);
         env.add_diag(diag);
     }
+}
+
+/// Converts the given compiled script into an equivalent compiled module. This assigns
+/// a unique name to the module based on the script function's name and the passed index.
+/// The index must be unique w.r.t. the context of where the result shall be used
+/// since the function name alone can be used by multiple scripts in the context.
+pub fn convert_script_to_module(script: CompiledScript, index: usize) -> CompiledModule {
+    let fhd = script
+        .function_handles
+        .first()
+        .expect("malformed script without function");
+    let name = script.identifier_at(fhd.name);
+    let unique_name = format!("{}_{}", name, index);
+    script_into_module(script, &unique_name)
 }
 
 #[allow(deprecated)]
@@ -920,7 +942,7 @@ fn expansion_script_to_module(script: E::Script) -> E::ModuleDefinition {
 }
 
 // =================================================================================================
-// AST visitors
+// AST visitors (v1 compiler infra)
 
 fn collect_lambda_lifted_functions_in_sequence(
     collection: &mut Vec<T::SpecLambdaLiftedFunction>,
@@ -1167,14 +1189,15 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
             downgrade_exp_inlining_to_expansion(else_case).into(),
         ),
         UnannotatedExp_::While(cond, body) => Exp_::While(
+            None, // note that labels cannot be downgraded as they are not supported in v1
             downgrade_exp_inlining_to_expansion(cond).into(),
             downgrade_exp_inlining_to_expansion(body).into(),
         ),
         UnannotatedExp_::Loop { has_break: _, body } => {
-            Exp_::Loop(downgrade_exp_inlining_to_expansion(body).into())
+            Exp_::Loop(None, downgrade_exp_inlining_to_expansion(body).into())
         },
-        UnannotatedExp_::Break => Exp_::Break,
-        UnannotatedExp_::Continue => Exp_::Continue,
+        UnannotatedExp_::Break => Exp_::Break(None),
+        UnannotatedExp_::Continue => Exp_::Continue(None),
 
         UnannotatedExp_::Block(seq) => Exp_::Block(downgrade_sequence_inlining_to_expansion(seq)),
         UnannotatedExp_::Lambda(..) => {

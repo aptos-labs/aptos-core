@@ -1,45 +1,23 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! This module (and its submodules) contain various stackless-bytecode-based lint checks.
+//! This module exercises externally provided stackless-bytecode-based lint checks.
 //! Live variable analysis is a prerequisite for this lint processor.
 //! The lint checks also assume that all the correctness checks have already been performed.
 
-mod avoid_copy_on_identity_comparison;
-
 use crate::{
-    lint_common::{lint_skips_from_attributes, LintChecker},
-    pipeline::lint_processor::avoid_copy_on_identity_comparison::AvoidCopyOnIdentityComparison,
+    external_checks::{known_checker_names, StacklessBytecodeChecker},
+    lint_common::lint_skips_from_attributes,
+    Options,
 };
-use move_compiler::shared::known_attributes::LintAttribute;
-use move_model::model::{FunctionEnv, GlobalEnv, Loc};
+use move_model::model::FunctionEnv;
 use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
 };
 use std::collections::BTreeSet;
 
-/// Perform various lint checks on the stackless bytecode.
-pub trait StacklessBytecodeLinter {
-    /// The corresponding lint checker enumerated value.
-    fn get_lint_checker(&self) -> LintChecker;
-
-    /// Examine the `target` and potentially emit lint warnings via `self.warning()`.
-    fn check(&self, target: &FunctionTarget);
-
-    /// Emit a lint warning with the `msg` highlighting the `loc`.
-    fn warning(&self, env: &GlobalEnv, loc: &Loc, msg: &str) {
-        env.lint_diag_with_notes(loc, msg, vec![
-            format!(
-                "To suppress this warning, annotate the function/module with the attribute `#[{}({})]`.",
-                LintAttribute::SKIP,
-                self.get_lint_checker()
-            ),
-        ]);
-    }
-}
-
-/// The top-level processor for the lint pipeline.
+/// The top-level processor for the stackless bytecode lint pipeline.
 pub struct LintProcessor {}
 
 impl FunctionTargetProcessor for LintProcessor {
@@ -70,29 +48,47 @@ impl FunctionTargetProcessor for LintProcessor {
 }
 
 impl LintProcessor {
-    /// Returns the default pipeline of stackless bytecode linters to run.
-    fn get_default_linter_pipeline() -> Vec<Box<dyn StacklessBytecodeLinter>> {
-        vec![Box::new(AvoidCopyOnIdentityComparison {})]
-    }
-
     /// Returns a filtered pipeline of stackless bytecode linters to run.
     /// The filtering is based on attributes attached to the function and module.
     pub fn get_applicable_linter_pipeline(
         target: &FunctionTarget,
-    ) -> Vec<Box<dyn StacklessBytecodeLinter>> {
-        let lint_skips = Self::get_lint_skips(target);
-        Self::get_default_linter_pipeline()
-            .into_iter()
-            .filter(|lint| !lint_skips.contains(&lint.get_lint_checker()))
+    ) -> Vec<Box<dyn StacklessBytecodeChecker>> {
+        let options = target
+            .global_env()
+            .get_extension::<Options>()
+            .expect("Options is available");
+        if options.external_checks.is_empty() {
+            return vec![];
+        }
+        let known_checker_names = known_checker_names(&options.external_checks);
+        let lint_skips = Self::get_lint_skips(target, &known_checker_names);
+        options
+            .external_checks
+            .iter()
+            .flat_map(|checks| {
+                checks
+                    .get_stackless_bytecode_checkers()
+                    .into_iter()
+                    .filter(|lint| !lint_skips.contains(&lint.get_name()))
+            })
             .collect()
     }
 
     /// Get the set of lint checks to skip based on attributes attached to the function and module.
-    fn get_lint_skips(target: &FunctionTarget) -> BTreeSet<LintChecker> {
-        let module_lint_skips =
-            lint_skips_from_attributes(target.global_env(), target.module_env().get_attributes());
-        let function_lint_skips =
-            lint_skips_from_attributes(target.global_env(), target.func_env.get_attributes());
+    fn get_lint_skips(
+        target: &FunctionTarget,
+        known_checker_names: &BTreeSet<String>,
+    ) -> BTreeSet<String> {
+        let module_lint_skips = lint_skips_from_attributes(
+            target.global_env(),
+            target.module_env().get_attributes(),
+            known_checker_names,
+        );
+        let function_lint_skips = lint_skips_from_attributes(
+            target.global_env(),
+            target.func_env.get_attributes(),
+            known_checker_names,
+        );
         BTreeSet::from_iter(module_lint_skips.into_iter().chain(function_lint_skips))
     }
 }

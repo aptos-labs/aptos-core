@@ -15,10 +15,13 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
-use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfoWithSignatures};
-use mirai_annotations::{checked_verify_eq, precondition};
+use aptos_types::{
+    block_info::{BlockInfo, Round},
+    ledger_info::LedgerInfoWithSignatures,
+};
+use mirai_annotations::precondition;
 use std::{
-    collections::{vec_deque::VecDeque, HashMap, HashSet},
+    collections::{vec_deque::VecDeque, BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
 
@@ -89,6 +92,9 @@ pub struct BlockTree {
     pruned_block_ids: VecDeque<HashValue>,
     /// Num pruned blocks to keep in memory.
     max_pruned_blocks_in_mem: usize,
+
+    /// Round to Block index. We expect only one block per round.
+    round_to_ids: BTreeMap<Round, HashValue>,
 }
 
 impl BlockTree {
@@ -108,6 +114,8 @@ impl BlockTree {
         let root_id = root.id();
 
         let mut id_to_block = HashMap::new();
+        let mut round_to_ids = BTreeMap::new();
+        round_to_ids.insert(root.round(), root_id);
         id_to_block.insert(root_id, LinkableBlock::new(root));
         counters::NUM_BLOCKS_IN_TREE.set(1);
 
@@ -132,6 +140,7 @@ impl BlockTree {
             pruned_block_ids,
             max_pruned_blocks_in_mem,
             highest_2chain_timeout_cert,
+            round_to_ids,
         }
     }
 
@@ -165,7 +174,10 @@ impl BlockTree {
 
     fn remove_block(&mut self, block_id: HashValue) {
         // Remove the block from the store
-        self.id_to_block.remove(&block_id);
+        if let Some(block) = self.id_to_block.remove(&block_id) {
+            let round = block.executed_block().round();
+            self.round_to_ids.remove(&round);
+        };
         self.id_to_quorum_cert.remove(&block_id);
     }
 
@@ -176,6 +188,12 @@ impl BlockTree {
     pub(super) fn get_block(&self, block_id: &HashValue) -> Option<Arc<PipelinedBlock>> {
         self.get_linkable_block(block_id)
             .map(|lb| lb.executed_block().clone())
+    }
+
+    pub(super) fn get_block_for_round(&self, round: Round) -> Option<Arc<PipelinedBlock>> {
+        self.round_to_ids
+            .get(&round)
+            .and_then(|block_id| self.get_block(block_id))
     }
 
     pub(super) fn ordered_root(&self) -> Arc<PipelinedBlock> {
@@ -231,7 +249,6 @@ impl BlockTree {
                        existing_block,
                        block_id,
                        block);
-            checked_verify_eq!(existing_block.compute_result(), block.compute_result());
             Ok(existing_block)
         } else {
             match self.get_linkable_block_mut(&block.parent_id()) {
@@ -241,6 +258,16 @@ impl BlockTree {
             let linkable_block = LinkableBlock::new(block);
             let arc_block = Arc::clone(linkable_block.executed_block());
             assert!(self.id_to_block.insert(block_id, linkable_block).is_none());
+            // Note: the assumption is that we have/enforce unequivocal proposer election.
+            if let Some(old_block_id) = self.round_to_ids.get(&arc_block.round()) {
+                warn!(
+                    "Multiple blocks received for round {}. Previous block id: {}",
+                    arc_block.round(),
+                    old_block_id
+                );
+            } else {
+                self.round_to_ids.insert(arc_block.round(), block_id);
+            }
             counters::NUM_BLOCKS_IN_TREE.inc();
             Ok(arc_block)
         }
@@ -318,6 +345,7 @@ impl BlockTree {
         let mut blocks_pruned = VecDeque::new();
         let mut blocks_to_be_pruned = vec![self.linkable_root()];
         while let Some(block_to_remove) = blocks_to_be_pruned.pop() {
+            block_to_remove.executed_block().abort_pipeline();
             // Add the children to the blocks to be pruned (if any), but stop when it reaches the
             // new root
             for child_id in block_to_remove.children() {
@@ -421,7 +449,7 @@ impl BlockTree {
     }
 
     /// Update the counters for committed blocks and prune them from the in-memory and persisted store.
-    pub fn commit_callback(
+    pub fn commit_callback_deprecated(
         &mut self,
         storage: Arc<dyn PersistentLivenessStorage>,
         blocks_to_commit: &[Arc<PipelinedBlock>],
@@ -431,18 +459,32 @@ impl BlockTree {
         let commit_proof = finality_proof
             .create_merged_with_executed_state(commit_decision)
             .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
-
-        let block_to_commit = blocks_to_commit.last().expect("pipeline is empty").clone();
         update_counters_for_committed_blocks(blocks_to_commit);
+        let last_block = blocks_to_commit.last().expect("pipeline is empty").clone();
+
+        let block_id = last_block.id();
+        let block_round = last_block.round();
+
+        self.commit_callback(storage, block_id, block_round, commit_proof);
+    }
+
+    pub fn commit_callback(
+        &mut self,
+        storage: Arc<dyn PersistentLivenessStorage>,
+        block_id: HashValue,
+        block_round: Round,
+        commit_proof: WrappedLedgerInfo,
+    ) {
         let current_round = self.commit_root().round();
-        let committed_round = block_to_commit.round();
+        let committed_round = block_round;
+
         debug!(
             LogSchema::new(LogEvent::CommitViaBlock).round(current_round),
             committed_round = committed_round,
-            block_id = block_to_commit.id(),
+            block_id = block_id,
         );
 
-        let ids_to_remove = self.find_blocks_to_prune(block_to_commit.id());
+        let ids_to_remove = self.find_blocks_to_prune(block_id);
         if let Err(e) = storage.prune_tree(ids_to_remove.clone().into_iter().collect()) {
             // it's fine to fail here, as long as the commit succeeds, the next restart will clean
             // up dangling blocks, and we need to prune the tree to keep the root consistent with

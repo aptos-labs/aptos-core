@@ -30,12 +30,7 @@ pub struct DuplicationChecker<'a> {
 
 impl<'a> DuplicationChecker<'a> {
     pub fn verify_module(module: &'a CompiledModule) -> VMResult<()> {
-        let res = Self::verify_module_impl(module)
-            .map_err(|e| e.finish(Location::Module(module.self_id())));
-        if let Err(e) = res.clone() {
-            println!("error: {}", e)
-        }
-        res
+        Self::verify_module_impl(module).map_err(|e| e.finish(Location::Module(module.self_id())))
     }
 
     fn verify_module_impl(module: &'a CompiledModule) -> PartialVMResult<()> {

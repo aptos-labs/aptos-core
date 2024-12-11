@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/function_acquires_bad_name.move:3:22
+  │
+3 │     fun f() acquires {
+  │                      ^
+  │                      │
+  │                      Unexpected '{'
+  │                      Expected an access specifier

@@ -5,7 +5,7 @@ use aptos_aggregator::resolver::{TAggregatorV1View, TDelayedFieldView};
 use aptos_types::{
     serde_helper::bcs_utils::size_u32_as_uleb128,
     state_store::{
-        errors::StateviewError,
+        errors::StateViewError,
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
@@ -176,9 +176,14 @@ pub trait TModuleView {
 
 /// Allows to query state information, e.g. its usage.
 pub trait StateStorageView {
+    type Key;
+
     fn id(&self) -> StateViewId;
 
-    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError>;
+    /// Reads the state value from the DB. Used to enforce read-before-write for module writes.
+    fn read_state_value(&self, state_key: &Self::Key) -> Result<(), StateViewError>;
+
+    fn get_usage(&self) -> Result<StateStorageUsage, StateViewError>;
 }
 
 /// A fine-grained view of the state during execution.
@@ -203,7 +208,7 @@ pub trait TExecutorView<K, T, L, I, V>:
     + TModuleView<Key = K>
     + TAggregatorV1View<Identifier = K>
     + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
-    + StateStorageView
+    + StateStorageView<Key = K>
 {
 }
 
@@ -212,7 +217,7 @@ impl<A, K, T, L, I, V> TExecutorView<K, T, L, I, V> for A where
         + TModuleView<Key = K>
         + TAggregatorV1View<Identifier = K>
         + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
-        + StateStorageView
+        + StateStorageView<Key = K>
 {
 }
 
@@ -278,11 +283,18 @@ impl<S> StateStorageView for S
 where
     S: StateView,
 {
+    type Key = StateKey;
+
     fn id(&self) -> StateViewId {
         self.id()
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
+    fn read_state_value(&self, state_key: &Self::Key) -> Result<(), StateViewError> {
+        self.get_state_value(state_key)?;
+        Ok(())
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
         self.get_usage().map_err(Into::into)
     }
 }

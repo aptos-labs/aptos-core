@@ -24,6 +24,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 #[derive(
     Copy, Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize, CryptoHasher, BCSCryptoHash,
 )]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Groth16Proof {
     a: G1Bytes,
     b: G2Bytes,
@@ -31,6 +32,7 @@ pub struct Groth16Proof {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct ZeroKnowledgeSig {
     pub proof: ZKP,
     /// The expiration horizon that the circuit should enforce on the expiration date committed in
@@ -163,6 +165,15 @@ impl ZeroKnowledgeSig {
         match self.proof {
             ZKP::Groth16(proof) => proof.verify_proof(public_inputs_hash, pvk),
         }
+    }
+}
+
+impl TryFrom<&[u8]> for ZeroKnowledgeSig {
+    type Error = CryptoMaterialError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, CryptoMaterialError> {
+        bcs::from_bytes::<ZeroKnowledgeSig>(bytes)
+            .map_err(|_e| CryptoMaterialError::DeserializationError)
     }
 }
 

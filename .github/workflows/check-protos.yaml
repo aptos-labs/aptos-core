@@ -34,7 +34,7 @@ jobs:
         github.event.pull_request.auto_merge != null
       )
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       # Install buf, which we use to generate code from the protos for Rust and TS.
       - name: Install buf

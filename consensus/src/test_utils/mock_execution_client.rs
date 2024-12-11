@@ -8,13 +8,13 @@ use crate::{
     payload_manager::{DirectMempoolPayloadManager, TPayloadManager},
     pipeline::{
         buffer_manager::OrderedBlocks, execution_client::TExecutionClient,
-        signing_phase::CommitSignerProvider,
+        pipeline_builder::PipelineBuilder, signing_phase::CommitSignerProvider,
     },
     rand::rand_gen::types::RandConfig,
     state_replication::StateComputerCommitCallBackType,
     test_utils::mock_storage::MockStorage,
 };
-use anyhow::{format_err, Result};
+use anyhow::{anyhow, format_err, Result};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::{
     common::{Payload, Round},
@@ -29,11 +29,12 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig},
     transaction::SignedTransaction,
+    validator_signer::ValidatorSigner,
 };
 use futures::{channel::mpsc, SinkExt};
 use futures_channel::mpsc::UnboundedSender;
 use move_core_types::account_address::AccountAddress;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 pub struct MockExecutionClient {
     state_sync_client: mpsc::UnboundedSender<Vec<SignedTransaction>>,
@@ -94,7 +95,7 @@ impl MockExecutionClient {
 impl TExecutionClient for MockExecutionClient {
     async fn start_epoch(
         &self,
-        _maybe_consensus_key: Option<Arc<PrivateKey>>,
+        _maybe_consensus_key: Arc<PrivateKey>,
         _epoch_state: Arc<EpochState>,
         _commit_signer_provider: Arc<dyn CommitSignerProvider>,
         _payload_manager: Arc<dyn TPayloadManager>,
@@ -162,7 +163,16 @@ impl TExecutionClient for MockExecutionClient {
         Ok(())
     }
 
-    async fn sync_to(&self, commit: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+    async fn sync_for_duration(
+        &self,
+        _duration: Duration,
+    ) -> Result<LedgerInfoWithSignatures, StateSyncError> {
+        Err(StateSyncError::from(anyhow!(
+            "sync_for_duration() is not supported by the MockExecutionClient!"
+        )))
+    }
+
+    async fn sync_to_target(&self, commit: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
         debug!(
             "Fake sync to block id {}",
             commit.ledger_info().consensus_block_id()
@@ -177,4 +187,8 @@ impl TExecutionClient for MockExecutionClient {
     }
 
     async fn end_epoch(&self) {}
+
+    fn pipeline_builder(&self, _signer: Arc<ValidatorSigner>) -> PipelineBuilder {
+        unimplemented!()
+    }
 }

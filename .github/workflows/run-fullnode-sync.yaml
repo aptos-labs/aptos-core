@@ -57,10 +57,10 @@ on:
 
 jobs:
   fullnode-sync:
-    runs-on: medium-perf-docker-with-local-ssd
+    runs-on: runs-on,family=c5ad.8xlarge,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=false
     timeout-minutes: ${{ inputs.TIMEOUT_MINUTES || 300 }} # the default run is 300 minutes (5 hours). Specified here because workflow_dispatch uses string rather than number
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: ./.github/actions/fullnode-sync
         with:
@@ -68,9 +68,9 @@ jobs:
           NETWORK: ${{ inputs.NETWORK }}
           BOOTSTRAPPING_MODE: ${{ inputs.BOOTSTRAPPING_MODE }}
           CONTINUOUS_SYNCING_MODE: ${{ inputs.CONTINUOUS_SYNCING_MODE }}
-          DATA_DIR_FILE_PATH: /tmp/
-          NODE_LOG_FILE_PATH: /tmp/node_log
-          METRICS_DUMP_FILE_PATH: /tmp/metrics
+          DATA_DIR_FILE_PATH: ${{ runner.temp }}/
+          NODE_LOG_FILE_PATH: ${{ runner.temp }}/node_log
+          METRICS_DUMP_FILE_PATH: ${{ runner.temp }}/metrics
 
       - name: Upload node logs as an artifact
         uses: actions/upload-artifact@v4
@@ -78,7 +78,7 @@ jobs:
         with:
           name: node_log
           path: |
-            /tmp/node_log
+            ${{ runner.temp }}/node_log
           retention-days: 14
 
       - name: Upload the metrics dump as an artifact
@@ -87,7 +87,7 @@ jobs:
         with:
           name: metrics
           path: |
-            /tmp/metrics
+            ${{ runner.temp }}/metrics
           retention-days: 14
 
       - name: Post to a Slack channel on failure
@@ -105,6 +105,6 @@ jobs:
       # Because we have to checkout the actions and then check out a different
       # git ref, it's possible the actions directory will be modified. So, we
       # need to check it out again for the Post Run actions/checkout to succeed.
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           path: actions

@@ -1,0 +1,11 @@
+
+Diagnostics:
+error: duplicate declaration, item, or annotation
+  ┌─ tests/more-v1/expansion/duplicate_field_assign.move:5:9
+  │
+5 │         S { f, f } = S { f: 0 };
+  │         ^^^^^^^^^^
+  │         │   │  │
+  │         │   │  Duplicate assignment binding given for field 'f'
+  │         │   Field previously defined here
+  │         Invalid deconstructing assignment

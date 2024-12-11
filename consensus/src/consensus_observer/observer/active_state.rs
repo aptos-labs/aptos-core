@@ -16,7 +16,6 @@ use crate::{
     state_replication::StateComputerCommitCallBackType,
 };
 use aptos_config::config::NodeConfig;
-use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_infallible::Mutex;
 use aptos_logger::{error, info, warn};
@@ -103,20 +102,29 @@ impl ActiveObserverState {
         &self,
         pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
         block_payload_store: Arc<Mutex<BlockPayloadStore>>,
-    ) -> StateComputerCommitCallBackType {
+    ) -> Box<dyn FnOnce(LedgerInfoWithSignatures) + Send + Sync> {
         // Clone the root pointer
         let root = self.root.clone();
 
         // Create the commit callback
-        Box::new(move |blocks, ledger_info: LedgerInfoWithSignatures| {
+        Box::new(move |ledger_info: LedgerInfoWithSignatures| {
             handle_committed_blocks(
                 pending_ordered_blocks,
                 block_payload_store,
                 root,
-                blocks,
                 ledger_info,
             );
         })
+    }
+
+    /// Creates and returns the commit callback used by old pipeline.
+    pub fn create_commit_callback_deprecated(
+        &self,
+        pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
+        block_payload_store: Arc<Mutex<BlockPayloadStore>>,
+    ) -> StateComputerCommitCallBackType {
+        let callback = self.create_commit_callback(pending_ordered_blocks, block_payload_store);
+        Box::new(move |_, ledger_info| callback(ledger_info))
     }
 
     /// Returns the current epoch state
@@ -186,6 +194,11 @@ impl ActiveObserverState {
             randomness_config,
         )
     }
+
+    /// Returns whether the pipeline is enabled
+    pub fn pipeline_enabled(&self) -> bool {
+        self.node_config.consensus_observer.enable_pipeline
+    }
 }
 
 /// A simple helper function that extracts the on-chain configs from the reconfig events
@@ -209,10 +222,10 @@ async fn extract_on_chain_configs(
     let validator_set: ValidatorSet = on_chain_configs
         .get()
         .expect("Failed to get the validator set from the on-chain configs!");
-    let epoch_state = Arc::new(EpochState {
-        epoch: on_chain_configs.epoch(),
-        verifier: (&validator_set).into(),
-    });
+    let epoch_state = Arc::new(EpochState::new(
+        on_chain_configs.epoch(),
+        (&validator_set).into(),
+    ));
 
     // Extract the consensus config (or use the default if it's missing)
     let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = on_chain_configs.get();
@@ -285,11 +298,13 @@ fn handle_committed_blocks(
     pending_ordered_blocks: Arc<Mutex<OrderedBlockStore>>,
     block_payload_store: Arc<Mutex<BlockPayloadStore>>,
     root: Arc<Mutex<LedgerInfoWithSignatures>>,
-    blocks: &[Arc<PipelinedBlock>],
     ledger_info: LedgerInfoWithSignatures,
 ) {
     // Remove the committed blocks from the payload and pending stores
-    block_payload_store.lock().remove_committed_blocks(blocks);
+    block_payload_store.lock().remove_blocks_for_epoch_round(
+        ledger_info.commit_info().epoch(),
+        ledger_info.commit_info().round(),
+    );
     pending_ordered_blocks
         .lock()
         .remove_blocks_for_commit(&ledger_info);
@@ -334,6 +349,7 @@ mod test {
     use aptos_consensus_types::{
         block::Block,
         block_data::{BlockData, BlockType},
+        pipelined_block::PipelinedBlock,
         quorum_cert::QuorumCert,
     };
     use aptos_crypto::HashValue;
@@ -421,7 +437,6 @@ mod test {
             ordered_block_store.clone(),
             block_payload_store.clone(),
             root.clone(),
-            &[],
             create_ledger_info(epoch + 1, round + 1),
         );
         assert_eq!(root.lock().commit_info().epoch(), epoch);
@@ -431,7 +446,6 @@ mod test {
             ordered_block_store.clone(),
             block_payload_store.clone(),
             root.clone(),
-            &[],
             create_ledger_info(epoch, round - 1),
         );
         assert_eq!(root.lock().commit_info().round(), round);
@@ -466,7 +480,6 @@ mod test {
             ordered_block_store.clone(),
             block_payload_store.clone(),
             root.clone(),
-            &committed_blocks,
             committed_ledger_info.clone(),
         );
 

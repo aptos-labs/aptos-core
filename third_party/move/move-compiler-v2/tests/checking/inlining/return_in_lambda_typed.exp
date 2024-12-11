@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: Return not currently supported in function-typed arguments (lambda expressions)
+   ┌─ tests/checking/inlining/return_in_lambda_typed.move:13:13
+   │
+13 │             return adder(x, y)
+   │             ^^^^^^^^^^^^^^^^^^
+
+error: Return not currently supported in function-typed arguments (lambda expressions)
+   ┌─ tests/checking/inlining/return_in_lambda_typed.move:16:13
+   │
+16 │             return adder(x, y)
+   │             ^^^^^^^^^^^^^^^^^^
+
+error: Return not currently supported in function-typed arguments (lambda expressions)
+   ┌─ tests/checking/inlining/return_in_lambda_typed.move:19:13
+   │
+19 │             return adder(x, y)
+   │             ^^^^^^^^^^^^^^^^^^

@@ -373,7 +373,7 @@ fn type_(context: &mut Context, sp!(_, ty_): &E::Type) {
             types(context, tys);
         },
         T::Multiple(tys) => types(context, tys),
-        T::Fun(tys, ret_ty) => {
+        T::Fun(tys, ret_ty, _abilities) => {
             types(context, tys);
             type_(context, ret_ty)
         },
@@ -435,8 +435,8 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
 
         E::Unit { .. }
         | E::UnresolvedError
-        | E::Break
-        | E::Continue
+        | E::Break(_)
+        | E::Continue(_)
         | E::Spec(_, _, _)
         | E::Value(_)
         | E::Move(_)
@@ -449,6 +449,10 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
         E::Call(ma, _is_macro, tys_opt, sp!(_, args_)) => {
             module_access(context, ma);
             types_opt(context, tys_opt);
+            args_.iter().for_each(|e| exp(context, e))
+        },
+        E::ExpCall(fexp, sp!(_, args_)) => {
+            exp(context, fexp);
             args_.iter().for_each(|e| exp(context, e))
         },
         E::Pack(ma, tys_opt, fields) => {
@@ -478,7 +482,7 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
             }
         },
 
-        E::BinopExp(e1, _, e2) | E::Mutate(e1, e2) | E::While(e1, e2) | E::Index(e1, e2) => {
+        E::BinopExp(e1, _, e2) | E::Mutate(e1, e2) | E::While(_, e1, e2) | E::Index(e1, e2) => {
             exp(context, e1);
             exp(context, e2)
         },
@@ -492,7 +496,7 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
             exp(context, e);
         },
 
-        E::Loop(e)
+        E::Loop(_, e)
         | E::Return(e)
         | E::Abort(e)
         | E::Dereference(e)
@@ -512,8 +516,10 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
             tys.iter().for_each(|ty| type_(context, ty))
         },
 
-        E::Lambda(ll, e) => {
-            lvalues(context, &ll.value);
+        E::Lambda(ll, e, _capture_kind, _abilities) => {
+            use crate::expansion::ast::TypedLValue_;
+            let mapped = ll.value.iter().map(|sp!(_, TypedLValue_(lv, _opt_ty))| lv);
+            lvalues(context, mapped);
             exp(context, e)
         },
         E::Quant(_, binds, es_vec, eopt, e) => {

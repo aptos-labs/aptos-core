@@ -9,11 +9,14 @@ cargo-fuzz = true
 
 [dependencies]
 aptos-cached-packages = { workspace = true }
+aptos-consensus = { workspace = true, features = ["fuzzing"] }
+aptos-crypto = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-language-e2e-tests = { workspace = true, features = ["fuzzing"] }
-aptos-types = { workspace = true }
+aptos-types = { workspace = true, features = ["fuzzing"] }
 aptos-vm = { workspace = true }
-arbitrary = "1.3.2"
+arbitrary = { workspace = true, features = ["derive"] }
+base64 = { workspace = true }
 bcs = { workspace = true }
 libfuzzer-sys = "0.4"
 move-binary-format = { workspace = true, features = ["fuzzing"] }
@@ -22,9 +25,9 @@ move-core-types = { workspace = true, features = ["fuzzing"] }
 move-vm-types = { workspace = true, features = ["fuzzing"] }
 once_cell = { workspace = true }
 rayon = { workspace = true }
-
-[features]
-disabled = []
+ring = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 [[bin]]
 name = "move_bytecode_verifier_code_unit"
@@ -43,28 +46,24 @@ name = "move_value_deserialize"
 path = "fuzz_targets/move/value_deserialize.rs"
 test = false
 doc = false
-required-features = ["disabled"]
 
 [[bin]]
 name = "move_move_value_deserialize"
 path = "fuzz_targets/move/move_value_deserialize.rs"
 test = false
 doc = false
-required-features = ["disabled"]
 
 [[bin]]
 name = "move_move_value_decorate"
 path = "fuzz_targets/move/move_value_decorate.rs"
 test = false
 doc = false
-required-features = ["disabled"]
 
 [[bin]]
 name = "signed_transaction_deserialize"
 path = "fuzz_targets/signed_transaction_deserialize.rs"
 test = false
 doc = false
-required-features = ["disabled"]
 
 [[bin]]
 name = "move_aptosvm_publish_and_run"
@@ -75,5 +74,23 @@ doc = false
 [[bin]]
 name = "move_aptosvm_publish"
 path = "fuzz_targets/move/aptosvm_publish.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "move_aptosvm_authenticators"
+path = "fuzz_targets/move/aptosvm_authenticators.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "use_case_aware_shuffler"
+path = "fuzz_targets/use_case_aware_shuffler.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "deserialize_script_module"
+path = "fuzz_targets/move/deserialize_script_module.rs"
 test = false
 doc = false

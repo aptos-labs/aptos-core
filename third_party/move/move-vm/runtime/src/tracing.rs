@@ -6,8 +6,8 @@
 use crate::debug::DebugContext;
 #[cfg(any(debug_assertions, feature = "debugging"))]
 use crate::{
-    interpreter::Interpreter,
-    loader::{LoadedFunction, Loader},
+    interpreter::InterpreterDebugInterface,
+    loader::{LoadedFunction, Resolver},
 };
 #[cfg(any(debug_assertions, feature = "debugging"))]
 use ::{
@@ -71,8 +71,8 @@ pub(crate) fn trace(
     locals: &Locals,
     pc: u16,
     instr: &Bytecode,
-    loader: &Loader,
-    interp: &Interpreter,
+    resolver: &Resolver,
+    interpreter: &dyn InterpreterDebugInterface,
 ) {
     if *TRACING_ENABLED {
         let buf_writer = &mut *LOGGING_FILE_WRITER.lock().unwrap();
@@ -88,10 +88,14 @@ pub(crate) fn trace(
         }
     }
     if *DEBUGGING_ENABLED {
-        DEBUG_CONTEXT
-            .lock()
-            .unwrap()
-            .debug_loop(function, locals, pc, instr, loader, interp);
+        DEBUG_CONTEXT.lock().unwrap().debug_loop(
+            function,
+            locals,
+            pc,
+            instr,
+            resolver,
+            interpreter,
+        );
     }
 }
 
@@ -100,13 +104,6 @@ macro_rules! trace {
     ($function_desc:expr, $locals:expr, $pc:expr, $instr:tt, $resolver:expr, $interp:expr) => {
         // Only include this code in debug releases
         #[cfg(any(debug_assertions, feature = "debugging"))]
-        $crate::tracing::trace(
-            &$function_desc,
-            $locals,
-            $pc,
-            &$instr,
-            $resolver.loader(),
-            $interp,
-        )
+        $crate::tracing::trace(&$function_desc, $locals, $pc, &$instr, $resolver, $interp)
     };
 }

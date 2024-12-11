@@ -5,6 +5,14 @@ validator:
   rust_log: info,hyper=off
   # force enable the telemetry service to try to send telemetry
   force_enable_telemetry: true
+  config:
+    storage:
+      rocksdb_configs:
+        enable_storage_sharding: true
+    indexer_db_config:
+      enable_event: true
+  podAnnotations:
+    "cluster-autoscaler.kubernetes.io/safe-to-evict": "false"
 
 fullnode:
   # at most one VFN per validator, depending on numFullnodeGroups
@@ -16,6 +24,14 @@ fullnode:
   rust_log: info,hyper=off
   # force enable the telemetry service to try to send telemetry
   force_enable_telemetry: true
+  config:
+    storage:
+      rocksdb_configs:
+        enable_storage_sharding: true
+    indexer_db_config:
+      enable_event: true
+  podAnnotations:
+    "cluster-autoscaler.kubernetes.io/safe-to-evict": "false"
 
 service:
   validator:

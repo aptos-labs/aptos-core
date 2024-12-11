@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/struct_missing_lbrace.move:3:5
+  │
+2 │     struct S { f: u64 // }
+  │              - To match this '{'
+3 │     fun f() {}
+  │     ^ Expected '}'

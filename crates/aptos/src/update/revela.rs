@@ -54,8 +54,8 @@ impl BinaryUpdater for RevelaUpdateTool {
         self.check
     }
 
-    fn pretty_name(&self) -> &'static str {
-        "Revela"
+    fn pretty_name(&self) -> String {
+        "Revela".to_string()
     }
 
     /// Return information about whether an update is required.
@@ -115,5 +115,11 @@ impl CliCommand<String> for RevelaUpdateTool {
 }
 
 pub fn get_revela_path() -> Result<PathBuf> {
-    get_path("decompiler", REVELA_EXE_ENV, REVELA_BINARY_NAME, REVELA_EXE)
+    get_path(
+        "decompiler",
+        REVELA_EXE_ENV,
+        REVELA_BINARY_NAME,
+        REVELA_EXE,
+        false,
+    )
 }

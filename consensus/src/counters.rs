@@ -8,9 +8,9 @@ use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     quorum_store,
 };
-use aptos_consensus_types::pipelined_block::PipelinedBlock;
+use aptos_consensus_types::{block::Block, pipelined_block::PipelinedBlock};
 use aptos_crypto::HashValue;
-use aptos_executor_types::ExecutorError;
+use aptos_executor_types::{state_compute_result::StateComputeResult, ExecutorError};
 use aptos_logger::prelude::{error, warn};
 use aptos_metrics_core::{
     exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_counter,
@@ -592,6 +592,26 @@ pub static TIMEOUT_ROUNDS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the round timeout by reason and by whether the aggregator is the next proposer.
+pub static AGGREGATED_ROUND_TIMEOUT_REASON: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_agg_round_timeout_reason",
+        "Count of round timeouts by reason",
+        &["reason", "author", "is_next_proposer"],
+    )
+    .unwrap()
+});
+
+/// Count of the missing authors if any reported in the round timeout reason
+pub static AGGREGATED_ROUND_TIMEOUT_REASON_MISSING_AUTHORS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_agg_round_timeout_reason_missing_authors",
+        "Count of missing authors in round timeout reason",
+        &["author"],
+    )
+    .unwrap()
+});
+
 /// Count the number of timeouts a node experienced since last restart (close to 0 in happy path).
 /// This count is different from `TIMEOUT_ROUNDS_COUNT`, because not every time a node has
 /// a timeout there is an ultimate decision to move to the next round (it might take multiple
@@ -955,6 +975,14 @@ pub static PENDING_STATE_SYNC_NOTIFICATION: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static PENDING_COMMIT_NOTIFICATION: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_consensus_pending_commit_notification",
+        "Count of the pending commit notification"
+    )
+    .unwrap()
+});
+
 /// Count of the pending quorum store commit notification.
 pub static PENDING_QUORUM_STORE_COMMIT_NOTIFICATION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
@@ -1211,51 +1239,53 @@ pub static FETCH_COMMIT_HISTORY_DURATION: Lazy<DurationHistogram> = Lazy::new(||
     )
 });
 
+pub fn update_counters_for_block(block: &Block) {
+    observe_block(block.timestamp_usecs(), BlockStage::COMMITTED);
+    NUM_BYTES_PER_BLOCK.observe(block.payload().map_or(0, |payload| payload.size()) as f64);
+    COMMITTED_BLOCKS_COUNT.inc();
+    LAST_COMMITTED_ROUND.set(block.round() as i64);
+    let failed_rounds = block
+        .block_data()
+        .failed_authors()
+        .map(|v| v.len())
+        .unwrap_or(0);
+    if failed_rounds > 0 {
+        COMMITTED_FAILED_ROUNDS_COUNT.inc_by(failed_rounds as u64);
+    }
+    quorum_store::counters::NUM_BATCH_PER_BLOCK.observe(block.payload_size() as f64);
+}
+
+pub fn update_counters_for_compute_result(compute_result: &StateComputeResult) {
+    let txn_status = compute_result.compute_status_for_input_txns();
+    LAST_COMMITTED_VERSION.set(compute_result.last_version_or_0() as i64);
+    NUM_TXNS_PER_BLOCK.observe(txn_status.len() as f64);
+    for status in txn_status.iter() {
+        let commit_status = match status {
+            TransactionStatus::Keep(_) => TXN_COMMIT_SUCCESS_LABEL,
+            TransactionStatus::Discard(reason) => {
+                if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW {
+                    TXN_COMMIT_RETRY_LABEL
+                } else if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD {
+                    TXN_COMMIT_FAILED_DUPLICATE_LABEL
+                } else if *reason == DiscardedVMStatus::TRANSACTION_EXPIRED {
+                    TXN_COMMIT_FAILED_EXPIRED_LABEL
+                } else {
+                    TXN_COMMIT_FAILED_LABEL
+                }
+            },
+            TransactionStatus::Retry => TXN_COMMIT_RETRY_LABEL,
+        };
+        COMMITTED_TXNS_COUNT
+            .with_label_values(&[commit_status])
+            .inc();
+    }
+}
+
 /// Update various counters for committed blocks
 pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<PipelinedBlock>]) {
     for block in blocks_to_commit {
-        observe_block(block.block().timestamp_usecs(), BlockStage::COMMITTED);
-        let txn_status = block.compute_result().compute_status_for_input_txns();
-        NUM_TXNS_PER_BLOCK.observe(txn_status.len() as f64);
-        NUM_BYTES_PER_BLOCK
-            .observe(block.block().payload().map_or(0, |payload| payload.size()) as f64);
-        COMMITTED_BLOCKS_COUNT.inc();
-        LAST_COMMITTED_ROUND.set(block.round() as i64);
-        LAST_COMMITTED_VERSION.set(block.compute_result().num_leaves() as i64);
-
-        let failed_rounds = block
-            .block()
-            .block_data()
-            .failed_authors()
-            .map(|v| v.len())
-            .unwrap_or(0);
-        if failed_rounds > 0 {
-            COMMITTED_FAILED_ROUNDS_COUNT.inc_by(failed_rounds as u64);
-        }
-
-        // Quorum store metrics
-        quorum_store::counters::NUM_BATCH_PER_BLOCK.observe(block.block().payload_size() as f64);
-
-        for status in txn_status.iter() {
-            let commit_status = match status {
-                TransactionStatus::Keep(_) => TXN_COMMIT_SUCCESS_LABEL,
-                TransactionStatus::Discard(reason) => {
-                    if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW {
-                        TXN_COMMIT_RETRY_LABEL
-                    } else if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD {
-                        TXN_COMMIT_FAILED_DUPLICATE_LABEL
-                    } else if *reason == DiscardedVMStatus::TRANSACTION_EXPIRED {
-                        TXN_COMMIT_FAILED_EXPIRED_LABEL
-                    } else {
-                        TXN_COMMIT_FAILED_LABEL
-                    }
-                },
-                TransactionStatus::Retry => TXN_COMMIT_RETRY_LABEL,
-            };
-            COMMITTED_TXNS_COUNT
-                .with_label_values(&[commit_status])
-                .inc();
-        }
+        update_counters_for_block(block.block());
+        update_counters_for_compute_result(block.compute_result());
     }
 }
 
@@ -1310,4 +1340,31 @@ pub static CONSENSUS_PROPOSAL_PAYLOAD_FETCH_DURATION: Lazy<HistogramVec> = Lazy:
         &["status"]
     )
     .unwrap()
+});
+
+pub static CONSENSUS_PROPOSAL_PAYLOAD_BATCH_AVAILABILITY_IN_QS: Lazy<IntCounterVec> = Lazy::new(
+    || {
+        register_int_counter_vec!(
+            "aptos_consensus_proposal_payload_batch_availability",
+            "The number of batches in payload that are available and missing locally by batch author",
+            &["author", "is_proof", "state"]
+        )
+        .unwrap()
+    },
+);
+
+pub static OPTQS_EXCLUDE_AUTHORS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_optqs_exclude_authors",
+        "The number of times a batch author appears on the exclude list",
+        &["author"]
+    )
+    .unwrap()
+});
+
+pub static OPTQS_LAST_CONSECUTIVE_SUCCESS_COUNT: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "aptos_optqs_last_consecutive_successes",
+        "The number of last consecutive successes capped at window length",
+    )
 });

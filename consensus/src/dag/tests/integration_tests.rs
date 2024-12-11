@@ -67,10 +67,7 @@ impl DagBootstrapUnit {
         >,
         all_signers: Vec<ValidatorSigner>,
     ) -> (Self, UnboundedReceiver<OrderedBlocks>) {
-        let epoch_state = Arc::new(EpochState {
-            epoch,
-            verifier: storage.get_validator_set().into(),
-        });
+        let epoch_state = Arc::new(EpochState::new(epoch, storage.get_validator_set().into()));
         let ledger_info = generate_ledger_info_with_sig(&all_signers, storage.get_ledger_info());
         let dag_storage =
             dag_test::MockStorage::new_with_ledger_info(ledger_info, epoch_state.clone());
@@ -136,7 +133,7 @@ fn create_network(
     playground: &mut NetworkPlayground,
     id: usize,
     author: Author,
-    validators: ValidatorVerifier,
+    validators: Arc<ValidatorVerifier>,
 ) -> (
     NetworkSender,
     Box<
@@ -178,6 +175,7 @@ fn bootstrap_nodes(
     validators: ValidatorVerifier,
 ) -> (Vec<DagBootstrapUnit>, Vec<UnboundedReceiver<OrderedBlocks>>) {
     let peers_and_metadata = playground.peer_protocols();
+    let validators = Arc::new(validators);
     let (nodes, ordered_node_receivers) = signers
         .iter()
         .enumerate()
@@ -194,7 +192,7 @@ fn bootstrap_nodes(
                 .insert_connection_metadata(peer_network_id, conn_meta)
                 .unwrap();
 
-            let (_, storage) = MockStorage::start_for_testing((&validators).into());
+            let (_, storage) = MockStorage::start_for_testing((&*validators).into());
             let (network, network_events) =
                 create_network(playground, id, signer.author(), validators.clone());
 

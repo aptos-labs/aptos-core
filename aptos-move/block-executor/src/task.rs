@@ -8,13 +8,18 @@ use aptos_aggregator::{
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    delayed_fields::PanicError,
+    error::PanicError,
     fee_statement::FeeStatement,
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
     write_set::WriteOp,
 };
-use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
+use aptos_vm_environment::environment::AptosEnvironment;
+use aptos_vm_types::{
+    module_and_script_storage::code_storage::AptosCodeStorage,
+    module_write_set::ModuleWrite,
+    resolver::{ResourceGroupSize, TExecutorView, TResourceGroupView},
+};
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use std::{
     collections::{BTreeMap, HashSet},
@@ -59,13 +64,9 @@ pub trait ExecutorTask: Sync {
     /// Type of error when the executor failed to process a transaction and needs to abort.
     type Error: Debug + Clone + Send + Sync + Eq + 'static;
 
-    /// Type to initialize the single thread transaction executor. Clone and Sync are required because
-    /// we will create an instance of executor on each individual thread.
-    type Environment: Sync + Clone;
-
     /// Create an instance of the transaction executor.
     fn init(
-        env: Self::Environment,
+        environment: AptosEnvironment,
         state_view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
     ) -> Self;
 
@@ -82,7 +83,7 @@ pub trait ExecutorTask: Sync {
             GroupKey = <Self::Txn as Transaction>::Key,
             ResourceTag = <Self::Txn as Transaction>::Tag,
             Layout = MoveTypeLayout,
-        >),
+        > + AptosCodeStorage),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
@@ -107,7 +108,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     fn module_write_set(
         &self,
-    ) -> BTreeMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+    ) -> BTreeMap<<Self::Txn as Transaction>::Key, ModuleWrite<<Self::Txn as Transaction>::Value>>;
 
     fn aggregator_v1_write_set(
         &self,
@@ -144,6 +145,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
     ) -> Vec<(
         <Self::Txn as Transaction>::Key,
         <Self::Txn as Transaction>::Value,
+        ResourceGroupSize,
         BTreeMap<
             <Self::Txn as Transaction>::Tag,
             (
@@ -161,7 +163,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
     )> {
         self.resource_group_write_set()
             .into_iter()
-            .map(|(key, op, _)| (key, op))
+            .map(|(key, op, _, _)| (key, op))
             .collect()
     }
 

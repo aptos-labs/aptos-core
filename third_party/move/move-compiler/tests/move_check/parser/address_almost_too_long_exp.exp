@@ -1,0 +1,6 @@
+warning[W09003]: unused assignment
+  ┌─ tests/move_check/parser/address_almost_too_long_exp.move:4:13
+  │
+4 │         let x = @0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+  │             ^ Unused assignment or binding for local 'x'. Consider removing, replacing with '_', or prefixing with '_' (e.g., '_x')
+

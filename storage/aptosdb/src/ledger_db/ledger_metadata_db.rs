@@ -16,20 +16,12 @@ use anyhow::anyhow;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{block_info::BlockInfo, db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
-    account_config::NewBlockEvent,
-    block_info::BlockHeight,
-    contract_event::ContractEvent,
-    epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
-    state_store::state_storage_usage::StateStorageUsage,
-    transaction::{AtomicVersion, Version},
+    account_config::NewBlockEvent, block_info::BlockHeight, contract_event::ContractEvent,
+    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
+    state_store::state_storage_usage::StateStorageUsage, transaction::Version,
 };
 use arc_swap::ArcSwap;
-use std::{
-    ops::Deref,
-    path::Path,
-    sync::{atomic::Ordering, Arc},
-};
+use std::{ops::Deref, path::Path, sync::Arc};
 
 fn get_latest_ledger_info_in_db_impl(db: &DB) -> Result<Option<LedgerInfoWithSignatures>> {
     let mut iter = db.iter::<LedgerInfoSchema>()?;
@@ -45,8 +37,6 @@ pub(crate) struct LedgerMetadataDb {
     /// cache it in memory in order to avoid reading DB and deserializing the object frequently. It
     /// should be updated every time new ledger info and signatures are persisted.
     latest_ledger_info: ArcSwap<Option<LedgerInfoWithSignatures>>,
-
-    next_pre_commit_version: AtomicVersion,
 }
 
 impl LedgerMetadataDb {
@@ -54,14 +44,9 @@ impl LedgerMetadataDb {
         let latest_ledger_info = get_latest_ledger_info_in_db_impl(&db).expect("DB read failed.");
         let latest_ledger_info = ArcSwap::from(Arc::new(latest_ledger_info));
 
-        let synced_version =
-            get_progress(&db, &DbMetadataKey::OverallCommitProgress).expect("DB read failed.");
-        let next_pre_commit_version = AtomicVersion::new(synced_version.map_or(0, |v| v + 1));
-
         Self {
             db,
             latest_ledger_info,
-            next_pre_commit_version,
         }
     }
 
@@ -92,30 +77,14 @@ impl LedgerMetadataDb {
         get_progress(&self.db, &DbMetadataKey::OverallCommitProgress)
     }
 
-    pub(crate) fn get_pre_committed_version(&self) -> Option<Version> {
-        let next_version = self.next_pre_commit_version.load(Ordering::Acquire);
-        if next_version == 0 {
-            None
-        } else {
-            Some(next_version - 1)
-        }
-    }
-
-    pub(crate) fn set_pre_committed_version(&self, version: Version) {
-        self.next_pre_commit_version
-            .store(version + 1, Ordering::Release);
-    }
-
     pub(crate) fn get_ledger_commit_progress(&self) -> Result<Version> {
-        get_progress(&self.db, &DbMetadataKey::LedgerCommitProgress)?.ok_or(AptosDbError::NotFound(
-            "No LedgerCommitProgress in db.".to_string(),
-        ))
+        get_progress(&self.db, &DbMetadataKey::LedgerCommitProgress)?
+            .ok_or_else(|| AptosDbError::NotFound("No LedgerCommitProgress in db.".to_string()))
     }
 
     pub(crate) fn get_pruner_progress(&self) -> Result<Version> {
-        get_progress(&self.db, &DbMetadataKey::LedgerPrunerProgress)?.ok_or(AptosDbError::NotFound(
-            "No LedgerPrunerProgress in db.".to_string(),
-        ))
+        get_progress(&self.db, &DbMetadataKey::LedgerPrunerProgress)?
+            .ok_or_else(|| AptosDbError::NotFound("No LedgerPrunerProgress in db.".to_string()))
     }
 }
 
@@ -137,7 +106,7 @@ impl LedgerMetadataDb {
     /// Returns the latest ledger info, or NOT_FOUND if it doesn't exist.
     pub(crate) fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures> {
         self.get_latest_ledger_info_option()
-            .ok_or(AptosDbError::NotFound(String::from("Genesis LedgerInfo")))
+            .ok_or_else(|| AptosDbError::NotFound(String::from("Genesis LedgerInfo")))
     }
 
     /// Returns the latest ledger info for a given epoch.
@@ -147,9 +116,7 @@ impl LedgerMetadataDb {
     ) -> Result<LedgerInfoWithSignatures> {
         self.db
             .get::<LedgerInfoSchema>(&epoch)?
-            .ok_or(AptosDbError::NotFound(format!(
-                "Last LedgerInfo of epoch {epoch}"
-            )))
+            .ok_or_else(|| AptosDbError::NotFound(format!("Last LedgerInfo of epoch {epoch}")))
     }
 
     /// Returns an iterator that yields epoch ending ledger infos, starting from `start_epoch`, and
@@ -304,9 +271,10 @@ impl LedgerMetadataDb {
         let mut iter = self.db.iter::<BlockByVersionSchema>()?;
 
         iter.seek_for_prev(&version)?;
-        let (_, block_height) = iter.next().transpose()?.ok_or(anyhow!(
-            "Block is not found at version {version}, maybe pruned?"
-        ))?;
+        let (_, block_height) = iter
+            .next()
+            .transpose()?
+            .ok_or_else(|| anyhow!("Block is not found at version {version}, maybe pruned?"))?;
 
         Ok(block_height)
     }
@@ -320,7 +288,7 @@ impl LedgerMetadataDb {
         let (block_version, block_height) = iter
             .next()
             .transpose()?
-            .ok_or(anyhow!("Block is not found at or after version {version}"))?;
+            .ok_or_else(|| anyhow!("Block is not found at or after version {version}"))?;
 
         Ok((block_version, block_height))
     }

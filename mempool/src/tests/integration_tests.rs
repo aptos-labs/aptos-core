@@ -319,6 +319,29 @@ async fn test_rebroadcast_retry_is_empty() {
         .await;
 }
 
+#[tokio::test]
+async fn test_get_all_addresses_from_parking_lot() {
+    let mut node = MempoolTestFrameworkBuilder::single_validator();
+
+    // Add second txn. Using TXN_2 here because sequence number needs to be higher than expected
+    // to be put in parking lot
+    node.add_txns_via_client(&TXN_2).await;
+
+    // Check to make sure transaction is in parking lot
+    let addresses = node.get_parking_lot_txns_via_client().await;
+    let address = addresses.first().unwrap().0;
+    let txn_size = addresses.first().unwrap().1;
+
+    // Assert that the address matches
+    assert_eq!(
+        address.to_string(),
+        TXN_2.first().unwrap().address.to_string()
+    );
+
+    // Assert there is only one transaction for that address
+    assert_eq!(txn_size, 1);
+}
+
 // -- Multi node tests below here --
 
 /// Tests if the node is a VFN, and it's getting forwarded messages from a PFN.  It should forward

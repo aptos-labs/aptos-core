@@ -421,6 +421,10 @@ ConsensusMsg:
       OrderVoteMsg:
         NEWTYPE:
           TYPENAME: OrderVoteMsg
+    19:
+      RoundTimeoutMsg:
+        NEWTYPE:
+          TYPENAME: RoundTimeoutMsg
 ContractEvent:
   ENUM:
     0:
@@ -828,6 +832,35 @@ RawTransaction:
     - expiration_timestamp_secs: U64
     - chain_id:
         TYPENAME: ChainId
+RoundTimeout:
+  STRUCT:
+    - timeout:
+        TYPENAME: TwoChainTimeout
+    - author:
+        TYPENAME: AccountAddress
+    - reason:
+        TYPENAME: RoundTimeoutReason
+    - signature:
+        TYPENAME: Signature
+RoundTimeoutMsg:
+  STRUCT:
+    - round_timeout:
+        TYPENAME: RoundTimeout
+    - sync_info:
+        TYPENAME: SyncInfo
+RoundTimeoutReason:
+  ENUM:
+    0:
+      Unknown: UNIT
+    1:
+      ProposalNotReceived: UNIT
+    2:
+      PayloadUnavailable:
+        STRUCT:
+          - missing_authors:
+              TYPENAME: BitVec
+    3:
+      NoQC: UNIT
 Script:
   STRUCT:
     - code: BYTES

@@ -4,18 +4,18 @@ module 0x8675309::M {
         dummy_field: bool,
     }
     private fun t0(a: &signer)
-        acquires M::R(*)
+        acquires R(*)
      {
         {
-          let _: bool = exists<M::R>(0x0);
+          let _: bool = exists<R>(0x0);
           {
-            let (): () = MoveTo<M::R>(a, pack M::R(false));
+            let (): () = MoveTo<R>(a, pack M::R(false));
             {
-              let _: &M::R = BorrowGlobal(Immutable)<M::R>(0x0);
+              let _: &R = BorrowGlobal(Immutable)<R>(0x0);
               {
-                let _: &mut M::R = BorrowGlobal(Mutable)<M::R>(0x0);
+                let _: &mut R = BorrowGlobal(Mutable)<R>(0x0);
                 {
-                  let M::R{ dummy_field: _ } = MoveFrom<M::R>(0x0);
+                  let M::R{ dummy_field: _ } = MoveFrom<R>(0x0);
                   Tuple()
                 }
               }
@@ -24,18 +24,18 @@ module 0x8675309::M {
         }
     }
     private fun t1(a: &signer)
-        acquires M::R(*)
+        acquires R(*)
      {
         {
-          let _: bool = exists<M::R>(0x0);
+          let _: bool = exists<R>(0x0);
           {
-            let (): () = MoveTo<M::R>(a, pack M::R(false));
+            let (): () = MoveTo<R>(a, pack M::R(false));
             {
-              let _: &M::R = BorrowGlobal(Immutable)<M::R>(0x0);
+              let _: &R = BorrowGlobal(Immutable)<R>(0x0);
               {
-                let _: &mut M::R = BorrowGlobal(Mutable)<M::R>(0x0);
+                let _: &mut R = BorrowGlobal(Mutable)<R>(0x0);
                 {
-                  let M::R{ dummy_field: _ } = MoveFrom<M::R>(0x0);
+                  let M::R{ dummy_field: _ } = MoveFrom<R>(0x0);
                   Tuple()
                 }
               }
@@ -44,3 +44,27 @@ module 0x8675309::M {
         }
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct R has key {
+    }
+    fun t0(a: &signer)
+        acquires R
+    {
+        let _ = exists<R>(0x0);
+        let () = move_to<R>(a, R{});
+        let _ = borrow_global<R>(0x0);
+        let _ = borrow_global_mut<R>(0x0);
+        let R{} = move_from<R>(0x0);
+    }
+    fun t1(a: &signer)
+        acquires R
+    {
+        let _ = exists<R>(0x0);
+        let () = move_to<R>(a, R{});
+        let _ = borrow_global<R>(0x0);
+        let _ = borrow_global_mut<R>(0x0);
+        let R{} = move_from<R>(0x0);
+    }
+}

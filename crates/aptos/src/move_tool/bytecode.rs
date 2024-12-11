@@ -12,6 +12,10 @@ use crate::{
     update::get_revela_path,
 };
 use anyhow::Context;
+use aptos_framework::{
+    get_compilation_metadata_from_compiled_module, get_compilation_metadata_from_compiled_script,
+    get_metadata_from_compiled_module, get_metadata_from_compiled_script, RuntimeModuleMetadataV1,
+};
 use async_trait::async_trait;
 use clap::{Args, Parser};
 use itertools::Itertools;
@@ -25,10 +29,13 @@ use move_command_line_common::files::{
 use move_coverage::coverage_map::CoverageMap;
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
+use move_model::metadata::{CompilationMetadata, CompilerVersion, LanguageVersion};
+use serde::{Deserialize, Serialize};
 use std::{
     fs,
     path::{Path, PathBuf},
     process::Command,
+    str,
 };
 
 const DISASSEMBLER_EXTENSION: &str = "mv.asm";
@@ -39,7 +46,7 @@ const DECOMPILER_EXTENSION: &str = "mv.move";
 ///
 /// For example, if you want to disassemble an on-chain package `PackName` at account `0x42`:
 /// 1. Download the package with `aptos move download --account 0x42 --package PackName --bytecode`
-/// 2. Disassemble the package bytecode with `aptos disassemble --package-path PackName/bytecode_modules`
+/// 2. Disassemble the package bytecode with `aptos move disassemble --package-path PackName/bytecode_modules`
 #[derive(Debug, Parser)]
 pub struct Disassemble {
     #[clap(flatten)]
@@ -80,6 +87,11 @@ pub struct BytecodeCommand {
 
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
+
+    /// When `--bytecode-path` is set with this option,
+    /// only print out the metadata and bytecode version of the target bytecode
+    #[clap(long)]
+    pub print_metadata_only: bool,
 }
 
 /// Allows to ensure that either one of both is selected (via  the `group` attribute).
@@ -127,6 +139,13 @@ impl CliCommand<String> for Decompile {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct BytecodeMetadata {
+    aptos_metadata: Option<RuntimeModuleMetadataV1>,
+    bytecode_version: u32,
+    compilation_metadata: CompilationMetadata,
+}
+
 impl BytecodeCommand {
     async fn execute(self, command_type: BytecodeCommandType) -> CliTypedResult<String> {
         let inputs = if let Some(path) = self.input.bytecode_path.clone() {
@@ -140,6 +159,10 @@ impl BytecodeCommand {
         } else {
             unreachable!("arguments required by clap")
         };
+
+        if self.print_metadata_only && self.input.bytecode_path.is_some() {
+            return self.print_metadata(&inputs[0]);
+        }
 
         let mut report = vec![];
         let mut last_out_dir = String::new();
@@ -199,6 +222,45 @@ impl BytecodeCommand {
             1 => format!("{}/{}", last_out_dir, report[0]),
             _ => format!("{}/{{{}}}", last_out_dir, report.into_iter().join(",")),
         })
+    }
+
+    fn print_metadata(&self, bytecode_path: &Path) -> Result<String, CliError> {
+        let bytecode_bytes = read_from_file(bytecode_path)?;
+
+        let v1_metadata = CompilationMetadata {
+            unstable: false,
+            compiler_version: CompilerVersion::V1.to_string(),
+            language_version: LanguageVersion::V1.to_string(),
+        };
+        let metadata = if self.is_script {
+            let script = CompiledScript::deserialize(&bytecode_bytes)
+                .context("Script blob can't be deserialized")?;
+            if let Some(data) = get_compilation_metadata_from_compiled_script(&script) {
+                serde_json::to_string_pretty(&data).expect("expect compilation metadata")
+            } else {
+                serde_json::to_string_pretty(&v1_metadata).expect("expect compilation metadata")
+            };
+            BytecodeMetadata {
+                aptos_metadata: get_metadata_from_compiled_script(&script),
+                bytecode_version: script.version,
+                compilation_metadata: get_compilation_metadata_from_compiled_script(&script)
+                    .unwrap_or(v1_metadata),
+            }
+        } else {
+            let module = CompiledModule::deserialize(&bytecode_bytes)
+                .context("Module blob can't be deserialized")?;
+            BytecodeMetadata {
+                aptos_metadata: get_metadata_from_compiled_module(&module),
+                bytecode_version: module.version,
+                compilation_metadata: get_compilation_metadata_from_compiled_module(&module)
+                    .unwrap_or(v1_metadata),
+            }
+        };
+        println!(
+            "Metadata: {}",
+            serde_json::to_string_pretty(&metadata).expect("expect metadata")
+        );
+        Ok("ok".to_string())
     }
 
     fn disassemble(&self, bytecode_path: &Path) -> Result<String, CliError> {

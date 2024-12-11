@@ -5,79 +5,23 @@
 use crate::options::ProverOptions;
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
-    ast::{self, TempIndex},
+    ast::{self},
     exp_generator::ExpGenerator,
     model::FunctionEnv,
-    pragmas::UNROLL_PRAGMA,
     ty::{PrimitiveType, Type},
 };
 use move_stackless_bytecode::{
+    fat_loop,
+    fat_loop::{FatLoopFunctionInfo, LoopUnrollingMark},
     function_data_builder::{FunctionDataBuilder, FunctionDataBuilderOptions},
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    graph::{Graph, NaturalLoop},
-    stackless_bytecode::{AttrId, Bytecode, HavocKind, Label, Operation, PropKind},
-    stackless_control_flow_graph::{BlockContent, BlockId, StacklessControlFlowGraph},
+    stackless_bytecode::{Bytecode, HavocKind, Label, Operation, PropKind},
 };
 use std::collections::{BTreeMap, BTreeSet};
 
 const LOOP_INVARIANT_BASE_FAILED: &str = "base case of the loop invariant does not hold";
 const LOOP_INVARIANT_INDUCTION_FAILED: &str = "induction case of the loop invariant does not hold";
-
-/// A fat-loop captures the information of one or more natural loops that share the same loop
-/// header. This shared header is called the header of the fat-loop.
-///
-/// Conceptually, every back edge defines a unique natural loop and different back edges may points
-/// to the same loop header (e.g., when there are two "continue" statements in the loop body).
-///
-/// However, since these natural loops share the same loop header, they share the same loop
-/// invariants too and the fat-loop targets (i.e., variables that may be changed in any sub-loop)
-/// is the union of loop targets per each natural loop that share the header.
-#[derive(Debug, Clone)]
-pub struct FatLoop {
-    pub invariants: BTreeMap<CodeOffset, (AttrId, ast::Exp)>,
-    pub val_targets: BTreeSet<TempIndex>,
-    pub mut_targets: BTreeMap<TempIndex, bool>,
-    pub back_edges: BTreeSet<CodeOffset>,
-}
-
-/// A summary of loops *with invariants specified by developers*.
-#[derive(Debug, Clone)]
-pub struct LoopAnnotation {
-    pub fat_loops: BTreeMap<Label, FatLoop>,
-}
-
-impl LoopAnnotation {
-    fn back_edges_locations(&self) -> BTreeSet<CodeOffset> {
-        self.fat_loops
-            .values()
-            .flat_map(|l| l.back_edges.iter())
-            .copied()
-            .collect()
-    }
-
-    fn invariants_locations(&self) -> BTreeSet<CodeOffset> {
-        self.fat_loops
-            .values()
-            .flat_map(|l| l.invariants.keys())
-            .copied()
-            .collect()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct LoopUnrollingMark {
-    pub marker: Option<AttrId>,
-    pub loop_body: Vec<Vec<Bytecode>>,
-    pub back_edges: BTreeSet<CodeOffset>,
-    pub iter_count: usize,
-}
-
-/// A summary of loops *without any invariant specified*.
-#[derive(Debug, Clone)]
-pub struct LoopUnrolling {
-    pub fat_loops: BTreeMap<Label, LoopUnrollingMark>,
-}
 
 pub struct LoopAnalysisProcessor {}
 
@@ -98,14 +42,24 @@ impl FunctionTargetProcessor for LoopAnalysisProcessor {
         if func_env.is_native() {
             return data;
         }
-        let (loops_with_invariants, loops_for_unrolling) = Self::build_loop_info(func_env, &data);
-        let mut data = Self::transform(func_env, data, &loops_with_invariants);
-        for (header_label, unrolling_instruction) in loops_for_unrolling.fat_loops {
-            data = Self::unroll(func_env, data, &header_label, &unrolling_instruction);
+        match fat_loop::build_loop_info_for_spec(&FunctionTarget::new(func_env, &data)) {
+            Ok((loops_with_invariants, loops_for_unrolling)) => {
+                let mut data = Self::transform(func_env, data, &loops_with_invariants);
+                for (header_label, unrolling_instruction) in loops_for_unrolling.fat_loops {
+                    data = Self::unroll(func_env, data, &header_label, &unrolling_instruction);
+                }
+                // we have unrolled the loop into a DAG, and there will be no loop unrolling marks left
+                data.loop_unrolling.clear();
+                data
+            },
+            Err(err) => {
+                func_env.module_env.env.error(
+                    &func_env.get_loc(),
+                    &format!("loop analysis failed: {}", err),
+                );
+                data
+            },
         }
-        // we have unrolled the loop into a DAG, and there will be no loop unrolling marks left
-        data.loop_unrolling.clear();
-        data
     }
 
     fn name(&self) -> String {
@@ -133,7 +87,7 @@ impl LoopAnalysisProcessor {
     fn transform(
         func_env: &FunctionEnv<'_>,
         data: FunctionData,
-        loop_annotation: &LoopAnnotation,
+        loop_annotation: &FatLoopFunctionInfo,
     ) -> FunctionData {
         let options = ProverOptions::get(func_env.module_env.env);
 
@@ -152,7 +106,7 @@ impl LoopAnalysisProcessor {
                     builder.set_loc_from_attr(attr_id);
                     if let Some(loop_info) = loop_annotation.fat_loops.get(&label) {
                         // assert loop invariants -> this is the base case
-                        for (attr_id, exp) in loop_info.invariants.values() {
+                        for (attr_id, exp) in loop_info.spec_info().invariants.values() {
                             builder.set_loc_and_vc_info(
                                 builder.get_loc(*attr_id),
                                 LOOP_INVARIANT_BASE_FAILED,
@@ -163,7 +117,7 @@ impl LoopAnalysisProcessor {
                         }
 
                         // havoc all loop targets
-                        for idx in &loop_info.val_targets {
+                        for idx in &loop_info.spec_info().val_targets {
                             builder.emit_with(|attr_id| {
                                 Bytecode::Call(
                                     attr_id,
@@ -181,7 +135,7 @@ impl LoopAnalysisProcessor {
                             );
                             builder.emit_with(move |id| Bytecode::Prop(id, PropKind::Assume, exp));
                         }
-                        for (idx, havoc_all) in &loop_info.mut_targets {
+                        for (idx, havoc_all) in &loop_info.spec_info().mut_targets {
                             let havoc_kind = if *havoc_all {
                                 HavocKind::MutationAll
                             } else {
@@ -207,9 +161,10 @@ impl LoopAnalysisProcessor {
 
                         // trace implicitly reassigned variables after havocking
                         let affected_variables: BTreeSet<_> = loop_info
+                            .spec_info()
                             .val_targets
                             .iter()
-                            .chain(loop_info.mut_targets.keys())
+                            .chain(loop_info.spec_info().mut_targets.keys())
                             .collect();
 
                         // Only emit this for user declared locals, not for ones introduced
@@ -227,7 +182,7 @@ impl LoopAnalysisProcessor {
                             // no user declared local is havocked
                             builder.set_next_debug_comment(format!(
                                 "info: enter loop {}",
-                                match loop_info.invariants.is_empty() {
+                                match loop_info.spec_info().invariants.is_empty() {
                                     true => "",
                                     false => ", loop invariant holds at current state",
                                 }
@@ -268,7 +223,7 @@ impl LoopAnalysisProcessor {
 
                         // after showing the havocked locals and their new values, show the following message
                         if !affected_non_temporary_variables.is_empty()
-                            && !loop_info.invariants.is_empty()
+                            && !loop_info.spec_info().invariants.is_empty()
                         {
                             builder.set_next_debug_comment(
                                 "info: loop invariant holds at current state".to_string(),
@@ -281,7 +236,7 @@ impl LoopAnalysisProcessor {
                         builder.emit_with(|attr_id| Bytecode::Prop(attr_id, PropKind::Assume, exp));
 
                         // re-assume loop invariants
-                        for (attr_id, exp) in loop_info.invariants.values() {
+                        for (attr_id, exp) in loop_info.spec_info().invariants.values() {
                             builder.emit(Bytecode::Prop(*attr_id, PropKind::Assume, exp.clone()));
                         }
                     }
@@ -319,7 +274,7 @@ impl LoopAnalysisProcessor {
             builder.clear_next_debug_comment();
 
             // add instrumentations to assert loop invariants -> this is the induction case
-            for (attr_id, exp) in loop_info.invariants.values() {
+            for (attr_id, exp) in loop_info.spec_info().invariants.values() {
                 builder.set_loc_and_vc_info(
                     builder.get_loc(*attr_id),
                     LOOP_INVARIANT_INDUCTION_FAILED,
@@ -486,330 +441,5 @@ impl LoopAnalysisProcessor {
         }
 
         builder.data
-    }
-
-    /// Collect invariants in the given loop header block
-    ///
-    /// Loop invariants are defined as
-    /// 1) the longest sequence of consecutive
-    /// 2) `PropKind::Assert` propositions
-    /// 3) in the loop header block, immediately after the `Label` statement,
-    /// 4) which are also marked in the `loop_invariants` field in the `FunctionData`.
-    /// All above conditions must be met to be qualified as a loop invariant.
-    ///
-    /// The reason we piggyback on `PropKind::Assert` instead of introducing a new
-    /// `PropKind::Invariant` is that we don't want to introduce a`PropKind::Invariant` type which
-    /// only exists to be eliminated. The same logic applies for other invariants in the system
-    /// (e.g., data invariants, global invariants, etc).
-    ///
-    /// In other words, for the loop header block:
-    /// - the first statement must be a `label`,
-    /// - followed by N `assert` statements, N >= 0
-    /// - all these N `assert` statements are marked as loop invariants,
-    /// - statement N + 1 is either not an `assert` or is not marked in `loop_invariants`.
-    fn collect_loop_invariants(
-        cfg: &StacklessControlFlowGraph,
-        func_target: &FunctionTarget<'_>,
-        loop_header: BlockId,
-    ) -> BTreeMap<CodeOffset, (AttrId, ast::Exp)> {
-        let code = func_target.get_bytecode();
-        let asserts_as_invariants = &func_target.data.loop_invariants;
-
-        let mut invariants = BTreeMap::new();
-        for (index, code_offset) in cfg.instr_indexes(loop_header).unwrap().enumerate() {
-            let bytecode = &code[code_offset as usize];
-            if index == 0 {
-                assert!(matches!(bytecode, Bytecode::Label(_, _)));
-            } else {
-                match bytecode {
-                    Bytecode::Prop(attr_id, PropKind::Assert, exp)
-                        if asserts_as_invariants.contains(attr_id) =>
-                    {
-                        invariants.insert(code_offset, (*attr_id, exp.clone()));
-                    },
-                    _ => break,
-                }
-            }
-        }
-        invariants
-    }
-
-    /// Collect loop unrolling instruction in the given loop header block
-    ///
-    /// A loop unrolling instruction defined as
-    /// - an `assume true;`
-    /// - in the loop header block, immediately after the `Label` statement,
-    /// - with its `attr_id` marked in the `loop_unrolling` field in the `FunctionData`
-    fn probe_loop_unrolling_mark(
-        cfg: &StacklessControlFlowGraph,
-        func_target: &FunctionTarget<'_>,
-        loop_header: BlockId,
-    ) -> Option<(AttrId, usize)> {
-        let code = func_target.get_bytecode();
-        let assumes_as_unrolling_marks = &func_target.data.loop_unrolling;
-
-        let mut marks = BTreeMap::new();
-        for (index, code_offset) in cfg.instr_indexes(loop_header).unwrap().enumerate() {
-            let bytecode = &code[code_offset as usize];
-            if index == 0 {
-                assert!(matches!(bytecode, Bytecode::Label(_, _)));
-            } else {
-                match bytecode {
-                    Bytecode::Prop(attr_id, PropKind::Assume, _) => {
-                        match assumes_as_unrolling_marks.get(attr_id) {
-                            None => {
-                                break;
-                            },
-                            Some(count) => {
-                                marks.insert(code_offset, (*attr_id, *count));
-                            },
-                        }
-                    },
-
-                    _ => break,
-                }
-            }
-        }
-
-        // check that there is at most one unrolling mark
-        let env = func_target.global_env();
-        if marks.len() > 1 {
-            for (attr_id, _) in marks.values() {
-                env.error(
-                    &func_target.get_bytecode_loc(*attr_id),
-                    "Loop unrolling mark can only be specified once per loop",
-                );
-            }
-        }
-        marks
-            .into_iter()
-            .next()
-            .map(|(_, (attr_id, count))| (attr_id, count))
-    }
-
-    /// Collect variables that may be changed during the loop execution.
-    ///
-    /// The input to this function should include all the sub loops that constitute a fat-loop.
-    /// This function will return two sets of variables that represents, respectively,
-    /// - the set of values to be havoc-ed, and
-    /// - the set of mutations to he havoc-ed and how they should be havoc-ed.
-    fn collect_loop_targets(
-        cfg: &StacklessControlFlowGraph,
-        func_target: &FunctionTarget<'_>,
-        sub_loops: &[NaturalLoop<BlockId>],
-    ) -> (BTreeSet<TempIndex>, BTreeMap<TempIndex, bool>) {
-        let code = func_target.get_bytecode();
-        let mut val_targets = BTreeSet::new();
-        let mut mut_targets = BTreeMap::new();
-        let fat_loop_body: BTreeSet<_> = sub_loops
-            .iter()
-            .flat_map(|l| l.loop_body.iter())
-            .copied()
-            .collect();
-        for block_id in fat_loop_body {
-            for code_offset in cfg
-                .instr_indexes(block_id)
-                .expect("A loop body should never contain a dummy block")
-            {
-                let bytecode = &code[code_offset as usize];
-                let (bc_val_targets, bc_mut_targets) = bytecode.modifies(func_target);
-                val_targets.extend(bc_val_targets);
-                for (idx, is_full_havoc) in bc_mut_targets {
-                    mut_targets
-                        .entry(idx)
-                        .and_modify(|v| {
-                            *v = *v || is_full_havoc;
-                        })
-                        .or_insert(is_full_havoc);
-                }
-            }
-        }
-        (val_targets, mut_targets)
-    }
-
-    /// Collect code offsets that are branch instructions forming loop back-edges
-    ///
-    /// The input to this function should include all the sub loops that constitute a fat-loop.
-    /// This function will return one back-edge location for each sub loop.
-    fn collect_loop_back_edges(
-        code: &[Bytecode],
-        cfg: &StacklessControlFlowGraph,
-        header_label: Label,
-        sub_loops: &[NaturalLoop<BlockId>],
-    ) -> BTreeSet<CodeOffset> {
-        sub_loops
-            .iter()
-            .map(|l| {
-                let code_offset = match cfg.content(l.loop_latch) {
-                    BlockContent::Dummy => {
-                        panic!("A loop body should never contain a dummy block")
-                    },
-                    BlockContent::Basic { upper, .. } => *upper,
-                };
-                match &code[code_offset as usize] {
-                    Bytecode::Jump(_, goto_label) if *goto_label == header_label => {},
-                    Bytecode::Branch(_, if_label, else_label, _)
-                        if *if_label == header_label || *else_label == header_label => {},
-                    _ => panic!("The latch bytecode of a loop does not branch into the header"),
-                };
-                code_offset
-            })
-            .collect()
-    }
-
-    /// Collect bytecodes that constitute the loop
-    ///
-    /// The input to this function should include all the sub loops that constitute a fat-loop.
-    /// This function will return a vector of basic blocks, where each basic block is a vector
-    /// of bytecode.
-    fn collect_loop_body_bytecode(
-        code: &[Bytecode],
-        cfg: &StacklessControlFlowGraph,
-        sub_loops: &[NaturalLoop<BlockId>],
-    ) -> Vec<Vec<Bytecode>> {
-        sub_loops
-            .iter()
-            .flat_map(|l| l.loop_body.iter())
-            .map(|block_id| match cfg.content(*block_id) {
-                BlockContent::Dummy => {
-                    panic!("A loop body should never contain a dummy block")
-                },
-                BlockContent::Basic { lower, upper } => {
-                    let block: Vec<_> = (*lower..=*upper)
-                        .map(|i| code.get(i as usize).unwrap().clone())
-                        .collect();
-                    block
-                },
-            })
-            .collect()
-    }
-
-    /// Find all loops in the function and collect information needed for invariant instrumentation
-    /// (i.e., loop-to-DAG transformation) and loop unrolling (if requested by user).
-    fn build_loop_info(
-        func_env: &FunctionEnv<'_>,
-        data: &FunctionData,
-    ) -> (LoopAnnotation, LoopUnrolling) {
-        // build for natural loops
-        let func_target = FunctionTarget::new(func_env, data);
-        let env = func_target.global_env();
-        let code = func_target.get_bytecode();
-        let cfg = StacklessControlFlowGraph::new_forward(code);
-        let entry = cfg.entry_block();
-        let nodes = cfg.blocks();
-        let edges: Vec<(BlockId, BlockId)> = nodes
-            .iter()
-            .flat_map(|x| {
-                cfg.successors(*x)
-                    .iter()
-                    .map(|y| (*x, *y))
-                    .collect::<Vec<(BlockId, BlockId)>>()
-            })
-            .collect();
-        let graph = Graph::new(entry, nodes, edges);
-        let natural_loops = graph.compute_reducible().expect(
-            "A well-formed Move function is expected to have a reducible control-flow graph",
-        );
-        let unroll_pragma = func_env.get_num_pragma(UNROLL_PRAGMA);
-
-        // collect shared headers from loops
-        let mut fat_headers = BTreeMap::new();
-        for single_loop in natural_loops {
-            fat_headers
-                .entry(single_loop.loop_header)
-                .or_insert_with(Vec::new)
-                .push(single_loop);
-        }
-
-        // build fat loops by label
-        let mut fat_loops_for_unrolling = BTreeMap::new();
-        let mut fat_loops_with_invariants = BTreeMap::new();
-        for (fat_root, sub_loops) in fat_headers {
-            // get the label of the scc root
-            let label = match cfg.content(fat_root) {
-                BlockContent::Dummy => panic!("A loop header should never be a dummy block"),
-                BlockContent::Basic { lower, upper: _ } => match code[*lower as usize] {
-                    Bytecode::Label(_, label) => label,
-                    _ => panic!("A loop header block is expected to start with a Label bytecode"),
-                },
-            };
-
-            let invariants = Self::collect_loop_invariants(&cfg, &func_target, fat_root);
-            let unrolling_mark = Self::probe_loop_unrolling_mark(&cfg, &func_target, fat_root)
-                .map(|(marker, count)| (Some(marker), count))
-                .or_else(|| unroll_pragma.map(|count| (None, count)));
-            let back_edges = Self::collect_loop_back_edges(code, &cfg, label, &sub_loops);
-
-            // loop invariants and unrolling should be mutual exclusive
-            match unrolling_mark {
-                None => {
-                    // loop invariant instrumentation route
-                    let (val_targets, mut_targets) =
-                        Self::collect_loop_targets(&cfg, &func_target, &sub_loops);
-                    fat_loops_with_invariants.insert(label, FatLoop {
-                        invariants,
-                        val_targets,
-                        mut_targets,
-                        back_edges,
-                    });
-                },
-                Some((attr_id, count)) => {
-                    if !invariants.is_empty() {
-                        let error_loc = attr_id.map_or_else(
-                            || env.unknown_loc(),
-                            |attr_id| func_target.get_bytecode_loc(attr_id),
-                        );
-                        env.error(
-                            &error_loc,
-                            "loop invariants and loop unrolling is mutual exclusive",
-                        );
-                    }
-                    // loop unrolling route
-                    let loop_body = Self::collect_loop_body_bytecode(code, &cfg, &sub_loops);
-                    fat_loops_for_unrolling.insert(label, LoopUnrollingMark {
-                        marker: attr_id,
-                        loop_body,
-                        back_edges,
-                        iter_count: count,
-                    });
-                },
-            }
-        }
-
-        // check for redundant loop invariant declarations in the spec
-        let all_invariants: BTreeSet<_> = fat_loops_with_invariants
-            .values()
-            .flat_map(|l| l.invariants.values().map(|(attr_id, _)| *attr_id))
-            .collect();
-        for attr_id in data.loop_invariants.difference(&all_invariants) {
-            env.error(
-                &func_target.get_bytecode_loc(*attr_id),
-                "Loop invariants must be declared at the beginning of the loop header in a \
-                consecutive sequence",
-            );
-        }
-
-        // check for redundant loop unrolling marks in the spe
-        let all_unrolling_marks: BTreeSet<_> = fat_loops_for_unrolling
-            .values()
-            .filter_map(|l| l.marker)
-            .collect();
-        let declared_unrolling_marks: BTreeSet<_> = data.loop_unrolling.keys().copied().collect();
-        for attr_id in declared_unrolling_marks.difference(&all_unrolling_marks) {
-            env.error(
-                &func_target.get_bytecode_loc(*attr_id),
-                "Loop unrolling mark must be declared at the beginning of the loop header",
-            );
-        }
-
-        // done with information collection
-        (
-            LoopAnnotation {
-                fat_loops: fat_loops_with_invariants,
-            },
-            LoopUnrolling {
-                fat_loops: fat_loops_for_unrolling,
-            },
-        )
     }
 }

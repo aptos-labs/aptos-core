@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{experiments::Experiment, Options};
 use codespan_reporting::diagnostic::Severity;
 use ethnum::U256;
 use itertools::Itertools;
@@ -324,6 +325,14 @@ impl<'env> Generator<'env> {
         let loc = env.get_node_loc(id);
         env.diag(severity, &loc, msg.as_ref())
     }
+
+    fn check_if_lambdas_enabled(&self) -> bool {
+        let options = self
+            .env()
+            .get_extension::<Options>()
+            .expect("Options is available");
+        options.experiment_on(Experiment::LAMBDA_VALUES)
+    }
 }
 
 // ======================================================================================
@@ -406,9 +415,12 @@ impl<'env> Generator<'env> {
                         ),
                     );
                 }
-                self.emit_call(*id, targets, BytecodeOperation::WriteRef, vec![
-                    lhs_temp, rhs_temp,
-                ])
+                self.emit_call(
+                    *id,
+                    targets,
+                    BytecodeOperation::WriteRef,
+                    vec![lhs_temp, rhs_temp],
+                )
             },
             ExpData::Assign(id, lhs, rhs) => self.gen_assign(*id, lhs, rhs, None),
             ExpData::Return(id, exp) => {
@@ -447,11 +459,11 @@ impl<'env> Generator<'env> {
                 self.emit_with(*id, |attr| Bytecode::Jump(attr, continue_label));
                 self.emit_with(*id, |attr| Bytecode::Label(attr, break_label));
             },
-            ExpData::LoopCont(id, do_continue) => {
+            ExpData::LoopCont(id, nest, do_continue) => {
                 if let Some(LoopContext {
                     continue_label,
                     break_label,
-                }) = self.loops.last()
+                }) = self.loops.iter().rev().nth(*nest)
                 {
                     let target = if *do_continue {
                         *continue_label
@@ -476,9 +488,25 @@ impl<'env> Generator<'env> {
                     .rewrite_spec_descent(&SpecBlockTarget::Inline, spec);
                 self.emit_with(*id, |attr| Bytecode::SpecBlock(attr, spec));
             },
-            ExpData::Invoke(id, _, _) | ExpData::Lambda(id, _, _) => {
-                self.internal_error(*id, format!("not yet implemented: {:?}", exp))
-            },
+            // TODO(LAMBDA)
+            ExpData::Lambda(id, _, _, _, _) =>
+                self.error(
+                *id,
+                if self.check_if_lambdas_enabled() {
+                    "Function-typed values not yet implemented except as parameters to calls to inline functions"
+                } else {
+                    "Function-typed values not yet supported except as parameters to calls to inline functions"
+                }
+            ),
+            // TODO(LAMBDA)
+            ExpData::Invoke(id, _exp, _) => self.error(
+                *id,
+                if self.check_if_lambdas_enabled() {
+                    "Calls to function values other than inline function parameters not yet implemented"
+                } else {
+                    "Calls to function values other than inline function parameters not yet supported"
+                }
+            ),
             ExpData::Quant(id, _, _, _, _, _) => {
                 self.internal_error(*id, "unsupported specification construct")
             },
@@ -553,6 +581,18 @@ impl<'env> Generator<'env> {
                     self.internal_error(id, format!("inconsistent vector type: {:?}", ty));
                     Constant::Bool(false)
                 }
+            },
+            // TODO(LAMBDA)
+            Value::Function(_mid, _fid) => {
+                self.error(
+                    id,
+                    if self.check_if_lambdas_enabled() {
+                        "Function-typed values not yet implemented except as parameters to calls to inline functions"
+                    } else {
+                        "Function-typed values not yet supported except as parameters to calls to inline functions"
+                    }
+                );
+                Constant::Bool(false)
             },
         }
     }
@@ -775,6 +815,15 @@ impl<'env> Generator<'env> {
             Operation::MoveFunction(m, f) => {
                 self.gen_function_call(targets, id, m.qualified(*f), args)
             },
+            // TODO(LAMBDA)
+            Operation::EarlyBind => self.error(
+                id,
+                if self.check_if_lambdas_enabled() {
+                    "Function-typed values not yet implemented except as parameters to calls to inline functions"
+                } else {
+                    "Function-typed values not yet supported except as parameters to calls to inline functions"
+                },
+            ),
             Operation::TestVariants(mid, sid, variants) => {
                 self.gen_test_variants(targets, id, mid.qualified(*sid), variants, args)
             },
@@ -802,8 +851,6 @@ impl<'env> Generator<'env> {
             Operation::Not => self.gen_op_call(targets, id, BytecodeOperation::Not, args),
 
             Operation::NoOp => {}, // do nothing
-
-            Operation::Closure(..) => self.internal_error(id, "closure not yet implemented"),
 
             // Non-supported specification related operations
             Operation::Exists(Some(_))

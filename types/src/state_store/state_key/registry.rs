@@ -152,12 +152,12 @@ where
         let mut locked = self.inner.write();
         if let Some(map2) = locked.get_mut(key1) {
             if let Some(entry) = map2.get(key2) {
-                if entry.upgrade().is_none() {
+                if entry.strong_count() == 0 {
                     map2.remove(key2);
+                    if map2.is_empty() {
+                        locked.remove(key1);
+                    }
                 }
-            }
-            if map2.is_empty() {
-                locked.remove(key1);
             }
         }
     }

@@ -5,6 +5,7 @@
 mod bytecode_generator;
 pub mod env_pipeline;
 mod experiments;
+pub mod external_checks;
 mod file_format_generator;
 pub mod lint_common;
 pub mod logging;
@@ -39,7 +40,6 @@ use crate::{
         variable_coalescing::VariableCoalescing,
     },
 };
-use anyhow::bail;
 use codespan_reporting::{
     diagnostic::Severity,
     term::termcolor::{ColorChoice, StandardStream, WriteColor},
@@ -453,6 +453,12 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
 
     if options.experiment_on(Experiment::CFG_SIMPLIFICATION) {
         pipeline.add_processor(Box::new(ControlFlowGraphSimplifier {}));
+        if options.experiment_on(Experiment::SPLIT_CRITICAL_EDGES) {
+            // Currently, CFG simplification can again introduce critical edges, so
+            // remove them. Notice that absence of critical edges is (theoretical) relevant
+            // for the livevar processor, which is used frequently below.
+            pipeline.add_processor(Box::new(SplitCriticalEdgesProcessor {}));
+        }
     }
 
     if options.experiment_on(Experiment::DEAD_CODE_ELIMINATION) {
@@ -570,7 +576,10 @@ fn report_bytecode_verification_error(
         let debug_info = if command_line::get_move_compiler_backtrace_from_env() {
             format!("\n{:#?}", e)
         } else {
-            "".to_string()
+            format!(
+                "\nError message: {}",
+                e.message().cloned().unwrap_or_else(|| "none".to_string())
+            )
         };
         env.diag(
             Severity::Bug,
@@ -596,21 +605,13 @@ fn get_vm_error_loc(env: &GlobalEnv, source_map: &SourceMap, e: &VMError) -> Opt
 }
 
 /// Report any diags in the env to the writer and fail if there are errors.
-pub fn check_errors<W>(
-    env: &GlobalEnv,
-    error_writer: &mut W,
-    msg: &'static str,
-) -> anyhow::Result<()>
+pub fn check_errors<W>(env: &GlobalEnv, error_writer: &mut W, msg: &str) -> anyhow::Result<()>
 where
     W: WriteColor + Write,
 {
     let options = env.get_extension::<Options>().unwrap_or_default();
     env.report_diag(error_writer, options.report_severity());
-    if env.has_errors() {
-        bail!("exiting with {}", msg);
-    } else {
-        Ok(())
-    }
+    env.check_diag(error_writer, options.report_severity(), msg)
 }
 
 /// Annotate the given compiled units.

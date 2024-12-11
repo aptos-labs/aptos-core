@@ -61,7 +61,7 @@ pub fn generate_upgrade_proposals(
     // For generating multi-step proposal files, we need to generate them in the reverse order since
     // we need the hash of the next script.
     // We will reverse the order back when writing the files into a directory.
-    if next_execution_hash.is_some() {
+    if is_multi_step {
         package_path_list.reverse();
     }
 

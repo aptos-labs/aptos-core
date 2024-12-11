@@ -1,9 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::metrics::CONCURRENCY_GAUGE;
 use aptos_metrics_core::IntGaugeHelper;
 use aptos_storage_interface::block_info::BlockInfo;
-use crate::metrics::CONCURRENCY_GAUGE;
 
 impl AptosDB {
     fn new_with_dbs(
@@ -44,8 +44,11 @@ impl AptosDB {
             internal_indexer_db.clone(),
         ));
 
-        let ledger_pruner =
-            LedgerPrunerManager::new(Arc::clone(&ledger_db), pruner_config.ledger_pruner_config, internal_indexer_db);
+        let ledger_pruner = LedgerPrunerManager::new(
+            Arc::clone(&ledger_db),
+            pruner_config.ledger_pruner_config,
+            internal_indexer_db,
+        );
 
         AptosDB {
             ledger_db: Arc::clone(&ledger_db),
@@ -63,6 +66,7 @@ impl AptosDB {
             commit_lock: std::sync::Mutex::new(()),
             indexer: None,
             skip_index_and_usage,
+            update_subscriber: None,
         }
     }
 
@@ -125,7 +129,7 @@ impl AptosDB {
         );
 
         if indexer.next_version() < ledger_next_version {
-            use aptos_storage_interface::state_view::DbStateViewAtVersion;
+            use aptos_storage_interface::state_store::state_view::db_state_view::DbStateViewAtVersion;
             let db: Arc<dyn DbReader> = self.state_store.clone();
 
             let state_view = db.state_view_at_version(Some(ledger_next_version - 1))?;
@@ -246,9 +250,9 @@ impl AptosDB {
                 .ledger_db
                 .metadata_db()
                 .get_block_info(block_height)?
-                .ok_or(AptosDbError::NotFound(format!(
-                    "BlockInfo not found at height {block_height}"
-                )))?)
+                .ok_or_else(|| {
+                    AptosDbError::NotFound(format!("BlockInfo not found at height {block_height}"))
+                })?)
         }
     }
 

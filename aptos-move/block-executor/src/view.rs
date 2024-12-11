@@ -8,6 +8,7 @@ use crate::{
         CapturedReads, DataRead, DelayedFieldRead, DelayedFieldReadKind, GroupRead, ReadKind,
         UnsyncReadSet,
     },
+    code_cache_global::GlobalModuleCache,
     counters,
     scheduler::{DependencyResult, DependencyStatus, Scheduler, TWaitForDependency},
     value_exchange::{
@@ -19,10 +20,7 @@ use aptos_aggregator::{
     delta_change_set::serialize,
     delta_math::DeltaHistory,
     resolver::{TAggregatorV1View, TDelayedFieldView},
-    types::{
-        code_invariant_error, expect_ok, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
-        ReadPosition,
-    },
+    types::{DelayedFieldValue, DelayedFieldsSpeculativeError, ReadPosition},
 };
 use aptos_logger::error;
 use aptos_mvhashmap::{
@@ -36,15 +34,16 @@ use aptos_mvhashmap::{
     MVHashMap,
 };
 use aptos_types::{
-    delayed_fields::PanicError,
+    error::{code_invariant_error, expect_ok, PanicError, PanicOr},
     executable::{Executable, ModulePath},
     state_store::{
-        errors::StateviewError,
+        errors::StateViewError,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
         StateViewId, TStateView,
     },
     transaction::BlockExecutableTransaction as Transaction,
+    vm::modules::AptosModuleExtension,
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
@@ -53,8 +52,12 @@ use aptos_vm_types::resolver::{
 };
 use bytes::Bytes;
 use claims::assert_ok;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
+use move_binary_format::{
+    errors::{PartialVMError, PartialVMResult},
+    CompiledModule,
+};
+use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_status::StatusCode};
+use move_vm_runtime::{Module, RuntimeEnvironment};
 use move_vm_types::{
     delayed_values::delayed_field_id::ExtractUniqueIndex,
     value_serde::{
@@ -143,7 +146,11 @@ trait ResourceState<T: Transaction> {
 }
 
 trait ResourceGroupState<T: Transaction> {
-    fn set_raw_group_base_values(&self, group_key: T::Key, base_values: Vec<(T::Tag, T::Value)>);
+    fn set_raw_group_base_values(
+        &self,
+        group_key: T::Key,
+        base_values: Vec<(T::Tag, T::Value)>,
+    ) -> PartialVMResult<()>;
 
     fn read_cached_group_tagged_data(
         &self,
@@ -160,11 +167,14 @@ pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
     scheduler: &'a Scheduler,
     start_counter: u32,
     counter: &'a AtomicU32,
-    captured_reads: RefCell<CapturedReads<T>>,
+    pub(crate) captured_reads:
+        RefCell<CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>>,
 }
 
 fn get_delayed_field_value_impl<T: Transaction>(
-    captured_reads: &RefCell<CapturedReads<T>>,
+    captured_reads: &RefCell<
+        CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>,
+    >,
     versioned_delayed_fields: &dyn TVersionedDelayedFieldView<T::Identifier>,
     wait_for: &dyn TWaitForDependency,
     id: &T::Identifier,
@@ -302,7 +312,9 @@ fn compute_delayed_field_try_add_delta_outcome_first_time(
 // TODO[agg_v2](cleanup): see about the split with CapturedReads,
 // and whether anything should be moved there.
 fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
-    captured_reads: &RefCell<CapturedReads<T>>,
+    captured_reads: &RefCell<
+        CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>,
+    >,
     versioned_delayed_fields: &dyn TVersionedDelayedFieldView<T::Identifier>,
     wait_for: &dyn TWaitForDependency,
     id: &T::Identifier,
@@ -362,8 +374,8 @@ fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
                 .into());
             }
 
-            let last_committed_value = loop {
-                match versioned_delayed_fields.read_latest_committed_value(
+            let predicted_value = loop {
+                match versioned_delayed_fields.read_latest_predicted_value(
                     id,
                     txn_idx,
                     ReadPosition::BeforeCurrentTxn,
@@ -388,7 +400,7 @@ fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
                 compute_delayed_field_try_add_delta_outcome_first_time(
                     delta,
                     max_value,
-                    last_committed_value,
+                    predicted_value,
                 )?;
 
             captured_reads
@@ -459,19 +471,22 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
             .set_base_value(id, base_value)
     }
 
-    // TODO: Actually fill in the logic to record fetched executables, etc.
+    #[deprecated]
     fn fetch_module(
         &self,
         key: &T::Key,
         txn_idx: TxnIndex,
     ) -> anyhow::Result<MVModulesOutput<T::Value, X>, MVModulesError> {
         // Record for the R/W path intersection fallback for modules.
+        #[allow(deprecated)]
         self.captured_reads
             .borrow_mut()
-            .module_reads
+            .deprecated_module_reads
             .push(key.clone());
-
-        self.versioned_map.modules().fetch_module(key, txn_idx)
+        #[allow(deprecated)]
+        self.versioned_map
+            .deprecated_modules()
+            .fetch_module(key, txn_idx)
     }
 
     fn read_group_size(
@@ -514,9 +529,6 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
                         )
                         .with_message("Interrupted as block execution was halted".to_string()));
                     }
-                },
-                Err(TagSerializationError(e)) => {
-                    return Err(e);
                 },
             }
         }
@@ -643,7 +655,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
                             ));
                         },
                         Ok(false) => {
-                            self.captured_reads.borrow_mut().mark_failure();
+                            self.captured_reads.borrow_mut().mark_failure(false);
                             return ReadResult::HaltSpeculativeExecution(
                                 "Interrupted as block execution was halted".to_string(),
                             );
@@ -655,7 +667,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
                 },
                 Err(DeltaApplicationFailure) => {
                     // AggregatorV1 may have delta application failure due to speculation.
-                    self.captured_reads.borrow_mut().mark_failure();
+                    self.captured_reads.borrow_mut().mark_failure(false);
                     return ReadResult::HaltSpeculativeExecution(
                         "Delta application failure (must be speculative)".to_string(),
                     );
@@ -666,10 +678,19 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
 }
 
 impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<'a, T, X> {
-    fn set_raw_group_base_values(&self, group_key: T::Key, base_values: Vec<(T::Tag, T::Value)>) {
+    fn set_raw_group_base_values(
+        &self,
+        group_key: T::Key,
+        base_values: Vec<(T::Tag, T::Value)>,
+    ) -> PartialVMResult<()> {
         self.versioned_map
             .group_data()
-            .set_raw_base_values(group_key.clone(), base_values);
+            .set_raw_base_values(group_key.clone(), base_values)
+            .map_err(|e| {
+                self.captured_reads.borrow_mut().mark_incorrect_use();
+                PartialVMError::new(StatusCode::UNEXPECTED_DESERIALIZATION_ERROR)
+                    .with_message(e.to_string())
+            })
     }
 
     fn read_cached_group_tagged_data(
@@ -760,25 +781,23 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
                         .with_message("Interrupted as block execution was halted".to_string()));
                     }
                 },
-                Err(TagSerializationError(_)) => {
-                    unreachable!("Reading a resource does not require tag serialization");
-                },
             }
         }
     }
 }
 
-pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
-    pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-    pub(crate) read_set: RefCell<UnsyncReadSet<T>>,
+pub(crate) struct SequentialState<'a, T: Transaction> {
+    pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, T::Identifier>,
+    pub(crate) read_set: RefCell<UnsyncReadSet<T, ModuleId>>,
     pub(crate) start_counter: u32,
     pub(crate) counter: &'a RefCell<u32>,
+    // TODO: Move to UnsyncMap.
     pub(crate) incorrect_use: RefCell<bool>,
 }
 
-impl<'a, T: Transaction, X: Executable> SequentialState<'a, T, X> {
+impl<'a, T: Transaction> SequentialState<'a, T> {
     pub fn new(
-        unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, T::Identifier>,
         start_counter: u32,
         counter: &'a RefCell<u32>,
     ) -> Self {
@@ -800,7 +819,7 @@ impl<'a, T: Transaction, X: Executable> SequentialState<'a, T, X> {
     }
 }
 
-impl<'a, T: Transaction, X: Executable> ResourceState<T> for SequentialState<'a, T, X> {
+impl<'a, T: Transaction> ResourceState<T> for SequentialState<'a, T> {
     fn set_base_value(&self, key: T::Key, value: ValueWithLayout<T::Value>) {
         self.unsync_map.set_base_value(key, value);
     }
@@ -869,10 +888,19 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for SequentialState<'a,
     }
 }
 
-impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for SequentialState<'a, T, X> {
-    fn set_raw_group_base_values(&self, group_key: T::Key, base_values: Vec<(T::Tag, T::Value)>) {
+impl<'a, T: Transaction> ResourceGroupState<T> for SequentialState<'a, T> {
+    fn set_raw_group_base_values(
+        &self,
+        group_key: T::Key,
+        base_values: Vec<(T::Tag, T::Value)>,
+    ) -> PartialVMResult<()> {
         self.unsync_map
-            .set_group_base_values(group_key.clone(), base_values);
+            .set_group_base_values(group_key.clone(), base_values)
+            .map_err(|e| {
+                *self.incorrect_use.borrow_mut() = true;
+                PartialVMError::new(StatusCode::UNEXPECTED_DESERIALIZATION_ERROR)
+                    .with_message(e.to_string())
+            })
     }
 
     fn read_cached_group_tagged_data(
@@ -936,7 +964,7 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for SequentialStat
 
 pub(crate) enum ViewState<'a, T: Transaction, X: Executable> {
     Sync(ParallelState<'a, T, X>),
-    Unsync(SequentialState<'a, T, X>),
+    Unsync(SequentialState<'a, T>),
 }
 
 impl<'a, T: Transaction, X: Executable> ViewState<'a, T, X> {
@@ -962,18 +990,30 @@ impl<'a, T: Transaction, X: Executable> ViewState<'a, T, X> {
 /// must be set according to the latest transaction that the worker was / is executing.
 pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> {
     base_view: &'a S,
+    pub(crate) global_module_cache:
+        &'a GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+    pub(crate) runtime_environment: &'a RuntimeEnvironment,
     pub(crate) latest_view: ViewState<'a, T, X>,
-    txn_idx: TxnIndex,
+    pub(crate) txn_idx: TxnIndex,
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
     pub(crate) fn new(
         base_view: &'a S,
+        global_module_cache: &'a GlobalModuleCache<
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >,
+        runtime_environment: &'a RuntimeEnvironment,
         latest_view: ViewState<'a, T, X>,
         txn_idx: TxnIndex,
     ) -> Self {
         Self {
             base_view,
+            global_module_cache,
+            runtime_environment,
             latest_view,
             txn_idx,
         }
@@ -988,7 +1028,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     }
 
     /// Drains the parallel captured reads.
-    pub(crate) fn take_parallel_reads(&self) -> CapturedReads<T> {
+    pub(crate) fn take_parallel_reads(
+        &self,
+    ) -> CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension> {
         match &self.latest_view {
             ViewState::Sync(state) => state.captured_reads.take(),
             ViewState::Unsync(_) => {
@@ -998,7 +1040,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     }
 
     /// Drains the unsync read set.
-    pub(crate) fn take_sequential_reads(&self) -> UnsyncReadSet<T> {
+    pub(crate) fn take_sequential_reads(&self) -> UnsyncReadSet<T, ModuleId> {
         match &self.latest_view {
             ViewState::Sync(_) => {
                 unreachable!("Take unsync reads called in parallel setting")
@@ -1016,12 +1058,19 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
     pub fn is_incorrect_use(&self) -> bool {
         match &self.latest_view {
-            ViewState::Sync(state) => state.captured_reads.borrow().is_incorrect_use(),
+            ViewState::Sync(_) => {
+                // Parallel executor accesses captured reads directly and does not use this API.
+                true
+            },
+            // TODO: store incorrect use in UnsyncMap and eliminate this API.
             ViewState::Unsync(state) => *state.incorrect_use.borrow(),
         }
     }
 
-    fn get_raw_base_value(&self, state_key: &T::Key) -> PartialVMResult<Option<StateValue>> {
+    pub(crate) fn get_raw_base_value(
+        &self,
+        state_key: &T::Key,
+    ) -> PartialVMResult<Option<StateValue>> {
         let ret = self.base_view.get_state_value(state_key).map_err(|e| {
             PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
                 "Unexpected storage error for {:?}: {:?}",
@@ -1064,7 +1113,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         );
                         self.mark_incorrect_use();
                         return Err(PartialVMError::new(
-                            StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
+                            StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR,
                         )
                         .with_message(format!("{}", err)));
                     },
@@ -1131,7 +1180,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     fn get_reads_needing_exchange_sequential(
         &self,
         read_set: &HashSet<T::Key>,
-        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, T::Identifier>,
         delayed_write_set_ids: &HashSet<T::Identifier>,
         skip: &HashSet<T::Key>,
     ) -> Result<BTreeMap<T::Key, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>, PanicError> {
@@ -1228,7 +1277,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     fn get_group_reads_needing_exchange_sequential(
         &self,
         group_read_set: &HashMap<T::Key, HashSet<T::Tag>>,
-        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, T::Identifier>,
         delayed_write_set_ids: &HashSet<T::Identifier>,
         skip: &HashSet<T::Key>,
     ) -> PartialVMResult<BTreeMap<T::Key, (StateValueMetadata, u64)>> {
@@ -1260,7 +1309,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         return Ok(None);
                     }
                     match self.get_resource_state_value_metadata(key)? {
-                        Some(metadata) => match unsync_map.get_group_size(key)? {
+                        Some(metadata) => match unsync_map.get_group_size(key) {
                             GroupReadResult::Size(group_size) => {
                                 Ok(Some((key.clone(), (metadata, group_size.get()))))
                             },
@@ -1355,7 +1404,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                     bcs::from_bytes(state_value.bytes()).map_err(|e| {
                         PartialVMError::new(StatusCode::UNEXPECTED_DESERIALIZATION_ERROR)
                             .with_message(format!(
-                                "Failed to deserialize the resource group at {:? }: {:?}",
+                                "Failed to deserialize the resource group at {:?}: {:?}",
                                 group_key, e
                             ))
                     })?,
@@ -1375,7 +1424,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
         self.latest_view
             .get_resource_group_state()
-            .set_raw_group_base_values(group_key.clone(), base_group_sentinel_ops);
+            .set_raw_group_base_values(group_key.clone(), base_group_sentinel_ops)?;
         self.latest_view.get_resource_state().set_base_value(
             group_key.clone(),
             ValueWithLayout::RawFromStorage(Arc::new(metadata_op)),
@@ -1442,7 +1491,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
     ) -> PartialVMResult<ResourceGroupSize> {
         let mut group_read = match &self.latest_view {
             ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx)?,
-            ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key)?,
+            ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key),
         };
 
         if matches!(group_read, GroupReadResult::Uninitialized) {
@@ -1450,7 +1499,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
 
             group_read = match &self.latest_view {
                 ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx)?,
-                ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key)?,
+                ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key),
             }
         };
 
@@ -1492,22 +1541,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         Ok(group_read.into_value().0)
     }
 
-    fn resource_size_in_group(
-        &self,
-        _group_key: &Self::GroupKey,
-        _resource_tag: &Self::ResourceTag,
-    ) -> PartialVMResult<usize> {
-        unimplemented!("Currently resolved by ResourceGroupAdapter");
-    }
-
-    fn resource_exists_in_group(
-        &self,
-        _group_key: &Self::GroupKey,
-        _resource_tag: &Self::ResourceTag,
-    ) -> PartialVMResult<bool> {
-        unimplemented!("Currently resolved by ResourceGroupAdapter");
-    }
-
     fn release_group_cache(
         &self,
     ) -> Option<HashMap<Self::GroupKey, BTreeMap<Self::ResourceTag, Bytes>>> {
@@ -1534,11 +1567,27 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
             state_key,
         );
 
+        // Enforce feature gating V2 loader implementation: TModuleView is no longer used in
+        // V2 interfaces because we implement storage traits directly. Use a debug assert to
+        // panic in tests, adn invariant violation for non-debug builds.
+        if self.runtime_environment.vm_config().use_loader_v2 {
+            let msg =
+                "ModuleView trait should not be used when loader V2 implementation is enabled"
+                    .to_string();
+            let err = Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(msg),
+            );
+            debug_assert!(err.is_ok());
+            return err;
+        }
+
         match &self.latest_view {
             ViewState::Sync(state) => {
                 use MVModulesError::*;
                 use MVModulesOutput::*;
 
+                #[allow(deprecated)]
                 match state.fetch_module(state_key, self.txn_idx) {
                     Ok(Executable(_)) => unreachable!("Versioned executable not implemented"),
                     Ok(Module((v, _))) => Ok(v.as_state_value()),
@@ -1551,15 +1600,20 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
                 }
             },
             ViewState::Unsync(state) => {
+                #[allow(deprecated)]
                 state
                     .read_set
                     .borrow_mut()
-                    .module_reads
+                    .deprecated_module_reads
                     .insert(state_key.clone());
-                state.unsync_map.fetch_module_data(state_key).map_or_else(
-                    || self.get_raw_base_value(state_key),
-                    |v| Ok(v.as_state_value()),
-                )
+                #[allow(deprecated)]
+                state
+                    .unsync_map
+                    .fetch_module_for_loader_v1(state_key)
+                    .map_or_else(
+                        || self.get_raw_base_value(state_key),
+                        |v| Ok(v.as_state_value()),
+                    )
             },
         }
     }
@@ -1568,11 +1622,18 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorageView
     for LatestView<'a, T, S, X>
 {
+    type Key = T::Key;
+
     fn id(&self) -> StateViewId {
         self.base_view.id()
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
+    fn read_state_value(&self, state_key: &Self::Key) -> Result<(), StateViewError> {
+        self.base_view.get_state_value(state_key)?;
+        Ok(())
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
         self.base_view.get_usage()
     }
 }
@@ -1759,7 +1820,7 @@ mod test {
     use aptos_aggregator::{
         bounded_math::{BoundedMath, SignedU128},
         delta_math::DeltaHistory,
-        types::{DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr, ReadPosition},
+        types::{DelayedFieldValue, DelayedFieldsSpeculativeError, ReadPosition},
     };
     use aptos_mvhashmap::{
         types::{MVDelayedFieldsError, TxnIndex},
@@ -1768,11 +1829,9 @@ mod test {
         MVHashMap,
     };
     use aptos_types::{
+        error::PanicOr,
         executable::Executable,
-        state_store::{
-            errors::StateviewError, state_storage_usage::StateStorageUsage,
-            state_value::StateValue, TStateView,
-        },
+        state_store::{state_value::StateValue, MockStateView},
         transaction::BlockExecutableTransaction,
         write_set::TransactionWrite,
     };
@@ -1813,7 +1872,7 @@ mod test {
                 .ok_or(PanicOr::Or(MVDelayedFieldsError::NotFound))
         }
 
-        fn read_latest_committed_value(
+        fn read_latest_predicted_value(
             &self,
             id: &DelayedFieldID,
             _current_txn_idx: TxnIndex,
@@ -1856,7 +1915,13 @@ mod test {
     #[test]
     fn test_history_updates() {
         let mut view = FakeVersionedDelayedFieldView::default();
-        let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
+        let captured_reads = RefCell::new(CapturedReads::<
+            TestTransactionType,
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >::new());
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -1995,7 +2060,13 @@ mod test {
     #[test]
     fn test_aggregator_overflows() {
         let mut view = FakeVersionedDelayedFieldView::default();
-        let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
+        let captured_reads = RefCell::new(CapturedReads::<
+            TestTransactionType,
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >::new());
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -2134,7 +2205,13 @@ mod test {
     #[test]
     fn test_aggregator_underflows() {
         let mut view = FakeVersionedDelayedFieldView::default();
-        let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
+        let captured_reads = RefCell::new(CapturedReads::<
+            TestTransactionType,
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >::new());
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -2273,7 +2350,13 @@ mod test {
     #[test]
     fn test_read_kind_upgrade_fail() {
         let mut view = FakeVersionedDelayedFieldView::default();
-        let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
+        let captured_reads = RefCell::new(CapturedReads::<
+            TestTransactionType,
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >::new());
         let wait_for = FakeWaitForDependency();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
@@ -2399,33 +2482,6 @@ mod test {
         StateValue::new_legacy(value.simple_serialize(layout).unwrap().into())
     }
 
-    // TODO: Check how to import MockStateView from other tests
-    // rather than rewriting it here again
-    struct MockStateView {
-        data: HashMap<KeyType<u32>, StateValue>,
-    }
-
-    impl MockStateView {
-        fn new(data: HashMap<KeyType<u32>, StateValue>) -> Self {
-            Self { data }
-        }
-    }
-
-    impl TStateView for MockStateView {
-        type Key = KeyType<u32>;
-
-        fn get_state_value(
-            &self,
-            state_key: &Self::Key,
-        ) -> Result<Option<StateValue>, StateviewError> {
-            Ok(self.data.get(state_key).cloned())
-        }
-
-        fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
-            unimplemented!();
-        }
-    }
-
     #[derive(Clone)]
     struct MockExecutable {}
 
@@ -2439,13 +2495,19 @@ mod test {
     fn test_id_value_exchange() {
         let unsync_map = UnsyncMap::new();
         let counter = RefCell::new(5);
-        let base_view = MockStateView::new(HashMap::new());
+        let base_view = MockStateView::empty();
         let start_counter = 5;
-        let latest_view = LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
-            &base_view,
-            ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
-            1,
-        );
+        let runtime_environment = RuntimeEnvironment::new(vec![]);
+        let global_module_cache = GlobalModuleCache::empty();
+
+        let latest_view =
+            LatestView::<TestTransactionType, MockStateView<KeyType<u32>>, MockExecutable>::new(
+                &base_view,
+                &global_module_cache,
+                &runtime_environment,
+                ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
+                1,
+            );
 
         // Test id -- value exchange for a value that does not contain delayed fields
         let layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![
@@ -2702,9 +2764,12 @@ mod test {
     }
 
     struct Holder {
-        unsync_map: UnsyncMap<KeyType<u32>, u32, ValueType, MockExecutable, DelayedFieldID>,
+        unsync_map: UnsyncMap<KeyType<u32>, u32, ValueType, DelayedFieldID>,
         counter: RefCell<u32>,
-        base_view: MockStateView,
+        base_view: MockStateView<KeyType<u32>>,
+        empty_global_module_cache:
+            GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+        runtime_environment: RuntimeEnvironment,
     }
 
     impl Holder {
@@ -2712,22 +2777,27 @@ mod test {
             let unsync_map = UnsyncMap::new();
             let counter = RefCell::new(start_counter);
             let base_view = MockStateView::new(data);
+            let runtime_environment = RuntimeEnvironment::new(vec![]);
             Self {
                 unsync_map,
                 counter,
                 base_view,
+                empty_global_module_cache: GlobalModuleCache::empty(),
+                runtime_environment,
             }
         }
     }
 
     fn create_sequential_latest_view<'a>(
         h: &'a Holder,
-    ) -> LatestView<'a, TestTransactionType, MockStateView, MockExecutable> {
-        let sequential_state: SequentialState<'a, TestTransactionType, MockExecutable> =
+    ) -> LatestView<'a, TestTransactionType, MockStateView<KeyType<u32>>, MockExecutable> {
+        let sequential_state: SequentialState<'a, TestTransactionType> =
             SequentialState::new(&h.unsync_map, *h.counter.borrow(), &h.counter);
 
-        LatestView::<'a, TestTransactionType, MockStateView, MockExecutable>::new(
+        LatestView::<'a, TestTransactionType, MockStateView<KeyType<u32>>, MockExecutable>::new(
             &h.base_view,
+            &h.empty_global_module_cache,
+            &h.runtime_environment,
             ViewState::Unsync(sequential_state),
             1,
         )
@@ -2737,7 +2807,8 @@ mod test {
         start_counter: u32,
         holder: Holder,
         counter: AtomicU32,
-        base_view: MockStateView,
+        base_view: MockStateView<KeyType<u32>>,
+        runtime_environment: RuntimeEnvironment,
         versioned_map: MVHashMap<KeyType<u32>, u32, ValueType, MockExecutable, DelayedFieldID>,
         scheduler: Scheduler,
     }
@@ -2749,12 +2820,14 @@ mod test {
             let base_view = MockStateView::new(data);
             let versioned_map = MVHashMap::new();
             let scheduler = Scheduler::new(30);
+            let runtime_environment = RuntimeEnvironment::new(vec![]);
 
             Self {
                 start_counter,
                 holder,
                 counter,
                 base_view,
+                runtime_environment,
                 versioned_map,
                 scheduler,
             }
@@ -2762,17 +2835,22 @@ mod test {
 
         fn new_view(&self) -> ViewsComparison<'_> {
             let latest_view_seq = create_sequential_latest_view(&self.holder);
-            let latest_view_par =
-                LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
-                    &self.base_view,
-                    ViewState::Sync(ParallelState::new(
-                        &self.versioned_map,
-                        &self.scheduler,
-                        self.start_counter,
-                        &self.counter,
-                    )),
-                    1,
-                );
+            let latest_view_par = LatestView::<
+                TestTransactionType,
+                MockStateView<KeyType<u32>>,
+                MockExecutable,
+            >::new(
+                &self.base_view,
+                &self.holder.empty_global_module_cache,
+                &self.runtime_environment,
+                ViewState::Sync(ParallelState::new(
+                    &self.versioned_map,
+                    &self.scheduler,
+                    self.start_counter,
+                    &self.counter,
+                )),
+                1,
+            );
 
             ViewsComparison {
                 latest_view_seq,
@@ -2782,8 +2860,10 @@ mod test {
     }
 
     struct ViewsComparison<'a> {
-        latest_view_seq: LatestView<'a, TestTransactionType, MockStateView, MockExecutable>,
-        latest_view_par: LatestView<'a, TestTransactionType, MockStateView, MockExecutable>,
+        latest_view_seq:
+            LatestView<'a, TestTransactionType, MockStateView<KeyType<u32>>, MockExecutable>,
+        latest_view_par:
+            LatestView<'a, TestTransactionType, MockStateView<KeyType<u32>>, MockExecutable>,
     }
 
     impl<'a> ViewsComparison<'a> {

@@ -97,8 +97,6 @@ impl<'a> BoundsChecker<'a> {
         self.check_function_instantiations()?;
         self.check_field_instantiations()?;
         self.check_struct_defs()?;
-        self.check_function_defs()?;
-        // Since bytecode version 7
         self.check_table(
             self.view.variant_field_handles(),
             Self::check_variant_field_handle,
@@ -115,6 +113,7 @@ impl<'a> BoundsChecker<'a> {
             self.view.struct_variant_instantiations(),
             Self::check_struct_variant_instantiation,
         )?;
+        self.check_function_defs()?;
         Ok(())
     }
 
@@ -272,6 +271,13 @@ impl<'a> BoundsChecker<'a> {
 
     fn check_variant_field_handle(&self, field_handle: &VariantFieldHandle) -> PartialVMResult<()> {
         check_bounds_impl_opt(&self.view.struct_defs(), field_handle.struct_index)?;
+        if field_handle.variants.is_empty() {
+            return Err(verification_error(
+                StatusCode::ZERO_VARIANTS_ERROR,
+                IndexKind::MemberCount,
+                field_handle.field,
+            ));
+        }
         let struct_def = self.view.struct_def_at(field_handle.struct_index)?;
         for variant in &field_handle.variants {
             Self::check_variant_index(struct_def, *variant)?;

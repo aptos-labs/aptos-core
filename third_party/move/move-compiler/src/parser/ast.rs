@@ -487,8 +487,8 @@ pub enum Type_ {
     // &t
     // &mut t
     Ref(bool, Box<Type>),
-    // (t1,...,tn):t
-    Fun(Vec<Type>, Box<Type>),
+    // |t1,...,tn|t with store+copy
+    Fun(Vec<Type>, Box<Type>, Vec<Ability>),
     // ()
     Unit,
     // (t1, t2, ... , tn)
@@ -502,6 +502,7 @@ pub type Type = Spanned<Type_>;
 //**************************************************************************************************
 
 new_name!(Var);
+new_name!(Label);
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Bind_ {
@@ -522,6 +523,13 @@ pub enum Bind_ {
 pub type Bind = Spanned<Bind_>;
 // b1, ..., bn
 pub type BindList = Spanned<Vec<Bind>>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypedBind_(pub Bind, pub Option<Type>);
+pub type TypedBind = Spanned<TypedBind_>;
+
+// b1 [":" <Type>], ..., bn [":" <Type>]
+pub type TypedBindList = Spanned<Vec<TypedBind>>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BindFieldOrDotDot_ {
@@ -637,6 +645,31 @@ pub enum CallKind {
     Receiver,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Copy, Default)]
+pub enum LambdaCaptureKind {
+    /// Direct use (e.g., inlining)
+    #[default]
+    Default,
+    /// Copy
+    Copy,
+    /// Move
+    Move,
+}
+
+impl fmt::Display for LambdaCaptureKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            LambdaCaptureKind::Default => {
+                write!(f, "")
+            },
+            LambdaCaptureKind::Copy => {
+                write!(f, "copy")
+            },
+            LambdaCaptureKind::Move => write!(f, "move"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 #[allow(clippy::large_enum_variant)]
 pub enum Exp_ {
@@ -658,6 +691,9 @@ pub enum Exp_ {
         Spanned<Vec<Exp>>,
     ),
 
+    // e(earg,* [..]?)
+    ExpCall(Box<Exp>, Spanned<Vec<Exp>>),
+
     // tn {f1: e1, ... , f_n: e_n }
     Pack(NameAccessChain, Option<Vec<Type>>, Vec<(Field, Exp)>),
 
@@ -671,17 +707,17 @@ pub enum Exp_ {
 
     // if (eb) et else ef
     IfElse(Box<Exp>, Box<Exp>, Option<Box<Exp>>),
-    // while (eb) eloop
-    While(Box<Exp>, Box<Exp>),
-    // loop eloop
-    Loop(Box<Exp>),
+    // [label] while (eb) eloop
+    While(Option<Label>, Box<Exp>, Box<Exp>),
+    // [label] loop eloop
+    Loop(Option<Label>, Box<Exp>),
     // match (e) { b1 [ if c_1] => e1, ... }
     Match(Box<Exp>, Vec<Spanned<(BindList, Option<Exp>, Exp)>>),
 
     // { seq }
     Block(Sequence),
-    // |x1, ..., xn| e
-    Lambda(BindList, Box<Exp>), // spec only
+    // | x1 [: t1], ..., xn [: tn] | e [ with <abilities> ]
+    Lambda(TypedBindList, Box<Exp>, LambdaCaptureKind, Vec<Ability>),
     // forall/exists x1 : e1, ..., xn [{ t1, .., tk } *] [where cond]: en.
     Quant(
         QuantKind,
@@ -695,17 +731,17 @@ pub enum Exp_ {
     // ()
     Unit,
 
-    // a = e
-    Assign(Box<Exp>, Box<Exp>),
+    // a [binop]= e
+    Assign(Box<Exp>, Option<BinOp>, Box<Exp>),
 
     // return e
     Return(Option<Box<Exp>>),
     // abort e
     Abort(Box<Exp>),
     // break
-    Break,
+    Break(Option<Label>),
     // continue
-    Continue,
+    Continue(Option<Label>),
 
     // *e
     Dereference(Box<Exp>),
@@ -1725,11 +1761,12 @@ impl AstDebug for Type_ {
                 }
                 s.ast_debug(w)
             },
-            Type_::Fun(args, result) => {
+            Type_::Fun(args, result, abilities) => {
                 w.write("(");
                 w.comma(args, |w, ty| ty.ast_debug(w));
                 w.write("):");
                 result.ast_debug(w);
+                ability_constraints_ast_debug(w, abilities);
             },
         }
     }
@@ -1780,6 +1817,7 @@ impl AstDebug for SequenceItem_ {
                 w.write("let ");
                 bs.ast_debug(w);
                 if let Some(ty) = ty_opt {
+                    w.write(":");
                     ty.ast_debug(w)
                 }
             },
@@ -1787,6 +1825,7 @@ impl AstDebug for SequenceItem_ {
                 w.write("let ");
                 bs.ast_debug(w);
                 if let Some(ty) = ty_opt {
+                    w.write(":");
                     ty.ast_debug(w)
                 }
                 w.write(" = ");
@@ -1820,6 +1859,12 @@ impl AstDebug for Exp_ {
                     ss.ast_debug(w);
                     w.write(">");
                 }
+                w.write("(");
+                w.comma(rhs, |w, e| e.ast_debug(w));
+                w.write(")");
+            },
+            E::ExpCall(arg, sp!(_, rhs)) => {
+                arg.ast_debug(w);
                 w.write("(");
                 w.comma(rhs, |w, e| e.ast_debug(w));
                 w.write(")");
@@ -1873,22 +1918,38 @@ impl AstDebug for Exp_ {
                     arm.value.2.ast_debug(w)
                 }
             },
-            E::While(b, e) => {
+            E::While(l, b, e) => {
+                if let Some(l) = l {
+                    w.write(&format!("{}: ", l.value().as_str()))
+                }
                 w.write("while (");
                 b.ast_debug(w);
                 w.write(")");
                 e.ast_debug(w);
             },
-            E::Loop(e) => {
+            E::Loop(l, e) => {
+                if let Some(l) = l {
+                    w.write(&format!("{}: ", l.value().as_str()))
+                }
                 w.write("loop ");
                 e.ast_debug(w);
             },
             E::Block(seq) => w.block(|w| seq.ast_debug(w)),
-            E::Lambda(sp!(_, bs), e) => {
+            E::Lambda(sp!(_, tbs), e, capture_kind, abilities) => {
+                if *capture_kind != LambdaCaptureKind::Default {
+                    w.write(format!("{} ", capture_kind));
+                }
                 w.write("|");
-                bs.ast_debug(w);
+                tbs.ast_debug(w);
                 w.write("|");
                 e.ast_debug(w);
+                if !abilities.is_empty() {
+                    w.write(" with ");
+                    w.list(abilities, ", ", |w, ab_mod| {
+                        ab_mod.ast_debug(w);
+                        false
+                    });
+                }
             },
             E::Quant(kind, sp!(_, rs), trs, c_opt, e) => {
                 kind.ast_debug(w);
@@ -1907,9 +1968,13 @@ impl AstDebug for Exp_ {
                 w.comma(es, |w, e| e.ast_debug(w));
                 w.write(")");
             },
-            E::Assign(lvalue, rhs) => {
+            E::Assign(lvalue, op_opt, rhs) => {
                 lvalue.ast_debug(w);
-                w.write(" = ");
+                w.write(" ");
+                if let Some(op) = op_opt {
+                    op.ast_debug(w);
+                }
+                w.write("= ");
                 rhs.ast_debug(w);
             },
             E::Return(e) => {
@@ -1923,8 +1988,18 @@ impl AstDebug for Exp_ {
                 w.write("abort ");
                 e.ast_debug(w);
             },
-            E::Break => w.write("break"),
-            E::Continue => w.write("continue"),
+            E::Break(l) => {
+                w.write("break");
+                if let Some(l) = l {
+                    w.write(format!(" {}", l.value().as_str()));
+                }
+            },
+            E::Continue(l) => {
+                w.write("continue");
+                if let Some(l) = l {
+                    w.write(format!(" {}", l.value().as_str()));
+                }
+            },
             E::Dereference(e) => {
                 w.write("*");
                 e.ast_debug(w)
@@ -2124,6 +2199,23 @@ impl AstDebug for Bind_ {
                 w.comma(args, |w, b| b.ast_debug(w));
                 w.write(")");
             },
+        }
+    }
+}
+
+impl AstDebug for Vec<TypedBind> {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        w.comma(self, |w, b| b.ast_debug(w));
+    }
+}
+
+impl AstDebug for TypedBind_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        let TypedBind_(b, ty_opt) = self;
+        b.ast_debug(w);
+        if let Some(ty) = ty_opt {
+            w.write(":");
+            ty.ast_debug(w)
         }
     }
 }

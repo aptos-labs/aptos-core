@@ -8,7 +8,7 @@ error: function does not abort under this condition
    =     at tests/sources/functional/bv_aborts.move:11: assert_with_spec
    =         x = <redacted>
    =     at tests/sources/functional/bv_aborts.move:12: assert_with_spec
-   =     at tests/sources/functional/bv_aborts.move:13: assert_with_spec
+   =     at tests/sources/functional/bv_aborts.move:11: assert_with_spec
    =     at tests/sources/functional/bv_aborts.move:16: assert_with_spec (spec)
 
 error: abort not covered by any of the `aborts_if` clauses

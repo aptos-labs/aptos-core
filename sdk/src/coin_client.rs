@@ -17,6 +17,7 @@ use crate::{
     },
 };
 use anyhow::{Context, Result};
+use aptos_types::transaction::SignedTransaction;
 use std::{
     str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
@@ -39,6 +40,25 @@ impl<'a> CoinClient<'a> {
         amount: u64,
         options: Option<TransferOptions<'_>>,
     ) -> Result<PendingTransaction> {
+        let signed_txn = self
+            .get_signed_transfer_txn(from_account, to_account, amount, options)
+            .await?;
+        Ok(self
+            .api_client
+            .submit(&signed_txn)
+            .await
+            .context("Failed to submit transfer transaction")?
+            .into_inner())
+        // <:!:section_1
+    }
+
+    pub async fn get_signed_transfer_txn(
+        &self,
+        from_account: &mut LocalAccount,
+        to_account: AccountAddress,
+        amount: u64,
+        options: Option<TransferOptions<'_>>,
+    ) -> Result<SignedTransaction> {
         let options = options.unwrap_or_default();
 
         // :!:>section_1
@@ -51,8 +71,11 @@ impl<'a> CoinClient<'a> {
             .chain_id;
         let transaction_builder = TransactionBuilder::new(
             TransactionPayload::EntryFunction(EntryFunction::new(
-                ModuleId::new(AccountAddress::ONE, Identifier::new("coin").unwrap()),
-                Identifier::new("transfer").unwrap(),
+                ModuleId::new(
+                    AccountAddress::ONE,
+                    Identifier::new("aptos_account").unwrap(),
+                ),
+                Identifier::new("transfer_coins").unwrap(),
                 vec![TypeTag::from_str(options.coin_type).unwrap()],
                 vec![
                     bcs::to_bytes(&to_account).unwrap(),
@@ -71,22 +94,16 @@ impl<'a> CoinClient<'a> {
         .max_gas_amount(options.max_gas_amount)
         .gas_unit_price(options.gas_unit_price);
         let signed_txn = from_account.sign_with_transaction_builder(transaction_builder);
-        Ok(self
-            .api_client
-            .submit(&signed_txn)
-            .await
-            .context("Failed to submit transfer transaction")?
-            .into_inner())
-        // <:!:section_1
+        Ok(signed_txn)
     }
 
     pub async fn get_account_balance(&self, account: &AccountAddress) -> Result<u64> {
         let response = self
             .api_client
-            .get_account_balance(*account)
+            .view_apt_account_balance(*account)
             .await
             .context("Failed to get account balance")?;
-        Ok(response.inner().get())
+        Ok(response.into_inner())
     }
 }
 

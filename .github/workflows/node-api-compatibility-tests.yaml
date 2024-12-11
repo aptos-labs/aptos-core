@@ -48,7 +48,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         if: ${{ !inputs.SKIP_JOB }}
         with:
           ref: ${{ env.GIT_SHA }}
@@ -108,21 +108,4 @@ jobs:
           git diff --no-index --ignore-space-at-eol --ignore-blank-lines ${{ runner.temp }}/specs/spec.json api/doc/spec.json
         if: ${{ !inputs.SKIP_JOB }}
 
-      # Run package install. If install fails, it probably means the lockfile
-      # was not included in the commit.
-      - run: cd ./ecosystem/typescript/sdk && pnpm install --frozen-lockfile
-        if: ${{ !inputs.SKIP_JOB }}
-
-      # Ensure any changes to the generated client were checked in.
-      - run: cd ./ecosystem/typescript/sdk && pnpm generate-client -o /tmp/generated_client
-        if: ${{ !inputs.SKIP_JOB }}
-
-      - run:
-          echo "If this step fails, run the following command locally to fix it:"
-          echo "cd ecosystem/typescript/sdk && pnpm generate-client"
-          git diff --no-index --ignore-space-at-eol --ignore-blank-lines ./ecosystem/typescript/sdk/src/generated/ /tmp/generated_client/
-        if: ${{ !inputs.SKIP_JOB }}
-
-      # Print out whether the job was skipped.
-      - run: echo "Skipping node API compatibility tests!"
-        if: ${{ inputs.SKIP_JOB }}
+      # TODO: Need to use the other SDKs here to verify correctness

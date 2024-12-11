@@ -110,7 +110,7 @@ impl BroadcastStatus<JWKConsensusMsg> for Arc<ObservationAggregationState> {
         if power_check_result.is_err() {
             return Ok(None);
         }
-        let multi_sig = self.epoch_state.verifier.aggregate_signatures(&partial_sigs).map_err(|e|anyhow!("adding peer observation failed with partial-to-aggregated conversion error: {e}"))?;
+        let multi_sig = self.epoch_state.verifier.aggregate_signatures(partial_sigs.signatures_iter()).map_err(|e|anyhow!("adding peer observation failed with partial-to-aggregated conversion error: {e}"))?;
 
         Ok(Some(QuorumCertifiedUpdate {
             update: peer_view,

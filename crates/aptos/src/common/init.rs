@@ -1,15 +1,20 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::types::FaucetOptions;
 use crate::{
     account::key_rotation::lookup_address,
     common::{
         types::{
-            account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
-            ConfigSearchMode, EncodingOptions, HardwareWalletOptions, PrivateKeyInputOptions,
-            ProfileConfig, ProfileOptions, PromptOptions, RngArgs, DEFAULT_PROFILE,
+            account_address_from_public_key, get_mint_site_url, CliCommand, CliConfig, CliError,
+            CliTypedResult, ConfigSearchMode, EncodingOptions, HardwareWalletOptions,
+            PrivateKeyInputOptions, ProfileConfig, ProfileOptions, PromptOptions, RngArgs,
+            DEFAULT_PROFILE,
         },
-        utils::{explorer_account_link, fund_account, prompt_yes_with_override, read_line},
+        utils::{
+            explorer_account_link, fund_account, prompt_yes_with_override, read_line,
+            strip_private_key_prefix,
+        },
     },
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
@@ -46,14 +51,8 @@ pub struct InitTool {
     #[clap(long)]
     pub rest_url: Option<Url>,
 
-    /// URL for the Faucet endpoint
-    #[clap(long)]
-    pub faucet_url: Option<Url>,
-
-    /// Auth token, if we're using the faucet. This is only used this time, we don't
-    /// store it.
-    #[clap(long, env)]
-    pub faucet_auth_token: Option<String>,
+    #[clap(flatten)]
+    pub faucet_options: FaucetOptions,
 
     /// Whether to skip the faucet for a non-faucet endpoint
     #[clap(long)]
@@ -126,6 +125,19 @@ impl CliCommand<()> for InitTool {
             }
         };
 
+        if network != Network::Custom {
+            if self.rest_url.is_some() {
+                return Err(CliError::CommandArgumentError(
+                    "--rest-url can only be used with --network custom".to_string(),
+                ));
+            }
+            if self.faucet_options.faucet_url.is_some() {
+                return Err(CliError::CommandArgumentError(
+                    "--faucet-url can only be used with --network custom".to_string(),
+                ));
+            }
+        }
+
         // Ensure the config contains the network used
         profile_config.network = Some(network);
 
@@ -139,8 +151,12 @@ impl CliCommand<()> for InitTool {
             Network::Testnet => {
                 profile_config.rest_url =
                     Some("https://fullnode.testnet.aptoslabs.com".to_string());
-                profile_config.faucet_url =
-                    Some("https://faucet.testnet.aptoslabs.com".to_string());
+                // The faucet in testnet is only accessible with some kind of bypass.
+                // For regular users this can only really mean an auth token. So if
+                // there is no auth token set, we don't set the faucet URL. If the user
+                // is confident they want to use the testnet faucet without a token
+                // they can set it manually with `--network custom` and `--faucet-url`.
+                profile_config.faucet_url = None;
             },
             Network::Devnet => {
                 profile_config.rest_url = Some("https://fullnode.devnet.aptoslabs.com".to_string());
@@ -218,7 +234,8 @@ impl CliCommand<()> for InitTool {
                             .generate_ed25519_private_key()
                     }
                 } else {
-                    Ed25519PrivateKey::from_encoded_string(input).map_err(|err| {
+                    let stripped = strip_private_key_prefix(&input.to_string())?;
+                    Ed25519PrivateKey::from_encoded_string(&stripped).map_err(|err| {
                         CliError::UnableToParse("Ed25519PrivateKey", err.to_string())
                     })?
                 }
@@ -231,9 +248,9 @@ impl CliCommand<()> for InitTool {
         let public_key = if self.is_hardware_wallet() {
             let pub_key = match aptos_ledger::get_public_key(
                 derivation_path
-                    .ok_or(CliError::UnexpectedError(
-                        "Invalid derivation path".to_string(),
-                    ))?
+                    .ok_or_else(|| {
+                        CliError::UnexpectedError("Invalid derivation path".to_string())
+                    })?
                     .as_str(),
                 false,
             ) {
@@ -319,7 +336,7 @@ impl CliCommand<()> for InitTool {
                     client,
                     Url::parse(faucet_url)
                         .map_err(|err| CliError::UnableToParse("rest_url", err.to_string()))?,
-                    self.faucet_auth_token.as_deref(),
+                    self.faucet_options.faucet_auth_token.as_deref(),
                     address,
                     NUM_DEFAULT_OCTAS,
                 )
@@ -327,9 +344,9 @@ impl CliCommand<()> for InitTool {
                 eprintln!("Account {} funded successfully", address);
             }
         } else if account_exists {
-            eprintln!("Account {} has been already found onchain", address);
-        } else if network == Network::Mainnet {
-            eprintln!("Account {} does not exist, you will need to create and fund the account by transferring funds from another account", address);
+            eprintln!("Account {} has been already found on chain", address);
+        } else if network == Network::Mainnet || network == Network::Testnet {
+            // Do nothing, we print information later.
         } else {
             eprintln!("Account {} has been initialized locally, but you must transfer coins to it to create the account onchain", address);
         }
@@ -344,16 +361,42 @@ impl CliCommand<()> for InitTool {
             .expect("Must have profiles, as created above")
             .insert(profile_name.to_string(), profile_config);
         config.save()?;
+
         let profile_name = self
             .profile_options
             .profile_name()
             .unwrap_or(DEFAULT_PROFILE);
+
         eprintln!(
-            "\n---\nAptos CLI is now set up for account {} as profile {}!\n See the account here: {}\n Run `aptos --help` for more information about commands",
-            address,
-            profile_name,
-            explorer_account_link(address, Some(network))
+            "\n---\nAptos CLI is now set up for account {} as profile {}!\n---\n",
+            address, profile_name,
         );
+
+        match network {
+            Network::Mainnet => {
+                eprintln!("The account has not been created on chain yet, you will need to create and fund the account by transferring funds from another account");
+            },
+            Network::Testnet => {
+                let mint_site_url = get_mint_site_url(Some(address));
+                eprintln!("The account has not been created on chain yet. To create the account and get APT on testnet you must visit {}", mint_site_url);
+                // We don't use `prompt_yes_with_override` here because we only want to
+                // automatically open the minting site if they're in an interactive setting.
+                if !self.prompt_options.assume_yes {
+                    eprint!("Press [Enter] to go there now > ");
+                    read_line("Confirmation")?;
+                    open::that(&mint_site_url).map_err(|err| {
+                        CliError::UnexpectedError(format!("Failed to open minting site: {}", err))
+                    })?;
+                }
+            },
+            wildcard => {
+                eprintln!(
+                    "See the account here: {}",
+                    explorer_account_link(address, Some(wildcard))
+                );
+            },
+        }
+
         Ok(())
     }
 }
@@ -395,7 +438,7 @@ impl InitTool {
         let faucet_url = if self.skip_faucet {
             eprintln!("Not configuring a faucet because --skip-faucet was provided");
             None
-        } else if let Some(ref faucet_url) = self.faucet_url {
+        } else if let Some(ref faucet_url) = self.faucet_options.faucet_url {
             eprintln!("Using command line argument for faucet URL {}", faucet_url);
             Some(faucet_url.to_string())
         } else {

@@ -6,4 +6,4 @@ version = "0.0.0"
 bcs_stream = "0xCAFE"
 
 [dependencies]
-AptosStdlib = { local = "../../framework/aptos-stdlib" }
+AptosStdlib = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-stdlib", rev = "mainnet" }

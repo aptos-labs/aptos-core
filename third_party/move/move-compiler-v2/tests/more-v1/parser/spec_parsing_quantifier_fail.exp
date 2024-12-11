@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/spec_parsing_quantifier_fail.move:3:33
+  │
+3 │         invariant forall x: num y: num : x == y;
+  │                                 ^
+  │                                 │
+  │                                 Unexpected 'y'
+  │                                 Expected ':'

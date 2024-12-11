@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    jwks::jwk::JWKMoveStruct,
+    jwks::jwk::{JWKMoveStruct, JWK},
     move_any::{Any as MoveAny, AsMoveAny},
     move_utils::as_move_value::AsMoveValue,
 };
@@ -35,4 +35,11 @@ pub struct PatchUpsertJWK {
 
 impl AsMoveAny for PatchUpsertJWK {
     const MOVE_TYPE_NAME: &'static str = "0x1::jwks::PatchUpsertJWK";
+}
+
+/// A variant representation used in genesis layout.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct IssuerJWK {
+    pub issuer: String,
+    pub jwk: JWK,
 }

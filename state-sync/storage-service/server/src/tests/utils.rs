@@ -102,7 +102,10 @@ pub fn create_data_chunks_with_epoch_boundary(
 pub fn create_epoch_ending_ledger_info(epoch: u64, version: u64) -> LedgerInfoWithSignatures {
     // Create a new epoch state
     let verifier = ValidatorVerifier::from(&ValidatorSet::empty());
-    let next_epoch_state = EpochState { epoch, verifier };
+    let next_epoch_state = EpochState {
+        epoch,
+        verifier: verifier.into(),
+    };
 
     // Create a mock ledger info with signatures
     let ledger_info = LedgerInfo::new(

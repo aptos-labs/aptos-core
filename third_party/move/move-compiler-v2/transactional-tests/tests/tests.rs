@@ -27,7 +27,9 @@ struct TestConfig {
     name: &'static str,
     runner: fn(&Path) -> datatest_stable::Result<()>,
     experiments: &'static [(&'static str, bool)],
-    language_version: LanguageVersion,
+    /// Run the tests with language version 1 (if true),
+    /// or with latest language version (if false).
+    is_lang_v1: bool,
     /// Path substrings for tests to include. If empty, all tests are included.
     include: &'static [&'static str],
     /// Path substrings for tests to exclude (applied after the include filter).
@@ -44,7 +46,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
             (Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, true),
             (Experiment::ACQUIRES_CHECK, false),
         ],
-        language_version: LanguageVersion::V2_0,
+        is_lang_v1: false,
         include: &[], // all tests except those excluded below
         exclude: &["/operator_eval/"],
     },
@@ -55,7 +57,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
             (Experiment::OPTIMIZE, false),
             (Experiment::ACQUIRES_CHECK, false),
         ],
-        language_version: LanguageVersion::V2_0,
+        is_lang_v1: false,
         include: &[], // all tests except those excluded below
         exclude: &["/operator_eval/"],
     },
@@ -68,7 +70,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
             (Experiment::AST_SIMPLIFY, false),
             (Experiment::ACQUIRES_CHECK, false),
         ],
-        language_version: LanguageVersion::V2_0,
+        is_lang_v1: false,
         include: &[], // all tests except those excluded below
         exclude: &["/operator_eval/"],
     },
@@ -76,7 +78,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         name: "operator-eval-lang-1",
         runner: |p| run(p, get_config_by_name("operator-eval-lang-1")),
         experiments: &[(Experiment::OPTIMIZE, true)],
-        language_version: LanguageVersion::V1,
+        is_lang_v1: true,
         include: &["/operator_eval/"],
         exclude: &[],
     },
@@ -84,7 +86,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         name: "operator-eval-lang-2",
         runner: |p| run(p, get_config_by_name("operator-eval-lang-2")),
         experiments: &[(Experiment::OPTIMIZE, true)],
-        language_version: LanguageVersion::V2_0,
+        is_lang_v1: false,
         include: &["/operator_eval/"],
         exclude: &[],
     },
@@ -134,7 +136,11 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         // Enable access control file format generation for those tests
         v2_experiments.push((Experiment::GEN_ACCESS_SPECIFIERS.to_string(), true))
     }
-    let language_version = config.language_version;
+    let language_version = if config.is_lang_v1 {
+        LanguageVersion::V1
+    } else {
+        LanguageVersion::latest_stable()
+    };
     let vm_test_config = if p.contains(SKIP_V1_COMPARISON_PATH) || move_test_debug() {
         TestRunConfig::CompilerV2 {
             language_version,

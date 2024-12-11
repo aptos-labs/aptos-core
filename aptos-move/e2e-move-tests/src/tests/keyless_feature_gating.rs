@@ -10,8 +10,9 @@ use aptos_types::{
     jwks::{rsa::RSA_JWK, secure_test_rsa_jwk},
     keyless::{
         test_utils::{
-            get_groth16_sig_and_pk_for_upgraded_vk, get_sample_esk, get_sample_groth16_sig_and_pk,
-            get_sample_iss, get_sample_jwk, get_sample_openid_sig_and_pk, get_upgraded_vk,
+            get_groth16_sig_and_pk_for_upgraded_vk, get_random_simulated_groth16_sig_and_pk,
+            get_sample_esk, get_sample_groth16_sig_and_pk, get_sample_iss, get_sample_jwk,
+            get_sample_openid_sig_and_pk, get_upgraded_vk,
         },
         AnyKeylessPublicKey, Configuration, EphemeralCertificate, FederatedKeylessPublicKey,
         Groth16VerificationKey, KeylessPublicKey, KeylessSignature, TransactionAndProof,
@@ -141,6 +142,32 @@ fn test_rotate_vk() {
         },
         TransactionStatus::Retry => panic!("Expected TransactionStatus::Discard, got Retry"),
     }
+}
+
+#[test]
+fn test_proof_simulation() {
+    let (mut h, recipient, core_resources) = init_feature_gating(
+        vec![
+            FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
+            FeatureFlag::BN254_STRUCTURES,
+            FeatureFlag::KEYLESS_ACCOUNTS,
+            FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
+        ],
+        vec![],
+    );
+
+    let (sig, pk, pvk) = get_random_simulated_groth16_sig_and_pk();
+    run_upgrade_vk_script(&mut h, core_resources, Groth16VerificationKey::from(pvk));
+    run_jwk_and_config_script(&mut h);
+
+    let transaction = create_and_spend_keyless_account(&mut h, sig, pk, *recipient.address());
+    let output = h.run_raw(transaction);
+
+    assert_success!(
+        output.status().clone(),
+        "Expected TransactionStatus::Keep(ExecutionStatus::Success), but got: {:?}",
+        output.status()
+    );
 }
 
 #[test]

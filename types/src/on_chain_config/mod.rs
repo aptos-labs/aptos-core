@@ -14,11 +14,11 @@ use move_core_types::{
     account_address::AccountAddress,
     ident_str,
     identifier::{IdentStr, Identifier},
-    language_storage::StructTag,
+    language_storage::{StructTag, TypeTag},
     move_resource::{MoveResource, MoveStructType},
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::HashMap, fmt, fmt::Debug, sync::Arc};
+use std::{collections::HashMap, fmt, fmt::Debug, str::FromStr, sync::Arc};
 
 mod approved_execution_hashes;
 mod aptos_features;
@@ -178,9 +178,19 @@ pub trait OnChainConfig: Send + Sync + DeserializeOwned {
     where
         T: ConfigStorage + ?Sized,
     {
+        Some(Self::fetch_config_and_bytes(storage)?.0)
+    }
+
+    /// Same as [Self::fetch_config], but also returns the underlying bytes that were used to
+    /// deserialize into config.
+    fn fetch_config_and_bytes<T>(storage: &T) -> Option<(Self, Bytes)>
+    where
+        T: ConfigStorage + ?Sized,
+    {
         let state_key = StateKey::on_chain_config::<Self>().ok()?;
         let bytes = storage.fetch_config_bytes(&state_key)?;
-        Self::deserialize_into_config(&bytes).ok()
+        let config = Self::deserialize_into_config(&bytes).ok()?;
+        Some((config, bytes))
     }
 
     fn address() -> &'static AccountAddress {
@@ -204,6 +214,10 @@ pub fn new_epoch_event_key() -> EventKey {
     EventKey::new(2, CORE_CODE_ADDRESS)
 }
 
+pub fn new_epoch_event_type_tag() -> TypeTag {
+    TypeTag::from_str("0x1::reconfiguration::NewEpoch").expect("cannot fail")
+}
+
 pub fn access_path_for_config(config_id: ConfigID) -> anyhow::Result<AccessPath> {
     let struct_tag = struct_tag_for_config(config_id);
     Ok(AccessPath::new(
@@ -224,6 +238,7 @@ pub fn struct_tag_for_config(config_id: ConfigID) -> StructTag {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ConfigurationResource {
     epoch: u64,
+    /// Unix epoch timestamp (in microseconds) of the last reconfiguration time.
     last_reconfiguration_time: u64,
     events: EventHandle,
 }
@@ -233,7 +248,8 @@ impl ConfigurationResource {
         self.epoch
     }
 
-    pub fn last_reconfiguration_time(&self) -> u64 {
+    /// Return the last Unix epoch timestamp (in microseconds) of the last reconfiguration time.
+    pub fn last_reconfiguration_time_micros(&self) -> u64 {
         self.last_reconfiguration_time
     }
 

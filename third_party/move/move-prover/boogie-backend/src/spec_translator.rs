@@ -270,8 +270,12 @@ impl<'env> SpecTranslator<'env> {
             // so we don't need to translate it.
             return;
         }
-        if let Type::Tuple(..) | Type::Fun(..) = fun.result_type {
-            self.error(&fun.loc, "function or tuple result type not yet supported");
+        if let Type::Tuple(..) = fun.result_type {
+            self.error(&fun.loc, "tuple result type not yet supported");
+            return;
+        }
+        if let Type::Fun(..) = fun.result_type {
+            self.error(&fun.loc, "function result type not yet supported"); // TODO(LAMBDA)
             return;
         }
         let qid = module_env.get_id().qualified(id);
@@ -528,7 +532,7 @@ impl<'env> SpecTranslator<'env> {
                 | Type::Struct(_, _, _)
                 | Type::TypeParameter(_)
                 | Type::Reference(_, _)
-                | Type::Fun(_, _)
+                | Type::Fun(..)
                 | Type::TypeDomain(_)
                 | Type::ResourceDomain(_, _, _)
                 | Type::Error
@@ -684,6 +688,7 @@ impl<'env> SpecTranslator<'env> {
             },
             ExpData::Invoke(node_id, ..) => {
                 self.error(&self.env.get_node_loc(*node_id), "Invoke not yet supported");
+                // TODO(LAMBDA)
             },
             ExpData::Lambda(node_id, ..) => self.error(
                 &self.env.get_node_loc(*node_id),
@@ -724,13 +729,18 @@ impl<'env> SpecTranslator<'env> {
                 // Single-element sequence is just a wrapped value.
                 self.translate_exp(exp_vec.first().expect("list has an element"));
             },
-            ExpData::Return(..)
-            | ExpData::Sequence(..)
-            | ExpData::Loop(..)
-            | ExpData::Assign(..)
-            | ExpData::Mutate(..)
-            | ExpData::SpecBlock(..)
-            | ExpData::LoopCont(..) => panic!("imperative expressions not supported"),
+            ExpData::Return(id, ..)
+            | ExpData::Sequence(id, ..)
+            | ExpData::Loop(id, ..)
+            | ExpData::Assign(id, ..)
+            | ExpData::Mutate(id, ..)
+            | ExpData::SpecBlock(id, ..)
+            | ExpData::LoopCont(id, ..) => {
+                self.env.error(
+                    &self.env.get_node_loc(*id),
+                    "imperative expressions not supported in specs",
+                );
+            },
         }
     }
 
@@ -768,6 +778,10 @@ impl<'env> SpecTranslator<'env> {
             Value::Tuple(val) => {
                 let loc = self.env.get_node_loc(node_id);
                 self.error(&loc, &format!("tuple value not yet supported: {:#?}", val))
+            },
+            Value::Function(_mid, _fid) => {
+                let loc = self.env.get_node_loc(node_id);
+                self.error(&loc, "Function values not yet supported") // TODO(LAMBDA)
             },
         }
     }
@@ -831,7 +845,6 @@ impl<'env> SpecTranslator<'env> {
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
         match oper {
-            Operation::Closure(..) => unimplemented!("closures in specs"),
             // Operators we introduced in the top level public entry `SpecTranslator::translate`,
             // mapping between Boogies single value domain and our typed world.
             Operation::BoxValue | Operation::UnboxValue => panic!("unexpected box/unbox"),
@@ -973,16 +986,49 @@ impl<'env> SpecTranslator<'env> {
                 // Skip freeze operation
                 self.translate_exp(&args[0])
             },
+            Operation::Vector if args.is_empty() => {
+                self.translate_primitive_inst_call(node_id, "$EmptyVec", args)
+            },
+            Operation::Vector if args.len() == 1 => self.translate_primitive_call("MakeVec1", args),
+            Operation::Vector if args.len() == 2 => self.translate_primitive_call("MakeVec2", args),
+            Operation::Vector if args.len() == 3 => self.translate_primitive_call("MakeVec3", args),
+            Operation::Vector if args.len() == 4 => self.translate_primitive_call("MakeVec4", args),
+            Operation::Vector => {
+                let mut count = 0;
+                for arg in &args[0..args.len() - 1] {
+                    emit!(self.writer, "ConcatVec(");
+                    self.translate_call(node_id, oper, &[arg.clone()]);
+                    emit!(self.writer, ",");
+                    count += 1;
+                }
+                self.translate_call(node_id, oper, &[args[args.len() - 1].clone()]);
+                emit!(self.writer, &")".repeat(count));
+            },
+            Operation::Abort => {
+                let exp_bv_flag = global_state.get_node_num_oper(node_id) == Bitwise;
+                emit!(
+                    self.writer,
+                    &format!(
+                        "$Arbitrary_value_of'{}'()",
+                        boogie_type_suffix_bv(self.env, &self.get_node_type(node_id), exp_bv_flag)
+                    )
+                );
+            },
             Operation::MoveFunction(_, _)
             | Operation::BorrowGlobal(_)
             | Operation::Borrow(..)
             | Operation::Deref
             | Operation::MoveTo
             | Operation::MoveFrom
-            | Operation::Abort
-            | Operation::Vector
+            | Operation::EarlyBind
             | Operation::Old => {
-                panic!("operation unexpected: {}", oper.display(self.env, node_id))
+                self.env.error(
+                    &self.env.get_node_loc(node_id),
+                    &format!(
+                        "bug: operation {} is not supported in the current context",
+                        oper.display(self.env, node_id)
+                    ),
+                );
             },
         }
     }
@@ -1426,7 +1472,7 @@ impl<'env> SpecTranslator<'env> {
                 | Type::Tuple(_)
                 | Type::TypeParameter(_)
                 | Type::Reference(_, _)
-                | Type::Fun(_, _)
+                | Type::Fun(..)
                 | Type::TypeDomain(_)
                 | Type::ResourceDomain(_, _, _)
                 | Type::Error
@@ -1589,7 +1635,7 @@ impl<'env> SpecTranslator<'env> {
                 | Type::Tuple(_)
                 | Type::TypeParameter(_)
                 | Type::Reference(_, _)
-                | Type::Fun(_, _)
+                | Type::Fun(..)
                 | Type::Error
                 | Type::Var(_) => panic!("unexpected type"),
             }

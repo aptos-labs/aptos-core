@@ -36,7 +36,7 @@ use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents}
 use aptos_storage_interface::DbReaderWriter;
 use aptos_time_service::TimeService;
 use aptos_validator_transaction_pool::VTxnPoolState;
-use aptos_vm::AptosVM;
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use futures::channel::mpsc;
 use move_core_types::account_address::AccountAddress;
 use std::{collections::HashMap, sync::Arc};
@@ -65,7 +65,7 @@ pub fn start_consensus(
     ));
 
     let execution_proxy = ExecutionProxy::new(
-        Arc::new(BlockExecutor::<AptosVM>::new(aptos_db)),
+        Arc::new(BlockExecutor::<AptosVMBlockExecutor>::new(aptos_db)),
         txn_notifier,
         state_sync_notifier,
         runtime.handle(),
@@ -158,7 +158,7 @@ pub fn start_consensus_observer(
             node_config.consensus.mempool_executed_txn_timeout_ms,
         ));
         let execution_proxy = ExecutionProxy::new(
-            Arc::new(BlockExecutor::<AptosVM>::new(aptos_db.clone())),
+            Arc::new(BlockExecutor::<AptosVMBlockExecutor>::new(aptos_db.clone())),
             txn_notifier,
             state_sync_notifier,
             consensus_observer_runtime.handle(),
@@ -187,14 +187,14 @@ pub fn start_consensus_observer(
     };
 
     // Create the consensus observer
-    let (sync_notification_sender, sync_notification_listener) =
+    let (state_sync_notification_sender, state_sync_notification_listener) =
         tokio::sync::mpsc::unbounded_channel();
     let consensus_observer = ConsensusObserver::new(
         node_config.clone(),
         consensus_observer_client,
         aptos_db.reader.clone(),
         execution_client,
-        sync_notification_sender,
+        state_sync_notification_sender,
         reconfig_events,
         consensus_publisher,
         TimeService::real(),
@@ -204,6 +204,6 @@ pub fn start_consensus_observer(
     consensus_observer_runtime.spawn(consensus_observer.start(
         node_config.consensus_observer,
         consensus_observer_message_receiver,
-        sync_notification_listener,
+        state_sync_notification_listener,
     ));
 }

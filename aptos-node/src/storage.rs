@@ -10,11 +10,16 @@ use aptos_executor::db_bootstrapper::maybe_bootstrap;
 use aptos_indexer_grpc_table_info::internal_indexer_db_service::InternalIndexerDBService;
 use aptos_logger::{debug, info};
 use aptos_storage_interface::{DbReader, DbReaderWriter};
-use aptos_types::{ledger_info::LedgerInfoWithSignatures, waypoint::Waypoint};
-use aptos_vm::AptosVM;
+use aptos_types::{
+    ledger_info::LedgerInfoWithSignatures, transaction::Version, waypoint::Waypoint,
+};
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use either::Either;
 use std::{fs, path::Path, sync::Arc, time::Instant};
-use tokio::runtime::Runtime;
+use tokio::{
+    runtime::Runtime,
+    sync::watch::{channel, Receiver as WatchReceiver},
+};
 
 pub(crate) fn maybe_apply_genesis(
     db_rw: &DbReaderWriter,
@@ -28,8 +33,9 @@ pub(crate) fn maybe_apply_genesis(
         .unwrap_or(&node_config.base.waypoint)
         .genesis_waypoint();
     if let Some(genesis) = get_genesis_txn(node_config) {
-        let ledger_info_opt = maybe_bootstrap::<AptosVM>(db_rw, genesis, genesis_waypoint)
-            .map_err(|err| anyhow!("DB failed to bootstrap {}", err))?;
+        let ledger_info_opt =
+            maybe_bootstrap::<AptosVMBlockExecutor>(db_rw, genesis, genesis_waypoint)
+                .map_err(|err| anyhow!("DB failed to bootstrap {}", err))?;
         Ok(ledger_info_opt)
     } else {
         info ! ("Genesis txn not provided! This is fine only if you don't expect to apply it. Otherwise, the config is incorrect!");
@@ -45,46 +51,60 @@ pub(crate) fn bootstrap_db(
     DbReaderWriter,
     Option<Runtime>,
     Option<InternalIndexerDB>,
+    Option<WatchReceiver<u64>>,
 )> {
     let internal_indexer_db = InternalIndexerDBService::get_indexer_db(node_config);
-    let (aptos_db_reader, db_rw, backup_service) =
-        match FastSyncStorageWrapper::initialize_dbs(node_config, internal_indexer_db.clone())? {
-            Either::Left(db) => {
-                let (db_arc, db_rw) = DbReaderWriter::wrap(db);
-                let db_backup_service = start_backup_service(
-                    node_config.storage.backup_service_address,
-                    db_arc.clone(),
-                );
-                maybe_apply_genesis(&db_rw, node_config)?;
-                (db_arc as Arc<dyn DbReader>, db_rw, Some(db_backup_service))
-            },
-            Either::Right(fast_sync_db_wrapper) => {
-                let temp_db = fast_sync_db_wrapper.get_temporary_db_with_genesis();
-                maybe_apply_genesis(&DbReaderWriter::from_arc(temp_db), node_config)?;
-                let (db_arc, db_rw) = DbReaderWriter::wrap(fast_sync_db_wrapper);
-                let fast_sync_db = db_arc.get_fast_sync_db();
-                // FastSyncDB requires ledger info at epoch 0 to establish provenance to genesis
-                let ledger_info = db_arc
-                    .get_temporary_db_with_genesis()
-                    .get_epoch_ending_ledger_info(0)
-                    .expect("Genesis ledger info must exist");
+    let (update_sender, update_receiver) = if internal_indexer_db.is_some() {
+        let (sender, receiver) = channel::<u64>(0);
+        (Some(sender), Some(receiver))
+    } else {
+        (None, None)
+    };
 
-                if fast_sync_db
-                    .get_latest_ledger_info_option()
-                    .expect("should returns Ok results")
-                    .is_none()
-                {
-                    // it means the DB is empty and we need to
-                    // commit the genesis ledger info to the DB.
-                    fast_sync_db.commit_genesis_ledger_info(&ledger_info)?;
-                }
+    let (aptos_db_reader, db_rw, backup_service) = match FastSyncStorageWrapper::initialize_dbs(
+        node_config,
+        internal_indexer_db.clone(),
+        update_sender,
+    )? {
+        Either::Left(db) => {
+            let (db_arc, db_rw) = DbReaderWriter::wrap(db);
+            let db_backup_service =
+                start_backup_service(node_config.storage.backup_service_address, db_arc.clone());
+            maybe_apply_genesis(&db_rw, node_config)?;
+            (db_arc as Arc<dyn DbReader>, db_rw, Some(db_backup_service))
+        },
+        Either::Right(fast_sync_db_wrapper) => {
+            let temp_db = fast_sync_db_wrapper.get_temporary_db_with_genesis();
+            maybe_apply_genesis(&DbReaderWriter::from_arc(temp_db), node_config)?;
+            let (db_arc, db_rw) = DbReaderWriter::wrap(fast_sync_db_wrapper);
+            let fast_sync_db = db_arc.get_fast_sync_db();
+            // FastSyncDB requires ledger info at epoch 0 to establish provenance to genesis
+            let ledger_info = db_arc
+                .get_temporary_db_with_genesis()
+                .get_epoch_ending_ledger_info(0)
+                .expect("Genesis ledger info must exist");
 
-                let db_backup_service =
-                    start_backup_service(node_config.storage.backup_service_address, fast_sync_db);
-                (db_arc as Arc<dyn DbReader>, db_rw, Some(db_backup_service))
-            },
-        };
-    Ok((aptos_db_reader, db_rw, backup_service, internal_indexer_db))
+            if fast_sync_db
+                .get_latest_ledger_info_option()
+                .expect("should returns Ok results")
+                .is_none()
+            {
+                // it means the DB is empty and we need to
+                // commit the genesis ledger info to the DB.
+                fast_sync_db.commit_genesis_ledger_info(&ledger_info)?;
+            }
+            let db_backup_service =
+                start_backup_service(node_config.storage.backup_service_address, fast_sync_db);
+            (db_arc as Arc<dyn DbReader>, db_rw, Some(db_backup_service))
+        },
+    };
+    Ok((
+        aptos_db_reader,
+        db_rw,
+        backup_service,
+        internal_indexer_db,
+        update_receiver,
+    ))
 }
 
 /// In consensus-only mode, return a in-memory based [FakeAptosDB] and
@@ -157,6 +177,7 @@ pub fn initialize_database_and_checkpoints(
     Option<Runtime>,
     Waypoint,
     Option<InternalIndexerDB>,
+    Option<WatchReceiver<Version>>,
 )> {
     // If required, create RocksDB checkpoints and change the working directory.
     // This is test-only.
@@ -166,7 +187,8 @@ pub fn initialize_database_and_checkpoints(
 
     // Open the database
     let instant = Instant::now();
-    let (_aptos_db, db_rw, backup_service, indexer_db_opt) = bootstrap_db(node_config)?;
+    let (_aptos_db, db_rw, backup_service, indexer_db_opt, update_receiver) =
+        bootstrap_db(node_config)?;
 
     // Log the duration to open storage
     debug!(
@@ -179,5 +201,6 @@ pub fn initialize_database_and_checkpoints(
         backup_service,
         node_config.base.waypoint.genesis_waypoint(),
         indexer_db_opt,
+        update_receiver,
     ))
 }

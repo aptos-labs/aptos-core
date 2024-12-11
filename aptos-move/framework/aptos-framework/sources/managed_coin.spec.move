@@ -147,4 +147,16 @@ spec aptos_framework::managed_coin {
         aborts_if !exists<coin::CoinStore<CoinType>>(account_addr) && !type_info::spec_is_struct<CoinType>();
         ensures exists<coin::CoinStore<CoinType>>(account_addr);
     }
+
+    spec remove_caps<CoinType>(account: &signer): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
+        let account_addr = signer::address_of(account);
+        aborts_if !exists<Capabilities<CoinType>>(account_addr);
+        ensures !exists<Capabilities<CoinType>>(account_addr);
+    }
+
+    spec destroy_caps <CoinType>(account: &signer) {
+        let account_addr = signer::address_of(account);
+        aborts_if !exists<Capabilities<CoinType>>(account_addr);
+        ensures !exists<Capabilities<CoinType>>(account_addr);
+    }
 }

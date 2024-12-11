@@ -1,0 +1,12 @@
+error[E04014]: invalid loop control
+   ┌─ tests/move_check/inlining/break_continue_in_lambda2.move:20:2
+   │
+20 │     break;
+   │     ^^^^^ Invalid usage of 'break'. 'break' can only be used inside a loop body
+
+error[E04014]: invalid loop control
+   ┌─ tests/move_check/inlining/break_continue_in_lambda2.move:24:2
+   │
+24 │     continue;
+   │     ^^^^^^^^ Invalid usage of 'continue'. 'continue' can only be used inside a loop body
+

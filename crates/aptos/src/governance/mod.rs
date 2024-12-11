@@ -30,6 +30,7 @@ use aptos_rest_client::{
 use aptos_sdk::move_types::language_storage::CORE_CODE_ADDRESS;
 use aptos_types::{
     account_address::AccountAddress,
+    account_config::is_aptos_governance_create_proposal_event,
     event::EventHandle,
     governance::VotingRecords,
     stake_pool::StakePool,
@@ -42,7 +43,10 @@ use move_core_types::{
     ident_str, language_storage::ModuleId, parser::parse_type_tag,
     transaction_argument::TransactionArgument,
 };
-use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_model::metadata::{
+    CompilerVersion, LanguageVersion, LATEST_STABLE_COMPILER_VERSION,
+    LATEST_STABLE_LANGUAGE_VERSION,
+};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -444,20 +448,21 @@ async fn get_metadata_from_url(metadata_url: &Url) -> CliTypedResult<Vec<u8>> {
 fn extract_proposal_id(txn: &Transaction) -> CliTypedResult<Option<u64>> {
     if let Transaction::UserTransaction(inner) = txn {
         // Find event with proposal id
-        let proposal_id = if let Some(event) = inner.events.iter().find(|event| {
-            event.typ.to_string().as_str() == "0x1::aptos_governance::CreateProposalEvent"
-        }) {
-            let data: CreateProposalEvent =
-                serde_json::from_value(event.data.clone()).map_err(|_| {
-                    CliError::UnexpectedError(
-                        "Failed to parse Proposal event to get ProposalId".to_string(),
-                    )
-                })?;
-            Some(data.proposal_id.0)
-        } else {
-            warn!("No proposal event found to find proposal id");
-            None
-        };
+        let proposal_id =
+            if let Some(event) = inner.events.iter().find(|event| {
+                is_aptos_governance_create_proposal_event(event.typ.to_string().as_str())
+            }) {
+                let data: CreateProposalEvent = serde_json::from_value(event.data.clone())
+                    .map_err(|_| {
+                        CliError::UnexpectedError(
+                            "Failed to parse Proposal event to get ProposalId".to_string(),
+                        )
+                    })?;
+                Some(data.proposal_id.0)
+            } else {
+                warn!("No proposal event found to find proposal id");
+                None
+            };
 
         return Ok(proposal_id);
     }
@@ -473,7 +478,7 @@ struct CreateProposalEvent {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ProposalSubmissionSummary {
-    proposal_id: Option<u64>,
+    pub proposal_id: Option<u64>,
     #[serde(flatten)]
     transaction: TransactionSummary,
 }
@@ -905,17 +910,17 @@ pub struct CompileScriptFunction {
     pub compiled_script_path: Option<PathBuf>,
 
     #[clap(flatten)]
-    pub(crate) framework_package_args: FrameworkPackageArgs,
+    pub framework_package_args: FrameworkPackageArgs,
 
     #[clap(long, default_value_if("move_2", "true", "7"))]
-    pub(crate) bytecode_version: Option<u32>,
+    pub bytecode_version: Option<u32>,
 
     #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
-           default_value_if("move_2", "true", "2.0"))]
+           default_value_if("move_2", "true", LATEST_STABLE_COMPILER_VERSION))]
     pub compiler_version: Option<CompilerVersion>,
 
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
-           default_value_if("move_2", "true", "2.0"))]
+           default_value_if("move_2", "true", LATEST_STABLE_LANGUAGE_VERSION))]
     pub language_version: Option<LanguageVersion>,
 
     /// Select bytecode, language, compiler for Move 2

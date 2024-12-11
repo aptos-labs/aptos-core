@@ -45,6 +45,7 @@ use log::{debug, trace};
 use move_model::{
     ast::{Exp, ExpData, Operation, Pattern, Spec, SpecBlockTarget, TempIndex},
     exp_rewriter::ExpRewriterFunctions,
+    metadata::LanguageVersion,
     model::{FunId, GlobalEnv, Loc, NodeId, Parameter, QualifiedId},
     symbol::Symbol,
     ty::{ReferenceKind, Type},
@@ -89,7 +90,7 @@ pub fn run_inlining(env: &mut GlobalEnv, scope: RewritingScope, keep_inline_func
         let mut visited_targets = BTreeSet::new();
         while let Some(target) = todo.pop_first() {
             if visited_targets.insert(target.clone()) {
-                let callees_with_sites = target.called_funs_with_call_sites(env);
+                let callees_with_sites = target.used_funs_with_uses(env);
                 for (callee, sites) in callees_with_sites {
                     todo.insert(RewriteTarget::MoveFun(callee));
                     targets.entry(RewriteTarget::MoveFun(callee));
@@ -800,7 +801,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
                          (lambda expressions)",
                     )
                 },
-                ExpData::LoopCont(node_id, is_continue) if !post && in_loop == 0 => {
+                ExpData::LoopCont(node_id, _, is_continue) if !post && in_loop == 0 => {
                     let node_loc = env.get_node_loc(*node_id);
                     env.error(
                         &node_loc,
@@ -833,7 +834,11 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             .map(|param| {
                 let Parameter(sym, ty, loc) = *param;
                 let id = env.new_node(loc.clone(), ty.instantiate(self.type_args));
-                if let Some(new_sym) = self.shadow_stack.get_shadow_symbol(*sym, true) {
+                if env.language_version().is_at_least(LanguageVersion::V2_1)
+                    && env.symbol_pool().string(*sym).as_ref() == "_"
+                {
+                    Pattern::Wildcard(id)
+                } else if let Some(new_sym) = self.shadow_stack.get_shadow_symbol(*sym, true) {
                     Pattern::Var(id, new_sym)
                 } else {
                     Pattern::Var(id, *sym)
@@ -1046,7 +1051,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
                 self.in_loop += 1;
                 true
             },
-            ExpData::LoopCont(node_id, is_continue) if self.in_loop == 0 => {
+            ExpData::LoopCont(node_id, _, is_continue) if self.in_loop == 0 => {
                 let node_loc = self.env.get_node_loc(*node_id);
                 self.env.error(
                     &node_loc,
@@ -1156,7 +1161,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
         };
         let call_loc = self.env.get_node_loc(id);
         if let Some(lambda_target) = optional_lambda_target {
-            if let ExpData::Lambda(_, pat, body) = lambda_target.as_ref() {
+            if let ExpData::Lambda(_, pat, body, _, _) = lambda_target.as_ref() {
                 let args_vec: Vec<Exp> = args.to_vec();
                 Some(InlinedRewriter::construct_inlined_call_expression(
                     self.env,
