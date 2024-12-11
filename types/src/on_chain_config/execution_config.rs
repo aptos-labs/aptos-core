@@ -161,7 +161,7 @@ impl TransactionShufflerType {
         TransactionShufflerType::UseCaseAware {
             sender_spread_factor: 32,
             platform_use_case_spread_factor: 0,
-            user_use_case_spread_factor: 4,
+            user_use_case_spread_factor: 16,
         }
     }
 
