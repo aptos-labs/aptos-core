@@ -317,7 +317,7 @@ mod test {
         code::{mock_verified_code, MockExtension},
         loaded_data::runtime_types::StructIdentifier,
     };
-    use std::collections::HashMap;
+    use std::{collections::HashMap, time::Duration};
 
     #[test]
     fn test_prefetch_existing_aptos_framework() {
@@ -543,44 +543,45 @@ mod test {
     }
 
     #[test]
-    fn test_try_lock_inner() {
-        let state_view = Arc::new(MockStateView::empty());
-        let config = Arc::new(BlockExecutorModuleCacheLocalConfig::default());
+    fn test_try_lock_inner_single_thread() {
+        let manager = AptosModuleCacheManager::new();
+
+        let state_view = MockStateView::empty();
+        let config = BlockExecutorModuleCacheLocalConfig::default();
+        let metadata = TransactionSliceMetadata::block_from_u64(0, 1);
+
+        let guard = assert_ok!(manager.try_lock(&state_view, &config, metadata));
+        assert!(matches!(guard, AptosModuleCacheManagerGuard::Guard { .. }));
+    }
+
+    #[test]
+    fn test_try_lock_inner_multiple_threads() {
         let manager = Arc::new(AptosModuleCacheManager::new());
 
-        // Single threaded execution. Locking succeeds.
-        let metadata_1 = TransactionSliceMetadata::block_from_u64(0, 1);
-        let guard = assert_ok!(manager.try_lock(&MockStateView::empty(), &config, metadata_1));
-        assert!(matches!(guard, AptosModuleCacheManagerGuard::Guard { .. }));
+        let state_view = Arc::new(MockStateView::empty());
+        let config = Arc::new(BlockExecutorModuleCacheLocalConfig::default());
+        let metadata = TransactionSliceMetadata::block_from_u64(0, 1);
 
-        // Multiple threads try to lock concurrently. Only one succeeds.
-        let metadata_2 = TransactionSliceMetadata::block_from_u64(1, 2);
         let mut handles = Vec::with_capacity(4);
-        for _ in 0..8 {
+        for _ in 0..2 {
             let handle = std::thread::spawn({
                 let manager = manager.clone();
                 let state_view = state_view.clone();
                 let config = config.clone();
                 move || {
-                    let guard =
-                        assert_ok!(manager.try_lock_inner(&state_view, &config, metadata_2));
-                    matches!(guard, AptosModuleCacheManagerGuard::Guard { .. })
+                    let guard = assert_ok!(manager.try_lock_inner(&state_view, &config, metadata));
+                    // Hold the guard for 1 second to make sure other thread runs at the same time.
+                    std::thread::sleep(Duration::from_secs(1));
+                    if matches!(guard, AptosModuleCacheManagerGuard::Guard { .. }) {
+                        1
+                    } else {
+                        0
+                    }
                 }
             });
             handles.push(handle);
         }
-
-        let mut num_guards = 0;
-        let mut num_nones = 0;
-        for handle in handles {
-            if handle.join().unwrap() {
-                num_guards += 1;
-            } else {
-                num_nones += 1;
-            }
-        }
-
-        assert!(num_guards <= 1);
-        assert!(num_nones >= 7);
+        let sum = handles.into_iter().map(|h| h.join().unwrap()).sum::<i32>();
+        assert_eq!(sum, 1);
     }
 }
