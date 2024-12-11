@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{counters::NUM_SENDERS_IN_BLOCK, transaction_shuffler::TransactionShuffler};
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::{
+    signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
+};
 use move_core_types::account_address::AccountAddress;
 use std::collections::{HashMap, VecDeque};
 
@@ -222,6 +224,30 @@ impl SlidingWindowState {
     pub fn finalize(self) -> Vec<SignedTransaction> {
         NUM_SENDERS_IN_BLOCK.set(self.senders_in_window.len() as f64);
         self.txns
+    }
+}
+
+pub trait SenderAwareTransaction {
+    fn parse_sender(&self) -> AccountAddress;
+    // Add any other sender-specific methods if necessary
+}
+
+impl SenderAwareTransaction for SignedTransaction {
+    fn parse_sender(&self) -> AccountAddress {
+        self.sender()
+    }
+}
+
+impl SenderAwareTransaction for SignatureVerifiedTransaction {
+    fn parse_sender(&self) -> AccountAddress {
+        let txn = match self {
+            SignatureVerifiedTransaction::Valid(txn) => txn,
+            SignatureVerifiedTransaction::Invalid(txn) => txn,
+        };
+        match txn {
+            aptos_types::transaction::Transaction::UserTransaction(txn) => txn.parse_sender(),
+            _ => unreachable!("SenderAwareTransaction should not be given non-UserTransaction"),
+        }
     }
 }
 
