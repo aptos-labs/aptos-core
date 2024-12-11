@@ -71,6 +71,7 @@ pub fn start_consensus(
         runtime.handle(),
         TransactionFilter::new(node_config.execution.transaction_filter.clone()),
         node_config.consensus.enable_pre_commit,
+        node_config.consensus.max_sending_block_txns_after_filtering,
     );
 
     let time_service = Arc::new(ClockTimeService::new(runtime.handle().clone()));
@@ -164,6 +165,7 @@ pub fn start_consensus_observer(
             consensus_observer_runtime.handle(),
             TransactionFilter::new(node_config.execution.transaction_filter.clone()),
             node_config.consensus.enable_pre_commit,
+            node_config.consensus.max_sending_block_txns_after_filtering,
         );
 
         // Create the execution proxy client

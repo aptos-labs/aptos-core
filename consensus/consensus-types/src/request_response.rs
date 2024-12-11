@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::{Payload, PayloadFilter},
+    common::{Payload, PayloadFilter, Round},
     payload_pull_params::OptQSPayloadPullParams,
     utils::PayloadTxnsSize,
 };
@@ -29,6 +29,8 @@ pub struct GetPayloadRequest {
     pub callback: oneshot::Sender<Result<GetPayloadResponse>>,
     // block timestamp
     pub block_timestamp: Duration,
+    // block round
+    pub block_round: Round,
 }
 
 pub enum GetPayloadCommand {
