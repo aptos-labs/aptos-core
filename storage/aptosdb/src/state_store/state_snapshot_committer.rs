@@ -108,22 +108,21 @@ impl StateSnapshotCommitter {
                             .unwrap();
 
                         THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
-                            (0..NUM_STATE_SHARDS as u8)
-                                .into_par_iter()
-                                .map(|shard_id| {
+                            snapshot
+                                .make_delta(&self.last_snapshot)
+                                .shards
+                                .par_iter()
+                                .enumerate()
+                                .map(|(shard_id, updates)| {
                                     let node_hashes = snapshot
                                         .summary()
                                         .global_state_summary
                                         .new_node_hashes_since(
                                             &self.last_snapshot.summary().global_state_summary,
-                                            shard_id,
+                                            shard_id as u8,
                                         );
                                     // TODO(aldenhu): iterator of refs
-                                    // FIXME(aldenhu): use makes_delta
-                                    let updates = snapshot.state().shards[shard_id as usize]
-                                        .view_layers_after(
-                                            &self.last_snapshot.state().shards[shard_id as usize],
-                                        )
+                                    let updates = updates
                                         .iter()
                                         .map(|(k, w)| {
                                             (
@@ -134,12 +133,12 @@ impl StateSnapshotCommitter {
                                         .collect_vec();
 
                                     self.state_db.state_merkle_db.merklize_value_set_for_shard(
-                                        shard_id,
+                                        shard_id as u8,
                                         jmt_update_refs(&updates),
                                         Some(&node_hashes),
                                         version,
                                         base_version,
-                                        shard_persisted_versions[shard_id as usize],
+                                        shard_persisted_versions[shard_id],
                                         previous_epoch_ending_version,
                                     )
                                 })
