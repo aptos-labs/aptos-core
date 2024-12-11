@@ -25,6 +25,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+use aptos_db::utils::ShardedStateKvSchemaBatch;
+
 pub(crate) fn gen_li_with_sigs(
     block_id: HashValue,
     root_hash: HashValue,
@@ -47,10 +49,18 @@ pub(crate) fn gen_li_with_sigs(
     )
 }
 
+// TODO (bowu)
+pub struct CommitBatches {
+    state_kv_metadata_batch: SchemaBatch,
+    sharded_state_kv_batches: ShardedStateKvSchemaBatch,
+}
+
 pub struct TransactionCommitter<V> {
     executor: Arc<BlockExecutor<V>>,
     start_version: Version,
     block_receiver: mpsc::Receiver<CommitBlockMessage>,
+    batch_sender: mpsc::Sender<CommitBatches>,
+    batch_receiver: mpsc::Receiver<CommitBatches>,
 }
 
 impl<V> TransactionCommitter<V>
@@ -62,15 +72,37 @@ where
         start_version: Version,
         block_receiver: mpsc::Receiver<CommitBlockMessage>,
     ) -> Self {
+        // spawn a new thread in backgrond to do the actual commit
+        let (batch_sender, batch_receiver) = mpsc::channel();
+
         Self {
             executor,
             start_version,
             block_receiver,
+            batch_sender,
+            batch_receiver,
         }
+    }
+
+    fn commit_batch(&self, batch: SchemaBatch) -> Result<()> {
+        Ok(())
+    }
+
+    fn prepare_commit(&self, block_id: u64, ledger_info_sigs: LedgerInfoWithSignatures) -> Result<()> {
+        self.executor.pre_commit_block(block_id)?;
+        self.executor.commit_ledger(ledger_info_sigs)?;
+        Ok(())
     }
 
     pub fn run(&mut self) {
         info!("Start with version: {}", self.start_version);
+
+        // Spawn a new thread in backgrond to do the actual commit
+        let commit_thread = thread::spawn(move || {
+            while let Ok(batch) = self.batch_receiver.recv() {
+                self.commit_batch(batch).unwrap();
+            }
+        });
 
         while let Ok(msg) = self.block_receiver.recv() {
             let CommitBlockMessage {
@@ -93,8 +125,7 @@ where
             let version = output.expect_last_version();
             let commit_start = Instant::now();
             let ledger_info_with_sigs = gen_li_with_sigs(block_id, root_hash, version);
-            self.executor.pre_commit_block(block_id).unwrap();
-            self.executor.commit_ledger(ledger_info_with_sigs).unwrap();
+            self.prepare_commit(block_id, ledger_info_sigs).unwrap();
 
             report_block(
                 self.start_version,
