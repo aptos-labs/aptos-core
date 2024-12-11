@@ -435,7 +435,8 @@ impl PipelinedBlock {
 /// Pipeline related functions
 impl PipelinedBlock {
     pub fn pipeline_enabled(&self) -> bool {
-        self.pipeline_futs.lock().is_some()
+        // pipeline future can be aborted, we use tx here
+        self.pipeline_tx.lock().is_some()
     }
 
     pub fn pipeline_futs(&self) -> Option<PipelineFutures> {
