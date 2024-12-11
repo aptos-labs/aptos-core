@@ -114,7 +114,19 @@ pub(crate) fn bcho_test() -> ForgeConfig {
         test: Box::new(PerformanceBenchmark),
         // Sequential workloads
         workloads: Workloads::TRANSACTIONS(vec![
-            TransactionWorkload::new(TransactionTypeArg::ModifyGlobalResource, 3_000)
+            TransactionWorkload::new(TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB, 4_000)
+                .with_gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+                .with_transactions_per_account(20),
+            TransactionWorkload::new(TransactionTypeArg::TokenV1FTMintAndTransfer, 3_000)
+                .with_gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+                .with_transactions_per_account(20),
+            TransactionWorkload::new(TransactionTypeArg::LiquidityPoolSwap, 1_500)
+                .with_gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+                .with_transactions_per_account(20),
+            TransactionWorkload::new(TransactionTypeArg::NoOpFeePayer, 4_000)
+                .with_gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+                .with_transactions_per_account(20),
+            TransactionWorkload::new(TransactionTypeArg::ModifyGlobalResource, 4_000)
                 .with_gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
                 .with_transactions_per_account(20),
             TransactionWorkload::new(TransactionTypeArg::SmartTablePicture1MWith256Change, 20)
@@ -125,7 +137,10 @@ pub(crate) fn bcho_test() -> ForgeConfig {
         background_traffic: background_traffic_for_sweep_with_latency(&[
             (3.0, 8.0),
             (3.0, 8.0),
-            (3.0, 4.0),
+            (3.0, 8.0),
+            (3.0, 8.0),
+            (3.0, 8.0),
+            (3.0, 8.0),
         ]),
     })
 }
