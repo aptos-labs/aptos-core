@@ -3,7 +3,7 @@
 
 use super::{update_binary, BinaryUpdater, UpdateRequiredInfo};
 use crate::{
-    common::types::{CliCommand, CliTypedResult},
+    common::types::{CliCommand, CliTypedResult, PromptOptions},
     update::update_helper::{build_updater, get_path},
 };
 use anyhow::{Context, Result};
@@ -48,9 +48,8 @@ pub struct RevelaUpdateTool {
     #[clap(long, default_value_t = false)]
     check: bool,
 
-    /// Assume yes for all yes/no prompts
-    #[clap(long)]
-    pub assume_yes: bool,
+    #[clap(flatten)]
+    pub prompt_options: PromptOptions,
 }
 
 impl BinaryUpdater for RevelaUpdateTool {
@@ -103,7 +102,7 @@ impl BinaryUpdater for RevelaUpdateTool {
             "unknown-linux-gnu",
             "apple-darwin",
             "pc-windows-gnu",
-            self.assume_yes,
+            self.prompt_options.assume_yes,
         )
     }
 }
