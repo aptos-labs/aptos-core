@@ -188,7 +188,7 @@ async fn main() -> Result<()> {
             } else {
                 PathBuf::from(".")
             };
-            prepare_aptos_packages(input.join(APTOS_COMMONS)).await;
+            // prepare_aptos_packages(input.join(APTOS_COMMONS)).await;
             let executor =
                 Execution::new(input, execution_mode.unwrap_or_default(), skip_ref_packages);
             executor

@@ -161,7 +161,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string(),
             description: "Turns on optimizations waiting for comparison testing".to_string(),
-            default: Given(true),
+            default: Given(false),
         },
         Experiment {
             name: Experiment::CFG_SIMPLIFICATION.to_string(),
@@ -274,7 +274,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::AVOID_STORE_IN_ASSIGNS.to_string(),
             description: "Avoid storing to a local during assigns".to_string(),
-            default: Inherited(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string()),
+            default: Given(true),
         },
         Experiment {
             name: Experiment::RETAIN_TEMPS_FOR_ARGS.to_string(),
@@ -282,7 +282,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
                 "Create temps for each argument of a function call during stackless bytecode \
                  generation and retain them until file format bytecode generation"
                     .to_string(),
-            default: Inherited(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string()),
+            default: Given(true),
         },
     ];
     experiments
