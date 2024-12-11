@@ -51,7 +51,7 @@ impl StructNameIndexMap {
             }
         }
 
-        // Possibly need to insert, so make the copies outside of the lock
+        // Possibly need to insert, so make the copies outside of the lock.
         let forward_key = struct_name.clone();
         let backward_value = Arc::new(struct_name.clone());
 
