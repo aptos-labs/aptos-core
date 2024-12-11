@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::state_store::{
-    per_version_state_update_refs::PerVersionStateUpdateRefs,
     state::LedgerState,
     state_summary::{LedgerStateSummary, StateWithSummary},
+    state_update_refs::PerVersionStateUpdateRefs,
     state_view::cached_state_view::ShardedStateCache,
 };
 use aptos_types::transaction::{Transaction, TransactionInfo, TransactionOutput, Version};

@@ -7,7 +7,7 @@ use aptos_storage_interface::state_store::state_view::cached_state_view::Sharded
 use aptos_storage_interface::state_store::state_delta::StateDelta;
 use aptos_types::transaction::{TransactionStatus, TransactionToCommit};
 use aptos_executor_types::transactions_with_output::TransactionsToKeep;
-use aptos_storage_interface::state_store::per_version_state_update_refs::PerVersionStateUpdateRefs;
+use aptos_storage_interface::state_store::state_update_refs::PerVersionStateUpdateRefs;
 
 impl AptosDB {
     /// This opens db in non-readonly mode, without the pruner.
@@ -145,22 +145,14 @@ impl ChunkToCommitOwned {
             .flat_map(TransactionOutput::events)
             .any(ContractEvent::is_new_epoch_event);
 
-        let transactions_to_keep = TransactionsToKeep::make(transactions, transaction_outputs, is_reconfig);
+        let transactions_to_keep = TransactionsToKeep::make(first_version, transactions, transaction_outputs, is_reconfig);
 
-        let state_updates_until_last_checkpoint = Self::gather_state_updates_until_last_checkpoint(
-            first_version,
-            latest_in_memory_state,
-            transactions_to_keep.state_update_refs(),
-            &transaction_infos,
-        );
 
         Self {
             first_version,
             transactions_to_keep,
             transaction_infos,
             base_state_version,
-            latest_in_memory_state: Arc::new(latest_in_memory_state.clone()),
-            state_updates_until_last_checkpoint,
             sharded_state_cache: None,
             is_reconfig,
         }

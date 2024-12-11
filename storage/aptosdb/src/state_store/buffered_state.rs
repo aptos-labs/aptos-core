@@ -11,18 +11,8 @@ use crate::{
     },
 };
 use aptos_infallible::Mutex;
-use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
-use aptos_storage_interface::{
-    db_ensure as ensure,
-    state_store::{
-        state::State,
-        state_delta::StateDelta,
-        state_summary::{LedgerStateSummary, StateWithSummary},
-        state_update_ref_map::BatchedStateUpdateRefs,
-    },
-    AptosDbError, Result,
-};
+use aptos_storage_interface::{state_store::state_summary::StateWithSummary, Result};
 use aptos_types::transaction::Version;
 use std::{
     sync::{
@@ -32,7 +22,6 @@ use std::{
     },
     thread::JoinHandle,
 };
-
 pub(crate) const ASYNC_COMMIT_CHANNEL_BUFFER_SIZE: u64 = 1;
 pub(crate) const TARGET_SNAPSHOT_INTERVAL_IN_VERSION: u64 = 100_000;
 

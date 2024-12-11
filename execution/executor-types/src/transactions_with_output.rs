@@ -3,17 +3,11 @@
 
 use crate::metrics::TIMER;
 use aptos_metrics_core::TimerHelper;
-use aptos_storage_interface::state_store::{
-    per_version_state_update_refs::PerVersionStateUpdateRefs, state_update::StateUpdateRef,
-    state_update_ref_map::BatchedStateUpdateRefs,
+use aptos_storage_interface::state_store::state_update_refs::{
+    BatchedStateUpdateRefs, PerVersionStateUpdateRefs, StateUpdateRefs,
 };
-use aptos_types::{
-    state_store::state_key::StateKey,
-    transaction::{Transaction, TransactionOutput, Version},
-    write_set::WriteSet,
-};
-use itertools::{izip, Itertools};
-use rayon::prelude::*;
+use aptos_types::transaction::{Transaction, TransactionOutput, Version};
+use itertools::izip;
 use std::{
     fmt::{Debug, Formatter},
     ops::Deref,
@@ -180,91 +174,5 @@ impl Debug for TransactionsToKeep {
             )
             .field("is_reconfig", &self.is_reconfig())
             .finish()
-    }
-}
-
-/// FIXME(aldenhu): move
-pub struct StateUpdateRefs<'kv> {
-    pub per_version: PerVersionStateUpdateRefs<'kv>,
-    pub for_last_checkpoint: Option<BatchedStateUpdateRefs<'kv>>,
-    pub for_latest: Option<BatchedStateUpdateRefs<'kv>>,
-}
-
-impl<'kv> StateUpdateRefs<'kv> {
-    pub fn index_write_sets(
-        first_version: Version,
-        write_sets: impl IntoIterator<Item = &'kv WriteSet>,
-        num_write_sets: usize,
-        last_checkpoint_index: Option<usize>,
-    ) -> Self {
-        let per_version =
-            PerVersionStateUpdateRefs::index_write_sets(first_version, write_sets, num_write_sets);
-        let (for_last_checkpoint, for_latest) =
-            Self::collect_updates(&per_version, last_checkpoint_index);
-        Self {
-            per_version,
-            for_last_checkpoint,
-            for_latest,
-        }
-    }
-
-    fn collect_updates(
-        per_version_updates: &PerVersionStateUpdateRefs<'kv>,
-        last_checkpoint_index: Option<usize>,
-    ) -> (
-        Option<BatchedStateUpdateRefs<'kv>>,
-        Option<BatchedStateUpdateRefs<'kv>>,
-    ) {
-        let _timer = TIMER.timer_with(&["index_state_updates__collect_batch"]);
-
-        let mut shard_iters = per_version_updates
-            .shards
-            .iter()
-            .map(|shard| shard.iter().cloned())
-            .collect::<Vec<_>>();
-
-        let mut first_version = per_version_updates.first_version;
-        let mut num_versions = per_version_updates.num_versions;
-        let updates_for_last_checkpoint = last_checkpoint_index.map(|idx| {
-            let ret = Self::collect_some_updates(first_version, idx + 1, &mut shard_iters);
-            first_version += idx as Version + 1;
-            num_versions -= idx + 1;
-            ret
-        });
-        let updates_for_latest = if num_versions == 0 {
-            None
-        } else {
-            Some(Self::collect_some_updates(
-                first_version,
-                num_versions,
-                &mut shard_iters,
-            ))
-        };
-
-        // Assert that all updates are consumed.
-        assert!(shard_iters.iter_mut().all(|iter| iter.next().is_none()));
-
-        (updates_for_last_checkpoint, updates_for_latest)
-    }
-
-    fn collect_some_updates(
-        first_version: Version,
-        num_versions: usize,
-        shard_iters: &mut [impl Iterator<Item = (&'kv StateKey, StateUpdateRef<'kv>)> + Clone + Send],
-    ) -> BatchedStateUpdateRefs<'kv> {
-        let mut ret = BatchedStateUpdateRefs::new_empty(first_version, num_versions);
-        // exclusive
-        let end_version = first_version + num_versions as Version;
-        shard_iters
-            .par_iter_mut()
-            .zip_eq(ret.shards.par_iter_mut())
-            .for_each(|(shard_iter, dedupped)| {
-                dedupped.extend(
-                    shard_iter
-                        // n.b. take_while_ref so that in the next step we can process the rest of the entries from the iters.
-                        .take_while_ref(|(_k, u)| u.version < end_version),
-                )
-            });
-        ret
     }
 }

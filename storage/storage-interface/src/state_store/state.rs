@@ -6,7 +6,7 @@ use crate::{
     state_store::{
         state_delta::StateDelta,
         state_update::{StateUpdate, StateUpdateRef},
-        state_update_ref_map::BatchedStateUpdateRefs,
+        state_update_refs::BatchedStateUpdateRefs,
         state_view::cached_state_view::{ShardedStateCache, StateCacheShard},
         NUM_STATE_SHARDS,
     },
@@ -38,15 +38,7 @@ pub struct State {
 }
 
 impl State {
-    pub fn new_empty() -> Self {
-        Self {
-            next_version: 0,
-            shards: Arc::new(arr_macro::arr![MapLayer::new_family("pre_genesis_state"); 16]),
-            usage: StateStorageUsage::zero(),
-        }
-    }
-
-    pub fn new_empty_at_version(version: Option<Version>, usage: StateStorageUsage) -> Self {
+    pub fn new_at_version(version: Option<Version>, usage: StateStorageUsage) -> Self {
         Self {
             next_version: version.map_or(0, |v| v + 1),
             shards: Arc::new(arr_macro::arr![MapLayer::new_family("state"); 16]),
@@ -54,7 +46,11 @@ impl State {
         }
     }
 
-    pub fn new(
+    pub fn new_empty() -> Self {
+        Self::new_at_version(None, StateStorageUsage::zero())
+    }
+
+    pub fn new_with_updates(
         next_version: Version,
         shards: Arc<[MapLayer<StateKey, StateUpdate>; NUM_STATE_SHARDS]>,
         usage: StateStorageUsage,
@@ -145,7 +141,7 @@ impl State {
         let shards = Arc::new(shards.try_into().expect("Known to be 16 shards."));
         let usage = self.update_usage(usage_delta_per_shard);
 
-        State::new(updates.next_version(), shards, usage)
+        State::new_with_updates(updates.next_version(), shards, usage)
     }
 
     fn update_usage(&self, usage_delta_per_shard: Vec<(i64, i64)>) -> StateStorageUsage {

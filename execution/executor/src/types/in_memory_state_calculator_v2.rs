@@ -11,9 +11,8 @@ use aptos_executor_types::{
 };
 use aptos_scratchpad::FrozenSparseMerkleTree;
 use aptos_storage_interface::state_store::{
-    per_version_state_update_refs::PerVersionStateUpdateRefs,
     state_delta::StateDelta,
-    state_update_ref_map::BatchedStateUpdateRefs,
+    state_update_refs::{BatchedStateUpdateRefs, PerVersionStateUpdateRefs},
     state_view::cached_state_view::{ShardedStateCache, StateCacheShard},
 };
 use aptos_types::{

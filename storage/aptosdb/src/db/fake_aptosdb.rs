@@ -18,7 +18,7 @@ use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     db_ensure as ensure,
     state_store::{
-        state_delta::StateDelta, state_update_ref_map::BatchedStateUpdateRefs,
+        state_delta::StateDelta, state_update_refs::BatchedStateUpdateRefs,
         state_view::cached_state_view::ShardedStateCache,
     },
     AptosDbError, DbReader, DbWriter, LedgerSummary, MAX_REQUEST_LIMIT,

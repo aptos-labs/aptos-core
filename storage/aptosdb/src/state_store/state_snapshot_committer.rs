@@ -119,6 +119,7 @@ impl StateSnapshotCommitter {
                                             shard_id,
                                         );
                                     // TODO(aldenhu): iterator of refs
+                                    // FIXME(aldenhu): use makes_delta
                                     let updates = snapshot.state().shards[shard_id as usize]
                                         .view_layers_after(
                                             &self.last_snapshot.state().shards[shard_id as usize],

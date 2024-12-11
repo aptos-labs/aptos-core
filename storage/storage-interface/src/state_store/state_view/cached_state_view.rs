@@ -114,6 +114,18 @@ impl CachedStateView {
         }
     }
 
+    pub fn new_dummy(state: &State) -> Self {
+        struct DummyDbReader;
+        impl DbReader for DummyDbReader {}
+
+        Self {
+            id: StateViewId::Miscellaneous,
+            reader: Arc::new(DummyDbReader),
+            memorized: ShardedStateCache::new_empty(0),
+            speculative: state.make_delta(state),
+        }
+    }
+
     // TODO(aldenhu): combine with StateStore::prime_state_cache
     pub fn prime_cache_by_write_sets<'a, T: IntoIterator<Item = &'a WriteSet> + Send>(
         &self,

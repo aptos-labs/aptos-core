@@ -525,7 +525,9 @@ impl<'a> TStateView for WriteSetStateView<'a> {
 #[cfg(test)]
 mod tests {
     use super::Parser;
-    use aptos_storage_interface::state_store::state_view::cached_state_view::CachedStateView;
+    use aptos_storage_interface::state_store::{
+        state::LedgerState, state_view::cached_state_view::CachedStateView,
+    };
     use aptos_types::{
         contract_event::ContractEvent,
         transaction::{
@@ -537,41 +539,46 @@ mod tests {
 
     #[test]
     fn should_filter_subscribable_events() {
-        /*
-            let event_0 =
-                ContractEvent::new_v2_with_type_tag_str("0x1::dkg::DKGStartEvent", b"dkg_1".to_vec());
-            let event_1 = ContractEvent::new_v2_with_type_tag_str(
-                "0x2345::random_module::RandomEvent",
-                b"random_x".to_vec(),
-            );
-            let event_2 =
-                ContractEvent::new_v2_with_type_tag_str("0x1::dkg::DKGStartEvent", b"dkg_2".to_vec());
+        let event_0 =
+            ContractEvent::new_v2_with_type_tag_str("0x1::dkg::DKGStartEvent", b"dkg_1".to_vec());
+        let event_1 = ContractEvent::new_v2_with_type_tag_str(
+            "0x2345::random_module::RandomEvent",
+            b"random_x".to_vec(),
+        );
+        let event_2 =
+            ContractEvent::new_v2_with_type_tag_str("0x1::dkg::DKGStartEvent", b"dkg_2".to_vec());
 
-            let txns = vec![Transaction::dummy(), Transaction::dummy()];
-            let txn_outs = vec![
-                TransactionOutput::new(
-                    WriteSet::default(),
-                    vec![event_0.clone()],
-                    0,
-                    TransactionStatus::Keep(ExecutionStatus::Success),
-                    TransactionAuxiliaryData::default(),
-                ),
-                TransactionOutput::new(
-                    WriteSet::default(),
-                    vec![event_1.clone(), event_2.clone()],
-                    0,
-                    TransactionStatus::Keep(ExecutionStatus::Success),
-                    TransactionAuxiliaryData::default(),
-                ),
-            ];
-            let execution_output =
-                Parser::parse(0, txns, txn_outs, CachedStateView::new_dummy(), None, None).unwrap();
-            assert_eq!(
-                vec![event_0, event_2],
-                *execution_output.subscribable_events
-            );
-        FIXME(aldenhu)
-             */
-        todo!()
+        let txns = vec![Transaction::dummy(), Transaction::dummy()];
+        let txn_outs = vec![
+            TransactionOutput::new(
+                WriteSet::default(),
+                vec![event_0.clone()],
+                0,
+                TransactionStatus::Keep(ExecutionStatus::Success),
+                TransactionAuxiliaryData::default(),
+            ),
+            TransactionOutput::new(
+                WriteSet::default(),
+                vec![event_1.clone(), event_2.clone()],
+                0,
+                TransactionStatus::Keep(ExecutionStatus::Success),
+                TransactionAuxiliaryData::default(),
+            ),
+        ];
+        let state = LedgerState::new_empty();
+        let execution_output = Parser::parse(
+            0,
+            txns,
+            txn_outs,
+            &state,
+            CachedStateView::new_dummy(&state),
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            vec![event_0, event_2],
+            *execution_output.subscribable_events
+        );
     }
 }

@@ -5,7 +5,7 @@ use crate::{
     metrics::TIMER,
     state_store::{
         state::{LedgerState, State},
-        state_update_ref_map::BatchedStateUpdateRefs,
+        state_update_refs::BatchedStateUpdateRefs,
     },
     DbReader,
 };
@@ -213,9 +213,13 @@ impl ProofRead for ProvableStateSummary {
     // FIXME(aldenhu): return error
     // FIXME(aldenhu): partial proof
     // FIXME(aldenhu): ref
+    // TODO(aldenhu): make proof reader creation lazy -- localize the memorized map to sub trees to reduce cost
     fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt> {
         self.version().map(|ver| {
+            let _timer = TIMER.timer_with(&["provable_state_summary__get_or_insert"]);
             self.memorized.insert(key, |key| {
+                let _timer = TIMER.timer_with(&["provable_state_summary__get_proof"]);
+
                 Box::new(
                     self.db
                         .get_state_proof_by_version_ext(key, ver, 0)
@@ -241,17 +245,16 @@ impl StateWithSummary {
         }
     }
 
-    // FIXME(aldenhu): rename
     pub fn new_at_version(
         version: Option<Version>,
         global_state_root_hash: HashValue,
-        state_usage: StateStorageUsage,
+        usage: StateStorageUsage,
     ) -> Self {
         Self {
-            state: State::new_empty_at_version(version, state_usage),
+            state: State::new_at_version(version, usage),
             summary: StateSummary::new_at_version(
                 version,
-                SparseMerkleTree::new(global_state_root_hash, state_usage),
+                SparseMerkleTree::new(global_state_root_hash, usage),
             ),
         }
     }

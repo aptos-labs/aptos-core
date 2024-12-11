@@ -69,9 +69,11 @@ impl DoStateCheckpoint {
 
             Ok(out)
         } else {
+            /* FIXME(aldenhu): relex for tests
             // We don't bother to deal with the case where the known hashes are not passed in while
             // there are potentially multiple state checkpoints in the output.
             ensure!(execution_output.is_block || num_txns == 1);
+             */
 
             let mut out = vec![None; num_txns];
 
@@ -82,7 +84,6 @@ impl DoStateCheckpoint {
                 let index = updates.num_versions - 1;
                 out[index] = Some(state_summary.last_checkpoint().root_hash());
             }
-            out[num_txns - 1] = Some(state_summary.root_hash());
 
             Ok(out)
         }

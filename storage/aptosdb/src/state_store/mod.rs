@@ -53,7 +53,6 @@ use aptos_executor::{
     types::in_memory_state_calculator_v2::InMemoryStateCalculatorV2,
     workflow::do_state_checkpoint::DoStateCheckpoint,
 };
-use aptos_executor_types::transactions_with_output::StateUpdateRefs;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
@@ -64,11 +63,11 @@ use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     db_ensure as ensure, db_other_bail as bail,
     state_store::{
-        per_version_state_update_refs::PerVersionStateUpdateRefs,
         state::{LedgerState, State},
         state_delta::StateDelta,
         state_summary::{ProvableStateSummary, StateSummary, StateWithSummary},
         state_update::{StateCacheEntry, StateUpdateRef},
+        state_update_refs::{PerVersionStateUpdateRefs, StateUpdateRefs},
         state_view::cached_state_view::{CachedStateView, ShardedStateCache, StateCacheShard},
         NUM_STATE_SHARDS,
     },
@@ -735,7 +734,7 @@ impl StateStore {
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
         enable_sharding: bool,
     ) -> Result<()> {
-        /* FIXME(aldenhu): for restore tool
+        /*
         self.put_value_sets(
             first_version,
             &ShardedStateUpdateRefs::index_write_sets(&write_sets, write_sets.len()),
@@ -745,7 +744,7 @@ impl StateStore {
             sharded_state_kv_batches,
             enable_sharding,
             None, // last_checkpoint_index
-        )
+        ) FIXME(aldenhu)
          */
         todo!()
     }

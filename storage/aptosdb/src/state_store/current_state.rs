@@ -1,11 +1,13 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_crypto::hash::SPARSE_MERKLE_PLACEHOLDER_HASH;
 use aptos_storage_interface::state_store::{
     state::LedgerState,
     state_delta::StateDelta,
     state_summary::{LedgerStateSummary, StateWithSummary},
 };
+use aptos_types::{state_store::state_storage_usage::StateStorageUsage, transaction::Version};
 use derive_more::{Deref, DerefMut};
 
 #[derive(Clone, Debug, Deref, DerefMut)]
@@ -32,6 +34,17 @@ impl LedgerStateWithSummary {
     pub fn new_dummy() -> Self {
         let empty = StateWithSummary::new_empty();
         Self::new(empty.clone(), empty)
+    }
+
+    pub(crate) fn new_dummy_at_checkpoint_version(
+        version: Option<Version>,
+    ) -> LedgerStateWithSummary {
+        let state = StateWithSummary::new_at_version(
+            version,
+            *SPARSE_MERKLE_PLACEHOLDER_HASH,
+            StateStorageUsage::new_untracked(),
+        );
+        LedgerStateWithSummary::new_at_checkpoint(state)
     }
 
     pub fn from_state_and_summary(state: LedgerState, summary: LedgerStateSummary) -> Self {
@@ -61,8 +74,8 @@ impl LedgerStateWithSummary {
 
     pub fn ledger_state_summary(&self) -> LedgerStateSummary {
         LedgerStateSummary::new(
-            self.latest.summary().clone(),
             self.last_checkpoint.summary().clone(),
+            self.latest.summary().clone(),
         )
     }
 
