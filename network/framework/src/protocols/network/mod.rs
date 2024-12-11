@@ -311,7 +311,7 @@ fn received_message_to_event<TMessage: Message>(
     received_message: ReceivedMessage,
 ) -> Option<Event<TMessage>> {
     // Unpack the received message
-    let (message, message_metadata, sender, rpc_replier) = received_message.into_parts();
+    let (network_message, message_metadata, sender, rpc_replier) = received_message.into_parts();
 
     // Update the metadata as having sent the message to the application
     let mut received_message_metadata = match message_metadata.into_received_metadata() {
@@ -325,16 +325,29 @@ fn received_message_to_event<TMessage: Message>(
 
     // Transform the message based on its type
     let peer_id = sender.peer_id();
-    match message {
-        NetworkMessage::RpcRequest(rpc_req) => {
+    match network_message {
+        NetworkMessage::DirectSendAndMetadata(message_and_metadata) => {
+            request_to_network_event(peer_id, &message_and_metadata)
+                .map(|msg| Event::Message(peer_id, msg))
+        },
+        NetworkMessage::RpcRequestAndMetadata(request_and_metadata) => {
             let rpc_replier = Arc::into_inner(rpc_replier.unwrap()).unwrap();
-            request_to_network_event(peer_id, &rpc_req)
-                .map(|msg| Event::RpcRequest(peer_id, msg, rpc_req.protocol_id, rpc_replier))
+            request_to_network_event(peer_id, &request_and_metadata).map(|msg| {
+                Event::RpcRequest(
+                    peer_id,
+                    msg,
+                    request_and_metadata.message_wire_metadata.protocol_id,
+                    rpc_replier,
+                )
+            })
         },
-        NetworkMessage::DirectSendMsg(request) => {
-            request_to_network_event(peer_id, &request).map(|msg| Event::Message(peer_id, msg))
+        _ => {
+            error!(
+                "Failed to transform message into event! Unexpected message type: {:?}",
+                network_message.get_label(),
+            );
+            None
         },
-        _ => None,
     }
 }
 
