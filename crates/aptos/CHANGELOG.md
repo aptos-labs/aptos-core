@@ -3,6 +3,7 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # Unreleased
+- [**Breaking Change**] `aptos init` and `aptos account fund-with-faucet` no longer work directly with testnet, you must now use the minting page at [Aptos Learn](https://aptos.dev/network/faucet). 
 
 ## [4.7.0] - 2024/12/10
 - [`Fix`] CLI config should not always require a private key field to be present.
