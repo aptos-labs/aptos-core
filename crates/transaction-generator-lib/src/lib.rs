@@ -132,7 +132,7 @@ impl WorkflowProgress {
 
 impl Default for TransactionType {
     fn default() -> Self {
-        TransactionTypeArg::CoinTransferOrderless.materialize_default()
+        TransactionTypeArg::CoinTransfer.materialize_default()
     }
 }
 
