@@ -252,6 +252,7 @@ impl ExecutionPipeline {
 
             counters::EXECUTE_BLOCK_WAIT_TIME.observe_duration(command_creation_time.elapsed());
             let block_id = block.block_id;
+            let round = pipelined_block.round();
             info!("execute_stage received block {}.", block_id);
 
             let mut committed_transactions = HashSet::new();
@@ -358,7 +359,7 @@ impl ExecutionPipeline {
                     let shuffle_iterator = crate::transaction_shuffler::use_case_aware::iterator::ShuffledTransactionIterator::new(crate::transaction_shuffler::use_case_aware::Config {
                             sender_spread_factor: 32,
                             platform_use_case_spread_factor: 0,
-                            user_use_case_spread_factor: 4,
+                            user_use_case_spread_factor: 16,
                         }).extended_with(txns);
                     for (idx, txn) in validator_txns
                         .into_iter()
@@ -386,7 +387,10 @@ impl ExecutionPipeline {
                     })
                 });
                 let start = Instant::now();
-                info!("execute_and_state_checkpoint start. {}", block_id);
+                info!(
+                    "execute_and_state_checkpoint start. {}, {}",
+                    round, block_id
+                );
                 executor
                     .execute_and_state_checkpoint(
                         block,
@@ -394,7 +398,12 @@ impl ExecutionPipeline {
                         block_executor_onchain_config,
                     )
                     .map(|output| {
-                        info!("execute_and_state_checkpoint end. {}", block_id);
+                        info!(
+                            "execute_and_state_checkpoint end. elapsed = {}ms, {}, {}",
+                            start.elapsed().as_millis(),
+                            round,
+                            block_id
+                        );
                         (output, start.elapsed())
                     })
             });
