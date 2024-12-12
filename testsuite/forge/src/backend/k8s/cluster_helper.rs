@@ -647,7 +647,7 @@ pub async fn install_testnet_resources(
         kube_client.clone(),
         kube_namespace.clone(),
         FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
-        Some("7ab32f3eb20e28fbc2103b0fbe82148063794b30".into()),
+        Some("f00ec95ed5f02d1372ee83102446be0a0f2840d8".into()),
     );
 
     testnet_deployer.start(config).await?;
