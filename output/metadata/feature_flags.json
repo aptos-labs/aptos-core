@@ -1,0 +1,6 @@
+{
+  "title": "Enable native memory operations feature flag",
+  "description": "[AIP-105] Enable native memory operations: mem::swap and vector::move_range",
+  "source_code_url": "https://github.com/aptos-labs/aptos-core",
+  "discussion_url": "https://github.com/aptos-labs/aptos-core"
+}
