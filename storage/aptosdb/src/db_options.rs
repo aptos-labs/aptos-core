@@ -28,7 +28,10 @@ pub(super) fn ledger_db_column_families() -> Vec<ColumnFamilyName> {
         TRANSACTION_ACCUMULATOR_CF_NAME,
         TRANSACTION_ACCUMULATOR_HASH_CF_NAME,
         TRANSACTION_AUXILIARY_DATA_CF_NAME,
-        TRANSACTION_BY_ACCOUNT_CF_NAME,
+        ORDERED_TRANSACTION_BY_ACCOUNT_CF_NAME,
+        // Question: Do we need to add these new column families in AptosDB as we are moving to indexer reader?
+        ORDERLESS_TRANSACTION_BY_ACCOUNT_CF_NAME,
+        TRANSACTION_SUMMARIES_BY_ACCOUNT_CF_NAME,
         TRANSACTION_BY_HASH_CF_NAME,
         TRANSACTION_INFO_CF_NAME,
         VERSION_DATA_CF_NAME,
@@ -70,7 +73,9 @@ pub(super) fn transaction_db_column_families() -> Vec<ColumnFamilyName> {
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
         DB_METADATA_CF_NAME,
         TRANSACTION_CF_NAME,
-        TRANSACTION_BY_ACCOUNT_CF_NAME,
+        ORDERED_TRANSACTION_BY_ACCOUNT_CF_NAME,
+        ORDERLESS_TRANSACTION_BY_ACCOUNT_CF_NAME,
+        TRANSACTION_SUMMARIES_BY_ACCOUNT_CF_NAME,
         TRANSACTION_BY_HASH_CF_NAME,
     ]
 }

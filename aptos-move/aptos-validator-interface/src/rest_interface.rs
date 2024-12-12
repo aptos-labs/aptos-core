@@ -16,8 +16,7 @@ use aptos_types::{
     account_address::AccountAddress,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        EntryFunction, ExecutionStatus::MiscellaneousError, Transaction, TransactionInfo,
-        TransactionPayload, Version,
+        EntryFunction, ExecutionStatus::MiscellaneousError, Transaction, TransactionInfo, TransactionPayload, Version
     },
 };
 use async_recursion::async_recursion;
@@ -354,7 +353,7 @@ impl AptosValidatorInterface for RestDebuggerInterface {
     ) -> Result<Option<Version>> {
         Ok(Some(
             self.0
-                .get_account_transactions_bcs(account, Some(seq), None)
+                .get_account_ordered_transactions_bcs(account, Some(seq), None)
                 .await?
                 .into_inner()[0]
                 .version,
