@@ -31,4 +31,5 @@ once_cell = { workspace = true }
 sha3 = { workspace = true }
 
 [dev-dependencies]
-aptos-types = { workspace = true, features = ["testing"] }
+aptos-types = { workspace = true, features = ["testing", "fuzzing"] }
+serde = { workspace = true }

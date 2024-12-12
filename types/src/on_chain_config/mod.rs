@@ -270,6 +270,11 @@ impl ConfigurationResource {
             events,
         }
     }
+
+    #[cfg(feature = "fuzzing")]
+    pub fn set_last_reconfiguration_time_for_test(&mut self, last_reconfiguration_time: u64) {
+        self.last_reconfiguration_time = last_reconfiguration_time;
+    }
 }
 
 #[cfg(feature = "fuzzing")]
