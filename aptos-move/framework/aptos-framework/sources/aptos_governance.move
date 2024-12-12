@@ -62,6 +62,8 @@ module aptos_framework::aptos_governance {
     const EPARTIAL_VOTING_NOT_INITIALIZED: u64 = 13;
     /// The proposal in the argument is not a partial voting proposal.
     const ENOT_PARTIAL_VOTING_PROPOSAL: u64 = 14;
+    /// The proposal has expired.
+    const EPROPOSAL_EXPIRED: u64 = 15;
 
     /// This matches the same enum const in voting. We have to duplicate it as Move doesn't have support for enums yet.
     const PROPOSAL_STATE_SUCCEEDED: u64 = 1;
@@ -331,6 +333,23 @@ module aptos_framework::aptos_governance {
         get_voting_power(stake_pool) - used_voting_power
     }
 
+    public fun assert_proposal_expiration(stake_pool: address, proposal_id: u64) {
+        assert_voting_initialization();
+        let proposal_expiration = voting::get_proposal_expiration_secs<GovernanceProposal>(
+            @aptos_framework,
+            proposal_id
+        );
+        // The voter's stake needs to be locked up at least as long as the proposal's expiration.
+        assert!(
+            proposal_expiration <= stake::get_lockup_secs(stake_pool),
+            error::invalid_argument(EINSUFFICIENT_STAKE_LOCKUP),
+        );
+        assert!(
+            timestamp::now_seconds() <= proposal_expiration,
+            error::invalid_argument(EPROPOSAL_EXPIRED),
+        );
+    }
+
     /// Create a single-step proposal with the backing `stake_pool`.
     /// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
     /// only the exact script with matching hash can be successfully executed.
@@ -512,15 +531,7 @@ module aptos_framework::aptos_governance {
         let voter_address = signer::address_of(voter);
         assert!(stake::get_delegated_voter(stake_pool) == voter_address, error::invalid_argument(ENOT_DELEGATED_VOTER));
 
-        // The voter's stake needs to be locked up at least as long as the proposal's expiration.
-        let proposal_expiration = voting::get_proposal_expiration_secs<GovernanceProposal>(
-            @aptos_framework,
-            proposal_id
-        );
-        assert!(
-            stake::get_lockup_secs(stake_pool) >= proposal_expiration,
-            error::invalid_argument(EINSUFFICIENT_STAKE_LOCKUP),
-        );
+        assert_proposal_expiration(stake_pool, proposal_id);
 
         // If a stake pool has already voted on a proposal before partial governance voting is enabled,
         // `get_remaining_voting_power` returns 0.
@@ -963,7 +974,7 @@ module aptos_framework::aptos_governance {
     }
 
     #[test(aptos_framework = @aptos_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
-    #[expected_failure(abort_code = 0x10004, location = aptos_framework::voting)]
+    #[expected_failure(abort_code = 65541, location = aptos_framework::aptos_governance)]
     public entry fun test_cannot_double_vote(
         aptos_framework: signer,
         proposer: signer,
@@ -975,7 +986,7 @@ module aptos_framework::aptos_governance {
         create_proposal(
             &proposer,
             signer::address_of(&proposer),
-            b"",
+            b"0",
             b"",
             b"",
         );
@@ -986,7 +997,54 @@ module aptos_framework::aptos_governance {
     }
 
     #[test(aptos_framework = @aptos_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
-    #[expected_failure(abort_code = 0x10004, location = aptos_framework::voting)]
+    #[expected_failure(abort_code = 65551, location = aptos_framework::aptos_governance)]
+    public entry fun test_cannot_vote_for_expired_proposal(
+        aptos_framework: signer,
+        proposer: signer,
+        voter_1: signer,
+        voter_2: signer,
+    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
+        setup_partial_voting_with_initialized_stake(&aptos_framework, &proposer, &voter_1, &voter_2);
+
+        create_proposal(
+            &proposer,
+            signer::address_of(&proposer),
+            b"0",
+            b"",
+            b"",
+        );
+
+        timestamp::fast_forward_seconds(2000);
+        stake::end_epoch();
+
+        // Should abort because the proposal has expired.
+        vote(&voter_1, signer::address_of(&voter_1), 0, true);
+    }
+
+    #[test(aptos_framework = @aptos_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @0x345)]
+    #[expected_failure(abort_code = 65539, location = aptos_framework::aptos_governance)]
+    public entry fun test_cannot_vote_due_to_insufficient_stake_lockup(
+        aptos_framework: signer,
+        proposer: signer,
+        voter_1: signer,
+        voter_2: signer,
+    ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
+        setup_partial_voting_with_initialized_stake(&aptos_framework, &proposer, &voter_1, &voter_2);
+
+        create_proposal(
+            &proposer,
+            signer::address_of(&proposer),
+            b"0",
+            b"",
+            b"",
+        );
+
+        // Should abort due to insufficient stake lockup.
+        vote(&voter_1, signer::address_of(&voter_1), 0, true);
+    }
+
+    #[test(aptos_framework = @aptos_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
+    #[expected_failure(abort_code = 65541, location = aptos_framework::aptos_governance)]
     public entry fun test_cannot_double_vote_with_different_voter_addresses(
         aptos_framework: signer,
         proposer: signer,
@@ -998,7 +1056,7 @@ module aptos_framework::aptos_governance {
         create_proposal(
             &proposer,
             signer::address_of(&proposer),
-            b"",
+            b"0",
             b"",
             b"",
         );
