@@ -64,6 +64,8 @@ NUM_ACCOUNTS = max(
     ]
 )
 MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
+NUM_KEYLESS_ACCOUNTS = 20000  # 20k keyless accounts should take ~1 min.
+MAX_BLOCK_SIZE_KEYLESS = 10000
 
 NOISE_LOWER_LIMIT = 0.98 if IS_MAINNET else 0.8
 NOISE_LOWER_LIMIT_WARN = 0.9
@@ -667,8 +669,8 @@ with tempfile.TemporaryDirectory() as tmpdirname, tempfile.TemporaryDirectory() 
     create_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-executor-type aptos-vm-with-block-stm --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db {FEATURE_FLAGS} --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
 
-    print(f"Warmup - creating another DB with {NUM_ACCOUNTS} keyless accounts")
-    create_db_command_keyless = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-executor-type aptos-vm-with-block-stm --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} --use-keyless-accounts create-db {FEATURE_FLAGS} --data-dir {keyless_tmp_dir}/db --num-accounts {NUM_ACCOUNTS}"
+    print(f"Warmup - creating another DB with {NUM_KEYLESS_ACCOUNTS} keyless accounts")
+    create_db_command_keyless = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-executor-type aptos-vm-with-block-stm --block-size {MAX_BLOCK_SIZE_KEYLESS} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} --use-keyless-accounts create-db {FEATURE_FLAGS} --data-dir {keyless_tmp_dir}/db --num-accounts {NUM_KEYLESS_ACCOUNTS}"
     output_keyless = execute_command(create_db_command_keyless)
 
     results += [
@@ -730,7 +732,8 @@ with tempfile.TemporaryDirectory() as tmpdirname, tempfile.TemporaryDirectory() 
             )
 
         # target 250ms blocks, a bit larger than prod
-        cur_block_size = max(4, int(min([criteria.expected_tps / 4, MAX_BLOCK_SIZE])))
+        max_block_size = MAX_BLOCK_SIZE_KEYLESS if test.key_extra.txn_auth_mode == "keyless" else MAX_BLOCK_SIZE
+        cur_block_size = max(4, int(min([criteria.expected_tps / 4, max_block_size])))
 
         print(f"Testing {test.key}")
         if test.key_extra.transaction_type_override == "":
@@ -797,22 +800,22 @@ with tempfile.TemporaryDirectory() as tmpdirname, tempfile.TemporaryDirectory() 
         pipeline_extra_args_str = " ".join(pipeline_extra_args)
 
         if test.key_extra.single_block_dst_working_set:
-            additional_dst_pool_accounts = MAX_BLOCK_SIZE
+            additional_dst_pool_accounts = max_block_size
         else:
-            additional_dst_pool_accounts = 2 * MAX_BLOCK_SIZE * NUM_BLOCKS
+            additional_dst_pool_accounts = 2 * max_block_size * NUM_BLOCKS
 
         data_dir = tmpdirname
         keyless_flags = ""
         if test.key_extra.txn_auth_mode == "keyless":
-            keyless_flags = "--use-keyless-accounts"
             data_dir = keyless_tmp_dir
+            keyless_flags = "--use-keyless-accounts"
 
-        common_command_suffix = f"{executor_type_str} {pipeline_extra_args_str} --block-size {cur_block_size} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} {keyless_flags} run-executor {FEATURE_FLAGS} {workload_args_str} --module-working-set-size {test.key.module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {additional_dst_pool_accounts} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
+        common_command_suffix = f"{executor_type_str} {pipeline_extra_args_str} --block-size {cur_block_size} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} {keyless_flags} run-executor {FEATURE_FLAGS} {workload_args_str} --module-working-set-size {test.key.module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {additional_dst_pool_accounts} --data-dir {data_dir}/db  --checkpoint-dir {data_dir}/cp"
 
         number_of_threads_results = {}
 
         for execution_threads in EXECUTION_ONLY_NUMBER_OF_THREADS:
-            test_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {execution_threads} --skip-commit {common_command_suffix} --blocks {NUM_BLOCKS_DETAILED}"
+            test_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {execution_threads} --skip-commit {common_command_suffix} --blocks {NUM_BLOCKS}"
             output = execute_command(test_db_command)
 
             number_of_threads_results[execution_threads] = extract_run_results(
