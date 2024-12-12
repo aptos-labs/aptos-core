@@ -28,7 +28,7 @@ pub use move_table_extension::{TableHandle, TableInfo, TableResolver};
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    value_serde::{deserialize_and_allow_delayed_values, serialize_and_allow_delayed_values},
+    value_serde::ValueSerDeContext,
     values::{GlobalValue, Reference, StructRef, Value},
 };
 use sha3::{Digest, Sha3_256};
@@ -529,7 +529,8 @@ fn get_table_handle(table: &StructRef) -> PartialVMResult<TableHandle> {
 }
 
 fn serialize_key(layout: &MoveTypeLayout, key: &Value) -> PartialVMResult<Vec<u8>> {
-    key.simple_serialize(layout)
+    ValueSerDeContext::new()
+        .serialize(key, layout)
         .ok_or_else(|| partial_extension_error("cannot serialize table key"))
 }
 
@@ -539,12 +540,14 @@ fn serialize_value(
 ) -> PartialVMResult<(Bytes, Option<Arc<MoveTypeLayout>>)> {
     let serialization_result = if layout_info.has_identifier_mappings {
         // Value contains delayed fields, so we should be able to serialize it.
-        serialize_and_allow_delayed_values(val, layout_info.layout.as_ref())?
+        ValueSerDeContext::new_with_delayed_fields_serde()
+            .serialize(val, layout_info.layout.as_ref())
             .map(|bytes| (bytes.into(), Some(layout_info.layout.clone())))
     } else {
         // No delayed fields, make sure serialization fails if there are any
         // native values.
-        val.simple_serialize(layout_info.layout.as_ref())
+        ValueSerDeContext::new()
+            .serialize(val, layout_info.layout.as_ref())
             .map(|bytes| (bytes.into(), None))
     };
     serialization_result.ok_or_else(|| partial_extension_error("cannot serialize table value"))
@@ -553,9 +556,9 @@ fn serialize_value(
 fn deserialize_value(layout_info: &LayoutInfo, bytes: &[u8]) -> PartialVMResult<Value> {
     let layout = layout_info.layout.as_ref();
     let deserialization_result = if layout_info.has_identifier_mappings {
-        deserialize_and_allow_delayed_values(bytes, layout)
+        ValueSerDeContext::new_with_delayed_fields_serde().deserialize(bytes, layout)
     } else {
-        Value::simple_deserialize(bytes, layout)
+        ValueSerDeContext::new().deserialize(bytes, layout)
     };
     deserialization_result.ok_or_else(|| partial_extension_error("cannot deserialize table value"))
 }

@@ -26,6 +26,7 @@ use move_vm_types::{
     loaded_data::runtime_types::Type,
     natives::function::NativeResult,
     pop_arg,
+    value_serde::ValueSerDeContext,
     values::{GlobalValue, Reference, StructRef, Value},
 };
 use sha3::{Digest, Sha3_256};
@@ -686,12 +687,14 @@ fn get_table_handle(table: &StructRef) -> PartialVMResult<TableHandle> {
 }
 
 fn serialize(layout: &MoveTypeLayout, val: &Value) -> PartialVMResult<Vec<u8>> {
-    val.simple_serialize(layout)
+    ValueSerDeContext::new()
+        .serialize(val, layout)
         .ok_or_else(|| partial_extension_error("cannot serialize table key or value"))
 }
 
 fn deserialize(layout: &MoveTypeLayout, bytes: &[u8]) -> PartialVMResult<Value> {
-    Value::simple_deserialize(bytes, layout)
+    ValueSerDeContext::new()
+        .deserialize(bytes, layout)
         .ok_or_else(|| partial_extension_error("cannot deserialize table key or value"))
 }
 

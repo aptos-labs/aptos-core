@@ -50,6 +50,7 @@ use move_model::{
 };
 use move_symbol_pool::Symbol;
 use move_vm_runtime::session::SerializedReturnValues;
+use move_vm_types::value_serde::ValueSerDeContext;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::{
@@ -621,8 +622,7 @@ fn display_return_values(return_values: SerializedReturnValues) -> Option<String
         let values = mutable_reference_outputs
             .iter()
             .map(|(idx, bytes, layout)| {
-                let value =
-                    move_vm_types::values::Value::simple_deserialize(bytes, layout).unwrap();
+                let value = ValueSerDeContext::new().deserialize(bytes, layout).unwrap();
                 (idx, value)
             })
             .collect::<Vec<_>>();
@@ -640,9 +640,7 @@ fn display_return_values(return_values: SerializedReturnValues) -> Option<String
     if !return_values.is_empty() {
         let values = return_values
             .iter()
-            .map(|(bytes, layout)| {
-                move_vm_types::values::Value::simple_deserialize(bytes, layout).unwrap()
-            })
+            .map(|(bytes, layout)| ValueSerDeContext::new().deserialize(bytes, layout).unwrap())
             .collect::<Vec<_>>();
         let printed = values
             .iter()

@@ -26,7 +26,7 @@ use move_core_types::{
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     resolver::MoveResolver,
-    value_serde::deserialize_and_allow_delayed_values,
+    value_serde::ValueSerDeContext,
     values::{GlobalValue, Value},
 };
 use sha3::{Digest, Sha3_256};
@@ -118,8 +118,8 @@ impl<'r> TransactionDataCache<'r> {
     ) -> PartialVMResult<ChangeSet> {
         let resource_converter =
             |value: Value, layout: MoveTypeLayout, _: bool| -> PartialVMResult<Bytes> {
-                value
-                    .simple_serialize(&layout)
+                ValueSerDeContext::new()
+                    .serialize(&value, &layout)
                     .map(Into::into)
                     .ok_or_else(|| {
                         PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
@@ -277,7 +277,9 @@ impl<'r> TransactionDataCache<'r> {
 
             let gv = match data {
                 Some(blob) => {
-                    let val = match deserialize_and_allow_delayed_values(&blob, &ty_layout) {
+                    let val = match ValueSerDeContext::new_with_delayed_fields_serde()
+                        .deserialize(&blob, &ty_layout)
+                    {
                         Some(val) => val,
                         None => {
                             let msg =

@@ -3625,51 +3625,15 @@ pub mod debug {
  *   is to involve an explicit representation of the type layout.
  *
  **************************************************************************************/
-use crate::value_serde::{CustomDeserializer, CustomSerializer, RelaxedCustomSerDe};
+use crate::value_serde::{
+    CustomDeserializer, CustomSerializer, RelaxedCustomSerDe, ValueSerDeContext,
+};
 use move_binary_format::file_format::VariantIndex;
 use serde::{
     de::{EnumAccess, Error as DeError, Unexpected, VariantAccess},
     ser::{Error as SerError, SerializeSeq, SerializeTuple, SerializeTupleVariant},
     Deserialize,
 };
-
-impl Value {
-    pub fn simple_deserialize(blob: &[u8], layout: &MoveTypeLayout) -> Option<Value> {
-        let seed = DeserializationSeed {
-            custom_deserializer: None::<&RelaxedCustomSerDe>,
-            layout,
-        };
-        bcs::from_bytes_seed(seed, blob).ok()
-    }
-
-    pub fn simple_serialize(&self, layout: &MoveTypeLayout) -> Option<Vec<u8>> {
-        bcs::to_bytes(&SerializationReadyValue {
-            custom_serializer: None::<&RelaxedCustomSerDe>,
-            layout,
-            value: &self.0,
-        })
-        .ok()
-    }
-}
-
-impl Struct {
-    pub fn simple_deserialize(blob: &[u8], layout: &MoveStructLayout) -> Option<Struct> {
-        let seed = DeserializationSeed {
-            custom_deserializer: None::<&RelaxedCustomSerDe>,
-            layout,
-        };
-        bcs::from_bytes_seed(seed, blob).ok()
-    }
-
-    pub fn simple_serialize(&self, layout: &MoveStructLayout) -> Option<Vec<u8>> {
-        bcs::to_bytes(&SerializationReadyValue {
-            custom_serializer: None::<&RelaxedCustomSerDe>,
-            layout,
-            value: &self.fields,
-        })
-        .ok()
-    }
-}
 
 // Wrapper around value with additional information which can be used by the
 // serializer.
@@ -4162,7 +4126,7 @@ impl Value {
 
     pub fn deserialize_constant(constant: &Constant) -> Option<Value> {
         let layout = Self::constant_sig_token_to_layout(&constant.type_)?;
-        Value::simple_deserialize(&constant.data, &layout)
+        ValueSerDeContext::new().deserialize(&constant.data, &layout)
     }
 }
 

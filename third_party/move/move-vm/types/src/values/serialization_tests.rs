@@ -5,7 +5,7 @@
 
 use crate::{
     delayed_values::delayed_field_id::DelayedFieldID,
-    value_serde::{serialize_and_allow_delayed_values, serialized_size_allowing_delayed_values},
+    value_serde::ValueSerDeContext,
     values::{values_impl, Struct, Value},
 };
 use claims::{assert_err, assert_ok, assert_some};
@@ -85,10 +85,12 @@ fn enum_round_trip_vm_value() {
         )),
     ];
     for value in good_values {
-        let blob = value
-            .simple_serialize(&layout)
+        let blob = ValueSerDeContext::new()
+            .serialize(&value, &layout)
             .expect("serialization succeeds");
-        let de_value = Value::simple_deserialize(&blob, &layout).expect("deserialization succeeds");
+        let de_value = ValueSerDeContext::new()
+            .deserialize(&blob, &layout)
+            .expect("deserialization succeeds");
         assert!(
             value.equals(&de_value).unwrap(),
             "roundtrip serialization succeeds"
@@ -96,12 +98,16 @@ fn enum_round_trip_vm_value() {
     }
     let bad_tag_value = Value::struct_(Struct::pack_variant(3, [Value::u64(42)]));
     assert!(
-        bad_tag_value.simple_serialize(&layout).is_none(),
+        ValueSerDeContext::new()
+            .serialize(&bad_tag_value, &layout)
+            .is_none(),
         "serialization fails"
     );
     let bad_struct_value = Value::struct_(Struct::pack([Value::u64(42)]));
     assert!(
-        bad_struct_value.simple_serialize(&layout).is_none(),
+        ValueSerDeContext::new()
+            .serialize(&bad_struct_value, &layout)
+            .is_none(),
         "serialization fails"
     );
 }
@@ -160,14 +166,16 @@ fn enum_rust_round_trip_vm_value() {
         RustEnum::BoolNumber(true, 13),
     ];
     for (move_value, rust_value) in move_values.into_iter().zip(rust_values) {
-        let from_move = move_value
-            .simple_serialize(&layout)
+        let from_move = ValueSerDeContext::new()
+            .serialize(&move_value, &layout)
             .expect("from move succeeds");
         let to_rust = bcs::from_bytes::<RustEnum>(&from_move).expect("to rust successful");
         assert_eq!(to_rust, rust_value);
 
         let from_rust = bcs::to_bytes(&rust_value).expect("from rust succeeds");
-        let to_move = Value::simple_deserialize(&from_rust, &layout).expect("to move succeeds");
+        let to_move = ValueSerDeContext::new()
+            .deserialize(&from_rust, &layout)
+            .expect("to move succeeds");
         assert!(
             to_move.equals(&move_value).unwrap(),
             "from rust to move failed"
@@ -224,10 +232,13 @@ fn test_serialized_size() {
         ),
     ];
     for (value, layout) in good_values_layouts_sizes {
-        let bytes = assert_some!(assert_ok!(serialize_and_allow_delayed_values(
-            &value, &layout
-        )));
-        let size = assert_ok!(serialized_size_allowing_delayed_values(&value, &layout));
+        let bytes = assert_some!(
+            ValueSerDeContext::new_with_delayed_fields_serde().serialize(&value, &layout)
+        );
+
+        let size = assert_ok!(
+            ValueSerDeContext::new_with_delayed_fields_serde().serialized_size(&value, &layout)
+        );
         assert_eq!(size, bytes.len());
     }
 
@@ -241,6 +252,8 @@ fn test_serialized_size() {
         (Value::u64(12), Native(Aggregator, Box::new(U64))),
     ];
     for (value, layout) in bad_values_layouts_sizes {
-        assert_err!(serialized_size_allowing_delayed_values(&value, &layout));
+        assert_err!(
+            ValueSerDeContext::new_with_delayed_fields_serde().serialized_size(&value, &layout)
+        );
     }
 }
