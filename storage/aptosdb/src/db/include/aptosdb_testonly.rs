@@ -7,6 +7,7 @@ use aptos_storage_interface::state_store::state_view::cached_state_view::Sharded
 use aptos_storage_interface::state_store::state_delta::StateDelta;
 use aptos_types::transaction::{TransactionStatus, TransactionToCommit};
 use aptos_executor_types::transactions_with_output::TransactionsToKeep;
+use aptos_storage_interface::state_store::state_summary::ProvableStateSummary;
 use aptos_storage_interface::state_store::state_update_refs::PerVersionStateUpdateRefs;
 
 impl AptosDB {
@@ -101,83 +102,43 @@ impl AptosDB {
         &self,
         txns_to_commit: &[TransactionToCommit],
         first_version: Version,
-        base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
-        latest_in_memory_state: &StateDelta,
     ) -> Result<()> {
-        let chunk = ChunkToCommitOwned::from_test_txns_to_commit(
-            txns_to_commit,
-            first_version,
-            base_state_version,
-            latest_in_memory_state,
-        );
-        self.save_transactions(
-            chunk.as_ref(),
-            ledger_info_with_sigs,
-            sync_commit,
-        )
-    }
-}
-
-pub struct ChunkToCommitOwned {
-    first_version: Version,
-    transactions_to_keep: TransactionsToKeep,
-    transaction_infos: Vec<TransactionInfo>,
-    base_state_version: Option<Version>,
-    sharded_state_cache: Option<ShardedStateCache>,
-    is_reconfig: bool,
-}
-
-impl ChunkToCommitOwned {
-    pub fn from_test_txns_to_commit(
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-        base_state_version: Option<Version>,
-        latest_in_memory_state: &StateDelta,
-    ) -> Self {
-        /*
         let (transactions, transaction_outputs, transaction_infos) = Self::disassemble_txns_to_commit(txns_to_commit);
-
         let is_reconfig = transaction_outputs
             .iter()
             .rev()
             .flat_map(TransactionOutput::events)
             .any(ContractEvent::is_new_epoch_event);
-
         let transactions_to_keep = TransactionsToKeep::make(first_version, transactions, transaction_outputs, is_reconfig);
 
+        let write_sets = transactions_to_keep.transaction_outputs.iter().map(TransactionOutput::write_set).cloned().collect::<Vec<_>>();
 
-        Self {
+        let (state_view, state) = self.state_store.calculate_state_by_write_sets(
+            &write_sets,
             first_version,
-            transactions_to_keep,
-            transaction_infos,
-            base_state_version,
-            sharded_state_cache: None,
-            is_reconfig,
-        }
-        FIXME(aldenhu)
-         */
-        todo!()
-    }
+            transactions_to_keep.state_update_refs(),
+        )?;
+        let state_summary = self.state_store.current_state_locked().ledger_state_summary().update(
+            &ProvableStateSummary::new_persisted(self)?,
+            transactions_to_keep.state_update_refs_for_last_checkpoint(),
+            transactions_to_keep.state_update_refs_for_latest(),
+        )?;
 
-    pub fn as_ref(&self) -> ChunkToCommit {
-        /*
-        ChunkToCommit {
-            first_version: self.first_version,
-            transactions: &self.transactions_to_keep.transactions,
-            transaction_outputs: &self.transactions_to_keep.transaction_outputs,
-            transaction_infos: &self.transaction_infos,
-            base_state_version: self.base_state_version,
-            latest_in_memory_state: &self.latest_in_memory_state,
-            state_update_refs: self.transactions_to_keep.state_update_refs(),
-            state_updates_until_last_checkpoint: self.state_updates_until_last_checkpoint.as_ref(),
-            state_reads: self.sharded_state_cache.as_ref(),
-            is_reconfig: self.is_reconfig,
-        }
-        FIXME(aldenhu)
-         */
-        todo!()
+        let chunk = ChunkToCommit {
+            first_version,
+            transactions: &transactions_to_keep.transactions,
+            transaction_outputs: &transactions_to_keep.transaction_outputs,
+            transaction_infos: &transaction_infos,
+            state: &state,
+            state_summary: &state_summary,
+            state_update_refs: transactions_to_keep.per_version_state_update_refs(),
+            state_reads: Some(state_view.memorized_reads()),
+            is_reconfig,
+        };
+
+        self.save_transactions( chunk, ledger_info_with_sigs, true )
     }
 
     fn disassemble_txns_to_commit(txns_to_commit: &[TransactionToCommit]) -> (
@@ -198,44 +159,5 @@ impl ChunkToCommitOwned {
 
             (transaction.clone(), transaction_output, transaction_info.clone())
         }).multiunzip()
-    }
-
-    pub fn gather_state_updates_until_last_checkpoint<'kv>(
-        _first_version: Version,
-        _latest_in_memory_state: &StateDelta,
-        _state_update_refs: &PerVersionStateUpdateRefs<'kv>,
-        _transaction_infos: &[TransactionInfo],
-    ) -> Option<BatchedStateUpdateRefs<'kv>> {
-        /* FIXME(aldenhu)
-        if let Some(latest_checkpoint_version) = latest_in_memory_state.base_version {
-            if latest_checkpoint_version >= first_version {
-                let idx = (latest_checkpoint_version - first_version) as usize;
-                assert!(
-                    transaction_infos[idx].state_checkpoint_hash().is_some(),
-                    "The new latest snapshot version passed in {:?} does not match with the last checkpoint version in txns_to_commit {:?}",
-                    latest_checkpoint_version,
-                    first_version + idx as u64
-                );
-                let mut sharded_state_updates = ShardedStateUpdates::new_empty();
-                sharded_state_updates
-                    .shards
-                    .par_iter_mut()
-                    .zip_eq(state_update_refs.shards.par_iter())
-                    .for_each(|(updates, index)| {
-                        updates
-                            .extend(
-                                index
-                                    .iter()
-                                    .take_while(|(i, _k, _v)| *i <= idx)
-                                    .map(|(_i, k, v)| ((*k).clone(), v.cloned()))
-                            );
-                    });
-                return Some(sharded_state_updates);
-            }
-        }
-
-        None
-         */
-        todo!()
     }
 }

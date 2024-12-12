@@ -24,7 +24,7 @@ impl ApplyExecutionOutput {
     pub fn run(
         execution_output: ExecutionOutput,
         base_view: LedgerSummary,
-        reader: Arc<dyn DbReader>,
+        reader: &(dyn DbReader + Sync),
     ) -> Result<PartialStateComputeResult> {
         let state_checkpoint_output = DoStateCheckpoint::run(
             &execution_output,

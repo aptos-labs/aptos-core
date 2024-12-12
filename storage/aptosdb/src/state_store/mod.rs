@@ -67,7 +67,7 @@ use aptos_storage_interface::{
         state_delta::StateDelta,
         state_summary::{ProvableStateSummary, StateSummary, StateWithSummary},
         state_update::{StateCacheEntry, StateUpdateRef},
-        state_update_refs::{PerVersionStateUpdateRefs, StateUpdateRefs},
+        state_update_refs::{BatchedStateUpdateRefs, PerVersionStateUpdateRefs, StateUpdateRefs},
         state_view::cached_state_view::{CachedStateView, ShardedStateCache, StateCacheShard},
         NUM_STATE_SHARDS,
     },
@@ -661,7 +661,7 @@ impl StateStore {
         );
 
         let new_ledger_state_summary = state.ledger_state_summary().update(
-            &ProvableStateSummary::new(state.summary().clone(), state_db.clone()),
+            &ProvableStateSummary::new(state.summary().clone(), state_db.as_ref()),
             state_update_refs.for_last_checkpoint.as_ref(),
             state_update_refs.for_latest.as_ref(),
         )?;
@@ -734,36 +734,46 @@ impl StateStore {
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
         enable_sharding: bool,
     ) -> Result<()> {
-        let current_state = self.current_state_locked().ledger_state();
-        let persisted = self.persisted_state_locked().state().clone();
-        let state_view = CachedStateView::new(
-            StateViewId::Miscellaneous,
-            self.state_db.clone(),
-            current_state.latest().clone(),
-        )?;
-        state_view.prime_cache_by_write_sets(write_sets)?;
         let state_update_refs = StateUpdateRefs::index_write_sets(
             first_version,
             write_sets,
             write_sets.len(),
             None, // last_checkpoint_index
         );
-
-        let state = current_state.update(
-            &persisted,
-            state_update_refs.for_last_checkpoint.as_ref(),
-            state_update_refs.for_latest.as_ref(),
-            state_view.state_cache(),
-        );
+        let (state_view, state) =
+            self.calculate_state_by_write_sets(write_sets, first_version, &state_update_refs)?;
 
         self.put_value_sets(
             &state,
             &state_update_refs.per_version,
-            Some(state_view.state_cache()),
+            Some(state_view.memorized_reads()),
             batch,
             sharded_state_kv_batches,
             enable_sharding,
         )
+    }
+
+    pub(crate) fn calculate_state_by_write_sets(
+        &self,
+        write_sets: &[WriteSet],
+        first_version: Version,
+        state_update_refs: &StateUpdateRefs,
+    ) -> Result<(CachedStateView, LedgerState)> {
+        let current = self.current_state_locked().ledger_state();
+        let persisted = self.persisted_state_locked().state().clone();
+        let state_view = CachedStateView::new(
+            StateViewId::Miscellaneous,
+            self.state_db.clone(),
+            current.latest().clone(),
+        )?;
+        state_view.prime_cache_by_write_sets(write_sets)?;
+        let state = current.update(
+            &persisted,
+            state_update_refs.for_last_checkpoint.as_ref(),
+            state_update_refs.for_latest.as_ref(),
+            state_view.memorized_reads(),
+        );
+        Ok((state_view, state))
     }
 
     /// Put the `value_state_sets` into its own CF.

@@ -298,7 +298,7 @@ where
                 output.set_state_checkpoint_output(DoStateCheckpoint::run(
                     &output.execution_output,
                     parent_block.output.expect_result_state_summary(),
-                    &ProvableStateSummary::new_persisted(self.db.reader.clone())?,
+                    &ProvableStateSummary::new_persisted(self.db.reader.as_ref())?,
                     Option::<Vec<_>>::None,
                 )?);
                 output.set_ledger_update_output(DoLedgerUpdate::run(

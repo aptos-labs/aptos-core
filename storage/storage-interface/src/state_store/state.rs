@@ -251,4 +251,9 @@ impl LedgerState {
 
         LedgerState::new(latest, last_checkpoint)
     }
+
+    pub fn is_the_same(&self, other: &Self) -> bool {
+        self.latest.is_the_same(&other.latest)
+            && self.last_checkpoint.is_the_same(&other.last_checkpoint)
+    }
 }

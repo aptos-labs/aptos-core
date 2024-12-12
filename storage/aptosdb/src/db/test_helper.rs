@@ -936,31 +936,29 @@ pub(crate) fn put_transaction_auxiliary_data(
 pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: StateValue) {
     /*
     let leaf_node = Node::new_leaf(key.hash(), value.hash(), (key.clone(), version));
+
     db.state_merkle_db()
         .metadata_db()
         .put::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version), &leaf_node)
         .unwrap();
     let smt = db
-        .get_buffered_state_base()
+        .get_persisted_state_summary()
         .unwrap()
+        .global_state_summary
         .batch_update(vec![(key.hash(), Some(&value))], &ProofReader::new_empty())
         .unwrap();
+
     db.state_kv_db
         .metadata_db()
         .put::<StateValueSchema>(&(key.clone(), version), &Some(value.clone()))
         .unwrap();
-    let mut in_memory_state = db.state_store.current_state_cloned();
-    in_memory_state.current = smt;
-    in_memory_state.current_version = Some(version);
-    in_memory_state.updates_since_base.insert(key, Some(value));
+
     db.state_store
         .buffered_state()
         .lock()
         .update(None, &in_memory_state, true)
         .unwrap();
-        FIXME(aldenhu):
      */
-    todo!()
 }
 
 pub fn test_sync_transactions_impl(

@@ -192,7 +192,7 @@ impl CachedStateView {
         &self.speculative.base
     }
 
-    pub fn state_cache(&self) -> &ShardedStateCache {
+    pub fn memorized_reads(&self) -> &ShardedStateCache {
         &self.memorized
     }
 }

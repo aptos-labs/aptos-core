@@ -180,9 +180,17 @@ fn test_get_latest_ledger_summary() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
 
+    db.save_transactions_for_test(
+        &[],
+        0,    /* first_version */
+        None, /* ledger_info_with_sigs */
+        true, /* sync_commit */
+    )
+    .unwrap();
+
     // entirely empty db
     let empty = db.get_pre_committed_ledger_summary().unwrap();
-    assert!(empty.is_same_view(&LedgerSummary::new_empty()));
+    assert_eq!(empty.next_version(), 0);
 
     // bootstrapped db (any transaction info is in)
     let key = StateKey::raw(b"test_key");
@@ -200,14 +208,12 @@ fn test_get_latest_ledger_summary() {
     put_transaction_infos(&db, 0, &[txn_info.clone()]);
 
     let bootstrapped = db.get_pre_committed_ledger_summary().unwrap();
-    assert!(
-        bootstrapped.is_same_view(&LedgerSummary::new_at_state_checkpoint(
-            txn_info.state_checkpoint_hash().unwrap(),
-            StateStorageUsage::new_untracked(),
-            vec![txn_info.hash()],
-            1,
-        ))
+    assert_eq!(bootstrapped.next_version(), 1);
+    assert_eq!(
+        bootstrapped.transaction_accumulator.root_hash(),
+        txn_info.state_checkpoint_hash().unwrap()
     );
+    assert_eq!(bootstrapped.state_summary.root_hash(), hash);
 }
 
 pub fn test_state_merkle_pruning_impl(

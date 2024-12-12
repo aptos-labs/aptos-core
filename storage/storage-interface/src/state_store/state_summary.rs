@@ -22,7 +22,6 @@ use derive_more::Deref;
 use itertools::Itertools;
 use once_map::sync::OnceMap;
 use rayon::prelude::*;
-use std::sync::Arc;
 
 /// The data structure through which the entire state at a given
 /// version can be summarized to a concise digest (the root hash).
@@ -141,11 +140,11 @@ impl LedgerStateSummary {
         self.latest.next_version()
     }
 
-    pub fn assert_versions_match(&self, latest_state: &LedgerState) {
-        assert_eq!(self.next_version(), latest_state.next_version());
+    pub fn assert_versions_match(&self, state: &LedgerState) {
+        assert_eq!(self.next_version(), state.next_version());
         assert_eq!(
             self.last_checkpoint.next_version(),
-            latest_state.last_checkpoint().next_version()
+            state.last_checkpoint().next_version()
         );
     }
 
@@ -187,20 +186,20 @@ impl LedgerStateSummary {
 }
 
 #[derive(Deref)]
-pub struct ProvableStateSummary {
+pub struct ProvableStateSummary<'db> {
     #[deref]
     state_summary: StateSummary,
-    db: Arc<dyn DbReader>,
+    db: &'db (dyn DbReader + Sync),
     // FIXME(aldenhu): avoid lock conflicts
     memorized: OnceMap<HashValue, Box<SparseMerkleProofExt>>,
 }
 
-impl ProvableStateSummary {
-    pub fn new_persisted(db: Arc<dyn DbReader>) -> Result<Self> {
+impl<'db> ProvableStateSummary<'db> {
+    pub fn new_persisted(db: &'db (dyn DbReader + Sync)) -> Result<Self> {
         Ok(Self::new(db.get_persisted_state_summary()?, db))
     }
 
-    pub fn new(state_summary: StateSummary, db: Arc<dyn DbReader>) -> Self {
+    pub fn new(state_summary: StateSummary, db: &'db (dyn DbReader + Sync)) -> Self {
         Self {
             state_summary,
             db,
@@ -209,7 +208,7 @@ impl ProvableStateSummary {
     }
 }
 
-impl ProofRead for ProvableStateSummary {
+impl<'db> ProofRead for ProvableStateSummary<'db> {
     // FIXME(aldenhu): return error
     // FIXME(aldenhu): partial proof
     // FIXME(aldenhu): ref

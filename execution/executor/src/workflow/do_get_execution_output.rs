@@ -351,7 +351,7 @@ impl Parser {
             base_state_view.persisted_state(),
             to_commit.state_update_refs_for_last_checkpoint(),
             to_commit.state_update_refs_for_latest(),
-            base_state_view.state_cache(),
+            base_state_view.memorized_reads(),
         );
         let state_cache = base_state_view.into_state_cache();
 

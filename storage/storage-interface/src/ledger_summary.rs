@@ -71,15 +71,6 @@ impl LedgerSummary {
             Arc::new(InMemoryAccumulator::new_empty()),
         )
     }
-
-    pub fn is_same_view(&self, _rhs: &Self) -> bool {
-        todo!()
-        /* FIXME(aldenhu)
-        self.state.has_same_current_state(rhs.state())
-            && self.transaction_accumulator.root_hash() == rhs.transaction_accumulator.root_hash()
-
-         */
-    }
 }
 
 impl Default for LedgerSummary {

@@ -500,7 +500,7 @@ fn apply_transaction_by_writeset(
     .unwrap();
 
     let output =
-        ApplyExecutionOutput::run(chunk_output, ledger_summary, db.reader.clone()).unwrap();
+        ApplyExecutionOutput::run(chunk_output, ledger_summary, db.reader.as_ref()).unwrap();
 
     db.writer
         .save_transactions(
@@ -701,7 +701,7 @@ fn run_transactions_naive(
             TransactionSliceMetadata::unknown(),
         )
         .unwrap();
-        let output = ApplyExecutionOutput::run(out, ledger_summary, db.reader.clone()).unwrap();
+        let output = ApplyExecutionOutput::run(out, ledger_summary, db.reader.as_ref()).unwrap();
         db.writer
             .save_transactions(
                 output.expect_complete_result().as_chunk_to_commit(),
