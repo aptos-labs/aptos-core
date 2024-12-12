@@ -174,11 +174,13 @@ module 0x42::freeze_mut_ref {
 public fun freeze_mut_ref::borrow_mut<#0>($t0: &mut vector<#0>): &#0 {
      var $t1: &#0
      var $t2: &mut #0
-     var $t3: u64
-  0: $t3 := 0
-  1: $t2 := vector::borrow_mut<#0>($t0, $t3)
-  2: $t1 := freeze_ref(implicit)($t2)
-  3: return $t1
+     var $t3: &mut vector<#0>
+     var $t4: u64
+  0: $t3 := infer($t0)
+  1: $t4 := 0
+  2: $t2 := vector::borrow_mut<#0>($t3, $t4)
+  3: $t1 := freeze_ref(implicit)($t2)
+  4: return $t1
 }
 
 
@@ -276,38 +278,42 @@ public fun freeze_mut_ref::t5($t0: &mut 0x42::freeze_mut_ref::G) {
      var $t3: &mut 0x42::freeze_mut_ref::G
      var $t4: u64
      var $t5: u64
-     var $t6: &mut u64
-     var $t7: &mut 0x42::freeze_mut_ref::G
-     var $t8: u64
+     var $t6: u64
+     var $t7: &mut u64
+     var $t8: &mut 0x42::freeze_mut_ref::G
      var $t9: u64
-     var $t10: &mut u64
+     var $t10: u64
      var $t11: u64
-     var $t12: &u64
+     var $t12: &mut u64
      var $t13: u64
-     var $t14: &mut u64
+     var $t14: &u64
      var $t15: u64
-     var $t16: &u64
+     var $t16: &mut u64
+     var $t17: u64
+     var $t18: &u64
   0: $t1 := 0
-  1: $t5 := 1
-  2: $t4 := +($t1, $t5)
-  3: $t1 := infer($t4)
-  4: $t3 := infer($t0)
-  5: $t2 := borrow_field<0x42::freeze_mut_ref::G>.f($t3)
-  6: $t9 := 1
-  7: $t8 := +($t1, $t9)
-  8: $t1 := infer($t8)
-  9: $t7 := infer($t0)
- 10: $t6 := borrow_field<0x42::freeze_mut_ref::G>.f($t7)
- 11: $t11 := 2
- 12: $t10 := borrow_local($t11)
+  1: $t5 := infer($t1)
+  2: $t6 := 1
+  3: $t4 := +($t5, $t6)
+  4: $t1 := infer($t4)
+  5: $t3 := infer($t0)
+  6: $t2 := borrow_field<0x42::freeze_mut_ref::G>.f($t3)
+  7: $t10 := infer($t1)
+  8: $t11 := 1
+  9: $t9 := +($t10, $t11)
+ 10: $t1 := infer($t9)
+ 11: $t8 := infer($t0)
+ 12: $t7 := borrow_field<0x42::freeze_mut_ref::G>.f($t8)
  13: $t13 := 2
- 14: $t15 := 0
- 15: write_ref($t2, $t15)
- 16: $t16 := freeze_ref(implicit)($t10)
- 17: $t12 := infer($t16)
- 18: $t14 := infer($t6)
- 19: write_ref($t14, $t13)
- 20: return ()
+ 14: $t12 := borrow_local($t13)
+ 15: $t15 := 2
+ 16: $t17 := 0
+ 17: write_ref($t2, $t17)
+ 18: $t18 := freeze_ref(implicit)($t12)
+ 19: $t14 := infer($t18)
+ 20: $t16 := infer($t7)
+ 21: write_ref($t16, $t15)
+ 22: return ()
 }
 
 
@@ -397,4 +403,193 @@ warning: Unused assignment to `x`. Consider removing or prefixing with an unders
    │                                   ^^^^^^^^^
 
 
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.freeze_mut_ref {
+struct G {
+	f: u64
+}
+struct S has drop {
+	dummy_field: bool
+}
+
+public borrow_mut<Ty0>(Arg0: &mut vector<Ty0>): &Ty0 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: &mut vector<Ty0>)
+	1: LdU64(0)
+	2: VecMutBorrow(2)
+	3: FreezeRef
+	4: Ret
+}
+public borrow_mut2<Ty0>(Arg0: &mut Ty0): &Ty0 /* def_idx: 1 */ {
+B0:
+	0: MoveLoc[0](Arg0: &mut Ty0)
+	1: FreezeRef
+	2: Ret
+}
+public borrow_mut3<Ty0>(Arg0: &mut Ty0, Arg1: &Ty0): &Ty0 /* def_idx: 2 */ {
+L2:	loc0: &Ty0
+B0:
+	0: MoveLoc[1](Arg1: &Ty0)
+	1: Pop
+	2: MoveLoc[0](Arg0: &mut Ty0)
+	3: FreezeRef
+	4: StLoc[2](loc0: &Ty0)
+B1:
+	5: MoveLoc[2](loc0: &Ty0)
+	6: Ret
+B2:
+	7: MoveLoc[0](Arg0: &mut Ty0)
+	8: Pop
+	9: MoveLoc[1](Arg1: &Ty0)
+	10: StLoc[2](loc0: &Ty0)
+	11: Branch(5)
+}
+public borrow_mut4<Ty0>(Arg0: &mut Ty0): &Ty0 /* def_idx: 3 */ {
+B0:
+	0: MoveLoc[0](Arg0: &mut Ty0)
+	1: FreezeRef
+	2: Ret
+}
+t0() /* def_idx: 4 */ {
+L0:	loc0: u64
+L1:	loc1: &u64
+B0:
+	0: LdU64(0)
+	1: StLoc[0](loc0: u64)
+	2: MutBorrowLoc[0](loc0: u64)
+	3: FreezeRef
+	4: Pop
+	5: Ret
+}
+t1(Arg0: &mut S): &S /* def_idx: 5 */ {
+B0:
+	0: MoveLoc[0](Arg0: &mut S)
+	1: FreezeRef
+	2: Ret
+}
+t2(Arg0: &mut u64, Arg1: &mut u64): &u64 * &mut u64 /* def_idx: 6 */ {
+B0:
+	0: MoveLoc[0](Arg0: &mut u64)
+	1: FreezeRef
+	2: MoveLoc[1](Arg1: &mut u64)
+	3: Ret
+}
+public t4() /* def_idx: 7 */ {
+L0:	loc0: u64
+L1:	loc1: &u64
+L2:	loc2: u64
+B0:
+	0: LdU64(0)
+	1: StLoc[0](loc0: u64)
+	2: MutBorrowLoc[0](loc0: u64)
+	3: FreezeRef
+	4: Pop
+	5: LdU64(0)
+	6: StLoc[2](loc2: u64)
+	7: MutBorrowLoc[2](loc2: u64)
+	8: FreezeRef
+	9: Pop
+	10: Ret
+}
+public t5(Arg0: &mut G) /* def_idx: 8 */ {
+L1:	loc0: &mut u64
+L2:	loc1: &mut u64
+L3:	loc2: u64
+L4:	loc3: &mut u64
+L5:	loc4: &u64
+B0:
+	0: LdU64(0)
+	1: LdU64(1)
+	2: Add
+	3: CopyLoc[0](Arg0: &mut G)
+	4: MutBorrowField[0](G.f: u64)
+	5: StLoc[1](loc0: &mut u64)
+	6: LdU64(1)
+	7: Add
+	8: Pop
+	9: MoveLoc[0](Arg0: &mut G)
+	10: MutBorrowField[0](G.f: u64)
+	11: StLoc[2](loc1: &mut u64)
+	12: LdU64(2)
+	13: StLoc[3](loc2: u64)
+	14: MutBorrowLoc[3](loc2: u64)
+	15: StLoc[4](loc3: &mut u64)
+	16: LdU64(2)
+	17: LdU64(0)
+	18: MoveLoc[1](loc0: &mut u64)
+	19: WriteRef
+	20: MoveLoc[4](loc3: &mut u64)
+	21: FreezeRef
+	22: Pop
+	23: MoveLoc[2](loc1: &mut u64)
+	24: WriteRef
+	25: Ret
+}
+t6(Arg0: bool, Arg1: &mut S, Arg2: &S) /* def_idx: 9 */ {
+L3:	loc0: &S
+B0:
+	0: MoveLoc[0](Arg0: bool)
+	1: BrFalse(10)
+B1:
+	2: MoveLoc[2](Arg2: &S)
+	3: Pop
+	4: CopyLoc[1](Arg1: &mut S)
+	5: MoveLoc[1](Arg1: &mut S)
+	6: Pop
+	7: FreezeRef
+	8: Pop
+B2:
+	9: Ret
+B3:
+	10: MoveLoc[1](Arg1: &mut S)
+	11: Pop
+	12: MoveLoc[2](Arg2: &S)
+	13: Pop
+	14: Branch(9)
+}
+t7(Arg0: bool, Arg1: &mut S, Arg2: &S) /* def_idx: 10 */ {
+L3:	loc0: &S
+L4:	loc1: &S
+B0:
+	0: MoveLoc[0](Arg0: bool)
+	1: BrFalse(10)
+B1:
+	2: MoveLoc[2](Arg2: &S)
+	3: Pop
+	4: MoveLoc[1](Arg1: &mut S)
+	5: FreezeRef
+	6: StLoc[3](loc0: &S)
+B2:
+	7: MoveLoc[3](loc0: &S)
+	8: Pop
+	9: Ret
+B3:
+	10: MoveLoc[1](Arg1: &mut S)
+	11: Pop
+	12: MoveLoc[2](Arg2: &S)
+	13: StLoc[3](loc0: &S)
+	14: Branch(7)
+}
+t8(Arg0: bool, Arg1: &mut S, Arg2: &S) /* def_idx: 11 */ {
+L3:	loc0: &S
+B0:
+	0: MoveLoc[0](Arg0: bool)
+	1: BrFalse(8)
+B1:
+	2: MoveLoc[2](Arg2: &S)
+	3: Pop
+	4: MoveLoc[1](Arg1: &mut S)
+	5: FreezeRef
+	6: Pop
+B2:
+	7: Ret
+B3:
+	8: MoveLoc[1](Arg1: &mut S)
+	9: Pop
+	10: MoveLoc[2](Arg2: &S)
+	11: Pop
+	12: Branch(7)
+}
+}
 ============ bytecode verification succeeded ========

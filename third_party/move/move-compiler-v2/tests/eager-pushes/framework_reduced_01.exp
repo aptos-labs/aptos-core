@@ -72,25 +72,27 @@ public fun m::test($t0: u64) {
      # live vars: $t0
   0: $t1 := m::two()
      # live vars: $t0, $t1
-  1: $t5 := m::one()
-     # live vars: $t0, $t1, $t5
-  2: $t0 := -($t0, $t5)
+  1: $t0 := move($t0)
      # live vars: $t0, $t1
-  3: $t2 := >($t0, $t1)
+  2: $t5 := m::one()
+     # live vars: $t0, $t1, $t5
+  3: $t0 := -($t0, $t5)
+     # live vars: $t0, $t1
+  4: $t2 := >($t0, $t1)
      # live vars: $t2
-  4: if ($t2) goto 7 else goto 5
+  5: if ($t2) goto 8 else goto 6
      # live vars:
-  5: label L3
+  6: label L3
      # live vars:
-  6: goto 9
+  7: goto 10
      # live vars:
-  7: label L0
+  8: label L0
      # live vars:
-  8: m::foo()
+  9: m::foo()
      # live vars:
-  9: label L2
+ 10: label L2
      # live vars:
- 10: return ()
+ 11: return ()
 }
 
 
@@ -120,24 +122,21 @@ B0:
 }
 public test(Arg0: u64) /* def_idx: 2 */ {
 L1:	loc0: u64
-L2:	loc1: u64
 B0:
 	0: Call two(): u64
 	1: StLoc[1](loc0: u64)
-	2: Call one(): u64
-	3: StLoc[2](loc1: u64)
-	4: MoveLoc[0](Arg0: u64)
-	5: MoveLoc[2](loc1: u64)
-	6: Sub
-	7: MoveLoc[1](loc0: u64)
-	8: Gt
-	9: BrTrue(11)
+	2: MoveLoc[0](Arg0: u64)
+	3: Call one(): u64
+	4: Sub
+	5: MoveLoc[1](loc0: u64)
+	6: Gt
+	7: BrTrue(9)
 B1:
-	10: Branch(12)
+	8: Branch(10)
 B2:
-	11: Call foo()
+	9: Call foo()
 B3:
-	12: Ret
+	10: Ret
 }
 two(): u64 /* def_idx: 3 */ {
 B0:
