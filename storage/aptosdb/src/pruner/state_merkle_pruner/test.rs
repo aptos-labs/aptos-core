@@ -1,6 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// FIXME(aldenhu)
+#![allow(unused_imports)]
+
 use crate::{
     db::{
         test_helper::{arb_state_kv_sets, update_store},
@@ -14,16 +17,10 @@ use crate::{
     },
     state_merkle_db::StateMerkleDb,
     state_store::StateStore,
-    utils::new_sharded_kv_schema_batch,
 };
 use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_schemadb::SchemaBatch;
-use aptos_storage_interface::{
-    jmt_update_refs, jmt_updates,
-    state_store::{sharded_state_update_refs::ShardedStateUpdateRefs, NUM_STATE_SHARDS},
-    DbReader,
-};
+use aptos_storage_interface::{state_store::NUM_STATE_SHARDS, DbReader};
 use aptos_temppath::TempPath;
 use aptos_types::{
     state_store::{
@@ -33,15 +30,16 @@ use aptos_types::{
     },
     transaction::Version,
 };
-use arr_macro::arr;
 use proptest::{prelude::*, proptest};
 use std::{collections::HashMap, sync::Arc};
 
 fn put_value_set(
-    state_store: &StateStore,
-    value_set: Vec<(StateKey, StateValue)>,
-    version: Version,
+    _state_store: &StateStore,
+    _value_set: Vec<(StateKey, StateValue)>,
+    _version: Version,
 ) -> HashValue {
+    todo!()
+    /* FIXME(aldenhu)
     let mut sharded_value_set = arr![HashMap::new(); 16];
     let value_set: HashMap<_, _> = value_set
         .iter()
@@ -87,6 +85,7 @@ fn put_value_set(
         .unwrap();
 
     root
+     */
 }
 
 fn verify_state_in_store(

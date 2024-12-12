@@ -15,7 +15,7 @@ use crate::{
     versioned_node_cache::VersionedNodeCache,
 };
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs, StorageDirPaths};
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::HashValue;
 use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
 use aptos_jellyfish_merkle::{
     node_type::NodeKey, JellyfishMerkleTree, TreeReader, TreeUpdateBatch, TreeWriter,
@@ -240,7 +240,7 @@ impl StateMerkleDb {
 
     pub fn get_with_proof_ext(
         &self,
-        state_key: &StateKey,
+        key: &HashValue,
         version: Version,
         root_depth: usize,
     ) -> Result<(
@@ -248,7 +248,7 @@ impl StateMerkleDb {
         SparseMerkleProofExt,
     )> {
         JellyfishMerkleTree::new(self)
-            .get_with_proof_ext(state_key.hash(), version, root_depth)
+            .get_with_proof_ext(key, version, root_depth)
             .map_err(Into::into)
     }
 
@@ -370,6 +370,8 @@ impl StateMerkleDb {
         Ok(batch)
     }
 
+    // FIXME(aldenhu)
+    #[allow(dead_code)]
     // A non-sharded helper function accepting KV updates from all shards.
     #[cfg(test)]
     pub fn merklize_value_set(

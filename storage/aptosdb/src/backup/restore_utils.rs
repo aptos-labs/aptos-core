@@ -13,13 +13,13 @@ use crate::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         transaction_accumulator::TransactionAccumulatorSchema,
     },
-    state_store::StateStore,
+    state_store::{current_state::LedgerStateWithSummary, StateStore},
     utils::{new_sharded_kv_schema_batch, ShardedStateKvSchemaBatch},
 };
 use aptos_crypto::HashValue;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{
-    db_ensure as ensure, state_store::state_delta::StateDelta, AptosDbError, Result,
+    db_ensure as ensure, state_store::state_update_refs::StateUpdateRefs, AptosDbError, Result,
 };
 use aptos_types::{
     contract_event::ContractEvent,
@@ -164,9 +164,8 @@ pub(crate) fn save_transactions(
 
         ledger_db.write_schemas(ledger_db_batch)?;
 
-        state_store
-            .current_state()
-            .set(StateDelta::new_empty_with_version(Some(last_version)));
+        *state_store.current_state_locked() =
+            LedgerStateWithSummary::new_dummy_at_checkpoint_version(Some(last_version));
     }
 
     Ok(())
@@ -239,9 +238,8 @@ pub(crate) fn save_transactions_impl(
     }
 
     if kv_replay && first_version > 0 && state_store.get_usage(Some(first_version - 1)).is_ok() {
-        state_store.put_write_sets(
-            write_sets.to_vec(),
-            first_version,
+        state_store.calculate_state_and_put_updates(
+            &StateUpdateRefs::index_write_sets(first_version, write_sets, write_sets.len(), None),
             &ledger_db_batch.ledger_metadata_db_batches, // used for storing the storage usage
             state_kv_batches,
             state_store.state_kv_db.enabled_sharding(),

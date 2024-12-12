@@ -709,13 +709,14 @@ where
         key: HashValue,
         version: Version,
     ) -> Result<(Option<(HashValue, (K, Version))>, SparseMerkleProof)> {
-        self.get_with_proof_ext(key, version, 0)
+        self.get_with_proof_ext(&key, version, 0)
             .map(|(value, proof_ext)| (value, proof_ext.into()))
     }
 
+    // FIXME(aldenhu): interface to get proof only
     pub fn get_with_proof_ext(
         &self,
-        key: HashValue,
+        key: &HashValue,
         version: Version,
         target_root_depth: usize,
     ) -> Result<(Option<(HashValue, (K, Version))>, SparseMerkleProofExt)> {
@@ -776,7 +777,7 @@ where
                 },
                 Node::Leaf(leaf_node) => {
                     return Ok((
-                        if leaf_node.account_key() == key {
+                        if leaf_node.account_key() == *key {
                             Some((leaf_node.value_hash(), leaf_node.value_index().clone()))
                         } else {
                             None

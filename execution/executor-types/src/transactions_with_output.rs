@@ -3,8 +3,10 @@
 
 use crate::metrics::TIMER;
 use aptos_metrics_core::TimerHelper;
-use aptos_storage_interface::state_store::sharded_state_update_refs::ShardedStateUpdateRefs;
-use aptos_types::transaction::{Transaction, TransactionOutput};
+use aptos_storage_interface::state_store::state_update_refs::{
+    BatchedStateUpdateRefs, PerVersionStateUpdateRefs, StateUpdateRefs,
+};
+use aptos_types::transaction::{Transaction, TransactionOutput, Version};
 use itertools::izip;
 use std::{
     fmt::{Debug, Formatter},
@@ -54,63 +56,80 @@ impl TransactionsWithOutput {
 #[ouroboros::self_referencing]
 pub struct TransactionsToKeep {
     transactions_with_output: TransactionsWithOutput,
-    last_checkpoint_index: Option<usize>,
     is_reconfig: bool,
     #[borrows(transactions_with_output)]
     #[covariant]
-    state_update_refs: ShardedStateUpdateRefs<'this>,
+    state_update_refs: StateUpdateRefs<'this>,
 }
 
 impl TransactionsToKeep {
-    pub fn index(transactions_with_output: TransactionsWithOutput, is_reconfig: bool) -> Self {
+    pub fn index(
+        first_version: Version,
+        transactions_with_output: TransactionsWithOutput,
+        is_reconfig: bool,
+    ) -> Self {
         let _timer = TIMER.timer_with(&["transactions_to_keep__index"]);
 
-        let num_write_sets = transactions_with_output.len();
-        let last_checkpoint_index =
-            Self::get_last_checkpoint_index(is_reconfig, &transactions_with_output.transactions);
         TransactionsToKeepBuilder {
             transactions_with_output,
             is_reconfig,
-            last_checkpoint_index,
             state_update_refs_builder: |transactions_with_output| {
                 let write_sets = transactions_with_output
                     .transaction_outputs
                     .iter()
                     .map(TransactionOutput::write_set);
-                ShardedStateUpdateRefs::index_write_sets(write_sets, num_write_sets)
+                let last_checkpoint_index = Self::get_last_checkpoint_index(
+                    is_reconfig,
+                    &transactions_with_output.transactions,
+                );
+                StateUpdateRefs::index_write_sets(
+                    first_version,
+                    write_sets,
+                    transactions_with_output.len(),
+                    last_checkpoint_index,
+                )
             },
         }
         .build()
     }
 
     pub fn make(
+        first_version: Version,
         transactions: Vec<Transaction>,
         transaction_outputs: Vec<TransactionOutput>,
         is_reconfig: bool,
     ) -> Self {
         let txns_with_output = TransactionsWithOutput::new(transactions, transaction_outputs);
-        Self::index(txns_with_output, is_reconfig)
+        Self::index(first_version, txns_with_output, is_reconfig)
     }
 
     pub fn new_empty() -> Self {
-        Self::make(vec![], vec![], false)
+        Self::make(0, vec![], vec![], false)
     }
 
     pub fn new_dummy_success(txns: Vec<Transaction>) -> Self {
         let txn_outputs = vec![TransactionOutput::new_empty_success(); txns.len()];
-        Self::make(txns, txn_outputs, false)
-    }
-
-    pub fn state_update_refs(&self) -> &ShardedStateUpdateRefs {
-        self.borrow_state_update_refs()
+        Self::make(0, txns, txn_outputs, false)
     }
 
     pub fn is_reconfig(&self) -> bool {
         *self.borrow_is_reconfig()
     }
 
-    pub fn last_checkpoint_index(&self) -> Option<usize> {
-        *self.borrow_last_checkpoint_index()
+    pub fn state_update_refs(&self) -> &StateUpdateRefs {
+        self.borrow_state_update_refs()
+    }
+
+    pub fn per_version_state_update_refs(&self) -> &PerVersionStateUpdateRefs {
+        &self.borrow_state_update_refs().per_version
+    }
+
+    pub fn state_update_refs_for_last_checkpoint(&self) -> Option<&BatchedStateUpdateRefs> {
+        self.borrow_state_update_refs().for_last_checkpoint.as_ref()
+    }
+
+    pub fn state_update_refs_for_latest(&self) -> Option<&BatchedStateUpdateRefs> {
+        self.borrow_state_update_refs().for_latest.as_ref()
     }
 
     pub fn ends_with_sole_checkpoint(&self) -> bool {

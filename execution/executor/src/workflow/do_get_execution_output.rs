@@ -23,8 +23,8 @@ use aptos_executor_types::{
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
-use aptos_storage_interface::state_store::state_view::cached_state_view::{
-    CachedStateView, StateCache,
+use aptos_storage_interface::state_store::{
+    state::LedgerState, state_view::cached_state_view::CachedStateView,
 };
 #[cfg(feature = "consensus-only-perf-test")]
 use aptos_types::transaction::ExecutionStatus;
@@ -57,6 +57,7 @@ impl DoGetExecutionOutput {
     pub fn by_transaction_execution<V: VMBlockExecutor>(
         executor: &V,
         transactions: ExecutableTransactions,
+        parent_state: &LedgerState,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
@@ -66,6 +67,7 @@ impl DoGetExecutionOutput {
                 Self::by_transaction_execution_unsharded::<V>(
                     executor,
                     txns,
+                    parent_state,
                     state_view,
                     onchain_config,
                     transaction_slice_metadata,
@@ -73,6 +75,7 @@ impl DoGetExecutionOutput {
             },
             ExecutableTransactions::Sharded(txns) => Self::by_transaction_execution_sharded::<V>(
                 txns,
+                parent_state,
                 state_view,
                 onchain_config,
                 transaction_slice_metadata.append_state_checkpoint_to_block(),
@@ -97,6 +100,7 @@ impl DoGetExecutionOutput {
     fn by_transaction_execution_unsharded<V: VMBlockExecutor>(
         executor: &V,
         transactions: Vec<SignatureVerifiedTransaction>,
+        parent_state: &LedgerState,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
@@ -121,7 +125,8 @@ impl DoGetExecutionOutput {
                 .map(|t| t.into_inner())
                 .collect(),
             transaction_outputs,
-            state_view.into_state_cache(),
+            parent_state,
+            state_view,
             block_end_info,
             append_state_checkpoint_to_block,
         )
@@ -129,6 +134,7 @@ impl DoGetExecutionOutput {
 
     pub fn by_transaction_execution_sharded<V: VMBlockExecutor>(
         transactions: PartitionedTransactions,
+        parent_state: &LedgerState,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
         append_state_checkpoint_to_block: Option<HashValue>,
@@ -152,7 +158,8 @@ impl DoGetExecutionOutput {
                 .map(|t| t.into_txn().into_inner())
                 .collect(),
             transaction_outputs,
-            state_view.into_state_cache(),
+            parent_state,
+            state_view,
             None, // block end info
             append_state_checkpoint_to_block,
         )
@@ -161,22 +168,24 @@ impl DoGetExecutionOutput {
     pub fn by_transaction_output(
         transactions: Vec<Transaction>,
         transaction_outputs: Vec<TransactionOutput>,
+        parent_state: &LedgerState,
         state_view: CachedStateView,
     ) -> Result<ExecutionOutput> {
-        // collect all accounts touched and dedup
-        let write_set = transaction_outputs
-            .iter()
-            .map(|o| o.write_set())
-            .collect::<Vec<_>>();
-
+        // TODO(aldenhu): optimize: state updates are gone through here once and again in the parser
         // prime the state cache by fetching all touched accounts
-        state_view.prime_cache_by_write_set(write_set)?;
+        state_view.batch_prime_cache(
+            transaction_outputs
+                .iter()
+                .flat_map(|t| t.write_set().state_update_refs())
+                .map(|(k, _u)| k),
+        )?;
 
         let out = Parser::parse(
             state_view.next_version(),
             transactions,
             transaction_outputs,
-            state_view.into_state_cache(),
+            parent_state,
+            state_view,
             None, // block end info
             None, // append state checkpoint to block
         )?;
@@ -287,7 +296,8 @@ impl Parser {
         first_version: Version,
         mut transactions: Vec<Transaction>,
         mut transaction_outputs: Vec<TransactionOutput>,
-        state_cache: StateCache,
+        parent_state: &LedgerState,
+        base_state_view: CachedStateView,
         block_end_info: Option<BlockEndInfo>,
         append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<ExecutionOutput> {
@@ -317,6 +327,7 @@ impl Parser {
             let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__to_commit"]);
             let to_commit = TransactionsWithOutput::new(transactions, transaction_outputs);
             TransactionsToKeep::index(
+                first_version,
                 Self::maybe_add_block_epilogue(
                     to_commit,
                     has_reconfig,
@@ -333,6 +344,14 @@ impl Parser {
                 .transpose()?
         };
 
+        let result_state = parent_state.update(
+            base_state_view.persisted_state(),
+            to_commit.state_update_refs_for_last_checkpoint(),
+            to_commit.state_update_refs_for_latest(),
+            base_state_view.memorized_reads(),
+        );
+        let state_cache = base_state_view.into_state_cache();
+
         let out = ExecutionOutput::new(
             is_block,
             first_version,
@@ -340,6 +359,7 @@ impl Parser {
             to_commit,
             to_discard,
             to_retry,
+            result_state,
             state_cache,
             block_end_info,
             next_epoch_state,
@@ -502,7 +522,9 @@ impl<'a> TStateView for WriteSetStateView<'a> {
 #[cfg(test)]
 mod tests {
     use super::Parser;
-    use aptos_storage_interface::state_store::state_view::cached_state_view::StateCache;
+    use aptos_storage_interface::state_store::{
+        state::LedgerState, state_view::cached_state_view::CachedStateView,
+    };
     use aptos_types::{
         contract_event::ContractEvent,
         transaction::{
@@ -540,8 +562,17 @@ mod tests {
                 TransactionAuxiliaryData::default(),
             ),
         ];
-        let execution_output =
-            Parser::parse(0, txns, txn_outs, StateCache::new_dummy(), None, None).unwrap();
+        let state = LedgerState::new_empty();
+        let execution_output = Parser::parse(
+            0,
+            txns,
+            txn_outs,
+            &state,
+            CachedStateView::new_dummy(&state),
+            None,
+            None,
+        )
+        .unwrap();
         assert_eq!(
             vec![event_0, event_2],
             *execution_output.subscribable_events

@@ -2,6 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+// FIXME(aldenhu)
+#![allow(unused_imports)]
+
 use super::*;
 use crate::{
     db::test_helper::{arb_state_kv_sets, update_store},
@@ -30,11 +33,14 @@ use proptest::{collection::hash_map, prelude::*};
 use std::collections::HashMap;
 
 fn put_value_set(
-    state_store: &StateStore,
-    value_set: Vec<(StateKey, StateValue)>,
-    version: Version,
-    base_version: Option<Version>,
+    _state_store: &StateStore,
+    _value_set: Vec<(StateKey, StateValue)>,
+    _version: Version,
+    _base_version: Option<Version>,
 ) -> HashValue {
+    // FIXME(aldenhu)
+    todo!()
+    /*
     let mut sharded_value_set = arr![HashMap::new(); 16];
     let value_set: HashMap<_, _> = value_set
         .iter()
@@ -51,16 +57,23 @@ fn put_value_set(
     let ledger_batch = SchemaBatch::new();
     let sharded_state_kv_batches = new_sharded_kv_schema_batch();
     let state_kv_metadata_batch = SchemaBatch::new();
+
+    let state_update_refs = &StateUpdateRefs::index(version, [value_set.clone()], 1, None);
+    let (_state_view, new_state) = StateStore::update_persisted_state_and_summary(
+        &state_store.state_db,
+        state_store.current_state_locked().clone(),
+        state_update_refs,
+    )
+    .unwrap();
+
     state_store
-        .put_value_sets(
-            version,
-            &ShardedStateUpdateRefs::index_per_version_updates([value_set.clone().into_iter()], 1),
-            StateStorageUsage::new_untracked(),
+        .put_state_updates(
+            &new_state.ledger_state(),
+            &state_update_refs.per_version,
             None,
             &ledger_batch,
             &sharded_state_kv_batches,
             /*put_state_value_indices=*/ false,
-            /*last_checkpoint_index=*/ None,
         )
         .unwrap();
     state_store
@@ -73,6 +86,7 @@ fn put_value_set(
         .commit(version, state_kv_metadata_batch, sharded_state_kv_batches)
         .unwrap();
     root
+     */
 }
 
 fn verify_value_and_proof(
