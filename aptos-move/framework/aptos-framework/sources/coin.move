@@ -864,7 +864,7 @@ module aptos_framework::coin {
                 let fa = coin_to_fungible_asset(coin);
                 let metadata = fungible_asset::asset_metadata(&fa);
                 let store = primary_fungible_store::ensure_primary_store_exists(account_addr, metadata);
-                fungible_asset::deposit_internal(object::object_address(&store), fa);
+                fungible_asset::unchecked_deposit_with_no_events(object::object_address(&store), fa);
             } else {
                 abort error::not_found(ECOIN_STORE_NOT_PUBLISHED)
             }

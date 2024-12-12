@@ -96,7 +96,7 @@ module aptos_framework::dispatchable_fungible_asset {
             assert!(amount <= start_balance - end_balance, error::aborted(EAMOUNT_MISMATCH));
             fa
         } else {
-            fungible_asset::withdraw_internal(object::object_address(&store), amount)
+            fungible_asset::unchecked_withdraw(object::object_address(&store), amount)
         }
     }
 
@@ -120,7 +120,7 @@ module aptos_framework::dispatchable_fungible_asset {
                 func
             )
         } else {
-            fungible_asset::deposit_internal(object::object_address(&store), fa)
+            fungible_asset::unchecked_deposit(object::object_address(&store), fa)
         }
     }
 
