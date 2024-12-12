@@ -101,15 +101,15 @@ pub struct Argument {
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Argument::parse();
-    env::set_var(
-        OVERRIDE_EXP_CACHE,
-        format!(
-            "{},{}",
-            Experiment::SPEC_CHECK,
-            Experiment::REFERENCE_SAFETY
-        ),
-    );
-    env::set_var("MOVE_COMPILER_EXP", DISABLE_SPEC_CHECK);
+    // env::set_var(
+    //     OVERRIDE_EXP_CACHE,
+    //     format!(
+    //         "{},{}",
+    //         Experiment::SPEC_CHECK,
+    //         Experiment::REFERENCE_SAFETY
+    //     ),
+    // );
+    // env::set_var("MOVE_COMPILER_EXP", DISABLE_SPEC_CHECK);
     match args.cmd {
         Cmd::Dump {
             endpoint,
@@ -188,7 +188,7 @@ async fn main() -> Result<()> {
             } else {
                 PathBuf::from(".")
             };
-            // prepare_aptos_packages(input.join(APTOS_COMMONS)).await;
+            prepare_aptos_packages(input.join(APTOS_COMMONS)).await;
             let executor =
                 Execution::new(input, execution_mode.unwrap_or_default(), skip_ref_packages);
             executor

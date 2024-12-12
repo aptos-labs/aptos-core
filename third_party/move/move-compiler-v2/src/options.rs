@@ -193,6 +193,7 @@ impl Options {
             let on = if let Some(on) = find_experiment(&self.experiments, name) {
                 on
             } else if let Some(on) = find_experiment(&compiler_exp_var(), name) {
+                println!("name:{}, value:{}", name, on);
                 on
             } else {
                 match &exp.default {

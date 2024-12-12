@@ -440,17 +440,17 @@ impl Execution {
             if compiled_cache.failed_packages_v2.contains(&package_info) {
                 v2_failed = true;
             } else {
-                if Self::check_package_skip_alternative(skip_ref_packages, &package_info.package_name) {
-                    env::set_var(
-                        "MOVE_COMPILER_EXP",
-                        format!("{},{}", DISABLE_SPEC_CHECK, DISABLE_REF_CHECK),
-                    );
-                } else {
-                    env::set_var(
-                        "MOVE_COMPILER_EXP",
-                        format!("{},{}", DISABLE_SPEC_CHECK, ENABLE_REF_CHECK),
-                    );
-                }
+                // if Self::check_package_skip_alternative(skip_ref_packages, &package_info.package_name) {
+                //     env::set_var(
+                //         "MOVE_COMPILER_EXP",
+                //         format!("{},{}", DISABLE_SPEC_CHECK, DISABLE_REF_CHECK),
+                //     );
+                // } else {
+                //     env::set_var(
+                //         "MOVE_COMPILER_EXP",
+                //         format!("{},{}", DISABLE_SPEC_CHECK, ENABLE_REF_CHECK),
+                //     );
+                // }
                 let compiled_res_v2 =
                     compile_package(package_dir, &package_info, Some(CompilerVersion::latest_stable()));
                 if let Ok(compiled_res) = compiled_res_v2 {
@@ -533,17 +533,17 @@ impl Execution {
             if compiled_cache.failed_packages_v2.contains(&package_info) {
                 v2_failed = true;
             } else {
-                if self.check_package_skip(&package_info.package_name) {
-                    env::set_var(
-                        "MOVE_COMPILER_EXP",
-                        format!("{},{}", DISABLE_SPEC_CHECK, DISABLE_REF_CHECK),
-                    );
-                } else {
-                    env::set_var(
-                        "MOVE_COMPILER_EXP",
-                        format!("{},{}", DISABLE_SPEC_CHECK, ENABLE_REF_CHECK),
-                    );
-                }
+                // if self.check_package_skip(&package_info.package_name) {
+                //     env::set_var(
+                //         "MOVE_COMPILER_EXP",
+                //         format!("{},{}", DISABLE_SPEC_CHECK, DISABLE_REF_CHECK),
+                //     );
+                // } else {
+                //     env::set_var(
+                //         "MOVE_COMPILER_EXP",
+                //         format!("{},{}", DISABLE_SPEC_CHECK, ENABLE_REF_CHECK),
+                //     );
+                // }
                 let compiled_res_v2 =
                     compile_package(package_dir, &package_info, Some(CompilerVersion::latest_stable()));
                 if let Ok(compiled_res) = compiled_res_v2 {
@@ -884,15 +884,12 @@ impl Execution {
         let mut features = Features::fetch_config(&state).unwrap_or_default();
         features.enable(FeatureFlag::VM_BINARY_FORMAT_V7);
         features.enable(FeatureFlag::NATIVE_MEMORY_OPERATIONS);
-        // module_event_migration_enabled
-        // features.enable(FeatureFlag::ENABLE_LOADER_V2);
+        features.enable(FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION);
+        features.enable(FeatureFlag::MODULE_EVENT_MIGRATION);
         if v2_flag {
             features.enable(FeatureFlag::FAKE_FEATURE_FOR_COMPARISON_TESTING);
         }
         state.set_features(features);
-        let features = Features::fetch_config(&state).unwrap();
-        println!("v2 flag:{}, enabled:{}", v2_flag, features.is_enabled(FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION));
-        println!("v2 flag:{}, enabled:{}", v2_flag, features.is_enabled(FeatureFlag::MODULE_EVENT_MIGRATION));
 
         // We use executor only to get access to block executor and avoid some of
         // the initializations, but ignore its internal state, i.e., FakeDataStore.
