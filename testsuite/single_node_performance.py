@@ -329,7 +329,7 @@ TESTS = [
         key=RunGroupKey("keyless-coin-transfer"),
         key_extra=RunGroupKeyExtra(
             txn_auth_mode="keyless",
-            transaction_type_override=""
+            transaction_type_override="non-conflicting-coin-transfer"
         ),
         included_in=LAND_BLOCKING_AND_C,
     )
