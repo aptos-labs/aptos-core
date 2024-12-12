@@ -326,7 +326,10 @@ TESTS = [
     RunGroupConfig(
         expected_tps=1,
         key=RunGroupKey("keyless-coin-transfer"),
-        key_extra=RunGroupKeyExtra(txn_auth_mode="keyless"),
+        key_extra=RunGroupKeyExtra(
+            txn_auth_mode="keyless",
+            transaction_type_override=""
+        ),
         included_in=LAND_BLOCKING_AND_C,
     )
 ]
