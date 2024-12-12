@@ -159,10 +159,7 @@ impl Cmd {
 mod test {
     use super::*;
     use crate::{
-        db::{
-            test_helper::{arb_blocks_to_commit_with_block_nums, update_in_memory_state},
-            AptosDB,
-        },
+        db::{test_helper::arb_blocks_to_commit_with_block_nums, AptosDB},
         schema::{
             epoch_by_version::EpochByVersionSchema,
             jellyfish_merkle_node::JellyfishMerkleNodeSchema, ledger_info::LedgerInfoSchema,
@@ -186,7 +183,6 @@ mod test {
 
         #[test]
         fn test_truncation(input in arb_blocks_to_commit_with_block_nums(80, 120)) {
-            /* FIXME(aldenhu)
             use aptos_config::config::DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD;
             aptos_logger::Logger::new().init();
             let sharding_config = ShardingConfig {
@@ -195,18 +191,13 @@ mod test {
             let tmp_dir = TempPath::new();
 
             let db = if input.1 { AptosDB::new_for_test_with_sharding(&tmp_dir, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD) } else { AptosDB::new_for_test(&tmp_dir) };
-            let mut in_memory_state = db.state_store.current_state_cloned();
-            let _ancestor = in_memory_state.base.clone();
             let mut version = 0;
             for (txns_to_commit, ledger_info_with_sigs) in input.0.iter() {
-                update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
                 db.save_transactions_for_test(
                     txns_to_commit,
                     version,
-                    version.checked_sub(1),
                     Some(ledger_info_with_sigs),
                     true,
-                    &in_memory_state,
                 )
                     .unwrap();
                 version += txns_to_commit.len() as u64;
@@ -383,7 +374,6 @@ mod test {
                     }
                 }
             }
-             */
         }
     }
 }

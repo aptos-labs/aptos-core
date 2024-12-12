@@ -761,11 +761,12 @@ impl StateStore {
     ) -> Result<(CachedStateView, LedgerState)> {
         let current = self.current_state_locked().ledger_state();
         let persisted = self.persisted_state_locked().state().clone();
-        let state_view = CachedStateView::new(
+        let state_view = CachedStateView::new_impl(
             StateViewId::Miscellaneous,
             self.state_db.clone(),
+            persisted.clone(),
             current.latest().clone(),
-        )?;
+        );
         state_view.prime_cache_by_write_sets(write_sets)?;
         let state = current.update(
             &persisted,

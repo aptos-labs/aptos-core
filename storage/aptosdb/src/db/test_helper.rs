@@ -15,19 +15,22 @@ use crate::state_store::StateStore;
 use crate::utils::new_sharded_kv_schema_batch;
 use crate::{
     schema::{jellyfish_merkle_node::JellyfishMerkleNodeSchema, state_value::StateValueSchema},
+    state_store::current_state::LedgerStateWithSummary,
     AptosDB,
 };
-use aptos_crypto::hash::CryptoHash;
+use aptos_crypto::hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH};
 #[cfg(test)]
 use aptos_crypto::HashValue;
 use aptos_executor_types::ProofReader;
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
 #[cfg(test)]
 use aptos_schemadb::SchemaBatch;
-use aptos_storage_interface::{state_store::state_delta::StateDelta, DbReader, Order, Result};
+use aptos_scratchpad::SparseMerkleTree;
+use aptos_storage_interface::{
+    state_store::{state_delta::StateDelta, state_summary::StateWithSummary},
+    DbReader, Order, Result,
+};
 use aptos_temppath::TempPath;
-#[cfg(test)]
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 #[cfg(test)]
 use aptos_types::transaction::TransactionAuxiliaryData;
 use aptos_types::{
@@ -37,7 +40,9 @@ use aptos_types::{
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     proof::accumulator::{InMemoryEventAccumulator, InMemoryTransactionAccumulator},
     proptest_types::{AccountInfoUniverse, BlockGen},
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    },
     transaction::{Transaction, TransactionInfo, TransactionToCommit, Version},
     write_set::TransactionWrite,
 };
@@ -122,62 +127,22 @@ pub(crate) fn update_store(
     todo!()
 }
 
-pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[TransactionToCommit]) {
-    /* FIXME(aldenhu):
-    let mut next_version = state.current_version.map_or(0, |v| v + 1);
-    for txn_to_commit in txns_to_commit {
-        txn_to_commit
-            .write_set
-            .state_updates_cloned()
-            .for_each(|(key, value)| {
-                state.updates_since_base.insert(key, value);
-            });
-        next_version += 1;
-        if txn_to_commit.has_state_checkpoint_hash() {
-            state.current = state
-                .current
-                .batch_update(
-                    state
-                        .updates_since_base
-                        .shards
-                        .iter()
-                        .flatten()
-                        .map(|(k, v)| (k.hash(), v.as_ref()))
-                        .collect(),
-                    &ProofReader::new_empty(),
-                )
-                .unwrap();
-            state.current_version = next_version.checked_sub(1);
-            state.base = state.current.clone();
-            state.base_version = state.current_version;
-            state
-                .updates_since_base
-                .shards
-                .iter_mut()
-                .for_each(|shard| {
-                    shard.clear();
-                });
-        }
-    }
-
-    if next_version.checked_sub(1) != state.current_version {
-        state.current = state
-            .current
-            .batch_update(
-                state
-                    .updates_since_base
-                    .shards
-                    .iter()
-                    .flatten()
-                    .map(|(k, v)| (k.hash(), v.as_ref()))
-                    .collect(),
-                &ProofReader::new_empty(),
-            )
-            .unwrap();
-        state.current_version = next_version.checked_sub(1);
-    }
-     */
-    todo!()
+pub fn update_in_memory_state(
+    smt: &SparseMerkleTree<StateValue>,
+    root_smt: &SparseMerkleTree<StateValue>,
+    txns_to_commit: &[TransactionToCommit],
+) -> SparseMerkleTree<StateValue> {
+    let updates = txns_to_commit
+        .iter()
+        .flat_map(|txn_to_commit| txn_to_commit.write_set().state_update_refs())
+        .collect::<HashMap<_, _>>()
+        .into_iter()
+        .map(|(k, u)| (k.hash(), u))
+        .collect();
+    smt.freeze(root_smt)
+        .batch_update(updates, StateStorageUsage::new_untracked(), &())
+        .unwrap()
+        .unfreeze()
 }
 
 prop_compose! {
@@ -197,17 +162,15 @@ prop_compose! {
         block_gens in vec(any_with::<BlockGen>(max_user_txns_per_block), min_blocks..=max_blocks),
     ) -> Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)> {
         let mut txn_accumulator = InMemoryTransactionAccumulator::new_empty();
-        let mut result = Vec::new();
+        let root_smt = SparseMerkleTree::new(*SPARSE_MERKLE_PLACEHOLDER_HASH, StateStorageUsage::new_untracked());
+        let mut smt = root_smt.clone();
 
-        let mut in_memory_state = StateDelta::new_empty();
-        let _ancester = in_memory_state.current.clone();
+        let mut result = Vec::new();
 
         for block_gen in block_gens {
             let (mut txns_to_commit, mut ledger_info) = block_gen.materialize(&mut universe);
-            update_in_memory_state(&mut in_memory_state, &txns_to_commit);
-            // FIXME(aldenhu):
-            // let state_checkpoint_root_hash = in_memory_state.root_hash();
-            let state_checkpoint_root_hash = aptos_crypto::HashValue::zero();
+            smt = update_in_memory_state(&smt, &root_smt, &txns_to_commit);
+            let state_checkpoint_root_hash = smt.root_hash();
 
             // make real txn_info's
             for txn in txns_to_commit.iter_mut() {
@@ -368,27 +331,21 @@ pub fn test_save_blocks_impl(
     input: Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>,
     snapshot_size_threshold: usize,
 ) {
-    /*
     let tmp_dir = TempPath::new();
     let db =
         AptosDB::new_for_test_with_buffered_state_target_items(&tmp_dir, snapshot_size_threshold);
 
-    let mut in_memory_state = db.state_store.current_state_cloned();
-    let _ancester = in_memory_state.current.clone();
     let num_batches = input.len();
     let mut cur_ver: Version = 0;
     let mut all_committed_txns = vec![];
     let mut updates = HashMap::new();
     let mut snapshot_versions = vec![];
     for (batch_idx, (txns_to_commit, ledger_info_with_sigs)) in input.iter().enumerate() {
-        update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
         db.save_transactions_for_test(
             txns_to_commit,
-            cur_ver,                /* first_version */
-            cur_ver.checked_sub(1), /* base_state_version */
+            cur_ver, /* first_version */
             Some(ledger_info_with_sigs),
             false, /* sync_commit */
-            &in_memory_state,
         )
         .unwrap();
 
@@ -454,9 +411,6 @@ pub fn test_save_blocks_impl(
             .flat_map(|(txns_to_commit, _)| txns_to_commit.iter())
             .collect(),
     );
-    FIXME(aldenhu)
-     */
-    todo!()
 }
 
 fn verify_snapshots(
@@ -933,45 +887,14 @@ pub(crate) fn put_transaction_auxiliary_data(
         .unwrap();
 }
 
-pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: StateValue) {
-    /*
-    let leaf_node = Node::new_leaf(key.hash(), value.hash(), (key.clone(), version));
-
-    db.state_merkle_db()
-        .metadata_db()
-        .put::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version), &leaf_node)
-        .unwrap();
-    let smt = db
-        .get_persisted_state_summary()
-        .unwrap()
-        .global_state_summary
-        .batch_update(vec![(key.hash(), Some(&value))], &ProofReader::new_empty())
-        .unwrap();
-
-    db.state_kv_db
-        .metadata_db()
-        .put::<StateValueSchema>(&(key.clone(), version), &Some(value.clone()))
-        .unwrap();
-
-    db.state_store
-        .buffered_state()
-        .lock()
-        .update(None, &in_memory_state, true)
-        .unwrap();
-     */
-}
-
 pub fn test_sync_transactions_impl(
     input: Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>,
     snapshot_size_threshold: usize,
 ) {
-    /*
     let tmp_dir = TempPath::new();
     let db =
         AptosDB::new_for_test_with_buffered_state_target_items(&tmp_dir, snapshot_size_threshold);
 
-    let mut in_memory_state = db.state_store.current_state_cloned();
-    let _ancester = in_memory_state.current.clone();
     let num_batches = input.len();
     let mut cur_ver: Version = 0;
     let mut updates = HashMap::new();
@@ -982,27 +905,21 @@ pub fn test_sync_transactions_impl(
         let base_state_version = cur_ver.checked_sub(1);
         if batch1_len > 0 {
             let txns_to_commit_batch = &txns_to_commit[..batch1_len];
-            update_in_memory_state(&mut in_memory_state, txns_to_commit_batch);
             db.save_transactions_for_test(
                 txns_to_commit_batch,
                 cur_ver, /* first_version */
-                base_state_version,
-                None,  /* ledger_info_with_sigs */
-                false, /* sync_commit */
-                &in_memory_state,
+                None,    /* ledger_info_with_sigs */
+                false,   /* sync_commit */
             )
             .unwrap();
         }
         let ver = cur_ver + batch1_len as Version;
         let txns_to_commit_batch = &txns_to_commit[batch1_len..];
-        update_in_memory_state(&mut in_memory_state, txns_to_commit_batch);
         db.save_transactions_for_test(
             txns_to_commit_batch,
             ver,
-            base_state_version,
             Some(ledger_info_with_sigs),
             false, /* sync_commit */
-            &in_memory_state,
         )
         .unwrap();
 
@@ -1037,7 +954,4 @@ pub fn test_sync_transactions_impl(
             .flat_map(|(txns_to_commit, _)| txns_to_commit.iter())
             .collect(),
     );
-    FIXME(aldenhu):
-     */
-    todo!()
 }

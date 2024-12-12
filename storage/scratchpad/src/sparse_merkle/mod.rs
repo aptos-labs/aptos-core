@@ -584,6 +584,12 @@ pub trait ProofRead: Sync {
     fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt>;
 }
 
+impl ProofRead for () {
+    fn get_proof(&self, _key: HashValue) -> Option<&SparseMerkleProofExt> {
+        unimplemented!()
+    }
+}
+
 /// All errors `update` can possibly return.
 #[derive(Debug, Error, Eq, PartialEq)]
 pub enum UpdateError {

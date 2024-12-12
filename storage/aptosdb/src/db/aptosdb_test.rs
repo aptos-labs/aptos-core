@@ -5,8 +5,7 @@ use crate::{
     db::{
         get_first_seq_num_and_limit, test_helper,
         test_helper::{
-            arb_blocks_to_commit, put_as_state_root, put_transaction_auxiliary_data,
-            put_transaction_infos,
+            arb_blocks_to_commit, put_transaction_auxiliary_data, put_transaction_infos,
         },
         AptosDB,
     },
@@ -32,6 +31,7 @@ use aptos_types::{
         TransactionToCommit, VMErrorDetail, Version,
     },
     vm_status::StatusCode,
+    write_set::{WriteOp, WriteSet},
 };
 use proptest::prelude::*;
 use std::{collections::HashSet, sync::Arc};
@@ -195,25 +195,32 @@ fn test_get_latest_ledger_summary() {
     // bootstrapped db (any transaction info is in)
     let key = StateKey::raw(b"test_key");
     let value = StateValue::from(b"test_val".to_vec());
-    let hash = SparseMerkleLeafNode::new(key.hash(), value.hash()).hash();
-    put_as_state_root(&db, 0, key, value);
+    let state_hash = SparseMerkleLeafNode::new(key.hash(), value.hash()).hash();
     let txn_info = TransactionInfo::new(
         HashValue::random(),
         HashValue::random(),
         HashValue::random(),
-        Some(hash),
+        Some(state_hash),
         0,
         ExecutionStatus::MiscellaneousError(None),
     );
-    put_transaction_infos(&db, 0, &[txn_info.clone()]);
+    let root_hash = txn_info.hash();
+    let mut txn_to_commit = TransactionToCommit::dummy();
+    txn_to_commit.transaction_info = txn_info;
+    txn_to_commit.write_set = WriteSet::new_for_test([(key, Some(value))]);
+
+    db.save_transactions_for_test(
+        &[txn_to_commit],
+        0,    /* first_version */
+        None, /* ledger_info_with_sigs */
+        true, /* sync_commit */
+    )
+    .unwrap();
 
     let bootstrapped = db.get_pre_committed_ledger_summary().unwrap();
     assert_eq!(bootstrapped.next_version(), 1);
-    assert_eq!(
-        bootstrapped.transaction_accumulator.root_hash(),
-        txn_info.state_checkpoint_hash().unwrap()
-    );
-    assert_eq!(bootstrapped.state_summary.root_hash(), hash);
+    assert_eq!(bootstrapped.transaction_accumulator.root_hash(), root_hash,);
+    assert_eq!(bootstrapped.state_summary.root_hash(), state_hash);
 }
 
 pub fn test_state_merkle_pruning_impl(
