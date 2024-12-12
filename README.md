@@ -11,7 +11,7 @@
 
 Aptos is a layer 1 blockchain bringing a paradigm shift to Web3 through better technology and user experience. Built with Move to create a home for developers building next-gen applications.
 
-## Getting Started
+## Getting  Started
 
 * [Aptos Foundation](https://aptosfoundation.org/)
 * [Aptos Developer Network](https://aptos.dev)
