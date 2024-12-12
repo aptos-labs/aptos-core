@@ -16,7 +16,7 @@ use aptos_sdk::{
     types::{AccountKey, LocalAccount},
 };
 use aptos_storage_interface::{
-    state_view::{DbStateViewAtVersion, VerifiedStateViewAtVersion},
+    state_store::state_view::db_state_view::{DbStateViewAtVersion, VerifiedStateViewAtVersion},
     DbReaderWriter,
 };
 use aptos_types::{

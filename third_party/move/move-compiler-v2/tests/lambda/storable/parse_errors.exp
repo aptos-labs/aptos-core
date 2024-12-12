@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+   ┌─ tests/lambda/storable/parse_errors.move:10:15
+   │
+10 │         x.y[3](27)
+   │               ^
+   │               │
+   │               Unexpected '('
+   │               Expected ';'

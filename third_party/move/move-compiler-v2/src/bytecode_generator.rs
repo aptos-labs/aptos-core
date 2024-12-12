@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{experiments::Experiment, Options};
 use codespan_reporting::diagnostic::Severity;
 use ethnum::U256;
 use itertools::Itertools;
@@ -324,6 +325,14 @@ impl<'env> Generator<'env> {
         let loc = env.get_node_loc(id);
         env.diag(severity, &loc, msg.as_ref())
     }
+
+    fn check_if_lambdas_enabled(&self) -> bool {
+        let options = self
+            .env()
+            .get_extension::<Options>()
+            .expect("Options is available");
+        options.experiment_on(Experiment::LAMBDA_VALUES)
+    }
 }
 
 // ======================================================================================
@@ -480,14 +489,23 @@ impl<'env> Generator<'env> {
                 self.emit_with(*id, |attr| Bytecode::SpecBlock(attr, spec));
             },
             // TODO(LAMBDA)
-            ExpData::Lambda(id, _, _) => self.error(
+            ExpData::Lambda(id, _, _, _, _) =>
+                self.error(
                 *id,
-                "Function-typed values not yet supported except as parameters to calls to inline functions",
+                if self.check_if_lambdas_enabled() {
+                    "Function-typed values not yet implemented except as parameters to calls to inline functions"
+                } else {
+                    "Function-typed values not yet supported except as parameters to calls to inline functions"
+                }
             ),
             // TODO(LAMBDA)
-            ExpData::Invoke(_, exp, _) => self.error(
-                exp.as_ref().node_id(),
-                "Calls to function values other than inline function parameters not yet supported",
+            ExpData::Invoke(id, _exp, _) => self.error(
+                *id,
+                if self.check_if_lambdas_enabled() {
+                    "Calls to function values other than inline function parameters not yet implemented"
+                } else {
+                    "Calls to function values other than inline function parameters not yet supported"
+                }
             ),
             ExpData::Quant(id, _, _, _, _, _) => {
                 self.internal_error(*id, "unsupported specification construct")
@@ -563,6 +581,18 @@ impl<'env> Generator<'env> {
                     self.internal_error(id, format!("inconsistent vector type: {:?}", ty));
                     Constant::Bool(false)
                 }
+            },
+            // TODO(LAMBDA)
+            Value::Function(_mid, _fid) => {
+                self.error(
+                    id,
+                    if self.check_if_lambdas_enabled() {
+                        "Function-typed values not yet implemented except as parameters to calls to inline functions"
+                    } else {
+                        "Function-typed values not yet supported except as parameters to calls to inline functions"
+                    }
+                );
+                Constant::Bool(false)
             },
         }
     }
@@ -785,6 +815,15 @@ impl<'env> Generator<'env> {
             Operation::MoveFunction(m, f) => {
                 self.gen_function_call(targets, id, m.qualified(*f), args)
             },
+            // TODO(LAMBDA)
+            Operation::EarlyBind => self.error(
+                id,
+                if self.check_if_lambdas_enabled() {
+                    "Function-typed values not yet implemented except as parameters to calls to inline functions"
+                } else {
+                    "Function-typed values not yet supported except as parameters to calls to inline functions"
+                },
+            ),
             Operation::TestVariants(mid, sid, variants) => {
                 self.gen_test_variants(targets, id, mid.qualified(*sid), variants, args)
             },
@@ -812,12 +851,6 @@ impl<'env> Generator<'env> {
             Operation::Not => self.gen_op_call(targets, id, BytecodeOperation::Not, args),
 
             Operation::NoOp => {}, // do nothing
-
-            // TODO(LAMBDA)
-            Operation::Closure(..) => self.error(
-                id,
-                "Function-typed values not yet supported except as parameters to calls to inline functions",
-            ),
 
             // Non-supported specification related operations
             Operation::Exists(Some(_))

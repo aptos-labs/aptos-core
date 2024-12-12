@@ -199,6 +199,7 @@ module aptos_framework::aptos_governance {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         voting::register<GovernanceProposal>(aptos_framework);
+        initialize_partial_voting(aptos_framework);
         move_to(aptos_framework, GovernanceConfig {
             voting_duration_secs,
             min_voting_threshold,
@@ -811,7 +812,7 @@ module aptos_framework::aptos_governance {
         multi_step: bool,
         use_generic_resolve_function: bool,
     ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
-        setup_voting(&aptos_framework, &proposer, &yes_voter, &no_voter);
+        setup_partial_voting(&aptos_framework, &proposer, &yes_voter, &no_voter);
 
         let execution_hash = vector::empty<u8>();
         vector::push_back(&mut execution_hash, 1);
@@ -898,7 +899,7 @@ module aptos_framework::aptos_governance {
         no_voter: signer,
         multi_step: bool,
     ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
-        setup_voting(&aptos_framework, &proposer, &yes_voter, &no_voter);
+        setup_partial_voting(&aptos_framework, &proposer, &yes_voter, &no_voter);
 
         create_proposal_for_test(&proposer, multi_step);
         vote(&yes_voter, signer::address_of(&yes_voter), 0, true);
@@ -1134,6 +1135,7 @@ module aptos_framework::aptos_governance {
         voter_1: signer,
         voter_2: signer,
     ) acquires ApprovedExecutionHashes, GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
+        features::change_feature_flags_for_testing(&aptos_framework, vector[], vector[features::get_partial_governance_voting()]);
         setup_voting(&aptos_framework, &proposer, &voter_1, &voter_2);
         let execution_hash = vector::empty<u8>();
         vector::push_back(&mut execution_hash, 1);
@@ -1147,7 +1149,6 @@ module aptos_framework::aptos_governance {
         assert!(get_remaining_voting_power(voter_1_addr, 0) == 0, 1);
         assert!(get_remaining_voting_power(voter_2_addr, 0) == 10, 2);
 
-        initialize_partial_voting(&aptos_framework);
         features::change_feature_flags_for_testing(&aptos_framework, vector[features::get_partial_governance_voting()], vector[]);
 
         coin::register<AptosCoin>(&voter_1);
@@ -1171,7 +1172,7 @@ module aptos_framework::aptos_governance {
         voter_1: signer,
         voter_2: signer,
     ) acquires GovernanceConfig, GovernanceResponsbility, VotingRecords, VotingRecordsV2, GovernanceEvents {
-        setup_voting_with_initialized_stake(&aptos_framework, &proposer, &voter_1, &voter_2);
+        setup_partial_voting_with_initialized_stake(&aptos_framework, &proposer, &voter_1, &voter_2);
         let execution_hash = vector::empty<u8>();
         vector::push_back(&mut execution_hash, 1);
         let proposer_addr = signer::address_of(&proposer);
@@ -1300,13 +1301,23 @@ module aptos_framework::aptos_governance {
     }
 
     #[test_only]
+    public fun setup_partial_voting_with_initialized_stake(
+        aptos_framework: &signer,
+        proposer: &signer,
+        yes_voter: &signer,
+        no_voter: &signer,
+    ) acquires GovernanceResponsbility {
+        features::change_feature_flags_for_testing(aptos_framework, vector[features::get_partial_governance_voting()], vector[]);
+        setup_voting_with_initialized_stake(aptos_framework, proposer, yes_voter, no_voter);
+    }
+
+    #[test_only]
     public fun setup_partial_voting(
         aptos_framework: &signer,
         proposer: &signer,
         voter_1: &signer,
         voter_2: &signer,
     ) acquires GovernanceResponsbility {
-        initialize_partial_voting(aptos_framework);
         features::change_feature_flags_for_testing(aptos_framework, vector[features::get_partial_governance_voting()], vector[]);
         setup_voting(aptos_framework, proposer, voter_1, voter_2);
     }
@@ -1340,7 +1351,7 @@ module aptos_framework::aptos_governance {
         yes_voter: signer,
         no_voter: signer,
     ) acquires GovernanceResponsbility, GovernanceConfig, ApprovedExecutionHashes, VotingRecords, VotingRecordsV2, GovernanceEvents {
-        setup_voting(&aptos_framework, &proposer, &yes_voter, &no_voter);
+        setup_partial_voting(&aptos_framework, &proposer, &yes_voter, &no_voter);
 
         create_proposal_for_test(&proposer, true);
         vote(&yes_voter, signer::address_of(&yes_voter), 0, true);

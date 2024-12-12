@@ -238,8 +238,7 @@ impl AptosDB {
         );
 
         {
-            let current_state_guard = self.state_store.current_state();
-            let current_state = current_state_guard.lock();
+            let current_state = self.state_store.current_state();
             ensure!(
                 chunk.base_state_version == current_state.base_version,
                 "base_state_version {:?} does not equal to the base_version {:?} in buffered state with current version {:?}",
@@ -309,12 +308,6 @@ impl AptosDB {
                     .commit_transaction_accumulator(chunk.first_version, chunk.transaction_infos)
                     .unwrap()
             });
-            s.spawn(|_| {
-                self.commit_transaction_auxiliary_data(
-                    chunk.first_version,
-                    chunk.transaction_outputs.iter().map(TransactionOutput::auxiliary_data))
-                    .unwrap()
-            });
         });
 
         Ok(new_root_hash)
@@ -338,8 +331,8 @@ impl AptosDB {
 
         // TODO(grao): Make state_store take sharded state updates.
         self.state_store.put_value_sets(
-            chunk.per_version_state_updates,
             chunk.first_version,
+            chunk.state_update_refs,
             chunk.latest_in_memory_state.current.usage(),
             chunk.sharded_state_cache,
             &ledger_metadata_batch,
@@ -489,6 +482,7 @@ impl AptosDB {
         Ok(root_hash)
     }
 
+    #[allow(dead_code)]
     fn commit_transaction_auxiliary_data<'a>(
         &self,
         first_version: Version,
@@ -555,7 +549,7 @@ impl AptosDB {
         version_to_commit: Version,
     ) -> Result<Option<Version>> {
         let old_committed_ver = self.ledger_db.metadata_db().get_synced_version()?;
-        let pre_committed_ver = self.state_store.current_state().lock().current_version;
+        let pre_committed_ver = self.state_store.current_state().current_version;
         ensure!(
             old_committed_ver.is_none() || version_to_commit >= old_committed_ver.unwrap(),
             "Version too old to commit. Committed: {:?}; Trying to commit with LI: {}",

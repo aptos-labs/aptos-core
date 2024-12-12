@@ -17,7 +17,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{
-        errors::StateviewError,
+        errors::StateViewError,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
         StateViewId, TStateView,
@@ -73,7 +73,7 @@ where
     type Key = K;
 
     // Contains mock storage value with STORAGE_AGGREGATOR_VALUE.
-    fn get_state_value(&self, _: &K) -> Result<Option<StateValue>, StateviewError> {
+    fn get_state_value(&self, _: &K) -> Result<Option<StateValue>, StateViewError> {
         Ok(Some(StateValue::new_legacy(
             serialize(&STORAGE_AGGREGATOR_VALUE).into(),
         )))
@@ -83,7 +83,7 @@ where
         StateViewId::Miscellaneous
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
+    fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
         unreachable!("Not used in tests");
     }
 }
@@ -99,7 +99,7 @@ where
     type Key = K;
 
     // Contains mock storage value with a non-empty group (w. value at RESERVED_TAG).
-    fn get_state_value(&self, key: &K) -> Result<Option<StateValue>, StateviewError> {
+    fn get_state_value(&self, key: &K) -> Result<Option<StateValue>, StateViewError> {
         if self.group_keys.contains(key) {
             let group: BTreeMap<u32, Bytes> = BTreeMap::from([(RESERVED_TAG, vec![0].into())]);
 
@@ -117,7 +117,7 @@ where
         StateViewId::Miscellaneous
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
+    fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
         unreachable!("Not used in tests");
     }
 }

@@ -129,7 +129,7 @@ impl AptosDB {
         );
 
         if indexer.next_version() < ledger_next_version {
-            use aptos_storage_interface::state_view::DbStateViewAtVersion;
+            use aptos_storage_interface::state_store::state_view::db_state_view::DbStateViewAtVersion;
             let db: Arc<dyn DbReader> = self.state_store.clone();
 
             let state_view = db.state_view_at_version(Some(ledger_next_version - 1))?;

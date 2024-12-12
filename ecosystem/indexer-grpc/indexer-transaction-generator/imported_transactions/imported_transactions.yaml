@@ -15,6 +15,10 @@ testnet:
     5992795934: 5992795934_fa_activities
     5523474016: 5523474016_validator_txn
 
+    # fungible asset processor
+    4462417704: 4462417704_secondary_store_burnt
+    646928741: 646928741_no_events
+
 
 mainnet:
   transaction_stream_endpoint: https://grpc.mainnet.aptoslabs.com:443
@@ -22,6 +26,7 @@ mainnet:
   versions_to_import:
     # fungible asset processor
     308783012: 308783012_fa_transfer
+    152449628: 152449628_coin_info_write
 
     # token v2 processor
     1058723093: 1058723093_token_v1_mint_withdraw_deposit_events
@@ -55,6 +60,7 @@ mainnet:
 
     # objects processor
     578318306: 578318306_objects_write_resource
+    1806220919: 1806220919_object_untransferable
 
     # stake processor
     121508544: 121508544_stake_distribute

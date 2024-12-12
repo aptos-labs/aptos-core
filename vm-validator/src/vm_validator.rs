@@ -5,8 +5,10 @@
 use anyhow::Result;
 use aptos_logger::info;
 use aptos_storage_interface::{
-    cached_state_view::CachedDbStateView,
-    state_view::{DbStateView, LatestDbStateCheckpointView},
+    state_store::state_view::{
+        cached_state_view::CachedDbStateView,
+        db_state_view::{DbStateView, LatestDbStateCheckpointView},
+    },
     DbReader,
 };
 use aptos_types::{

@@ -21,6 +21,8 @@ pub const RESOURCE_TAG: u8 = 1;
 
 /// Hex address: 0x1
 pub const CORE_CODE_ADDRESS: AccountAddress = AccountAddress::ONE;
+pub const TOKEN_ADDRESS: AccountAddress = AccountAddress::THREE;
+pub const TOKEN_OBJECTS_ADDRESS: AccountAddress = AccountAddress::FOUR;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 #[cfg_attr(
@@ -379,7 +381,7 @@ mod tests {
     fn test_nested_type_tag_struct_serde() {
         let mut type_tags = vec![make_type_tag_struct(TypeTag::U8)];
 
-        let limit = MAX_TYPE_TAG_NESTING - 1;
+        let limit = MAX_TYPE_TAG_NESTING;
         while type_tags.len() < limit.into() {
             type_tags.push(make_type_tag_struct(type_tags.last().unwrap().clone()));
         }
@@ -403,7 +405,7 @@ mod tests {
     fn test_nested_type_tag_vector_serde() {
         let mut type_tags = vec![make_type_tag_struct(TypeTag::U8)];
 
-        let limit = MAX_TYPE_TAG_NESTING - 1;
+        let limit = MAX_TYPE_TAG_NESTING;
         while type_tags.len() < limit.into() {
             type_tags.push(make_type_tag_vector(type_tags.last().unwrap().clone()));
         }

@@ -1,9 +1,12 @@
-error[E01002]: unexpected token
-  ┌─ tests/move_check/parser/invalid_call_lhs_value2.move:3:10
+error[E01013]: unsupported language construct
+  ┌─ tests/move_check/parser/invalid_call_lhs_value2.move:3:9
   │
 3 │         5();
-  │          ^
-  │          │
-  │          Unexpected '('
-  │          Expected ';'
+  │         ^ Calls through computed functions not supported by this compiler
+
+error[E01013]: unsupported language construct
+  ┌─ tests/move_check/parser/invalid_call_lhs_value2.move:4:9
+  │
+4 │         5(0, 1);
+  │         ^ Calls through computed functions not supported by this compiler
 

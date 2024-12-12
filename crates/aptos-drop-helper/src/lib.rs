@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::async_concurrent_dropper::AsyncConcurrentDropper;
-use derive_more::{Deref, DerefMut};
 use once_cell::sync::Lazy;
-use std::{cell::Cell, mem::ManuallyDrop};
+use std::{
+    cell::Cell,
+    ops::{Deref, DerefMut},
+};
 
 pub mod async_concurrent_dropper;
 pub mod async_drop_queue;
@@ -23,25 +25,37 @@ pub trait ArcAsyncDrop: Send + Sync + 'static {}
 
 impl<T: Send + Sync + 'static> ArcAsyncDrop for T {}
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, DerefMut)]
-#[repr(transparent)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DropHelper<T: Send + 'static> {
-    #[deref]
-    #[deref_mut]
-    inner: ManuallyDrop<T>,
+    inner: Option<T>,
 }
 
 impl<T: Send + 'static> DropHelper<T> {
     pub fn new(inner: T) -> Self {
-        Self {
-            inner: ManuallyDrop::new(inner),
-        }
+        Self { inner: Some(inner) }
+    }
+
+    pub fn into_inner(mut self) -> T {
+        self.inner.take().expect("Initialized to Some.")
     }
 }
 
 impl<T: Send + 'static> Drop for DropHelper<T> {
     fn drop(&mut self) {
-        let inner = unsafe { ManuallyDrop::take(&mut self.inner) };
-        DEFAULT_DROPPER.schedule_drop(inner);
+        DEFAULT_DROPPER.schedule_drop(self.inner.take());
+    }
+}
+
+impl<T: Send + 'static> Deref for DropHelper<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.inner.as_ref().expect("Initialized to Some.")
+    }
+}
+
+impl<T: Send + 'static> DerefMut for DropHelper<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.inner.as_mut().expect("Initialized to Some.")
     }
 }

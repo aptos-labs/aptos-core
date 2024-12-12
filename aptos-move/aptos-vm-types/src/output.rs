@@ -34,7 +34,6 @@ pub struct VMOutput {
     module_write_set: ModuleWriteSet,
     fee_statement: FeeStatement,
     status: TransactionStatus,
-    auxiliary_data: TransactionAuxiliaryData,
 }
 
 impl VMOutput {
@@ -43,14 +42,12 @@ impl VMOutput {
         module_write_set: ModuleWriteSet,
         fee_statement: FeeStatement,
         status: TransactionStatus,
-        auxiliary_data: TransactionAuxiliaryData,
     ) -> Self {
         Self {
             change_set,
             module_write_set,
             fee_statement,
             status,
-            auxiliary_data,
         }
     }
 
@@ -60,7 +57,6 @@ impl VMOutput {
             module_write_set: ModuleWriteSet::empty(),
             fee_statement: FeeStatement::zero(),
             status,
-            auxiliary_data: TransactionAuxiliaryData::default(),
         }
     }
 
@@ -100,10 +96,6 @@ impl VMOutput {
 
     pub fn status(&self) -> &TransactionStatus {
         &self.status
-    }
-
-    pub fn auxiliary_data(&self) -> &TransactionAuxiliaryData {
-        &self.auxiliary_data
     }
 
     pub fn materialized_size(&self) -> u64 {
@@ -179,7 +171,6 @@ impl VMOutput {
             module_write_set,
             fee_statement,
             status,
-            auxiliary_data,
         } = self;
         let (write_set, events) = change_set
             .try_combine_into_storage_change_set(module_write_set)?
@@ -189,7 +180,7 @@ impl VMOutput {
             events,
             fee_statement.gas_used(),
             status,
-            auxiliary_data,
+            TransactionAuxiliaryData::default(),
         ))
     }
 

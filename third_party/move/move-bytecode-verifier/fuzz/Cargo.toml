@@ -12,12 +12,9 @@ cargo-fuzz = true
 [dependencies]
 arbitrary = { workspace = true }
 libfuzzer-sys = { workspace = true }
-move-binary-format = { path = "../../move-binary-format", features = ["fuzzing"] }
-move-bytecode-verifier = { path = "../" }
-move-core-types = { path = "../../move-core/types", features = ["fuzzing"] }
-# Prevent this from interfering with workspaces
-#[workspace]
-#members = ["."]
+move-binary-format = { workspace = true, features = ["fuzzing"] }
+move-bytecode-verifier = { workspace = true }
+move-core-types = { workspace = true, features = ["fuzzing"] }
 
 [[bin]]
 name = "code_unit"

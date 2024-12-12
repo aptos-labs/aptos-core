@@ -1443,7 +1443,7 @@ async fn get_epoch_info(client: &Client) -> CliTypedResult<EpochInfo> {
 
     let epoch_interval = block_resource.epoch_interval();
     let epoch_interval_secs = epoch_interval / SECS_TO_MICROSECS;
-    let last_reconfig = reconfig_resource.last_reconfiguration_time();
+    let last_reconfig = reconfig_resource.last_reconfiguration_time_micros();
     Ok(EpochInfo {
         epoch: reconfig_resource.epoch(),
         epoch_interval_secs,

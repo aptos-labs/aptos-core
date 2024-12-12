@@ -25,7 +25,7 @@ use aptos_crypto::{
     encoding_type::{EncodingError, EncodingType},
     x25519, PrivateKey, ValidCryptoMaterialStringExt,
 };
-use aptos_framework::chunked_publish::LARGE_PACKAGES_MODULE_ADDRESS;
+use aptos_framework::chunked_publish::{CHUNK_SIZE_IN_BYTES, LARGE_PACKAGES_MODULE_ADDRESS};
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
 use aptos_logger::Level;
@@ -250,8 +250,11 @@ pub struct ProfileConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub network: Option<Network>,
     /// Private key for commands.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(deserialize_with = "deserialize_private_key_with_prefix")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        default,
+        deserialize_with = "deserialize_private_key_with_prefix"
+    )]
     pub private_key: Option<Ed25519PrivateKey>,
     /// Public key for commands
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1511,12 +1514,12 @@ pub struct ChangeSummary {
 pub struct FaucetOptions {
     /// URL for the faucet endpoint e.g. `https://faucet.devnet.aptoslabs.com`
     #[clap(long)]
-    faucet_url: Option<reqwest::Url>,
+    pub faucet_url: Option<reqwest::Url>,
 
     /// Auth token to bypass faucet ratelimits. You can also set this as an environment
     /// variable with FAUCET_AUTH_TOKEN.
     #[clap(long, env)]
-    faucet_auth_token: Option<String>,
+    pub faucet_auth_token: Option<String>,
 }
 
 impl FaucetOptions {
@@ -1527,19 +1530,38 @@ impl FaucetOptions {
         }
     }
 
-    fn faucet_url(&self, profile: &ProfileOptions) -> CliTypedResult<reqwest::Url> {
+    fn faucet_url(&self, profile_options: &ProfileOptions) -> CliTypedResult<reqwest::Url> {
         if let Some(ref faucet_url) = self.faucet_url {
-            Ok(faucet_url.clone())
-        } else if let Some(Some(url)) = CliConfig::load_profile(
-            profile.profile_name(),
+            return Ok(faucet_url.clone());
+        }
+        let profile = CliConfig::load_profile(
+            profile_options.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
-        )?
-        .map(|profile| profile.faucet_url)
-        {
-            reqwest::Url::parse(&url)
-                .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string()))
-        } else {
-            Err(CliError::CommandArgumentError("No faucet given. Please add --faucet-url or add a faucet URL to the .aptos/config.yaml for the current profile".to_string()))
+        )?;
+        let profile = match profile {
+            Some(profile) => profile,
+            None => {
+                return Err(CliError::CommandArgumentError(format!(
+                    "Profile \"{}\" not found.",
+                    profile_options.profile_name().unwrap_or(DEFAULT_PROFILE)
+                )))
+            },
+        };
+
+        match profile.faucet_url {
+            Some(url) => reqwest::Url::parse(&url)
+                .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string())),
+            None => match profile.network {
+                Some(Network::Mainnet) => {
+                    Err(CliError::CommandArgumentError("There is no faucet for mainnet. Please create and fund the account by transferring funds from another account. If you are confident you want to use a faucet, set --faucet-url or add a faucet URL to .aptos/config.yaml for the current profile".to_string()))
+                },
+                Some(Network::Testnet) => {
+                    Err(CliError::CommandArgumentError(format!("To get testnet APT you must visit {}. If you are confident you want to use a faucet programmatically, set --faucet-url or add a faucet URL to .aptos/config.yaml for the current profile", get_mint_site_url(None))))
+                },
+                _ => {
+                    Err(CliError::CommandArgumentError("No faucet given. Please set --faucet-url or add a faucet URL to .aptos/config.yaml for the current profile".to_string()))
+                },
+            },
         }
     }
 
@@ -2370,8 +2392,25 @@ pub struct ChunkedPublishOption {
     /// Address of the `large_packages` move module for chunked publishing
     ///
     /// By default, on the module is published at `0x0e1ca3011bdd07246d4d16d909dbb2d6953a86c4735d5acf5865d962c630cce7`
-    /// on Testnet and Mainnet.  On any other network, you will need to first publish it from the framework
+    /// on Testnet and Mainnet. On any other network, you will need to first publish it from the framework
     /// under move-examples/large_packages.
     #[clap(long, default_value = LARGE_PACKAGES_MODULE_ADDRESS, value_parser = crate::common::types::load_account_arg)]
     pub(crate) large_packages_module_address: AccountAddress,
+
+    /// Size of the code chunk in bytes for splitting bytecode and metadata of large packages
+    ///
+    /// By default, the chunk size is set to `CHUNK_SIZE_IN_BYTES`. A smaller chunk size will result
+    /// in more transactions required to publish a package, while a larger chunk size might cause
+    /// transaction to fail due to exceeding the execution gas limit.
+    #[clap(long, default_value_t = CHUNK_SIZE_IN_BYTES)]
+    pub(crate) chunk_size: usize,
+}
+
+/// For minting testnet APT.
+pub fn get_mint_site_url(address: Option<AccountAddress>) -> String {
+    let params = match address {
+        Some(address) => format!("?address={}", address.to_standard_string()),
+        None => "".to_string(),
+    };
+    format!("https://aptos.dev/network/faucet{}", params)
 }

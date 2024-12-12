@@ -73,6 +73,10 @@ impl<C: CoinType> CoinStoreResource<C> {
         self.coin
     }
 
+    pub fn set_coin(&mut self, coin: u64) {
+        self.coin = coin;
+    }
+
     pub fn frozen(&self) -> bool {
         self.frozen
     }
