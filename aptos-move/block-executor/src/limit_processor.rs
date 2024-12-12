@@ -281,7 +281,6 @@ mod test {
         proptest_types::types::{KeyType, MockEvent, MockTransaction},
         types::InputOutputKey,
     };
-    use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
     use std::collections::HashSet;
 
     // TODO: add tests for accumulate_fee_statement / compute_conflict_multiplier for different BlockGasLimitType configs
@@ -363,9 +362,7 @@ mod test {
         assert!(processor.should_end_block_parallel());
     }
 
-    fn to_map(
-        reads: &[InputOutputKey<u64, u32, u64>],
-    ) -> HashSet<InputOutputKey<KeyType<u64>, u32, DelayedFieldID>> {
+    fn to_map(reads: &[InputOutputKey<u64, u32>]) -> HashSet<InputOutputKey<KeyType<u64>, u32>> {
         reads
             .iter()
             .map(|key| match key {

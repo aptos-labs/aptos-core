@@ -9,6 +9,8 @@ use crate::{
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
+    identifier::IdentStr,
+    language_storage::ModuleId,
     value::{IdentifierMappingKind, MoveTypeLayout},
     vm_status::StatusCode,
 };
@@ -18,6 +20,78 @@ use serde::{
     Deserializer, Serialize, Serializer,
 };
 use std::cell::RefCell;
+
+pub trait FunctionExtension {
+    fn get_function_layout(
+        &self,
+        module_id: &ModuleId,
+        function_name: &IdentStr,
+    ) -> PartialVMResult<()>;
+}
+
+pub struct DelayedFieldsExtension<'a> {
+    #[allow(dead_code)]
+    pub(crate) delayed_fields_count: RefCell<usize>,
+    #[allow(dead_code)]
+    pub(crate) mapping: Option<&'a dyn ValueToIdentifierMapping<Identifier = DelayedFieldID>>,
+}
+
+pub struct ValueSerDeContext<'a> {
+    #[allow(dead_code)]
+    pub(crate) function_extension: Option<&'a dyn FunctionExtension>,
+    #[allow(dead_code)]
+    pub(crate) delayed_fields_extension: Option<DelayedFieldsExtension<'a>>,
+}
+
+impl<'a> ValueSerDeContext<'a> {
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
+        Self {
+            function_extension: None,
+            delayed_fields_extension: None,
+        }
+    }
+
+    pub fn new_with_delayed_fields_replacement(
+        mapping: &'a dyn ValueToIdentifierMapping<Identifier = DelayedFieldID>,
+    ) -> Self {
+        let delayed_fields_extension = Some(DelayedFieldsExtension {
+            delayed_fields_count: RefCell::new(0),
+            mapping: Some(mapping),
+        });
+        Self {
+            function_extension: None,
+            delayed_fields_extension,
+        }
+    }
+
+    pub fn new_with_delayed_fields_serde() -> Self {
+        let delayed_fields_extension = Some(DelayedFieldsExtension {
+            delayed_fields_count: RefCell::new(0),
+            mapping: None,
+        });
+        Self {
+            function_extension: None,
+            delayed_fields_extension,
+        }
+    }
+
+    pub fn serialize(&self, _value: &Value, _layout: &MoveTypeLayout) -> Option<Vec<u8>> {
+        todo!()
+    }
+
+    pub fn serialized_size(
+        &self,
+        _value: &Value,
+        _layout: &MoveTypeLayout,
+    ) -> PartialVMResult<usize> {
+        todo!()
+    }
+
+    pub fn deserialize(&self, _bytes: &[u8], _layout: &MoveTypeLayout) -> Option<Value> {
+        todo!()
+    }
+}
 
 pub trait CustomDeserializer {
     fn custom_deserialize<'d, D: Deserializer<'d>>(
@@ -109,6 +183,7 @@ impl CustomSerializer for RelaxedCustomSerDe {
     }
 }
 
+#[allow(dead_code)]
 pub fn deserialize_and_allow_delayed_values(
     bytes: &[u8],
     layout: &MoveTypeLayout,
@@ -125,6 +200,7 @@ pub fn deserialize_and_allow_delayed_values(
     })
 }
 
+#[allow(dead_code)]
 pub fn serialize_and_allow_delayed_values(
     value: &Value,
     layout: &MoveTypeLayout,
@@ -154,6 +230,7 @@ pub fn serialize_and_allow_delayed_values(
 /// Note that the layout should match, as otherwise serialization fails. This
 /// method explicitly allows having delayed values inside the passed in Move value
 /// because their size is fixed and cannot change.
+#[allow(dead_code)]
 pub fn serialized_size_allowing_delayed_values(
     value: &Value,
     layout: &MoveTypeLayout,
@@ -264,6 +341,7 @@ impl<'a, I: From<u64> + ExtractWidth + ExtractUniqueIndex> CustomDeserializer
     }
 }
 
+#[allow(dead_code)]
 pub fn deserialize_and_replace_values_with_ids<I: From<u64> + ExtractWidth + ExtractUniqueIndex>(
     bytes: &[u8],
     layout: &MoveTypeLayout,
@@ -281,6 +359,7 @@ pub fn deserialize_and_replace_values_with_ids<I: From<u64> + ExtractWidth + Ext
     })
 }
 
+#[allow(dead_code)]
 pub fn serialize_and_replace_ids_with_values<I: From<u64> + ExtractWidth + ExtractUniqueIndex>(
     value: &Value,
     layout: &MoveTypeLayout,

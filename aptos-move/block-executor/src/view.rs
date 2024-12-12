@@ -59,11 +59,8 @@ use move_binary_format::{
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_runtime::{Module, RuntimeEnvironment};
 use move_vm_types::{
-    delayed_values::delayed_field_id::ExtractUniqueIndex,
-    value_serde::{
-        deserialize_and_allow_delayed_values, deserialize_and_replace_values_with_ids,
-        serialize_and_allow_delayed_values, serialize_and_replace_ids_with_values,
-    },
+    delayed_values::delayed_field_id::{DelayedFieldID, ExtractUniqueIndex},
+    value_serde::ValueSerDeContext,
 };
 use std::{
     cell::RefCell,
@@ -163,7 +160,7 @@ trait ResourceGroupState<T: Transaction> {
 }
 
 pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
-    pub(crate) versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+    pub(crate) versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, DelayedFieldID>,
     scheduler: &'a Scheduler,
     start_counter: u32,
     counter: &'a AtomicU32,
@@ -175,9 +172,9 @@ fn get_delayed_field_value_impl<T: Transaction>(
     captured_reads: &RefCell<
         CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>,
     >,
-    versioned_delayed_fields: &dyn TVersionedDelayedFieldView<T::Identifier>,
+    versioned_delayed_fields: &dyn TVersionedDelayedFieldView<DelayedFieldID>,
     wait_for: &dyn TWaitForDependency,
-    id: &T::Identifier,
+    id: &DelayedFieldID,
     txn_idx: TxnIndex,
 ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
     // We expect only DelayedFieldReadKind::Value (which is set from this function),
@@ -315,9 +312,9 @@ fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
     captured_reads: &RefCell<
         CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>,
     >,
-    versioned_delayed_fields: &dyn TVersionedDelayedFieldView<T::Identifier>,
+    versioned_delayed_fields: &dyn TVersionedDelayedFieldView<DelayedFieldID>,
     wait_for: &dyn TWaitForDependency,
-    id: &T::Identifier,
+    id: &DelayedFieldID,
     base_delta: &SignedU128,
     delta: &SignedU128,
     max_value: u128,
@@ -451,7 +448,7 @@ fn wait_for_dependency(
 
 impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
     pub(crate) fn new(
-        shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, DelayedFieldID>,
         shared_scheduler: &'a Scheduler,
         start_shared_counter: u32,
         shared_counter: &'a AtomicU32,
@@ -465,7 +462,11 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         }
     }
 
-    pub(crate) fn set_delayed_field_value(&self, id: T::Identifier, base_value: DelayedFieldValue) {
+    pub(crate) fn set_delayed_field_value(
+        &self,
+        id: DelayedFieldID,
+        base_value: DelayedFieldValue,
+    ) {
         self.versioned_map
             .delayed_fields()
             .set_base_value(id, base_value)
@@ -787,7 +788,7 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
 }
 
 pub(crate) struct SequentialState<'a, T: Transaction> {
-    pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, T::Identifier>,
+    pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
     pub(crate) read_set: RefCell<UnsyncReadSet<T, ModuleId>>,
     pub(crate) start_counter: u32,
     pub(crate) counter: &'a RefCell<u32>,
@@ -797,7 +798,7 @@ pub(crate) struct SequentialState<'a, T: Transaction> {
 
 impl<'a, T: Transaction> SequentialState<'a, T> {
     pub fn new(
-        unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, T::Identifier>,
+        unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         start_counter: u32,
         counter: &'a RefCell<u32>,
     ) -> Self {
@@ -810,11 +811,15 @@ impl<'a, T: Transaction> SequentialState<'a, T> {
         }
     }
 
-    pub(crate) fn set_delayed_field_value(&self, id: T::Identifier, base_value: DelayedFieldValue) {
+    pub(crate) fn set_delayed_field_value(
+        &self,
+        id: DelayedFieldID,
+        base_value: DelayedFieldValue,
+    ) {
         self.unsync_map.set_base_delayed_field(id, base_value)
     }
 
-    pub(crate) fn read_delayed_field(&self, id: T::Identifier) -> Option<DelayedFieldValue> {
+    pub(crate) fn read_delayed_field(&self, id: DelayedFieldID) -> Option<DelayedFieldValue> {
         self.unsync_map.fetch_delayed_field(&id)
     }
 }
@@ -1020,7 +1025,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     }
 
     #[cfg(test)]
-    fn get_read_summary(&self) -> HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>> {
+    fn get_read_summary(&self) -> HashSet<InputOutputKey<T::Key, T::Tag>> {
         match &self.latest_view {
             ViewState::Sync(state) => state.captured_reads.borrow().get_read_summary(),
             ViewState::Unsync(state) => state.read_set.borrow().get_read_summary(),
@@ -1130,8 +1135,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         &self,
         state_value: StateValue,
         layout: &MoveTypeLayout,
-    ) -> anyhow::Result<(StateValue, HashSet<T::Identifier>)> {
+    ) -> anyhow::Result<(StateValue, HashSet<DelayedFieldID>)> {
         let mapping = TemporaryValueToIdentifierMapping::new(self, self.txn_idx);
+
         state_value
             .map_bytes(|bytes| {
                 // This call will replace all occurrences of aggregator / snapshot
@@ -1139,11 +1145,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 // The values are stored in aggregators multi-version data structure,
                 // see the actual trait implementation for more details.
                 let patched_value =
-                    deserialize_and_replace_values_with_ids(bytes.as_ref(), layout, &mapping)
+                    ValueSerDeContext::new_with_delayed_fields_replacement(&mapping)
+                        .deserialize(bytes.as_ref(), layout)
                         .ok_or_else(|| {
                             anyhow::anyhow!("Failed to deserialize resource during id replacement")
                         })?;
-                serialize_and_allow_delayed_values(&patched_value, layout)?
+
+                ValueSerDeContext::new_with_delayed_fields_serde()
+                    .serialize(&patched_value, layout)
                     .ok_or_else(|| {
                         anyhow::anyhow!(
                             "Failed to serialize value {} after id replacement",
@@ -1161,17 +1170,21 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         &self,
         bytes: &Bytes,
         layout: &MoveTypeLayout,
-    ) -> anyhow::Result<(Bytes, HashSet<T::Identifier>)> {
+    ) -> anyhow::Result<(Bytes, HashSet<DelayedFieldID>)> {
         // This call will replace all occurrences of aggregator / snapshot
         // identifiers with values with the same type layout.
-        let value = deserialize_and_allow_delayed_values(bytes, layout).ok_or_else(|| {
-            anyhow::anyhow!(
-                "Failed to deserialize resource during id replacement: {:?}",
-                bytes
-            )
-        })?;
+        let value = ValueSerDeContext::new_with_delayed_fields_serde()
+            .deserialize(bytes, layout)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Failed to deserialize resource during id replacement: {:?}",
+                    bytes
+                )
+            })?;
+
         let mapping = TemporaryValueToIdentifierMapping::new(self, self.txn_idx);
-        let patched_bytes = serialize_and_replace_ids_with_values(&value, layout, &mapping)
+        let patched_bytes = ValueSerDeContext::new_with_delayed_fields_replacement(&mapping)
+            .serialize(&value, layout)
             .ok_or_else(|| anyhow::anyhow!("Failed to serialize resource during id replacement"))?
             .into();
         Ok((patched_bytes, mapping.into_inner()))
@@ -1180,8 +1193,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     fn get_reads_needing_exchange_sequential(
         &self,
         read_set: &HashSet<T::Key>,
-        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, T::Identifier>,
-        delayed_write_set_ids: &HashSet<T::Identifier>,
+        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        delayed_write_set_ids: &HashSet<DelayedFieldID>,
         skip: &HashSet<T::Key>,
     ) -> Result<BTreeMap<T::Key, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>, PanicError> {
         read_set
@@ -1213,7 +1226,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     fn get_group_reads_needing_exchange_parallel(
         &self,
         parallel_state: &ParallelState<'a, T, X>,
-        delayed_write_set_ids: &HashSet<T::Identifier>,
+        delayed_write_set_ids: &HashSet<DelayedFieldID>,
         skip: &HashSet<T::Key>,
     ) -> PartialVMResult<BTreeMap<T::Key, (StateValueMetadata, u64)>> {
         let reads_with_delayed_fields = parallel_state
@@ -1277,8 +1290,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     fn get_group_reads_needing_exchange_sequential(
         &self,
         group_read_set: &HashMap<T::Key, HashSet<T::Tag>>,
-        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, T::Identifier>,
-        delayed_write_set_ids: &HashSet<T::Identifier>,
+        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        delayed_write_set_ids: &HashSet<DelayedFieldID>,
         skip: &HashSet<T::Key>,
     ) -> PartialVMResult<BTreeMap<T::Key, (StateValueMetadata, u64)>> {
         group_read_set
@@ -1659,7 +1672,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFieldView
     for LatestView<'a, T, S, X>
 {
-    type Identifier = T::Identifier;
+    type Identifier = DelayedFieldID;
     type ResourceGroupTag = T::Tag;
     type ResourceKey = T::Key;
 
@@ -1836,7 +1849,6 @@ mod test {
         write_set::TransactionWrite,
     };
     use aptos_vm_types::resolver::TResourceView;
-    use bytes::Bytes;
     use claims::{assert_err_eq, assert_none, assert_ok_eq, assert_some_eq};
     use move_core_types::value::{IdentifierMappingKind, MoveStructLayout, MoveTypeLayout};
     use move_vm_types::{
@@ -1902,7 +1914,6 @@ mod test {
 
     impl BlockExecutableTransaction for TestTransactionType {
         type Event = MockEvent;
-        type Identifier = DelayedFieldID;
         type Key = KeyType<u32>;
         type Tag = u32;
         type Value = ValueType;
@@ -2479,7 +2490,12 @@ mod test {
     }
 
     fn create_state_value(value: &Value, layout: &MoveTypeLayout) -> StateValue {
-        StateValue::new_legacy(value.simple_serialize(layout).unwrap().into())
+        StateValue::new_legacy(
+            ValueSerDeContext::new()
+                .serialize(value, layout)
+                .unwrap()
+                .into(),
+        )
     }
 
     #[derive(Clone)]
@@ -2520,7 +2536,7 @@ mod test {
             Value::u64(2),
             Value::u64(3),
         ]));
-        let state_value = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
+        let state_value = create_state_value(&value, &layout);
         let (patched_state_value, identifiers) = latest_view
             .replace_values_with_identifiers(state_value.clone(), &layout)
             .unwrap();
@@ -2546,8 +2562,7 @@ mod test {
         let storage_layout =
             create_struct_layout(create_aggregator_storage_layout(MoveTypeLayout::U64));
         let value = create_struct_value(create_aggregator_value_u64(25, 30));
-        let state_value =
-            StateValue::new_legacy(value.simple_serialize(&storage_layout).unwrap().into());
+        let state_value = create_state_value(&value, &storage_layout);
 
         let layout = create_struct_layout(create_aggregator_layout_u64());
         let (patched_state_value, identifiers) = latest_view
@@ -2585,8 +2600,7 @@ mod test {
             create_aggregator_value_u64(35, 65),
             create_aggregator_value_u64(0, 20),
         ]));
-        let state_value =
-            StateValue::new_legacy(value.simple_serialize(&storage_layout).unwrap().into());
+        let state_value = create_state_value(&value, &storage_layout);
 
         let layout = create_struct_layout(create_vector_layout(create_aggregator_layout_u64()));
         let (patched_state_value, identifiers) = latest_view
@@ -2619,12 +2633,7 @@ mod test {
             ])]));
         assert_eq!(
             patched_state_value,
-            StateValue::new_legacy(
-                patched_value
-                    .simple_serialize(&storage_layout)
-                    .unwrap()
-                    .into()
-            )
+            create_state_value(&patched_value, &storage_layout),
         );
         let (final_state_value, identifiers) = latest_view
             .replace_identifiers_with_values(patched_state_value.bytes(), &layout)
@@ -2649,8 +2658,7 @@ mod test {
             create_snapshot_value(Value::u128(35)),
             create_snapshot_value(Value::u128(0)),
         ]));
-        let state_value =
-            StateValue::new_legacy(value.simple_serialize(&storage_layout).unwrap().into());
+        let state_value = create_state_value(&value, &storage_layout);
 
         let layout = create_struct_layout(create_vector_layout(create_snapshot_layout(
             MoveTypeLayout::U128,
@@ -2682,12 +2690,7 @@ mod test {
             ])]));
         assert_eq!(
             patched_state_value,
-            StateValue::new_legacy(
-                patched_value
-                    .simple_serialize(&storage_layout)
-                    .unwrap()
-                    .into()
-            )
+            create_state_value(&patched_value, &storage_layout),
         );
         let (final_state_value, identifiers2) = latest_view
             .replace_identifiers_with_values(patched_state_value.bytes(), &layout)
@@ -2712,8 +2715,7 @@ mod test {
             create_derived_value("ab", 55),
             create_derived_value("c", 50),
         ]));
-        let state_value =
-            StateValue::new_legacy(value.simple_serialize(&storage_layout).unwrap().into());
+        let state_value = create_state_value(&value, &storage_layout);
 
         let layout = create_struct_layout(create_vector_layout(create_derived_string_layout()));
         let (patched_state_value, identifiers) = latest_view
@@ -2744,12 +2746,7 @@ mod test {
             ])]));
         assert_eq!(
             patched_state_value,
-            StateValue::new_legacy(
-                patched_value
-                    .simple_serialize(&storage_layout)
-                    .unwrap()
-                    .into()
-            )
+            create_state_value(&patched_value, &storage_layout),
         );
         let (final_state_value, identifiers2) = latest_view
             .replace_identifiers_with_values(patched_state_value.bytes(), &layout)
@@ -3100,18 +3097,13 @@ mod test {
 
     #[test]
     fn test_read_operations() {
-        let state_value_3 = StateValue::new_legacy(Bytes::from(
-            Value::u64(12321)
-                .simple_serialize(&MoveTypeLayout::U64)
-                .unwrap(),
-        ));
+        let state_value_3 = create_state_value(&Value::u64(12321), &MoveTypeLayout::U64);
         let mut data = HashMap::new();
         data.insert(KeyType::<u32>(3, false), state_value_3.clone());
         let storage_layout =
             create_struct_layout(create_aggregator_storage_layout(MoveTypeLayout::U64));
         let value = create_struct_value(create_aggregator_value_u64(25, 30));
-        let state_value_4 =
-            StateValue::new_legacy(value.simple_serialize(&storage_layout).unwrap().into());
+        let state_value_4 = create_state_value(&value, &storage_layout);
         data.insert(KeyType::<u32>(4, false), state_value_4);
 
         let start_counter = 1000;
@@ -3150,12 +3142,7 @@ mod test {
         );
 
         let patched_value = create_struct_value(create_aggregator_value_u64(id.as_u64(), 30));
-        let state_value_4 = StateValue::new_legacy(
-            patched_value
-                .simple_serialize(&storage_layout)
-                .unwrap()
-                .into(),
-        );
+        let state_value_4 = create_state_value(&patched_value, &storage_layout);
         assert_eq!(
             views
                 .get_resource_state_value(&KeyType::<u32>(4, false), Some(&layout))
