@@ -1910,6 +1910,10 @@ mod test {
         fn user_txn_bytes_len(&self) -> usize {
             0
         }
+
+        fn is_block_metadata_txn(&self) -> bool {
+            false
+        }
     }
 
     #[test]
