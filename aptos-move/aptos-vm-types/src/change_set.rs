@@ -852,7 +852,7 @@ pub trait ChangeSetInterface {
         &'a mut self,
         executor_view: &'a dyn ExecutorView,
         module_storage: &'a impl AptosModuleStorage,
-    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>>;
+    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo<'a>>>;
 }
 
 impl ChangeSetInterface for VMChangeSet {
@@ -877,7 +877,7 @@ impl ChangeSetInterface for VMChangeSet {
         &'a mut self,
         executor_view: &'a dyn ExecutorView,
         _module_storage: &'a impl AptosModuleStorage,
-    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
+    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo<'a>>> {
         let resources = self.resource_write_set.iter_mut().map(|(key, op)| {
             Ok(WriteOpInfo {
                 key,

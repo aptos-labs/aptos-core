@@ -109,7 +109,7 @@ impl ModuleWriteSet {
         &'a mut self,
         executor_view: &'a dyn ExecutorView,
         module_storage: &'a impl ModuleStorage,
-    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
+    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo<'a>>> {
         self.writes.iter_mut().map(move |(key, write)| {
             let prev_size = if module_storage.is_enabled() {
                 module_storage

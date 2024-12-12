@@ -668,7 +668,7 @@ mockall = "0.11.4"
 more-asserts = "0.3.0"
 named-lock = "0.2.0"
 native-tls = "0.2.10"
-neptune = { version = "13.0.0", default_features = false }
+neptune = { version = "13.0.0", default-features = false }
 ntest = "0.9.3"
 num = "0.4.0"
 num-bigint = { version = "0.3.2", features = ["rand"] }
@@ -751,7 +751,7 @@ ring = { version = "0.16.20", features = ["std"] }
 ripemd = "0.1.1"
 rocksdb = { version = "0.22.0", features = ["lz4"] }
 rsa = { version = "0.9.6" }
-rstack-self = { version = "0.3.0", features = ["dw"], default_features = false }
+rstack-self = { version = "0.3.0", features = ["dw"], default-features = false }
 rstest = "0.15.0"
 rusty-fork = "0.3.0"
 rustversion = "1.0.14"
@@ -835,7 +835,7 @@ uint = "0.9.4"
 ureq = { version = "1.5.4", features = [
     "json",
     "native-tls",
-], default_features = false }
+], default-features = false }
 url = { version = "2.4.0", features = ["serde"] }
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
 variant_count = "1.1.0"

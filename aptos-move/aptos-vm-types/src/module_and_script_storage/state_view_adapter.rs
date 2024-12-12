@@ -177,7 +177,7 @@ pub trait AsAptosCodeStorage<'s, S, E> {
 }
 
 impl<'s, S: StateView, E: WithRuntimeEnvironment> AsAptosCodeStorage<'s, S, E> for S {
-    fn as_aptos_code_storage(&'s self, runtime_environment: E) -> AptosCodeStorageAdapter<S, E> {
+    fn as_aptos_code_storage(&'s self, runtime_environment: E) -> AptosCodeStorageAdapter<'s, S, E> {
         AptosCodeStorageAdapter::from_borrowed(self, runtime_environment)
     }
 

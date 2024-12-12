@@ -380,12 +380,12 @@ struct LifetimeAnalysisStep<'env, 'state> {
 }
 
 impl<'env> LifeTimeAnalysis<'env> {
-    fn new_step<'a>(
+    fn new_step<'a: 'env>(
         &'a self,
         code_offset: CodeOffset,
         attr_id: AttrId,
         state: &'a mut LifetimeState,
-    ) -> LifetimeAnalysisStep {
+    ) -> LifetimeAnalysisStep<'env, 'a> {
         let alive = self
             .live_var_annotation
             .get_live_var_info_at(code_offset)

@@ -1,6 +1,24 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! This crate is designed to help with tracking events and state that might be speculative in
+//! nature due to speculative execution of transactions (e.g. by BlockSTM parallel executor, but
+//! also in any other context). The idea is that a transaction may be speculative executed, but
+//! then the speculative execution might be invalidated and discarded, possibly triggering
+//! another re-execution. In this case, it is convenient to buffer certain state and events and
+//! also discard them, while having a way to flush in case the execution is actually finalized.
+//! All components here can (and are intended to) be used in a concurrent fashion.
+//!
+//! An important feature is that flush for events happens asynchronously (and in parallel via
+//! rayon global pool), and a number of optimizations ensures that the operations on the critical
+//! path do not introduce too much overhead (e.g. clearing, initialization).
+//!
+//! As far as the state is concerned, the crate currently just implements a SpeculativeCounter.
+//! In the future, we could easily implement a structure similar to SpeculativeEvents to
+//! keep track of any speculative state, where a trait could allow updating it (running state).
+//!
+//! An example of using the crate for speculative logging can be founds in tests/logging.rs
+
 // Suppress incorrect warning, as without mut the take_counts method stops compiling.
 #![allow(unused_mut)]
 
@@ -13,26 +31,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 mod tests;
 
 const EVENT_DISPATCH_BATCH_SIZE: usize = 25;
-
-/// This crate is designed to help with tracking events and state that might be speculative in
-/// nature due to speculative execution of transactions (e.g. by BlockSTM parallel executor, but
-/// also in any other context). The idea is that a transaction may be speculative executed, but
-/// then the speculative execution might be invalidated and discarded, possibly triggering
-/// another re-execution. In this case, it is convenient to buffer certain state and events and
-/// also discard them, while having a way to flush in case the execution is actually finalized.
-/// All components here can (and are intended to) be used in a concurrent fashion.
-///
-/// An important feature is that flush for events happens asynchronously (and in parallel via
-/// rayon global pool), and a number of optimizations ensures that the operations on the critical
-/// path do not introduce too much overhead (e.g. clearing, initialization).
-///
-/// As far as the state is concerned, the crate currently just implements a SpeculativeCounter.
-/// In the future, we could easily implement a structure similar to SpeculativeEvents to
-/// keep track of any speculative state, where a trait could allow updating it (running state).
-///
-/// An example of using the crate for speculative logging can be founds in tests/logging.rs
-
-/// ============================================================================================
 
 /// A trait for a speculative event, only requiring a dispatch() method that destroys the
 /// event and manifests the desired behavior as a side effect (returning nothing). This occurs
