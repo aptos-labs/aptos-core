@@ -496,30 +496,33 @@ where
     ) -> Result<(), PeerManagerError> {
         match &message {
             NetworkMessage::DirectSendMsg(direct) => {
-                let data_len = direct.raw_msg.len();
+                let data_length = direct.data_length();
                 network_application_inbound_traffic(
                     self.network_context,
-                    direct.protocol_id,
-                    data_len as u64,
+                    direct.protocol_id(),
+                    data_length,
                 );
 
                 // Attempt to get the handler for the protocol id
-                match self.upstream_handlers.get(&direct.protocol_id) {
+                match self.upstream_handlers.get(&direct.protocol_id()) {
                     None => {
                         counters::direct_send_messages(&self.network_context, UNKNOWN_LABEL).inc();
                         counters::direct_send_bytes(&self.network_context, UNKNOWN_LABEL)
-                            .inc_by(data_len as u64);
+                            .inc_by(data_length);
                     },
                     Some(handler) => {
                         // Extract the message and context
-                        let key = (self.connection_metadata.remote_peer_id, direct.protocol_id);
+                        let key = (
+                            self.connection_metadata.remote_peer_id,
+                            direct.protocol_id(),
+                        );
                         let sender = self.connection_metadata.remote_peer_id;
                         let network_id = self.network_context.network_id();
                         let sender = PeerNetworkId::new(network_id, sender);
 
                         // Update the received message metadata
                         received_message_metadata.update_protocol_id_and_message_type(
-                            direct.protocol_id,
+                            direct.protocol_id(),
                             MessageReceiveType::DirectSend,
                         );
 
@@ -537,7 +540,7 @@ where
                                 )
                                 .inc();
                                 counters::direct_send_bytes(&self.network_context, DECLINED_LABEL)
-                                    .inc_by(data_len as u64);
+                                    .inc_by(data_length);
                             },
                             Ok(_) => {
                                 counters::direct_send_messages(
@@ -546,7 +549,7 @@ where
                                 )
                                 .inc();
                                 counters::direct_send_bytes(&self.network_context, RECEIVED_LABEL)
-                                    .inc_by(data_len as u64);
+                                    .inc_by(data_length);
                             },
                         }
                     },

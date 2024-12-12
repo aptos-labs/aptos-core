@@ -24,7 +24,10 @@ use aptos_network::{
     peer_manager::{ConnectionRequestSender, PeerManagerRequest, PeerManagerRequestSender},
     protocols::{
         network::{NewNetworkEvents, ReceivedMessage, RpcError, SerializedRequest},
-        wire::{handshake::v1::ProtocolIdSet, messaging::v1::NetworkMessage},
+        wire::{
+            handshake::v1::ProtocolIdSet,
+            messaging::v1::{IncomingRequest, NetworkMessage},
+        },
     },
     ProtocolId,
 };
@@ -233,10 +236,9 @@ impl NetworkPlayground {
         // copy message data
         let source_address = rmsg.sender().peer_id();
         let consensus_msg = match rmsg.network_message() {
-            NetworkMessage::DirectSendMsg(dmsg) => dmsg
-                .protocol_id
-                .from_bytes(dmsg.raw_msg.as_slice())
-                .unwrap(),
+            NetworkMessage::DirectSendMsg(dmsg) => {
+                dmsg.protocol_id().from_bytes(dmsg.data()).unwrap()
+            },
             wrong_message => {
                 panic!(
                     "[network playground] Unexpected ReceivedMessage: {:?}",

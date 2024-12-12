@@ -155,7 +155,7 @@ impl InboundStream {
             NetworkMessage::Error(_) => panic!("StreamHeader with Error should be rejected"),
             NetworkMessage::RpcRequest(request) => request.data_mut().append(raw_data),
             NetworkMessage::RpcResponse(response) => response.raw_response.append(raw_data),
-            NetworkMessage::DirectSendMsg(message) => message.raw_msg.append(raw_data),
+            NetworkMessage::DirectSendMsg(message) => message.data_mut().append(raw_data),
         }
         Ok(self.current_fragment_id == self.num_fragments)
     }
@@ -231,7 +231,7 @@ impl OutboundStream {
                 response.raw_response.split_off(self.max_frame_size)
             },
             NetworkMessage::DirectSendMsg(message) => {
-                message.raw_msg.split_off(self.max_frame_size)
+                message.data_mut().split_off(self.max_frame_size)
             },
         };
         let chunks = rest.chunks(self.max_frame_size);

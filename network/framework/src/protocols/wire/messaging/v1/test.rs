@@ -179,10 +179,8 @@ fn arb_direct_send_msg(max_frame_size: usize) -> impl Strategy<Value = DirectSen
         any::<Priority>(),
         (0..max_frame_size).prop_map(|size| vec![0u8; size]),
     );
-    args.prop_map(|(protocol_id, priority, raw_msg)| DirectSendMsg {
-        protocol_id,
-        priority,
-        raw_msg,
+    args.prop_map(|(protocol_id, priority, raw_msg)| {
+        DirectSendMsg::new(protocol_id, priority, raw_msg)
     })
 }
 

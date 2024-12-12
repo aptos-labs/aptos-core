@@ -237,12 +237,12 @@ impl RpcResponse {
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct DirectSendMsg {
     /// `protocol_id` is a variant of the ProtocolId enum.
-    pub protocol_id: ProtocolId,
+    protocol_id: ProtocolId,
     /// Message priority in the range 0..=255.
-    pub priority: Priority,
+    priority: Priority,
     /// Message payload.
     #[serde(with = "serde_bytes")]
-    pub raw_msg: Vec<u8>,
+    raw_msg: Vec<u8>,
 }
 
 impl DirectSendMsg {
@@ -252,6 +252,11 @@ impl DirectSendMsg {
             priority,
             raw_msg,
         }
+    }
+
+    /// Returns a mutable reference to the raw data of the direct send message
+    pub fn data_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.raw_msg
     }
 }
 
