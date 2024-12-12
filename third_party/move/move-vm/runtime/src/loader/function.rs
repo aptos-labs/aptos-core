@@ -125,6 +125,10 @@ impl LoadedFunction {
         &self.function.code
     }
 
+    pub(crate) fn code_size(&self) -> usize {
+        self.function.code.len()
+    }
+
     pub(crate) fn access_specifier(&self) -> &AccessSpecifier {
         &self.function.access_specifier
     }

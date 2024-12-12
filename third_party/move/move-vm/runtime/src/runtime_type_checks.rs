@@ -534,14 +534,16 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             | Bytecode::Or
             | Bytecode::And => {
                 let rhs_ty = operand_stack.pop_ty()?;
-                let lhs_ty = operand_stack.pop_ty()?;
-                rhs_ty.paranoid_check_eq(&lhs_ty)?;
-                operand_stack.push_ty(rhs_ty)?;
+                rhs_ty.paranoid_check_eq(operand_stack.top_ty()?)?;
+                // let lhs_ty = operand_stack.pop_ty()?;
+                // rhs_ty.paranoid_check_eq(&lhs_ty)?;
+                // operand_stack.push_ty(rhs_ty)?;
             },
             Bytecode::Shl | Bytecode::Shr => {
                 let _rhs = operand_stack.pop_ty()?;
-                let lhs = operand_stack.pop_ty()?;
-                operand_stack.push_ty(lhs)?;
+                // NO-OP, same as the two lines below
+                // let lhs = operand_stack.pop_ty()?;
+                // operand_stack.push_ty(lhs)?;
             },
             Bytecode::Lt | Bytecode::Le | Bytecode::Gt | Bytecode::Ge => {
                 let rhs_ty = operand_stack.pop_ty()?;
@@ -629,9 +631,9 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             Bytecode::Nop => (),
             Bytecode::Not => {
-                operand_stack.pop_ty()?.paranoid_check_is_bool_ty()?;
-                let bool_ty = ty_builder.create_bool_ty();
-                operand_stack.push_ty(bool_ty)?;
+                operand_stack.top_ty()?.paranoid_check_is_bool_ty()?;
+                // let bool_ty = ty_builder.create_bool_ty();
+                // operand_stack.push_ty(bool_ty)?;
             },
             Bytecode::VecPack(si, num) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
@@ -647,7 +649,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
                 operand_stack
                     .pop_ty()?
-                    .paranoid_check_is_vec_ref_ty(ty, false)?;
+                    .paranoid_check_is_vec_ref_ty::<false>(ty)?;
 
                 let u64_ty = ty_builder.create_u64_ty();
                 operand_stack.push_ty(u64_ty)?;
@@ -657,7 +659,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 let elem_ref_ty = operand_stack
                     .pop_ty()?
-                    .paranoid_check_and_get_vec_elem_ref_ty(ty, false)?;
+                    .paranoid_check_and_get_vec_elem_ref_ty::<false>(ty)?;
 
                 operand_stack.push_ty(elem_ref_ty)?;
             },
@@ -666,7 +668,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 let elem_ref_ty = operand_stack
                     .pop_ty()?
-                    .paranoid_check_and_get_vec_elem_ref_ty(ty, true)?;
+                    .paranoid_check_and_get_vec_elem_ref_ty::<true>(ty)?;
                 operand_stack.push_ty(elem_ref_ty)?;
             },
             Bytecode::VecPushBack(si) => {
@@ -674,13 +676,13 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack.pop_ty()?.paranoid_check_eq(ty)?;
                 operand_stack
                     .pop_ty()?
-                    .paranoid_check_is_vec_ref_ty(ty, true)?;
+                    .paranoid_check_is_vec_ref_ty::<true>(ty)?;
             },
             Bytecode::VecPopBack(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
                 let elem_ty = operand_stack
                     .pop_ty()?
-                    .paranoid_check_and_get_vec_elem_ty(ty, true)?;
+                    .paranoid_check_and_get_vec_elem_ty::<true>(ty)?;
                 operand_stack.push_ty(elem_ty)?;
             },
             Bytecode::VecUnpack(si, num) => {
@@ -698,7 +700,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 operand_stack
                     .pop_ty()?
-                    .paranoid_check_is_vec_ref_ty(ty, true)?;
+                    .paranoid_check_is_vec_ref_ty::<true>(ty)?;
             },
         }
         Ok(())
