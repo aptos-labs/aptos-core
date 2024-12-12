@@ -322,9 +322,10 @@ TESTS = [
         (True, [] if FA_MIGRATION_COMPLETE else ["VM", "NativeVM"])
     ]
     for executor_type in executor_types
-] + [
+]
+TESTS = [
     RunGroupConfig(
-        expected_tps=1,
+        expected_tps=10000,
         key=RunGroupKey("keyless-coin-transfer"),
         key_extra=RunGroupKeyExtra(
             txn_auth_mode="keyless",
