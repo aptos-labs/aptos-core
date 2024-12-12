@@ -7,5 +7,9 @@ version = '1.0.0'
 ambassador = "0xCAFE"
 
 [dependencies]
-AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-framework", rev = "mainnet" }
-AptosTokenObjects = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-token-objects", rev = "mainnet" }
+
+AptosFramework = { local = "../../../../aptos-move/framework/aptos-framework" }
+AptosTokenObjects = { local = "../../../../aptos-move/framework/aptos-token-objects" }
+
+# AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-framework", rev = "mainnet" }
+# AptosTokenObjects = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-token-objects", rev = "mainnet" }

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3.11
 
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
@@ -33,6 +33,8 @@ class Flow(Flag):
     RESOURCE_GROUPS = auto()
     # Test different executor types
     EXECUTORS = auto()
+    #
+    COMPRESSSED_TOKENS = auto()
 
 
 # Tests that are run on LAND_BLOCKING and continuously on main
@@ -169,7 +171,6 @@ CALIBRATION_SEPARATOR = "	"
 with open('testsuite/single_node_performance_values.tsv', 'r') as file:
     CALIBRATION = file.read()
 
-
 # when adding a new test, add estimated expected_tps to it, as well as waived=True.
 # And then after a day or two - add calibration result for it above, removing expected_tps/waived fields.
 
@@ -237,8 +238,10 @@ TESTS = [
 
     RunGroupConfig(key=RunGroupKey("no-op5-signers"), included_in=Flow.CONTINUOUS),
 
-    RunGroupConfig(key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),
+    RunGroupConfig(key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET | Flow.COMPRESSSED_TOKENS),
     RunGroupConfig(key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.CONTINUOUS),
+
+    RunGroupConfig(expected_tps=3000, key=RunGroupKey("compressed-token-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.COMPRESSSED_TOKENS),
 
     RunGroupConfig(key=RunGroupKey("liquidity-pool-swap"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(key=RunGroupKey("liquidity-pool-swap", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.CONTINUOUS),
