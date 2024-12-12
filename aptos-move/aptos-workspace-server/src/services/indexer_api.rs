@@ -7,10 +7,10 @@ use super::{
 };
 use crate::common::{make_shared, IP_LOCAL_HOST};
 use anyhow::{anyhow, Context, Result};
-use aptos_localnet::{
+use aptos::node::local_testnet::{
     docker,
-    health_checker::HealthChecker,
     indexer_api::{post_metadata, HASURA_IMAGE, HASURA_METADATA},
+    HealthChecker,
 };
 use bollard::{
     container::{CreateContainerOptions, WaitContainerOptions},

@@ -78,7 +78,6 @@ members = [
     "crates/aptos-jwk-consensus",
     "crates/aptos-keygen",
     "crates/aptos-ledger",
-    "crates/aptos-localnet",
     "crates/aptos-log-derive",
     "crates/aptos-logger",
     "crates/aptos-metrics-core",
@@ -381,7 +380,6 @@ aptos-jwk-utils = { path = "crates/jwk-utils" }
 aptos-keygen = { path = "crates/aptos-keygen" }
 aptos-language-e2e-tests = { path = "aptos-move/e2e-tests" }
 aptos-ledger = { path = "crates/aptos-ledger" }
-aptos-localnet = { path = "crates/aptos-localnet" }
 aptos-log-derive = { path = "crates/aptos-log-derive" }
 aptos-logger = { path = "crates/aptos-logger" }
 aptos-memory-usage-tracker = { path = "aptos-move/aptos-memory-usage-tracker" }
@@ -468,7 +466,6 @@ aptos-vm-logging = { path = "aptos-move/aptos-vm-logging" }
 aptos-vm-genesis = { path = "aptos-move/vm-genesis" }
 aptos-vm-types = { path = "aptos-move/aptos-vm-types" }
 aptos-vm-validator = { path = "vm-validator" }
-aptos-workspace-server = { path = "aptos-move/aptos-workspace-server" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
 aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
 

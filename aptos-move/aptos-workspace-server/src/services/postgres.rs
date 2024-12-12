@@ -1,12 +1,10 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    common::{make_shared, IP_LOCAL_HOST},
-    services::docker_common::{create_docker_volume, create_start_and_inspect_container},
-};
+use super::docker_common::{create_docker_volume, create_start_and_inspect_container};
+use crate::common::{make_shared, IP_LOCAL_HOST};
 use anyhow::{anyhow, Context, Result};
-use aptos_localnet::{docker, health_checker::HealthChecker};
+use aptos::node::local_testnet::{docker, HealthChecker};
 use bollard::{
     container::{CreateContainerOptions, WaitContainerOptions},
     secret::{ContainerInspectResponse, HostConfig, PortBinding},
