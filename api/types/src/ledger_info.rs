@@ -6,6 +6,7 @@ use crate::U64;
 use aptos_types::{chain_id::ChainId, ledger_info::LedgerInfoWithSignatures};
 use poem_openapi::Object as PoemObject;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 /// The Ledger information representing the current state of the chain
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, PoemObject)]
@@ -74,5 +75,14 @@ impl LedgerInfo {
 
     pub fn timestamp(&self) -> u64 {
         self.ledger_timestamp.into()
+    }
+
+    pub fn timestamp_duration(&self) -> Duration {
+        Duration::from_micros(self.ledger_timestamp.into())
+    }
+
+    pub fn duration_since_timestamp(&self) -> Duration {
+        let now = aptos_infallible::duration_since_epoch();
+        now.saturating_sub(self.timestamp_duration())
     }
 }
