@@ -26,11 +26,11 @@
 mod common;
 mod services;
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use common::make_shared;
 use futures::TryFutureExt;
 use services::{
-    docker_common::create_docker_network, indexer_api::start_indexer_api,
+    docker_common::create_docker_network_permanent, indexer_api::start_indexer_api,
     processors::start_all_processors,
 };
 use tokio_util::sync::CancellationToken;
@@ -73,9 +73,11 @@ pub async fn run_all_services() -> Result<()> {
     );
 
     // Docker Network
-    let docker_network_name = format!("aptos-workspace-{}", instance_id);
-    let (fut_docker_network, fut_docker_network_clean_up) =
-        create_docker_network(shutdown.clone(), docker_network_name);
+    let docker_network_name = "aptos-workspace".to_string();
+    let fut_docker_network = make_shared(create_docker_network_permanent(
+        shutdown.clone(),
+        docker_network_name,
+    ));
 
     // Indexer part 1: postgres db
     let (fut_postgres, fut_postgres_finish, fut_postgres_clean_up) =
@@ -106,11 +108,11 @@ pub async fn run_all_services() -> Result<()> {
     // Phase 2: Wait for all services to be up.
     let all_services_up = async move {
         tokio::try_join!(
-            fut_node_api.map_err(anyhow::Error::msg),
-            fut_indexer_grpc.map_err(anyhow::Error::msg),
+            fut_node_api.map_err(|err| anyhow!(err)),
+            fut_indexer_grpc.map_err(|err| anyhow!(err)),
             fut_faucet,
-            fut_postgres.map_err(anyhow::Error::msg),
-            fut_all_processors_ready.map_err(anyhow::Error::msg),
+            fut_postgres.map_err(|err| anyhow!(err)),
+            fut_all_processors_ready.map_err(|err| anyhow!(err)),
             fut_indexer_api,
         )
     };
@@ -118,7 +120,6 @@ pub async fn run_all_services() -> Result<()> {
         eprintln!("Running shutdown steps");
         fut_indexer_api_clean_up.await;
         fut_postgres_clean_up.await;
-        fut_docker_network_clean_up.await;
     };
     tokio::select! {
         _ = shutdown.cancelled() => {

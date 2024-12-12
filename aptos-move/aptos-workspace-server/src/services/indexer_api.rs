@@ -5,7 +5,7 @@ use super::{
     docker_common::create_start_and_inspect_container,
     postgres::get_postgres_connection_string_within_docker_network,
 };
-use crate::common::{make_shared, IP_LOCAL_HOST};
+use crate::common::{make_shared, ArcError, IP_LOCAL_HOST};
 use anyhow::{anyhow, Context, Result};
 use aptos_localnet::{
     docker,
@@ -124,15 +124,9 @@ fn create_container_options_and_config(
 pub fn start_indexer_api(
     instance_id: Uuid,
     shutdown: CancellationToken,
-    fut_docker_network: impl Future<Output = Result<String, Arc<anyhow::Error>>>
-        + Clone
-        + Send
-        + 'static,
-    fut_postgres: impl Future<Output = Result<u16, Arc<anyhow::Error>>> + Clone + Send + 'static,
-    fut_all_processors_ready: impl Future<Output = Result<(), Arc<anyhow::Error>>>
-        + Clone
-        + Send
-        + 'static,
+    fut_docker_network: impl Future<Output = Result<String, ArcError>> + Clone + Send + 'static,
+    fut_postgres: impl Future<Output = Result<u16, ArcError>> + Clone + Send + 'static,
+    fut_all_processors_ready: impl Future<Output = Result<(), ArcError>> + Clone + Send + 'static,
 ) -> (
     impl Future<Output = Result<u16>>,
     impl Future<Output = Result<()>>,
@@ -144,15 +138,10 @@ pub fn start_indexer_api(
         let fut_container_clean_up = fut_container_clean_up.clone();
 
         async move {
-            let (docker_network_name, _postgres_port, _) = try_join!(
-                fut_docker_network,
-                fut_postgres,
-                fut_all_processors_ready
-            )
-            .map_err(anyhow::Error::msg)
-            .context(
-                "failed to start indexer api server: one or more dependencies failed to start",
-            )?;
+            let (docker_network_name, _postgres_port, _) =
+                try_join!(fut_docker_network, fut_postgres, fut_all_processors_ready).context(
+                    "failed to start indexer api server: one or more dependencies failed to start",
+                )?;
 
             println!("Starting indexer API..");
 
@@ -164,7 +153,6 @@ pub fn start_indexer_api(
 
             let container_info = fut_container
                 .await
-                .map_err(anyhow::Error::msg)
                 .context("failed to start indexer api server")?;
 
             let indexer_api_port = get_hasura_assigned_port(&container_info)
@@ -178,7 +166,7 @@ pub fn start_indexer_api(
         let fut_create_indexer_api = fut_create_indexer_api.clone();
 
         async move {
-            let indexer_api_port = fut_create_indexer_api.await.map_err(anyhow::Error::msg)?;
+            let indexer_api_port = fut_create_indexer_api.await?;
 
             let url =
                 Url::parse(&format!("http://{}:{}", IP_LOCAL_HOST, indexer_api_port)).unwrap();
