@@ -76,6 +76,7 @@ spec aptos_framework::aptos_governance {
         ensures exists<GovernanceEvents>(addr);
         ensures exists<VotingRecords>(addr);
         ensures exists<ApprovedExecutionHashes>(addr);
+        ensures exists<VotingRecordsV2>(addr);
     }
 
     /// Signer address must be @aptos_framework.
@@ -104,6 +105,7 @@ spec aptos_framework::aptos_governance {
         aborts_if exists<VotingRecords>(addr);
         aborts_if exists<ApprovedExecutionHashes>(addr);
         aborts_if !exists<account::Account>(addr);
+        aborts_if exists<VotingRecordsV2>(addr);
     }
 
     /// Signer address must be @aptos_framework.

@@ -343,6 +343,7 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
     <a href="execution_config.md#0x1_execution_config_set">execution_config::set</a>(&aptos_framework_account, <a href="execution_config.md#0x1_execution_config">execution_config</a>);
     <a href="version.md#0x1_version_initialize">version::initialize</a>(&aptos_framework_account, initial_version);
     <a href="stake.md#0x1_stake_initialize">stake::initialize</a>(&aptos_framework_account);
+    <a href="timestamp.md#0x1_timestamp_set_time_has_started">timestamp::set_time_has_started</a>(&aptos_framework_account);
     <a href="staking_config.md#0x1_staking_config_initialize">staking_config::initialize</a>(
         &aptos_framework_account,
         minimum_stake,
@@ -363,7 +364,6 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
     <a href="reconfiguration.md#0x1_reconfiguration_initialize">reconfiguration::initialize</a>(&aptos_framework_account);
     <a href="block.md#0x1_block_initialize">block::initialize</a>(&aptos_framework_account, epoch_interval_microsecs);
     <a href="state_storage.md#0x1_state_storage_initialize">state_storage::initialize</a>(&aptos_framework_account);
-    <a href="timestamp.md#0x1_timestamp_set_time_has_started">timestamp::set_time_has_started</a>(&aptos_framework_account);
 }
 </code></pre>
 
