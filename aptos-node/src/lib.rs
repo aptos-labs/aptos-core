@@ -731,8 +731,12 @@ pub fn setup_environment_and_start_node(
         );
 
     // Create the DKG runtime and get the VTxn pool
-    let (vtxn_pool, dkg_runtime) =
-        consensus::create_dkg_runtime(&mut node_config, dkg_subscriptions, dkg_network_interfaces);
+    let (vtxn_pool, dkg_runtime) = consensus::create_dkg_runtime(
+        &mut node_config,
+        db_rw.reader.clone(),
+        dkg_subscriptions,
+        dkg_network_interfaces,
+    );
 
     // Create the JWK consensus runtime
     let jwk_consensus_runtime = consensus::create_jwk_consensus_runtime(

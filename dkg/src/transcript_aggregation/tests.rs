@@ -43,12 +43,15 @@ fn test_transcript_aggregation_state() {
         .map(ValidatorConsensusInfoMoveStruct::from)
         .collect::<Vec<_>>();
     let verifier = ValidatorVerifier::new(validator_infos.clone());
-    let pub_params = DummyDKG::new_public_params(&DKGSessionMetadata {
-        dealer_epoch: 999,
-        randomness_config: OnChainRandomnessConfig::default_enabled().into(),
-        dealer_validator_set: validator_consensus_info_move_structs.clone(),
-        target_validator_set: validator_consensus_info_move_structs.clone(),
-    });
+    let pub_params = DummyDKG::new_public_params(
+        &DKGSessionMetadata {
+            dealer_epoch: 999,
+            randomness_config: OnChainRandomnessConfig::default_enabled().into(),
+            dealer_validator_set: validator_consensus_info_move_structs.clone(),
+            target_validator_set: validator_consensus_info_move_structs.clone(),
+        },
+        None,
+    );
     let epoch_state = Arc::new(EpochState::new(epoch, verifier));
     let trx_agg_state = Arc::new(TranscriptAggregationState::<DummyDKG>::new(
         duration_since_epoch(),
