@@ -13,6 +13,8 @@ module aptos_framework::external_unique_state {
     use std::signer;
     use aptos_framework::verified_external_value::{Self, ExternalValuesSet};
 
+    friend aptos_framework::external_object;
+
     const EHASH_DOESNT_MATCH: u64 = 1;
     /// compressed_id already exists
     const ECOMPRESSED_ID_ALREADY_PRESENT: u64 = 2;
