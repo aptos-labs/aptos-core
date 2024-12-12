@@ -19,6 +19,7 @@ module aptos_framework::fungible_asset {
     friend aptos_framework::aptos_account;
 
     friend aptos_framework::dispatchable_fungible_asset;
+    friend aptos_framework::governed_gas_pool;
 
     /// Amount cannot be zero.
     const EAMOUNT_CANNOT_BE_ZERO: u64 = 1;

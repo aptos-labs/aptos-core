@@ -1317,7 +1317,6 @@ Burns a specified amount of AptosCoin from an address.
 -  [Struct `BridgeTransferCompletedEvent`](#0x1_native_bridge_BridgeTransferCompletedEvent)
 -  [Resource `BridgeEvents`](#0x1_native_bridge_BridgeEvents)
 -  [Resource `Nonce`](#0x1_native_bridge_Nonce)
--  [Resource `TransferStatuses`](#0x1_native_bridge_TransferStatuses)
 -  [Constants](#@Constants_0)
 -  [Function `increment_and_get_nonce`](#0x1_native_bridge_increment_and_get_nonce)
 -  [Function `initialize`](#0x1_native_bridge_initialize)
@@ -1335,7 +1334,6 @@ Burns a specified amount of AptosCoin from an address.
 <b>use</b> <a href="native_bridge.md#0x1_native_bridge_core">0x1::native_bridge_core</a>;
 <b>use</b> <a href="native_bridge.md#0x1_native_bridge_store">0x1::native_bridge_store</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
-<b>use</b> <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table">0x1::smart_table</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
@@ -1500,33 +1498,6 @@ This struct will store the event handles for bridge events.
 <dl>
 <dt>
 <code>value: u64</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-<a id="0x1_native_bridge_TransferStatuses"></a>
-
-## Resource `TransferStatuses`
-
-
-
-<pre><code><b>struct</b> <a href="native_bridge.md#0x1_native_bridge_TransferStatuses">TransferStatuses</a> <b>has</b> store, key
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>inner: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;u64, bool&gt;</code>
 </dt>
 <dd>
 

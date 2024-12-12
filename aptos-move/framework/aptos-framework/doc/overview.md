@@ -43,6 +43,7 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::gas_schedule`](gas_schedule.md#0x1_gas_schedule)
 -  [`0x1::genesis`](genesis.md#0x1_genesis)
 -  [`0x1::governance_proposal`](governance_proposal.md#0x1_governance_proposal)
+-  [`0x1::governed_gas_pool`](governed_gas_pool.md#0x1_governed_gas_pool)
 -  [`0x1::guid`](guid.md#0x1_guid)
 -  [`0x1::jwk_consensus_config`](jwk_consensus_config.md#0x1_jwk_consensus_config)
 -  [`0x1::jwks`](jwks.md#0x1_jwks)
