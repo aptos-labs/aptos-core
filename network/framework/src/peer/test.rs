@@ -16,7 +16,8 @@ use crate::{
         wire::{
             handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
             messaging::v1::{
-                MultiplexMessage, MultiplexMessageSink, MultiplexMessageStream, NetworkMessage,
+                IncomingRequest, MultiplexMessage, MultiplexMessageSink, MultiplexMessageStream,
+                NetworkMessage,
             },
         },
     },
@@ -459,7 +460,7 @@ fn peer_recv_rpc_concurrent() {
             let mut received = prot_rx.next().await.unwrap();
             match received.network_message() {
                 NetworkMessage::RpcRequest(req) => {
-                    assert_eq!(Vec::from("hello world"), req.raw_request);
+                    assert_eq!(&Vec::from("hello world"), req.data());
                     let arcsender = received.take_rpc_replier().unwrap();
                     let sender = Arc::into_inner(arcsender).unwrap();
                     res_txs.push(sender)
@@ -507,7 +508,7 @@ fn peer_recv_rpc_timeout() {
         // Pull out the request completion handle.
         let mut res_tx = match received.network_message() {
             NetworkMessage::RpcRequest(req) => {
-                assert_eq!(Vec::from("hello world"), req.raw_request);
+                assert_eq!(&Vec::from("hello world"), req.data());
                 let arcsender = received.take_rpc_replier().unwrap();
                 Arc::into_inner(arcsender).unwrap()
             },
@@ -563,7 +564,7 @@ fn peer_recv_rpc_cancel() {
         // Pull out the request completion handle.
         let res_tx = match received.network_message() {
             NetworkMessage::RpcRequest(req) => {
-                assert_eq!(Vec::from("hello world"), req.raw_request);
+                assert_eq!(&Vec::from("hello world"), req.data());
                 let arcsender = received.take_rpc_replier().unwrap();
                 Arc::into_inner(arcsender).unwrap()
             },
@@ -622,18 +623,18 @@ fn peer_send_rpc() {
                 _ => panic!("Expected RpcRequest; unexpected: {:?}", received),
             };
 
-            assert_eq!(received.protocol_id, PROTOCOL);
-            assert_eq!(received.priority, 0);
-            assert_eq!(received.raw_request, b"hello world");
+            assert_eq!(received.protocol_id(), PROTOCOL);
+            assert_eq!(received.priority(), 0);
+            assert_eq!(received.data(), b"hello world");
 
             assert!(
-                request_ids.insert(received.request_id),
+                request_ids.insert(received.request_id()),
                 "should not receive requests with duplicate request ids: {}",
-                received.request_id,
+                received.request_id(),
             );
 
             let response = MultiplexMessage::Message(NetworkMessage::new_rpc_response(
-                received.request_id,
+                received.request_id(),
                 Vec::from(&b"goodbye world"[..]),
             ));
 
@@ -691,18 +692,18 @@ fn peer_send_rpc_concurrent() {
                 _ => panic!("Expected RpcRequest; unexpected: {:?}", received),
             };
 
-            assert_eq!(received.protocol_id, PROTOCOL);
-            assert_eq!(received.priority, 0);
-            assert_eq!(received.raw_request, b"hello world");
+            assert_eq!(received.protocol_id(), PROTOCOL);
+            assert_eq!(received.priority(), 0);
+            assert_eq!(received.data(), b"hello world");
 
             assert!(
-                request_ids.insert(received.request_id),
+                request_ids.insert(received.request_id()),
                 "should not receive requests with duplicate request ids: {}",
-                received.request_id,
+                received.request_id(),
             );
 
             let response = MultiplexMessage::Message(NetworkMessage::new_rpc_response(
-                received.request_id,
+                received.request_id(),
                 Vec::from(&b"goodbye world"[..]),
             ));
 
@@ -747,9 +748,9 @@ fn peer_send_rpc_cancel() {
             _ => panic!("Expected RpcRequest; unexpected: {:?}", received),
         };
 
-        assert_eq!(received.protocol_id, PROTOCOL);
-        assert_eq!(received.priority, 0);
-        assert_eq!(received.raw_request, b"hello world");
+        assert_eq!(received.protocol_id(), PROTOCOL);
+        assert_eq!(received.priority(), 0);
+        assert_eq!(received.data(), b"hello world");
 
         // Request should still be live. Ok(_) means the sender is not dropped.
         // Ok(None) means there is no response yet.
@@ -760,7 +761,7 @@ fn peer_send_rpc_cancel() {
 
         // Server sending an expired response is fine.
         let response = MultiplexMessage::Message(NetworkMessage::new_rpc_response(
-            received.request_id,
+            received.request_id(),
             Vec::from(&b"goodbye world"[..]),
         ));
         server_sink.send(&response).await.unwrap();
@@ -809,9 +810,9 @@ fn peer_send_rpc_timeout() {
             _ => panic!("Expected RpcRequest; unexpected: {:?}", received),
         };
 
-        assert_eq!(received.protocol_id, PROTOCOL);
-        assert_eq!(received.priority, 0);
-        assert_eq!(received.raw_request, b"hello world");
+        assert_eq!(received.protocol_id(), PROTOCOL);
+        assert_eq!(received.priority(), 0);
+        assert_eq!(received.data(), b"hello world");
 
         // Request should still be live. Ok(_) means the sender is not dropped.
         // Ok(None) means there is no response yet.
@@ -825,7 +826,7 @@ fn peer_send_rpc_timeout() {
 
         // Server sending an expired response is fine.
         let response = MultiplexMessage::Message(NetworkMessage::new_rpc_response(
-            received.request_id,
+            received.request_id(),
             Vec::from(&b"goodbye world"[..]),
         ));
         server_sink.send(&response).await.unwrap();

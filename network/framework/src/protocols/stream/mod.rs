@@ -153,7 +153,7 @@ impl InboundStream {
         let raw_data = &mut fragment.raw_data;
         match &mut self.message {
             NetworkMessage::Error(_) => panic!("StreamHeader with Error should be rejected"),
-            NetworkMessage::RpcRequest(request) => request.raw_request.append(raw_data),
+            NetworkMessage::RpcRequest(request) => request.data_mut().append(raw_data),
             NetworkMessage::RpcResponse(response) => response.raw_response.append(raw_data),
             NetworkMessage::DirectSendMsg(message) => message.raw_msg.append(raw_data),
         }
@@ -192,8 +192,8 @@ impl OutboundStream {
 
     /// Returns true iff the message should be streamed (i.e., broken into chunks)
     pub fn should_stream(&self, message_with_metadata: &NetworkMessageWithMetadata) -> bool {
-        let message_length = message_with_metadata.network_message().data_len();
-        message_length > self.max_frame_size
+        let message_length = message_with_metadata.network_message().data_length();
+        message_length > (self.max_frame_size as u64)
     }
 
     pub async fn stream_message(
@@ -208,15 +208,15 @@ impl OutboundStream {
         };
 
         ensure!(
-            message.data_len() <= self.max_message_size,
+            message.data_length() <= (self.max_message_size as u64),
             "Message length {} exceed size limit {}",
-            message.data_len(),
+            message.data_length(),
             self.max_message_size,
         );
         ensure!(
-            message.data_len() >= self.max_frame_size,
+            message.data_length() >= (self.max_frame_size as u64),
             "Message length {} is smaller than frame size {}, should not go through stream",
-            message.data_len(),
+            message.data_length(),
             self.max_frame_size,
         );
         let request_id = self.request_id_gen.next();
@@ -225,7 +225,7 @@ impl OutboundStream {
                 unreachable!("NetworkMessage::Error should always fit in a single frame")
             },
             NetworkMessage::RpcRequest(request) => {
-                request.raw_request.split_off(self.max_frame_size)
+                request.data_mut().split_off(self.max_frame_size)
             },
             NetworkMessage::RpcResponse(response) => {
                 response.raw_response.split_off(self.max_frame_size)

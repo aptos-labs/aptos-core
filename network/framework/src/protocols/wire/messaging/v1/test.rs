@@ -39,12 +39,7 @@ fn error_code() -> bcs::Result<()> {
 
 #[test]
 fn rpc_request() -> bcs::Result<()> {
-    let rpc_request = RpcRequest {
-        request_id: 25,
-        protocol_id: ProtocolId::ConsensusRpcBcs,
-        priority: 0,
-        raw_request: [0, 1, 2, 3].to_vec(),
-    };
+    let rpc_request = RpcRequest::new(ProtocolId::ConsensusRpcBcs, 25, 0, vec![0, 1, 2, 3]);
     assert_eq!(
         bcs::to_bytes(&rpc_request)?,
         // [0] -> protocol_id
@@ -160,14 +155,9 @@ fn arb_rpc_request(max_frame_size: usize) -> impl Strategy<Value = RpcRequest> {
         any::<Priority>(),
         (0..max_frame_size).prop_map(|size| vec![0u8; size]),
     )
-        .prop_map(
-            |(protocol_id, request_id, priority, raw_request)| RpcRequest {
-                protocol_id,
-                request_id,
-                priority,
-                raw_request,
-            },
-        )
+        .prop_map(|(protocol_id, request_id, priority, raw_request)| {
+            RpcRequest::new(protocol_id, request_id, priority, raw_request)
+        })
 }
 
 fn arb_rpc_response(max_frame_size: usize) -> impl Strategy<Value = RpcResponse> {

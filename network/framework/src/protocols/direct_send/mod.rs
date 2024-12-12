@@ -75,7 +75,7 @@ impl Message {
 
 impl Debug for Message {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mdata_str = if self.data().len() <= 10 {
+        let mdata_str = if self.data_length() <= 10 {
             format!("{:?}", self.data())
         } else {
             format!("{:?}...", self.data().slice(..10))

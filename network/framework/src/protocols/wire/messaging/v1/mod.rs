@@ -55,31 +55,25 @@ pub enum MultiplexMessage {
 
 impl NetworkMessage {
     /// The size of the raw data excluding the headers
-    pub fn data_len(&self) -> usize {
+    pub fn data_length(&self) -> u64 {
         match self {
             NetworkMessage::Error(_) => 0,
-            NetworkMessage::RpcRequest(request) => request.raw_request.len(),
-            NetworkMessage::RpcResponse(response) => response.raw_response.len(),
-            NetworkMessage::DirectSendMsg(message) => message.raw_msg.len(),
+            NetworkMessage::RpcRequest(request) => request.data_length(),
+            NetworkMessage::RpcResponse(response) => response.raw_response.len() as u64,
+            NetworkMessage::DirectSendMsg(message) => message.data_length(),
         }
     }
 
     /// Creates a direct send message with the default priority
     pub fn new_direct_send(protocol_id: ProtocolId, raw_msg: Vec<u8>) -> Self {
-        NetworkMessage::DirectSendMsg(DirectSendMsg {
-            protocol_id,
-            priority: Priority::default(),
-            raw_msg,
-        })
+        let direct_send_message = DirectSendMsg::new(protocol_id, Priority::default(), raw_msg);
+        NetworkMessage::DirectSendMsg(direct_send_message)
     }
 
     /// Creates an RPC response message with the default priority
     pub fn new_rpc_response(request_id: RequestId, raw_response: Vec<u8>) -> Self {
-        NetworkMessage::RpcResponse(RpcResponse {
-            request_id,
-            priority: Priority::default(),
-            raw_response,
-        })
+        let rpc_response = RpcResponse::new(request_id, Priority::default(), raw_response);
+        NetworkMessage::RpcResponse(rpc_response)
     }
 
     /// Creates an RPC response message for testing.
@@ -94,12 +88,9 @@ impl NetworkMessage {
         request_id: RequestId,
         raw_request: Vec<u8>,
     ) -> Self {
-        NetworkMessage::RpcRequest(RpcRequest {
-            protocol_id,
-            request_id,
-            priority: Priority::default(),
-            raw_request,
-        })
+        let rpc_request =
+            RpcRequest::new(protocol_id, request_id, Priority::default(), raw_request);
+        NetworkMessage::RpcRequest(rpc_request)
     }
 
     /// Creates an RPC request message for testing.
@@ -152,6 +143,11 @@ pub trait IncomingRequest {
     fn protocol_id(&self) -> crate::ProtocolId;
     fn data(&self) -> &Vec<u8>;
 
+    /// Returns the length of the data in the request
+    fn data_length(&self) -> u64 {
+        self.data().len() as u64
+    }
+
     /// Converts the `SerializedMessage` into its deserialized version of `TMessage` based on the
     /// `ProtocolId`.  See: [`crate::ProtocolId::from_bytes`]
     fn to_message<TMessage: DeserializeOwned>(&self) -> anyhow::Result<TMessage> {
@@ -163,14 +159,45 @@ pub trait IncomingRequest {
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct RpcRequest {
     /// `protocol_id` is a variant of the ProtocolId enum.
-    pub protocol_id: ProtocolId,
+    protocol_id: ProtocolId,
     /// RequestId for the RPC Request.
-    pub request_id: RequestId,
+    request_id: RequestId,
     /// Request priority in the range 0..=255.
-    pub priority: Priority,
+    priority: Priority,
     /// Request payload. This will be parsed by the application-level handler.
     #[serde(with = "serde_bytes")]
-    pub raw_request: Vec<u8>,
+    raw_request: Vec<u8>,
+}
+
+impl RpcRequest {
+    pub fn new(
+        protocol_id: ProtocolId,
+        request_id: RequestId,
+        priority: Priority,
+        raw_request: Vec<u8>,
+    ) -> Self {
+        Self {
+            protocol_id,
+            request_id,
+            priority,
+            raw_request,
+        }
+    }
+
+    /// Returns a mutable reference to the raw data of the RPC request
+    pub fn data_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.raw_request
+    }
+
+    /// Returns the priority of the RPC request
+    pub fn priority(&self) -> Priority {
+        self.priority
+    }
+
+    /// Returns the ID of the RPC request
+    pub fn request_id(&self) -> RequestId {
+        self.request_id
+    }
 }
 
 impl IncomingRequest for RpcRequest {
@@ -196,6 +223,16 @@ pub struct RpcResponse {
     pub raw_response: Vec<u8>,
 }
 
+impl RpcResponse {
+    pub fn new(request_id: RequestId, priority: Priority, raw_response: Vec<u8>) -> Self {
+        Self {
+            request_id,
+            priority,
+            raw_response,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct DirectSendMsg {
@@ -206,6 +243,16 @@ pub struct DirectSendMsg {
     /// Message payload.
     #[serde(with = "serde_bytes")]
     pub raw_msg: Vec<u8>,
+}
+
+impl DirectSendMsg {
+    pub fn new(protocol_id: ProtocolId, priority: Priority, raw_msg: Vec<u8>) -> Self {
+        Self {
+            protocol_id,
+            priority,
+            raw_msg,
+        }
+    }
 }
 
 impl IncomingRequest for DirectSendMsg {

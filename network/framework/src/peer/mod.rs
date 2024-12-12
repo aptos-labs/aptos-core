@@ -33,8 +33,8 @@ use crate::{
                 MultiplexMessageWithMetadata, NetworkMessageWithMetadata, ReceivedMessageMetadata,
                 SentMessageMetadata,
             },
-            ErrorCode, MultiplexMessage, MultiplexMessageSink, MultiplexMessageStream,
-            NetworkMessage, ReadError, WriteError,
+            ErrorCode, IncomingRequest, MultiplexMessage, MultiplexMessageSink,
+            MultiplexMessageStream, NetworkMessage, ReadError, WriteError,
         },
     },
     transport::{self, Connection, ConnectionMetadata},
@@ -565,11 +565,11 @@ where
             },
             NetworkMessage::RpcRequest(request) => {
                 // Attempt to get the handler for the protocol id
-                match self.upstream_handlers.get(&request.protocol_id) {
+                match self.upstream_handlers.get(&request.protocol_id()) {
                     None => {
                         counters::direct_send_messages(&self.network_context, UNKNOWN_LABEL).inc();
                         counters::direct_send_bytes(&self.network_context, UNKNOWN_LABEL)
-                            .inc_by(request.raw_request.len() as u64);
+                            .inc_by(request.data_length());
                     },
                     Some(handler) => {
                         // Extract the message and context
@@ -579,7 +579,7 @@ where
 
                         // Update the received message metadata
                         received_message_metadata.update_protocol_id_and_message_type(
-                            request.protocol_id,
+                            request.protocol_id(),
                             MessageReceiveType::RpcRequest,
                         );
 

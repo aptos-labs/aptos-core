@@ -329,7 +329,7 @@ fn received_message_to_event<TMessage: Message>(
         NetworkMessage::RpcRequest(rpc_req) => {
             let rpc_replier = Arc::into_inner(rpc_replier.unwrap()).unwrap();
             request_to_network_event(peer_id, &rpc_req)
-                .map(|msg| Event::RpcRequest(peer_id, msg, rpc_req.protocol_id, rpc_replier))
+                .map(|msg| Event::RpcRequest(peer_id, msg, rpc_req.protocol_id(), rpc_replier))
         },
         NetworkMessage::DirectSendMsg(request) => {
             request_to_network_event(peer_id, &request).map(|msg| Event::Message(peer_id, msg))
@@ -514,6 +514,11 @@ impl<TMessage: Message + Send + 'static> NetworkSender<TMessage> {
 pub trait SerializedRequest {
     fn protocol_id(&self) -> ProtocolId;
     fn data(&self) -> &Bytes;
+
+    /// Returns the length of the data in the request
+    fn data_length(&self) -> u64 {
+        self.data().len() as u64
+    }
 
     /// Converts the `SerializedMessage` into its deserialized version of `TMessage` based on the
     /// `ProtocolId`.  See: [`ProtocolId::from_bytes`]

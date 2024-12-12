@@ -58,7 +58,7 @@ use crate::{
                 MessageMetadata, MessageReceiveType, MessageSendType, NetworkMessageWithMetadata,
                 ReceivedMessageMetadata, RpcResponseWithMetadata, SentMessageMetadata,
             },
-            NetworkMessage, Priority, RequestId, RpcRequest, RpcResponse,
+            IncomingRequest, NetworkMessage, RequestId, RpcResponse,
         },
     },
     ProtocolId,
@@ -183,12 +183,11 @@ impl OutboundRpcRequest {
         oneshot::Sender<Result<Bytes, RpcError>>,
     ) {
         // Create the RPC network message
-        let network_message = NetworkMessage::RpcRequest(RpcRequest {
-            protocol_id: self.protocol_id,
+        let network_message = NetworkMessage::new_rpc_request(
+            self.protocol_id,
             request_id,
-            priority: Priority::default(),
-            raw_request: Vec::from(self.data.as_ref()),
-        });
+            Vec::from(self.data.as_ref()),
+        );
 
         // Create the network message with metadata
         let sent_message_metadata = SentMessageMetadata::new(
@@ -328,9 +327,9 @@ impl InboundRpcs {
         let NetworkMessage::RpcRequest(rpc_request) = request.network_message() else {
             return Err(RpcError::InvalidRpcResponse);
         };
-        let protocol_id = rpc_request.protocol_id;
-        let request_id = rpc_request.request_id;
-        let priority = rpc_request.priority;
+        let protocol_id = rpc_request.protocol_id();
+        let request_id = rpc_request.request_id();
+        let priority = rpc_request.priority();
 
         trace!(
             NetworkSchema::new(network_context).remote_peer(&self.remote_peer_id),
@@ -340,7 +339,7 @@ impl InboundRpcs {
             request_id,
             protocol_id,
         );
-        self.update_inbound_rpc_request_metrics(protocol_id, rpc_request.raw_request.len() as u64);
+        self.update_inbound_rpc_request_metrics(protocol_id, rpc_request.data().len() as u64);
 
         let timer =
             counters::inbound_rpc_handler_latency(network_context, protocol_id).start_timer();
@@ -606,7 +605,7 @@ impl OutboundRpcs {
         );
 
         // Convert the message into a network message with metadata
-        let request_length = request.data().len() as u64;
+        let request_length = request.data_length();
         let timeout = request.timeout();
         let (network_message, mut application_response_tx) =
             request.into_network_message(network_context.network_id(), request_id);
