@@ -4,9 +4,7 @@
 use crate::{
     db::{
         get_first_seq_num_and_limit, test_helper,
-        test_helper::{
-            arb_blocks_to_commit, put_transaction_auxiliary_data, put_transaction_infos,
-        },
+        test_helper::{arb_blocks_to_commit, put_transaction_auxiliary_data},
         AptosDB,
     },
     pruner::{LedgerPrunerManager, PrunerManager, StateMerklePrunerManager},
@@ -18,20 +16,18 @@ use aptos_config::config::{
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_storage_interface::{DbReader, LedgerSummary, Order};
+use aptos_storage_interface::{DbReader, Order};
 use aptos_temppath::TempPath;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     proof::SparseMerkleLeafNode,
-    state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
-    },
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         ExecutionStatus, TransactionAuxiliaryData, TransactionAuxiliaryDataV1, TransactionInfo,
         TransactionToCommit, VMErrorDetail, Version,
     },
     vm_status::StatusCode,
-    write_set::{WriteOp, WriteSet},
+    write_set::WriteSet,
 };
 use proptest::prelude::*;
 use std::{collections::HashSet, sync::Arc};
@@ -226,7 +222,6 @@ fn test_get_latest_ledger_summary() {
 pub fn test_state_merkle_pruning_impl(
     input: Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>,
 ) {
-    /* FIXME(aldenhu)
     // set up DB with state prune window 5 and epoch ending state prune window 10
     let tmp_dir = TempPath::new();
     let db = AptosDB::open(
@@ -259,19 +254,14 @@ pub fn test_state_merkle_pruning_impl(
     .unwrap();
 
     // augment DB in blocks
-    let mut in_memory_state = db.state_store.current_state_cloned();
-    let _ancester = in_memory_state.current.clone();
     let mut next_ver: Version = 0;
     let mut snapshot_versions = vec![];
     for (txns_to_commit, ledger_info_with_sigs) in input.iter() {
-        test_helper::update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
         db.save_transactions_for_test(
             txns_to_commit,
-            next_ver,                /* first_version */
-            next_ver.checked_sub(1), /* base_state_version */
+            next_ver, /* first_version */
             Some(ledger_info_with_sigs),
             true, /* sync_commit */
-            &in_memory_state,
         )
         .unwrap();
 
@@ -325,7 +315,6 @@ pub fn test_state_merkle_pruning_impl(
 
         assert_eq!(expected_nodes, all_nodes);
     }
-     */
 }
 
 proptest! {

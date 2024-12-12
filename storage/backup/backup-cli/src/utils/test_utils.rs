@@ -6,7 +6,6 @@ use aptos_backup_service::start_backup_service;
 use aptos_config::utils::get_available_port;
 use aptos_db::{db::test_helper::arb_blocks_to_commit, AptosDB};
 use aptos_proptest_helpers::ValueGenerator;
-use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,

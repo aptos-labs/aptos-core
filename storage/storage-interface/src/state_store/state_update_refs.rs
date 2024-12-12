@@ -24,20 +24,6 @@ pub struct PerVersionStateUpdateRefs<'kv> {
 }
 
 impl<'kv> PerVersionStateUpdateRefs<'kv> {
-    pub fn index_write_sets(
-        first_version: Version,
-        write_sets: impl IntoIterator<Item = &'kv WriteSet>,
-        num_write_sets: usize,
-    ) -> Self {
-        Self::index(
-            first_version,
-            write_sets
-                .into_iter()
-                .map(|write_set| write_set.state_update_refs()),
-            num_write_sets,
-        )
-    }
-
     pub fn index<
         UpdateIter: IntoIterator<Item = (&'kv StateKey, Option<&'kv StateValue>)>,
         VersionIter: IntoIterator<Item = UpdateIter>,
@@ -108,8 +94,28 @@ impl<'kv> StateUpdateRefs<'kv> {
         num_write_sets: usize,
         last_checkpoint_index: Option<usize>,
     ) -> Self {
+        Self::index(
+            first_version,
+            write_sets
+                .into_iter()
+                .map(|write_set| write_set.state_update_refs()),
+            num_write_sets,
+            last_checkpoint_index,
+        )
+    }
+
+    pub fn index<
+        UpdateIter: IntoIterator<Item = (&'kv StateKey, Option<&'kv StateValue>)>,
+        VersionIter: IntoIterator<Item = UpdateIter>,
+    >(
+        first_version: Version,
+        updates_by_version: VersionIter,
+        num_versions: usize,
+        last_checkpoint_index: Option<usize>,
+    ) -> Self {
         let per_version =
-            PerVersionStateUpdateRefs::index_write_sets(first_version, write_sets, num_write_sets);
+            PerVersionStateUpdateRefs::index(first_version, updates_by_version, num_versions);
+
         let (for_last_checkpoint, for_latest) =
             Self::collect_updates(&per_version, last_checkpoint_index);
         Self {

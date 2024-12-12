@@ -3,12 +3,8 @@
 
 use aptos_config::config::{BUFFERED_STATE_TARGET_ITEMS_FOR_TEST, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD};
 use std::default::Default;
-use aptos_storage_interface::state_store::state_view::cached_state_view::ShardedStateCache;
-use aptos_storage_interface::state_store::state_delta::StateDelta;
 use aptos_types::transaction::{TransactionStatus, TransactionToCommit};
 use aptos_executor_types::transactions_with_output::TransactionsToKeep;
-use aptos_storage_interface::state_store::state_summary::ProvableStateSummary;
-use aptos_storage_interface::state_store::state_update_refs::PerVersionStateUpdateRefs;
 
 impl AptosDB {
     /// This opens db in non-readonly mode, without the pruner.
@@ -91,6 +87,7 @@ impl AptosDB {
         )
     }
 
+    #[cfg(test)]
     pub(crate) fn state_merkle_db(&self) -> Arc<StateMerkleDb> {
         self.state_store.state_db.state_merkle_db.clone()
     }
@@ -113,17 +110,11 @@ impl AptosDB {
             .any(ContractEvent::is_new_epoch_event);
         let transactions_to_keep = TransactionsToKeep::make(first_version, transactions, transaction_outputs, is_reconfig);
 
-        let write_sets = transactions_to_keep.transaction_outputs.iter().map(TransactionOutput::write_set).cloned().collect::<Vec<_>>();
-
-        let (state_view, state) = self.state_store.calculate_state_by_write_sets(
-            &write_sets,
-            first_version,
+        let (state_view, new_state) = StateStore::update_persisted_state_and_summary(
+            &self.state_store.state_db,
+            self.state_store.current_state_locked().clone(),
+            self.state_store.persisted_state_locked().clone(),
             transactions_to_keep.state_update_refs(),
-        )?;
-        let state_summary = self.state_store.current_state_locked().ledger_state_summary().update(
-            &ProvableStateSummary::new_persisted(self)?,
-            transactions_to_keep.state_update_refs_for_last_checkpoint(),
-            transactions_to_keep.state_update_refs_for_latest(),
         )?;
 
         let chunk = ChunkToCommit {
@@ -131,14 +122,14 @@ impl AptosDB {
             transactions: &transactions_to_keep.transactions,
             transaction_outputs: &transactions_to_keep.transaction_outputs,
             transaction_infos: &transaction_infos,
-            state: &state,
-            state_summary: &state_summary,
+            state: &new_state.ledger_state(),
+            state_summary: &new_state.ledger_state_summary(),
             state_update_refs: transactions_to_keep.per_version_state_update_refs(),
             state_reads: Some(state_view.memorized_reads()),
             is_reconfig,
         };
 
-        self.save_transactions( chunk, ledger_info_with_sigs, true )
+        self.save_transactions( chunk, ledger_info_with_sigs, sync_commit)
     }
 
     fn disassemble_txns_to_commit(txns_to_commit: &[TransactionToCommit]) -> (

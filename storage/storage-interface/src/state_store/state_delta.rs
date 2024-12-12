@@ -47,24 +47,6 @@ impl StateDelta {
         }
     }
 
-    pub fn new_empty_with_version(_version: Option<u64>) -> StateDelta {
-        /* FIXME(aldenhu):
-        let smt = SparseMerkleTree::new_empty();
-        Self::new(
-            smt.clone(),
-            version,
-            smt,
-            version,
-            ShardedStateUpdates::new_empty(),
-        )
-         */
-        todo!()
-    }
-
-    pub fn new_empty() -> Self {
-        Self::new_empty_with_version(None)
-    }
-
     pub fn next_version(&self) -> Version {
         self.current.next_version()
     }

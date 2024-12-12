@@ -44,7 +44,7 @@ use mock_vm::{
     MockVM, DISCARD_STATUS, KEEP_STATUS,
 };
 use proptest::prelude::*;
-use std::{iter::once, sync::Arc};
+use std::iter::once;
 
 mod chunk_executor_tests;
 #[cfg(test)]

@@ -4,14 +4,11 @@
 
 //! This file defines state store APIs that are related account state Merkle tree.
 
-// FIXME(aldenhu)
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
+// FIXME(aldenhu): log STATE_ITEMS, TOTAL_STATE_BYTES
 
 use crate::{
     ledger_db::LedgerDb,
-    metrics::{OTHER_TIMERS_SECONDS, STATE_ITEMS, TOTAL_STATE_BYTES},
+    metrics::OTHER_TIMERS_SECONDS,
     pruner::{StateKvPrunerManager, StateMerklePrunerManager},
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -49,25 +46,18 @@ use aptos_db_indexer_schemas::{
     metadata::{MetadataKey, MetadataValue, StateSnapshotProgress},
     schema::indexer_metadata::InternalIndexerMetadataSchema,
 };
-use aptos_executor::{
-    types::in_memory_state_calculator_v2::InMemoryStateCalculatorV2,
-    workflow::do_state_checkpoint::DoStateCheckpoint,
-};
-use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::SchemaBatch;
-use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     db_ensure as ensure, db_other_bail as bail,
     state_store::{
         state::{LedgerState, State},
-        state_delta::StateDelta,
         state_summary::{ProvableStateSummary, StateSummary, StateWithSummary},
         state_update::{StateCacheEntry, StateUpdateRef},
-        state_update_refs::{BatchedStateUpdateRefs, PerVersionStateUpdateRefs, StateUpdateRefs},
+        state_update_refs::{PerVersionStateUpdateRefs, StateUpdateRefs},
         state_view::cached_state_view::{CachedStateView, ShardedStateCache, StateCacheShard},
         NUM_STATE_SHARDS,
     },
@@ -85,14 +75,11 @@ use aptos_types::{
         StateViewId,
     },
     transaction::Version,
-    write_set::WriteSet,
 };
-use arc_swap::ArcSwap;
 use claims::{assert_ge, assert_le};
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::{
-    collections::HashSet,
     ops::Deref,
     sync::{Arc, MutexGuard},
 };
@@ -474,9 +461,9 @@ impl StateStore {
 
     #[cfg(feature = "db-debugger")]
     pub fn catch_up_state_merkle_db(
-        ledger_db: Arc<LedgerDb>,
-        state_merkle_db: Arc<StateMerkleDb>,
-        state_kv_db: Arc<StateKvDb>,
+        _ledger_db: Arc<LedgerDb>,
+        _state_merkle_db: Arc<StateMerkleDb>,
+        _state_kv_db: Arc<StateKvDb>,
     ) -> Result<Option<Version>> {
         /*
         use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
@@ -609,11 +596,19 @@ impl StateStore {
                 .last()
                 .map(|(idx, _)| idx);
 
-            let new_state = Self::update_ledger_state_with_write_sets(
-                state_db,
-                out_current_state.lock().clone(),
+            let state_update_refs = StateUpdateRefs::index_write_sets(
+                state.next_version(),
                 &write_sets,
+                write_sets.len(),
                 last_checkpoint_index,
+            );
+            let current_state = out_current_state.lock().clone();
+            let persisted = current_state.latest().clone();
+            let (_state_view, new_state) = Self::update_persisted_state_and_summary(
+                state_db,
+                current_state,
+                persisted,
+                &state_update_refs,
             )?;
 
             // synchronously commit the snapshot at the last checkpoint here if not committed to disk yet.
@@ -633,43 +628,38 @@ impl StateStore {
         Ok(buffered_state)
     }
 
-    pub fn update_ledger_state_with_write_sets(
+    pub fn update_persisted_state_and_summary(
         state_db: &Arc<StateDb>,
-        state: LedgerStateWithSummary,
-        write_sets: &[WriteSet],
-        last_checkpoint_index: Option<usize>,
-    ) -> Result<LedgerStateWithSummary> {
-        let state_view = CachedStateView::new(
+        current: LedgerStateWithSummary,
+        persisted: StateWithSummary,
+        state_update_refs: &StateUpdateRefs,
+    ) -> Result<(CachedStateView, LedgerStateWithSummary)> {
+        let state_view = CachedStateView::new_impl(
             StateViewId::Miscellaneous,
             state_db.clone(),
-            state.state().clone(),
-        )?;
-        state_view.prime_cache_by_write_sets(write_sets)?;
-
-        let state_update_refs = StateUpdateRefs::index_write_sets(
-            state.next_version(),
-            write_sets,
-            write_sets.len(),
-            last_checkpoint_index,
+            persisted.state().clone(),
+            current.state().clone(),
         );
+        state_view.prime_cache_by_update_refs(state_update_refs);
 
-        let new_ledger_state = state.ledger_state().update(
-            state.state(),
+        let new_ledger_state = current.ledger_state().update(
+            persisted.state(),
             state_update_refs.for_last_checkpoint.as_ref(),
             state_update_refs.for_latest.as_ref(),
-            &state_view.into_state_cache(),
+            state_view.memorized_reads(),
         );
 
-        let new_ledger_state_summary = state.ledger_state_summary().update(
-            &ProvableStateSummary::new(state.summary().clone(), state_db.as_ref()),
+        let new_ledger_state_summary = current.ledger_state_summary().update(
+            &ProvableStateSummary::new(persisted.summary().clone(), state_db.as_ref()),
             state_update_refs.for_last_checkpoint.as_ref(),
             state_update_refs.for_latest.as_ref(),
         )?;
 
-        Ok(LedgerStateWithSummary::from_state_and_summary(
+        let ret = LedgerStateWithSummary::from_state_and_summary(
             new_ledger_state,
             new_ledger_state_summary,
-        ))
+        );
+        Ok((state_view, ret))
     }
 
     pub fn reset(&self) {
@@ -725,25 +715,16 @@ impl StateStore {
         self.state_merkle_db.get_range_proof(rightmost_key, version)
     }
 
-    /// Put the write sets on top of current state
-    pub fn put_write_sets(
+    pub fn calculate_state_and_put_updates(
         &self,
-        write_sets: &[WriteSet],
-        first_version: Version,
+        state_update_refs: &StateUpdateRefs,
         batch: &SchemaBatch,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
         enable_sharding: bool,
     ) -> Result<()> {
-        let state_update_refs = StateUpdateRefs::index_write_sets(
-            first_version,
-            write_sets,
-            write_sets.len(),
-            None, // last_checkpoint_index
-        );
-        let (state_view, state) =
-            self.calculate_state_by_write_sets(write_sets, first_version, &state_update_refs)?;
+        let (state_view, state) = self.calculate_state_by_update_refs(state_update_refs)?;
 
-        self.put_value_sets(
+        self.put_state_updates(
             &state,
             &state_update_refs.per_version,
             Some(state_view.memorized_reads()),
@@ -753,23 +734,23 @@ impl StateStore {
         )
     }
 
-    pub(crate) fn calculate_state_by_write_sets(
+    pub(crate) fn calculate_state_by_update_refs(
         &self,
-        write_sets: &[WriteSet],
-        first_version: Version,
         state_update_refs: &StateUpdateRefs,
     ) -> Result<(CachedStateView, LedgerState)> {
         let current = self.current_state_locked().ledger_state();
         let persisted = self.persisted_state_locked().state().clone();
+
         let state_view = CachedStateView::new_impl(
             StateViewId::Miscellaneous,
             self.state_db.clone(),
             persisted.clone(),
             current.latest().clone(),
         );
-        state_view.prime_cache_by_write_sets(write_sets)?;
+        state_view.prime_cache_by_update_refs(state_update_refs);
+
         let state = current.update(
-            &persisted,
+            state_view.persisted_state(),
             state_update_refs.for_last_checkpoint.as_ref(),
             state_update_refs.for_latest.as_ref(),
             state_view.memorized_reads(),
@@ -777,8 +758,7 @@ impl StateStore {
         Ok((state_view, state))
     }
 
-    /// Put the `value_state_sets` into its own CF.
-    pub fn put_value_sets(
+    pub fn put_state_updates(
         &self,
         state: &LedgerState,
         state_update_refs: &PerVersionStateUpdateRefs,
@@ -1013,7 +993,7 @@ impl StateStore {
 
                 if let StateCacheEntry::Value {
                     version: old_version,
-                    value: old_value,
+                    value: _,
                 } = old_state_value_with_version_opt
                 {
                     // stale index of the old value at its version.
@@ -1084,6 +1064,8 @@ impl StateStore {
         Ok(())
     }
 
+    // FIXME(aldenhu)
+    #[allow(dead_code)]
     /// Merklize the results generated by `value_state_sets` to `batch` and return the result root
     /// hashes for each write set.
     #[cfg(test)]

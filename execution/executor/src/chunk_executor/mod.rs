@@ -17,8 +17,7 @@ use crate::{
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_executor_types::{
-    state_checkpoint_output, ChunkCommitNotification, ChunkExecutorTrait, TransactionReplayer,
-    VerifyExecutionMode,
+    ChunkCommitNotification, ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::{Mutex, RwLock};

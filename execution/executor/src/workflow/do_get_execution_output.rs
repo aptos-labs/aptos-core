@@ -23,10 +23,8 @@ use aptos_executor_types::{
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
-use aptos_sdk::types::HardwareWalletType::Ledger;
 use aptos_storage_interface::state_store::{
-    state::LedgerState,
-    state_view::cached_state_view::{CachedStateView, ShardedStateCache},
+    state::LedgerState, state_view::cached_state_view::CachedStateView,
 };
 #[cfg(feature = "consensus-only-perf-test")]
 use aptos_types::transaction::ExecutionStatus;
@@ -173,15 +171,14 @@ impl DoGetExecutionOutput {
         parent_state: &LedgerState,
         state_view: CachedStateView,
     ) -> Result<ExecutionOutput> {
-        // collect all accounts touched and dedup
-        let write_set = transaction_outputs
-            .iter()
-            .map(|o| o.write_set())
-            .collect::<Vec<_>>();
-
         // TODO(aldenhu): optimize: state updates are gone through here once and again in the parser
         // prime the state cache by fetching all touched accounts
-        state_view.prime_cache_by_write_sets(write_set)?;
+        state_view.batch_prime_cache(
+            transaction_outputs
+                .iter()
+                .flat_map(|t| t.write_set().state_update_refs())
+                .map(|(k, _u)| k),
+        )?;
 
         let out = Parser::parse(
             state_view.next_version(),

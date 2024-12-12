@@ -2,11 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// FIXME(aldenhu)
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
-
 use crate::db::{test_helper::arb_blocks_to_commit, AptosDB};
 use anyhow::Result;
 use aptos_temppath::TempPath;

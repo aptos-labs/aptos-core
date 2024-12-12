@@ -4,7 +4,6 @@
 use aptos_crypto::hash::SPARSE_MERKLE_PLACEHOLDER_HASH;
 use aptos_storage_interface::state_store::{
     state::LedgerState,
-    state_delta::StateDelta,
     state_summary::{LedgerStateSummary, StateWithSummary},
 };
 use aptos_types::{state_store::state_storage_usage::StateStorageUsage, transaction::Version};
@@ -59,6 +58,10 @@ impl LedgerStateWithSummary {
 
     pub fn set(&mut self, current_state: LedgerStateWithSummary) {
         *self = current_state;
+    }
+
+    pub fn latest(&self) -> &StateWithSummary {
+        &self.latest
     }
 
     pub fn last_checkpoint(&self) -> &StateWithSummary {

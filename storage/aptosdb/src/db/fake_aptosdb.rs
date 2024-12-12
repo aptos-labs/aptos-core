@@ -410,6 +410,7 @@ impl FakeAptosDB {
                     ledger_info_with_sigs,
                     sync_commit,
                     &latest_in_memory_state,
+                    true,
                 )?;
             }
 

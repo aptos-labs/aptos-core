@@ -16,9 +16,7 @@ use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_logger::{info, trace};
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::SchemaBatch;
-use aptos_storage_interface::state_store::{
-    state::State, state_delta::StateDelta, state_summary::StateWithSummary,
-};
+use aptos_storage_interface::state_store::{state::State, state_summary::StateWithSummary};
 use std::sync::{mpsc::Receiver, Arc};
 
 pub struct StateMerkleBatch {

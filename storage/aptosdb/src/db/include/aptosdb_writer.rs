@@ -300,7 +300,7 @@ impl AptosDB {
         let sharded_state_kv_batches = new_sharded_kv_schema_batch();
         let state_kv_metadata_batch = SchemaBatch::new();
 
-        self.state_store.put_value_sets(
+        self.state_store.put_state_updates(
             chunk.state,
             chunk.state_update_refs,
             chunk.state_reads,

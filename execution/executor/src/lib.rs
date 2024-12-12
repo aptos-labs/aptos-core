@@ -3,10 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
-// FIXME(aldenhu)
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod fuzzing;

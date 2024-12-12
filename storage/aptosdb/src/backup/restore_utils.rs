@@ -1,11 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// FIXME(aldenhu)
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
-
 //! This file contains utilities that are helpful for performing
 //! database restore operations, as required by restore and
 //! state sync v2.
@@ -24,7 +19,7 @@ use crate::{
 use aptos_crypto::HashValue;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{
-    db_ensure as ensure, state_store::state_delta::StateDelta, AptosDbError, Result,
+    db_ensure as ensure, state_store::state_update_refs::StateUpdateRefs, AptosDbError, Result,
 };
 use aptos_types::{
     contract_event::ContractEvent,
@@ -243,9 +238,8 @@ pub(crate) fn save_transactions_impl(
     }
 
     if kv_replay && first_version > 0 && state_store.get_usage(Some(first_version - 1)).is_ok() {
-        state_store.put_write_sets(
-            write_sets,
-            first_version,
+        state_store.calculate_state_and_put_updates(
+            &StateUpdateRefs::index_write_sets(first_version, write_sets, write_sets.len(), None),
             &ledger_db_batch.ledger_metadata_db_batches, // used for storing the storage usage
             state_kv_batches,
             state_store.state_kv_db.enabled_sharding(),

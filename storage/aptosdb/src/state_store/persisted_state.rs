@@ -3,9 +3,8 @@
 
 use crate::metrics::OTHER_TIMERS_SECONDS;
 use aptos_metrics_core::TimerHelper;
-use aptos_scratchpad::{SparseMerkleTree, SUBTREE_DROPPER};
+use aptos_scratchpad::SUBTREE_DROPPER;
 use aptos_storage_interface::state_store::state_summary::StateWithSummary;
-use aptos_types::state_store::state_value::StateValue;
 use std::ops::Deref;
 
 pub struct PersistedState {

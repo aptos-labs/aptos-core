@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+/*
 #![allow(dead_code)]
 
 use anyhow::Result;
@@ -32,8 +33,6 @@ impl InMemoryStateCalculatorV2 {
         _parent_state: &Arc<StateDelta>,
         _known_state_checkpoints: Option<impl IntoIterator<Item = Option<HashValue>>>,
     ) -> Result<StateCheckpointOutput> {
-        todo!()
-        /*
         if execution_output.is_block {
             Self::validate_input_for_block(parent_state, &execution_output.to_commit)?;
         }
@@ -46,7 +45,6 @@ impl InMemoryStateCalculatorV2 {
             execution_output.is_block,
             known_state_checkpoints,
         )
-         */
     }
 
     pub fn calculate_for_write_sets_after_snapshot(
@@ -55,7 +53,6 @@ impl InMemoryStateCalculatorV2 {
         last_checkpoint_index: Option<usize>,
         write_sets: &[WriteSet],
     ) -> Result<StateCheckpointOutput> {
-        /*
         let state_update_refs = PerVersionStateUpdateRefs::index_write_sets(
             parent_state.next_version(),
             write_sets,
@@ -70,8 +67,6 @@ impl InMemoryStateCalculatorV2 {
             false,
             Option::<Vec<_>>::None,
         )
-         */
-        todo!()
     }
 
     fn calculate_impl(
@@ -82,7 +77,6 @@ impl InMemoryStateCalculatorV2 {
         _is_block: bool,
         _known_state_checkpoints: Option<impl IntoIterator<Item = Option<HashValue>>>,
     ) -> Result<StateCheckpointOutput> {
-        /*
         let StateCache {
             // This makes sure all in-mem nodes seen while proofs were fetched stays in mem during the
             // calculation
@@ -211,9 +205,6 @@ impl InMemoryStateCalculatorV2 {
             last_checkpoint_index.map(|_| updates_before_last_checkpoint),
             state_checkpoint_hashes,
         ))
-        FIXME(aldenhu)
-         */
-        todo!()
     }
 
     fn add_to_delta(
@@ -223,8 +214,6 @@ impl InMemoryStateCalculatorV2 {
         _items_delta: &mut i64,
         _bytes_delta: &mut i64,
     ) {
-        todo!()
-        /* FIXME(aldenhu)
         let key_size = k.size();
         if let Some(value) = v {
             *items_delta += 1;
@@ -238,7 +227,6 @@ impl InMemoryStateCalculatorV2 {
             *items_delta -= 1;
             *bytes_delta -= (key_size + old_v.size()) as i64;
         }
-         */
     }
 
     fn calculate_usage(
@@ -246,7 +234,6 @@ impl InMemoryStateCalculatorV2 {
         _sharded_state_cache: &ShardedStateCache,
         _updates: &BatchedStateUpdateRefs,
     ) -> StateStorageUsage {
-        /*
         let _timer = OTHER_TIMERS.timer_with(&["calculate_usage"]);
 
         if old_usage.is_untracked() {
@@ -277,9 +264,6 @@ impl InMemoryStateCalculatorV2 {
             (old_usage.items() as i64 + items_delta) as usize,
             (old_usage.bytes() as i64 + bytes_delta) as usize,
         )
-
-         */
-        todo!()
     }
 
     fn make_checkpoint(
@@ -288,7 +272,6 @@ impl InMemoryStateCalculatorV2 {
         _usage: StateStorageUsage,
         _proof_reader: &ProofReader,
     ) -> Result<FrozenSparseMerkleTree<StateValue>> {
-        /*
         let _timer = OTHER_TIMERS.timer_with(&["make_checkpoint"]);
 
         // Update SMT.
@@ -308,18 +291,12 @@ impl InMemoryStateCalculatorV2 {
             latest_checkpoint.batch_update(smt_updates, usage, proof_reader)?
         };
         Ok(new_checkpoint)
-
-         */
-        todo!()
     }
 
     fn validate_input_for_block(
         _base: &StateDelta,
         _to_commit: &TransactionsWithOutput,
     ) -> Result<()> {
-        // FIXME(aldenhu): check equivalent is done
-        todo!()
-        /*
         let num_txns = to_commit.len();
         ensure!(num_txns != 0, "Empty block is not allowed.");
         ensure!(
@@ -334,7 +311,6 @@ impl InMemoryStateCalculatorV2 {
         );
 
         Ok(())
-
-         */
     }
 }
+*/

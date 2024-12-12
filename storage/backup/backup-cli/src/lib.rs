@@ -3,9 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::arithmetic_side_effects)]
-// FIXME(aldenhu)
-#![allow(unused_variables)]
-#![allow(unused_imports)]
 
 pub mod backup_types;
 pub mod coordinators;

@@ -2,10 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::state_store::{state::LedgerState, state_summary::LedgerStateSummary};
-use aptos_crypto::HashValue;
 use aptos_types::{
     proof::accumulator::{InMemoryAccumulator, InMemoryTransactionAccumulator},
-    state_store::state_storage_usage::StateStorageUsage,
     transaction::Version,
 };
 use std::sync::Arc;
@@ -38,28 +36,6 @@ impl LedgerSummary {
 
     pub fn version(&self) -> Option<Version> {
         self.next_version().checked_sub(1)
-    }
-
-    pub fn new_at_state_checkpoint(
-        _state_root_hash: HashValue,
-        _state_usage: StateStorageUsage,
-        _frozen_subtrees_in_accumulator: Vec<HashValue>,
-        _num_leaves_in_accumulator: u64,
-    ) -> Self {
-        todo!()
-        /* FIXME(aldenhu)
-        let state = Arc::new(StateDelta::new_at_checkpoint(
-            state_root_hash,
-            state_usage,
-            num_leaves_in_accumulator.checked_sub(1),
-        ));
-        let transaction_accumulator = Arc::new(
-            InMemoryAccumulator::new(frozen_subtrees_in_accumulator, num_leaves_in_accumulator)
-                .expect("The startup info read from storage should be valid."),
-        );
-
-        Self::new(state, transaction_accumulator)
-         */
     }
 
     pub fn new_empty() -> Self {

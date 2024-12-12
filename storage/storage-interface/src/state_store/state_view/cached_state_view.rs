@@ -4,7 +4,10 @@
 use crate::{
     metrics::TIMER,
     state_store::{
-        state::State, state_delta::StateDelta, state_update::StateCacheEntry,
+        state::State,
+        state_delta::StateDelta,
+        state_update::StateCacheEntry,
+        state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
         state_view::db_state_view::DbStateView,
     },
     DbReader,
@@ -16,14 +19,14 @@ use aptos_types::{
         StateViewId, StateViewResult, TStateView,
     },
     transaction::Version,
-    write_set::WriteSet,
 };
 use core::fmt;
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
+use rayon::prelude::*;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fmt::{Debug, Formatter},
     sync::Arc,
 };
@@ -127,9 +130,9 @@ impl CachedStateView {
     }
 
     // TODO(aldenhu): combine with StateStore::prime_state_cache
-    pub fn prime_cache_by_write_sets<'a, T: IntoIterator<Item = &'a WriteSet> + Send>(
+    pub fn batch_prime_cache<'a, T: IntoIterator<Item = &'a StateKey> + Send>(
         &self,
-        write_sets: T,
+        keys: T,
     ) -> StateViewResult<()> {
         let _timer = TIMER
             .with_label_values(&["prime_cache_by_write_sets"])
@@ -137,19 +140,33 @@ impl CachedStateView {
 
         // TODO(aldenhu): avoid collecting to the same hashset
         IO_POOL.scope(|s| {
-            write_sets
-                .into_iter()
-                .flat_map(|write_set| write_set.iter())
-                .map(|(key, _)| key)
-                .collect::<HashSet<_>>()
-                .into_iter()
-                .for_each(|key| {
-                    s.spawn(move |_| {
-                        self.get_state_value(key).expect("Must succeed.");
-                    })
-                });
+            keys.into_iter().for_each(|key| {
+                s.spawn(move |_| {
+                    self.get_state_value(key).expect("Must succeed.");
+                })
+            });
         });
         Ok(())
+    }
+
+    pub fn prime_cache_by_update_refs(&self, updates: &StateUpdateRefs) {
+        IO_POOL.install(|| {
+            if let Some(updates) = &updates.for_last_checkpoint {
+                self.prime_cache_by_batched_update_refs(updates);
+            }
+            if let Some(updates) = &updates.for_latest {
+                self.prime_cache_by_batched_update_refs(updates);
+            }
+        });
+    }
+
+    fn prime_cache_by_batched_update_refs(&self, updates: &BatchedStateUpdateRefs) {
+        IO_POOL.install(|| {
+            updates.shards.par_iter().for_each(|shard| {
+                self.batch_prime_cache(shard.keys().cloned())
+                    .expect("Must succeed.");
+            });
+        });
     }
 
     /// Consumes `Self` and returns the state and all the memorized state reads.
@@ -186,6 +203,10 @@ impl CachedStateView {
 
     pub fn next_version(&self) -> Version {
         self.speculative.next_version()
+    }
+
+    pub fn current_state(&self) -> &State {
+        &self.speculative.current
     }
 
     pub fn persisted_state(&self) -> &State {

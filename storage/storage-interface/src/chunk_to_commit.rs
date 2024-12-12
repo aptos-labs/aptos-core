@@ -39,7 +39,6 @@ impl<'a> ChunkToCommit<'a> {
         self.next_version() - 1
     }
 
-    // FIXME(aldenhu): check efficiency (did we clone more than needed?)
     pub fn state(&self) -> StateWithSummary {
         StateWithSummary::new(
             self.state.latest().clone(),
