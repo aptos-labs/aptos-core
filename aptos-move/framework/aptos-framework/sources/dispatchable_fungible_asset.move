@@ -173,6 +173,25 @@ module aptos_framework::dispatchable_fungible_asset {
     }
 
     #[view]
+    /// Whether the derived value of store using the overloaded hook is at least `amount`
+    ///
+    /// The semantics of value will be governed by the function specified in DispatchFunctionStore.
+    public fun is_derived_balance_at_least<T: key>(store: Object<T>, amount: u64): bool {
+        let func_opt = fungible_asset::derived_balance_dispatch_function(store);
+        if (option::is_some(&func_opt)) {
+            assert!(
+                features::dispatchable_fungible_asset_enabled(),
+                error::aborted(ENOT_ACTIVATED)
+            );
+            let func = option::borrow(&func_opt);
+            function_info::load_module_from_function(func);
+            dispatchable_derived_balance(store, func) >= amount
+        } else {
+            fungible_asset::is_balance_at_least(store, amount)
+        }
+    }
+
+    #[view]
     /// Get the derived supply of the fungible asset using the overloaded hook.
     ///
     /// The semantics of supply will be governed by the function specified in DeriveSupplyDispatch.
@@ -222,7 +241,7 @@ module aptos_framework::dispatchable_fungible_asset {
     ): u64;
 
     native fun dispatchable_derived_supply<T: key>(
-        store: Object<T>,
+        metadata: Object<T>,
         function: &FunctionInfo,
     ): Option<u128>;
 }
