@@ -481,7 +481,7 @@ base64 = "0.13.0"
 base64-url = "2.0.1"
 backoff = { version = "0.4.0", features = ["tokio"] }
 backtrace = "0.3.58"
-bcs = "0.1.6"
+bcs = { git = "https://github.com/movementlabsxyz/bcs.git", rev = "bc16d2d39cabafaabd76173dd1b04b2aa170cf0c" }
 better_any = "0.1.1"
 bellman = { version = "0.13.1", default-features = false }
 bigdecimal = { version = "0.4.0", features = ["serde"] }
