@@ -1010,6 +1010,13 @@ impl AbilitySet {
     pub fn into_u8(self) -> u8 {
         self.0
     }
+
+    pub fn to_string_concise(self) -> String {
+        self.iter()
+            .map(|a| a.to_string())
+            .collect::<Vec<_>>()
+            .join("+")
+    }
 }
 
 impl fmt::Display for AbilitySet {
@@ -1018,8 +1025,8 @@ impl fmt::Display for AbilitySet {
             &self
                 .iter()
                 .map(|a| a.to_string())
-                .reduce(|l, r| format!("{} + {}", l, r))
-                .unwrap_or_default(),
+                .collect::<Vec<_>>()
+                .join(" + "),
         )
     }
 }
@@ -1239,6 +1246,7 @@ pub enum AddressSpecifier {
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
 )]
+#[allow(unused_variables)]
 pub enum SignatureToken {
     /// Boolean, `true` or `false`.
     Bool,
@@ -1254,6 +1262,12 @@ pub enum SignatureToken {
     Signer,
     /// Vector
     Vector(Box<SignatureToken>),
+    /// Function, with n argument types and m result types, and an associated ability set.
+    Function(
+        Vec<SignatureToken>, // args
+        Vec<SignatureToken>, // results
+        AbilitySet,          // abilities
+    ),
     /// User defined type
     Struct(StructHandleIndex),
     StructInstantiation(StructHandleIndex, Vec<SignatureToken>),
@@ -1296,6 +1310,11 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIter<'a> {
                         self.stack.extend(inner_toks.iter().rev())
                     },
 
+                    Function(args, results, ..) => {
+                        self.stack.extend(args.iter().rev());
+                        self.stack.extend(results.iter().rev());
+                    },
+
                     Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | Struct(_)
                     | TypeParameter(_) => (),
                 }
@@ -1328,6 +1347,13 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIterWithDepth<'a> {
                     StructInstantiation(_, inner_toks) => self
                         .stack
                         .extend(inner_toks.iter().map(|tok| (tok, depth + 1)).rev()),
+
+                    Function(args, results, ..) => {
+                        self.stack
+                            .extend(args.iter().map(|tok| (tok, depth + 1)).rev());
+                        self.stack
+                            .extend(results.iter().map(|tok| (tok, depth + 1)).rev());
+                    },
 
                     Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | Struct(_)
                     | TypeParameter(_) => (),
@@ -1389,11 +1415,14 @@ impl std::fmt::Debug for SignatureToken {
             SignatureToken::Address => write!(f, "Address"),
             SignatureToken::Signer => write!(f, "Signer"),
             SignatureToken::Vector(boxed) => write!(f, "Vector({:?})", boxed),
+            SignatureToken::Function(args, results, abilities) => {
+                write!(f, "Function({:?}, {:?}, {})", args, results, abilities)
+            },
+            SignatureToken::Reference(boxed) => write!(f, "Reference({:?})", boxed),
             SignatureToken::Struct(idx) => write!(f, "Struct({:?})", idx),
             SignatureToken::StructInstantiation(idx, types) => {
                 write!(f, "StructInstantiation({:?}, {:?})", idx, types)
             },
-            SignatureToken::Reference(boxed) => write!(f, "Reference({:?})", boxed),
             SignatureToken::MutableReference(boxed) => write!(f, "MutableReference({:?})", boxed),
             SignatureToken::TypeParameter(idx) => write!(f, "TypeParameter({:?})", idx),
         }
@@ -1401,7 +1430,7 @@ impl std::fmt::Debug for SignatureToken {
 }
 
 impl SignatureToken {
-    /// Returns true if the token is an integer type.
+    /// Returns `true` if the `SignatureToken` is an integer type.
     pub fn is_integer(&self) -> bool {
         use SignatureToken::*;
         match self {
@@ -1410,6 +1439,7 @@ impl SignatureToken {
             | Address
             | Signer
             | Vector(_)
+            | Function(..)
             | Struct(_)
             | StructInstantiation(_, _)
             | Reference(_)
@@ -1448,12 +1478,20 @@ impl SignatureToken {
             Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
             Vector(inner) => inner.is_valid_for_constant(),
             Signer
+            | Function(..)
             | Struct(_)
             | StructInstantiation(_, _)
             | Reference(_)
             | MutableReference(_)
             | TypeParameter(_) => false,
         }
+    }
+
+    /// Returns true if the `SignatureToken` is a function.
+    pub fn is_function(&self) -> bool {
+        use SignatureToken::*;
+
+        matches!(self, Function(..))
     }
 
     /// Set the index to this one. Useful for random testing.
@@ -1490,6 +1528,9 @@ impl SignatureToken {
 
     pub fn instantiate(&self, subst_mapping: &[SignatureToken]) -> SignatureToken {
         use SignatureToken::*;
+        let inst_vec = |v: &[SignatureToken]| -> Vec<SignatureToken> {
+            v.iter().map(|ty| ty.instantiate(subst_mapping)).collect()
+        };
         match self {
             Bool => Bool,
             U8 => U8,
@@ -1501,14 +1542,13 @@ impl SignatureToken {
             Address => Address,
             Signer => Signer,
             Vector(ty) => Vector(Box::new(ty.instantiate(subst_mapping))),
+            Function(args, results, abilities) => {
+                Function(inst_vec(args), inst_vec(results), *abilities)
+            },
             Struct(idx) => Struct(*idx),
-            StructInstantiation(idx, struct_type_args) => StructInstantiation(
-                *idx,
-                struct_type_args
-                    .iter()
-                    .map(|ty| ty.instantiate(subst_mapping))
-                    .collect(),
-            ),
+            StructInstantiation(idx, struct_type_args) => {
+                StructInstantiation(*idx, inst_vec(struct_type_args))
+            },
             Reference(ty) => Reference(Box::new(ty.instantiate(subst_mapping))),
             MutableReference(ty) => MutableReference(Box::new(ty.instantiate(subst_mapping))),
             TypeParameter(idx) => subst_mapping[*idx as usize].clone(),
@@ -1669,7 +1709,7 @@ pub enum Bytecode {
             arithmetic error
         else:
             stack << int_val as u8
-    "#]
+     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> _
         ty_stack << u8
@@ -1799,6 +1839,11 @@ pub enum Bytecode {
         // Here `func` is loaded from the file format, containing information like the
         // the function signature, the locals, and the body.
 
+        // TODO(LAMBDA) - try to loosen this restriction after MVP if we can
+        // prove safety using access specifiers or other mechanisms.
+        if conservative_invocation_mode then
+            if stack already contains a call to the same module as func, then abort
+
         ty_args = if func.is_generic then func.ty_args else []
 
         n = func.num_params
@@ -1857,6 +1902,7 @@ pub enum Bytecode {
         ty_stack << struct_ty
     "#]
     Pack(StructDefinitionIndex),
+
     #[group = "struct"]
     #[static_operands = "[struct_inst_idx]"]
     #[description = "Generic version of `Pack`."]
@@ -1896,7 +1942,6 @@ pub enum Bytecode {
     #[gas_type_creation_tier_1 = "field_tys"]
     PackVariantGeneric(StructVariantInstantiationIndex),
 
-    //TODO: Unpack, Test
     #[group = "struct"]
     #[static_operands = "[struct_def_idx]"]
     #[description = "Destroy an instance of a struct and push the values bound to each field onto the stack."]
@@ -2934,6 +2979,143 @@ pub enum Bytecode {
     "#]
     VecSwap(SignatureIndex),
 
+    #[group = "closure"]
+    #[description = "Load a function value onto the stack."]
+    #[static_operands = "[func_handle_idx]"]
+    #[semantics = "stack << functions[function_handle_idx]"]
+    #[runtime_check_epilogue = "ty_stack << func_ty"]
+    #[gas_type_creation_tier_1 = "func_ty"]
+    LdFunction(FunctionHandleIndex),
+
+    #[group = "closure"]
+    #[description = "Generic version of `LdFunction`."]
+    #[static_operands = "[func_inst_idx]"]
+    #[semantics = "See `LdFunction`."]
+    #[runtime_check_epilogue = "See `LdFunction`."]
+    #[gas_type_creation_tier_0 = "ty_args"]
+    #[gas_type_creation_tier_1 = "local_tys"]
+    LdFunctionGeneric(FunctionInstantiationIndex),
+
+    #[group = "closure"]
+    #[description = r#"
+        `EarlyBindFunction(|t1..tn|r with a, count)` creates new function value based
+        on the function value at top of stack by adding `count` arguments
+        popped from the stack to the closure found on top of stack.
+
+        If the function value's type has at least `count` parameters with types
+        that match the `count` arguments on the stack, then a function closure
+        capturing those values with the provided function is pushed on top of
+        stack.
+
+        Notice that the type as part of this instruction is redundant for
+        execution semantics. Since the closure is expected to be on top of the stack,
+        it can decode the arguments underneath without type information.
+        However, the type is required for the current implementation of
+        static bytecode verification.
+    "#]
+    #[static_operands = "[u8_value]"]
+    #[semantics = r#"
+        stack >> function_handle
+
+        let [func, k, [arg_0, .., arg_{k-1}]] = function_handle
+        // Information like the function signature are loaded from the file format
+        i = u8_value
+        n = func.num_params
+        if i + k > n then abort
+
+        stack >> arg'_{i-1}
+        ..
+        stack >> arg'_0
+        new_function_handle = [func, k + i, [arg_0, .., arg_{k-1}, arg'_0, .., arg'_{i-1}]]
+        stack << new_function_handle
+    "#]
+    #[runtime_check_epilogue = r#"
+        // NOT: assert func visibility rules
+        func param types match provided parameter types
+    "#]
+    #[gas_type_creation_tier_0 = "closure_ty"]
+    EarlyBindFunction(SignatureIndex, u8),
+
+    #[group = "closure"]
+    #[description = r#"
+        `InvokeFunction(|t1..tn|r with a)` calls a function value of the specified type,
+        with `n` argument values from the stack.
+
+        On top of the stack is the closure being evaluated, underneath the arguments:
+        `[c,vn,..,v1] + stack`. The type of the closure must match the type specified in
+        the instruction, with abilities `a` a subset of the abilities of the closure value.
+        A value `vi` on the stack must have type `ti`.
+
+        Notice that the type as part of this instruction is redundant for
+        execution semantics. Since the closure is expected to be on top of the stack,
+        it can decode the arguments underneath without type information.
+        However, the type is required for the current implementation of
+        static bytecode verification.
+
+        The arguments are consumed and pushed to the locals of the function.
+
+        Return values are pushed onto the stack from the first to the last and
+        available to the caller after returning from the callee.
+
+        For MVP, we dynamically disallow all module reentrancy starting with
+        any dynamic call.  This means that normal calls need a dynamic stack check
+        if there is a dynamic call frame on the stack.  We denote this here
+        using a "conservative_invocation_mode" state variable.
+
+        During execution of the dynamic function conservative_invocation_mode
+        is enabled; afterwards, it is restored to its original state.
+    "#]
+    #[semantics = r#"
+        stack >> function_handle
+        let [func, k, [arg_0, .., arg_{k-1}]] = function_handle
+        // Information like the function signature are loaded from the file format
+        // and compared with the signature parameter.
+        n = func.num_params
+        ty_args = if func.is_generic then func.ty_args else []
+
+        // TODO(LAMBDA) - try to loosen this restriction after MVP if we can
+        // prove safety using access specifiers or other mechanisms.
+        if stack already contains a call to the same module as func, then abort
+
+        n = func.num_params
+        stack >> arg_{n-1}
+        ..
+        stack >> arg_k
+
+        old_conservative_invocation_mode = conservative_invocation_mode
+        conservative_invocation_mode = true
+
+        let module = func.module
+        if module is on invocation_stack then
+           abort
+        else
+           invocation_stack << module
+
+        if func.is_native()
+            call_native(func.name, ty_args, args = [arg_0, .., arg_{n-1}])
+            current_frame.pc += 1
+        else
+            call_stack << current_frame
+
+            current_frame = new_frame_from_func(
+                func,
+                ty_args,
+                locals = [arg_0, .., arg_n-1, invalid, ..]
+                                           // ^ other locals
+            )
+
+        invocation_stack >> _
+        conservative_invocation_mode = old_conservative_invocation_mode
+    "#]
+    #[runtime_check_epilogue = r#"
+        // NOT: assert func visibility rules
+        for i in 0..#args:
+            ty_stack >> ty
+            assert ty == locals[#args -  i - 1]
+    "#]
+    #[gas_type_creation_tier_1 = "closure_ty"]
+    InvokeFunction(SignatureIndex),
+
     #[group = "stack_and_local"]
     #[description = "Push a u16 constant onto the stack."]
     #[static_operands = "[u16_value]"]
@@ -3044,6 +3226,12 @@ impl ::std::fmt::Debug for Bytecode {
             Bytecode::UnpackGeneric(a) => write!(f, "UnpackGeneric({})", a),
             Bytecode::UnpackVariant(a) => write!(f, "UnpackVariant({})", a),
             Bytecode::UnpackVariantGeneric(a) => write!(f, "UnpackVariantGeneric({})", a),
+            Bytecode::LdFunction(a) => write!(f, "LdFunction({})", a),
+            Bytecode::LdFunctionGeneric(a) => write!(f, "LdFunctionGeneric({})", a),
+            Bytecode::EarlyBindFunction(sig_idx, a) => {
+                write!(f, "EarlyBindFunction({}, {})", sig_idx, a)
+            },
+            Bytecode::InvokeFunction(sig_idx) => write!(f, "InvokeFunction({})", sig_idx),
             Bytecode::ReadRef => write!(f, "ReadRef"),
             Bytecode::WriteRef => write!(f, "WriteRef"),
             Bytecode::FreezeRef => write!(f, "FreezeRef"),

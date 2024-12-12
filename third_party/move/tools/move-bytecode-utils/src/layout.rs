@@ -386,6 +386,10 @@ impl TypeLayoutBuilder {
     ) -> anyhow::Result<MoveTypeLayout> {
         use SignatureToken::*;
         Ok(match s {
+            Function(..) => {
+                // TODO(LAMBDA)
+                bail!("function types NYI for MoveTypeLayout")
+            },
             Vector(t) => MoveTypeLayout::Vector(Box::new(Self::build_from_signature_token(
                 m,
                 t,

@@ -629,6 +629,29 @@ impl<'a> Disassembler<'a> {
                 })?
                 .0
                 .to_string(),
+            SignatureToken::Function(args, results, abilities) => {
+                let args_str = args
+                    .into_iter()
+                    .map(|tok| self.disassemble_sig_tok(tok, type_param_context))
+                    .collect::<Result<Vec<_>>>()?
+                    .join(",");
+                let results_str = results
+                    .into_iter()
+                    .map(|tok| self.disassemble_sig_tok(tok, type_param_context))
+                    .collect::<Result<Vec<_>>>()?
+                    .join(",");
+                let abilities_str = if abilities.is_subset(AbilitySet::FUNCTIONS) {
+                    "".to_string()
+                } else {
+                    let ability_vec: Vec<_> = abilities
+                        .setminus(AbilitySet::FUNCTIONS)
+                        .into_iter()
+                        .map(Self::format_ability)
+                        .collect();
+                    format!(" with {}", ability_vec.join("+"))
+                };
+                format!("|{}|{}{}", args_str, results_str, abilities_str)
+            },
         })
     }
 
@@ -641,6 +664,103 @@ impl<'a> Disassembler<'a> {
         default_location: &Loc,
     ) -> Result<String> {
         match instruction {
+            Bytecode::LdFunction(method_idx) => {
+                let function_handle = self.source_mapper.bytecode.function_handle_at(*method_idx);
+                let module_handle = self
+                    .source_mapper
+                    .bytecode
+                    .module_handle_at(function_handle.module);
+                let fcall_name = self.get_function_string(module_handle, function_handle);
+                let type_arguments = self
+                    .source_mapper
+                    .bytecode
+                    .signature_at(function_handle.parameters)
+                    .0
+                    .iter()
+                    .map(|sig_tok| self.disassemble_sig_tok(sig_tok.clone(), &[]))
+                    .collect::<Result<Vec<String>>>()?
+                    .join(", ");
+                let type_rets = self
+                    .source_mapper
+                    .bytecode
+                    .signature_at(function_handle.return_)
+                    .0
+                    .iter()
+                    .map(|sig_tok| self.disassemble_sig_tok(sig_tok.clone(), &[]))
+                    .collect::<Result<Vec<String>>>()?;
+                Ok(format!(
+                    "LdFunction {}({}){}",
+                    fcall_name,
+                    type_arguments,
+                    Self::format_ret_type(&type_rets)
+                ))
+            },
+            Bytecode::LdFunctionGeneric(method_idx) => {
+                let func_inst = self
+                    .source_mapper
+                    .bytecode
+                    .function_instantiation_at(*method_idx);
+                let function_handle = self
+                    .source_mapper
+                    .bytecode
+                    .function_handle_at(func_inst.handle);
+                let module_handle = self
+                    .source_mapper
+                    .bytecode
+                    .module_handle_at(function_handle.module);
+                let fcall_name = self.get_function_string(module_handle, function_handle);
+                let ty_params = self
+                    .source_mapper
+                    .bytecode
+                    .signature_at(func_inst.type_parameters)
+                    .0
+                    .iter()
+                    .map(|sig_tok| {
+                        Ok((
+                            self.disassemble_sig_tok(
+                                sig_tok.clone(),
+                                &function_source_map.type_parameters,
+                            )?,
+                            *default_location,
+                        ))
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                let type_arguments = self
+                    .source_mapper
+                    .bytecode
+                    .signature_at(function_handle.parameters)
+                    .0
+                    .iter()
+                    .map(|sig_tok| self.disassemble_sig_tok(sig_tok.clone(), &ty_params))
+                    .collect::<Result<Vec<String>>>()?
+                    .join(", ");
+                let type_rets = self
+                    .source_mapper
+                    .bytecode
+                    .signature_at(function_handle.return_)
+                    .0
+                    .iter()
+                    .map(|sig_tok| self.disassemble_sig_tok(sig_tok.clone(), &ty_params))
+                    .collect::<Result<Vec<String>>>()?;
+                Ok(format!(
+                    "LdFunctionGeneric {}{}({}){}",
+                    fcall_name,
+                    Self::format_type_params(
+                        &ty_params.into_iter().map(|(s, _)| s).collect::<Vec<_>>()
+                    ),
+                    type_arguments,
+                    Self::format_ret_type(&type_rets)
+                ))
+            },
+            Bytecode::InvokeFunction(idx) => {
+                let _signature = self.source_mapper.bytecode.signature_at(*idx);
+                Ok(format!("InvokeFunction({})", idx))
+            },
+            Bytecode::EarlyBindFunction(idx, count) => {
+                let _signature = self.source_mapper.bytecode.signature_at(*idx);
+                Ok(format!("EarlyBindFunction({}, {})", idx, count))
+            },
+
             Bytecode::LdConst(idx) => {
                 let constant = self.source_mapper.bytecode.constant_at(*idx);
                 Ok(format!(
