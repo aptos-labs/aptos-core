@@ -144,7 +144,6 @@ return true.
 -  [Function `contains`](#0x1_features_contains)
 -  [Function `apply_diff`](#0x1_features_apply_diff)
 -  [Function `ensure_framework_signer`](#0x1_features_ensure_framework_signer)
--  [Function `change_feature_flags_for_verification`](#0x1_features_change_feature_flags_for_verification)
 -  [Specification](#@Specification_1)
     -  [Resource `Features`](#@Specification_1_Features)
     -  [Resource `PendingFeatures`](#@Specification_1_PendingFeatures)
@@ -3614,35 +3613,6 @@ Helper to check whether a feature flag is enabled.
 <pre><code><b>fun</b> <a href="features.md#0x1_features_ensure_framework_signer">ensure_framework_signer</a>(account: &<a href="signer.md#0x1_signer">signer</a>) {
     <b>let</b> addr = <a href="signer.md#0x1_signer_address_of">signer::address_of</a>(account);
     <b>assert</b>!(addr == @std, <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>));
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_features_change_feature_flags_for_verification"></a>
-
-## Function `change_feature_flags_for_verification`
-
-
-
-<pre><code>#[verify_only]
-<b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags_for_verification">change_feature_flags_for_verification</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags_for_verification">change_feature_flags_for_verification</a>(
-    framework: &<a href="signer.md#0x1_signer">signer</a>,
-    enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;,
-    disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;
-) <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_change_feature_flags_internal">change_feature_flags_internal</a>(framework, enable, disable)
 }
 </code></pre>
 
