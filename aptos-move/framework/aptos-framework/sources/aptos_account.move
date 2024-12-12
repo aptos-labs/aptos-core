@@ -76,19 +76,18 @@ module aptos_framework::aptos_account {
     /// This would create the recipient account first, which also registers it to receive APT, before transferring.
     public entry fun transfer(source: &signer, to: address, amount: u64) {
         if (!account::exists_at(to)) {
-            create_account(to)
+            create_account(to);
         };
-
+        // Resource accounts can be created without registering them to receive APT.
+        // This conveniently does the registration if necessary.
+        if (!coin::is_account_registered<AptosCoin>(to)) {
+            coin::register<AptosCoin>(&create_signer(to));
+        };
         if (features::operations_default_to_fa_apt_store_enabled()) {
-            fungible_transfer_only(source, to, amount)
+            fungible_transfer_only(source, to, amount);
         } else {
-            // Resource accounts can be created without registering them to receive APT.
-            // This conveniently does the registration if necessary.
-            if (!coin::is_account_registered<AptosCoin>(to)) {
-                coin::register<AptosCoin>(&create_signer(to));
-            };
             coin::transfer<AptosCoin>(source, to, amount)
-        }
+        };
     }
 
     /// Batch version of transfer_coins.
@@ -258,13 +257,14 @@ module aptos_framework::aptos_account {
 
     /// Burn from APT Primary FungibleStore
     public(friend) fun burn_from_fungible_store(
+        account: &signer,
         ref: &BurnRef,
-        account: address,
         amount: u64,
     ) {
+        let account_addr = signer::address_of(account);
         // Skip burning if amount is zero. This shouldn't error out as it's called as part of transaction fee burning.
         if (amount != 0) {
-            let store_addr = primary_fungible_store_address(account);
+            let store_addr = primary_fungible_store_address(account_addr);
             fungible_asset::address_burn_from(ref, store_addr, amount);
         };
     }

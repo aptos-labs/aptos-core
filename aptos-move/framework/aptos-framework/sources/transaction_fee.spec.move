@@ -71,7 +71,7 @@ spec aptos_framework::transaction_fee {
     }
 
     /// `AptosCoinCapabilities` should be exists.
-    spec burn_fee(account: address, fee: u64) {
+    spec burn_fee(account: &signer, fee: u64) {
         use aptos_std::type_info;
         use aptos_framework::optional_aggregator;
         use aptos_framework::coin;
@@ -82,7 +82,7 @@ spec aptos_framework::transaction_fee {
         aborts_if !exists<AptosCoinCapabilities>(@aptos_framework);
 
         // This function essentially calls `coin::burn_coin`, monophormized for `AptosCoin`.
-        let account_addr = account;
+        let account_addr = signer::address_of(account);
         let amount = fee;
 
         let aptos_addr = type_info::type_of<AptosCoin>().account_address;
@@ -114,7 +114,7 @@ spec aptos_framework::transaction_fee {
         ensures coin::supply<AptosCoin> == old(coin::supply<AptosCoin>) - amount;
     }
 
-    spec mint_and_refund(account: address, refund: u64) {
+    spec mint_and_refund(account: &signer, refund: u64) {
         use aptos_std::type_info;
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::coin::{CoinInfo, CoinStore};
@@ -128,7 +128,7 @@ spec aptos_framework::transaction_fee {
         aborts_if (refund != 0) && !exists<CoinInfo<AptosCoin>>(aptos_addr);
         include coin::CoinAddAbortsIf<AptosCoin> { amount: refund };
 
-        aborts_if !exists<CoinStore<AptosCoin>>(account);
+        aborts_if !exists<CoinStore<AptosCoin>>(signer::address_of(account));
         // modifies global<CoinStore<AptosCoin>>(account);
 
         aborts_if !exists<AptosCoinMintCapability>(@aptos_framework);

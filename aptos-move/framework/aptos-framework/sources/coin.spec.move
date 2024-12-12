@@ -324,9 +324,10 @@ spec aptos_framework::coin {
         aborts_if coin_store.frozen;
     }
 
-    spec force_deposit<CoinType>(account_addr: address, coin: Coin<CoinType>) {
+    spec force_deposit<CoinType>(account: &signer, coin: Coin<CoinType>) {
         // TODO(fa_migration)
         pragma verify = false;
+        let account_addr = signer::address_of(account);
         modifies global<CoinStore<CoinType>>(account_addr);
         aborts_if !exists<CoinStore<CoinType>>(account_addr);
         ensures global<CoinStore<CoinType>>(account_addr).coin.value == old(
