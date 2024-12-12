@@ -25,19 +25,8 @@ use itertools::zip_eq;
 use std::collections::HashMap;
 use tokio::time::Instant;
 
-fn generate_commit_ledger_info(
-    commit_info: &BlockInfo,
-    ordered_proof: &LedgerInfoWithSignatures,
-    order_vote_enabled: bool,
-) -> LedgerInfo {
-    LedgerInfo::new(
-        commit_info.clone(),
-        if order_vote_enabled {
-            HashValue::zero()
-        } else {
-            ordered_proof.ledger_info().consensus_data_hash()
-        },
-    )
+fn generate_commit_ledger_info(commit_info: &BlockInfo) -> LedgerInfo {
+    LedgerInfo::new(commit_info.clone(), HashValue::zero())
 }
 
 fn create_signature_aggregator(
@@ -125,7 +114,6 @@ impl BufferItem {
         executed_blocks: Vec<PipelinedBlock>,
         validator: &ValidatorVerifier,
         epoch_end_timestamp: Option<u64>,
-        order_vote_enabled: bool,
     ) -> Self {
         match self {
             Self::Ordered(ordered_item) => {
@@ -167,11 +155,7 @@ impl BufferItem {
                         callback,
                     }))
                 } else {
-                    let commit_ledger_info = generate_commit_ledger_info(
-                        &commit_info,
-                        &ordered_proof,
-                        order_vote_enabled,
-                    );
+                    let commit_ledger_info = generate_commit_ledger_info(&commit_info);
 
                     let mut partial_commit_proof =
                         create_signature_aggregator(unverified_votes, &commit_ledger_info);
@@ -592,7 +576,6 @@ mod test {
             vec![pipelined_block.clone()],
             &validator_verifier,
             None,
-            true,
         );
 
         match executed_item {
@@ -698,7 +681,6 @@ mod test {
             vec![pipelined_block.clone()],
             &validator_verifier,
             None,
-            true,
         );
 
         match executed_item {

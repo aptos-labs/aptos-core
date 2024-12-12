@@ -125,24 +125,8 @@ impl BlockStore {
         // Even though we inserted the highest_quorum_cert (and its ancestors) in the above step,
         // we still need to insert ordered cert explicitly. This will send the highest ordered block
         // to execution.
-        if self.order_vote_enabled {
-            self.insert_ordered_cert(&sync_info.highest_ordered_cert())
-                .await?;
-        } else {
-            // When order votes are disabled, the highest_ordered_cert().certified_block().id() need not be
-            // one of the ancestors of highest_quorum_cert.certified_block().id() due to forks. So, we call
-            // insert_quorum_cert instead of insert_ordered_cert as in the above case. This will ensure that
-            // highest_ordered_cert().certified_block().id() is inserted the block store.
-            self.insert_quorum_cert(
-                &self
-                    .highest_ordered_cert()
-                    .as_ref()
-                    .clone()
-                    .into_quorum_cert(self.order_vote_enabled)?,
-                &mut retriever,
-            )
+        self.insert_ordered_cert(&sync_info.highest_ordered_cert())
             .await?;
-        }
 
         if let Some(tc) = sync_info.highest_2chain_timeout_cert() {
             self.insert_2chain_timeout_certificate(Arc::new(tc.clone()))?;
@@ -266,7 +250,6 @@ impl BlockStore {
             self.storage.clone(),
             self.execution_client.clone(),
             self.payload_manager.clone(),
-            self.order_vote_enabled,
         )
         .await?
         .take();
@@ -297,7 +280,6 @@ impl BlockStore {
         storage: Arc<dyn PersistentLivenessStorage>,
         execution_client: Arc<dyn TExecutionClient>,
         payload_manager: Arc<dyn TPayloadManager>,
-        order_vote_enabled: bool,
     ) -> anyhow::Result<RecoveryData> {
         info!(
             LogSchema::new(LogEvent::StateSync).remote_peer(retriever.preferred_peer),
@@ -315,7 +297,7 @@ impl BlockStore {
         assert!(num_blocks < std::usize::MAX as u64);
 
         BLOCKS_FETCHED_FROM_NETWORK_WHILE_FAST_FORWARD_SYNC.inc_by(num_blocks);
-        let mut blocks = retriever
+        let blocks = retriever
             .retrieve_blocks_in_range(
                 highest_quorum_cert.certified_block().id(),
                 num_blocks,
@@ -348,50 +330,6 @@ impl BlockStore {
                 .map(|block| block.quorum_cert().clone()),
         );
 
-        if !order_vote_enabled {
-            // check if highest_commit_cert comes from a fork
-            // if so, we need to fetch it's block as well, to have a proof of commit.
-            let highest_commit_certified_block_id = highest_commit_cert
-                .certified_block(order_vote_enabled)?
-                .id();
-            if !blocks
-                .iter()
-                .any(|block| block.id() == highest_commit_certified_block_id)
-            {
-                info!(
-                    "Found forked QC {}, fetching it as well",
-                    highest_commit_cert
-                );
-                BLOCKS_FETCHED_FROM_NETWORK_WHILE_FAST_FORWARD_SYNC.inc_by(1);
-                let mut additional_blocks = retriever
-                    .retrieve_blocks_in_range(
-                        highest_commit_certified_block_id,
-                        1,
-                        highest_commit_certified_block_id,
-                        highest_commit_cert
-                            .ledger_info()
-                            .get_voters(&retriever.validator_addresses()),
-                    )
-                    .await?;
-
-                assert_eq!(additional_blocks.len(), 1);
-                let block = additional_blocks.pop().expect("blocks are empty");
-                assert_eq!(
-                    block.id(),
-                    highest_commit_certified_block_id,
-                    "Expecting in the retrieval response, for commit certificate fork, first block should be {}, but got {}",
-                    highest_commit_certified_block_id,
-                    block.id(),
-                );
-                blocks.push(block);
-                quorum_certs.push(
-                    highest_commit_cert
-                        .clone()
-                        .into_quorum_cert(order_vote_enabled)?,
-                );
-            }
-        }
-
         assert_eq!(blocks.len(), quorum_certs.len());
         info!("[FastForwardSync] Fetched {} blocks. Requested num_blocks {}. Initial block hash {:?}, target block hash {:?}",
             blocks.len(), num_blocks, highest_quorum_cert.certified_block().id(), highest_commit_cert.commit_info().id()
@@ -405,11 +343,7 @@ impl BlockStore {
 
         // Check early that recovery will succeed, and return before corrupting our state in case it will not.
         LedgerRecoveryData::new(highest_commit_cert.ledger_info().clone())
-            .find_root(
-                &mut blocks.clone(),
-                &mut quorum_certs.clone(),
-                order_vote_enabled,
-            )
+            .find_root(&mut blocks.clone(), &mut quorum_certs.clone())
             .with_context(|| {
                 // for better readability
                 quorum_certs.sort_by_key(|qc| qc.certified_block().round());
@@ -438,7 +372,7 @@ impl BlockStore {
         // we do not need to update block_tree.highest_commit_decision_ledger_info here
         // because the block_tree is going to rebuild itself.
 
-        let recovery_data = match storage.start(order_vote_enabled) {
+        let recovery_data = match storage.start() {
             LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
             _ => panic!("Failed to construct recovery data after fast forward sync"),
         };
