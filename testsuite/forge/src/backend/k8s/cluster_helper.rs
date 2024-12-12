@@ -1032,7 +1032,7 @@ pub async fn cleanup_cluster_with_management(dry_run: bool) -> Result<()> {
         .await?
         .items
         .into_iter()
-        .filter(|namespace| namespace.name().contains("forge"))
+        .filter(|namespace| namespace.name().contains("forge-"))
         .collect::<Vec<Namespace>>();
     // print all namespace names
     for namespace in &forge_namespaces {
