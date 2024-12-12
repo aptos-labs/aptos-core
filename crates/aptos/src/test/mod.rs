@@ -855,6 +855,7 @@ impl CliTestFramework {
         CompilePackage {
             move_options: self.move_options(account_strs),
             save_metadata: false,
+            fetch_deps_only: false,
             included_artifacts_args: IncludedArtifactsArgs {
                 included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
             },
