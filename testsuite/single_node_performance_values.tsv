@@ -1,14 +1,14 @@
 no-op	1	VM	60	0.812	1.022	38853.0
-no-op	1000	VM	60	0.820	1.027	36792.8
-apt-fa-transfer	1	VM	60	0.831	1.028	27197.8
+no-op	1000	VM	6	0.943	1.019	37286.0
+apt-fa-transfer	1	VM	6	0.927	1.018	27651.0
 apt-fa-transfer	1	NativeVM	60	0.829	1.158	32347.9
-account-generation	1	VM	60	0.776	1.035	20568.6
-account-generation	1	NativeVM	60	0.791	1.126	28249.8
+account-generation	1	VM	60	0.776	1.035	27409.7
+account-generation	1	NativeVM	60	0.791	1.126	29014.1
 account-resource32-b	1	VM	60	0.819	1.027	34193.3
 modify-global-resource	1	VM	60	0.932	1.015	2273.4
 modify-global-resource	100	VM	60	0.838	1.019	33327.8
 publish-package	1	VM	60	0.887	1.014	1666.6
-mix_publish_transfer	1	VM	60	0.835	1.035	21291.6
+mix_publish_transfer	1	VM	60	0.835	1.035	21767.1
 batch100-transfer	1	VM	60	0.794	1.041	634.6
 batch100-transfer	1	NativeVM	60	0.776	1.157	1387.1
 vector-picture30k	1	VM	60	0.960	1.051	102.5
@@ -22,7 +22,7 @@ modify-global-milestone-agg-v2	1	VM	60	0.879	1.022	25097.7
 resource-groups-global-write-tag1-kb	1	VM	60	0.921	1.025	9303.3
 resource-groups-global-write-and-read-tag1-kb	1	VM	60	0.955	1.020	5548.2
 resource-groups-sender-write-tag1-kb	1	VM	60	0.856	1.147	20568.6
-resource-groups-sender-multi-change1-kb	1	VM	60	0.905	1.099	17029.7
+resource-groups-sender-multi-change1-kb	1	VM	60	0.905	1.099	17127.4
 token-v1ft-mint-and-transfer	1	VM	60	0.941	1.017	1162.9
 token-v1ft-mint-and-transfer	100	VM	60	0.880	1.021	18257.0
 token-v1nft-mint-and-transfer-sequential	1	VM	60	0.946	1.013	735.7
@@ -39,7 +39,7 @@ liquidity-pool-swap	100	VM	60	0.875	1.022	11378.2
 liquidity-pool-swap-stable	1	VM	60	0.930	1.028	781.5
 liquidity-pool-swap-stable	100	VM	60	0.903	1.019	11056.6
 deserialize-u256	1	VM	60	0.869	1.021	37002.8
-no-op-fee-payer	1	VM	60	0.952	1.026	2058.3
+no-op-fee-payer	1	VM	60	0.952	1.026	2049.5
 no-op-fee-payer	100	VM	60	0.828	1.016	32284.2
 simple-script	1	VM	60	0.830	1.024	37707.7
 vector-trim-append-len3000-size1	1	VM	60	0.830	1.024	535
