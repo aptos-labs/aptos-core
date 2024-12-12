@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::{make_shared, IP_LOCAL_HOST},
+    common::{make_shared, ArcError, IP_LOCAL_HOST},
     services::docker_common::{create_docker_volume, create_start_and_inspect_container},
 };
 use anyhow::{anyhow, Context, Result};
@@ -161,7 +161,7 @@ fn create_container_options_and_config(
 /// as it relies on external commands that may fail for various reasons.
 pub fn start_postgres(
     shutdown: CancellationToken,
-    fut_network: impl Future<Output = Result<String, Arc<anyhow::Error>>>,
+    fut_network: impl Future<Output = Result<String, ArcError>>,
     instance_id: Uuid,
 ) -> (
     impl Future<Output = Result<u16>>,
@@ -180,7 +180,6 @@ pub fn start_postgres(
 
         async move {
             let (network_name, volume_name) = try_join!(fut_network, fut_volume)
-                .map_err(anyhow::Error::msg)
                 .context("failed to start postgres: one or more dependencies failed to start")?;
 
             let (options, config) =
@@ -189,10 +188,7 @@ pub fn start_postgres(
                 create_start_and_inspect_container(shutdown.clone(), options, config);
             *fut_container_clean_up.lock().await = Some(fut_container_cleanup);
 
-            let container_info = fut_container
-                .await
-                .map_err(anyhow::Error::msg)
-                .context("failed to start postgres")?;
+            let container_info = fut_container.await.context("failed to start postgres")?;
 
             let postgres_port = get_postgres_assigned_port(&container_info)
                 .ok_or_else(|| anyhow!("failed to get postgres port"))?;
@@ -205,7 +201,7 @@ pub fn start_postgres(
         let fut_create_postgres = fut_create_postgres.clone();
 
         async move {
-            let postgres_port = fut_create_postgres.await.map_err(anyhow::Error::msg)?;
+            let postgres_port = fut_create_postgres.await?;
 
             let health_checker =
                 HealthChecker::Postgres(get_postgres_connection_string(postgres_port));
