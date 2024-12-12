@@ -7,7 +7,6 @@ module cafe.vectors {
 entry public guess_flips(Arg0: vector<u8>) /* def_idx: 0 */ {
 L1:	loc0: &vector<u8>
 L2:	loc1: u64
-L3:	loc2: u64
 B0:
 	0: ImmBorrowLoc[0](Arg0: vector<u8>)
 	1: StLoc[1](loc0: &vector<u8>)
@@ -48,7 +47,6 @@ B7:
 }
 entry public guess_flips_directly(Arg0: vector<u8>) /* def_idx: 1 */ {
 L1:	loc0: u64
-L2:	loc1: u64
 B0:
 	0: LdU64(0)
 	1: StLoc[1](loc0: u64)
@@ -90,7 +88,6 @@ B0:
 entry public guess_without_break_with_inline(Arg0: vector<u8>) /* def_idx: 3 */ {
 L1:	loc0: &vector<u8>
 L2:	loc1: u64
-L3:	loc2: u64
 B0:
 	0: ImmBorrowLoc[0](Arg0: vector<u8>)
 	1: StLoc[1](loc0: &vector<u8>)
@@ -134,7 +131,6 @@ B8:
 }
 loops_with_break_no_inline(Arg0: &vector<u8>) /* def_idx: 4 */ {
 L1:	loc0: u64
-L2:	loc1: u64
 B0:
 	0: LdU64(0)
 	1: StLoc[1](loc0: u64)
