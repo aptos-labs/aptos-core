@@ -140,4 +140,64 @@ fun test::optimize_vector() {
 }
 
 
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.test {
+struct X has copy, drop, key {
+	value: bool
+}
+
+no_optimize_resource(): bool /* def_idx: 0 */ {
+L0:	loc0: X
+B0:
+	0: LdConst[0](Address: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
+	1: ImmBorrowGlobal[0](X)
+	2: ReadRef
+	3: StLoc[0](loc0: X)
+	4: MutBorrowLoc[0](loc0: X)
+	5: ImmBorrowField[0](X.value: bool)
+	6: ReadRef
+	7: Ret
+}
+no_optimize_vector() /* def_idx: 1 */ {
+L0:	loc0: vector<vector<u64>>
+L1:	loc1: vector<u64>
+L2:	loc2: &mut u64
+B0:
+	0: LdConst[1](Vector(Vector(U64)): [1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0])
+	1: StLoc[0](loc0: vector<vector<u64>>)
+	2: ImmBorrowLoc[0](loc0: vector<vector<u64>>)
+	3: LdU64(0)
+	4: VecImmBorrow(3)
+	5: ReadRef
+	6: StLoc[1](loc1: vector<u64>)
+	7: MutBorrowLoc[1](loc1: vector<u64>)
+	8: LdU64(1)
+	9: VecMutBorrow(4)
+	10: Pop
+	11: Ret
+}
+optimize_resource(): bool /* def_idx: 2 */ {
+B0:
+	0: LdConst[0](Address: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
+	1: ImmBorrowGlobal[0](X)
+	2: ImmBorrowField[0](X.value: bool)
+	3: ReadRef
+	4: Ret
+}
+optimize_vector() /* def_idx: 3 */ {
+L0:	loc0: vector<vector<u64>>
+L1:	loc1: &mut u64
+B0:
+	0: LdConst[1](Vector(Vector(U64)): [1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0])
+	1: StLoc[0](loc0: vector<vector<u64>>)
+	2: MutBorrowLoc[0](loc0: vector<vector<u64>>)
+	3: LdU64(0)
+	4: VecMutBorrow(3)
+	5: LdU64(1)
+	6: VecMutBorrow(4)
+	7: Pop
+	8: Ret
+}
+}
 ============ bytecode verification succeeded ========

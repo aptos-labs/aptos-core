@@ -20,12 +20,16 @@ fun m::take2($t0: u64, $t1: u64) {
 [variant baseline]
 public fun m::test($t0: u64) {
      var $t1: u64
+     var $t2: u64 [unused]
+     # flush: $t1
      # live vars: $t0
   0: $t1 := m::one()
      # live vars: $t0, $t1
-  1: m::take2($t0, $t1)
+  1: $t0 := move($t0)
+     # live vars: $t0, $t1
+  2: m::take2($t0, $t1)
      # live vars:
-  2: return ()
+  3: return ()
 }
 
 

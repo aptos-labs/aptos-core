@@ -11,32 +11,40 @@ fun m::foo(): u64 {
      var $t6: u64
      var $t7: &vector<u64>
      var $t8: bool
-     var $t9: bool
+     var $t9: u64
      var $t10: bool
-     var $t11: &u64
+     var $t11: bool
      var $t12: &u64
-     var $t13: &vector<u64>
-     var $t14: u64
+     var $t13: &u64
+     var $t14: &vector<u64>
      var $t15: u64
      var $t16: u64
      var $t17: u64
      var $t18: u64
      var $t19: u64
      var $t20: u64
-     var $t21: bool
-     var $t22: bool
-     var $t23: &u64
-     var $t24: &u64
-     var $t25: &vector<u64>
-     var $t26: u64
-     var $t27: u64
-     var $t28: u64
-     var $t29: u64
+     var $t21: u64
+     var $t22: u64
+     var $t23: u64
+     var $t24: bool
+     var $t25: u64
+     var $t26: bool
+     var $t27: &u64
+     var $t28: &u64
+     var $t29: &vector<u64>
      var $t30: u64
      var $t31: u64
-     var $t32: &u64
-     var $t33: &vector<u64>
+     var $t32: &mut vector<u64>
+     var $t33: u64
      var $t34: u64
+     var $t35: u64
+     var $t36: u64
+     var $t37: u64
+     var $t38: u64
+     var $t39: u64
+     var $t40: &u64
+     var $t41: &vector<u64>
+     var $t42: u64
   0: $t1 := ["1", "2", "3"]
   1: $t2 := borrow_local($t1)
   2: $t4 := infer($t2)
@@ -44,69 +52,77 @@ fun m::foo(): u64 {
   4: $t7 := freeze_ref(implicit)($t4)
   5: $t6 := vector::length<u64>($t7)
   6: label L0
-  7: $t8 := <($t5, $t6)
-  8: if ($t8) goto 9 else goto 27
-  9: label L2
- 10: $t13 := freeze_ref(implicit)($t4)
- 11: $t12 := vector::borrow<u64>($t13, $t5)
- 12: $t11 := infer($t12)
- 13: $t14 := read_ref($t11)
- 14: $t15 := 1
- 15: $t10 := >($t14, $t15)
- 16: $t9 := !($t10)
- 17: if ($t9) goto 18 else goto 21
- 18: label L5
- 19: goto 31
- 20: goto 22
- 21: label L6
- 22: label L7
- 23: $t17 := 1
- 24: $t16 := +($t5, $t17)
- 25: $t5 := infer($t16)
- 26: goto 29
- 27: label L3
+  7: $t9 := infer($t5)
+  8: $t8 := <($t9, $t6)
+  9: if ($t8) goto 10 else goto 29
+ 10: label L2
+ 11: $t14 := freeze_ref(implicit)($t4)
+ 12: $t13 := vector::borrow<u64>($t14, $t5)
+ 13: $t12 := infer($t13)
+ 14: $t15 := read_ref($t12)
+ 15: $t16 := 1
+ 16: $t11 := >($t15, $t16)
+ 17: $t10 := !($t11)
+ 18: if ($t10) goto 19 else goto 22
+ 19: label L5
+ 20: goto 33
+ 21: goto 23
+ 22: label L6
+ 23: label L7
+ 24: $t18 := infer($t5)
+ 25: $t19 := 1
+ 26: $t17 := +($t18, $t19)
+ 27: $t5 := infer($t17)
  28: goto 31
- 29: label L4
- 30: goto 6
- 31: label L1
- 32: $t18 := infer($t5)
- 33: $t20 := 1
- 34: $t19 := +($t5, $t20)
- 35: $t5 := infer($t19)
- 36: label L8
- 37: $t21 := <($t5, $t6)
- 38: if ($t21) goto 39 else goto 59
- 39: label L10
- 40: $t25 := freeze_ref(implicit)($t4)
- 41: $t24 := vector::borrow<u64>($t25, $t5)
- 42: $t23 := infer($t24)
- 43: $t26 := read_ref($t23)
- 44: $t27 := 1
- 45: $t22 := >($t26, $t27)
- 46: if ($t22) goto 47 else goto 53
- 47: label L13
- 48: vector::swap<u64>($t4, $t18, $t5)
- 49: $t29 := 1
- 50: $t28 := +($t18, $t29)
- 51: $t18 := infer($t28)
- 52: goto 54
- 53: label L14
- 54: label L15
- 55: $t31 := 1
- 56: $t30 := +($t5, $t31)
- 57: $t5 := infer($t30)
- 58: goto 61
- 59: label L11
- 60: goto 63
- 61: label L12
- 62: goto 36
- 63: label L9
- 64: $t3 := infer($t18)
- 65: $t33 := freeze_ref(implicit)($t2)
- 66: $t34 := 0
- 67: $t32 := vector::borrow<u64>($t33, $t34)
- 68: $t0 := read_ref($t32)
- 69: return $t0
+ 29: label L3
+ 30: goto 33
+ 31: label L4
+ 32: goto 6
+ 33: label L1
+ 34: $t20 := infer($t5)
+ 35: $t22 := infer($t5)
+ 36: $t23 := 1
+ 37: $t21 := +($t22, $t23)
+ 38: $t5 := infer($t21)
+ 39: label L8
+ 40: $t25 := infer($t5)
+ 41: $t24 := <($t25, $t6)
+ 42: if ($t24) goto 43 else goto 67
+ 43: label L10
+ 44: $t29 := freeze_ref(implicit)($t4)
+ 45: $t28 := vector::borrow<u64>($t29, $t5)
+ 46: $t27 := infer($t28)
+ 47: $t30 := read_ref($t27)
+ 48: $t31 := 1
+ 49: $t26 := >($t30, $t31)
+ 50: if ($t26) goto 51 else goto 60
+ 51: label L13
+ 52: $t32 := infer($t4)
+ 53: $t33 := infer($t20)
+ 54: vector::swap<u64>($t32, $t33, $t5)
+ 55: $t35 := infer($t20)
+ 56: $t36 := 1
+ 57: $t34 := +($t35, $t36)
+ 58: $t20 := infer($t34)
+ 59: goto 61
+ 60: label L14
+ 61: label L15
+ 62: $t38 := infer($t5)
+ 63: $t39 := 1
+ 64: $t37 := +($t38, $t39)
+ 65: $t5 := infer($t37)
+ 66: goto 69
+ 67: label L11
+ 68: goto 71
+ 69: label L12
+ 70: goto 39
+ 71: label L9
+ 72: $t3 := infer($t20)
+ 73: $t41 := freeze_ref(implicit)($t2)
+ 74: $t42 := 0
+ 75: $t40 := vector::borrow<u64>($t41, $t42)
+ 76: $t0 := read_ref($t40)
+ 77: return $t0
 }
 
 ============ after LiveVarAnalysisProcessor: ================
@@ -122,32 +138,40 @@ fun m::foo(): u64 {
      var $t6: u64
      var $t7: &vector<u64>
      var $t8: bool
-     var $t9: bool
+     var $t9: u64
      var $t10: bool
-     var $t11: &u64
+     var $t11: bool
      var $t12: &u64
-     var $t13: &vector<u64>
-     var $t14: u64
+     var $t13: &u64
+     var $t14: &vector<u64>
      var $t15: u64
      var $t16: u64
      var $t17: u64
      var $t18: u64
      var $t19: u64
      var $t20: u64
-     var $t21: bool
-     var $t22: bool
-     var $t23: &u64
-     var $t24: &u64
-     var $t25: &vector<u64>
-     var $t26: u64
-     var $t27: u64
-     var $t28: u64
-     var $t29: u64
+     var $t21: u64
+     var $t22: u64
+     var $t23: u64
+     var $t24: bool
+     var $t25: u64
+     var $t26: bool
+     var $t27: &u64
+     var $t28: &u64
+     var $t29: &vector<u64>
      var $t30: u64
      var $t31: u64
-     var $t32: &u64
-     var $t33: &vector<u64>
+     var $t32: &mut vector<u64>
+     var $t33: u64
      var $t34: u64
+     var $t35: u64
+     var $t36: u64
+     var $t37: u64
+     var $t38: u64
+     var $t39: u64
+     var $t40: &u64
+     var $t41: &vector<u64>
+     var $t42: u64
      # live vars:
   0: $t1 := ["1", "2", "3"]
      # live vars: $t1
@@ -163,129 +187,1205 @@ fun m::foo(): u64 {
      # live vars: $t2, $t4, $t5, $t6
   6: label L0
      # live vars: $t2, $t4, $t5, $t6
-  7: $t8 := <($t5, $t6)
-     # live vars: $t2, $t4, $t5, $t6, $t8
-  8: if ($t8) goto 9 else goto 27
-     # live vars: $t2, $t4, $t5, $t6
-  9: label L2
-     # live vars: $t2, $t4, $t5, $t6
- 10: $t13 := freeze_ref(implicit)($t4)
-     # live vars: $t2, $t4, $t5, $t6, $t13
- 11: $t12 := vector::borrow<u64>($t13, $t5)
-     # live vars: $t2, $t4, $t5, $t6, $t12
- 12: $t11 := infer($t12)
-     # live vars: $t2, $t4, $t5, $t6, $t11
- 13: $t14 := read_ref($t11)
-     # live vars: $t2, $t4, $t5, $t6, $t14
- 14: $t15 := 1
-     # live vars: $t2, $t4, $t5, $t6, $t14, $t15
- 15: $t10 := >($t14, $t15)
-     # live vars: $t2, $t4, $t5, $t6, $t10
- 16: $t9 := !($t10)
+  7: $t9 := infer($t5)
      # live vars: $t2, $t4, $t5, $t6, $t9
- 17: if ($t9) goto 18 else goto 21
+  8: $t8 := <($t9, $t6)
+     # live vars: $t2, $t4, $t5, $t6, $t8
+  9: if ($t8) goto 10 else goto 29
      # live vars: $t2, $t4, $t5, $t6
- 18: label L5
+ 10: label L2
      # live vars: $t2, $t4, $t5, $t6
- 19: goto 31
+ 11: $t14 := freeze_ref(implicit)($t4)
+     # live vars: $t2, $t4, $t5, $t6, $t14
+ 12: $t13 := vector::borrow<u64>($t14, $t5)
+     # live vars: $t2, $t4, $t5, $t6, $t13
+ 13: $t12 := infer($t13)
+     # live vars: $t2, $t4, $t5, $t6, $t12
+ 14: $t15 := read_ref($t12)
+     # live vars: $t2, $t4, $t5, $t6, $t15
+ 15: $t16 := 1
+     # live vars: $t2, $t4, $t5, $t6, $t15, $t16
+ 16: $t11 := >($t15, $t16)
+     # live vars: $t2, $t4, $t5, $t6, $t11
+ 17: $t10 := !($t11)
+     # live vars: $t2, $t4, $t5, $t6, $t10
+ 18: if ($t10) goto 19 else goto 22
      # live vars: $t2, $t4, $t5, $t6
- 20: goto 22
+ 19: label L5
      # live vars: $t2, $t4, $t5, $t6
- 21: label L6
+ 20: goto 33
      # live vars: $t2, $t4, $t5, $t6
- 22: label L7
+ 21: goto 23
      # live vars: $t2, $t4, $t5, $t6
- 23: $t17 := 1
-     # live vars: $t2, $t4, $t5, $t6, $t17
- 24: $t16 := +($t5, $t17)
-     # live vars: $t2, $t4, $t6, $t16
- 25: $t5 := infer($t16)
+ 22: label L6
      # live vars: $t2, $t4, $t5, $t6
- 26: goto 29
+ 23: label L7
      # live vars: $t2, $t4, $t5, $t6
- 27: label L3
+ 24: $t18 := infer($t5)
+     # live vars: $t2, $t4, $t6, $t18
+ 25: $t19 := 1
+     # live vars: $t2, $t4, $t6, $t18, $t19
+ 26: $t17 := +($t18, $t19)
+     # live vars: $t2, $t4, $t6, $t17
+ 27: $t5 := infer($t17)
      # live vars: $t2, $t4, $t5, $t6
  28: goto 31
      # live vars: $t2, $t4, $t5, $t6
- 29: label L4
+ 29: label L3
      # live vars: $t2, $t4, $t5, $t6
- 30: goto 6
+ 30: goto 33
      # live vars: $t2, $t4, $t5, $t6
- 31: label L1
+ 31: label L4
      # live vars: $t2, $t4, $t5, $t6
- 32: $t18 := infer($t5)
-     # live vars: $t2, $t4, $t5, $t6, $t18
- 33: $t20 := 1
-     # live vars: $t2, $t4, $t5, $t6, $t18, $t20
- 34: $t19 := +($t5, $t20)
-     # live vars: $t2, $t4, $t6, $t18, $t19
- 35: $t5 := infer($t19)
-     # live vars: $t2, $t4, $t5, $t6, $t18
- 36: label L8
-     # live vars: $t2, $t4, $t5, $t6, $t18
- 37: $t21 := <($t5, $t6)
-     # live vars: $t2, $t4, $t5, $t6, $t18, $t21
- 38: if ($t21) goto 39 else goto 59
-     # live vars: $t2, $t4, $t5, $t6, $t18
- 39: label L10
-     # live vars: $t2, $t4, $t5, $t6, $t18
- 40: $t25 := freeze_ref(implicit)($t4)
-     # live vars: $t2, $t4, $t5, $t6, $t18, $t25
- 41: $t24 := vector::borrow<u64>($t25, $t5)
-     # live vars: $t2, $t4, $t5, $t6, $t18, $t24
- 42: $t23 := infer($t24)
-     # live vars: $t2, $t4, $t5, $t6, $t18, $t23
- 43: $t26 := read_ref($t23)
-     # live vars: $t2, $t4, $t5, $t6, $t18, $t26
- 44: $t27 := 1
-     # live vars: $t2, $t4, $t5, $t6, $t18, $t26, $t27
- 45: $t22 := >($t26, $t27)
-     # live vars: $t2, $t4, $t5, $t6, $t18, $t22
- 46: if ($t22) goto 47 else goto 53
-     # live vars: $t2, $t4, $t5, $t6, $t18
- 47: label L13
-     # live vars: $t2, $t4, $t5, $t6, $t18
- 48: vector::swap<u64>($t4, $t18, $t5)
-     # live vars: $t2, $t4, $t5, $t6, $t18
- 49: $t29 := 1
-     # live vars: $t2, $t4, $t5, $t6, $t18, $t29
- 50: $t28 := +($t18, $t29)
-     # live vars: $t2, $t4, $t5, $t6, $t28
- 51: $t18 := infer($t28)
-     # live vars: $t2, $t4, $t5, $t6, $t18
- 52: goto 54
-     # live vars: $t2, $t4, $t5, $t6, $t18
- 53: label L14
-     # live vars: $t2, $t4, $t5, $t6, $t18
- 54: label L15
-     # live vars: $t2, $t4, $t5, $t6, $t18
- 55: $t31 := 1
-     # live vars: $t2, $t4, $t5, $t6, $t18, $t31
- 56: $t30 := +($t5, $t31)
-     # live vars: $t2, $t4, $t6, $t18, $t30
- 57: $t5 := infer($t30)
-     # live vars: $t2, $t4, $t5, $t6, $t18
- 58: goto 61
-     # live vars: $t2, $t4, $t5, $t6, $t18
- 59: label L11
-     # live vars: $t2, $t18
- 60: goto 63
-     # live vars: $t2, $t4, $t5, $t6, $t18
- 61: label L12
-     # live vars: $t2, $t4, $t5, $t6, $t18
- 62: goto 36
-     # live vars: $t2, $t18
- 63: label L9
-     # live vars: $t2, $t18
- 64: $t3 := infer($t18)
+ 32: goto 6
+     # live vars: $t2, $t4, $t5, $t6
+ 33: label L1
+     # live vars: $t2, $t4, $t5, $t6
+ 34: $t20 := infer($t5)
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 35: $t22 := infer($t5)
+     # live vars: $t2, $t4, $t6, $t20, $t22
+ 36: $t23 := 1
+     # live vars: $t2, $t4, $t6, $t20, $t22, $t23
+ 37: $t21 := +($t22, $t23)
+     # live vars: $t2, $t4, $t6, $t20, $t21
+ 38: $t5 := infer($t21)
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 39: label L8
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 40: $t25 := infer($t5)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t25
+ 41: $t24 := <($t25, $t6)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t24
+ 42: if ($t24) goto 43 else goto 67
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 43: label L10
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 44: $t29 := freeze_ref(implicit)($t4)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t29
+ 45: $t28 := vector::borrow<u64>($t29, $t5)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t28
+ 46: $t27 := infer($t28)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t27
+ 47: $t30 := read_ref($t27)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t30
+ 48: $t31 := 1
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t30, $t31
+ 49: $t26 := >($t30, $t31)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t26
+ 50: if ($t26) goto 51 else goto 60
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 51: label L13
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 52: $t32 := infer($t4)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t32
+ 53: $t33 := infer($t20)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t32, $t33
+ 54: vector::swap<u64>($t32, $t33, $t5)
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 55: $t35 := infer($t20)
+     # live vars: $t2, $t4, $t5, $t6, $t35
+ 56: $t36 := 1
+     # live vars: $t2, $t4, $t5, $t6, $t35, $t36
+ 57: $t34 := +($t35, $t36)
+     # live vars: $t2, $t4, $t5, $t6, $t34
+ 58: $t20 := infer($t34)
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 59: goto 61
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 60: label L14
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 61: label L15
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 62: $t38 := infer($t5)
+     # live vars: $t2, $t4, $t6, $t20, $t38
+ 63: $t39 := 1
+     # live vars: $t2, $t4, $t6, $t20, $t38, $t39
+ 64: $t37 := +($t38, $t39)
+     # live vars: $t2, $t4, $t6, $t20, $t37
+ 65: $t5 := infer($t37)
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 66: goto 69
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 67: label L11
+     # live vars: $t2, $t20
+ 68: goto 71
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 69: label L12
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 70: goto 39
+     # live vars: $t2, $t20
+ 71: label L9
+     # live vars: $t2, $t20
+ 72: $t3 := infer($t20)
      # live vars: $t2
- 65: $t33 := freeze_ref(implicit)($t2)
-     # live vars: $t33
- 66: $t34 := 0
-     # live vars: $t33, $t34
- 67: $t32 := vector::borrow<u64>($t33, $t34)
-     # live vars: $t32
- 68: $t0 := read_ref($t32)
+ 73: $t41 := freeze_ref(implicit)($t2)
+     # live vars: $t41
+ 74: $t42 := 0
+     # live vars: $t41, $t42
+ 75: $t40 := vector::borrow<u64>($t41, $t42)
+     # live vars: $t40
+ 76: $t0 := read_ref($t40)
      # live vars: $t0
- 69: return $t0
+ 77: return $t0
 }
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::foo(): u64 {
+     var $t0: u64
+     var $t1: vector<u64>
+     var $t2: &mut vector<u64>
+     var $t3: u64
+     var $t4: &mut vector<u64>
+     var $t5: u64
+     var $t6: u64
+     var $t7: &vector<u64>
+     var $t8: bool
+     var $t9: u64
+     var $t10: bool
+     var $t11: bool
+     var $t12: &u64
+     var $t13: &u64
+     var $t14: &vector<u64>
+     var $t15: u64
+     var $t16: u64
+     var $t17: u64
+     var $t18: u64
+     var $t19: u64
+     var $t20: u64
+     var $t21: u64
+     var $t22: u64
+     var $t23: u64
+     var $t24: bool
+     var $t25: u64
+     var $t26: bool
+     var $t27: &u64
+     var $t28: &u64
+     var $t29: &vector<u64>
+     var $t30: u64
+     var $t31: u64
+     var $t32: &mut vector<u64>
+     var $t33: u64
+     var $t34: u64
+     var $t35: u64
+     var $t36: u64
+     var $t37: u64
+     var $t38: u64
+     var $t39: u64
+     var $t40: &u64
+     var $t41: &vector<u64>
+     var $t42: u64
+     # live vars:
+  0: $t1 := ["1", "2", "3"]
+     # live vars: $t1
+  1: $t2 := borrow_local($t1)
+     # live vars: $t2
+  2: $t4 := infer($t2)
+     # live vars: $t2, $t4
+  3: $t5 := 0
+     # live vars: $t2, $t4, $t5
+  4: $t7 := freeze_ref(implicit)($t4)
+     # live vars: $t2, $t4, $t5, $t7
+  5: $t6 := vector::length<u64>($t7)
+     # live vars: $t2, $t4, $t5, $t6
+  6: label L0
+     # live vars: $t2, $t4, $t5, $t6
+  7: $t9 := infer($t5)
+     # live vars: $t2, $t4, $t5, $t6, $t9
+  8: $t8 := <($t9, $t6)
+     # live vars: $t2, $t4, $t5, $t6, $t8
+  9: if ($t8) goto 10 else goto 29
+     # live vars: $t2, $t4, $t5, $t6
+ 10: label L2
+     # live vars: $t2, $t4, $t5, $t6
+ 11: $t14 := freeze_ref(implicit)($t4)
+     # live vars: $t2, $t4, $t5, $t6, $t14
+ 12: $t13 := vector::borrow<u64>($t14, $t5)
+     # live vars: $t2, $t4, $t5, $t6, $t13
+ 13: $t12 := infer($t13)
+     # live vars: $t2, $t4, $t5, $t6, $t12
+ 14: $t15 := read_ref($t12)
+     # live vars: $t2, $t4, $t5, $t6, $t15
+ 15: $t16 := 1
+     # live vars: $t2, $t4, $t5, $t6, $t15, $t16
+ 16: $t11 := >($t15, $t16)
+     # live vars: $t2, $t4, $t5, $t6, $t11
+ 17: $t10 := !($t11)
+     # live vars: $t2, $t4, $t5, $t6, $t10
+ 18: if ($t10) goto 19 else goto 22
+     # live vars: $t2, $t4, $t5, $t6
+ 19: label L5
+     # live vars: $t2, $t4, $t5, $t6
+ 20: goto 33
+     # live vars: $t2, $t4, $t5, $t6
+ 21: goto 23
+     # live vars: $t2, $t4, $t5, $t6
+ 22: label L6
+     # live vars: $t2, $t4, $t5, $t6
+ 23: label L7
+     # live vars: $t2, $t4, $t5, $t6
+ 24: $t18 := infer($t5)
+     # live vars: $t2, $t4, $t6, $t18
+ 25: $t19 := 1
+     # live vars: $t2, $t4, $t6, $t18, $t19
+ 26: $t17 := +($t18, $t19)
+     # live vars: $t2, $t4, $t6, $t17
+ 27: $t5 := infer($t17)
+     # live vars: $t2, $t4, $t5, $t6
+ 28: goto 31
+     # live vars: $t2, $t4, $t5, $t6
+ 29: label L3
+     # live vars: $t2, $t4, $t5, $t6
+ 30: goto 33
+     # live vars: $t2, $t4, $t5, $t6
+ 31: label L4
+     # live vars: $t2, $t4, $t5, $t6
+ 32: goto 6
+     # live vars: $t2, $t4, $t5, $t6
+ 33: label L1
+     # live vars: $t2, $t4, $t5, $t6
+ 34: $t20 := infer($t5)
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 35: $t22 := infer($t5)
+     # live vars: $t2, $t4, $t6, $t20, $t22
+ 36: $t23 := 1
+     # live vars: $t2, $t4, $t6, $t20, $t22, $t23
+ 37: $t21 := +($t22, $t23)
+     # live vars: $t2, $t4, $t6, $t20, $t21
+ 38: $t5 := infer($t21)
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 39: label L8
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 40: $t25 := infer($t5)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t25
+ 41: $t24 := <($t25, $t6)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t24
+ 42: if ($t24) goto 43 else goto 67
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 43: label L10
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 44: $t29 := freeze_ref(implicit)($t4)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t29
+ 45: $t28 := vector::borrow<u64>($t29, $t5)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t28
+ 46: $t27 := infer($t28)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t27
+ 47: $t30 := read_ref($t27)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t30
+ 48: $t31 := 1
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t30, $t31
+ 49: $t26 := >($t30, $t31)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t26
+ 50: if ($t26) goto 51 else goto 60
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 51: label L13
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 52: $t32 := infer($t4)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t32
+ 53: $t33 := infer($t20)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t32, $t33
+ 54: vector::swap<u64>($t32, $t33, $t5)
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 55: $t35 := infer($t20)
+     # live vars: $t2, $t4, $t5, $t6, $t35
+ 56: $t36 := 1
+     # live vars: $t2, $t4, $t5, $t6, $t35, $t36
+ 57: $t34 := +($t35, $t36)
+     # live vars: $t2, $t4, $t5, $t6, $t34
+ 58: $t20 := infer($t34)
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 59: goto 61
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 60: label L14
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 61: label L15
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 62: $t38 := infer($t5)
+     # live vars: $t2, $t4, $t6, $t20, $t38
+ 63: $t39 := 1
+     # live vars: $t2, $t4, $t6, $t20, $t38, $t39
+ 64: $t37 := +($t38, $t39)
+     # live vars: $t2, $t4, $t6, $t20, $t37
+ 65: $t5 := infer($t37)
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 66: goto 69
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 67: label L11
+     # live vars: $t2, $t20
+ 68: goto 71
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 69: label L12
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 70: goto 39
+     # live vars: $t2, $t20
+ 71: label L9
+     # live vars: $t2, $t20
+ 72: $t3 := infer($t20)
+     # live vars: $t2
+ 73: $t41 := freeze_ref(implicit)($t2)
+     # live vars: $t41
+ 74: $t42 := 0
+     # live vars: $t41, $t42
+ 75: $t40 := vector::borrow<u64>($t41, $t42)
+     # live vars: $t40
+ 76: $t0 := read_ref($t40)
+     # live vars: $t0
+ 77: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::foo(): u64 {
+     var $t0: u64
+     var $t1: vector<u64>
+     var $t2: &mut vector<u64>
+     var $t3: u64
+     var $t4: &mut vector<u64>
+     var $t5: u64
+     var $t6: u64
+     var $t7: &vector<u64>
+     var $t8: bool
+     var $t9: u64
+     var $t10: bool
+     var $t11: bool
+     var $t12: &u64
+     var $t13: &u64
+     var $t14: &vector<u64>
+     var $t15: u64
+     var $t16: u64
+     var $t17: u64
+     var $t18: u64
+     var $t19: u64
+     var $t20: u64
+     var $t21: u64
+     var $t22: u64
+     var $t23: u64
+     var $t24: bool
+     var $t25: u64
+     var $t26: bool
+     var $t27: &u64
+     var $t28: &u64
+     var $t29: &vector<u64>
+     var $t30: u64
+     var $t31: u64
+     var $t32: &mut vector<u64>
+     var $t33: u64
+     var $t34: u64
+     var $t35: u64
+     var $t36: u64
+     var $t37: u64
+     var $t38: u64
+     var $t39: u64
+     var $t40: &u64
+     var $t41: &vector<u64>
+     var $t42: u64
+     # live vars:
+  0: $t1 := ["1", "2", "3"]
+     # live vars: $t1
+  1: $t2 := borrow_local($t1)
+     # live vars: $t2
+  2: $t4 := copy($t2)
+     # live vars: $t2, $t4
+  3: $t5 := 0
+     # live vars: $t2, $t4, $t5
+  4: $t7 := freeze_ref(implicit)($t4)
+     # live vars: $t2, $t4, $t5, $t7
+  5: $t6 := vector::length<u64>($t7)
+     # live vars: $t2, $t4, $t5, $t6
+  6: label L0
+     # live vars: $t2, $t4, $t5, $t6
+  7: $t9 := copy($t5)
+     # live vars: $t2, $t4, $t5, $t6, $t9
+  8: $t8 := <($t9, $t6)
+     # live vars: $t2, $t4, $t5, $t6, $t8
+  9: if ($t8) goto 12 else goto 10
+     # live vars: $t2, $t4, $t5, $t6
+ 10: label L16
+     # live vars: $t2, $t4, $t5, $t6
+ 11: goto 23
+     # live vars: $t2, $t4, $t5, $t6
+ 12: label L2
+     # live vars: $t2, $t4, $t5, $t6
+ 13: $t14 := freeze_ref(implicit)($t4)
+     # live vars: $t2, $t4, $t5, $t6, $t14
+ 14: $t13 := vector::borrow<u64>($t14, $t5)
+     # live vars: $t2, $t4, $t5, $t6, $t13
+ 15: $t12 := move($t13)
+     # live vars: $t2, $t4, $t5, $t6, $t12
+ 16: $t15 := read_ref($t12)
+     # live vars: $t2, $t4, $t5, $t6, $t15
+ 17: $t16 := 1
+     # live vars: $t2, $t4, $t5, $t6, $t15, $t16
+ 18: $t11 := >($t15, $t16)
+     # live vars: $t2, $t4, $t5, $t6, $t11
+ 19: $t10 := !($t11)
+     # live vars: $t2, $t4, $t5, $t6, $t10
+ 20: if ($t10) goto 21 else goto 65
+     # live vars: $t2, $t4, $t5, $t6
+ 21: label L17
+     # live vars: $t2, $t4, $t5, $t6
+ 22: goto 23
+     # live vars: $t2, $t4, $t5, $t6
+ 23: label L1
+     # live vars: $t2, $t4, $t5, $t6
+ 24: $t20 := copy($t5)
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 25: $t22 := move($t5)
+     # live vars: $t2, $t4, $t6, $t20, $t22
+ 26: $t23 := 1
+     # live vars: $t2, $t4, $t6, $t20, $t22, $t23
+ 27: $t21 := +($t22, $t23)
+     # live vars: $t2, $t4, $t6, $t20, $t21
+ 28: $t5 := move($t21)
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 29: label L8
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 30: $t25 := copy($t5)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t25
+ 31: $t24 := <($t25, $t6)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t24
+ 32: if ($t24) goto 33 else goto 57
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 33: label L10
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 34: $t29 := freeze_ref(implicit)($t4)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t29
+ 35: $t28 := vector::borrow<u64>($t29, $t5)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t28
+ 36: $t27 := move($t28)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t27
+ 37: $t30 := read_ref($t27)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t30
+ 38: $t31 := 1
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t30, $t31
+ 39: $t26 := >($t30, $t31)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t26
+ 40: if ($t26) goto 43 else goto 41
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 41: label L18
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 42: goto 51
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 43: label L13
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 44: $t32 := copy($t4)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t32
+ 45: $t33 := copy($t20)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t32, $t33
+ 46: vector::swap<u64>($t32, $t33, $t5)
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 47: $t35 := move($t20)
+     # live vars: $t2, $t4, $t5, $t6, $t35
+ 48: $t36 := 1
+     # live vars: $t2, $t4, $t5, $t6, $t35, $t36
+ 49: $t34 := +($t35, $t36)
+     # live vars: $t2, $t4, $t5, $t6, $t34
+ 50: $t20 := move($t34)
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 51: label L15
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 52: $t38 := move($t5)
+     # live vars: $t2, $t4, $t6, $t20, $t38
+ 53: $t39 := 1
+     # live vars: $t2, $t4, $t6, $t20, $t38, $t39
+ 54: $t37 := +($t38, $t39)
+     # live vars: $t2, $t4, $t6, $t20, $t37
+ 55: $t5 := move($t37)
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 56: goto 29
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 57: label L11
+     # live vars: $t2, $t4, $t20
+ 58: drop($t4)
+     # live vars: $t2, $t20
+ 59: $t3 := move($t20)
+     # live vars: $t2
+ 60: $t41 := freeze_ref(implicit)($t2)
+     # live vars: $t41
+ 61: $t42 := 0
+     # live vars: $t41, $t42
+ 62: $t40 := vector::borrow<u64>($t41, $t42)
+     # live vars: $t40
+ 63: $t0 := read_ref($t40)
+     # live vars: $t0
+ 64: return $t0
+     # live vars: $t2, $t4, $t5, $t6
+ 65: label L7
+     # live vars: $t2, $t4, $t5, $t6
+ 66: $t18 := move($t5)
+     # live vars: $t2, $t4, $t6, $t18
+ 67: $t19 := 1
+     # live vars: $t2, $t4, $t6, $t18, $t19
+ 68: $t17 := +($t18, $t19)
+     # live vars: $t2, $t4, $t6, $t17
+ 69: $t5 := move($t17)
+     # live vars: $t2, $t4, $t5, $t6
+ 70: goto 6
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::foo(): u64 {
+     var $t0: u64
+     var $t1: vector<u64>
+     var $t2: &mut vector<u64>
+     var $t3: u64 [unused]
+     var $t4: &mut vector<u64>
+     var $t5: u64
+     var $t6: u64
+     var $t7: &vector<u64>
+     var $t8: bool
+     var $t9: u64
+     var $t10: bool
+     var $t11: bool
+     var $t12: &u64
+     var $t13: &u64
+     var $t14: &vector<u64>
+     var $t15: u64
+     var $t16: u64
+     var $t17: u64
+     var $t18: u64
+     var $t19: u64
+     var $t20: u64
+     var $t21: u64
+     var $t22: u64
+     var $t23: u64
+     var $t24: bool
+     var $t25: u64
+     var $t26: bool
+     var $t27: &u64
+     var $t28: &u64
+     var $t29: &vector<u64>
+     var $t30: u64
+     var $t31: u64
+     var $t32: &mut vector<u64>
+     var $t33: u64
+     var $t34: u64
+     var $t35: u64
+     var $t36: u64
+     var $t37: u64
+     var $t38: u64
+     var $t39: u64
+     var $t40: &u64
+     var $t41: &vector<u64>
+     var $t42: u64
+     # live vars:
+  0: $t1 := ["1", "2", "3"]
+     # live vars: $t1
+  1: $t2 := borrow_local($t1)
+     # live vars: $t2
+  2: $t4 := copy($t2)
+     # live vars: $t2, $t4
+  3: $t5 := 0
+     # live vars: $t2, $t4, $t5
+  4: $t7 := freeze_ref(implicit)($t4)
+     # live vars: $t2, $t4, $t5, $t7
+  5: $t6 := vector::length<u64>($t7)
+     # live vars: $t2, $t4, $t5, $t6
+  6: label L0
+     # live vars: $t2, $t4, $t5, $t6
+  7: $t9 := copy($t5)
+     # live vars: $t2, $t4, $t5, $t6, $t9
+  8: $t8 := <($t9, $t6)
+     # live vars: $t2, $t4, $t5, $t6, $t8
+  9: if ($t8) goto 12 else goto 10
+     # live vars: $t2, $t4, $t5, $t6
+ 10: label L16
+     # live vars: $t2, $t4, $t5, $t6
+ 11: goto 23
+     # live vars: $t2, $t4, $t5, $t6
+ 12: label L2
+     # live vars: $t2, $t4, $t5, $t6
+ 13: $t14 := freeze_ref(implicit)($t4)
+     # live vars: $t2, $t4, $t5, $t6, $t14
+ 14: $t13 := vector::borrow<u64>($t14, $t5)
+     # live vars: $t2, $t4, $t5, $t6, $t13
+ 15: $t12 := move($t13)
+     # live vars: $t2, $t4, $t5, $t6, $t12
+ 16: $t15 := read_ref($t12)
+     # live vars: $t2, $t4, $t5, $t6, $t15
+ 17: $t16 := 1
+     # live vars: $t2, $t4, $t5, $t6, $t15, $t16
+ 18: $t11 := >($t15, $t16)
+     # live vars: $t2, $t4, $t5, $t6, $t11
+ 19: $t10 := !($t11)
+     # live vars: $t2, $t4, $t5, $t6, $t10
+ 20: if ($t10) goto 21 else goto 64
+     # live vars: $t2, $t4, $t5, $t6
+ 21: label L17
+     # live vars: $t2, $t4, $t5, $t6
+ 22: goto 23
+     # live vars: $t2, $t4, $t5, $t6
+ 23: label L1
+     # live vars: $t2, $t4, $t5, $t6
+ 24: $t20 := copy($t5)
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 25: $t22 := move($t5)
+     # live vars: $t2, $t4, $t6, $t20, $t22
+ 26: $t23 := 1
+     # live vars: $t2, $t4, $t6, $t20, $t22, $t23
+ 27: $t21 := +($t22, $t23)
+     # live vars: $t2, $t4, $t6, $t20, $t21
+ 28: $t5 := move($t21)
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 29: label L8
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 30: $t25 := copy($t5)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t25
+ 31: $t24 := <($t25, $t6)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t24
+ 32: if ($t24) goto 33 else goto 57
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 33: label L10
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 34: $t29 := freeze_ref(implicit)($t4)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t29
+ 35: $t28 := vector::borrow<u64>($t29, $t5)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t28
+ 36: $t27 := move($t28)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t27
+ 37: $t30 := read_ref($t27)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t30
+ 38: $t31 := 1
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t30, $t31
+ 39: $t26 := >($t30, $t31)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t26
+ 40: if ($t26) goto 43 else goto 41
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 41: label L18
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 42: goto 51
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 43: label L13
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 44: $t32 := copy($t4)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t32
+ 45: $t33 := copy($t20)
+     # live vars: $t2, $t4, $t5, $t6, $t20, $t32, $t33
+ 46: vector::swap<u64>($t32, $t33, $t5)
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 47: $t35 := move($t20)
+     # live vars: $t2, $t4, $t5, $t6, $t35
+ 48: $t36 := 1
+     # live vars: $t2, $t4, $t5, $t6, $t35, $t36
+ 49: $t34 := +($t35, $t36)
+     # live vars: $t2, $t4, $t5, $t6, $t34
+ 50: $t20 := move($t34)
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 51: label L15
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 52: $t38 := move($t5)
+     # live vars: $t2, $t4, $t6, $t20, $t38
+ 53: $t39 := 1
+     # live vars: $t2, $t4, $t6, $t20, $t38, $t39
+ 54: $t37 := +($t38, $t39)
+     # live vars: $t2, $t4, $t6, $t20, $t37
+ 55: $t5 := move($t37)
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 56: goto 29
+     # live vars: $t2, $t4, $t5, $t6, $t20
+ 57: label L11
+     # live vars: $t2, $t4
+ 58: drop($t4)
+     # live vars: $t2
+ 59: $t41 := freeze_ref(implicit)($t2)
+     # live vars: $t41
+ 60: $t42 := 0
+     # live vars: $t41, $t42
+ 61: $t40 := vector::borrow<u64>($t41, $t42)
+     # live vars: $t40
+ 62: $t0 := read_ref($t40)
+     # live vars: $t0
+ 63: return $t0
+     # live vars: $t2, $t4, $t5, $t6
+ 64: label L7
+     # live vars: $t2, $t4, $t5, $t6
+ 65: $t18 := move($t5)
+     # live vars: $t2, $t4, $t6, $t18
+ 66: $t19 := 1
+     # live vars: $t2, $t4, $t6, $t18, $t19
+ 67: $t17 := +($t18, $t19)
+     # live vars: $t2, $t4, $t6, $t17
+ 68: $t5 := move($t17)
+     # live vars: $t2, $t4, $t5, $t6
+ 69: goto 6
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::foo(): u64 {
+     var $t0: u64 [unused]
+     var $t1: vector<u64>
+     var $t2: &mut vector<u64>
+     var $t3: u64 [unused]
+     var $t4: &mut vector<u64>
+     var $t5: u64
+     var $t6: u64
+     var $t7: &vector<u64>
+     var $t8: bool
+     var $t9: u64
+     var $t10: bool [unused]
+     var $t11: bool [unused]
+     var $t12: &u64 [unused]
+     var $t13: &u64
+     var $t14: &vector<u64> [unused]
+     var $t15: u64 [unused]
+     var $t16: u64
+     var $t17: u64 [unused]
+     var $t18: u64 [unused]
+     var $t19: u64 [unused]
+     var $t20: u64 [unused]
+     var $t21: u64 [unused]
+     var $t22: u64 [unused]
+     var $t23: u64
+     var $t24: bool [unused]
+     var $t25: u64 [unused]
+     var $t26: bool [unused]
+     var $t27: &u64 [unused]
+     var $t28: &u64 [unused]
+     var $t29: &vector<u64> [unused]
+     var $t30: u64 [unused]
+     var $t31: u64 [unused]
+     var $t32: &mut vector<u64>
+     var $t33: u64 [unused]
+     var $t34: u64 [unused]
+     var $t35: u64 [unused]
+     var $t36: u64 [unused]
+     var $t37: u64 [unused]
+     var $t38: u64 [unused]
+     var $t39: u64 [unused]
+     var $t40: &u64 [unused]
+     var $t41: &vector<u64> [unused]
+     var $t42: u64 [unused]
+     # live vars:
+  0: $t1 := ["1", "2", "3"]
+     # live vars: $t1
+  1: $t2 := borrow_local($t1)
+     # live vars: $t2
+  2: $t4 := copy($t2)
+     # live vars: $t2, $t4
+  3: $t5 := 0
+     # live vars: $t2, $t4, $t5
+  4: $t7 := freeze_ref(implicit)($t4)
+     # live vars: $t2, $t4, $t5, $t7
+  5: $t6 := vector::length<u64>($t7)
+     # live vars: $t2, $t4, $t5, $t6
+  6: label L0
+     # live vars: $t2, $t4, $t5, $t6
+  7: $t9 := copy($t5)
+     # live vars: $t2, $t4, $t5, $t6, $t9
+  8: $t8 := <($t9, $t6)
+     # live vars: $t2, $t4, $t5, $t6, $t8
+  9: if ($t8) goto 12 else goto 10
+     # live vars: $t2, $t4, $t5, $t6
+ 10: label L16
+     # live vars: $t2, $t4, $t5, $t6
+ 11: goto 23
+     # live vars: $t2, $t4, $t5, $t6
+ 12: label L2
+     # live vars: $t2, $t4, $t5, $t6
+ 13: $t7 := freeze_ref(implicit)($t4)
+     # live vars: $t2, $t4, $t5, $t6, $t7
+ 14: $t13 := vector::borrow<u64>($t7, $t5)
+     # live vars: $t2, $t4, $t5, $t6, $t13
+ 15: $t13 := move($t13)
+     # live vars: $t2, $t4, $t5, $t6, $t13
+ 16: $t9 := read_ref($t13)
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 17: $t16 := 1
+     # live vars: $t2, $t4, $t5, $t6, $t9, $t16
+ 18: $t8 := >($t9, $t16)
+     # live vars: $t2, $t4, $t5, $t6, $t8
+ 19: $t8 := !($t8)
+     # live vars: $t2, $t4, $t5, $t6, $t8
+ 20: if ($t8) goto 21 else goto 64
+     # live vars: $t2, $t4, $t5, $t6
+ 21: label L17
+     # live vars: $t2, $t4, $t5, $t6
+ 22: goto 23
+     # live vars: $t2, $t4, $t5, $t6
+ 23: label L1
+     # live vars: $t2, $t4, $t5, $t6
+ 24: $t9 := copy($t5)
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 25: $t16 := move($t5)
+     # live vars: $t2, $t4, $t6, $t9, $t16
+ 26: $t23 := 1
+     # live vars: $t2, $t4, $t6, $t9, $t16, $t23
+ 27: $t16 := +($t16, $t23)
+     # live vars: $t2, $t4, $t6, $t9, $t16
+ 28: $t5 := move($t16)
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 29: label L8
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 30: $t16 := copy($t5)
+     # live vars: $t2, $t4, $t5, $t6, $t9, $t16
+ 31: $t8 := <($t16, $t6)
+     # live vars: $t2, $t4, $t5, $t6, $t8, $t9
+ 32: if ($t8) goto 33 else goto 57
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 33: label L10
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 34: $t7 := freeze_ref(implicit)($t4)
+     # live vars: $t2, $t4, $t5, $t6, $t7, $t9
+ 35: $t13 := vector::borrow<u64>($t7, $t5)
+     # live vars: $t2, $t4, $t5, $t6, $t9, $t13
+ 36: $t13 := move($t13)
+     # live vars: $t2, $t4, $t5, $t6, $t9, $t13
+ 37: $t16 := read_ref($t13)
+     # live vars: $t2, $t4, $t5, $t6, $t9, $t16
+ 38: $t23 := 1
+     # live vars: $t2, $t4, $t5, $t6, $t9, $t16, $t23
+ 39: $t8 := >($t16, $t23)
+     # live vars: $t2, $t4, $t5, $t6, $t8, $t9
+ 40: if ($t8) goto 43 else goto 41
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 41: label L18
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 42: goto 51
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 43: label L13
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 44: $t32 := copy($t4)
+     # live vars: $t2, $t4, $t5, $t6, $t9, $t32
+ 45: $t16 := copy($t9)
+     # live vars: $t2, $t4, $t5, $t6, $t9, $t16, $t32
+ 46: vector::swap<u64>($t32, $t16, $t5)
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 47: $t16 := move($t9)
+     # live vars: $t2, $t4, $t5, $t6, $t16
+ 48: $t23 := 1
+     # live vars: $t2, $t4, $t5, $t6, $t16, $t23
+ 49: $t16 := +($t16, $t23)
+     # live vars: $t2, $t4, $t5, $t6, $t16
+ 50: $t9 := move($t16)
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 51: label L15
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 52: $t16 := move($t5)
+     # live vars: $t2, $t4, $t6, $t9, $t16
+ 53: $t23 := 1
+     # live vars: $t2, $t4, $t6, $t9, $t16, $t23
+ 54: $t16 := +($t16, $t23)
+     # live vars: $t2, $t4, $t6, $t9, $t16
+ 55: $t5 := move($t16)
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 56: goto 29
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 57: label L11
+     # live vars: $t2, $t4
+ 58: drop($t4)
+     # live vars: $t2
+ 59: $t7 := freeze_ref(implicit)($t2)
+     # live vars: $t7
+ 60: $t9 := 0
+     # live vars: $t7, $t9
+ 61: $t13 := vector::borrow<u64>($t7, $t9)
+     # live vars: $t13
+ 62: $t9 := read_ref($t13)
+     # live vars: $t9
+ 63: return $t9
+     # live vars: $t2, $t4, $t5, $t6
+ 64: label L7
+     # live vars: $t2, $t4, $t5, $t6
+ 65: $t9 := move($t5)
+     # live vars: $t2, $t4, $t6, $t9
+ 66: $t16 := 1
+     # live vars: $t2, $t4, $t6, $t9, $t16
+ 67: $t9 := +($t9, $t16)
+     # live vars: $t2, $t4, $t6, $t9
+ 68: $t5 := move($t9)
+     # live vars: $t2, $t4, $t5, $t6
+ 69: goto 6
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::foo(): u64 {
+     var $t0: u64 [unused]
+     var $t1: vector<u64>
+     var $t2: &mut vector<u64>
+     var $t3: u64 [unused]
+     var $t4: &mut vector<u64>
+     var $t5: u64
+     var $t6: u64
+     var $t7: &vector<u64>
+     var $t8: bool
+     var $t9: u64
+     var $t10: bool [unused]
+     var $t11: bool [unused]
+     var $t12: &u64 [unused]
+     var $t13: &u64
+     var $t14: &vector<u64> [unused]
+     var $t15: u64 [unused]
+     var $t16: u64
+     var $t17: u64 [unused]
+     var $t18: u64 [unused]
+     var $t19: u64 [unused]
+     var $t20: u64 [unused]
+     var $t21: u64 [unused]
+     var $t22: u64 [unused]
+     var $t23: u64
+     var $t24: bool [unused]
+     var $t25: u64 [unused]
+     var $t26: bool [unused]
+     var $t27: &u64 [unused]
+     var $t28: &u64 [unused]
+     var $t29: &vector<u64> [unused]
+     var $t30: u64 [unused]
+     var $t31: u64 [unused]
+     var $t32: &mut vector<u64>
+     var $t33: u64 [unused]
+     var $t34: u64 [unused]
+     var $t35: u64 [unused]
+     var $t36: u64 [unused]
+     var $t37: u64 [unused]
+     var $t38: u64 [unused]
+     var $t39: u64 [unused]
+     var $t40: &u64 [unused]
+     var $t41: &vector<u64> [unused]
+     var $t42: u64 [unused]
+     # live vars:
+  0: $t1 := ["1", "2", "3"]
+     # live vars: $t1
+  1: $t2 := borrow_local($t1)
+     # live vars: $t2
+  2: $t4 := copy($t2)
+     # live vars: $t2, $t4
+  3: $t5 := 0
+     # live vars: $t2, $t4, $t5
+  4: $t7 := freeze_ref(implicit)($t4)
+     # live vars: $t2, $t4, $t5, $t7
+  5: $t6 := vector::length<u64>($t7)
+     # live vars: $t2, $t4, $t5, $t6
+  6: label L0
+     # live vars: $t2, $t4, $t5, $t6
+  7: $t9 := copy($t5)
+     # live vars: $t2, $t4, $t5, $t6, $t9
+  8: $t8 := <($t9, $t6)
+     # live vars: $t2, $t4, $t5, $t6, $t8
+  9: if ($t8) goto 12 else goto 10
+     # live vars: $t2, $t4, $t5, $t6
+ 10: label L16
+     # live vars: $t2, $t4, $t5, $t6
+ 11: goto 22
+     # live vars: $t2, $t4, $t5, $t6
+ 12: label L2
+     # live vars: $t2, $t4, $t5, $t6
+ 13: $t7 := freeze_ref(implicit)($t4)
+     # live vars: $t2, $t4, $t5, $t6, $t7
+ 14: $t13 := vector::borrow<u64>($t7, $t5)
+     # live vars: $t2, $t4, $t5, $t6, $t13
+ 15: $t9 := read_ref($t13)
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 16: $t16 := 1
+     # live vars: $t2, $t4, $t5, $t6, $t9, $t16
+ 17: $t8 := >($t9, $t16)
+     # live vars: $t2, $t4, $t5, $t6, $t8
+ 18: $t8 := !($t8)
+     # live vars: $t2, $t4, $t5, $t6, $t8
+ 19: if ($t8) goto 20 else goto 62
+     # live vars: $t2, $t4, $t5, $t6
+ 20: label L17
+     # live vars: $t2, $t4, $t5, $t6
+ 21: goto 22
+     # live vars: $t2, $t4, $t5, $t6
+ 22: label L1
+     # live vars: $t2, $t4, $t5, $t6
+ 23: $t9 := copy($t5)
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 24: $t16 := move($t5)
+     # live vars: $t2, $t4, $t6, $t9, $t16
+ 25: $t23 := 1
+     # live vars: $t2, $t4, $t6, $t9, $t16, $t23
+ 26: $t16 := +($t16, $t23)
+     # live vars: $t2, $t4, $t6, $t9, $t16
+ 27: $t5 := move($t16)
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 28: label L8
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 29: $t16 := copy($t5)
+     # live vars: $t2, $t4, $t5, $t6, $t9, $t16
+ 30: $t8 := <($t16, $t6)
+     # live vars: $t2, $t4, $t5, $t6, $t8, $t9
+ 31: if ($t8) goto 32 else goto 55
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 32: label L10
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 33: $t7 := freeze_ref(implicit)($t4)
+     # live vars: $t2, $t4, $t5, $t6, $t7, $t9
+ 34: $t13 := vector::borrow<u64>($t7, $t5)
+     # live vars: $t2, $t4, $t5, $t6, $t9, $t13
+ 35: $t16 := read_ref($t13)
+     # live vars: $t2, $t4, $t5, $t6, $t9, $t16
+ 36: $t23 := 1
+     # live vars: $t2, $t4, $t5, $t6, $t9, $t16, $t23
+ 37: $t8 := >($t16, $t23)
+     # live vars: $t2, $t4, $t5, $t6, $t8, $t9
+ 38: if ($t8) goto 41 else goto 39
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 39: label L18
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 40: goto 49
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 41: label L13
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 42: $t32 := copy($t4)
+     # live vars: $t2, $t4, $t5, $t6, $t9, $t32
+ 43: $t16 := copy($t9)
+     # live vars: $t2, $t4, $t5, $t6, $t9, $t16, $t32
+ 44: vector::swap<u64>($t32, $t16, $t5)
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 45: $t16 := move($t9)
+     # live vars: $t2, $t4, $t5, $t6, $t16
+ 46: $t23 := 1
+     # live vars: $t2, $t4, $t5, $t6, $t16, $t23
+ 47: $t16 := +($t16, $t23)
+     # live vars: $t2, $t4, $t5, $t6, $t16
+ 48: $t9 := move($t16)
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 49: label L15
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 50: $t16 := move($t5)
+     # live vars: $t2, $t4, $t6, $t9, $t16
+ 51: $t23 := 1
+     # live vars: $t2, $t4, $t6, $t9, $t16, $t23
+ 52: $t16 := +($t16, $t23)
+     # live vars: $t2, $t4, $t6, $t9, $t16
+ 53: $t5 := move($t16)
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 54: goto 28
+     # live vars: $t2, $t4, $t5, $t6, $t9
+ 55: label L11
+     # live vars: $t2, $t4
+ 56: drop($t4)
+     # live vars: $t2
+ 57: $t7 := freeze_ref(implicit)($t2)
+     # live vars: $t7
+ 58: $t9 := 0
+     # live vars: $t7, $t9
+ 59: $t13 := vector::borrow<u64>($t7, $t9)
+     # live vars: $t13
+ 60: $t9 := read_ref($t13)
+     # live vars: $t9
+ 61: return $t9
+     # live vars: $t2, $t4, $t5, $t6
+ 62: label L7
+     # live vars: $t2, $t4, $t5, $t6
+ 63: $t9 := move($t5)
+     # live vars: $t2, $t4, $t6, $t9
+ 64: $t16 := 1
+     # live vars: $t2, $t4, $t6, $t9, $t16
+ 65: $t9 := +($t9, $t16)
+     # live vars: $t2, $t4, $t6, $t9
+ 66: $t5 := move($t9)
+     # live vars: $t2, $t4, $t5, $t6
+ 67: goto 6
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.m {
+
+
+foo(): u64 /* def_idx: 0 */ {
+L0:	loc0: vector<u64>
+L1:	loc1: &mut vector<u64>
+L2:	loc2: &mut vector<u64>
+L3:	loc3: u64
+L4:	loc4: u64
+L5:	loc5: u64
+B0:
+	0: LdConst[0](Vector(U64): [3, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0])
+	1: StLoc[0](loc0: vector<u64>)
+	2: MutBorrowLoc[0](loc0: vector<u64>)
+	3: StLoc[1](loc1: &mut vector<u64>)
+	4: CopyLoc[1](loc1: &mut vector<u64>)
+	5: StLoc[2](loc2: &mut vector<u64>)
+	6: LdU64(0)
+	7: StLoc[3](loc3: u64)
+	8: CopyLoc[2](loc2: &mut vector<u64>)
+	9: FreezeRef
+	10: VecLen(1)
+	11: StLoc[4](loc4: u64)
+B1:
+	12: CopyLoc[3](loc3: u64)
+	13: CopyLoc[4](loc4: u64)
+	14: Lt
+	15: BrTrue(17)
+B2:
+	16: Branch(26)
+B3:
+	17: CopyLoc[2](loc2: &mut vector<u64>)
+	18: FreezeRef
+	19: CopyLoc[3](loc3: u64)
+	20: VecImmBorrow(1)
+	21: ReadRef
+	22: LdU64(1)
+	23: Gt
+	24: BrTrue(66)
+B4:
+	25: Branch(26)
+B5:
+	26: CopyLoc[3](loc3: u64)
+	27: StLoc[5](loc5: u64)
+	28: MoveLoc[3](loc3: u64)
+	29: LdU64(1)
+	30: Add
+	31: StLoc[3](loc3: u64)
+B6:
+	32: CopyLoc[3](loc3: u64)
+	33: CopyLoc[4](loc4: u64)
+	34: Lt
+	35: BrFalse(58)
+B7:
+	36: CopyLoc[2](loc2: &mut vector<u64>)
+	37: FreezeRef
+	38: CopyLoc[3](loc3: u64)
+	39: VecImmBorrow(1)
+	40: ReadRef
+	41: LdU64(1)
+	42: Gt
+	43: BrTrue(45)
+B8:
+	44: Branch(53)
+B9:
+	45: CopyLoc[2](loc2: &mut vector<u64>)
+	46: CopyLoc[5](loc5: u64)
+	47: CopyLoc[3](loc3: u64)
+	48: VecSwap(1)
+	49: MoveLoc[5](loc5: u64)
+	50: LdU64(1)
+	51: Add
+	52: StLoc[5](loc5: u64)
+B10:
+	53: MoveLoc[3](loc3: u64)
+	54: LdU64(1)
+	55: Add
+	56: StLoc[3](loc3: u64)
+	57: Branch(32)
+B11:
+	58: MoveLoc[2](loc2: &mut vector<u64>)
+	59: Pop
+	60: MoveLoc[1](loc1: &mut vector<u64>)
+	61: FreezeRef
+	62: LdU64(0)
+	63: VecImmBorrow(1)
+	64: ReadRef
+	65: Ret
+B12:
+	66: MoveLoc[3](loc3: u64)
+	67: LdU64(1)
+	68: Add
+	69: StLoc[3](loc3: u64)
+	70: Branch(12)
+}
+}
+============ bytecode verification succeeded ========
