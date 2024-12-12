@@ -1032,7 +1032,7 @@ pub async fn cleanup_cluster_with_management(dry_run: bool) -> Result<()> {
         .await?
         .items
         .into_iter()
-        .filter(|namespace| namespace.name().contains("forge-"))
+        .filter(|namespace| namespace.name().starts_with("forge-"))
         .collect::<Vec<Namespace>>();
     // print all namespace names
     for namespace in &forge_namespaces {
@@ -1055,12 +1055,16 @@ pub async fn cleanup_cluster_with_management(dry_run: bool) -> Result<()> {
             // If there is no namespace that matches the pod name, it's an orphan pod
             !forge_namespaces
                 .iter()
-                .any(|namespace| pod_name.contains(namespace.metadata.name.as_ref().unwrap()))
+                .any(|namespace| pod_name.starts_with(namespace.metadata.name.as_ref().unwrap()))
         });
     for pod in orphan_forge_test_runner_pods_to_delete {
         let pod_name = pod.name();
-        let pod_age = time_since_the_epoch - pod.metadata.creation_timestamp.unwrap().0.timestamp() as u64;
-        info!("Deleting orphaned pod {} with age {} without any corresponding namespace", pod_name, pod_age);
+        let pod_age =
+            time_since_the_epoch - pod.metadata.creation_timestamp.unwrap().0.timestamp() as u64;
+        info!(
+            "Deleting orphaned pod {} with age {} without any corresponding namespace",
+            pod_name, pod_age
+        );
         if !dry_run {
             pods_api.delete(&pod_name, &DeleteParams::default()).await?;
         }
