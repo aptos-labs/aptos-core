@@ -17,7 +17,7 @@ use aptos_executor_types::{
     state_compute_result::StateComputeResult, ExecutorError, ExecutorResult,
 };
 use aptos_infallible::Mutex;
-use aptos_logger::{error, warn};
+use aptos_logger::{error, info, warn};
 use aptos_types::{
     block_info::BlockInfo,
     contract_event::ContractEvent,
@@ -107,15 +107,15 @@ impl PipelineFutures {
 pub struct PipelineInputTx {
     pub rand_tx: Option<oneshot::Sender<Option<Randomness>>>,
     pub order_vote_tx: Option<oneshot::Sender<()>>,
-    pub order_proof_tx: tokio::sync::broadcast::Sender<()>,
-    pub commit_proof_tx: tokio::sync::broadcast::Sender<LedgerInfoWithSignatures>,
+    pub order_proof_tx: Option<oneshot::Sender<()>>,
+    pub commit_proof_tx: Option<oneshot::Sender<LedgerInfoWithSignatures>>,
 }
 
 pub struct PipelineInputRx {
     pub rand_rx: oneshot::Receiver<Option<Randomness>>,
     pub order_vote_rx: oneshot::Receiver<()>,
-    pub order_proof_rx: tokio::sync::broadcast::Receiver<()>,
-    pub commit_proof_rx: tokio::sync::broadcast::Receiver<LedgerInfoWithSignatures>,
+    pub order_proof_fut: TaskFuture<()>,
+    pub commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
 }
 
 /// A representation of a block that has been added to the execution pipeline. It might either be in ordered
@@ -427,7 +427,9 @@ impl PipelinedBlock {
 /// Pipeline related functions
 impl PipelinedBlock {
     pub fn pipeline_enabled(&self) -> bool {
-        self.pipeline_futs.lock().is_some()
+        // if the pipeline_tx is set, the pipeline is enabled,
+        // we don't use pipeline fut here because it can't be taken when abort
+        self.pipeline_tx.lock().is_some()
     }
 
     pub fn pipeline_futs(&self) -> Option<PipelineFutures> {
@@ -451,6 +453,12 @@ impl PipelinedBlock {
     }
 
     pub fn abort_pipeline(&self) -> Option<PipelineFutures> {
+        info!(
+            "[Pipeline] Aborting pipeline for block {} {} {}",
+            self.id(),
+            self.epoch(),
+            self.round()
+        );
         if let Some(abort_handles) = self.pipeline_abort_handle.lock().take() {
             for handle in abort_handles {
                 handle.abort();
@@ -461,7 +469,9 @@ impl PipelinedBlock {
 
     pub async fn wait_for_compute_result(&self) -> ExecutorResult<(StateComputeResult, Duration)> {
         self.pipeline_futs()
-            .expect("Pipeline needs to be enabled")
+            .ok_or(ExecutorError::InternalError {
+                error: "Pipeline aborted".to_string(),
+            })?
             .ledger_update_fut
             .await
             .map(|(compute_result, execution_time, _)| (compute_result, execution_time))
@@ -471,11 +481,11 @@ impl PipelinedBlock {
     }
 
     pub async fn wait_for_commit_ledger(&self) {
-        self.pipeline_futs()
-            .expect("Pipeline needs to be enabled")
-            .commit_ledger_fut
-            .await
-            .expect("Commit ledger should succeed");
+        // may be aborted (e.g. by reset)
+        if let Some(fut) = self.pipeline_futs() {
+            // this may be cancelled
+            let _ = fut.commit_ledger_fut.await;
+        }
     }
 }
 

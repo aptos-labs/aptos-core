@@ -13,7 +13,7 @@ use aptos_executor_types::{
     BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode,
 };
 use aptos_storage_interface::{
-    state_store::state_view::async_proof_fetcher::AsyncProofFetcher, DbReaderWriter, ExecutedTrees,
+    state_store::state_view::async_proof_fetcher::AsyncProofFetcher, DbReaderWriter, LedgerSummary,
     Result,
 };
 use aptos_types::{
@@ -457,7 +457,7 @@ fn apply_transaction_by_writeset(
     db: &DbReaderWriter,
     transactions_and_writesets: Vec<(Transaction, WriteSet)>,
 ) {
-    let ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
+    let ledger_summary: LedgerSummary = db.reader.get_pre_committed_ledger_summary().unwrap();
 
     let (txns, txn_outs) = transactions_and_writesets
         .iter()
@@ -485,7 +485,7 @@ fn apply_transaction_by_writeset(
         )))
         .unzip();
 
-    let state_view = ledger_view
+    let state_view = ledger_summary
         .verified_state_view(
             StateViewId::Miscellaneous,
             Arc::clone(&db.reader),
@@ -496,7 +496,7 @@ fn apply_transaction_by_writeset(
     let chunk_output =
         DoGetExecutionOutput::by_transaction_output(txns, txn_outs, state_view).unwrap();
 
-    let output = ApplyExecutionOutput::run(chunk_output, &ledger_view).unwrap();
+    let output = ApplyExecutionOutput::run(chunk_output, &ledger_summary).unwrap();
 
     db.writer
         .save_transactions(
@@ -681,11 +681,11 @@ fn run_transactions_naive(
     let db = &executor.db;
 
     for txn in transactions {
-        let ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
+        let ledger_summary: LedgerSummary = db.reader.get_pre_committed_ledger_summary().unwrap();
         let out = DoGetExecutionOutput::by_transaction_execution(
             &MockVM::new(),
             vec![txn].into(),
-            ledger_view
+            ledger_summary
                 .verified_state_view(
                     StateViewId::Miscellaneous,
                     Arc::clone(&db.reader),
@@ -696,7 +696,7 @@ fn run_transactions_naive(
             TransactionSliceMetadata::unknown(),
         )
         .unwrap();
-        let output = ApplyExecutionOutput::run(out, &ledger_view).unwrap();
+        let output = ApplyExecutionOutput::run(out, &ledger_summary).unwrap();
         db.writer
             .save_transactions(
                 output.expect_complete_result().as_chunk_to_commit(),
@@ -706,7 +706,7 @@ fn run_transactions_naive(
             .unwrap();
     }
     db.reader
-        .get_latest_executed_trees()
+        .get_pre_committed_ledger_summary()
         .unwrap()
         .transaction_accumulator
         .root_hash()

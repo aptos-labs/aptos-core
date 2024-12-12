@@ -75,7 +75,7 @@ pub use quorum_store::quorum_store_db::QUORUM_STORE_DB_NAME;
 #[cfg(feature = "fuzzing")]
 pub use round_manager::round_manager_fuzzing;
 
-struct IntGaugeGuard {
+pub struct IntGaugeGuard {
     gauge: IntGauge,
 }
 

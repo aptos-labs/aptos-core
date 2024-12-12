@@ -5,6 +5,7 @@ use std::{env, fs, path::Path};
 
 const IMPORTED_MAINNET_TXNS: &str = "imported_mainnet_txns";
 const IMPORTED_TESTNET_TXNS: &str = "imported_testnet_txns";
+const IMPORTED_DEVNET_TXNS: &str = "imported_devnet_txns";
 const SCRIPTED_TRANSACTIONS_TXNS: &str = "scripted_transactions";
 #[derive(Default)]
 pub struct TransactionCodeBuilder {
@@ -113,12 +114,14 @@ fn main() {
     // Create necessary directories if missing
     create_directory_if_missing(&format!("json_transactions/{}", IMPORTED_MAINNET_TXNS));
     create_directory_if_missing(&format!("json_transactions/{}", IMPORTED_TESTNET_TXNS));
+    create_directory_if_missing(&format!("json_transactions/{}", IMPORTED_DEVNET_TXNS));
     create_directory_if_missing(&format!("json_transactions/{}", SCRIPTED_TRANSACTIONS_TXNS));
 
     // Using the builder pattern to construct the code
     let code = TransactionCodeBuilder::new()
         .add_directory(IMPORTED_MAINNET_TXNS, IMPORTED_MAINNET_TXNS, false)
         .add_directory(IMPORTED_TESTNET_TXNS, IMPORTED_TESTNET_TXNS, false)
+        .add_directory(IMPORTED_DEVNET_TXNS, IMPORTED_DEVNET_TXNS, false)
         .add_directory(SCRIPTED_TRANSACTIONS_TXNS, SCRIPTED_TRANSACTIONS_TXNS, true)
         .add_transaction_name_function()
         .build();

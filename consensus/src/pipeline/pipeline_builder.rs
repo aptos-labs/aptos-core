@@ -10,6 +10,7 @@ use crate::{
     monitor,
     payload_manager::TPayloadManager,
     txn_notifier::TxnNotifier,
+    IntGaugeGuard,
 };
 use anyhow::anyhow;
 use aptos_consensus_notifications::ConsensusNotificationSender;
@@ -104,18 +105,30 @@ struct Tracker {
     block_id: HashValue,
     epoch: u64,
     round: Round,
+    created_at: Instant,
+    started_at: Option<Instant>,
+    running_guard: Option<IntGaugeGuard>,
 }
 
 impl Tracker {
-    pub fn new(name: &'static str, block: &Block) -> Self {
-        let ret = Self {
+    fn start_waiting(name: &'static str, block: &Block) -> Self {
+        Self {
             name,
             block_id: block.id(),
             epoch: block.epoch(),
             round: block.round(),
-        };
-        ret.log_start();
-        ret
+            created_at: Instant::now(),
+            started_at: None,
+            running_guard: None,
+        }
+    }
+
+    fn start_working(&mut self) {
+        self.started_at = Some(Instant::now());
+        self.running_guard = Some(IntGaugeGuard::new(
+            counters::OP_COUNTERS.gauge(&format!("{}_running", self.name)),
+        ));
+        self.log_start();
     }
 
     fn log_start(&self) {
@@ -126,9 +139,25 @@ impl Tracker {
     }
 
     fn log_end(&self) {
+        let Some(started_at) = self.started_at else {
+            return;
+        };
+        let wait_time = started_at.duration_since(self.created_at);
+        let work_time = Instant::now().duration_since(started_at);
+        counters::PIPELINE_TRACING
+            .with_label_values(&[self.name, "wait_time"])
+            .observe(wait_time.as_secs_f64());
+        counters::PIPELINE_TRACING
+            .with_label_values(&[self.name, "work_time"])
+            .observe(work_time.as_secs_f64());
         info!(
-            "[Pipeline] Block {} {} {} finishes {}",
-            self.block_id, self.epoch, self.round, self.name
+            "[Pipeline] Block {} {} {} finishes {}, waits {}, takes {}",
+            self.block_id,
+            self.epoch,
+            self.round,
+            self.name,
+            wait_time.as_millis(),
+            work_time.as_millis()
         );
     }
 }
@@ -139,7 +168,6 @@ impl Drop for Tracker {
     }
 }
 
-// TODO: add counters for each phase
 impl PipelineBuilder {
     pub fn new(
         block_preparer: Arc<BlockPreparer>,
@@ -165,23 +193,39 @@ impl PipelineBuilder {
         }
     }
 
-    fn channel() -> (PipelineInputTx, PipelineInputRx) {
+    fn channel(abort_handles: &mut Vec<AbortHandle>) -> (PipelineInputTx, PipelineInputRx) {
         let (rand_tx, rand_rx) = oneshot::channel();
         let (order_vote_tx, order_vote_rx) = oneshot::channel();
-        let (order_proof_tx, order_proof_rx) = tokio::sync::broadcast::channel(1);
-        let (commit_proof_tx, commit_proof_rx) = tokio::sync::broadcast::channel(1);
+        let (order_proof_tx, order_proof_fut) = oneshot::channel();
+        let (commit_proof_tx, commit_proof_fut) = oneshot::channel();
+        let order_proof_fut = spawn_shared_fut(
+            async move {
+                order_proof_fut
+                    .await
+                    .map_err(|_| TaskError::from(anyhow!("order proof tx cancelled")))
+            },
+            abort_handles,
+        );
+        let commit_proof_fut = spawn_shared_fut(
+            async move {
+                commit_proof_fut
+                    .await
+                    .map_err(|_| TaskError::from(anyhow!("commit proof tx cancelled")))
+            },
+            abort_handles,
+        );
         (
             PipelineInputTx {
                 rand_tx: Some(rand_tx),
                 order_vote_tx: Some(order_vote_tx),
-                order_proof_tx,
-                commit_proof_tx,
+                order_proof_tx: Some(order_proof_tx),
+                commit_proof_tx: Some(commit_proof_tx),
             },
             PipelineInputRx {
                 rand_rx,
                 order_vote_rx,
-                order_proof_rx,
-                commit_proof_rx,
+                order_proof_fut,
+                commit_proof_fut,
             },
         )
     }
@@ -242,15 +286,14 @@ impl PipelineBuilder {
         block: Arc<Block>,
         block_store_callback: Box<dyn FnOnce(LedgerInfoWithSignatures) + Send + Sync>,
     ) -> (PipelineFutures, PipelineInputTx, Vec<AbortHandle>) {
-        let (tx, rx) = Self::channel();
+        let mut abort_handles = vec![];
+        let (tx, rx) = Self::channel(&mut abort_handles);
         let PipelineInputRx {
             rand_rx,
             order_vote_rx,
-            order_proof_rx,
-            commit_proof_rx,
+            order_proof_fut,
+            commit_proof_fut,
         } = rx;
-
-        let mut abort_handles = vec![];
 
         let prepare_fut = spawn_shared_fut(
             Self::prepare(self.block_preparer.clone(), block.clone()),
@@ -282,8 +325,8 @@ impl PipelineBuilder {
             Self::sign_commit_vote(
                 ledger_update_fut.clone(),
                 order_vote_rx,
-                order_proof_rx.resubscribe(),
-                commit_proof_rx.resubscribe(),
+                order_proof_fut.clone(),
+                commit_proof_fut.clone(),
                 self.signer.clone(),
                 block.clone(),
             ),
@@ -293,8 +336,8 @@ impl PipelineBuilder {
             Self::pre_commit(
                 ledger_update_fut.clone(),
                 parent.pre_commit_fut.clone(),
-                order_proof_rx,
-                commit_proof_rx.resubscribe(),
+                order_proof_fut,
+                commit_proof_fut.clone(),
                 self.executor.clone(),
                 block.clone(),
             ),
@@ -303,7 +346,7 @@ impl PipelineBuilder {
         let commit_ledger_fut = spawn_shared_fut(
             Self::commit_ledger(
                 pre_commit_fut.clone(),
-                commit_proof_rx,
+                commit_proof_fut,
                 parent.commit_ledger_fut.clone(),
                 self.executor.clone(),
                 block.clone(),
@@ -333,6 +376,7 @@ impl PipelineBuilder {
             Self::post_commit_ledger(
                 pre_commit_fut.clone(),
                 commit_ledger_fut.clone(),
+                post_pre_commit_fut.clone(),
                 parent.post_commit_fut.clone(),
                 self.payload_manager.clone(),
                 block_store_callback,
@@ -363,7 +407,8 @@ impl PipelineBuilder {
     /// Precondition: Block is inserted into block tree (all ancestors are available)
     /// What it does: Wait for all data becomes available and verify transaction signatures
     async fn prepare(preparer: Arc<BlockPreparer>, block: Arc<Block>) -> TaskResult<PrepareResult> {
-        let _tracker = Tracker::new("prepare", &block);
+        let mut tracker = Tracker::start_waiting("prepare", &block);
+        tracker.start_working();
         // the loop can only be abort by the caller
         let input_txns = loop {
             match preparer.prepare_block(&block).await {
@@ -404,13 +449,14 @@ impl PipelineBuilder {
         validator: Arc<[AccountAddress]>,
         onchain_execution_config: BlockExecutorConfigFromOnchain,
     ) -> TaskResult<ExecuteResult> {
+        let mut tracker = Tracker::start_waiting("execute", &block);
         parent_block_execute_phase.await?;
         let user_txns = prepare_phase.await?;
         let maybe_rand = randomness_rx
             .await
             .map_err(|_| anyhow!("randomness tx cancelled"))?;
 
-        let _tracker = Tracker::new("execute", &block);
+        tracker.start_working();
         let metadata_txn = if is_randomness_enabled {
             block.new_metadata_with_randomness(&validator, maybe_rand)
         } else {
@@ -455,9 +501,11 @@ impl PipelineBuilder {
         executor: Arc<dyn BlockExecutorTrait>,
         block: Arc<Block>,
     ) -> TaskResult<LedgerUpdateResult> {
+        let mut tracker = Tracker::start_waiting("ledger_update", &block);
         let (_, _, prev_epoch_end_timestamp) = parent_block_ledger_update_phase.await?;
         let execution_time = execute_phase.await?;
-        let _tracker = Tracker::new("ledger_update", &block);
+
+        tracker.start_working();
         let timestamp = block.timestamp_usecs();
         let result = tokio::task::spawn_blocking(move || {
             executor
@@ -485,10 +533,11 @@ impl PipelineBuilder {
         mempool_notifier: Arc<dyn TxnNotifier>,
         block: Arc<Block>,
     ) -> TaskResult<PostLedgerUpdateResult> {
+        let mut tracker = Tracker::start_waiting("post_ledger_update", &block);
         let user_txns = prepare_fut.await?;
         let (compute_result, _, _) = ledger_update.await?;
 
-        let _tracker = Tracker::new("post_ledger_update", &block);
+        tracker.start_working();
         let compute_status = compute_result.compute_status_for_input_txns();
         // the length of compute_status is user_txns.len() + num_vtxns + 1 due to having blockmetadata
         if user_txns.len() >= compute_status.len() {
@@ -530,26 +579,27 @@ impl PipelineBuilder {
     async fn sign_commit_vote(
         ledger_update_phase: TaskFuture<LedgerUpdateResult>,
         order_vote_rx: oneshot::Receiver<()>,
-        mut order_proof_rx: tokio::sync::broadcast::Receiver<()>,
-        mut commit_proof_rx: tokio::sync::broadcast::Receiver<LedgerInfoWithSignatures>,
+        order_proof_fut: TaskFuture<()>,
+        commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
         signer: Arc<ValidatorSigner>,
         block: Arc<Block>,
     ) -> TaskResult<CommitVoteResult> {
+        let mut tracker = Tracker::start_waiting("sign_commit_vote", &block);
         let (compute_result, _, epoch_end_timestamp) = ledger_update_phase.await?;
-        // either order_vote_rx or order_proof_rx can trigger the next phase
+        // either order_vote_rx or order_proof_fut can trigger the next phase
         select! {
             Ok(_) = order_vote_rx => {
             }
-            Ok(_) = order_proof_rx.recv() => {
+            Ok(_) = order_proof_fut => {
             }
-            Ok(_) = commit_proof_rx.recv() => {
+            Ok(_) = commit_proof_fut => {
             }
             else => {
                 return Err(anyhow!("all receivers dropped"))?;
             }
         }
+        tracker.start_working();
 
-        let _tracker = Tracker::new("sign_commit_vote", &block);
         let mut block_info = block.gen_block_info(
             compute_result.root_hash(),
             compute_result.last_version_or_0(),
@@ -580,27 +630,22 @@ impl PipelineBuilder {
         ledger_update_phase: TaskFuture<LedgerUpdateResult>,
         // TODO bound parent_commit_ledger too
         parent_block_pre_commit_phase: TaskFuture<PreCommitResult>,
-        mut order_proof_rx: tokio::sync::broadcast::Receiver<()>,
-        mut commit_proof_rx: tokio::sync::broadcast::Receiver<LedgerInfoWithSignatures>,
+        order_proof_fut: TaskFuture<()>,
+        commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
         executor: Arc<dyn BlockExecutorTrait>,
         block: Arc<Block>,
     ) -> TaskResult<PreCommitResult> {
+        let mut tracker = Tracker::start_waiting("pre_commit", &block);
         let (compute_result, _, _) = ledger_update_phase.await?;
         parent_block_pre_commit_phase.await?;
 
-        order_proof_rx
-            .recv()
-            .await
-            .map_err(|_| anyhow!("order proof tx cancelled"))?;
+        order_proof_fut.await?;
 
         if compute_result.has_reconfiguration() {
-            commit_proof_rx
-                .recv()
-                .await
-                .map_err(|_| anyhow!("commit proof tx cancelled"))?;
+            commit_proof_fut.await?;
         }
 
-        let _tracker = Tracker::new("pre_commit", &block);
+        tracker.start_working();
         tokio::task::spawn_blocking(move || {
             executor
                 .pre_commit_block(block.id())
@@ -620,12 +665,11 @@ impl PipelineBuilder {
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         block: Arc<Block>,
     ) -> TaskResult<PostPreCommitResult> {
+        let mut tracker = Tracker::start_waiting("post_pre_commit", &block);
         let compute_result = pre_commit.await?;
         parent_post_pre_commit.await?;
 
-        let _tracker = Tracker::new("post_pre_commit", &block);
-        let _timer = counters::OP_COUNTERS.timer("pre_commit_notify");
-
+        tracker.start_working();
         let txns = compute_result.transactions_to_commit().to_vec();
         let subscribable_events = compute_result.subscribable_events().to_vec();
         if let Err(e) = monitor!(
@@ -644,24 +688,22 @@ impl PipelineBuilder {
     /// What it does: Commit the ledger info to storage, this makes the data visible for clients
     async fn commit_ledger(
         pre_commit_fut: TaskFuture<PreCommitResult>,
-        mut commit_proof_rx: tokio::sync::broadcast::Receiver<LedgerInfoWithSignatures>,
+        commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
         parent_block_commit_phase: TaskFuture<CommitLedgerResult>,
         executor: Arc<dyn BlockExecutorTrait>,
         block: Arc<Block>,
     ) -> TaskResult<CommitLedgerResult> {
+        let mut tracker = Tracker::start_waiting("commit_ledger", &block);
         parent_block_commit_phase.await?;
         pre_commit_fut.await?;
-        let ledger_info_with_sigs = commit_proof_rx
-            .recv()
-            .await
-            .map_err(|_| anyhow!("commit rx cancelled"))?;
+        let ledger_info_with_sigs = commit_proof_fut.await?;
 
         // it's committed as prefix
         if ledger_info_with_sigs.commit_info().id() != block.id() {
             return Ok(None);
         }
 
-        let _tracker = Tracker::new("commit_ledger", &block);
+        tracker.start_working();
         let ledger_info_with_sigs_clone = ledger_info_with_sigs.clone();
         tokio::task::spawn_blocking(move || {
             executor
@@ -673,21 +715,24 @@ impl PipelineBuilder {
         Ok(Some(ledger_info_with_sigs))
     }
 
-    /// Precondition: 1. commit ledger finishes, 2. parent block's phase finishes
+    /// Precondition: 1. commit ledger finishes, 2. parent block's phase finishes 3. post pre commit finishes
     /// What it does: Update counters for the block, and notify block tree about the commit
     async fn post_commit_ledger(
         pre_commit_fut: TaskFuture<PreCommitResult>,
         commit_ledger_fut: TaskFuture<CommitLedgerResult>,
+        post_pre_commit_fut: TaskFuture<PostPreCommitResult>,
         parent_post_commit: TaskFuture<PostCommitResult>,
         payload_manager: Arc<dyn TPayloadManager>,
         block_store_callback: Box<dyn FnOnce(LedgerInfoWithSignatures) + Send + Sync>,
         block: Arc<Block>,
     ) -> TaskResult<PostCommitResult> {
+        let mut tracker = Tracker::start_waiting("post_commit_ledger", &block);
         parent_post_commit.await?;
         let maybe_ledger_info_with_sigs = commit_ledger_fut.await?;
         let compute_result = pre_commit_fut.await?;
+        post_pre_commit_fut.await?;
 
-        let _tracker = Tracker::new("post_commit_ledger", &block);
+        tracker.start_working();
         update_counters_for_block(&block);
         update_counters_for_compute_result(&compute_result);
 

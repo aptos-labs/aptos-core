@@ -21,7 +21,7 @@ use aptos_storage_interface::{
         sharded_state_updates::ShardedStateUpdates, state_delta::StateDelta,
         state_view::cached_state_view::ShardedStateCache,
     },
-    AptosDbError, DbReader, DbWriter, ExecutedTrees, MAX_REQUEST_LIMIT,
+    AptosDbError, DbReader, DbWriter, LedgerSummary, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     access_path::AccessPath,
@@ -200,7 +200,7 @@ impl FakeAptosDB {
                 first_version, /* num_existing_leaves */
                 &txn_hashes,
             )?;
-        // Store the transaction hash by position to serve [DbReader::get_latest_executed_trees] calls
+        // Store the transaction hash by position to serve [DbReader::get_pre_committed_ledger_summary] calls
         writes.iter().for_each(|(pos, hash)| {
             self.txn_hash_by_position.insert(*pos, *hash);
         });
@@ -833,16 +833,16 @@ impl DbReader for FakeAptosDB {
             .get_state_value_with_proof_by_version_ext(state_key, version, root_depth)
     }
 
-    fn get_latest_executed_trees(&self) -> Result<ExecutedTrees> {
+    fn get_pre_committed_ledger_summary(&self) -> Result<LedgerSummary> {
         // If the genesis is not executed yet, we need to get the executed trees from the inner AptosDB
         // This is because when we call save_transactions for the genesis block, we call [AptosDB::save_transactions]
         // where there is an expectation that the root of the SMTs are the same pointers. Here,
         // we get from the inner AptosDB which ensures that the pointers match when save_transactions is called.
         if self.ensure_synced_version().unwrap_or_default() == 0 {
-            return self.inner.get_latest_executed_trees();
+            return self.inner.get_pre_committed_ledger_summary();
         }
 
-        gauged_api("get_latest_executed_trees", || {
+        gauged_api("get_pre_committed_ledger_summary", || {
             let buffered_state = self.buffered_state.lock();
             let num_txns = buffered_state
                 .current_state()
@@ -852,11 +852,11 @@ impl DbReader for FakeAptosDB {
             let frozen_subtrees = self.get_frozen_subtree_hashes(num_txns)?;
             let transaction_accumulator =
                 Arc::new(InMemoryAccumulator::new(frozen_subtrees, num_txns)?);
-            let executed_trees = ExecutedTrees::new(
+            let ledger_summary = LedgerSummary::new(
                 buffered_state.current_state().clone(),
                 transaction_accumulator,
             );
-            Ok(executed_trees)
+            Ok(ledger_summary)
         })
     }
 
@@ -946,7 +946,7 @@ impl DbReader for FakeAptosDB {
     }
 }
 
-/// This is necessary for constructing the [ExecutedTrees] to serve [DbReader::get_latest_executed_trees]
+/// This is necessary for constructing the [LedgerSummary] to serve [DbReader::get_pre_committed_ledger_summary]
 /// requests.
 impl HashReader for FakeAptosDB {
     fn get(&self, position: Position) -> anyhow::Result<HashValue> {
@@ -999,7 +999,7 @@ mod tests {
 
             let mut in_memory_state = db
                 .inner
-            .get_latest_executed_trees().state;
+            .get_pre_committed_ledger_summary().state;
 
             let mut cur_ver: Version = 0;
             for (txns_to_commit, ledger_info_with_sigs) in input.iter() {

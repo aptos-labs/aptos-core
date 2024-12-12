@@ -6,6 +6,7 @@ use crate::{
     tests::common, MoveHarness,
 };
 use aptos_types::account_address::AccountAddress;
+use move_core_types::transaction_argument::TransactionArgument;
 use once_cell::sync::Lazy;
 use std::collections::BTreeMap;
 
@@ -33,6 +34,17 @@ fn test_vote() {
     assert_success!(setup_staking(&mut harness, &validator_2, stake_amount_2));
     assert_success!(increase_lockup(&mut harness, &validator_2));
 
+    // Disable partial governance voting.
+    let core_resources =
+        harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
+    let script_code = PROPOSAL_SCRIPTS
+        .get("enable_partial_governance_voting")
+        .expect("proposal script should be built");
+    let txn = harness.create_script(&core_resources, script_code.clone(), vec![], vec![
+        TransactionArgument::Bool(false),
+    ]);
+    assert_success!(harness.run(txn));
+
     let mut proposal_id: u64 = 0;
     assert_success!(create_proposal_v2(
         &mut harness,
@@ -59,12 +71,9 @@ fn test_vote() {
     );
 
     // Enable partial governance voting. In production it requires governance.
-    let core_resources =
-        harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
-    let script_code = PROPOSAL_SCRIPTS
-        .get("enable_partial_governance_voting")
-        .expect("proposal script should be built");
-    let txn = harness.create_script(&core_resources, script_code.clone(), vec![], vec![]);
+    let txn = harness.create_script(&core_resources, script_code.clone(), vec![], vec![
+        TransactionArgument::Bool(true),
+    ]);
     assert_success!(harness.run(txn));
 
     // If a voter has already voted on a proposal before partial voting is enabled, the voter cannot vote on the proposal again.

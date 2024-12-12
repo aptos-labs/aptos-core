@@ -42,37 +42,48 @@ impl StructNameIndexMap {
     /// if A == B, they have the same indices.
     pub(crate) fn struct_name_to_idx(
         &self,
-        struct_name: StructIdentifier,
+        struct_name: &StructIdentifier,
     ) -> PartialVMResult<StructNameIndex> {
-        // Note that we take a write lock here once, instead of (*): taking a read lock, checking
-        // if the index is cached, re-acquiring the (write) lock, and checking again, as it makes
-        // things faster.
-        // Note that even if we do (*), we MUST check if another thread has cached the index before
-        // we reached this point for correctness. If we do not do this, we can end up evicting the
-        // previous index, and end up with multiple indices corresponding to the same struct. As
-        // indices are stored inside types, type comparison breaks!
-        let mut index_map = self.0.write();
-
-        // Index is cached, return early.
-        if let Some(idx) = index_map.forward_map.get(&struct_name) {
-            return Ok(StructNameIndex(*idx));
+        {
+            let index_map = self.0.read();
+            if let Some(idx) = index_map.forward_map.get(struct_name) {
+                return Ok(StructNameIndex(*idx));
+            }
         }
 
-        // Otherwise, the cache is locked and the struct name is not present. We simply add it
-        // to the cache and return the corresponding index.
-        let idx = index_map.backward_map.len();
-        let prev_idx = index_map.forward_map.insert(struct_name.clone(), idx);
-        index_map.backward_map.push(Arc::new(struct_name));
+        // Possibly need to insert, so make the copies outside of the lock.
+        let forward_key = struct_name.clone();
+        let backward_value = Arc::new(struct_name.clone());
 
-        // Unlock the cache.
-        drop(index_map);
+        let idx = {
+            let mut index_map = self.0.write();
 
-        if prev_idx.is_some() {
-            return Err(panic_error!(
-                "Indexing map should never evict cached entries"
-            ));
-        }
+            if let Some(idx) = index_map.forward_map.get(struct_name) {
+                return Ok(StructNameIndex(*idx));
+            }
+
+            let idx = index_map.backward_map.len();
+            index_map.backward_map.push(backward_value);
+            index_map.forward_map.insert(forward_key, idx);
+            idx
+        };
+
         Ok(StructNameIndex(idx))
+    }
+
+    fn idx_to_struct_name_helper<'a>(
+        index_map: &'a parking_lot::RwLockReadGuard<IndexMap<StructIdentifier>>,
+        idx: StructNameIndex,
+    ) -> PartialVMResult<&'a Arc<StructIdentifier>> {
+        index_map.backward_map.get(idx.0).ok_or_else(|| {
+            let msg = format!(
+                "Index out of bounds when accessing struct name reference \
+                     at index {}, backward map length: {}",
+                idx.0,
+                index_map.backward_map.len()
+            );
+            panic_error!(msg)
+        })
     }
 
     /// Returns the reference of the struct name corresponding to the index. Here, we wrap the
@@ -82,19 +93,7 @@ impl StructNameIndexMap {
         idx: StructNameIndex,
     ) -> PartialVMResult<Arc<StructIdentifier>> {
         let index_map = self.0.read();
-        Ok(index_map
-            .backward_map
-            .get(idx.0)
-            .ok_or_else(|| {
-                let msg = format!(
-                    "Index out of bounds when accessing struct name reference \
-                     at index {}, backward map length: {}",
-                    idx.0,
-                    index_map.backward_map.len()
-                );
-                panic_error!(msg)
-            })?
-            .clone())
+        Ok(Self::idx_to_struct_name_helper(&index_map, idx)?.clone())
     }
 
     /// Returns the clone of the struct name corresponding to the index. The clone ensures that the
@@ -104,18 +103,7 @@ impl StructNameIndexMap {
         idx: StructNameIndex,
     ) -> PartialVMResult<StructIdentifier> {
         let index_map = self.0.read();
-        Ok(index_map
-            .backward_map
-            .get(idx.0)
-            .ok_or_else(|| {
-                let msg = format!(
-                    "Index out of bounds when accessing struct name at index {}, \
-                     backward map length: {}",
-                    idx.0,
-                    index_map.backward_map.len()
-                );
-                panic_error!(msg)
-            })?
+        Ok(Self::idx_to_struct_name_helper(&index_map, idx)?
             .as_ref()
             .clone())
     }
@@ -127,19 +115,7 @@ impl StructNameIndexMap {
         ty_args: Vec<TypeTag>,
     ) -> PartialVMResult<StructTag> {
         let index_map = self.0.read();
-        let struct_name = index_map
-            .backward_map
-            .get(idx.0)
-            .ok_or_else(|| {
-                let msg = format!(
-                    "Index out of bounds when constructing a struct tag \
-                     for struct name at index {}, backward map length: {}",
-                    idx.0,
-                    index_map.backward_map.len()
-                );
-                panic_error!(msg)
-            })?
-            .as_ref();
+        let struct_name = Self::idx_to_struct_name_helper(&index_map, idx)?.as_ref();
         Ok(StructTag {
             address: *struct_name.module.address(),
             module: struct_name.module.name().to_owned(),
@@ -151,10 +127,10 @@ impl StructNameIndexMap {
     /// Returns the number of cached entries. Asserts that the number of cached indices is equal to
     /// the number of cached struct names.
     pub(crate) fn checked_len(&self) -> PartialVMResult<usize> {
-        let index_map = self.0.read();
-        let forward_map_len = index_map.forward_map.len();
-        let backward_map_len = index_map.backward_map.len();
-        drop(index_map);
+        let (forward_map_len, backward_map_len) = {
+            let index_map = self.0.read();
+            (index_map.forward_map.len(), index_map.backward_map.len())
+        };
 
         if forward_map_len != backward_map_len {
             let msg = format!(
@@ -205,11 +181,11 @@ mod test {
         // First-time access.
 
         let foo = make_struct_name("foo", "Foo");
-        let foo_idx = assert_ok!(struct_name_idx_map.struct_name_to_idx(foo.clone()));
+        let foo_idx = assert_ok!(struct_name_idx_map.struct_name_to_idx(&foo));
         assert_eq!(foo_idx.0, 0);
 
         let bar = make_struct_name("bar", "Bar");
-        let bar_idx = assert_ok!(struct_name_idx_map.struct_name_to_idx(bar.clone()));
+        let bar_idx = assert_ok!(struct_name_idx_map.struct_name_to_idx(&bar));
         assert_eq!(bar_idx.0, 1);
 
         // Check that struct names actually correspond to indices.
@@ -219,9 +195,9 @@ mod test {
         assert_eq!(returned_bar.as_ref(), &bar);
 
         // Re-check indices on second access.
-        let foo_idx = assert_ok!(struct_name_idx_map.struct_name_to_idx(foo));
+        let foo_idx = assert_ok!(struct_name_idx_map.struct_name_to_idx(&foo));
         assert_eq!(foo_idx.0, 0);
-        let bar_idx = assert_ok!(struct_name_idx_map.struct_name_to_idx(bar));
+        let bar_idx = assert_ok!(struct_name_idx_map.struct_name_to_idx(&bar));
         assert_eq!(bar_idx.0, 1);
 
         let len = assert_ok!(struct_name_idx_map.checked_len());
@@ -251,7 +227,7 @@ mod test {
                     s.spawn({
                         let struct_name_idx_map = struct_name_idx_map.clone();
                         move || {
-                            let idx = assert_ok!(struct_name_idx_map.struct_name_to_idx(struct_name.clone()));
+                            let idx = assert_ok!(struct_name_idx_map.struct_name_to_idx(struct_name));
                             let actual_struct_name = assert_ok!(struct_name_idx_map.idx_to_struct_name_ref(idx));
                             assert_eq!(actual_struct_name.as_ref(), struct_name);
                         }
@@ -273,7 +249,7 @@ mod test {
                     let struct_name_idx_map = struct_name_idx_map.clone();
                     let struct_name = struct_name.clone();
                     move || {
-                        assert_ok!(struct_name_idx_map.struct_name_to_idx(struct_name));
+                        assert_ok!(struct_name_idx_map.struct_name_to_idx(&struct_name));
                     }
                 });
             }

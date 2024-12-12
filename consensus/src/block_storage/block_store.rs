@@ -400,9 +400,9 @@ impl BlockStore {
             });
             pipeline_builder.build(
                 &pipelined_block,
-                parent_block
-                    .pipeline_futs()
-                    .expect("Futures should exist when pipeline enabled"),
+                parent_block.pipeline_futs().ok_or_else(|| {
+                    anyhow::anyhow!("Parent future doesn't exist, potentially epoch ended")
+                })?,
                 callback,
             );
         }

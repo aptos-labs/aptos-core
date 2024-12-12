@@ -165,8 +165,9 @@ pub(crate) fn save_transactions(
 
         ledger_db.write_schemas(ledger_db_batch)?;
 
-        *state_store.current_state().lock() =
-            StateDelta::new_empty_with_version(Some(last_version));
+        state_store
+            .current_state()
+            .set(StateDelta::new_empty_with_version(Some(last_version)));
     }
 
     Ok(())

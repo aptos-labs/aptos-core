@@ -521,11 +521,9 @@ pub enum MoveType {
     Unparsable(String),
 }
 
-/// Maximum number of recursive types
-/// Currently, this is allowed up to the serde limit of 16
-///
-/// TODO: Should this number be re-evaluated
-pub const MAX_RECURSIVE_TYPES_ALLOWED: u8 = 16;
+/// Maximum number of recursive types - Same as (non-public)
+/// move_core_types::safe_serialize::MAX_TYPE_TAG_NESTING
+pub const MAX_RECURSIVE_TYPES_ALLOWED: u8 = 8;
 
 impl VerifyInputWithRecursion for MoveType {
     fn verify(&self, recursion_count: u8) -> anyhow::Result<()> {

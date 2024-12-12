@@ -14,7 +14,7 @@ use bytes::Bytes;
 use move_core_types::move_resource::MoveResource;
 #[cfg(any(test, feature = "testing"))]
 use std::hash::Hash;
-use std::{collections::HashMap, ops::Deref};
+use std::ops::Deref;
 
 pub mod errors;
 pub mod state_key;
@@ -93,18 +93,18 @@ where
 /// Test-only basic [StateView] implementation with generic keys.
 #[cfg(any(test, feature = "testing"))]
 pub struct MockStateView<K> {
-    data: HashMap<K, StateValue>,
+    data: std::collections::HashMap<K, StateValue>,
 }
 
 #[cfg(any(test, feature = "testing"))]
 impl<K> MockStateView<K> {
     pub fn empty() -> Self {
         Self {
-            data: HashMap::new(),
+            data: std::collections::HashMap::new(),
         }
     }
 
-    pub fn new(data: HashMap<K, StateValue>) -> Self {
+    pub fn new(data: std::collections::HashMap<K, StateValue>) -> Self {
         Self { data }
     }
 }

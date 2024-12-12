@@ -9,6 +9,8 @@
 /// Move functions here because many have loops, requiring loop invariants to prove, and
 /// the return on investment didn't seem worth it for these simple functions.
 module std::vector {
+    // use std::mem;
+
     /// The index into the vector is out of bounds
     const EINDEX_OUT_OF_BOUNDS: u64 = 0x20000;
 
@@ -23,6 +25,11 @@ module std::vector {
 
     /// The range in `slice` is invalid.
     const EINVALID_SLICE_RANGE: u64 = 0x20004;
+
+    /// Whether to utilize native vector::move_range
+    /// Vector module cannot call features module, due to cyclic dependency,
+    /// so this is a constant.
+    const USE_MOVE_RANGE: bool = true;
 
     #[bytecode_instruction]
     /// Create an empty vector.
@@ -121,8 +128,15 @@ module std::vector {
 
     /// Pushes all of the elements of the `other` vector into the `self` vector.
     public fun append<Element>(self: &mut vector<Element>, other: vector<Element>) {
-        reverse(&mut other);
-        reverse_append(self, other);
+        if (USE_MOVE_RANGE) {
+            let self_length = length(self);
+            let other_length = length(&other);
+            move_range(&mut other, 0, other_length, self, self_length);
+            destroy_empty(other);
+        } else {
+            reverse(&mut other);
+            reverse_append(self, other);
+        }
     }
     spec append {
         pragma intrinsic = true;
@@ -144,11 +158,27 @@ module std::vector {
         pragma intrinsic = true;
     }
 
-    /// Trim a vector to a smaller size, returning the evicted elements in order
+    /// Splits (trims) the collection into two at the given index.
+    /// Returns a newly allocated vector containing the elements in the range [new_len, len).
+    /// After the call, the original vector will be left containing the elements [0, new_len)
+    /// with its previous capacity unchanged.
+    /// In many languages this is also called `split_off`.
     public fun trim<Element>(self: &mut vector<Element>, new_len: u64): vector<Element> {
-        let res = trim_reverse(self, new_len);
-        reverse(&mut res);
-        res
+        let len = length(self);
+        assert!(new_len <= len, EINDEX_OUT_OF_BOUNDS);
+
+        let other = empty();
+        if (USE_MOVE_RANGE) {
+            move_range(self, new_len, len - new_len, &mut other, 0);
+        } else {
+            while (len > new_len) {
+                push_back(&mut other, pop_back(self));
+                len = len - 1;
+            };
+            reverse(&mut other);
+        };
+
+        other
     }
     spec trim {
         pragma intrinsic = true;
@@ -229,10 +259,27 @@ module std::vector {
     public fun insert<Element>(self: &mut vector<Element>, i: u64, e: Element) {
         let len = length(self);
         assert!(i <= len, EINDEX_OUT_OF_BOUNDS);
-        push_back(self, e);
-        while (i < len) {
-            swap(self, i, len);
-            i = i + 1;
+
+        if (USE_MOVE_RANGE) {
+            if (i + 2 >= len) {
+                // When we are close to the end, it is cheaper to not create
+                // a temporary vector, and swap directly
+                push_back(self, e);
+                while (i < len) {
+                    swap(self, i, len);
+                    i = i + 1;
+                };
+            } else {
+                let other = singleton(e);
+                move_range(&mut other, 0, 1, self, i);
+                destroy_empty(other);
+            }
+        } else {
+            push_back(self, e);
+            while (i < len) {
+                swap(self, i, len);
+                i = i + 1;
+            };
         };
     }
     spec insert {
@@ -247,9 +294,25 @@ module std::vector {
         // i out of bounds; abort
         if (i >= len) abort EINDEX_OUT_OF_BOUNDS;
 
-        len = len - 1;
-        while (i < len) swap(self, i, { i = i + 1; i });
-        pop_back(self)
+        if (USE_MOVE_RANGE) {
+            // When we are close to the end, it is cheaper to not create
+            // a temporary vector, and swap directly
+            if (i + 3 >= len) {
+                len = len - 1;
+                while (i < len) swap(self, i, { i = i + 1; i });
+                pop_back(self)
+            } else {
+                let other = empty();
+                move_range(self, i, 1, &mut other, 0);
+                let result = pop_back(&mut other);
+                destroy_empty(other);
+                result
+            }
+        } else {
+            len = len - 1;
+            while (i < len) swap(self, i, { i = i + 1; i });
+            pop_back(self)
+        }
     }
     spec remove {
         pragma intrinsic = true;
@@ -286,6 +349,22 @@ module std::vector {
     }
     spec swap_remove {
         pragma intrinsic = true;
+    }
+
+    /// Replace the `i`th element of the vector `self` with the given value, and return
+    /// to the caller the value that was there before.
+    /// Aborts if `i` is out of bounds.
+    public fun replace<Element>(self: &mut vector<Element>, i: u64, val: Element): Element {
+        let last_idx = length(self);
+        assert!(i < last_idx, EINDEX_OUT_OF_BOUNDS);
+        // TODO: Enable after tests are fixed.
+        // if (USE_MOVE_RANGE) {
+        //     mem::replace(borrow_mut(self, i), val)
+        // } else {
+        push_back(self, val);
+        swap(self, i, last_idx);
+        pop_back(self)
+        // }
     }
 
     /// Apply the function to each element in the vector, consuming it.

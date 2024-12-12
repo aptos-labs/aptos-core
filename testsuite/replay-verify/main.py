@@ -17,7 +17,7 @@ from testsuite import forge
 from archive_disk_utils import (
     TESTNET_SNAPSHOT_NAME,
     MAINNET_SNAPSHOT_NAME,
-    create_pvcs_from_snapshot,
+    create_replay_verify_pvcs_from_snapshot,
     get_kubectl_credentials,
 )
 
@@ -27,6 +27,7 @@ RETRY_DELAY = 20  # seconds
 QUERY_DELAY = 5  # seconds
 
 REPLAY_CONCURRENCY_LEVEL = 1
+
 
 class Network(Enum):
     TESTNET = 1
@@ -241,6 +242,7 @@ class WorkerPod:
     def get_humio_log_link(self):
         return construct_humio_url(self.label, self.name, self.start_time, time.time())
 
+
 class ReplayConfig:
     def __init__(self, network):
         if network == Network.TESTNET:
@@ -253,8 +255,9 @@ class ReplayConfig:
             self.concurrent_replayer = 18
             self.pvc_number = 8
             self.min_range_size = 10_000
-            self.range_size = 2_000_000 
+            self.range_size = 2_000_000
             self.timeout_secs = 400
+
 
 class TaskStats:
     def __init__(self, name):
@@ -308,7 +311,7 @@ class ReplayScheduler:
         self.image = image
         self.pvcs = []
         self.config = replay_config
-        
+
     def __str__(self):
         return f"""ReplayScheduler:
             id: {self.id}
@@ -359,8 +362,12 @@ class ReplayScheduler:
             if self.network == Network.TESTNET
             else MAINNET_SNAPSHOT_NAME
         )
-        pvcs = create_pvcs_from_snapshot(
-            self.id, snapshot_name, self.namespace, self.config.pvc_number, self.get_label()
+        pvcs = create_replay_verify_pvcs_from_snapshot(
+            self.id,
+            snapshot_name,
+            self.namespace,
+            self.config.pvc_number,
+            self.get_label(),
         )
         assert len(pvcs) == self.config.pvc_number, "failed to create all pvcs"
         self.pvcs = pvcs
@@ -493,7 +500,9 @@ def parse_args():
     parser.add_argument("--end", required=False, type=int)
     parser.add_argument("--worker_cnt", required=False, type=int)
     parser.add_argument("--range_size", required=False, type=int)
-    parser.add_argument("--namespace", required=False, type=str, default="default")
+    parser.add_argument(
+        "--namespace", required=False, type=str, default="replay-verify"
+    )
     parser.add_argument("--image_tag", required=False, type=str)
     parser.add_argument("--cleanup", required=False, action="store_true", default=False)
     args = parser.parse_args()
@@ -504,12 +513,16 @@ def get_image(image_tag=None):
     shell = forge.LocalShell()
     git = forge.Git(shell)
     image_name = "tools"
-    default_latest_image = forge.find_recent_images(
-        shell,
-        git,
-        1,
-        image_name=image_name,
-    )[0] if image_tag is None else image_tag
+    default_latest_image = (
+        forge.find_recent_images(
+            shell,
+            git,
+            1,
+            image_name=image_name,
+        )[0]
+        if image_tag is None
+        else image_tag
+    )
     full_image = f"{forge.GAR_REPO_NAME}/{image_name}:{default_latest_image}"
     return full_image
 
@@ -537,6 +550,16 @@ if __name__ == "__main__":
     config = ReplayConfig(network)
     worker_cnt = args.worker_cnt if args.worker_cnt else config.pvc_number * 7
     range_size = args.range_size if args.range_size else config.range_size
+
+    if args.start is not None:
+        assert (
+            args.start >= start
+        ), f"start version {args.start} is out of range {start} - {end}"
+    if args.end is not None:
+        assert (
+            args.end <= end
+        ), f"end version {args.end} is out of range {start} - {end}"
+
     scheduler = ReplayScheduler(
         run_id,
         start if args.start is None else args.start,
@@ -546,7 +569,7 @@ if __name__ == "__main__":
         range_size=range_size,
         image=image,
         replay_config=config,
-        network= network,
+        network=network,
         namespace=args.namespace,
     )
     logger.info(f"scheduler: {scheduler}")
@@ -561,6 +584,9 @@ if __name__ == "__main__":
             (failed_logs, txn_mismatch_logs) = scheduler.collect_all_failed_logs()
             scheduler.print_stats()
             print_logs(failed_logs, txn_mismatch_logs)
+            if txn_mismatch_logs:
+                logger.error("Transaction mismatch logs found.")
+                exit(1)
 
         finally:
             scheduler.cleanup()

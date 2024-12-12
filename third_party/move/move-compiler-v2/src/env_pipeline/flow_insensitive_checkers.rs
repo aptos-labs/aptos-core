@@ -147,7 +147,7 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
                 Pre | Post | BeforeBody | MidMutate | BeforeThen | BeforeElse
                 | PreSequenceValue => {},
             },
-            Lambda(_, pat, _) => {
+            Lambda(_, pat, _, _, _) => {
                 match position {
                     Pre => self.seen_uses.enter_scope(),
                     Post => {

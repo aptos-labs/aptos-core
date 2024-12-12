@@ -31,7 +31,7 @@ on:
       - ".github/workflows/replay-verify-on-archive.yaml"
       - ".github/workflows/workflow-run-replay-verify-on-archive.yaml"
   schedule:
-    - cron: "0 22 * * 0,2,4" # The main branch cadence. This runs every Sun,Tues,Thurs
+    - cron: "0 8 * * 0,2,4" # The main branch cadence. This runs every Sun,Tues,Thurs UTC 08:00
 
 permissions:
   contents: read
@@ -58,7 +58,6 @@ jobs:
   replay-testnet:
     if: |
       github.event_name == 'schedule' ||
-      github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' && (inputs.NETWORK == 'testnet' || inputs.NETWORK == 'all')
     needs: determine-test-metadata
     uses: ./.github/workflows/workflow-run-replay-verify-on-archive.yaml
@@ -72,8 +71,6 @@ jobs:
   replay-mainnet:
     if: |
       github.event_name == 'schedule' ||
-      github.event_name == 'push' ||
-      github.event_name == 'pull_request' ||
       github.event_name == 'workflow_dispatch' && (inputs.NETWORK == 'mainnet' || inputs.NETWORK == 'all' )
     needs: determine-test-metadata
     uses: ./.github/workflows/workflow-run-replay-verify-on-archive.yaml

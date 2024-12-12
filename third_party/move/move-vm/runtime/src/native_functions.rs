@@ -4,7 +4,7 @@
 
 use crate::{
     data_cache::TransactionDataCache,
-    interpreter::Interpreter,
+    interpreter::InterpreterDebugInterface,
     loader::{Function, Loader, Resolver},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
@@ -25,7 +25,6 @@ use move_vm_types::{
 };
 use std::{
     collections::{HashMap, VecDeque},
-    fmt::Write,
     sync::Arc,
 };
 
@@ -97,7 +96,7 @@ impl NativeFunctions {
 }
 
 pub struct NativeContext<'a, 'b, 'c> {
-    interpreter: &'a mut Interpreter,
+    interpreter: &'a mut dyn InterpreterDebugInterface,
     data_store: &'a mut TransactionDataCache<'c>,
     resolver: &'a Resolver<'a>,
     extensions: &'a mut NativeContextExtensions<'b>,
@@ -107,7 +106,7 @@ pub struct NativeContext<'a, 'b, 'c> {
 
 impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     pub(crate) fn new(
-        interpreter: &'a mut Interpreter,
+        interpreter: &'a mut dyn InterpreterDebugInterface,
         data_store: &'a mut TransactionDataCache<'c>,
         resolver: &'a Resolver<'a>,
         extensions: &'a mut NativeContextExtensions<'b>,
@@ -126,7 +125,7 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
 }
 
 impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
-    pub fn print_stack_trace<B: Write>(&self, buf: &mut B) -> PartialVMResult<()> {
+    pub fn print_stack_trace(&self, buf: &mut String) -> PartialVMResult<()> {
         self.interpreter.debug_print_stack_trace(buf, self.resolver)
     }
 

@@ -10,14 +10,11 @@ edition = "2021"
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
-
-move-cli = { path = "../../../../../tools/move-cli" }
-move-core-types = { path = "../../../../../move-core/types" }
-
-move-stdlib = { path = "../../../../../move-stdlib" }
-move-vm-test-utils = { path = "../../../../../move-vm/test-utils" }
-
 diem-framework-natives = { path = "../natives" }
+move-cli = { workspace = true }
+move-core-types = { workspace = true }
+move-stdlib = { path = "../../../../move-stdlib" }
+move-vm-test-utils = { workspace = true }
 
 [dev-dependencies]
 datatest-stable = { workspace = true }
