@@ -22,7 +22,9 @@ use clap::*;
 use move_compiler::{
     command_line::SKIP_ATTRIBUTE_CHECKS, shared::known_attributes::KnownAttribute,
 };
-use move_compiler_v2::external_checks::ExternalChecks;
+use move_compiler_v2::{
+    diagnostics::message_format::MessageFormat, external_checks::ExternalChecks,
+};
 use move_core_types::account_address::AccountAddress;
 use move_model::{
     metadata::{CompilerVersion, LanguageVersion},
@@ -172,6 +174,9 @@ pub struct CompilerConfig {
     /// Experiments for v2 compiler to set to true
     #[clap(long, global = true)]
     pub experiments: Vec<String>,
+
+    #[clap(long, default_value = "human")]
+    pub message_format: MessageFormat,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
