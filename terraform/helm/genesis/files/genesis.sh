@@ -189,8 +189,7 @@ create_secrets() {
     )
 
     if [[ "$include_genesis_blob" == "true" ]]; then
-      tar -C $WORKSPACE -czf ${WORKSPACE}/genesis.blob.tar.gz genesis.blob
-      files_to_include+=("--from-file=genesis.blob.tar.gz=${WORKSPACE}/genesis.blob.tar.gz")
+      files_to_include+=("--from-file=genesis.blob=${WORKSPACE}/genesis.blob")
     fi
 
     kubectl create secret generic "${username}-genesis-e${ERA}" "${files_to_include[@]}"
