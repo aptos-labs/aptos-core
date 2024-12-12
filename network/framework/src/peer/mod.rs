@@ -285,7 +285,7 @@ where
                 maybe_response = self.inbound_rpcs.next_completed_response() => {
                     // Extract the relevant metadata from the message
                     let message_metadata = match &maybe_response {
-                        Ok((response_with_metadata, protocol_id)) => Some((response_with_metadata.rpc_response().request_id, *protocol_id)),
+                        Ok((response_with_metadata, protocol_id)) => Some((response_with_metadata.rpc_response().request_id(), *protocol_id)),
                         _ => None,
                     };
 

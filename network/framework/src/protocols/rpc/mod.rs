@@ -339,7 +339,7 @@ impl InboundRpcs {
             request_id,
             protocol_id,
         );
-        self.update_inbound_rpc_request_metrics(protocol_id, rpc_request.data().len() as u64);
+        self.update_inbound_rpc_request_metrics(protocol_id, rpc_request.data_length());
 
         let timer =
             counters::inbound_rpc_handler_latency(network_context, protocol_id).start_timer();
@@ -373,11 +373,11 @@ impl InboundRpcs {
                             MessageMetadata::new_sent_metadata(sent_message_metadata);
 
                         // Create an RPC response with metadata
-                        let rpc_response = RpcResponse {
+                        let rpc_response = RpcResponse::new(
                             request_id,
                             priority,
-                            raw_response: Vec::from(response_bytes.as_ref()),
-                        };
+                            Vec::from(response_bytes.as_ref()),
+                        );
                         let response_with_metadata =
                             RpcResponseWithMetadata::new(message_metadata, rpc_response);
 
@@ -457,7 +457,7 @@ impl InboundRpcs {
                 return Err(err);
             },
         };
-        let res_len = response_with_metadata.rpc_response().raw_response.len() as u64;
+        let res_len = response_with_metadata.rpc_response().data_length();
 
         // Send outbound response to remote peer.
         trace!(
@@ -465,7 +465,7 @@ impl InboundRpcs {
             "{} Sending rpc response to peer {} for request_id {}",
             network_context,
             self.remote_peer_id.short_str(),
-            response_with_metadata.rpc_response().request_id,
+            response_with_metadata.rpc_response().request_id(),
         );
         let message = response_with_metadata.into_network_message();
         write_reqs_tx.push((), message)?;
@@ -639,7 +639,7 @@ impl OutboundRpcs {
                 // Flatten errors.
                 match result {
                     Ok(Ok((response, received_message_metadata))) => {
-                        let raw_response = Bytes::from(response.raw_response);
+                        let raw_response = Bytes::from(response.consume_data());
                         Ok((raw_response, received_message_metadata))
                     },
                     Ok(Err(oneshot::Canceled)) => Err(RpcError::UnexpectedResponseChannelCancel),
@@ -830,16 +830,13 @@ impl OutboundRpcs {
     ) {
         let network_context = &self.network_context;
         let peer_id = &self.remote_peer_id;
-        let request_id = response.request_id;
+        let request_id = response.request_id();
 
         let is_canceled = if let Some((protocol_id, response_tx)) =
             self.pending_outbound_rpcs.remove(&request_id)
         {
             // Update the inbound RPC response metrics
-            self.update_inbound_rpc_response_metrics(
-                protocol_id,
-                response.raw_response.len() as u64,
-            );
+            self.update_inbound_rpc_response_metrics(protocol_id, response.data_length());
 
             // Update the received message metadata
             received_message_metadata

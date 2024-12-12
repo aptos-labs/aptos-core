@@ -59,7 +59,7 @@ impl NetworkMessage {
         match self {
             NetworkMessage::Error(_) => 0,
             NetworkMessage::RpcRequest(request) => request.data_length(),
-            NetworkMessage::RpcResponse(response) => response.raw_response.len() as u64,
+            NetworkMessage::RpcResponse(response) => response.data_length(),
             NetworkMessage::DirectSendMsg(message) => message.data_length(),
         }
     }
@@ -214,13 +214,13 @@ impl IncomingRequest for RpcRequest {
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct RpcResponse {
     /// RequestId for corresponding request. This is copied as is from the RpcRequest.
-    pub request_id: RequestId,
+    request_id: RequestId,
     /// Response priority in the range 0..=255. This will likely be same as the priority of
     /// corresponding request.
-    pub priority: Priority,
+    priority: Priority,
     /// Response payload.
     #[serde(with = "serde_bytes")]
-    pub raw_response: Vec<u8>,
+    raw_response: Vec<u8>,
 }
 
 impl RpcResponse {
@@ -230,6 +230,26 @@ impl RpcResponse {
             priority,
             raw_response,
         }
+    }
+
+    /// Returns the raw data of the RPC response and consumes the response
+    pub fn consume_data(self) -> Vec<u8> {
+        self.raw_response
+    }
+
+    /// Returns a mutable reference to the raw data of the RPC response
+    pub fn data_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.raw_response
+    }
+
+    /// Returns the length of the data in the response
+    pub fn data_length(&self) -> u64 {
+        self.raw_response.len() as u64
+    }
+
+    /// Returns the ID of the RPC request
+    pub fn request_id(&self) -> RequestId {
+        self.request_id
     }
 }
 

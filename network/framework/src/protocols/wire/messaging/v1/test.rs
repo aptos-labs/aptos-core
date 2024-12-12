@@ -166,10 +166,8 @@ fn arb_rpc_response(max_frame_size: usize) -> impl Strategy<Value = RpcResponse>
         any::<Priority>(),
         (0..max_frame_size).prop_map(|size| vec![0u8; size]),
     )
-        .prop_map(|(request_id, priority, raw_response)| RpcResponse {
-            request_id,
-            priority,
-            raw_response,
+        .prop_map(|(request_id, priority, raw_response)| {
+            RpcResponse::new(request_id, priority, raw_response)
         })
 }
 
