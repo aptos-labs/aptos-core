@@ -13,6 +13,7 @@ This is the reference documentation of the Aptos standard library.
 
 
 -  [`0x1::any`](any.md#0x1_any)
+-  [`0x1::any_map`](any_map.md#0x1_any_map)
 -  [`0x1::aptos_hash`](hash.md#0x1_aptos_hash)
 -  [`0x1::big_ordered_map`](big_ordered_map.md#0x1_big_ordered_map)
 -  [`0x1::big_vector`](big_vector.md#0x1_big_vector)
