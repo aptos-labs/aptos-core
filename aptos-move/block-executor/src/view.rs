@@ -48,7 +48,8 @@ use aptos_types::{
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::{
-    ResourceGroupSize, StateStorageView, TModuleView, TResourceGroupView, TResourceView,
+    BlockSynchronizationView, ResourceGroupSize, StateStorageView, TModuleView, TResourceGroupView,
+    TResourceView,
 };
 use bytes::Bytes;
 use claims::assert_ok;
@@ -1430,6 +1431,17 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             ValueWithLayout::RawFromStorage(Arc::new(metadata_op)),
         );
         Ok(())
+    }
+}
+
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> BlockSynchronizationView
+    for LatestView<'a, T, S, X>
+{
+    fn early_abort_execution(&self) -> bool {
+        match &self.latest_view {
+            ViewState::Sync(state) => state.scheduler.has_halted(),
+            ViewState::Unsync(_) => false,
+        }
     }
 }
 
