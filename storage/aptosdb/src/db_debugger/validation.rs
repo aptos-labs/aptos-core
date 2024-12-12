@@ -11,7 +11,7 @@ use aptos_db_indexer_schemas::schema::{
     event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
     state_keys::StateKeysSchema, transaction_by_account::TransactionByAccountSchema,
 };
-use aptos_schemadb::{ReadOptions, DB};
+use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_storage_interface::{DbReader, Result};
 use aptos_types::{
     contract_event::ContractEvent,
@@ -25,6 +25,9 @@ use rayon::{
 use std::{cmp, collections::HashSet, path::Path};
 const SAMPLE_RATE: usize = 500_000;
 use clap::Parser;
+use aptos_types::account_config::new_block_event_key;
+use crate::ledger_db::ledger_metadata_db::LedgerMetadataDb;
+use std::time::Instant;
 
 #[derive(Parser, Debug)]
 pub struct ValidationArgs {
@@ -40,6 +43,7 @@ pub struct ValidationArgs {
 #[derive(clap::Subcommand)]
 pub enum Cmd {
     ValidateIndexerDB(ValidationArgs),
+    FillBlockInfo(ValidationArgs),
 }
 
 impl Cmd {
@@ -50,8 +54,70 @@ impl Cmd {
                 Path::new(&args.internal_indexer_db_path.as_str()),
                 args.target_version,
             ),
+            Cmd::FillBlockInfo(args) => fill_block_info(Path::new(args.db_root_path.as_str()), 0, args.target_version)
         }
     }
+}
+
+pub fn fill_block_info(db_root_path: &Path, start_version: u64, target_ledger_version: u64) -> Result<()> {
+    let num_threads = 30;
+    ThreadPoolBuilder::new()
+        .num_threads(num_threads)
+        .build_global()
+        .unwrap();
+    let batch_size = cmp::max((target_ledger_version - start_version) / 25, 1);
+    // split the range to 25 chunks and fill them concurrently
+     // Calculate ranges and split into chunks
+     let ranges: Vec<(u64, u64)> = (start_version..target_ledger_version)
+     .step_by(batch_size as usize)
+     .map(|start| {
+         let end = cmp::min(start + batch_size, target_ledger_version);
+         (start, end)
+     })
+     .collect();
+    let aptos_db = AptosDB::new_for_test_with_sharding(db_root_path, 1000000);
+    // Process each chunk in parallel
+    ranges.into_par_iter().for_each(|(start, end)| {
+        println!("fill block info from {} to {}", start, end);
+        fill_block_info_range(&aptos_db, start, end+1).unwrap();
+    });
+
+    Ok(())
+
+}
+
+pub fn fill_block_info_range(aptos_db: &AptosDB, start_version: u64, target_version: u64) -> Result<()> {
+    let batch_size = 1_000_000;
+    let mut cur_version = start_version;
+    let timer = Instant::now();
+    while cur_version < target_version {
+        let batch_start = cur_version;
+        let schema_batch = SchemaBatch::new();
+        let num_of_txns = std::cmp::min(batch_size, target_version - cur_version);
+        let txns = aptos_db
+            .get_transactions(batch_start, num_of_txns, target_version, true)
+            .unwrap();
+        for (idx, events) in txns.events.expect("no None events").iter().enumerate() {
+            let version = cur_version + idx as u64;
+            for event in events {
+                if let Some(event_key) = event.event_key() {
+                    if *event_key == new_block_event_key() {
+                        LedgerMetadataDb::put_block_info(
+                            version,
+                            event,
+                            &schema_batch,
+                        )?;
+                    }
+                }
+            }
+        }
+        aptos_db.ledger_db.metadata_db().write_schemas(schema_batch)?;
+        cur_version += num_of_txns;
+        println!("accumulative tps: {}", (cur_version - start_version) as f64 / timer.elapsed().as_secs_f64());
+    }
+
+    Ok(())
+    
 }
 
 pub fn validate_db_data(
