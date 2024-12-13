@@ -4,7 +4,7 @@ version = "0.0.0"
 upgrade_policy = "compatible"
 
 [dependencies]
-AptosFramework = { local = "../../framework/aptos-framework" }
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-framework", rev = "mainnet" }
 
 [addresses]
 # change it to `source_addr = "_" when calling `create-resource-account-and-publish-package` from the cli

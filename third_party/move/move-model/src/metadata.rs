@@ -17,6 +17,8 @@ use std::{
 };
 
 const UNSTABLE_MARKER: &str = "-unstable";
+pub const LATEST_STABLE_LANGUAGE_VERSION: &str = "2.1";
+pub const LATEST_STABLE_COMPILER_VERSION: &str = "2.0";
 
 pub static COMPILATION_METADATA_KEY: &[u8] = "compilation_metadata".as_bytes();
 
@@ -152,7 +154,7 @@ impl CompilerVersion {
 
     /// The latest stable compiler version.
     pub fn latest_stable() -> Self {
-        CompilerVersion::V2_0
+        CompilerVersion::from_str(LATEST_STABLE_COMPILER_VERSION).expect("valid version")
     }
 
     /// Check whether the compiler version supports the given language version,
@@ -167,6 +169,15 @@ impl CompilerVersion {
                 }
             },
             _ => Ok(()),
+        }
+    }
+
+    /// Infer the latest stable language version based on the compiler version
+    pub fn infer_stable_language_version(&self) -> LanguageVersion {
+        if *self == CompilerVersion::V1 {
+            LanguageVersion::V1
+        } else {
+            LanguageVersion::latest_stable()
         }
     }
 }
@@ -194,6 +205,11 @@ pub enum LanguageVersion {
     V2_1,
     /// The currently unstable 2.2 version of Move
     V2_2,
+}
+
+impl LanguageVersion {
+    /// Leave this symbolic for now in case of more versions.
+    pub const V2_LAMBDA: Self = Self::V2_2;
 }
 
 impl Default for LanguageVersion {
@@ -256,7 +272,7 @@ impl LanguageVersion {
 
     /// The latest stable language version.
     pub fn latest_stable() -> Self {
-        LanguageVersion::V2_1
+        LanguageVersion::from_str(LATEST_STABLE_LANGUAGE_VERSION).expect("valid version")
     }
 
     /// Whether the language version is equal to greater than `ver`

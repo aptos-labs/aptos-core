@@ -79,7 +79,7 @@ module aptos_framework::stake {
     const EINVALID_LOCKUP: u64 = 18;
     /// Table to store collected transaction fees for each validator already exists.
     const EFEES_TABLE_ALREADY_EXISTS: u64 = 19;
-    /// Validator set change temporarily disabled because of in-progress reconfiguration.
+    /// Validator set change temporarily disabled because of in-progress reconfiguration. Please retry after 1 minute.
     const ERECONFIGURATION_IN_PROGRESS: u64 = 20;
 
     /// Validator status enum. We can switch to proper enum later once Move supports it.
@@ -1760,6 +1760,8 @@ module aptos_framework::stake {
     public fun initialize_for_test(aptos_framework: &signer) {
         reconfiguration_state::initialize(aptos_framework);
         initialize_for_test_custom(aptos_framework, 100, 10000, LOCKUP_CYCLE_SECONDS, true, 1, 100, 1000000);
+        // In the test environment, the periodical_reward_rate_decrease feature is initially turned off.
+        features::change_feature_flags_for_testing(aptos_framework, vector[], vector[features::get_periodical_reward_rate_decrease_feature()]);
     }
 
     #[test_only]
@@ -1820,6 +1822,9 @@ module aptos_framework::stake {
             store_aptos_coin_mint_cap(aptos_framework, mint_cap);
             coin::destroy_burn_cap<AptosCoin>(burn_cap);
         };
+
+        // In the test environment, the periodical_reward_rate_decrease feature is initially turned off.
+        features::change_feature_flags_for_testing(aptos_framework, vector[], vector[features::get_periodical_reward_rate_decrease_feature()]);
     }
 
     // This function assumes the stake module already the capability to mint aptos coins.

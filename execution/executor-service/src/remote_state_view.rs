@@ -17,7 +17,8 @@ use aptos_logger::trace;
 use aptos_types::{
     block_executor::partitioner::ShardId,
     state_store::{
-        state_storage_usage::StateStorageUsage, state_value::StateValue, Result, TStateView,
+        state_storage_usage::StateStorageUsage, state_value::StateValue, StateViewResult,
+        TStateView,
     },
 };
 use dashmap::DashMap;
@@ -53,7 +54,7 @@ impl RemoteStateView {
             .or_insert(RemoteStateValue::waiting());
     }
 
-    pub fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
+    pub fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
         if let Some(value) = self.state_values.get(state_key) {
             let value_clone = value.clone();
             // It is possible that the value is not ready yet and the get_value call blocks. In that
@@ -182,7 +183,7 @@ impl RemoteStateViewClient {
 impl TStateView for RemoteStateViewClient {
     type Key = StateKey;
 
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
+    fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
         let state_view_reader = self.state_view.read().unwrap();
         if state_view_reader.has_state_key(state_key) {
             // If the key is already in the cache then we return it.
@@ -202,7 +203,7 @@ impl TStateView for RemoteStateViewClient {
         state_view_reader.get_state_value(state_key)
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage> {
+    fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
         unimplemented!("get_usage is not implemented for RemoteStateView")
     }
 }

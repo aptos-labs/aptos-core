@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::{GAUGE, TIMER};
+use crate::{
+    metrics::{GAUGE, TIMER},
+    IN_ANY_DROP_POOL,
+};
 use aptos_infallible::Mutex;
 use aptos_metrics_core::{IntGaugeHelper, TimerHelper};
 use std::sync::{
@@ -42,12 +45,25 @@ impl AsyncConcurrentDropper {
         rx
     }
 
+    pub fn max_tasks(&self) -> usize {
+        self.num_tasks_tracker.max_tasks
+    }
+
+    pub fn num_threads(&self) -> usize {
+        self.thread_pool.max_count()
+    }
+
     pub fn wait_for_backlog_drop(&self, no_more_than: usize) {
         let _timer = TIMER.timer_with(&[self.name, "wait_for_backlog_drop"]);
         self.num_tasks_tracker.wait_for_backlog_drop(no_more_than);
     }
 
     fn schedule_drop_impl<V: Send + 'static>(&self, v: V, notif_sender_opt: Option<Sender<()>>) {
+        if IN_ANY_DROP_POOL.get() {
+            Self::do_drop(v, notif_sender_opt);
+            return;
+        }
+
         let _timer = TIMER.timer_with(&[self.name, "enqueue_drop"]);
         self.num_tasks_tracker.inc();
 
@@ -57,14 +73,22 @@ impl AsyncConcurrentDropper {
         self.thread_pool.execute(move || {
             let _timer = TIMER.timer_with(&[name, "real_drop"]);
 
-            drop(v);
+            IN_ANY_DROP_POOL.with(|flag| {
+                flag.set(true);
+            });
 
-            if let Some(sender) = notif_sender_opt {
-                sender.send(()).ok();
-            }
+            Self::do_drop(v, notif_sender_opt);
 
             num_tasks_tracker.dec();
         })
+    }
+
+    fn do_drop<V: Send + 'static>(v: V, notif_sender_opt: Option<Sender<()>>) {
+        drop(v);
+
+        if let Some(sender) = notif_sender_opt {
+            sender.send(()).ok();
+        }
     }
 }
 
@@ -111,10 +135,12 @@ impl NumTasksTracker {
 
 #[cfg(test)]
 mod tests {
-    use crate::AsyncConcurrentDropper;
+    use crate::{AsyncConcurrentDropper, DropHelper, DEFAULT_DROPPER};
+    use rayon::prelude::*;
     use std::{sync::Arc, thread::sleep, time::Duration};
     use threadpool::ThreadPool;
 
+    #[derive(Clone, Default)]
     struct SlowDropper;
 
     impl Drop for SlowDropper {
@@ -196,5 +222,26 @@ mod tests {
         assert!(now.elapsed() < Duration::from_millis(600));
         s.wait_for_backlog_drop(0);
         assert!(now.elapsed() < Duration::from_millis(600));
+    }
+
+    #[test]
+    fn test_nested_drops() {
+        #[derive(Clone, Default)]
+        struct Nested {
+            _inner: DropHelper<SlowDropper>,
+        }
+
+        // pump 2 x max_tasks to the drop queue
+        let num_items = DEFAULT_DROPPER.max_tasks() * 2;
+        let items = vec![DropHelper::new(Nested::default()); num_items];
+        let drop_thread = std::thread::spawn(move || {
+            items.into_par_iter().for_each(drop);
+        });
+
+        // expect no deadlock and the whole thing to be dropped in full concurrency (with some leeway)
+        sleep(Duration::from_millis(
+            200 + 200 * num_items as u64 / DEFAULT_DROPPER.num_threads() as u64,
+        ));
+        assert!(drop_thread.is_finished(), "Drop queue deadlocked.");
     }
 }

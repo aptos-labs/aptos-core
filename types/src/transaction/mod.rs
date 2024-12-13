@@ -11,9 +11,7 @@ use crate::{
     contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
     keyless::{KeylessPublicKey, KeylessSignature},
     ledger_info::LedgerInfo,
-    on_chain_config::{FeatureFlag, Features},
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
-    state_store::ShardedStateUpdates,
     transaction::authenticator::{
         AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator,
         TransactionAuthenticator,
@@ -54,12 +52,15 @@ pub mod user_transaction_context;
 pub mod webauthn;
 
 pub use self::block_epilogue::{BlockEndInfo, BlockEpiloguePayload};
-#[cfg(any(test, feature = "fuzzing"))]
-use crate::state_store::create_empty_sharded_state_updates;
 use crate::{
-    block_metadata_ext::BlockMetadataExt, contract_event::TransactionEvent, executable::ModulePath,
-    fee_statement::FeeStatement, keyless::FederatedKeylessPublicKey,
-    proof::accumulator::InMemoryEventAccumulator, validator_txn::ValidatorTransaction,
+    block_metadata_ext::BlockMetadataExt,
+    contract_event::TransactionEvent,
+    executable::ModulePath,
+    fee_statement::FeeStatement,
+    keyless::FederatedKeylessPublicKey,
+    proof::accumulator::InMemoryEventAccumulator,
+    state_store::{state_key::StateKey, state_value::StateValue},
+    validator_txn::ValidatorTransaction,
     write_set::TransactionWrite,
 };
 pub use block_output::BlockOutput;
@@ -433,7 +434,7 @@ impl TransactionPayload {
 }
 
 /// Two different kinds of WriteSet transactions.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum WriteSetPayload {
     /// Directly passing in the WriteSet.
     Direct(ChangeSet),
@@ -912,22 +913,6 @@ impl ExecutionStatus {
             _ => ExecutionStatus::MiscellaneousError(None),
         }
     }
-
-    pub fn remove_error_detail(self) -> Self {
-        match self {
-            ExecutionStatus::MoveAbort {
-                location,
-                code,
-                info: _,
-            } => ExecutionStatus::MoveAbort {
-                location,
-                code,
-                info: None,
-            },
-            ExecutionStatus::MiscellaneousError(_) => ExecutionStatus::MiscellaneousError(None),
-            _ => self,
-        }
-    }
 }
 
 /// The status of executing a transaction. The VM decides whether or not we should `Keep` the
@@ -977,15 +962,10 @@ impl TransactionStatus {
         }
     }
 
-    pub fn from_vm_status(
-        vm_status: VMStatus,
-        charge_invariant_violation: bool,
-        features: &Features,
-    ) -> (Self, TransactionAuxiliaryData) {
+    pub fn from_vm_status(vm_status: VMStatus, charge_invariant_violation: bool) -> Self {
         let status_code = vm_status.status_code();
-        let txn_aux = TransactionAuxiliaryData::from_vm_status(&vm_status);
         // TODO: keep_or_discard logic should be deprecated from Move repo and refactored into here.
-        let status = match vm_status.keep_or_discard() {
+        match vm_status.keep_or_discard() {
             Ok(recorded) => match recorded {
                 // TODO(bowu):status code should be removed from transaction status
                 KeptVMStatus::MiscellaneousError => {
@@ -1002,21 +982,6 @@ impl TransactionStatus {
                     TransactionStatus::Discard(code)
                 }
             },
-        };
-
-        if features.is_enabled(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH) {
-            (status.remove_error_detail(), txn_aux)
-        } else {
-            (status, txn_aux)
-        }
-    }
-
-    pub fn remove_error_detail(self) -> Self {
-        match self {
-            TransactionStatus::Keep(status) => {
-                TransactionStatus::Keep(status.remove_error_detail())
-            },
-            _ => self,
         }
     }
 
@@ -1264,17 +1229,6 @@ impl TransactionOutput {
         (write_set, events, gas_used, status, auxiliary_data)
     }
 
-    // This function is supposed to be called in various tests only
-    pub fn fill_error_status(&mut self) {
-        if let TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)) = self.status {
-            if let Some(detail) = self.auxiliary_data.get_detail_error_message() {
-                self.status = TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
-                    detail.status_code(),
-                )));
-            }
-        }
-    }
-
     pub fn ensure_match_transaction_info(
         &self,
         version: Version,
@@ -1287,10 +1241,11 @@ impl TransactionOutput {
         let expected_txn_status: TransactionStatus = txn_info.status().clone().into();
         ensure!(
             self.status() == &expected_txn_status,
-            "{}: version:{}, status:{:?}, expected:{:?}",
+            "{}: version:{}, status:{:?}, auxiliary data:{:?}, expected:{:?}",
             ERR_MSG,
             version,
             self.status(),
+            self.auxiliary_data(),
             expected_txn_status,
         );
 
@@ -1347,6 +1302,10 @@ impl TransactionOutput {
 
     pub fn has_new_epoch_event(&self) -> bool {
         self.events.iter().any(ContractEvent::is_new_epoch_event)
+    }
+
+    pub fn state_update_refs(&self) -> impl Iterator<Item = (&StateKey, Option<&StateValue>)> + '_ {
+        self.write_set.state_update_refs()
     }
 }
 
@@ -1514,7 +1473,6 @@ impl Display for TransactionInfo {
 pub struct TransactionToCommit {
     pub transaction: Transaction,
     pub transaction_info: TransactionInfo,
-    pub state_updates: ShardedStateUpdates,
     pub write_set: WriteSet,
     pub events: Vec<ContractEvent>,
     pub is_reconfig: bool,
@@ -1525,7 +1483,6 @@ impl TransactionToCommit {
     pub fn new(
         transaction: Transaction,
         transaction_info: TransactionInfo,
-        state_updates: ShardedStateUpdates,
         write_set: WriteSet,
         events: Vec<ContractEvent>,
         is_reconfig: bool,
@@ -1534,7 +1491,6 @@ impl TransactionToCommit {
         TransactionToCommit {
             transaction,
             transaction_info,
-            state_updates,
             write_set,
             events,
             is_reconfig,
@@ -1547,7 +1503,6 @@ impl TransactionToCommit {
         Self {
             transaction: Transaction::StateCheckpoint(HashValue::zero()),
             transaction_info: TransactionInfo::dummy(),
-            state_updates: create_empty_sharded_state_updates(),
             write_set: Default::default(),
             events: vec![],
             is_reconfig: false,
@@ -1607,12 +1562,12 @@ impl TransactionToCommit {
         self.transaction_info = txn_info
     }
 
-    pub fn state_updates(&self) -> &ShardedStateUpdates {
-        &self.state_updates
-    }
-
     pub fn write_set(&self) -> &WriteSet {
         &self.write_set
+    }
+
+    pub fn state_update_refs(&self) -> impl Iterator<Item = (&StateKey, Option<&StateValue>)> + '_ {
+        self.write_set.state_update_refs()
     }
 
     pub fn events(&self) -> &[ContractEvent] {

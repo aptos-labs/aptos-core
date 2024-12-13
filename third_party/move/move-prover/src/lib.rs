@@ -91,6 +91,7 @@ pub fn run_move_prover_v2<W: WriteColor>(
         whole_program: false,
         compile_test_code: false,
         compile_verify_code: true,
+        external_checks: vec![],
     };
 
     let mut env = move_compiler_v2::run_move_compiler_for_analysis(error_writer, compiler_options)?;
@@ -149,7 +150,6 @@ pub fn run_move_prover_with_model_v2<W: WriteColor>(
         error_writer,
         "exiting with model building errors",
     )?;
-    env.report_diag(error_writer, options.prover.report_severity);
 
     // Add the prover options as an extension to the environment, so they can be accessed
     // from there.

@@ -136,6 +136,9 @@ pub enum EntryFunctionCall {
     /// does not come with a proof-of-knowledge of the underlying SK. Nonetheless, we need this functionality due to
     /// the introduction of non-standard key algorithms, such as passkeys, which cannot produce proofs-of-knowledge in
     /// the format expected in `rotate_authentication_key`.
+    ///
+    /// If you'd like to followup with updating the `OriginatingAddress` table, you can call
+    /// `set_originating_address()`.
     AccountRotateAuthenticationKeyCall {
         new_auth_key: Vec<u8>,
     },
@@ -146,6 +149,21 @@ pub enum EntryFunctionCall {
         new_public_key_bytes: Vec<u8>,
         cap_update_table: Vec<u8>,
     },
+
+    /// For the given account, add an entry to `OriginatingAddress` table mapping the account's
+    /// authentication key to the account's address.
+    ///
+    /// Can be used as a followup to `rotate_authentication_key_call()` to reconcile the
+    /// `OriginatingAddress` table, or to establish a mapping for a new account that has not yet had
+    /// its authentication key rotated.
+    ///
+    /// Aborts if there is already an entry in the `OriginatingAddress` table for the account's
+    /// authentication key.
+    ///
+    /// Kept as a private entry function to ensure that after an unproven rotation via
+    /// `rotate_authentication_key_call()`, the `OriginatingAddress` table is only updated under the
+    /// authority of the new authentication key.
+    AccountSetOriginatingAddress {},
 
     /// Batch version of APT transfer.
     AptosAccountBatchTransfer {
@@ -303,6 +321,12 @@ pub enum EntryFunctionCall {
     /// Create APT pairing by passing `AptosCoin`.
     CoinCreatePairing {
         coin_type: TypeTag,
+    },
+
+    /// Migrate to fungible store for `CoinType` if not yet.
+    CoinMigrateCoinStoreToFungibleStore {
+        coin_type: TypeTag,
+        accounts: Vec<AccountAddress>,
     },
 
     /// Voluntarily migrate to fungible store for `CoinType` if not yet.
@@ -1191,6 +1215,7 @@ impl EntryFunctionCall {
                 new_public_key_bytes,
                 cap_update_table,
             ),
+            AccountSetOriginatingAddress {} => account_set_originating_address(),
             AptosAccountBatchTransfer {
                 recipients,
                 amounts,
@@ -1279,6 +1304,10 @@ impl EntryFunctionCall {
             } => code_publish_package_txn(metadata_serialized, code),
             CoinCreateCoinConversionMap {} => coin_create_coin_conversion_map(),
             CoinCreatePairing { coin_type } => coin_create_pairing(coin_type),
+            CoinMigrateCoinStoreToFungibleStore {
+                coin_type,
+                accounts,
+            } => coin_migrate_coin_store_to_fungible_store(coin_type, accounts),
             CoinMigrateToFungibleStore { coin_type } => coin_migrate_to_fungible_store(coin_type),
             CoinTransfer {
                 coin_type,
@@ -1993,6 +2022,9 @@ pub fn account_rotate_authentication_key(
 /// does not come with a proof-of-knowledge of the underlying SK. Nonetheless, we need this functionality due to
 /// the introduction of non-standard key algorithms, such as passkeys, which cannot produce proofs-of-knowledge in
 /// the format expected in `rotate_authentication_key`.
+///
+/// If you'd like to followup with updating the `OriginatingAddress` table, you can call
+/// `set_originating_address()`.
 pub fn account_rotate_authentication_key_call(new_auth_key: Vec<u8>) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -2030,6 +2062,34 @@ pub fn account_rotate_authentication_key_with_rotation_capability(
             bcs::to_bytes(&new_public_key_bytes).unwrap(),
             bcs::to_bytes(&cap_update_table).unwrap(),
         ],
+    ))
+}
+
+/// For the given account, add an entry to `OriginatingAddress` table mapping the account's
+/// authentication key to the account's address.
+///
+/// Can be used as a followup to `rotate_authentication_key_call()` to reconcile the
+/// `OriginatingAddress` table, or to establish a mapping for a new account that has not yet had
+/// its authentication key rotated.
+///
+/// Aborts if there is already an entry in the `OriginatingAddress` table for the account's
+/// authentication key.
+///
+/// Kept as a private entry function to ensure that after an unproven rotation via
+/// `rotate_authentication_key_call()`, the `OriginatingAddress` table is only updated under the
+/// authority of the new authentication key.
+pub fn account_set_originating_address() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("set_originating_address").to_owned(),
+        vec![],
+        vec![],
     ))
 }
 
@@ -2509,6 +2569,25 @@ pub fn coin_create_pairing(coin_type: TypeTag) -> TransactionPayload {
         ident_str!("create_pairing").to_owned(),
         vec![coin_type],
         vec![],
+    ))
+}
+
+/// Migrate to fungible store for `CoinType` if not yet.
+pub fn coin_migrate_coin_store_to_fungible_store(
+    coin_type: TypeTag,
+    accounts: Vec<AccountAddress>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("coin").to_owned(),
+        ),
+        ident_str!("migrate_coin_store_to_fungible_store").to_owned(),
+        vec![coin_type],
+        vec![bcs::to_bytes(&accounts).unwrap()],
     ))
 }
 
@@ -5064,6 +5143,16 @@ mod decoder {
         }
     }
 
+    pub fn account_set_originating_address(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::AccountSetOriginatingAddress {})
+        } else {
+            None
+        }
+    }
+
     pub fn aptos_account_batch_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosAccountBatchTransfer {
@@ -5332,6 +5421,19 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CoinCreatePairing {
                 coin_type: script.ty_args().get(0)?.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn coin_migrate_coin_store_to_fungible_store(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CoinMigrateCoinStoreToFungibleStore {
+                coin_type: script.ty_args().get(0)?.clone(),
+                accounts: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -6792,6 +6894,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::account_rotate_authentication_key_with_rotation_capability),
         );
         map.insert(
+            "account_set_originating_address".to_string(),
+            Box::new(decoder::account_set_originating_address),
+        );
+        map.insert(
             "aptos_account_batch_transfer".to_string(),
             Box::new(decoder::aptos_account_batch_transfer),
         );
@@ -6882,6 +6988,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "coin_create_pairing".to_string(),
             Box::new(decoder::coin_create_pairing),
+        );
+        map.insert(
+            "coin_migrate_coin_store_to_fungible_store".to_string(),
+            Box::new(decoder::coin_migrate_coin_store_to_fungible_store),
         );
         map.insert(
             "coin_migrate_to_fungible_store".to_string(),

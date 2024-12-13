@@ -7,17 +7,16 @@ use crate::{
     metrics::{LATEST_SNAPSHOT_VERSION, OTHER_TIMERS_SECONDS},
     pruner::PrunerManager,
     schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-    state_store::{buffered_state::CommitMessage, StateDb},
+    state_store::{buffered_state::CommitMessage, persisted_state::PersistedState, StateDb},
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::HashValue;
+use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_logger::{info, trace};
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::SchemaBatch;
-use aptos_scratchpad::SmtAncestors;
-use aptos_storage_interface::state_delta::StateDelta;
-use aptos_types::state_store::state_value::StateValue;
+use aptos_storage_interface::state_store::state_delta::StateDelta;
 use std::sync::{mpsc::Receiver, Arc};
 
 pub struct StateMerkleBatch {
@@ -30,19 +29,19 @@ pub struct StateMerkleBatch {
 pub(crate) struct StateMerkleBatchCommitter {
     state_db: Arc<StateDb>,
     state_merkle_batch_receiver: Receiver<CommitMessage<StateMerkleBatch>>,
-    smt_ancestors: SmtAncestors<StateValue>,
+    persisted_state: Arc<Mutex<PersistedState>>,
 }
 
 impl StateMerkleBatchCommitter {
     pub fn new(
         state_db: Arc<StateDb>,
         state_merkle_batch_receiver: Receiver<CommitMessage<StateMerkleBatch>>,
-        smt_ancestors: SmtAncestors<StateValue>,
+        persisted_state: Arc<Mutex<PersistedState>>,
     ) -> Self {
         Self {
             state_db,
             state_merkle_batch_receiver,
-            smt_ancestors,
+            persisted_state,
         }
     }
 
@@ -100,7 +99,7 @@ impl StateMerkleBatchCommitter {
                         .current
                         .log_generation("buffered_state_in_mem_base");
 
-                    self.smt_ancestors.add(state_delta.current.clone());
+                    self.persisted_state.lock().set(state_delta.current.clone());
                 },
                 CommitMessage::Sync(finish_sender) => finish_sender.send(()).unwrap(),
                 CommitMessage::Exit => {

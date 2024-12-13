@@ -10,7 +10,7 @@ use crate::{
     round_manager::VerifiedEvent,
 };
 use aptos_channels::aptos_channel;
-use aptos_consensus_types::proof_of_store::BatchInfo;
+use aptos_consensus_types::{common::Author, proof_of_store::BatchInfo};
 use aptos_logger::prelude::*;
 use aptos_types::{account_address::AccountAddress, PeerId};
 use futures::StreamExt;
@@ -27,7 +27,7 @@ pub struct QuorumStoreCoordinator {
     remote_batch_coordinator_cmd_tx: Vec<mpsc::Sender<BatchCoordinatorCommand>>,
     proof_coordinator_cmd_tx: mpsc::Sender<ProofCoordinatorCommand>,
     proof_manager_cmd_tx: mpsc::Sender<ProofManagerCommand>,
-    quorum_store_msg_tx: aptos_channel::Sender<AccountAddress, VerifiedEvent>,
+    quorum_store_msg_tx: aptos_channel::Sender<AccountAddress, (Author, VerifiedEvent)>,
 }
 
 impl QuorumStoreCoordinator {
@@ -37,7 +37,7 @@ impl QuorumStoreCoordinator {
         remote_batch_coordinator_cmd_tx: Vec<mpsc::Sender<BatchCoordinatorCommand>>,
         proof_coordinator_cmd_tx: mpsc::Sender<ProofCoordinatorCommand>,
         proof_manager_cmd_tx: mpsc::Sender<ProofManagerCommand>,
-        quorum_store_msg_tx: aptos_channel::Sender<AccountAddress, VerifiedEvent>,
+        quorum_store_msg_tx: aptos_channel::Sender<AccountAddress, (Author, VerifiedEvent)>,
     ) -> Self {
         Self {
             my_peer_id,
@@ -94,7 +94,10 @@ impl QuorumStoreCoordinator {
                             oneshot::channel();
                         match self.quorum_store_msg_tx.push(
                             self.my_peer_id,
-                            VerifiedEvent::Shutdown(network_listener_shutdown_tx),
+                            (
+                                self.my_peer_id,
+                                VerifiedEvent::Shutdown(network_listener_shutdown_tx),
+                            ),
                         ) {
                             Ok(()) => info!("QS: shutdown network listener sent"),
                             Err(err) => panic!("Failed to send to NetworkListener, Err {:?}", err),

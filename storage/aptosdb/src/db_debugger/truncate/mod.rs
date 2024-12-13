@@ -159,7 +159,6 @@ impl Cmd {
 mod test {
     use super::*;
     use crate::{
-        common::NUM_STATE_SHARDS,
         db::{
             test_helper::{arb_blocks_to_commit_with_block_nums, update_in_memory_state},
             AptosDB,
@@ -178,7 +177,7 @@ mod test {
         },
         utils::truncation_helper::num_frozen_nodes_in_accumulator,
     };
-    use aptos_storage_interface::DbReader;
+    use aptos_storage_interface::{state_store::NUM_STATE_SHARDS, DbReader};
     use aptos_temppath::TempPath;
     use proptest::prelude::*;
 
@@ -195,7 +194,7 @@ mod test {
             let tmp_dir = TempPath::new();
 
             let db = if input.1 { AptosDB::new_for_test_with_sharding(&tmp_dir, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD) } else { AptosDB::new_for_test(&tmp_dir) };
-            let mut in_memory_state = db.state_store.buffered_state().lock().current_state().clone();
+            let mut in_memory_state = db.state_store.current_state_cloned();
             let _ancestor = in_memory_state.base.clone();
             let mut version = 0;
             for (txns_to_commit, ledger_info_with_sigs) in input.0.iter() {

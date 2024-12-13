@@ -673,7 +673,6 @@ module aptos_token_objects::collection {
     public fun set_description(mutator_ref: &MutatorRef, description: String) acquires Collection {
         assert!(string::length(&description) <= MAX_DESCRIPTION_LENGTH, error::out_of_range(EDESCRIPTION_TOO_LONG));
         let collection = borrow_mut(mutator_ref);
-        collection.description = description;
         if (std::features::module_event_migration_enabled()) {
             event::emit(Mutation {
                 mutated_field_name: string::utf8(b"description"),
@@ -687,12 +686,12 @@ module aptos_token_objects::collection {
                 MutationEvent { mutated_field_name: string::utf8(b"description") },
             );
         };
+        collection.description = description;
     }
 
     public fun set_uri(mutator_ref: &MutatorRef, uri: String) acquires Collection {
         assert!(string::length(&uri) <= MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
         let collection = borrow_mut(mutator_ref);
-        collection.uri = uri;
         if (std::features::module_event_migration_enabled()) {
             event::emit(Mutation {
                 mutated_field_name: string::utf8(b"uri"),
@@ -706,6 +705,7 @@ module aptos_token_objects::collection {
                 MutationEvent { mutated_field_name: string::utf8(b"uri") },
             );
         };
+        collection.uri = uri;
     }
 
     public fun set_max_supply(mutator_ref: &MutatorRef, max_supply: u64) acquires ConcurrentSupply, FixedSupply {

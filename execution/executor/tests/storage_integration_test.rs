@@ -11,7 +11,7 @@ use aptos_executor_test_helpers::{
     },
 };
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_storage_interface::state_view::DbStateViewAtVersion;
+use aptos_storage_interface::state_store::state_view::db_state_view::DbStateViewAtVersion;
 use aptos_types::{
     account_config::{aptos_test_root_address, AccountResource, CORE_CODE_ADDRESS},
     block_metadata::BlockMetadata,

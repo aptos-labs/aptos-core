@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use anyhow::Context;
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use std::{
     fs,
@@ -62,14 +63,22 @@ pub fn create_tar_gz(dir_path: PathBuf, backup_file_name: &str) -> Result<PathBu
         backup_file_name = backup_file_name,
         "[Table Info] Creating a tar.gz archive from the db snapshot directory"
     );
-    tar_builder.append_dir_all(".", &dir_path)?;
+    tar_builder
+        .append_dir_all(".", &dir_path)
+        .context("Tar building failed.")?;
     aptos_logger::info!("[Table Info] Directory contents appended to the tar.gz archive");
     // Finish writing the tar archive and get the compressed GzEncoder back
-    let tar_data = tar_builder.into_inner()?;
-    let gz_encoder = tar_data.into_inner()?;
+    let tar_data = tar_builder
+        .into_inner()
+        .context("Unwrap the tar builder failed.")?;
+    let gz_encoder = tar_data
+        .into_inner()
+        .context("Failed to get the compressed buffer.")?;
 
     // Finish the compression process
-    let compressed_data = gz_encoder.finish()?;
+    let compressed_data = gz_encoder
+        .finish()
+        .context("Failed to build the compressed bytes.")?;
 
     let tar_file_name = format!("{}.tar.gz", backup_file_name);
     let tar_file_path = dir_path.join(&tar_file_name);
@@ -81,7 +90,8 @@ pub fn create_tar_gz(dir_path: PathBuf, backup_file_name: &str) -> Result<PathBu
         "[Table Info] Prepare to compress the db snapshot directory"
     );
     // Write the tar.gz archive to a file
-    std::fs::write(&tar_file_path, compressed_data)?;
+    std::fs::write(&tar_file_path, compressed_data)
+        .context("Failed to write the compressed data.")?;
     aptos_logger::info!("[Table Info] Tar.gz archive created successfully");
 
     Ok(tar_file_path)

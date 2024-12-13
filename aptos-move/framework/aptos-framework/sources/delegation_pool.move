@@ -2402,6 +2402,12 @@ module aptos_framework::delegation_pool {
         validator: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test(aptos_framework);
+        // This test case checks the scenario where delegation_pool_partial_governance_voting is disabled.
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[],
+            vector[features::get_delegation_pool_partial_governance_voting()]
+        );
 
         let validator_address = signer::address_of(validator);
         initialize_delegation_pool(validator, 0, vector::empty<u8>());
@@ -2435,7 +2441,30 @@ module aptos_framework::delegation_pool {
         validator: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test(aptos_framework);
+        // This test case checks the scenario where delegation_pool_partial_governance_voting is disabled.
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[],
+            vector[features::get_delegation_pool_partial_governance_voting()]
+        );
         // account does not own any delegation pool
+        set_delegated_voter(validator, @0x112);
+    }
+
+    #[test(aptos_framework = @aptos_framework, validator = @0x123)]
+    #[expected_failure(abort_code = 0x3000C, location = Self)]
+    public entry fun test_cannot_set_delegated_voter_if_partial_governance_voting(
+        aptos_framework: &signer,
+        validator: &signer,
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(aptos_framework);
+        // This test case checks the scenario where delegation_pool_partial_governance_voting is enabled.
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[features::get_delegation_pool_partial_governance_voting()],
+            vector[]
+        );
+        // cannot call this deprecated function anymore
         set_delegated_voter(validator, @0x112);
     }
 
@@ -2467,6 +2496,12 @@ module aptos_framework::delegation_pool {
         validator: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test(aptos_framework);
+        // This test case checks the scenario where delegation_pool_partial_governance_voting is disabled.
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[],
+            vector[features::get_delegation_pool_partial_governance_voting()]
+        );
 
         let validator_address = signer::address_of(validator);
         initialize_delegation_pool(validator, 1234, vector::empty<u8>());
@@ -2477,6 +2512,7 @@ module aptos_framework::delegation_pool {
 
         assert!(stake::stake_pool_exists(pool_address), 0);
         assert!(stake::get_operator(pool_address) == validator_address, 0);
+        // pool created before partial governance voting, owner account is delegated voter
         assert!(stake::get_delegated_voter(pool_address) == validator_address, 0);
 
         assert!(observed_lockup_cycle(pool_address) == 0, 0);
@@ -4175,7 +4211,6 @@ module aptos_framework::delegation_pool {
             100 * ONE_APT,
             1000,
         );
-        aptos_governance::initialize_partial_voting(aptos_framework);
         features::change_feature_flags_for_testing(
             aptos_framework,
             vector[features::get_partial_governance_voting(), features::get_delegation_pool_partial_governance_voting(
@@ -4221,7 +4256,6 @@ module aptos_framework::delegation_pool {
             100 * ONE_APT,
             1000,
         );
-        aptos_governance::initialize_partial_voting(aptos_framework);
         features::change_feature_flags_for_testing(
             aptos_framework,
             vector[features::get_partial_governance_voting(), features::get_delegation_pool_partial_governance_voting(
@@ -4277,7 +4311,6 @@ module aptos_framework::delegation_pool {
             100 * ONE_APT,
             1000,
         );
-        aptos_governance::initialize_partial_voting(aptos_framework);
         features::change_feature_flags_for_testing(
             aptos_framework,
             vector[features::get_partial_governance_voting(), features::get_delegation_pool_partial_governance_voting(
@@ -4428,7 +4461,12 @@ module aptos_framework::delegation_pool {
             100 * ONE_APT,
             1000,
         );
-        aptos_governance::initialize_partial_voting(aptos_framework);
+        // This test case checks the scenario where delegation_pool_partial_governance_voting is disabled.
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[],
+            vector[features::get_delegation_pool_partial_governance_voting()]
+        );
 
         initialize_test_validator(validator, 100 * ONE_APT, true, false);
 
@@ -4510,7 +4548,6 @@ module aptos_framework::delegation_pool {
             100 * ONE_APT,
             1000,
         );
-        aptos_governance::initialize_partial_voting(aptos_framework);
         features::change_feature_flags_for_testing(
             aptos_framework,
             vector[features::get_partial_governance_voting(), features::get_delegation_pool_partial_governance_voting(
@@ -4592,6 +4629,12 @@ module aptos_framework::delegation_pool {
         voter1: &signer,
         voter2: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolAllowlisting {
+        // This test case checks the scenario where delegation_pool_partial_governance_voting is disabled.
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[],
+            vector[features::get_delegation_pool_partial_governance_voting()]
+        );
         // partial voing hasn't been enabled yet. A proposal has been created by the validator.
         let proposal1_id = setup_vote(aptos_framework, validator, false);
 
@@ -4685,6 +4728,12 @@ module aptos_framework::delegation_pool {
         delegator1: &signer,
         voter1: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolAllowlisting {
+        // This test case checks the scenario where delegation_pool_partial_governance_voting is disabled.
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[],
+            vector[features::get_delegation_pool_partial_governance_voting()]
+        );
         // partial voing hasn't been enabled yet. A proposal has been created by the validator.
         let proposal1_id = setup_vote(aptos_framework, validator, false);
 
@@ -4722,6 +4771,12 @@ module aptos_framework::delegation_pool {
         delegator1: &signer,
         voter1: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolAllowlisting {
+        // This test case checks the scenario where delegation_pool_partial_governance_voting is disabled.
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[],
+            vector[features::get_delegation_pool_partial_governance_voting()]
+        );
         // partial voing hasn't been enabled yet. A proposal has been created by the validator.
         let proposal1_id = setup_vote(aptos_framework, validator, false);
 
@@ -4761,6 +4816,12 @@ module aptos_framework::delegation_pool {
         validator: &signer,
         delegator1: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolAllowlisting {
+        // This test case checks the scenario where delegation_pool_partial_governance_voting is disabled.
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[],
+            vector[features::get_delegation_pool_partial_governance_voting()]
+        );
         // partial voing hasn't been enabled yet. A proposal has been created by the validator.
         let proposal1_id = setup_vote(aptos_framework, validator, true);
 
@@ -4780,6 +4841,12 @@ module aptos_framework::delegation_pool {
         delegator1: &signer,
         voter1: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolAllowlisting {
+        // This test case checks the scenario where delegation_pool_partial_governance_voting is disabled.
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[],
+            vector[features::get_delegation_pool_partial_governance_voting()]
+        );
         // partial voing hasn't been enabled yet. A proposal has been created by the validator.
         setup_vote(aptos_framework, validator, true);
 
@@ -4807,7 +4874,6 @@ module aptos_framework::delegation_pool {
         voter2: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolAllowlisting {
         initialize_for_test(aptos_framework);
-        aptos_governance::initialize_partial_voting(aptos_framework);
         features::change_feature_flags_for_testing(
             aptos_framework,
             vector[
@@ -4955,7 +5021,6 @@ module aptos_framework::delegation_pool {
         voter2: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolAllowlisting {
         initialize_for_test(aptos_framework);
-        aptos_governance::initialize_partial_voting(aptos_framework);
         features::change_feature_flags_for_testing(
             aptos_framework,
             vector[
@@ -5527,7 +5592,6 @@ module aptos_framework::delegation_pool {
             100 * ONE_APT,
             1000,
         );
-        aptos_governance::initialize_partial_voting(aptos_framework);
 
         initialize_test_validator(validator, 100 * ONE_APT, true, false);
 

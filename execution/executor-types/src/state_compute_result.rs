@@ -116,7 +116,7 @@ impl StateComputeResult {
     }
 
     pub fn transactions_to_commit(&self) -> &[Transaction] {
-        self.execution_output.to_commit.txns()
+        &self.execution_output.to_commit.transactions
     }
 
     pub fn transaction_info_hashes(&self) -> &Vec<HashValue> {
@@ -145,8 +145,12 @@ impl StateComputeResult {
 
     pub fn make_chunk_commit_notification(&self) -> ChunkCommitNotification {
         ChunkCommitNotification {
-            subscribable_events: self.execution_output.subscribable_events.clone(),
-            committed_transactions: self.execution_output.to_commit.txns().to_vec(),
+            subscribable_events: self
+                .execution_output
+                .subscribable_events
+                .get(Some("wait_for_subscribable_events"))
+                .clone(),
+            committed_transactions: self.execution_output.to_commit.transactions.clone(),
             reconfiguration_occurred: self.execution_output.next_epoch_state.is_some(),
         }
     }
@@ -154,18 +158,18 @@ impl StateComputeResult {
     pub fn as_chunk_to_commit(&self) -> ChunkToCommit {
         ChunkToCommit {
             first_version: self.ledger_update_output.first_version(),
-            transactions: self.execution_output.to_commit.txns(),
-            transaction_outputs: self.execution_output.to_commit.transaction_outputs(),
+            transactions: &self.execution_output.to_commit.transactions,
+            transaction_outputs: &self.execution_output.to_commit.transaction_outputs,
             transaction_infos: &self.ledger_update_output.transaction_infos,
-            per_version_state_updates: &self.state_checkpoint_output.per_version_state_updates,
             base_state_version: self.state_checkpoint_output.parent_state.base_version,
             latest_in_memory_state: &self.state_checkpoint_output.result_state,
+            state_update_refs: self.execution_output.to_commit.state_update_refs(),
             state_updates_until_last_checkpoint: self
                 .state_checkpoint_output
                 .state_updates_before_last_checkpoint
                 .as_ref(),
             sharded_state_cache: Some(&self.execution_output.state_cache.sharded_state_cache),
-            is_reconfig: self.execution_output.block_end_info.is_some(),
+            is_reconfig: self.execution_output.next_epoch_state.is_some(),
         }
     }
 }

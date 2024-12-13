@@ -19,7 +19,6 @@ This module provides the foundation for typesafe Coins.
 -  [Struct `WithdrawEvent`](#0x1_coin_WithdrawEvent)
 -  [Struct `CoinEventHandleDeletion`](#0x1_coin_CoinEventHandleDeletion)
 -  [Struct `PairCreation`](#0x1_coin_PairCreation)
--  [Resource `MigrationFlag`](#0x1_coin_MigrationFlag)
 -  [Struct `MintCapability`](#0x1_coin_MintCapability)
 -  [Struct `FreezeCapability`](#0x1_coin_FreezeCapability)
 -  [Struct `BurnCapability`](#0x1_coin_BurnCapability)
@@ -29,6 +28,7 @@ This module provides the foundation for typesafe Coins.
 -  [Struct `MintRefReceipt`](#0x1_coin_MintRefReceipt)
 -  [Struct `TransferRefReceipt`](#0x1_coin_TransferRefReceipt)
 -  [Struct `BurnRefReceipt`](#0x1_coin_BurnRefReceipt)
+-  [Resource `MigrationFlag`](#0x1_coin_MigrationFlag)
 -  [Resource `Ghost$supply`](#0x1_coin_Ghost$supply)
 -  [Resource `Ghost$aggregate_supply`](#0x1_coin_Ghost$aggregate_supply)
 -  [Constants](#@Constants_0)
@@ -53,11 +53,11 @@ This module provides the foundation for typesafe Coins.
 -  [Function `convert_and_take_paired_burn_ref`](#0x1_coin_convert_and_take_paired_burn_ref)
 -  [Function `return_paired_burn_ref`](#0x1_coin_return_paired_burn_ref)
 -  [Function `borrow_paired_burn_ref`](#0x1_coin_borrow_paired_burn_ref)
--  [Function `initialize_supply_config`](#0x1_coin_initialize_supply_config)
 -  [Function `allow_supply_upgrades`](#0x1_coin_allow_supply_upgrades)
 -  [Function `calculate_amount_to_withdraw`](#0x1_coin_calculate_amount_to_withdraw)
 -  [Function `maybe_convert_to_fungible_store`](#0x1_coin_maybe_convert_to_fungible_store)
 -  [Function `migrate_to_fungible_store`](#0x1_coin_migrate_to_fungible_store)
+-  [Function `migrate_coin_store_to_fungible_store`](#0x1_coin_migrate_coin_store_to_fungible_store)
 -  [Function `coin_address`](#0x1_coin_coin_address)
 -  [Function `balance`](#0x1_coin_balance)
 -  [Function `is_balance_at_least`](#0x1_coin_is_balance_at_least)
@@ -73,7 +73,7 @@ This module provides the foundation for typesafe Coins.
 -  [Function `burn`](#0x1_coin_burn)
 -  [Function `burn_from`](#0x1_coin_burn_from)
 -  [Function `deposit`](#0x1_coin_deposit)
--  [Function `migrated_primary_fungible_store_exists`](#0x1_coin_migrated_primary_fungible_store_exists)
+-  [Function `can_receive_paired_fungible_asset`](#0x1_coin_can_receive_paired_fungible_asset)
 -  [Function `force_deposit`](#0x1_coin_force_deposit)
 -  [Function `destroy_zero`](#0x1_coin_destroy_zero)
 -  [Function `extract`](#0x1_coin_extract)
@@ -102,7 +102,6 @@ This module provides the foundation for typesafe Coins.
     -  [Struct `AggregatableCoin`](#@Specification_1_AggregatableCoin)
     -  [Function `coin_to_fungible_asset`](#@Specification_1_coin_to_fungible_asset)
     -  [Function `fungible_asset_to_coin`](#@Specification_1_fungible_asset_to_coin)
-    -  [Function `initialize_supply_config`](#@Specification_1_initialize_supply_config)
     -  [Function `allow_supply_upgrades`](#@Specification_1_allow_supply_upgrades)
     -  [Function `maybe_convert_to_fungible_store`](#@Specification_1_maybe_convert_to_fungible_store)
     -  [Function `coin_address`](#@Specification_1_coin_address)
@@ -153,6 +152,7 @@ This module provides the foundation for typesafe Coins.
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">0x1::table</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info">0x1::type_info</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
 
 
@@ -270,7 +270,8 @@ Configuration that controls the behavior of total coin supply. If the field
 is set, coin creators are allowed to upgrade to parallelizable implementations.
 
 
-<pre><code><b>struct</b> <a href="coin.md#0x1_coin_SupplyConfig">SupplyConfig</a> <b>has</b> key
+<pre><code>#[deprecated]
+<b>struct</b> <a href="coin.md#0x1_coin_SupplyConfig">SupplyConfig</a> <b>has</b> key
 </code></pre>
 
 
@@ -624,35 +625,6 @@ Module event emitted when a new pair of coin and fungible asset is created.
 
 </details>
 
-<a id="0x1_coin_MigrationFlag"></a>
-
-## Resource `MigrationFlag`
-
-The flag the existence of which indicates the primary fungible store is created by the migration from CoinStore.
-
-
-<pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
-<b>struct</b> <a href="coin.md#0x1_coin_MigrationFlag">MigrationFlag</a> <b>has</b> key
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>dummy_field: bool</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
 <a id="0x1_coin_MintCapability"></a>
 
 ## Struct `MintCapability`
@@ -919,6 +891,36 @@ The hot potato receipt for flash borrowing BurnRef.
 
 </details>
 
+<a id="0x1_coin_MigrationFlag"></a>
+
+## Resource `MigrationFlag`
+
+The flag the existence of which indicates the primary fungible store is created by the migration from CoinStore.
+
+
+<pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
+#[deprecated]
+<b>struct</b> <a href="coin.md#0x1_coin_MigrationFlag">MigrationFlag</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="0x1_coin_Ghost$supply"></a>
 
 ## Resource `Ghost$supply`
@@ -984,16 +986,6 @@ Maximum possible aggregatable coin value.
 
 
 <pre><code><b>const</b> <a href="coin.md#0x1_coin_MAX_U64">MAX_U64</a>: u128 = 18446744073709551615;
-</code></pre>
-
-
-
-<a id="0x1_coin_MAX_U128"></a>
-
-Maximum possible coin supply.
-
-
-<pre><code><b>const</b> <a href="coin.md#0x1_coin_MAX_U128">MAX_U128</a>: u128 = 340282366920938463463374607431768211455;
 </code></pre>
 
 
@@ -1961,32 +1953,6 @@ Return the <code>BurnRef</code> with the hot potato receipt.
 
 </details>
 
-<a id="0x1_coin_initialize_supply_config"></a>
-
-## Function `initialize_supply_config`
-
-Publishes supply configuration. Initially, upgrading is not allowed.
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_initialize_supply_config">initialize_supply_config</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_initialize_supply_config">initialize_supply_config</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
-    <b>move_to</b>(aptos_framework, <a href="coin.md#0x1_coin_SupplyConfig">SupplyConfig</a> { allow_upgrades: <b>false</b> });
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_coin_allow_supply_upgrades"></a>
 
 ## Function `allow_supply_upgrades`
@@ -1995,7 +1961,7 @@ This should be called by on-chain governance to update the config and allow
 or disallow upgradability of total supply.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_allow_supply_upgrades">allow_supply_upgrades</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, allowed: bool)
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_allow_supply_upgrades">allow_supply_upgrades</a>(_aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _allowed: bool)
 </code></pre>
 
 
@@ -2004,10 +1970,8 @@ or disallow upgradability of total supply.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_allow_supply_upgrades">allow_supply_upgrades</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, allowed: bool) <b>acquires</b> <a href="coin.md#0x1_coin_SupplyConfig">SupplyConfig</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
-    <b>let</b> allow_upgrades = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_SupplyConfig">SupplyConfig</a>&gt;(@aptos_framework).allow_upgrades;
-    *allow_upgrades = allowed;
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_allow_supply_upgrades">allow_supply_upgrades</a>(_aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _allowed: bool) {
+    <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="coin.md#0x1_coin_ECOIN_SUPPLY_UPGRADE_NOT_SUPPORTED">ECOIN_SUPPLY_UPGRADE_NOT_SUPPORTED</a>)
 }
 </code></pre>
 
@@ -2077,7 +2041,6 @@ or disallow upgradability of total supply.
 
     <b>let</b> metadata = <a href="coin.md#0x1_coin_ensure_paired_metadata">ensure_paired_metadata</a>&lt;CoinType&gt;();
     <b>let</b> store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">primary_fungible_store::ensure_primary_store_exists</a>(<a href="account.md#0x1_account">account</a>, metadata);
-    <b>let</b> store_address = <a href="object.md#0x1_object_object_address">object::object_address</a>(&store);
     <b>if</b> (<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(<a href="account.md#0x1_account">account</a>)) {
         <b>let</b> <a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt; { <a href="coin.md#0x1_coin">coin</a>, frozen, deposit_events, withdraw_events } = <b>move_from</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(
             <a href="account.md#0x1_account">account</a>
@@ -2091,13 +2054,21 @@ or disallow upgradability of total supply.
                 deleted_withdraw_event_handle_creation_number: <a href="guid.md#0x1_guid_creation_num">guid::creation_num</a>(<a href="event.md#0x1_event_guid">event::guid</a>(&withdraw_events))
             }
         );
-        <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(deposit_events);
-        <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(withdraw_events);
         <b>if</b> (<a href="coin.md#0x1_coin">coin</a>.value == 0) {
             <a href="coin.md#0x1_coin_destroy_zero">destroy_zero</a>(<a href="coin.md#0x1_coin">coin</a>);
         } <b>else</b> {
-            <a href="fungible_asset.md#0x1_fungible_asset_deposit">fungible_asset::deposit</a>(store, <a href="coin.md#0x1_coin_coin_to_fungible_asset">coin_to_fungible_asset</a>(<a href="coin.md#0x1_coin">coin</a>));
+            <b>if</b> (std::features::module_event_migration_enabled()) {
+                <a href="event.md#0x1_event_emit">event::emit</a>(<a href="coin.md#0x1_coin_CoinWithdraw">CoinWithdraw</a> { coin_type: type_name&lt;CoinType&gt;(), <a href="account.md#0x1_account">account</a>, amount: <a href="coin.md#0x1_coin">coin</a>.value });
+            } <b>else</b> {
+                <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="coin.md#0x1_coin_WithdrawEvent">WithdrawEvent</a>&gt;(
+                    &<b>mut</b> withdraw_events,
+                    <a href="coin.md#0x1_coin_WithdrawEvent">WithdrawEvent</a> { amount: <a href="coin.md#0x1_coin">coin</a>.value },
+                );
+            };
+            <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">fungible_asset::deposit_internal</a>(object_address(&store), <a href="coin.md#0x1_coin_coin_to_fungible_asset">coin_to_fungible_asset</a>(<a href="coin.md#0x1_coin">coin</a>));
         };
+        <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(deposit_events);
+        <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(withdraw_events);
         // Note:
         // It is possible the primary fungible store may already exist before this function call.
         // In this case, <b>if</b> the <a href="account.md#0x1_account">account</a> owns a frozen <a href="coin.md#0x1_coin_CoinStore">CoinStore</a> and an unfrozen primary fungible store, this
@@ -2107,9 +2078,6 @@ or disallow upgradability of total supply.
             <a href="fungible_asset.md#0x1_fungible_asset_set_frozen_flag_internal">fungible_asset::set_frozen_flag_internal</a>(store, frozen);
         }
     };
-    <b>if</b> (!<b>exists</b>&lt;<a href="coin.md#0x1_coin_MigrationFlag">MigrationFlag</a>&gt;(store_address)) {
-        <b>move_to</b>(&<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(store_address), <a href="coin.md#0x1_coin_MigrationFlag">MigrationFlag</a> {});
-    }
 }
 </code></pre>
 
@@ -2137,6 +2105,37 @@ Voluntarily migrate to fungible store for <code>CoinType</code> if not yet.
     <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
 ) <b>acquires</b> <a href="coin.md#0x1_coin_CoinStore">CoinStore</a>, <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>, <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a> {
     <a href="coin.md#0x1_coin_maybe_convert_to_fungible_store">maybe_convert_to_fungible_store</a>&lt;CoinType&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_coin_migrate_coin_store_to_fungible_store"></a>
+
+## Function `migrate_coin_store_to_fungible_store`
+
+Migrate to fungible store for <code>CoinType</code> if not yet.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_migrate_coin_store_to_fungible_store">migrate_coin_store_to_fungible_store</a>&lt;CoinType&gt;(accounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_migrate_coin_store_to_fungible_store">migrate_coin_store_to_fungible_store</a>&lt;CoinType&gt;(
+    accounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
+) <b>acquires</b> <a href="coin.md#0x1_coin_CoinStore">CoinStore</a>, <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>, <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a> {
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_new_accounts_default_to_fa_apt_store_enabled">features::new_accounts_default_to_fa_apt_store_enabled</a>()) {
+        std::vector::for_each(accounts, |<a href="account.md#0x1_account">account</a>| {
+            <a href="coin.md#0x1_coin_maybe_convert_to_fungible_store">maybe_convert_to_fungible_store</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>);
+        });
+    }
 }
 </code></pre>
 
@@ -2353,7 +2352,7 @@ Returns <code><b>true</b></code> if <code>account_addr</code> is registered to r
         <b>let</b> paired_metadata_opt = <a href="coin.md#0x1_coin_paired_metadata">paired_metadata</a>&lt;CoinType&gt;();
         (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(
             &paired_metadata_opt
-        ) && <a href="coin.md#0x1_coin_migrated_primary_fungible_store_exists">migrated_primary_fungible_store_exists</a>(account_addr, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(paired_metadata_opt)))
+        ) && <a href="coin.md#0x1_coin_can_receive_paired_fungible_asset">can_receive_paired_fungible_asset</a>(account_addr, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(paired_metadata_opt)))
     }
 }
 </code></pre>
@@ -2629,7 +2628,7 @@ Deposit the coin balance into the recipient's account and emit an event.
         <a href="coin.md#0x1_coin_merge">merge</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, <a href="coin.md#0x1_coin">coin</a>);
     } <b>else</b> {
         <b>let</b> metadata = <a href="coin.md#0x1_coin_paired_metadata">paired_metadata</a>&lt;CoinType&gt;();
-        <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&metadata) && <a href="coin.md#0x1_coin_migrated_primary_fungible_store_exists">migrated_primary_fungible_store_exists</a>(
+        <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&metadata) && <a href="coin.md#0x1_coin_can_receive_paired_fungible_asset">can_receive_paired_fungible_asset</a>(
             account_addr,
             <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(metadata)
         )) {
@@ -2645,13 +2644,13 @@ Deposit the coin balance into the recipient's account and emit an event.
 
 </details>
 
-<a id="0x1_coin_migrated_primary_fungible_store_exists"></a>
+<a id="0x1_coin_can_receive_paired_fungible_asset"></a>
 
-## Function `migrated_primary_fungible_store_exists`
+## Function `can_receive_paired_fungible_asset`
 
 
 
-<pre><code><b>fun</b> <a href="coin.md#0x1_coin_migrated_primary_fungible_store_exists">migrated_primary_fungible_store_exists</a>(account_address: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;): bool
+<pre><code><b>fun</b> <a href="coin.md#0x1_coin_can_receive_paired_fungible_asset">can_receive_paired_fungible_asset</a>(account_address: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;): bool
 </code></pre>
 
 
@@ -2660,15 +2659,17 @@ Deposit the coin balance into the recipient's account and emit an event.
 <summary>Implementation</summary>
 
 
-<pre><code>inline <b>fun</b> <a href="coin.md#0x1_coin_migrated_primary_fungible_store_exists">migrated_primary_fungible_store_exists</a>(
+<pre><code>inline <b>fun</b> <a href="coin.md#0x1_coin_can_receive_paired_fungible_asset">can_receive_paired_fungible_asset</a>(
     account_address: <b>address</b>,
     metadata: Object&lt;Metadata&gt;
 ): bool {
-    <b>let</b> primary_store_address = <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address">primary_fungible_store::primary_store_address</a>&lt;Metadata&gt;(account_address, metadata);
-    <a href="fungible_asset.md#0x1_fungible_asset_store_exists">fungible_asset::store_exists</a>(primary_store_address) && (
-        // migration flag is needed, until we start defaulting new accounts <b>to</b> APT PFS
-        <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_new_accounts_default_to_fa_apt_store_enabled">features::new_accounts_default_to_fa_apt_store_enabled</a>() || <b>exists</b>&lt;<a href="coin.md#0x1_coin_MigrationFlag">MigrationFlag</a>&gt;(primary_store_address)
-    )
+    (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_new_accounts_default_to_fa_apt_store_enabled">features::new_accounts_default_to_fa_apt_store_enabled</a>() && <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata) == @0xa) || {
+        <b>let</b> primary_store_address = <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address">primary_fungible_store::primary_store_address</a>&lt;Metadata&gt;(
+            account_address,
+            metadata
+        );
+        <a href="fungible_asset.md#0x1_fungible_asset_store_exists">fungible_asset::store_exists</a>(primary_store_address)
+    }
 }
 </code></pre>
 
@@ -2702,13 +2703,13 @@ This is for internal use only and doesn't emit an DepositEvent.
         <a href="coin.md#0x1_coin_merge">merge</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, <a href="coin.md#0x1_coin">coin</a>);
     } <b>else</b> {
         <b>let</b> metadata = <a href="coin.md#0x1_coin_paired_metadata">paired_metadata</a>&lt;CoinType&gt;();
-        <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&metadata) && <a href="coin.md#0x1_coin_migrated_primary_fungible_store_exists">migrated_primary_fungible_store_exists</a>(
+        <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&metadata) && <a href="coin.md#0x1_coin_can_receive_paired_fungible_asset">can_receive_paired_fungible_asset</a>(
             account_addr,
             <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(metadata)
         )) {
             <b>let</b> fa = <a href="coin.md#0x1_coin_coin_to_fungible_asset">coin_to_fungible_asset</a>(<a href="coin.md#0x1_coin">coin</a>);
             <b>let</b> metadata = <a href="fungible_asset.md#0x1_fungible_asset_asset_metadata">fungible_asset::asset_metadata</a>(&fa);
-            <b>let</b> store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_fungible_store::primary_store</a>(account_addr, metadata);
+            <b>let</b> store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">primary_fungible_store::ensure_primary_store_exists</a>(account_addr, metadata);
             <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">fungible_asset::deposit_internal</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store), fa);
         } <b>else</b> {
             <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="coin.md#0x1_coin_ECOIN_STORE_NOT_PUBLISHED">ECOIN_STORE_NOT_PUBLISHED</a>)
@@ -2886,7 +2887,7 @@ Upgrade total supply to use a parallelizable implementation if it is
 available.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_upgrade_supply">upgrade_supply</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_upgrade_supply">upgrade_supply</a>&lt;CoinType&gt;(_account: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -2895,30 +2896,8 @@ available.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_upgrade_supply">upgrade_supply</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>, <a href="coin.md#0x1_coin_SupplyConfig">SupplyConfig</a> {
-    <b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-
-    // Only <a href="coin.md#0x1_coin">coin</a> creators can upgrade total <a href="coin.md#0x1_coin_supply">supply</a>.
-    <b>assert</b>!(
-        <a href="coin.md#0x1_coin_coin_address">coin_address</a>&lt;CoinType&gt;() == account_addr,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="coin.md#0x1_coin_ECOIN_INFO_ADDRESS_MISMATCH">ECOIN_INFO_ADDRESS_MISMATCH</a>),
-    );
-
-    // Can only succeed once on-chain governance agreed on the upgrade.
-    <b>assert</b>!(
-        <b>borrow_global</b>&lt;<a href="coin.md#0x1_coin_SupplyConfig">SupplyConfig</a>&gt;(@aptos_framework).allow_upgrades,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="coin.md#0x1_coin_ECOIN_SUPPLY_UPGRADE_NOT_SUPPORTED">ECOIN_SUPPLY_UPGRADE_NOT_SUPPORTED</a>)
-    );
-
-    <b>let</b> maybe_supply = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(account_addr).<a href="coin.md#0x1_coin_supply">supply</a>;
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(maybe_supply)) {
-        <b>let</b> <a href="coin.md#0x1_coin_supply">supply</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow_mut">option::borrow_mut</a>(maybe_supply);
-
-        // If <a href="coin.md#0x1_coin_supply">supply</a> is tracked and the current implementation uses an integer - upgrade.
-        <b>if</b> (!<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">optional_aggregator::is_parallelizable</a>(<a href="coin.md#0x1_coin_supply">supply</a>)) {
-            <a href="optional_aggregator.md#0x1_optional_aggregator_switch">optional_aggregator::switch</a>(<a href="coin.md#0x1_coin_supply">supply</a>);
-        }
-    }
+<pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_upgrade_supply">upgrade_supply</a>&lt;CoinType&gt;(_account: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="coin.md#0x1_coin_ECOIN_SUPPLY_UPGRADE_NOT_SUPPORTED">ECOIN_SUPPLY_UPGRADE_NOT_SUPPORTED</a>)
 }
 </code></pre>
 
@@ -3035,7 +3014,7 @@ Same as <code>initialize</code> but supply can be initialized to parallelizable 
         decimals,
         <a href="coin.md#0x1_coin_supply">supply</a>: <b>if</b> (monitor_supply) {
             <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(
-                <a href="optional_aggregator.md#0x1_optional_aggregator_new">optional_aggregator::new</a>(<a href="coin.md#0x1_coin_MAX_U128">MAX_U128</a>, parallelizable)
+                <a href="optional_aggregator.md#0x1_optional_aggregator_new">optional_aggregator::new</a>(parallelizable)
             )
         } <b>else</b> { <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>() },
     };
@@ -3682,46 +3661,19 @@ initialize, initialize_internal, initialize_with_parallelizable_supply;
 
 
 
-<a id="@Specification_1_initialize_supply_config"></a>
-
-### Function `initialize_supply_config`
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_initialize_supply_config">initialize_supply_config</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
-
-
-Can only be initialized once.
-Can only be published by reserved addresses.
-
-
-<pre><code><b>let</b> aptos_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
-<b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(aptos_addr);
-<b>aborts_if</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_SupplyConfig">SupplyConfig</a>&gt;(aptos_addr);
-<b>ensures</b> !<b>global</b>&lt;<a href="coin.md#0x1_coin_SupplyConfig">SupplyConfig</a>&gt;(aptos_addr).allow_upgrades;
-<b>ensures</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_SupplyConfig">SupplyConfig</a>&gt;(aptos_addr);
-</code></pre>
-
-
-
 <a id="@Specification_1_allow_supply_upgrades"></a>
 
 ### Function `allow_supply_upgrades`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_allow_supply_upgrades">allow_supply_upgrades</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, allowed: bool)
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_allow_supply_upgrades">allow_supply_upgrades</a>(_aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _allowed: bool)
 </code></pre>
 
 
 Can only be updated by <code>@aptos_framework</code>.
 
 
-<pre><code><b>modifies</b> <b>global</b>&lt;<a href="coin.md#0x1_coin_SupplyConfig">SupplyConfig</a>&gt;(@aptos_framework);
-<b>let</b> aptos_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
-<b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(aptos_addr);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_SupplyConfig">SupplyConfig</a>&gt;(aptos_addr);
-<b>let</b> <b>post</b> allow_upgrades_post = <b>global</b>&lt;<a href="coin.md#0x1_coin_SupplyConfig">SupplyConfig</a>&gt;(@aptos_framework);
-<b>ensures</b> allow_upgrades_post.allow_upgrades == allowed;
+<pre><code><b>aborts_if</b> <b>true</b>;
 </code></pre>
 
 
@@ -3870,7 +3822,8 @@ Get address by reflection.
 
 <pre><code><b>fun</b> <a href="coin.md#0x1_coin_spec_is_account_registered">spec_is_account_registered</a>&lt;CoinType&gt;(account_addr: <b>address</b>): bool {
    <b>let</b> paired_metadata_opt = <a href="coin.md#0x1_coin_spec_paired_metadata">spec_paired_metadata</a>&lt;CoinType&gt;();
-   <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr) || (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(
+   <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr) || <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_new_accounts_default_to_fa_apt_store_enabled">features::spec_new_accounts_default_to_fa_apt_store_enabled</a>(
+   ) || (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(
        paired_metadata_opt
    ) && <a href="primary_fungible_store.md#0x1_primary_fungible_store_spec_primary_store_exists">primary_fungible_store::spec_primary_store_exists</a>(account_addr, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(paired_metadata_opt)))
 }
@@ -4226,7 +4179,7 @@ The value of <code>zero_coin</code> must be 0.
 ### Function `upgrade_supply`
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_upgrade_supply">upgrade_supply</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_upgrade_supply">upgrade_supply</a>&lt;CoinType&gt;(_account: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -4234,26 +4187,7 @@ The creator of <code>CoinType</code> must be <code>@aptos_framework</code>.
 <code><a href="coin.md#0x1_coin_SupplyConfig">SupplyConfig</a></code> allow upgrade.
 
 
-<pre><code><b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-<b>let</b> coin_address = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
-<b>aborts_if</b> coin_address != account_addr;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_SupplyConfig">SupplyConfig</a>&gt;(@aptos_framework);
-// This enforces <a id="high-level-req-1.1" href="#high-level-req">high-level requirement 1</a>:
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(account_addr);
-<b>let</b> supply_config = <b>global</b>&lt;<a href="coin.md#0x1_coin_SupplyConfig">SupplyConfig</a>&gt;(@aptos_framework);
-<b>aborts_if</b> !supply_config.allow_upgrades;
-<b>modifies</b> <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(account_addr);
-<b>let</b> maybe_supply = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(account_addr).<a href="coin.md#0x1_coin_supply">supply</a>;
-<b>let</b> <a href="coin.md#0x1_coin_supply">supply</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(maybe_supply);
-<b>let</b> value = <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator::optional_aggregator_value</a>(<a href="coin.md#0x1_coin_supply">supply</a>);
-<b>let</b> <b>post</b> post_maybe_supply = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(account_addr).<a href="coin.md#0x1_coin_supply">supply</a>;
-<b>let</b> <b>post</b> post_supply = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(post_maybe_supply);
-<b>let</b> <b>post</b> post_value = <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator::optional_aggregator_value</a>(post_supply);
-<b>let</b> supply_no_parallel = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(maybe_supply) &&
-    !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">optional_aggregator::is_parallelizable</a>(<a href="coin.md#0x1_coin_supply">supply</a>);
-<b>aborts_if</b> supply_no_parallel && !<b>exists</b>&lt;<a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">aggregator_factory::AggregatorFactory</a>&gt;(@aptos_framework);
-<b>ensures</b> supply_no_parallel ==&gt;
-    <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">optional_aggregator::is_parallelizable</a>(post_supply) && post_value == value;
+<pre><code><b>aborts_if</b> <b>true</b>;
 </code></pre>
 
 
@@ -4302,27 +4236,6 @@ The creator of <code>CoinType</code> must be <code>@aptos_framework</code>.
 </code></pre>
 
 
-Make sure <code>name</code> and <code>symbol</code> are legal length.
-Only the creator of <code>CoinType</code> can initialize.
-
-
-<a id="0x1_coin_InitializeInternalSchema"></a>
-
-
-<pre><code><b>schema</b> <a href="coin.md#0x1_coin_InitializeInternalSchema">InitializeInternalSchema</a>&lt;CoinType&gt; {
-    <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
-    name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-    symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-    <b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-    <b>let</b> coin_address = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
-    <b>aborts_if</b> coin_address != account_addr;
-    <b>aborts_if</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(account_addr);
-    <b>aborts_if</b> len(name) &gt; <a href="coin.md#0x1_coin_MAX_COIN_NAME_LENGTH">MAX_COIN_NAME_LENGTH</a>;
-    <b>aborts_if</b> len(symbol) &gt; <a href="coin.md#0x1_coin_MAX_COIN_SYMBOL_LENGTH">MAX_COIN_SYMBOL_LENGTH</a>;
-}
-</code></pre>
-
-
 
 <a id="@Specification_1_initialize_internal"></a>
 
@@ -4353,7 +4266,7 @@ Only the creator of <code>CoinType</code> can initialize.
     && coin_info.symbol == symbol
     && coin_info.decimals == decimals;
 <b>ensures</b> <b>if</b> (monitor_supply) {
-    value == 0 && limit == <a href="coin.md#0x1_coin_MAX_U128">MAX_U128</a>
+    value == 0 && limit == MAX_U128
         && (parallelizable == <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">optional_aggregator::is_parallelizable</a>(<a href="coin.md#0x1_coin_supply">supply</a>))
 } <b>else</b> {
     <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(coin_info.<a href="coin.md#0x1_coin_supply">supply</a>)

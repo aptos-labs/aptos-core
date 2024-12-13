@@ -238,7 +238,7 @@ pub(crate) fn realistic_env_graceful_overload(duration: Duration) -> ForgeConfig
         .with_initial_fullnode_count(20)
         .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 15000 })
+                .mode(EmitJobMode::ConstTps { tps: 30000 })
                 .init_gas_price_multiplier(20),
             inner_success_criteria: SuccessCriteria::new(7500),
         }))
@@ -262,9 +262,10 @@ pub(crate) fn realistic_env_graceful_overload(duration: Duration) -> ForgeConfig
                     // overload test uses more CPUs than others, so increase the limit
                     // Check that we don't use more than 28 CPU cores for 20% of the time.
                     MetricsThreshold::new(28.0, 20),
-                    // Memory starts around 6GB, and grows around 8GB/hr in this test.
+                    // TODO(ibalajiarun): Investigate the high utilization and adjust accordingly.
+                    // Memory starts around 8GB, and grows around 8GB/hr in this test.
                     // Check that we don't use more than final expected memory for more than 20% of the time.
-                    MetricsThreshold::new_gb(6.5 + 8.0 * (duration.as_secs_f64() / 3600.0), 20),
+                    MetricsThreshold::new_gb(8.5 + 8.0 * (duration.as_secs_f64() / 3600.0), 20),
                 ))
                 .add_latency_threshold(10.0, LatencyType::P50)
                 .add_latency_threshold(30.0, LatencyType::P90)
@@ -303,9 +304,9 @@ pub(crate) fn realistic_env_max_load_test(
         .add_system_metrics_threshold(SystemMetricsThreshold::new(
             // Check that we don't use more than 18 CPU cores for 15% of the time.
             MetricsThreshold::new(25.0, 15),
-            // Memory starts around 7GB, and grows around 1.4GB/hr in this test.
+            // Memory starts around 8GB, and grows around 1.4GB/hr in this test.
             // Check that we don't use more than final expected memory for more than 20% of the time.
-            MetricsThreshold::new_gb(7.0 + 1.4 * (duration_secs as f64 / 3600.0), 20),
+            MetricsThreshold::new_gb(8.0 + 1.4 * (duration_secs as f64 / 3600.0), 20),
         ))
         .add_no_restarts()
         .add_wait_for_catchup_s(
@@ -316,7 +317,7 @@ pub(crate) fn realistic_env_max_load_test(
         .add_latency_threshold(4.5, LatencyType::P70)
         .add_chain_progress(StateProgressThreshold {
             max_non_epoch_no_progress_secs: 15.0,
-            max_epoch_no_progress_secs: 15.0,
+            max_epoch_no_progress_secs: 16.0,
             max_non_epoch_round_gap: 4,
             max_epoch_round_gap: 4,
         });

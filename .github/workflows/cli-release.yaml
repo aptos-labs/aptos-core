@@ -30,7 +30,7 @@ jobs:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - name: Build CLI
-        run: scripts/cli/build_cli_release.sh "Ubuntu"
+        run: scripts/cli/build_cli_release.sh "Ubuntu" "${{inputs.release_version}}"
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
@@ -46,7 +46,7 @@ jobs:
           ref: ${{ github.event.inputs.source_git_ref_override }}
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - name: Build CLI
-        run: scripts/cli/build_cli_release.sh "Ubuntu-22.04"
+        run: scripts/cli/build_cli_release.sh "Ubuntu-22.04" "${{inputs.release_version}}"
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:

@@ -971,12 +971,6 @@ module aptos_framework::staking_contract {
     const MAXIMUM_STAKE: u64 = 100000000000000000; // 1B APT coins with 8 decimals.
 
     #[test_only]
-    const MODULE_EVENT: u64 = 26;
-
-    #[test_only]
-    const OPERATOR_BENEFICIARY_CHANGE: u64 = 39;
-
-    #[test_only]
     public fun setup(aptos_framework: &signer, staker: &signer, operator: &signer, initial_balance: u64) {
         // Reward rate of 0.1% per epoch.
         stake::initialize_for_test_custom(
@@ -1015,7 +1009,8 @@ module aptos_framework::staking_contract {
 
         // Voter is initially set to operator but then updated to be staker.
         create_staking_contract(staker, operator_address, operator_address, amount, commission, vector::empty<u8>());
-        std::features::change_feature_flags_for_testing(aptos_framework, vector[MODULE_EVENT, OPERATOR_BENEFICIARY_CHANGE], vector[]);
+        // In the test environment, the periodical_reward_rate_decrease feature is initially turned off.
+        std::features::change_feature_flags_for_testing(aptos_framework, vector[], vector[features::get_periodical_reward_rate_decrease_feature()]);
     }
 
     #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]

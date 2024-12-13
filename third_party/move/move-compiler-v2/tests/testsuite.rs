@@ -106,7 +106,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         // Turn optimization on by default. Some configs below may turn it off.
         .set_experiment(Experiment::OPTIMIZE, true)
         .set_experiment(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS, true)
-        .set_language_version(LanguageVersion::V2_1);
+        .set_language_version(LanguageVersion::latest_stable());
     opts.testing = true;
     let configs = vec![
         // --- Tests for checking and ast processing
@@ -174,7 +174,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 .set_experiment(Experiment::LAMBDA_IN_PARAMS, true)
                 .set_experiment(Experiment::LAMBDA_IN_RETURNS, true)
                 .set_experiment(Experiment::LAMBDA_VALUES, true)
-                .set_experiment(Experiment::LAMBDA_LIFTING, true),
+                .set_experiment(Experiment::LAMBDA_LIFTING, true)
+                .set_language_version(LanguageVersion::V2_LAMBDA),
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::AllStages,
             dump_bytecode: DumpLevel::EndStage,
@@ -671,21 +672,6 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode_filter: None,
         },
         TestConfig {
-            name: "lint-checks",
-            runner: |p| run_test(p, get_config_by_name("lint-checks")),
-            include: vec![
-                "/lints/model_ast_lints/",
-                "/lints/stackless_bytecode_lints/",
-            ],
-            exclude: vec![],
-            exp_suffix: None,
-            options: opts.clone().set_experiment(Experiment::LINT_CHECKS, true),
-            stop_after: StopAfter::FileFormat,
-            dump_ast: DumpLevel::None,
-            dump_bytecode: DumpLevel::None,
-            dump_bytecode_filter: None,
-        },
-        TestConfig {
             name: "control-flow-simplification-on",
             runner: |p| run_test(p, get_config_by_name("control-flow-simplification-on")),
             include: vec!["/control-flow-simplification/"],
@@ -723,6 +709,18 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             // Run the entire compiler pipeline to double-check the result
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::EndStage,
+            dump_bytecode: DumpLevel::EndStage,
+            dump_bytecode_filter: None,
+        },
+        TestConfig {
+            name: "eager-pushes",
+            runner: |p| run_test(p, get_config_by_name("eager-pushes")),
+            include: vec!["/eager-pushes/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts.clone(),
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::EndStage,
             dump_bytecode_filter: None,
         },

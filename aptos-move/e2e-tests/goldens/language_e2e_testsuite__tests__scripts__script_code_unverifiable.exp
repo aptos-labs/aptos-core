@@ -18,19 +18,12 @@ Ok(
             gas_used: 3,
             status: Keep(
                 MiscellaneousError(
-                    None,
+                    Some(
+                        NEGATIVE_STACK_SIZE_WITHIN_BLOCK,
+                    ),
                 ),
             ),
-            auxiliary_data: V1(
-                TransactionAuxiliaryDataV1 {
-                    detail_error_message: Some(
-                        VMErrorDetail {
-                            status_code: NEGATIVE_STACK_SIZE_WITHIN_BLOCK,
-                            message: None,
-                        },
-                    ),
-                },
-            ),
+            auxiliary_data: None,
         },
     ],
 )

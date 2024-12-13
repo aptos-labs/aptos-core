@@ -12,6 +12,7 @@ use move_core_types::{
 };
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumString, FromRepr};
+
 /// The feature flags define in the Move source. This must stay aligned with the constants there.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr, EnumString)]
 #[allow(non_camel_case_types)]
@@ -60,10 +61,10 @@ pub enum FeatureFlag {
     COMMISSION_CHANGE_DELEGATION_POOL = 42,
     BN254_STRUCTURES = 43,
     WEBAUTHN_SIGNATURE = 44,
-    RECONFIGURE_WITH_DKG = 45,
+    _DEPRECATED_RECONFIGURE_WITH_DKG = 45,
     KEYLESS_ACCOUNTS = 46,
     KEYLESS_BUT_ZKLESS_ACCOUNTS = 47,
-    REMOVE_DETAILED_ERROR_FROM_HASH = 48,
+    _DEPRECATED_REMOVE_DETAILED_ERROR_FROM_HASH = 48, // This feature is not used
     JWK_CONSENSUS = 49,
     CONCURRENT_FUNGIBLE_ASSETS = 50,
     REFUNDABLE_BYTES = 51,
@@ -95,6 +96,10 @@ pub enum FeatureFlag {
     FEDERATED_KEYLESS = 77,
     TRANSACTION_SIMULATION_ENHANCEMENT = 78,
     COLLECTION_OWNER = 79,
+    /// covers mem::swap and vector::move_range
+    /// AIP-105 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-105.md)
+    NATIVE_MEMORY_OPERATIONS = 80,
+    ENABLE_LOADER_V2 = 81,
 }
 
 impl FeatureFlag {
@@ -117,9 +122,12 @@ impl FeatureFlag {
             FeatureFlag::BLS12_381_STRUCTURES,
             FeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH,
             FeatureFlag::STRUCT_CONSTRUCTORS,
+            FeatureFlag::PERIODICAL_REWARD_RATE_DECREASE,
+            FeatureFlag::PARTIAL_GOVERNANCE_VOTING,
             FeatureFlag::SIGNATURE_CHECKER_V2,
             FeatureFlag::STORAGE_SLOT_METADATA,
             FeatureFlag::CHARGE_INVARIANT_VIOLATION,
+            FeatureFlag::DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING,
             FeatureFlag::APTOS_UNIQUE_IDENTIFIERS,
             FeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::BULLETPROOFS_NATIVES,
@@ -142,7 +150,6 @@ impl FeatureFlag {
             FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
             FeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL,
             FeatureFlag::WEBAUTHN_SIGNATURE,
-            // FeatureFlag::RECONFIGURE_WITH_DKG, //TODO: re-enable once randomness is ready.
             FeatureFlag::KEYLESS_ACCOUNTS,
             FeatureFlag::FEDERATED_KEYLESS,
             FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
@@ -159,7 +166,6 @@ impl FeatureFlag {
             FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION,
             FeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS,
             FeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET,
-            FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH,
             FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
             FeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API,
             FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
@@ -172,6 +178,9 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL,
             FeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT,
             FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT,
+            FeatureFlag::NATIVE_MEMORY_OPERATIONS,
+            FeatureFlag::COLLECTION_OWNER,
+            FeatureFlag::ENABLE_LOADER_V2,
         ]
     }
 }
@@ -192,7 +201,6 @@ impl Default for Features {
         for feature in FeatureFlag::default_features() {
             features.enable(feature);
         }
-
         features
     }
 }
@@ -301,10 +309,6 @@ impl Features {
         self.is_enabled(FeatureFlag::FEDERATED_KEYLESS)
     }
 
-    pub fn is_remove_detailed_error_from_hash_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH)
-    }
-
     pub fn is_refundable_bytes_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::REFUNDABLE_BYTES)
     }
@@ -315,6 +319,14 @@ impl Features {
 
     pub fn is_transaction_simulation_enhancement_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::TRANSACTION_SIMULATION_ENHANCEMENT)
+    }
+
+    pub fn is_native_memory_operations_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::NATIVE_MEMORY_OPERATIONS)
+    }
+
+    pub fn is_loader_v2_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ENABLE_LOADER_V2)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

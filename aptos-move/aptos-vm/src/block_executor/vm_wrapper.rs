@@ -12,28 +12,27 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction, WriteSetPayload,
     },
 };
+use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::{
-    environment::Environment,
+    module_and_script_storage::code_storage::AptosCodeStorage,
     resolver::{ExecutorView, ResourceGroupView},
 };
 use fail::fail_point;
 use move_core_types::vm_status::{StatusCode, VMStatus};
-use std::sync::Arc;
 
-pub(crate) struct AptosExecutorTask {
+pub struct AptosExecutorTask {
     vm: AptosVM,
     id: StateViewId,
 }
 
 impl ExecutorTask for AptosExecutorTask {
-    type Environment = Arc<Environment>;
     type Error = VMStatus;
     type Output = AptosTransactionOutput;
     type Txn = SignatureVerifiedTransaction;
 
-    fn init(env: Self::Environment, state_view: &impl StateView) -> Self {
-        let vm = AptosVM::new_with_environment(env, state_view, false);
+    fn init(environment: AptosEnvironment, state_view: &impl StateView) -> Self {
+        let vm = AptosVM::new(environment, state_view);
         let id = state_view.id();
         Self { vm, id }
     }
@@ -43,7 +42,7 @@ impl ExecutorTask for AptosExecutorTask {
     // execution, or speculatively as a part of a parallel execution.
     fn execute_transaction(
         &self,
-        executor_with_group_view: &(impl ExecutorView + ResourceGroupView),
+        view: &(impl ExecutorView + ResourceGroupView + AptosCodeStorage),
         txn: &SignatureVerifiedTransaction,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
@@ -52,12 +51,10 @@ impl ExecutorTask for AptosExecutorTask {
         });
 
         let log_context = AdapterLogSchema::new(self.id, txn_idx as usize);
-        let resolver = self
-            .vm
-            .as_move_resolver_with_group_view(executor_with_group_view);
+        let resolver = self.vm.as_move_resolver_with_group_view(view);
         match self
             .vm
-            .execute_single_transaction(txn, &resolver, &log_context)
+            .execute_single_transaction(txn, &resolver, view, &log_context)
         {
             Ok((vm_status, vm_output)) => {
                 if vm_output.status().is_discarded() {

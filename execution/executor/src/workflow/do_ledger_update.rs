@@ -29,8 +29,7 @@ impl DoLedgerUpdate {
         let _timer = OTHER_TIMERS.timer_with(&["do_ledger_update"]);
 
         // Calculate hashes
-        let to_commit = &execution_output.to_commit;
-        let txn_outs = to_commit.transaction_outputs();
+        let txn_outs = &execution_output.to_commit.transaction_outputs;
 
         let (event_hashes, writeset_hashes) = Self::calculate_events_and_writeset_hashes(txn_outs);
 
@@ -93,12 +92,7 @@ impl DoLedgerUpdate {
             writeset_hashes
         )
         .map(
-            |(
-                (txn, txn_out, _is_reconfig),
-                state_checkpoint_hash,
-                event_root_hash,
-                write_set_hash,
-            )| {
+            |((txn, txn_out), state_checkpoint_hash, event_root_hash, write_set_hash)| {
                 TransactionInfo::new(
                     txn.hash(),
                     write_set_hash,
