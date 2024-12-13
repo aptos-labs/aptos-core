@@ -231,7 +231,7 @@ pub enum AptosModuleCacheManagerGuard<'a> {
     },
 }
 
-impl<'a> AptosModuleCacheManagerGuard<'a> {
+impl AptosModuleCacheManagerGuard<'_> {
     /// Returns the references to the environment. If environment is not set, panics.
     pub fn environment(&self) -> &AptosEnvironment {
         use AptosModuleCacheManagerGuard::*;

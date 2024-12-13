@@ -229,7 +229,7 @@ pub(crate) fn run_script_prologue(
 /// 1. The multisig tx exists
 /// 2. It has received enough approvals to meet the signature threshold of the multisig account
 /// 3. If only the payload hash was stored on chain, the provided payload in execution should
-/// match that hash.
+///    match that hash.
 pub(crate) fn run_multisig_prologue(
     session: &mut SessionExt,
     module_storage: &impl AptosModuleStorage,

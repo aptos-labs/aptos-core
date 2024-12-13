@@ -534,7 +534,7 @@ impl<'a, T: Transaction> ParallelState<'a, T> {
     }
 }
 
-impl<'a, T: Transaction> ResourceState<T> for ParallelState<'a, T> {
+impl<T: Transaction> ResourceState<T> for ParallelState<'_, T> {
     fn set_base_value(&self, key: T::Key, value: ValueWithLayout<T::Value>) {
         self.versioned_map.data().set_base_value(key, value);
     }
@@ -676,7 +676,7 @@ impl<'a, T: Transaction> ResourceState<T> for ParallelState<'a, T> {
     }
 }
 
-impl<'a, T: Transaction> ResourceGroupState<T> for ParallelState<'a, T> {
+impl<T: Transaction> ResourceGroupState<T> for ParallelState<'_, T> {
     fn set_raw_group_base_values(
         &self,
         group_key: T::Key,
@@ -822,7 +822,7 @@ impl<'a, T: Transaction> SequentialState<'a, T> {
     }
 }
 
-impl<'a, T: Transaction> ResourceState<T> for SequentialState<'a, T> {
+impl<T: Transaction> ResourceState<T> for SequentialState<'_, T> {
     fn set_base_value(&self, key: T::Key, value: ValueWithLayout<T::Value>) {
         self.unsync_map.set_base_value(key, value);
     }
@@ -891,7 +891,7 @@ impl<'a, T: Transaction> ResourceState<T> for SequentialState<'a, T> {
     }
 }
 
-impl<'a, T: Transaction> ResourceGroupState<T> for SequentialState<'a, T> {
+impl<T: Transaction> ResourceGroupState<T> for SequentialState<'_, T> {
     fn set_raw_group_base_values(
         &self,
         group_key: T::Key,
@@ -970,7 +970,7 @@ pub(crate) enum ViewState<'a, T: Transaction> {
     Unsync(SequentialState<'a, T>),
 }
 
-impl<'a, T: Transaction> ViewState<'a, T> {
+impl<T: Transaction> ViewState<'_, T> {
     fn get_resource_state(&self) -> &dyn ResourceState<T> {
         match self {
             ViewState::Sync(state) => state,
@@ -1449,7 +1449,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceView for LatestView<'a, T, S> {
+impl<T: Transaction, S: TStateView<Key = T::Key>> TResourceView
+    for LatestView<'_, T, S>
+{
     type Key = T::Key;
     type Layout = MoveTypeLayout;
 
@@ -1492,7 +1494,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceView for LatestVi
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for LatestView<'a, T, S> {
+impl<T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView
+    for LatestView<'_, T, S>
+{
     type GroupKey = T::Key;
     type Layout = MoveTypeLayout;
     type ResourceTag = T::Tag;
@@ -1567,7 +1571,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for Lat
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TModuleView for LatestView<'a, T, S> {
+impl<T: Transaction, S: TStateView<Key = T::Key>> TModuleView
+    for LatestView<'_, T, S>
+{
     type Key = T::Key;
 
     fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
@@ -1629,7 +1635,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TModuleView for LatestView
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> StateStorageView for LatestView<'a, T, S> {
+impl<T: Transaction, S: TStateView<Key = T::Key>> StateStorageView
+    for LatestView<'_, T, S>
+{
     type Key = T::Key;
 
     fn id(&self) -> StateViewId {
@@ -1646,7 +1654,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> StateStorageView for Lates
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TAggregatorV1View for LatestView<'a, T, S> {
+impl<T: Transaction, S: TStateView<Key = T::Key>> TAggregatorV1View
+    for LatestView<'_, T, S>
+{
     type Identifier = T::Key;
 
     fn get_aggregator_v1_state_value(
@@ -1662,8 +1672,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TAggregatorV1View for Late
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for LatestView<'a, T, S> {
-    type Identifier = DelayedFieldID;
+impl<T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView
+    for LatestView<'_, T, S>
+{
+    type Identifier = T::Identifier;
     type ResourceGroupTag = T::Tag;
     type ResourceKey = T::Key;
 
@@ -2839,7 +2851,7 @@ mod test {
         latest_view_par: LatestView<'a, TestTransactionType, MockStateView<KeyType<u32>>>,
     }
 
-    impl<'a> ViewsComparison<'a> {
+    impl ViewsComparison<'_> {
         fn assert_res_eq<T, E>(&self, res_seq: Result<T, E>, res_par: Result<T, E>) -> Result<T, E>
         where
             T: std::fmt::Debug + PartialEq,

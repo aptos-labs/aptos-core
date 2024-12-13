@@ -62,7 +62,7 @@ impl ChangeSetInterface for UserSessionChangeSet {
         &'a mut self,
         executor_view: &'a dyn ExecutorView,
         module_storage: &'a impl AptosModuleStorage,
-    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
+    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo<'a>>> {
         self.change_set
             .write_op_info_iter_mut(executor_view, module_storage)
             .chain(
@@ -115,7 +115,7 @@ impl ChangeSetInterface for SystemSessionChangeSet {
         &'a mut self,
         executor_view: &'a dyn ExecutorView,
         module_storage: &'a impl AptosModuleStorage,
-    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
+    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo<'a>>> {
         self.change_set
             .write_op_info_iter_mut(executor_view, module_storage)
     }

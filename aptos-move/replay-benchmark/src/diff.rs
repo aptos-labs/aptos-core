@@ -15,6 +15,7 @@ use std::collections::BTreeMap;
 ///   2. status (must be kept since transactions are replayed),
 ///   3. events,
 ///   4. writes.
+///
 /// Note that fine-grained comparison allows for some differences to be okay, e.g., using more gas
 /// implies that the fee statement event, the account balance of the fee payer, and the total token
 /// supply are different.

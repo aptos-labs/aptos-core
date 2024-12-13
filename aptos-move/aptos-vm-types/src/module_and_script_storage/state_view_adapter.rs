@@ -38,7 +38,7 @@ struct StateViewAdapter<'s, S> {
     state_view: BorrowedOrOwned<'s, S>,
 }
 
-impl<'s, S: StateView> ModuleBytesStorage for StateViewAdapter<'s, S> {
+impl<S: StateView> ModuleBytesStorage for StateViewAdapter<'_, S> {
     fn fetch_module_bytes(
         &self,
         address: &AccountAddress,
@@ -51,7 +51,7 @@ impl<'s, S: StateView> ModuleBytesStorage for StateViewAdapter<'s, S> {
     }
 }
 
-impl<'s, S: StateView> Deref for StateViewAdapter<'s, S> {
+impl<S: StateView> Deref for StateViewAdapter<'_, S> {
     type Target = S;
 
     fn deref(&self) -> &Self::Target {
@@ -62,6 +62,7 @@ impl<'s, S: StateView> Deref for StateViewAdapter<'s, S> {
 /// A (not thread-safe) implementation of code storage on top of a state view. It is never built
 /// directly by clients - only via [AsAptosCodeStorage] trait. Can be used to resolve both modules
 /// and cached scripts.
+#[allow(clippy::duplicated_attributes)]
 #[derive(Delegate)]
 #[delegate(
     WithRuntimeEnvironment,
@@ -146,8 +147,8 @@ impl<'s, S: StateView, E: WithRuntimeEnvironment> AptosCodeStorageAdapter<'s, S,
     }
 }
 
-impl<'s, S: StateView, E: WithRuntimeEnvironment> AptosModuleStorage
-    for AptosCodeStorageAdapter<'s, S, E>
+impl<S: StateView, E: WithRuntimeEnvironment> AptosModuleStorage
+    for AptosCodeStorageAdapter<'_, S, E>
 {
     fn fetch_state_value_metadata(
         &self,
@@ -177,7 +178,10 @@ pub trait AsAptosCodeStorage<'s, S, E> {
 }
 
 impl<'s, S: StateView, E: WithRuntimeEnvironment> AsAptosCodeStorage<'s, S, E> for S {
-    fn as_aptos_code_storage(&'s self, runtime_environment: E) -> AptosCodeStorageAdapter<'s, S, E> {
+    fn as_aptos_code_storage(
+        &'s self,
+        runtime_environment: E,
+    ) -> AptosCodeStorageAdapter<'s, S, E> {
         AptosCodeStorageAdapter::from_borrowed(self, runtime_environment)
     }
 

@@ -102,10 +102,10 @@ impl AptosVM {
         update: jwks::QuorumCertifiedUpdate,
     ) -> Result<(VMStatus, VMOutput), ExecutionFailure> {
         // Load resources.
-        let validator_set = ValidatorSet::fetch_config(resolver)
-            .ok_or_else(|| Expected(MissingResourceValidatorSet))?;
-        let observed_jwks = ObservedJWKs::fetch_config(resolver)
-            .ok_or_else(|| Expected(MissingResourceObservedJWKs))?;
+        let validator_set =
+            ValidatorSet::fetch_config(resolver).ok_or(Expected(MissingResourceValidatorSet))?;
+        let observed_jwks =
+            ObservedJWKs::fetch_config(resolver).ok_or(Expected(MissingResourceObservedJWKs))?;
 
         let mut jwks_by_issuer: HashMap<Issuer, ProviderJWKs> =
             observed_jwks.into_providers_jwks().into();

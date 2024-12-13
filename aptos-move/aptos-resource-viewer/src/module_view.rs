@@ -31,7 +31,7 @@ impl<'a, S: StateView> ModuleView<'a, S> {
     }
 }
 
-impl<'a, S: StateView> CompiledModuleView for ModuleView<'a, S> {
+impl<S: StateView> CompiledModuleView for ModuleView<'_, S> {
     type Item = Arc<CompiledModule>;
 
     fn view_compiled_module(&self, module_id: &ModuleId) -> anyhow::Result<Option<Self::Item>> {

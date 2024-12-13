@@ -210,7 +210,7 @@ struct SimulationStateView<'a, S> {
     states: Mutex<HashMap<StateKey, Option<StateValue>>>,
 }
 
-impl<'a, S> SimulationStateView<'a, S>
+impl<S> SimulationStateView<'_, S>
 where
     S: StateView,
 {
@@ -289,7 +289,7 @@ where
     }
 }
 
-impl<'a, S> TStateView for SimulationStateView<'a, S>
+impl<S> TStateView for SimulationStateView<'_, S>
 where
     S: StateView,
 {

@@ -1,6 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! This tests the `object_code_deployment.move` module under the `aptos-framework` package.
+//! The feature `OBJECT_CODE_DEPLOYMENT` is on by default for tests.
+
 use crate::{assert_abort, assert_success, assert_vm_status, tests::common, MoveHarness};
 use aptos_framework::{
     natives::{
@@ -19,9 +22,6 @@ use aptos_types::{
 use move_core_types::{parser::parse_struct_tag, vm_status::StatusCode};
 use rstest::rstest;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-
-/// This tests the `object_code_deployment.move` module under the `aptos-framework` package.
-/// The feature `OBJECT_CODE_DEPLOYMENT` is on by default for tests.
 
 /// Mimics `object::test::State`
 #[derive(Serialize, Deserialize)]
