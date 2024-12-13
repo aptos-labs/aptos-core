@@ -171,14 +171,13 @@ impl<'input> Lexer<'input> {
         self.prev_end
     }
 
-    #[allow(clippy::manual_pattern_char_comparison)]
     fn trim_whitespace_and_comments(&self) -> &'input str {
         let mut text = &self.text[self.cur_end..];
         loop {
             // Trim the only whitespace characters we recognize: newline, tab, and space.
             text = text.trim_start_matches("\r\n");
 
-            text = text.trim_start_matches(|c: char| matches!(c, '\n' | '\t' | ' '));
+            text = text.trim_start_matches(['\n', '\t', ' ']);
             // Trim the only comments we recognize: '// ... \n'.
             if text.starts_with("//") {
                 text = text.trim_start_matches(|c: char| c != '\n');
