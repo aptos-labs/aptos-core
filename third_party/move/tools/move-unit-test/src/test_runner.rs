@@ -27,7 +27,7 @@ use move_vm_runtime::{
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunctionTable,
-    AsFunctionValueSerDeExtension, AsUnsyncModuleStorage, RuntimeEnvironment,
+    AsFunctionValueExtension, AsUnsyncModuleStorage, RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use rayon::prelude::*;

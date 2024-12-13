@@ -39,7 +39,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     move_vm::MoveVM, native_extensions::NativeContextExtensions, session::Session,
-    AsFunctionValueSerDeExtension, ModuleStorage, VerifiedModuleBundle,
+    AsFunctionValueExtension, ModuleStorage, VerifiedModuleBundle,
 };
 use move_vm_types::{value_serde::ValueSerDeContext, values::Value};
 use std::{

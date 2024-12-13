@@ -17,7 +17,7 @@ use aptos_types::{
 use bytes::Bytes;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::value::{IdentifierMappingKind, MoveTypeLayout};
-use move_vm_runtime::AsFunctionValueSerDeExtension;
+use move_vm_runtime::AsFunctionValueExtension;
 use move_vm_types::{
     delayed_values::delayed_field_id::{DelayedFieldID, ExtractWidth, TryFromMoveValue},
     value_serde::{ValueSerDeContext, ValueToIdentifierMapping},
