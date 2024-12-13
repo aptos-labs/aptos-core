@@ -205,7 +205,7 @@ impl FunctionSourceMap {
     /// Remap the code map based on the given `remap`.
     /// If `remap[i] == j`, then the code location associated with code offset `j`
     /// will now be associated with code offset `i`.
-    pub fn remap_code_map(&mut self, remap: Vec<CodeOffset>) {
+    pub fn remap_code_map(&mut self, remap: &[CodeOffset]) {
         let mut prev_loc = None;
         let new_code_map = remap
             .iter()
@@ -393,7 +393,7 @@ impl SourceMap {
     pub fn remap_code_map(
         &mut self,
         fdef_idx: FunctionDefinitionIndex,
-        remap: Vec<CodeOffset>,
+        remap: &[CodeOffset],
     ) -> Result<()> {
         let func_entry = self
             .function_map

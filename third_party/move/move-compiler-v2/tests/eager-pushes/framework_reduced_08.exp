@@ -55,9 +55,7 @@ fun m::bar($t0: &u64, $t1: u64) {
 fun m::foo($t0: &u64, $t1: u64): &u64 {
      var $t2: &u64 [unused]
      # live vars: $t0, $t1
-  0: $t0 := move($t0)
-     # live vars: $t0
-  1: return $t0
+  0: return $t0
 }
 
 

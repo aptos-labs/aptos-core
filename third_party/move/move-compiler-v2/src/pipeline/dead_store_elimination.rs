@@ -24,7 +24,6 @@ use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
     stackless_bytecode::Bytecode,
-    stackless_control_flow_graph::StacklessControlFlowGraph,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -81,7 +80,6 @@ impl ReducedDefUseGraph {
         eliminate_all_self_assigns: bool,
     ) -> BTreeSet<u16> {
         let code = target.get_bytecode();
-        let cfg = StacklessControlFlowGraph::new_forward(code);
         let live_vars = target
             .get_annotations()
             .get::<LiveVarAnnotation>()
@@ -113,7 +111,6 @@ impl ReducedDefUseGraph {
             let eliminate_this_self_assign = Self::should_eliminate_given_self_assign(
                 self_assign,
                 code,
-                &cfg,
                 live_vars,
                 eliminate_all_self_assigns,
             );
@@ -232,27 +229,29 @@ impl ReducedDefUseGraph {
 
     /// Should `self_assign` be eliminated?
     fn should_eliminate_given_self_assign(
-        self_assign: CodeOffset,
+        self_assign_offset: CodeOffset,
         code: &[Bytecode],
-        cfg: &StacklessControlFlowGraph,
         live_vars: &LiveVarAnnotation,
         eliminate_all_self_assigns: bool,
     ) -> bool {
         if !eliminate_all_self_assigns {
-            // Eliminate this self assign if the definition for this self-assign is in the same block
-            // before the self assign.
-            let block = cfg.enclosing_block(self_assign);
-            let block_begin_offset = cfg.code_range(block).start;
-            let self_assign_instr = &code[self_assign as usize];
+            // Eliminate this self assign if each of its uses are the last sources of their instructions.
+            let self_assign_instr = &code[self_assign_offset as usize];
             let self_assign_temp = self_assign_instr.dests()[0];
-            // Is `self_assign_temp` live before this block?
-            let info = live_vars
-                .get_info_at(block_begin_offset as CodeOffset)
-                .before
+            let live_info_after = live_vars
+                .get_info_at(self_assign_offset)
+                .after
                 .get(&self_assign_temp);
-            match info {
-                None => true, // must be defined in the block
-                Some(live) => !live.usage_offsets().contains(&self_assign),
+            match live_info_after {
+                None => true,
+                Some(live) => live.usage_offsets().iter().all(|use_offset| {
+                    let use_instr = &code[*use_offset as usize];
+                    let sources = use_instr.sources();
+                    sources
+                        .iter()
+                        .position(|source| *source == self_assign_temp)
+                        .is_some_and(|pos| pos == sources.len() - 1)
+                }),
             }
         } else {
             true

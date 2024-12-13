@@ -31,7 +31,7 @@ fun m::take2($t0: u64, $t1: u64) {
 public fun m::test() {
      var $t0: u64
      var $t1: u64
-     # flush: $t0
+     # flush: $t1
      # live vars:
   0: ($t0, $t1) := m::one_one()
      # live vars: $t0, $t1
@@ -64,7 +64,6 @@ B0:
 }
 public test() /* def_idx: 3 */ {
 L0:	loc0: u64
-L1:	loc1: u64
 B0:
 	0: Call one_one(): u64 * u64
 	1: StLoc[0](loc0: u64)

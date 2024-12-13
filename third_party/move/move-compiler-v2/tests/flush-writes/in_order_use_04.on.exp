@@ -1,0 +1,124 @@
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::consume_2($t0: u64, $t1: u64) {
+     # live vars: $t0, $t1
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::consume_4($t0: u64, $t1: u64, $t2: u64, $t3: u64) {
+     # live vars: $t0, $t1, $t2, $t3
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::four(): (u64, u64, u64, u64) {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: $t1 := 2
+     # live vars: $t0, $t1
+  2: $t2 := 3
+     # live vars: $t0, $t1, $t2
+  3: $t3 := 4
+     # live vars: $t0, $t1, $t2, $t3
+  4: return ($t0, $t1, $t2, $t3)
+}
+
+
+[variant baseline]
+public fun m::test() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64 [unused]
+     var $t7: u64 [unused]
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
+     # live vars:
+  0: ($t0, $t1, $t2, $t3) := m::four()
+     # live vars: $t0, $t1, $t2, $t3
+  1: ($t4, $t5) := m::two()
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5
+  2: $t4 := move($t4)
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5
+  3: m::consume_2($t4, $t5)
+     # live vars: $t0, $t1, $t2, $t3
+  4: $t0 := move($t0)
+     # live vars: $t0, $t1, $t2, $t3
+  5: $t1 := move($t1)
+     # live vars: $t0, $t1, $t2, $t3
+  6: $t2 := move($t2)
+     # live vars: $t0, $t1, $t2, $t3
+  7: m::consume_4($t0, $t1, $t2, $t3)
+     # live vars:
+  8: return ()
+}
+
+
+[variant baseline]
+fun m::two(): (u64, u64) {
+     var $t0: u64
+     var $t1: u64
+     # live vars:
+  0: $t0 := 5
+     # live vars: $t0
+  1: $t1 := 6
+     # live vars: $t0, $t1
+  2: return ($t0, $t1)
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+consume_2(Arg0: u64, Arg1: u64) /* def_idx: 0 */ {
+B0:
+	0: Ret
+}
+consume_4(Arg0: u64, Arg1: u64, Arg2: u64, Arg3: u64) /* def_idx: 1 */ {
+B0:
+	0: Ret
+}
+four(): u64 * u64 * u64 * u64 /* def_idx: 2 */ {
+B0:
+	0: LdU64(1)
+	1: LdU64(2)
+	2: LdU64(3)
+	3: LdU64(4)
+	4: Ret
+}
+public test() /* def_idx: 3 */ {
+L0:	loc0: u64
+L1:	loc1: u64
+L2:	loc2: u64
+L3:	loc3: u64
+L4:	loc4: u64
+L5:	loc5: u64
+B0:
+	0: Call four(): u64 * u64 * u64 * u64
+	1: Call two(): u64 * u64
+	2: Call consume_2(u64, u64)
+	3: Call consume_4(u64, u64, u64, u64)
+	4: Ret
+}
+two(): u64 * u64 /* def_idx: 4 */ {
+B0:
+	0: LdU64(5)
+	1: LdU64(6)
+	2: Ret
+}
+}
+============ bytecode verification succeeded ========

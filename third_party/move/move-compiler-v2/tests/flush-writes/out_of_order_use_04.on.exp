@@ -32,9 +32,11 @@ public fun m::test() {
      # live vars: $t0, $t1
   2: $t2 := copy($t0)
      # live vars: $t0, $t1, $t2
-  3: m::consume($t2, $t1, $t0)
+  3: $t1 := move($t1)
+     # live vars: $t0, $t1, $t2
+  4: m::consume($t2, $t1, $t0)
      # live vars:
-  4: return ()
+  5: return ()
 }
 
 
