@@ -94,6 +94,7 @@ failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "aptos-executor/f
 indexer = ["aptos-indexer"]
 tokio-console = ["aptos-logger/tokio-console", "aptos-config/tokio-console"]
 smoke-test = ["aptos-jwk-consensus/smoke-test", "aptos-dkg-runtime/smoke-test"]
+fuzzing = []
 
 [package.metadata.cargo-machete]
 ignored = ["aptos-crypto"]

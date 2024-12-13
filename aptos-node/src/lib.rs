@@ -238,7 +238,7 @@ pub fn start_and_report_ports(
     let (remote_log_receiver, logger_filter_update) = logger::create_logger(&config, log_file);
 
     assert!(
-        !cfg!(feature = "testing") && !cfg!(feature = "fuzzing"),
+        !cfg!(test) && !cfg!(feature = "fuzzing"),
         "Testing features shouldn't be compiled"
     );
 
