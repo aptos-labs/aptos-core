@@ -59,9 +59,7 @@ fun m::foo($t0: &mut u64, $t1: u64): &mut u64 {
      # live vars: $t0, $t1
   0: write_ref($t0, $t1)
      # live vars: $t0
-  1: $t0 := move($t0)
-     # live vars: $t0
-  2: return $t0
+  1: return $t0
 }
 
 

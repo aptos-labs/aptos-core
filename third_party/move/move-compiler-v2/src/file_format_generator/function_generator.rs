@@ -150,27 +150,24 @@ impl<'a> FunctionGenerator<'a> {
                 type_parameters: fun_env.get_type_parameters(),
                 def_idx,
             });
-            if fun_gen.spec_blocks.is_empty() {
-                // Currently, peephole optimizations require that there are no inline spec blocks.
-                // This is to ensure that spec-related data structures do not refer to code
-                // offsets which could be changed by the peephole optimizer.
-                let options = ctx
-                    .env
-                    .get_extension::<Options>()
-                    .expect("Options is available");
-                if options.experiment_on(Experiment::PEEPHOLE_OPTIMIZATION) {
-                    let transformed_code_chunk = peephole_optimizer::optimize(&code.code);
-                    // Fix the source map for the optimized code.
-                    fun_gen
-                        .gen
-                        .source_map
-                        .remap_code_map(def_idx, transformed_code_chunk.original_offsets)
-                        .expect(SOURCE_MAP_OK);
-                    // Replace the code with the optimized one.
-                    code.code = transformed_code_chunk.code;
-                }
-            } else {
-                // Write the spec block table back to the environment.
+            let options = ctx
+                .env
+                .get_extension::<Options>()
+                .expect("Options is available");
+            if options.experiment_on(Experiment::PEEPHOLE_OPTIMIZATION) {
+                let transformed_code_chunk = peephole_optimizer::optimize(&code.code);
+                // Fix the source map for the optimized code.
+                fun_gen
+                    .gen
+                    .source_map
+                    .remap_code_map(def_idx, &transformed_code_chunk.original_offsets)
+                    .expect(SOURCE_MAP_OK);
+                // Replace the code with the optimized one.
+                code.code = transformed_code_chunk.code;
+                // Remap the spec blocks to the new code offsets.
+                fun_gen.remap_spec_blocks(&transformed_code_chunk.original_offsets);
+            }
+            if !fun_gen.spec_blocks.is_empty() {
                 fun_env.get_mut_spec().on_impl = fun_gen.spec_blocks;
             }
             (fun_gen.gen, Some(code))
@@ -910,6 +907,34 @@ impl<'a> FunctionGenerator<'a> {
             .rewrite_spec_descent(&SpecBlockTarget::Inline, spec);
         self.spec_blocks.insert(self.code.len() as CodeOffset, spec);
         self.emit(FF::Bytecode::Nop)
+    }
+
+    /// Remap the spec blocks, given the mapping of new offsets to original offsets.
+    fn remap_spec_blocks(&mut self, new_to_original_offsets: &[CodeOffset]) {
+        if new_to_original_offsets.is_empty() {
+            return;
+        }
+        let old_to_new = new_to_original_offsets
+            .iter()
+            .enumerate()
+            .map(|(new_offset, old_offset)| (*old_offset, new_offset as CodeOffset))
+            .collect::<BTreeMap<_, _>>();
+        let largest_offset = (new_to_original_offsets.len() - 1) as CodeOffset;
+
+        // Rewrite the spec blocks mapping.
+        self.spec_blocks = std::mem::take(&mut self.spec_blocks)
+            .into_iter()
+            .map(|(old_offset, spec)| {
+                // If there is no mapping found for the old offset, then we use the next largest
+                // offset. If there is no such offset, then we use the overall largest offset.
+                let new_offset = old_to_new
+                    .range(old_offset..)
+                    .next()
+                    .map(|(_, v)| *v)
+                    .unwrap_or(largest_offset);
+                (new_offset, spec)
+            })
+            .collect::<BTreeMap<_, _>>();
     }
 
     /// Emits a file-format bytecode.

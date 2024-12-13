@@ -39,9 +39,15 @@ public fun m::test() {
      # live vars:
   0: ($t0, $t1, $t2, $t3) := m::foo()
      # live vars: $t0, $t1, $t2, $t3
-  1: m::take($t1, $t2, $t3, $t0)
+  1: $t1 := move($t1)
+     # live vars: $t0, $t1, $t2, $t3
+  2: $t2 := move($t2)
+     # live vars: $t0, $t1, $t2, $t3
+  3: $t3 := move($t3)
+     # live vars: $t0, $t1, $t2, $t3
+  4: m::take($t1, $t2, $t3, $t0)
      # live vars:
-  2: return ()
+  5: return ()
 }
 
 

@@ -1,0 +1,261 @@
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::bytes($t0: &u64): vector<u8> {
+     var $t1: vector<u8>
+     # live vars: $t0
+  0: $t1 := ["1", "2"]
+     # live vars: $t0, $t1
+  1: drop($t0)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+fun m::cons_2($t0: u64, $t1: &mut u64): u64 {
+     var $t2: u64 [unused]
+     # live vars: $t0, $t1
+  0: drop($t1)
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+fun m::cons_2_another($t0: &u64, $t1: u64) {
+     # live vars: $t0, $t1
+  0: drop($t0)
+     # live vars:
+  1: return ()
+}
+
+
+[variant baseline]
+fun m::cons_7($t0: vector<u8>, $t1: u64, $t2: u64, $t3: u64, $t4: u64, $t5: u64, $t6: u64): u64 {
+     var $t7: u64 [unused]
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5, $t6
+  0: $t1 := 0
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun m::id($t0: u64): u64 {
+     var $t1: u64 [unused]
+     # live vars: $t0
+  0: return $t0
+}
+
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: vector<u8>
+     var $t4: &u64
+     var $t5: bool
+     var $t6: u64
+     var $t7: &vector<u8>
+     var $t8: u64
+     var $t9: u64 [unused]
+     var $t10: u64
+     var $t11: u64 [unused]
+     var $t12: u64 [unused]
+     var $t13: &mut u64
+     var $t14: u64 [unused]
+     var $t15: u64 [unused]
+     var $t16: u64 [unused]
+     var $t17: &mut u64 [unused]
+     var $t18: u64 [unused]
+     var $t19: &u64 [unused]
+     var $t20: u64 [unused]
+     var $t21: vector<u8>
+     var $t22: u64
+     var $t23: u64
+     var $t24: u64 [unused]
+     var $t25: u64 [unused]
+     var $t26: u64 [unused]
+     var $t27: u64
+     var $t28: u64 [unused]
+     var $t29: u64
+     # flush: $t2
+     # live vars: $t0
+  0: $t2 := m::id($t0)
+     # live vars: $t0, $t2
+  1: $t4 := borrow_local($t0)
+     # flush: $t3
+     # live vars: $t0, $t2, $t4
+  2: $t3 := m::bytes($t4)
+     # live vars: $t0, $t2, $t3
+  3: $t7 := borrow_local($t3)
+     # live vars: $t0, $t2, $t3, $t7
+  4: $t6 := vector::length<u8>($t7)
+     # live vars: $t0, $t2, $t3, $t6
+  5: $t8 := 2
+     # live vars: $t0, $t2, $t3, $t6, $t8
+  6: $t5 := ==($t6, $t8)
+     # live vars: $t0, $t2, $t3, $t5
+  7: if ($t5) goto 8 else goto 32
+     # live vars: $t0, $t2, $t3
+  8: label L0
+     # flush: $t10
+     # live vars: $t0, $t2, $t3
+  9: $t10 := 0
+     # live vars: $t0, $t2, $t3, $t10
+ 10: $t6 := copy($t0)
+     # live vars: $t0, $t2, $t3, $t6, $t10
+ 11: $t13 := borrow_local($t10)
+     # live vars: $t0, $t2, $t3, $t6, $t10, $t13
+ 12: $t6 := m::cons_2($t6, $t13)
+     # flush: $t6
+     # live vars: $t0, $t2, $t3, $t6, $t10
+ 13: $t6 := m::id($t6)
+     # live vars: $t0, $t2, $t3, $t6, $t10
+ 14: $t8 := move($t0)
+     # live vars: $t2, $t3, $t6, $t8, $t10
+ 15: $t13 := borrow_local($t10)
+     # live vars: $t2, $t3, $t6, $t8, $t10, $t13
+ 16: $t8 := m::cons_2($t8, $t13)
+     # flush: $t8
+     # live vars: $t2, $t3, $t6, $t8, $t10
+ 17: $t8 := m::id($t8)
+     # live vars: $t2, $t3, $t6, $t8, $t10
+ 18: $t4 := borrow_local($t2)
+     # live vars: $t2, $t3, $t4, $t6, $t8, $t10
+ 19: $t21 := move($t3)
+     # live vars: $t2, $t4, $t6, $t8, $t10, $t21
+ 20: $t22 := 0
+     # live vars: $t2, $t4, $t6, $t8, $t10, $t21, $t22
+ 21: $t23 := move($t10)
+     # live vars: $t2, $t4, $t6, $t8, $t21, $t22, $t23
+ 22: $t6 := move($t6)
+     # live vars: $t2, $t4, $t6, $t8, $t21, $t22, $t23
+ 23: $t8 := move($t8)
+     # live vars: $t2, $t4, $t6, $t8, $t21, $t22, $t23
+ 24: $t27 := m::one()
+     # live vars: $t2, $t4, $t6, $t8, $t21, $t22, $t23, $t27
+ 25: $t27 := m::id($t27)
+     # live vars: $t2, $t4, $t6, $t8, $t21, $t22, $t23, $t27
+ 26: $t29 := m::one()
+     # live vars: $t2, $t4, $t6, $t8, $t21, $t22, $t23, $t27, $t29
+ 27: $t29 := m::id($t29)
+     # live vars: $t2, $t4, $t6, $t8, $t21, $t22, $t23, $t27, $t29
+ 28: $t6 := m::cons_7($t21, $t22, $t23, $t6, $t8, $t27, $t29)
+     # live vars: $t2, $t4, $t6
+ 29: m::cons_2_another($t4, $t6)
+     # live vars: $t2
+ 30: $t6 := move($t2)
+     # live vars: $t6
+ 31: return $t6
+     # live vars: $t0, $t2, $t3
+ 32: label L1
+     # live vars:
+ 33: $t6 := 42
+     # live vars: $t6
+ 34: abort($t6)
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+bytes(Arg0: &u64): vector<u8> /* def_idx: 0 */ {
+B0:
+	0: LdConst[0](Vector(U8): [2, 1, 2])
+	1: MoveLoc[0](Arg0: &u64)
+	2: Pop
+	3: Ret
+}
+cons_2(Arg0: u64, Arg1: &mut u64): u64 /* def_idx: 1 */ {
+B0:
+	0: MoveLoc[1](Arg1: &mut u64)
+	1: Pop
+	2: MoveLoc[0](Arg0: u64)
+	3: Ret
+}
+cons_2_another(Arg0: &u64, Arg1: u64) /* def_idx: 2 */ {
+B0:
+	0: MoveLoc[0](Arg0: &u64)
+	1: Pop
+	2: Ret
+}
+cons_7(Arg0: vector<u8>, Arg1: u64, Arg2: u64, Arg3: u64, Arg4: u64, Arg5: u64, Arg6: u64): u64 /* def_idx: 3 */ {
+B0:
+	0: LdU64(0)
+	1: Ret
+}
+id(Arg0: u64): u64 /* def_idx: 4 */ {
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: Ret
+}
+one(): u64 /* def_idx: 5 */ {
+B0:
+	0: LdU64(1)
+	1: Ret
+}
+test(Arg0: u64): u64 /* def_idx: 6 */ {
+L1:	loc0: u64
+L2:	loc1: vector<u8>
+L3:	loc2: u64
+L4:	loc3: u64
+L5:	loc4: u64
+B0:
+	0: CopyLoc[0](Arg0: u64)
+	1: Call id(u64): u64
+	2: StLoc[1](loc0: u64)
+	3: ImmBorrowLoc[0](Arg0: u64)
+	4: Call bytes(&u64): vector<u8>
+	5: StLoc[2](loc1: vector<u8>)
+	6: ImmBorrowLoc[2](loc1: vector<u8>)
+	7: VecLen(7)
+	8: LdU64(2)
+	9: Eq
+	10: BrFalse(37)
+B1:
+	11: LdU64(0)
+	12: StLoc[3](loc2: u64)
+	13: CopyLoc[0](Arg0: u64)
+	14: MutBorrowLoc[3](loc2: u64)
+	15: Call cons_2(u64, &mut u64): u64
+	16: Call id(u64): u64
+	17: StLoc[4](loc3: u64)
+	18: MoveLoc[0](Arg0: u64)
+	19: MutBorrowLoc[3](loc2: u64)
+	20: Call cons_2(u64, &mut u64): u64
+	21: Call id(u64): u64
+	22: StLoc[5](loc4: u64)
+	23: ImmBorrowLoc[1](loc0: u64)
+	24: MoveLoc[2](loc1: vector<u8>)
+	25: LdU64(0)
+	26: MoveLoc[3](loc2: u64)
+	27: MoveLoc[4](loc3: u64)
+	28: MoveLoc[5](loc4: u64)
+	29: Call one(): u64
+	30: Call id(u64): u64
+	31: Call one(): u64
+	32: Call id(u64): u64
+	33: Call cons_7(vector<u8>, u64, u64, u64, u64, u64, u64): u64
+	34: Call cons_2_another(&u64, u64)
+	35: MoveLoc[1](loc0: u64)
+	36: Ret
+B2:
+	37: LdU64(42)
+	38: Abort
+}
+}
+============ bytecode verification succeeded ========
