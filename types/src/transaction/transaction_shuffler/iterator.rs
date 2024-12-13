@@ -18,4 +18,6 @@
 ///
 /// impl TransactionShufflerIterator for UseCaseAwareTransactionShufflerIterator { ... }
 /// ```
-pub trait TransactionShufflerIterator: Iterator {}
+pub trait TransactionShufflerIterator: Iterator {
+    fn iter(&self) -> impl Iterator<Item = &Self::Item> + '_;
+}
