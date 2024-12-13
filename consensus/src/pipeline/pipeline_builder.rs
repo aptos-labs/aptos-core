@@ -69,6 +69,7 @@ pub struct PipelineBuilder {
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     payload_manager: Arc<dyn TPayloadManager>,
     txn_notifier: Arc<dyn TxnNotifier>,
+    execution_lock: Arc<Mutex<()>>,
 }
 
 fn spawn_shared_fut<
@@ -191,6 +192,7 @@ impl PipelineBuilder {
             state_sync_notifier,
             payload_manager,
             txn_notifier,
+            execution_lock: Arc::new(Mutex::new(())),
         }
     }
 
@@ -320,6 +322,7 @@ impl PipelineBuilder {
                 self.is_randomness_enabled,
                 self.validators.clone(),
                 self.block_executor_onchain_config.clone(),
+                self.execution_lock.clone(),
             ),
             &mut abort_handles,
         );
@@ -456,6 +459,7 @@ impl PipelineBuilder {
         is_randomness_enabled: bool,
         validator: Arc<[AccountAddress]>,
         onchain_execution_config: BlockExecutorConfigFromOnchain,
+        execution_lock: Arc<Mutex<()>>,
     ) -> TaskResult<ExecuteResult> {
         let mut tracker = Tracker::new("execute", &block);
         parent_block_execute_phase.await?;
@@ -487,6 +491,7 @@ impl PipelineBuilder {
         .concat();
         let start = Instant::now();
         tokio::task::spawn_blocking(move || {
+            let _guard = execution_lock.lock();
             executor
                 .execute_and_state_checkpoint(
                     (block.id(), txns).into(),
