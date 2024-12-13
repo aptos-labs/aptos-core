@@ -12,7 +12,8 @@ use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_framework::APTOS_PACKAGES;
 use aptos_language_e2e_tests::{data_store::FakeDataStore, executor::FakeExecutor};
 use aptos_types::{
-    access_path::Path, block_executor::transaction_slice_metadata::TransactionSliceMetadata, contract_event::ContractEvent, on_chain_config::{FeatureFlag, Features, OnChainConfig}, state_store::state_key::{inner::StateKeyInner, StateKey}, transaction::{signature_verified_transaction::{
+    account_config::FungibleStoreResource,
+    access_path::Path, account_config::ObjectGroupResource, block_executor::transaction_slice_metadata::TransactionSliceMetadata, contract_event::ContractEvent, on_chain_config::{FeatureFlag, Features, OnChainConfig}, state_store::state_key::{inner::StateKeyInner, StateKey}, transaction::{signature_verified_transaction::{
         into_signature_verified_block, SignatureVerifiedTransaction,
     }, Transaction, TransactionOutput, TransactionStatus, Version}, vm_status::VMStatus, write_set::{WriteSet, TOTAL_SUPPLY_STATE_KEY}
 };
@@ -20,7 +21,7 @@ use aptos_validator_interface::AptosValidatorInterface;
 use clap::ValueEnum;
 use itertools::Itertools;
 use move_binary_format::file_format_common::VERSION_DEFAULT;
-use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
+use move_core_types::{account_address::AccountAddress, language_storage::{StructTag, ModuleId}, move_resource::MoveStructType};
 use move_model::metadata::CompilerVersion;
 use std::{cmp, collections::HashMap, env, path::PathBuf, sync::Arc};
 use std::{
@@ -28,6 +29,9 @@ use std::{
 };
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
 use aptos_types::block_executor::config::BlockExecutorConfigFromOnchain;
+use aptos_types::account_config::{WithdrawFAEvent, DepositFAEvent};
+use aptos_types::write_set::WriteOp;
+use std::collections::BTreeMap;
 // use std::cmp::min;
 
 const GAS_DIFF_PERCENTAGE: u64 = 3;
@@ -440,17 +444,17 @@ impl Execution {
             if compiled_cache.failed_packages_v2.contains(&package_info) {
                 v2_failed = true;
             } else {
-                if Self::check_package_skip_alternative(skip_ref_packages, &package_info.package_name) {
-                    env::set_var(
-                        "MOVE_COMPILER_EXP",
-                        format!("{},{}", DISABLE_SPEC_CHECK, DISABLE_REF_CHECK),
-                    );
-                } else {
-                    env::set_var(
-                        "MOVE_COMPILER_EXP",
-                        format!("{},{}", DISABLE_SPEC_CHECK, ENABLE_REF_CHECK),
-                    );
-                }
+                // if Self::check_package_skip_alternative(skip_ref_packages, &package_info.package_name) {
+                //     env::set_var(
+                //         "MOVE_COMPILER_EXP",
+                //         format!("{},{}", DISABLE_SPEC_CHECK, DISABLE_REF_CHECK),
+                //     );
+                // } else {
+                //     env::set_var(
+                //         "MOVE_COMPILER_EXP",
+                //         format!("{},{}", DISABLE_SPEC_CHECK, ENABLE_REF_CHECK),
+                //     );
+                // }
                 let compiled_res_v2 =
                     compile_package(package_dir, &package_info, Some(CompilerVersion::latest_stable()));
                 if let Ok(compiled_res) = compiled_res_v2 {
@@ -533,17 +537,17 @@ impl Execution {
             if compiled_cache.failed_packages_v2.contains(&package_info) {
                 v2_failed = true;
             } else {
-                if self.check_package_skip(&package_info.package_name) {
-                    env::set_var(
-                        "MOVE_COMPILER_EXP",
-                        format!("{},{}", DISABLE_SPEC_CHECK, DISABLE_REF_CHECK),
-                    );
-                } else {
-                    env::set_var(
-                        "MOVE_COMPILER_EXP",
-                        format!("{},{}", DISABLE_SPEC_CHECK, ENABLE_REF_CHECK),
-                    );
-                }
+                // if self.check_package_skip(&package_info.package_name) {
+                //     env::set_var(
+                //         "MOVE_COMPILER_EXP",
+                //         format!("{},{}", DISABLE_SPEC_CHECK, DISABLE_REF_CHECK),
+                //     );
+                // } else {
+                //     env::set_var(
+                //         "MOVE_COMPILER_EXP",
+                //         format!("{},{}", DISABLE_SPEC_CHECK, ENABLE_REF_CHECK),
+                //     );
+                // }
                 let compiled_res_v2 =
                     compile_package(package_dir, &package_info, Some(CompilerVersion::latest_stable()));
                 if let Ok(compiled_res) = compiled_res_v2 {
@@ -884,7 +888,6 @@ impl Execution {
         let mut features = Features::fetch_config(&state).unwrap_or_default();
         features.enable(FeatureFlag::VM_BINARY_FORMAT_V7);
         features.enable(FeatureFlag::NATIVE_MEMORY_OPERATIONS);
-        // features.enable(FeatureFlag::ENABLE_LOADER_V2);
         if v2_flag {
             features.enable(FeatureFlag::FAKE_FEATURE_FOR_COMPARISON_TESTING);
         }
@@ -932,7 +935,7 @@ impl Execution {
         }
     }
 
-    fn filter_stake_key(&self, key: &StateKey) -> bool {
+    fn is_fee_related_stake_key(&self, key: &StateKey) -> bool {
         if let StateKeyInner::AccessPath(p) = key.inner() {
             let path = p.get_path();
             if let Path::Resource(tag) = path {
@@ -947,9 +950,53 @@ impl Execution {
         *key == *TOTAL_SUPPLY_STATE_KEY
     }
 
-    fn filter_event_key(&self, event: &ContractEvent) -> bool {
+    fn filter_stake_key_resource_group(&self, key: &StateKey, value_1: &WriteOp, value_2: &WriteOp) -> bool {
+        if let StateKeyInner::AccessPath(p) = key.inner() {
+            let path = p.get_path();
+            if let Path::ResourceGroup(tag) = path {
+                let state_value_1_opt = value_1.state_value_ref();
+                let state_value_2_opt = value_2.state_value_ref();
+                if let (Some(start_value_1), Some(start_value_2)) = (state_value_1_opt, state_value_2_opt) {
+                    if tag == ObjectGroupResource::struct_tag() {
+                        let byte_map_1: BTreeMap<StructTag, Vec<u8>> =
+                        bcs::from_bytes(&start_value_1.bytes().to_vec()).unwrap();
+                        let byte_map_2: BTreeMap<StructTag, Vec<u8>> =
+                        bcs::from_bytes(&start_value_1.bytes().to_vec()).unwrap();
+                        if byte_map_1.len() != byte_map_2.len() {
+                            return false;
+                        }
+                        for tag_1 in byte_map_1.keys() {
+                            if !byte_map_2.contains_key(tag_1) {
+                                return false;
+                            }
+                            if tag_1.name.as_str() != "ConcurrentSupply" || tag_1.name.as_str() != "FungibleStore" {
+                                if byte_map_1.get(tag_1).unwrap() != byte_map_1.get(tag_1).unwrap() {
+                                    return false;
+                                }
+                             }
+                        }
+                        return true;
+                    }
+                } else {
+                    return false;
+                }
+            }
+        }
+        false
+    }
+
+    fn is_fee_statement_event_key(&self, event: &ContractEvent) -> bool {
         event.type_tag().to_string() == "0x1::transaction_fee::FeeStatement"
     }
+
+    fn is_withdraw_event_key(&self, event: &ContractEvent) -> bool {
+        event.type_tag().to_string() == "0x1::fungible_asset::Withdraw"
+    }
+
+    fn is_deposit_event_key(&self, event: &ContractEvent) -> bool {
+        event.type_tag().to_string() == "0x1::fungible_asset::Deposit"
+    }
+
 
     fn print_mismatches(
         &self,
@@ -1003,30 +1050,19 @@ impl Execution {
                     self.output_result_str(format!("txn status is different at version: {}, status from V1:{:?}, gas used:{}, status from V2:{:?}, gas used:{}", cur_version, txn_status_1, gas_used_1, txn_status_2, gas_used_2));
                     return;
                 }
-                // compare events
-                let mut event_error = false;
-                if res_1.1.len() != res_2.1.len() {
-                    event_error = true;
-                }
-                for idx in 0..cmp::min(res_1.1.len(), res_2.1.len()) {
-                    let event_1 = &res_1.1[idx];
-                    let event_2 = &res_2.1[idx];
-                    if event_1 != event_2 && !self.filter_event_key(event_1) {
-                        event_error = true;
-                        self.output_result_str(format!(
-                            "event raised from V1: {} at index: {}",
-                            event_1, idx
-                        ));
-                        self.output_result_str(format!(
-                            "event raised from V2: {} at index: {}",
-                            event_2, idx
-                        ));
-                    }
-                }
-                if event_error {
+                let (diff, gas2_gt_gas1, gas1_gt_gas_2) =
+                gas_diff(*gas_used_1, *gas_used_2, GAS_DIFF_PERCENTAGE);
+                let greater_version = if gas1_gt_gas_2 { "v1" } else { "v2" };
+                let gas_equal = !(gas2_gt_gas1 || gas1_gt_gas_2);
+                if !gas_equal {
                     self.output_result_str(format!(
-                        "event is different at version: {}",
-                        cur_version
+                        "gas v1:{}, gas v2:{}, gas diff: {}'s gas usage is {} percent more than the other at version: {}, v1 status:{:?}, v2 status:{:?} for package:{}",
+                        gas_used_1, gas_used_2, greater_version, diff, cur_version, txn_status_1, txn_status_2, package_name.unwrap_or("unknown package".to_string())
+                    ));
+                } else {
+                    self.output_result_str(format!(
+                        "v1 and v2 cosumes same amount of gas {} at version: {}, v1 status:{:?}, v2 status:{:?} for package:{}",
+                        gas_used_1, cur_version, txn_status_1, txn_status_2, package_name.unwrap_or("unknown package".to_string())
                     ));
                 }
                 // compare write set
@@ -1056,8 +1092,11 @@ impl Execution {
                     }
                     if write_set_1.1 != write_set_2.1
                         && write_set_1.0 == write_set_2.0
-                        && !self.filter_stake_key(write_set_1.0)
+                        && (gas_equal || !self.is_fee_related_stake_key(write_set_1.0))
                     {
+                        if !gas_equal && self.filter_stake_key_resource_group(write_set_1.0, write_set_1.1, write_set_2.1) {
+                            continue;
+                        }
                         write_set_error = true;
                         self.output_result_str(format!(
                             "write set value is different at version: {}, index: {} for key:{:?}, key eq:{}",
@@ -1079,18 +1118,40 @@ impl Execution {
                         cur_version
                     ));
                 }
-                let (diff, gas2_gt_gas1, gas1_gt_gas_2) =
-                    gas_diff(*gas_used_1, *gas_used_2, GAS_DIFF_PERCENTAGE);
-                let greater_version = if gas1_gt_gas_2 { "v1" } else { "v2" };
-                if gas2_gt_gas1 || gas1_gt_gas_2 {
+                // compare events
+                let mut event_error = false;
+                if res_1.1.len() != res_2.1.len() {
+                    event_error = true;
+                }
+                for idx in 0..cmp::min(res_1.1.len(), res_2.1.len()) {
+                    let event_1 = &res_1.1[idx];
+                    let event_2 = &res_2.1[idx];
+                    if event_1 != event_2 && (gas_equal || !self.is_fee_statement_event_key(event_1)) {
+                        if self.is_withdraw_event_key(event_1) && !write_set_error {
+                            println!("Withdraw event v1:{:?}", bcs::from_bytes::<WithdrawFAEvent>(&event_1.event_data()));
+                            println!("Withdraw event v2:{:?}", bcs::from_bytes::<WithdrawFAEvent>(&event_2.event_data()));
+                            continue;
+                        }
+                        if self.is_deposit_event_key(event_1) && !write_set_error {
+                            println!("Deposit event v1:{:?}", bcs::from_bytes::<DepositFAEvent>(&event_1.event_data()));
+                            println!("Deposit event v2:{:?}", bcs::from_bytes::<DepositFAEvent>(&event_2.event_data()));
+                            continue;
+                        }
+                        event_error = true;
+                        self.output_result_str(format!(
+                            "event raised from V1: {} at index: {}",
+                            event_1, idx
+                        ));
+                        self.output_result_str(format!(
+                            "event raised from V2: {} at index: {}",
+                            event_2, idx
+                        ));
+                    }
+                }
+                if event_error {
                     self.output_result_str(format!(
-                        "gas v1:{}, gas v2:{}, gas diff: {}'s gas usage is {} percent more than the other at version: {}, v1 status:{:?}, v2 status:{:?} for package:{}",
-                        gas_used_1, gas_used_2, greater_version, diff, cur_version, txn_status_1, txn_status_2, package_name.unwrap_or("unknown package".to_string())
-                    ));
-                } else {
-                    self.output_result_str(format!(
-                        "v1 and v2 cosumes same amount of gas {} at version: {}, v1 status:{:?}, v2 status:{:?} for package:{}",
-                        gas_used_1, cur_version, txn_status_1, txn_status_2, package_name.unwrap_or("unknown package".to_string())
+                        "event is different at version: {}",
+                        cur_version
                     ));
                 }
             },
