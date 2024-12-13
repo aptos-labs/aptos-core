@@ -156,6 +156,11 @@ impl InboundStream {
             NetworkMessage::RpcRequest(request) => request.data_mut().append(raw_data),
             NetworkMessage::RpcResponse(response) => response.data_mut().append(raw_data),
             NetworkMessage::DirectSendMsg(message) => message.data_mut().append(raw_data),
+            NetworkMessage::RpcRequestAndMetadata(request) => request.data_mut().append(raw_data),
+            NetworkMessage::RpcResponseAndMetadata(response) => {
+                response.data_mut().append(raw_data)
+            },
+            NetworkMessage::DirectSendAndMetadata(message) => message.data_mut().append(raw_data),
         }
         Ok(self.current_fragment_id == self.num_fragments)
     }
@@ -231,6 +236,15 @@ impl OutboundStream {
                 response.data_mut().split_off(self.max_frame_size)
             },
             NetworkMessage::DirectSendMsg(message) => {
+                message.data_mut().split_off(self.max_frame_size)
+            },
+            NetworkMessage::RpcRequestAndMetadata(request) => {
+                request.data_mut().split_off(self.max_frame_size)
+            },
+            NetworkMessage::RpcResponseAndMetadata(response) => {
+                response.data_mut().split_off(self.max_frame_size)
+            },
+            NetworkMessage::DirectSendAndMetadata(message) => {
                 message.data_mut().split_off(self.max_frame_size)
             },
         };

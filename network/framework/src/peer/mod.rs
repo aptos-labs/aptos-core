@@ -615,6 +615,9 @@ where
                 self.outbound_rpcs
                     .handle_inbound_response(response, received_message_metadata);
             },
+            _ => {
+                // TODO: handle the new message types!
+            },
         };
         Ok(())
     }
