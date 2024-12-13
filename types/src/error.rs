@@ -109,9 +109,9 @@ impl<T: std::fmt::Debug + NonPanic> From<T> for PanicOr<T> {
     }
 }
 
-///
-/// Error codes that follow the Move error convention of the Aptos Framework.
-///
+//
+// Error codes that follow the Move error convention of the Aptos Framework.
+//
 
 /// Caller specified an invalid argument (http: 400)
 pub const INVALID_ARGUMENT: u64 = 0x1;

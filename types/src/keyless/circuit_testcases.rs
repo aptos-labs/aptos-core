@@ -37,7 +37,6 @@ pub(crate) static SAMPLE_JWT_HEADER_B64: Lazy<String> =
     Lazy::new(|| base64url_encode_str(SAMPLE_JWT_HEADER_JSON.as_str()));
 
 /// The JWT payload, decoded as JSON
-
 pub static SAMPLE_NONCE: Lazy<String> = Lazy::new(|| {
     let config = Configuration::new_for_testing();
     OpenIdSig::reconstruct_oauth_nonce(
@@ -179,6 +178,7 @@ pub(crate) static SAMPLE_PK: Lazy<KeylessPublicKey> = Lazy::new(|| {
 ///  - uid_key set to `sub`
 ///  - no override aud
 ///  - the extra field enabled
+///
 /// https://github.com/aptos-labs/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
 pub(crate) static SAMPLE_PROOF: Lazy<Groth16Proof> = Lazy::new(|| {
     Groth16Proof::new(
@@ -192,6 +192,7 @@ pub(crate) static SAMPLE_PROOF: Lazy<Groth16Proof> = Lazy::new(|| {
 ///  - uid_key set to `sub`
 ///  - no override aud
 ///  - no extra field
+///
 /// https://github.com/aptos-labs/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
 pub(crate) static SAMPLE_PROOF_NO_EXTRA_FIELD: Lazy<Groth16Proof> = Lazy::new(|| {
     Groth16Proof::new(
