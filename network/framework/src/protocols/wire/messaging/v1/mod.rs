@@ -390,6 +390,16 @@ impl RpcRequestAndMetadata {
     pub fn data_mut(&mut self) -> &mut Vec<u8> {
         &mut self.serialized_request
     }
+
+    /// Returns the priority of the RPC request
+    pub fn priority(&self) -> Priority {
+        self.message_wire_metadata.priority
+    }
+
+    /// Returns the ID of the RPC request
+    pub fn request_id(&self) -> RequestId {
+        self.request_id
+    }
 }
 
 impl IncomingRequest for RpcRequestAndMetadata {
@@ -424,6 +434,11 @@ impl RpcResponseAndMetadata {
         }
     }
 
+    /// Returns the raw data of the RPC response and consumes the response
+    pub fn consume_data(self) -> Vec<u8> {
+        self.serialized_response
+    }
+
     /// Returns the length of the data in the response
     pub fn data_length(&self) -> u64 {
         self.serialized_response.len() as u64
@@ -432,6 +447,11 @@ impl RpcResponseAndMetadata {
     /// Returns a mutable reference to the raw data of the RPC response
     pub fn data_mut(&mut self) -> &mut Vec<u8> {
         &mut self.serialized_response
+    }
+
+    /// Returns the ID of the RPC request
+    pub fn request_id(&self) -> RequestId {
+        self.request_id
     }
 }
 
