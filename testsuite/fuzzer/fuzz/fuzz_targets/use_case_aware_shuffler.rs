@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_consensus::transaction_shuffler_fuzzing::use_case_aware::{Config, UseCaseAwareShuffler};
-use aptos_types::transaction::use_case::{UseCaseAwareTransaction, UseCaseKey};
+use aptos_types::transaction::{
+    transaction_shuffler::iterator_item::TransactionShufflerIteratorItem, use_case::UseCaseKey,
+};
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use move_core_types::account_address::AccountAddress;
@@ -28,7 +30,7 @@ struct FuzzData {
     test_determinism: bool,
 }
 
-impl UseCaseAwareTransaction for Tx {
+impl TransactionShufflerIteratorItem for Tx {
     fn parse_sender(&self) -> AccountAddress {
         let mut addr = [0u8; AccountAddress::LENGTH];
         addr[AccountAddress::LENGTH - 1] = self.sender;

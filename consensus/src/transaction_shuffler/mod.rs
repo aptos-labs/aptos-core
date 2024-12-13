@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 mod sender_aware;
 pub mod use_case_aware;
+
 // re-export use case aware shuffler for fuzzer.
 #[cfg(feature = "fuzzing")]
 pub mod transaction_shuffler_fuzzing {
