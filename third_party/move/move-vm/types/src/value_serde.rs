@@ -3,34 +3,36 @@
 
 use crate::{
     delayed_values::delayed_field_id::DelayedFieldID,
+    loaded_data::runtime_types::Type,
     values::{DeserializationSeed, SerializationReadyValue, Value},
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     identifier::IdentStr,
-    language_storage::ModuleId,
+    language_storage::{ModuleId, TypeTag},
     value::{IdentifierMappingKind, MoveTypeLayout},
     vm_status::StatusCode,
 };
 use std::cell::RefCell;
 
-pub trait FunctionExtension {
-    fn get_function_layout(
+pub trait FunctionValueSerDeExtension {
+    fn get_function_arg_tys(
         &self,
         module_id: &ModuleId,
         function_name: &IdentStr,
-    ) -> PartialVMResult<()>;
+        ty_arg_tags: Vec<TypeTag>,
+    ) -> PartialVMResult<Vec<Type>>;
 }
 
-pub(crate) struct DelayedFieldsExtension<'a> {
+pub(crate) struct DelayedFieldsSerDeExtension<'a> {
     pub(crate) delayed_fields_count: RefCell<usize>,
     pub(crate) mapping: Option<&'a dyn ValueToIdentifierMapping>,
 }
 
 pub struct ValueSerDeContext<'a> {
     #[allow(dead_code)]
-    pub(crate) function_extension: Option<&'a dyn FunctionExtension>,
-    pub(crate) delayed_fields_extension: Option<DelayedFieldsExtension<'a>>,
+    pub(crate) function_extension: Option<&'a dyn FunctionValueSerDeExtension>,
+    pub(crate) delayed_fields_extension: Option<DelayedFieldsSerDeExtension<'a>>,
 }
 
 impl<'a> ValueSerDeContext<'a> {
@@ -43,33 +45,47 @@ impl<'a> ValueSerDeContext<'a> {
         }
     }
 
+    /// Custom (de)serializer such that supports lookup of the argument types of a function during
+    /// function value deserialization.
+    pub fn with_func_args_deserialization(
+        mut self,
+        function_extension: &'a dyn FunctionValueSerDeExtension,
+    ) -> Self {
+        self.function_extension = Some(function_extension);
+        self
+    }
+
+    pub(crate) fn clone_without_delayed_fields(&self) -> Self {
+        Self {
+            function_extension: self.function_extension,
+            delayed_fields_extension: None,
+        }
+    }
+
     /// Custom (de)serializer such that:
     ///   1. when serializing, the delayed value is replaced with a concrete value instance and
     ///      serialized instead;
     ///   2. when deserializing, the concrete value instance is replaced with a delayed id.
-    pub fn new_with_delayed_fields_replacement(mapping: &'a dyn ValueToIdentifierMapping) -> Self {
-        let delayed_fields_extension = Some(DelayedFieldsExtension {
+    pub fn with_delayed_fields_replacement(
+        mut self,
+        mapping: &'a dyn ValueToIdentifierMapping,
+    ) -> Self {
+        self.delayed_fields_extension = Some(DelayedFieldsSerDeExtension {
             delayed_fields_count: RefCell::new(0),
             mapping: Some(mapping),
         });
-        Self {
-            function_extension: None,
-            delayed_fields_extension,
-        }
+        self
     }
 
     /// Custom (de)serializer that allows delayed values to be (de)serialized as is. This means
     /// that when a delayed value is serialized, the deserialization must construct the delayed
     /// value back.
-    pub fn new_with_delayed_fields_serde() -> Self {
-        let delayed_fields_extension = Some(DelayedFieldsExtension {
+    pub fn with_delayed_fields_serde(mut self) -> Self {
+        self.delayed_fields_extension = Some(DelayedFieldsSerDeExtension {
             delayed_fields_count: RefCell::new(0),
             mapping: None,
         });
-        Self {
-            function_extension: None,
-            delayed_fields_extension,
-        }
+        self
     }
 
     pub fn serialize(

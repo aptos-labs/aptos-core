@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    code_cache_global::GlobalModuleCache, types::InputOutputKey,
-    value_exchange::filter_value_for_exchange,
-};
+use crate::{code_cache_global::GlobalModuleCache, types::InputOutputKey, view::LatestView};
 use anyhow::bail;
 use aptos_aggregator::{
     delta_math::DeltaHistory,
@@ -21,8 +18,8 @@ use aptos_mvhashmap::{
 };
 use aptos_types::{
     error::{code_invariant_error, PanicError, PanicOr},
-    executable::ModulePath,
-    state_store::state_value::StateValueMetadata,
+    executable::{Executable, ModulePath},
+    state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
     write_set::TransactionWrite,
 };
@@ -362,8 +359,12 @@ where
     S: WithSize,
 {
     // Return an iterator over the captured reads.
-    pub(crate) fn get_read_values_with_delayed_fields(
+    pub(crate) fn get_read_values_with_delayed_fields<
+        SV: TStateView<Key = T::Key>,
+        X: Executable,
+    >(
         &self,
+        view: &LatestView<T, SV, X>,
         delayed_write_set_ids: &HashSet<DelayedFieldID>,
         skip: &HashSet<T::Key>,
     ) -> Result<BTreeMap<T::Key, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>, PanicError> {
@@ -375,7 +376,7 @@ where
                 }
 
                 if let DataRead::Versioned(_version, value, Some(layout)) = data_read {
-                    filter_value_for_exchange::<T>(value, layout, delayed_write_set_ids, key)
+                    view.filter_value_for_exchange(value, layout, delayed_write_set_ids, key)
                 } else {
                     None
                 }

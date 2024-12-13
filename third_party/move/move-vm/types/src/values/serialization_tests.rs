@@ -236,13 +236,13 @@ fn test_serialized_size() {
         ),
     ];
     for (value, layout) in good_values_layouts_sizes {
-        let bytes = assert_some!(assert_ok!(
-            ValueSerDeContext::new_with_delayed_fields_serde().serialize(&value, &layout)
-        ));
+        let bytes = assert_some!(assert_ok!(ValueSerDeContext::new()
+            .with_delayed_fields_serde()
+            .serialize(&value, &layout)));
 
-        let size = assert_ok!(
-            ValueSerDeContext::new_with_delayed_fields_serde().serialized_size(&value, &layout)
-        );
+        let size = assert_ok!(ValueSerDeContext::new()
+            .with_delayed_fields_serde()
+            .serialized_size(&value, &layout));
         assert_eq!(size, bytes.len());
     }
 
@@ -256,8 +256,8 @@ fn test_serialized_size() {
         (Value::u64(12), Native(Aggregator, Box::new(U64))),
     ];
     for (value, layout) in bad_values_layouts_sizes {
-        assert_err!(
-            ValueSerDeContext::new_with_delayed_fields_serde().serialized_size(&value, &layout)
-        );
+        assert_err!(ValueSerDeContext::new()
+            .with_delayed_fields_serde()
+            .serialized_size(&value, &layout));
     }
 }

@@ -38,8 +38,8 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    move_vm::MoveVM, native_extensions::NativeContextExtensions, session::Session, ModuleStorage,
-    VerifiedModuleBundle,
+    move_vm::MoveVM, native_extensions::NativeContextExtensions, session::Session,
+    AsFunctionValueSerDeExtension, ModuleStorage, VerifiedModuleBundle,
 };
 use move_vm_types::{value_serde::ValueSerDeContext, values::Value};
 use std::{
@@ -127,6 +127,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         module_storage: &impl ModuleStorage,
     ) -> VMResult<(VMChangeSet, ModuleWriteSet)> {
         let move_vm = self.inner.get_move_vm();
+        let function_extension = module_storage.as_function_extension();
 
         let resource_converter = |value: Value,
                                   layout: MoveTypeLayout,
@@ -136,13 +137,16 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 // We allow serialization of native values here because we want to
                 // temporarily store native values (via encoding to ensure deterministic
                 // gas charging) in block storage.
-                ValueSerDeContext::new_with_delayed_fields_serde()
+                ValueSerDeContext::new()
+                    .with_delayed_fields_serde()
+                    .with_func_args_deserialization(&function_extension)
                     .serialize(&value, &layout)?
                     .map(|bytes| (bytes.into(), Some(Arc::new(layout))))
             } else {
                 // Otherwise, there should be no native values so ensure
                 // serialization fails here if there are any.
                 ValueSerDeContext::new()
+                    .with_func_args_deserialization(&function_extension)
                     .serialize(&value, &layout)?
                     .map(|bytes| (bytes.into(), None))
             };
@@ -166,7 +170,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         let table_context: NativeTableContext = extensions.remove();
         let table_change_set = table_context
-            .into_change_set()
+            .into_change_set(&function_extension)
             .map_err(|e| e.finish(Location::Undefined))?;
 
         let aggregator_context: NativeAggregatorContext = extensions.remove();

@@ -34,7 +34,7 @@ mod frame_type_cache;
 mod runtime_type_checks;
 mod storage;
 
-pub use loader::{LoadedFunction, Module, Script};
+pub use loader::{Function, LoadedFunction, Module, Script};
 #[cfg(any(test, feature = "testing"))]
 pub use storage::implementations::unreachable_code_storage;
 pub use storage::{
@@ -46,6 +46,6 @@ pub use storage::{
         unsync_code_storage::{AsUnsyncCodeStorage, UnsyncCodeStorage},
         unsync_module_storage::{AsUnsyncModuleStorage, BorrowedOrOwned, UnsyncModuleStorage},
     },
-    module_storage::{ambassador_impl_ModuleStorage, ModuleStorage},
+    module_storage::{ambassador_impl_ModuleStorage, AsFunctionValueSerDeExtension, ModuleStorage},
     publishing::{StagingModuleStorage, VerifiedModuleBundle},
 };

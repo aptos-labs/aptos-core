@@ -1,12 +1,12 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{loader::Script, logging::expect_no_verification_errors, ModuleStorage};
+use crate::{loader::Script, ModuleStorage};
 use ambassador::delegatable_trait;
 use move_binary_format::{errors::VMResult, file_format::CompiledScript};
 use move_vm_types::{
     code::{Code, ScriptCache},
-    module_linker_error, sha3_256,
+    sha3_256,
 };
 use std::sync::Arc;
 
@@ -72,9 +72,7 @@ where
             .immediate_dependencies_iter()
             .map(|(addr, name)| {
                 // Since module is stored on-chain, we should not see any verification errors here.
-                self.fetch_verified_module(addr, name)
-                    .map_err(expect_no_verification_errors)?
-                    .ok_or_else(|| module_linker_error!(addr, name))
+                self.fetch_existing_verified_module(addr, name)
             })
             .collect::<VMResult<Vec<_>>>()?;
         let verified_script = self

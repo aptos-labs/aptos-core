@@ -90,7 +90,9 @@ fn native_write_to_event_store(
     let (layout, has_aggregator_lifting) =
         context.type_to_type_layout_with_identifier_mappings(&ty)?;
 
-    let blob = ValueSerDeContext::new_with_delayed_fields_serde()
+    let blob = ValueSerDeContext::new()
+        .with_delayed_fields_serde()
+        .with_func_args_deserialization(context.resolver())
         .serialize(&msg, &layout)?
         .ok_or_else(|| {
             SafeNativeError::InvariantViolation(PartialVMError::new(
@@ -147,12 +149,13 @@ fn native_emitted_events_by_handle(
     let key = EventKey::new(creation_num, addr);
     let ty_tag = context.type_to_type_tag(&ty)?;
     let ty_layout = context.type_to_type_layout(&ty)?;
-    let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
+    let ctx = context.extensions().get::<NativeEventContext>();
     let events = ctx
         .emitted_v1_events(&key, &ty_tag)
         .into_iter()
         .map(|blob| {
             ValueSerDeContext::new()
+                .with_func_args_deserialization(context.resolver())
                 .deserialize(blob, &ty_layout)
                 .ok_or_else(|| {
                     SafeNativeError::InvariantViolation(PartialVMError::new(
@@ -177,14 +180,15 @@ fn native_emitted_events(
 
     let ty_tag = context.type_to_type_tag(&ty)?;
     let ty_layout = context.type_to_type_layout(&ty)?;
-    let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
+    let ctx = context.extensions().get::<NativeEventContext>();
 
-    let _ctx = ValueSerDeContext::new();
     let events = ctx
         .emitted_v2_events(&ty_tag)
         .into_iter()
         .map(|blob| {
-            ValueSerDeContext::new_with_delayed_fields_serde()
+            ValueSerDeContext::new()
+                .with_func_args_deserialization(context.resolver())
+                .with_delayed_fields_serde()
                 .deserialize(blob, &ty_layout)
                 .ok_or_else(|| {
                     SafeNativeError::InvariantViolation(PartialVMError::new(
@@ -240,7 +244,9 @@ fn native_write_module_event_to_store(
     }
     let (layout, has_identifier_mappings) =
         context.type_to_type_layout_with_identifier_mappings(&ty)?;
-    let blob = ValueSerDeContext::new_with_delayed_fields_serde()
+    let blob = ValueSerDeContext::new()
+        .with_delayed_fields_serde()
+        .with_func_args_deserialization(context.resolver())
         .serialize(&msg, &layout)?
         .ok_or_else(|| {
             SafeNativeError::InvariantViolation(
