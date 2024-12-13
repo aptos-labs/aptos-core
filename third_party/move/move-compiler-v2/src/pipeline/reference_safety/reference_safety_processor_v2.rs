@@ -1976,17 +1976,23 @@ impl TransferFunctions for LifeTimeAnalysis<'_> {
         #[allow(clippy::single_match)]
         match instr {
             // Call operations which can take references
-            Call(_, _, Operation::ReadRef
-            | Operation::WriteRef
-            | Operation::Function(..)
-            | Operation::Eq
-            | Operation::Neq, srcs, ..) => {
-                    let exclusive_refs = srcs
-                        .iter()
-                        .filter(|t| step.is_ref(**t))
-                        .cloned()
-                        .collect_vec();
-                    step.check_borrow_safety(&exclusive_refs)
+            Call(
+                _,
+                _,
+                Operation::ReadRef
+                | Operation::WriteRef
+                | Operation::Function(..)
+                | Operation::Eq
+                | Operation::Neq,
+                srcs,
+                ..,
+            ) => {
+                let exclusive_refs = srcs
+                    .iter()
+                    .filter(|t| step.is_ref(**t))
+                    .cloned()
+                    .collect_vec();
+                step.check_borrow_safety(&exclusive_refs)
             },
             Ret(_, srcs) => {
                 let exclusive_refs = srcs

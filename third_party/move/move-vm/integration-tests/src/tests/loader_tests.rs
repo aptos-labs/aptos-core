@@ -123,7 +123,7 @@ impl Adapter {
         &'a self,
         module_storage: &'a M,
         modules: Vec<CompiledModule>,
-    ) -> StagingModuleStorage<M> {
+    ) -> StagingModuleStorage<'a, M> {
         let module_bundle = modules
             .into_iter()
             .map(|module| {

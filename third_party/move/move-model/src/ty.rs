@@ -979,14 +979,17 @@ impl Type {
 
     /// Returns true if this is any number type.
     pub fn is_number(&self) -> bool {
-        if let Type::Primitive(PrimitiveType::U8
-                               | PrimitiveType::U16
-                               | PrimitiveType::U32
-                               | PrimitiveType::U64
-                               | PrimitiveType::U128
-                               | PrimitiveType::U256
-                               | PrimitiveType::Num) = self {
-                return true;
+        if let Type::Primitive(
+            PrimitiveType::U8
+            | PrimitiveType::U16
+            | PrimitiveType::U32
+            | PrimitiveType::U64
+            | PrimitiveType::U128
+            | PrimitiveType::U256
+            | PrimitiveType::Num,
+        ) = self
+        {
+            return true;
         }
         false
     }

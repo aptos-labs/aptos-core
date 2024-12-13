@@ -29,8 +29,6 @@ use move_core_types::{
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-
-
 /// A normalized version of `SignatureToken`, a type expression appearing in struct or function
 /// declarations. Unlike `SignatureToken`s, `normalized::Type`s from different modules can safely be
 /// compared.

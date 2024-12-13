@@ -54,7 +54,7 @@ struct StagingModuleBytesStorage<'a, M> {
     module_storage: &'a M,
 }
 
-impl< M: ModuleStorage> ModuleBytesStorage for StagingModuleBytesStorage<'_, M> {
+impl<M: ModuleStorage> ModuleBytesStorage for StagingModuleBytesStorage<'_, M> {
     fn fetch_module_bytes(
         &self,
         address: &AccountAddress,

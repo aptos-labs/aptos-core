@@ -13,8 +13,6 @@ use move_core_types::{
     value::MoveTypeLayout,
 };
 
-
-
 /// A persistent storage backend that can resolve modules by address + name.
 /// Storage backends should return
 ///   - Ok(Some(..)) if the data exists

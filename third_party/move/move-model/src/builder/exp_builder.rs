@@ -782,9 +782,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
 // # Unification Context
 
-impl<> UnificationContext
-    for ExpTranslator<'_, '_, '_>
-{
+impl UnificationContext for ExpTranslator<'_, '_, '_> {
     fn get_struct_field_decls(
         &self,
         id: &QualifiedInstId<StructId>,
@@ -832,9 +830,7 @@ impl<> UnificationContext
 
 // # Ability Context
 
-impl AbilityContext
-    for ExpTranslator<'_, '_, '_>
-{
+impl AbilityContext for ExpTranslator<'_, '_, '_> {
     fn type_param(&self, idx: u16) -> TypeParameter {
         let (name, _, kind, loc) = &self.type_params[idx as usize];
         TypeParameter(*name, kind.clone(), loc.clone())
@@ -1375,7 +1371,7 @@ impl ExpTranslator<'_, '_, '_> {
 
 // # Expression Translation
 
-impl ExpTranslator<'_,'_, '_> {
+impl ExpTranslator<'_, '_, '_> {
     /// Translates an expression representing a modify target
     pub fn translate_modify_target(&mut self, exp: &EA::Exp) -> ExpData {
         let loc = self.to_loc(&exp.loc);

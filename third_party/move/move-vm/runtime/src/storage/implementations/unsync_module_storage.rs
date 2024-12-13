@@ -40,7 +40,7 @@ pub enum BorrowedOrOwned<'a, T> {
     Owned(T),
 }
 
-impl< T> Deref for BorrowedOrOwned<'_, T> {
+impl<T> Deref for BorrowedOrOwned<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
