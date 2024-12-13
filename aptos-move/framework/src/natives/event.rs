@@ -91,7 +91,7 @@ fn native_write_to_event_store(
         context.type_to_type_layout_with_identifier_mappings(&ty)?;
 
     let blob = ValueSerDeContext::new_with_delayed_fields_serde()
-        .serialize(&msg, &layout)
+        .serialize(&msg, &layout)?
         .ok_or_else(|| {
             SafeNativeError::InvariantViolation(PartialVMError::new(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -241,7 +241,7 @@ fn native_write_module_event_to_store(
     let (layout, has_identifier_mappings) =
         context.type_to_type_layout_with_identifier_mappings(&ty)?;
     let blob = ValueSerDeContext::new_with_delayed_fields_serde()
-        .serialize(&msg, &layout)
+        .serialize(&msg, &layout)?
         .ok_or_else(|| {
             SafeNativeError::InvariantViolation(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)

@@ -87,6 +87,7 @@ fn enum_round_trip_vm_value() {
     for value in good_values {
         let blob = ValueSerDeContext::new()
             .serialize(&value, &layout)
+            .unwrap()
             .expect("serialization succeeds");
         let de_value = ValueSerDeContext::new()
             .deserialize(&blob, &layout)
@@ -100,6 +101,7 @@ fn enum_round_trip_vm_value() {
     assert!(
         ValueSerDeContext::new()
             .serialize(&bad_tag_value, &layout)
+            .unwrap()
             .is_none(),
         "serialization fails"
     );
@@ -107,6 +109,7 @@ fn enum_round_trip_vm_value() {
     assert!(
         ValueSerDeContext::new()
             .serialize(&bad_struct_value, &layout)
+            .unwrap()
             .is_none(),
         "serialization fails"
     );
@@ -168,6 +171,7 @@ fn enum_rust_round_trip_vm_value() {
     for (move_value, rust_value) in move_values.into_iter().zip(rust_values) {
         let from_move = ValueSerDeContext::new()
             .serialize(&move_value, &layout)
+            .unwrap()
             .expect("from move succeeds");
         let to_rust = bcs::from_bytes::<RustEnum>(&from_move).expect("to rust successful");
         assert_eq!(to_rust, rust_value);
@@ -232,9 +236,9 @@ fn test_serialized_size() {
         ),
     ];
     for (value, layout) in good_values_layouts_sizes {
-        let bytes = assert_some!(
+        let bytes = assert_some!(assert_ok!(
             ValueSerDeContext::new_with_delayed_fields_serde().serialize(&value, &layout)
-        );
+        ));
 
         let size = assert_ok!(
             ValueSerDeContext::new_with_delayed_fields_serde().serialized_size(&value, &layout)

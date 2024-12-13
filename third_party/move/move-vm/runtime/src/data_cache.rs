@@ -119,7 +119,7 @@ impl<'r> TransactionDataCache<'r> {
         let resource_converter =
             |value: Value, layout: MoveTypeLayout, _: bool| -> PartialVMResult<Bytes> {
                 ValueSerDeContext::new()
-                    .serialize(&value, &layout)
+                    .serialize(&value, &layout)?
                     .map(Into::into)
                     .ok_or_else(|| {
                         PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)

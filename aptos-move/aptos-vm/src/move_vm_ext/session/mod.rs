@@ -137,13 +137,13 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 // temporarily store native values (via encoding to ensure deterministic
                 // gas charging) in block storage.
                 ValueSerDeContext::new_with_delayed_fields_serde()
-                    .serialize(&value, &layout)
+                    .serialize(&value, &layout)?
                     .map(|bytes| (bytes.into(), Some(Arc::new(layout))))
             } else {
                 // Otherwise, there should be no native values so ensure
                 // serialization fails here if there are any.
                 ValueSerDeContext::new()
-                    .serialize(&value, &layout)
+                    .serialize(&value, &layout)?
                     .map(|bytes| (bytes.into(), None))
             };
             serialization_result.ok_or_else(|| {

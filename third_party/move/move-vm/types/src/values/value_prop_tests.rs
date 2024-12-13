@@ -9,7 +9,7 @@ use proptest::prelude::*;
 proptest! {
     #[test]
     fn serializer_round_trip((layout, value) in layout_and_value_strategy()) {
-        let blob = ValueSerDeContext::new().serialize(&value, &layout).expect("must serialize");
+        let blob = ValueSerDeContext::new().serialize(&value, &layout).unwrap().expect("must serialize");
         let value_deserialized = ValueSerDeContext::new().deserialize(&blob, &layout).expect("must deserialize");
         assert!(value.equals(&value_deserialized).unwrap());
 

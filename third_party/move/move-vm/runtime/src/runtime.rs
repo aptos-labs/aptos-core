@@ -356,7 +356,7 @@ impl VMRuntime {
         }
 
         let bytes = ValueSerDeContext::new()
-            .serialize(&value, &layout)
+            .serialize(&value, &layout)?
             .ok_or_else(serialization_error)?;
         Ok((bytes, layout))
     }
