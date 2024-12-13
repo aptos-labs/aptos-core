@@ -31,15 +31,17 @@ public fun m::test1($t0: u64) {
      # live vars: $t0
   1: ($t1, $t0) := m::foo($t0)
      # live vars: $t0, $t1
-  2: $t4 := 0
+  2: $t1 := move($t1)
+     # live vars: $t0, $t1
+  3: $t4 := 0
      # live vars: $t0, $t1, $t4
-  3: $t2 := ==($t1, $t4)
+  4: $t2 := ==($t1, $t4)
      # live vars: $t0, $t2
-  4: if ($t2) goto 5 else goto 0
+  5: if ($t2) goto 6 else goto 0
      # live vars: $t0
-  5: label L2
+  6: label L2
      # live vars:
-  6: return ()
+  7: return ()
 }
 
 
@@ -55,15 +57,17 @@ public fun m::test2($t0: u64) {
      # live vars: $t0
   1: ($t0, $t1) := m::foo($t0)
      # live vars: $t0, $t1
-  2: $t4 := 0
+  2: $t1 := move($t1)
+     # live vars: $t0, $t1
+  3: $t4 := 0
      # live vars: $t0, $t1, $t4
-  3: $t2 := ==($t1, $t4)
+  4: $t2 := ==($t1, $t4)
      # live vars: $t0, $t2
-  4: if ($t2) goto 5 else goto 0
+  5: if ($t2) goto 6 else goto 0
      # live vars: $t0
-  5: label L2
+  6: label L2
      # live vars:
-  6: return ()
+  7: return ()
 }
 
 
