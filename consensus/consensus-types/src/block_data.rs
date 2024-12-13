@@ -112,6 +112,10 @@ impl CryptoHash for BlockData {
 }
 
 impl BlockData {
+    pub fn set_timestamp(&mut self, timestamp: u64) {
+        self.timestamp_usecs = timestamp;
+    }
+
     pub fn set_quorum_cert(&mut self, qc: QuorumCert) {
         self.quorum_cert = qc;
     }

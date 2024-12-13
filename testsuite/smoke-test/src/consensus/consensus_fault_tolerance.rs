@@ -348,6 +348,47 @@ async fn test_execution_retry() {
 }
 
 #[tokio::test]
+async fn test_fault_tolerance_of_leader_equivocation() {
+    let num_validators = 4;
+
+    let swarm = create_swarm(num_validators, 1).await;
+    let (validator_clients, public_info) = {
+        (
+            swarm.get_validator_clients_with_names(),
+            swarm.aptos_public_info(),
+        )
+    };
+    test_consensus_fault_tolerance(
+        validator_clients,
+        public_info,
+        3,
+        5.0,
+        1,
+        Box::new(FailPointFailureInjection::new(Box::new(move |cycle, _| {
+            (
+                vec![(
+                    cycle % num_validators,
+                    "consensus::leader_equivocation".to_string(),
+                    format!("{}%return", 50),
+                )],
+                true,
+            )
+        }))),
+        Box::new(
+            move |_, executed_epochs, executed_rounds, executed_transactions, _, _| {
+                successful_criteria(executed_epochs, executed_rounds, executed_transactions);
+                Ok(())
+            },
+        ),
+        true,
+        false,
+    )
+    .await
+    .unwrap();
+    panic!("test_fault_tolerance_of_leader_equivocation");
+}
+
+#[tokio::test]
 async fn test_fault_tolerance_of_network_send() {
     // Randomly increase network failure rate, until network halts, and check that it comes back afterwards.
     let mut small_rng = SmallRng::from_entropy();
