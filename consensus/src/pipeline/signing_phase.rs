@@ -17,7 +17,6 @@ use std::{
 /// SigningPhase is a singleton that receives executed blocks from
 /// the buffer manager and sign them. After getting the signature from
 /// the safety rule, SigningPhase sends the signature and error (if any) back.
-
 pub struct SigningRequest {
     pub ordered_ledger_info: LedgerInfoWithSignatures,
     pub commit_ledger_info: LedgerInfo,

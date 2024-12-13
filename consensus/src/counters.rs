@@ -392,7 +392,7 @@ pub static PROPOSER_ESTIMATED_CALIBRATED_BLOCK_TXNS: Lazy<Histogram> = Lazy::new
     .unwrap()
 });
 
-/// Next set of counters are computed at leader election time, with some delay.
+// Next set of counters are computed at leader election time, with some delay.
 
 /// Current voting power fraction that participated in consensus
 /// (voted or proposed) in the reputation window, used for chain-health
@@ -630,7 +630,7 @@ pub static ROUND_TIMEOUT_MS: Lazy<IntGauge> = Lazy::new(|| {
 });
 
 ////////////////////////
-/// ORDER VOTE COUNTERS
+// ORDER VOTE COUNTERS
 ////////////////////////
 
 pub static SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC: Lazy<IntCounter> = Lazy::new(|| {

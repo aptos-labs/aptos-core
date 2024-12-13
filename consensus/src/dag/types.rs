@@ -65,7 +65,7 @@ struct NodeWithoutDigest<'a> {
     extensions: &'a Extensions,
 }
 
-impl<'a> CryptoHash for NodeWithoutDigest<'a> {
+impl CryptoHash for NodeWithoutDigest<'_> {
     type Hasher = NodeHasher;
 
     fn hash(&self) -> HashValue {

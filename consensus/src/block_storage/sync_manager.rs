@@ -248,7 +248,7 @@ impl BlockStore {
     /// It works as follows:
     /// 1. request the gap blocks from the peer (from highest_ledger_info to highest_ordered_cert)
     /// 2. We persist the gap blocks to storage before start sync to ensure we could restart if we
-    /// crash in the middle of the sync.
+    ///    crash in the middle of the sync.
     /// 3. We prune the old tree and replace with a new tree built with the 3-chain.
     async fn sync_to_highest_quorum_cert(
         &self,

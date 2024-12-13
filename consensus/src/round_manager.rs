@@ -762,10 +762,10 @@ impl RoundManager {
     /// can be aggregated to a TimeoutCertificate.
     /// The timeout vote message can be one of the following three options:
     /// 1) In case a validator has previously voted in this round, it repeats the same vote and sign
-    /// a timeout.
+    ///    a timeout.
     /// 2) Otherwise vote for a NIL block and sign a timeout.
-    /// Note this function returns Err even if messages are broadcasted successfully because timeout
-    /// is considered as error. It only returns Ok(()) when the timeout is stale.
+    ///    Note this function returns Err even if messages are broadcasted successfully because timeout
+    ///    is considered as error. It only returns Ok(()) when the timeout is stale.
     pub async fn process_local_timeout(&mut self, round: Round) -> anyhow::Result<()> {
         if !self.round_state.process_local_timeout(round) {
             return Ok(());
@@ -883,7 +883,7 @@ impl RoundManager {
     /// 2. Execute and add it to a block store.
     /// 3. Try to vote for it following the safety rules.
     /// 4. In case a validator chooses to vote, send the vote to the representatives at the next
-    /// round.
+    ///    round.
     async fn process_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
         let author = proposal
             .author()
@@ -1337,7 +1337,7 @@ impl RoundManager {
     /// Upon new vote:
     /// 1. Ensures we're processing the vote from the same round as local round
     /// 2. Filter out votes for rounds that should not be processed by this validator (to avoid
-    /// potential attacks).
+    ///    potential attacks).
     /// 2. Add the vote to the pending votes and check whether it finishes a QC.
     /// 3. Once the QC/TC successfully formed, notify the RoundState.
     pub async fn process_vote_msg(&mut self, vote_msg: VoteMsg) -> anyhow::Result<()> {

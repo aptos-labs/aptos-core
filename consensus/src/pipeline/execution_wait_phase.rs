@@ -12,7 +12,6 @@ use std::fmt::{Debug, Display, Formatter};
 /// [ This class is used when consensus.decoupled = true ]
 /// ExecutionWaitPhase is a singleton that receives scheduled execution futures
 /// from ExecutionSchedulePhase and waits for the results from the ExecutionPipeline.
-
 pub struct ExecutionWaitRequest {
     pub block_id: HashValue,
     pub fut: ExecutionFut,
