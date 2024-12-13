@@ -88,7 +88,7 @@ impl LocalFactory {
         })?;
         let revision =
             cargo::get_aptos_node_binary_at_revision(revision).map(|(revision, bin)| {
-                let version = Version::new(usize::min_value(), revision);
+                let version = Version::new(usize::MIN, revision);
                 LocalVersion { bin, version }
             })?;
 

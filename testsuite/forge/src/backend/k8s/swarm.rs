@@ -799,6 +799,7 @@ fn check_all_injected(status: &Option<ChaosStatus>) -> bool {
         })
 }
 
+#[allow(dead_code)]
 struct MockChaosExperimentOps {
     network_chaos: Vec<NetworkChaos>,
     stress_chaos: Vec<StressChaos>,

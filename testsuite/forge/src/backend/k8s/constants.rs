@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-/// A collection of constants and default values for configuring various Forge components.
+//! A collection of constants and default values for configuring various Forge components.
 
 // These are test keys for forge ephemeral networks. Do not use these elsewhere!
 pub const DEFAULT_ROOT_KEY: &str =

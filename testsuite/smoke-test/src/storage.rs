@@ -197,7 +197,7 @@ fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
     cmd.args(["aptos-db", "backup", "verify"]);
     trusted_waypoints.iter().for_each(|w| {
         cmd.arg("--trust-waypoint");
-        cmd.arg(&w.to_string());
+        cmd.arg(w.to_string());
     });
 
     let status = cmd
@@ -229,7 +229,7 @@ fn replay_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
     cmd.args(["aptos-db", "replay-verify"]);
     trusted_waypoints.iter().for_each(|w| {
         cmd.arg("--trust-waypoint");
-        cmd.arg(&w.to_string());
+        cmd.arg(w.to_string());
     });
 
     let replay = cmd
@@ -349,6 +349,7 @@ pub(crate) fn db_backup(
     get_backup_storage_state(&bin_path, metadata_cache_path2.path(), backup_path.path()).unwrap();
 
     // spawn the backup coordinator
+    #[allow(clippy::zombie_processes)]
     let mut backup_coordinator = Command::new(bin_path.as_path())
         .current_dir(workspace_root())
         .args([
@@ -432,7 +433,7 @@ pub(crate) fn db_restore(
     cmd.args(["aptos-db", "restore", "bootstrap-db"]);
     trusted_waypoints.iter().for_each(|w| {
         cmd.arg("--trust-waypoint");
-        cmd.arg(&w.to_string());
+        cmd.arg(w.to_string());
     });
 
     if enable_storage_sharding {
@@ -441,7 +442,7 @@ pub(crate) fn db_restore(
     }
     if let Some(version) = target_verion {
         cmd.arg("--target-version");
-        cmd.arg(&version.to_string());
+        cmd.arg(version.to_string());
     }
 
     let status = cmd

@@ -99,7 +99,7 @@ async fn test_fullnode_genesis_transaction_flow() {
     let first_validator_storage_dir = first_validator_config.storage.dir();
     let output = Command::new(aptos_debugger.as_path())
         .current_dir(workspace_root())
-        .args(&vec![
+        .args(vec![
             "aptos-db",
             "bootstrap",
             first_validator_storage_dir.to_str().unwrap(),
@@ -236,7 +236,7 @@ async fn test_validator_genesis_transaction_and_db_restore_flow() {
     let first_validator_storage_dir = first_validator_config.storage.dir();
     let output = Command::new(aptos_debugger.as_path())
         .current_dir(workspace_root())
-        .args(&vec![
+        .args(vec![
             "aptos-db",
             "bootstrap",
             first_validator_storage_dir.to_str().unwrap(),
@@ -484,7 +484,7 @@ fn generate_genesis_transaction(
     // Generate the genesis write-set transaction
     Command::new(aptos_cli.as_path())
         .current_dir(workspace_root())
-        .args(&vec![
+        .args(vec![
             "genesis",
             "generate-admin-write-set",
             "--output-file",

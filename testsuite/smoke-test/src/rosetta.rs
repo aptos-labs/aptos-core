@@ -2700,6 +2700,7 @@ async fn test_delegation_pool_operations() {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum ErrorWrapper {
     BeforeSubmission(anyhow::Error),
     AfterSubmission(UserTransaction),

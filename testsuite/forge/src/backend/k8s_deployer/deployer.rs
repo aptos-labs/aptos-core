@@ -108,7 +108,7 @@ impl ForgeDeployerManager {
     /// Builds a k8s job for the forge deployer that implements the particular interface that it expects:
     /// - Runs the corresponding forge-<component>-deployer image
     /// - Sets the FORGE_DEPLOY_VALUES_JSON environment variable to the configmap that contains the values
-    /// Does not actually create the job in k8s
+    ///   Does not actually create the job in k8s
     fn build_forge_deployer_k8s_job(&self, configmap_name: String) -> Result<Job> {
         let job_name = self.get_name();
         let image_repo: &str = &self.image_repo;
