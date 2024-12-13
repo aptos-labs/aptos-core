@@ -44,7 +44,7 @@ module Evm::Caller {
         } else if (ExternalResult::is_panic(&v)) {
             return ExternalResult::unwrap_panic(v)
         };
-        return  U256::max_value()()
+        return  U256::max()
     }
 
 }
