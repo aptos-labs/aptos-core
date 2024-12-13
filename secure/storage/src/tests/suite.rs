@@ -2,15 +2,15 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+//! This suite contains tests for secure storage backends. We test the correct functionality
+//! of both key/value and cryptographic operations for storage implementations. All storage backend
+//! implementations should be tested using the tests in this suite.
+
 use crate::{CryptoStorage, Error, KVStorage, Storage};
 use aptos_crypto::{
     ed25519::Ed25519PrivateKey, test_utils::TestAptosCrypto, HashValue, PrivateKey, Signature,
     Uniform,
 };
-
-/// This suite contains tests for secure storage backends. We test the correct functionality
-/// of both key/value and cryptographic operations for storage implementations. All storage backend
-/// implementations should be tested using the tests in this suite.
 
 /// This holds the canonical list of secure storage tests. It allows different callers
 /// of the test suite to ensure they're executing all tests.

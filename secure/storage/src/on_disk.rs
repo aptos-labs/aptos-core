@@ -88,7 +88,7 @@ impl KVStorage for OnDiskStorage {
         let mut data = self.read()?;
         data.insert(
             key.to_string(),
-            serde_json::to_value(&GetResponse::new(value, now))?,
+            serde_json::to_value(GetResponse::new(value, now))?,
         );
         self.write(&data)
     }
