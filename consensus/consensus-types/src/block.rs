@@ -532,7 +532,7 @@ impl Block {
             self.epoch(),
             self.round(),
             self.author().unwrap_or(AccountAddress::ZERO),
-            vec![1; self.previous_bitvec().num_buckets()], // optimistic proposal hack
+            BitVec::default().into(), // optimistic proposal hack
             // For nil block, we use 0x0 which is convention for nil address in move.
             self.block_data()
                 .failed_authors()
