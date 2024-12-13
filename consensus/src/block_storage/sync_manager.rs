@@ -312,7 +312,7 @@ impl BlockStore {
             + 1;
 
         // although unlikely, we might wrap num_blocks around on a 32-bit machine
-        assert!(num_blocks < std::usize::MAX as u64);
+        assert!(num_blocks < usize::MAX as u64);
 
         BLOCKS_FETCHED_FROM_NETWORK_WHILE_FAST_FORWARD_SYNC.inc_by(num_blocks);
         let mut blocks = retriever

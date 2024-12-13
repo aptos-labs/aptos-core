@@ -152,7 +152,7 @@ module Evm::ERC20Mock {
     /// Helper function to update `owner` s allowance for `spender` based on spent `amount`.
     fun spendAllowance_(state: &mut State, owner: address, spender: address, amount: U256) {
         let currentAllowance = allowance(state, owner, spender);
-        if (currentAllowance != U256::max()) {
+        if (currentAllowance != U256::max_value()()) {
             require(U256::ge(currentAllowance, amount), b"ERC20: insufficient allowance");
             approve_(state, owner, spender, U256::sub(currentAllowance, amount));
         }

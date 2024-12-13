@@ -2,28 +2,28 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-/// Simple trait used for pretty printing the various AST
-///
-/// Unfortunately, the trait implementation cannot be derived. The actual implementation should
-/// closely resemble the source syntax. As suchfield does not get printed in a direct manner, and
-/// most of the logic is ad hoc
-///
-/// To avoid missing fields in the printing, be sure to fully pattern match against the struct
-/// (without the use of `..`) when implementing `AstDebug`. For example,
-///
-/// ```rust,ignore
-/// impl AstDebug for StructDefinition {
-///     fn ast_debug(&self, w: &mut AstWriter) {
-///         let StructDefinition {
-///             resource_opt,
-///             name,
-///             type_parameters,
-///             fields,
-///         } = self;
-///         ...
-///     }
-/// }
-/// ```
+//! Simple trait used for pretty printing the various AST
+//!
+//! Unfortunately, the trait implementation cannot be derived. The actual implementation should
+//! closely resemble the source syntax. As suchfield does not get printed in a direct manner, and
+//! most of the logic is ad hoc
+//!
+//! To avoid missing fields in the printing, be sure to fully pattern match against the struct
+//! (without the use of `..`) when implementing `AstDebug`. For example,
+//!
+//! ```rust,ignore
+//! impl AstDebug for StructDefinition {
+//!     fn ast_debug(&self, w: &mut AstWriter) {
+//!         let StructDefinition {
+//!             resource_opt,
+//!             name,
+//!             type_parameters,
+//!             fields,
+//!         } = self;
+//!         ...
+//!     }
+//! }
+//! ```
 
 pub trait AstDebug {
     fn ast_debug(&self, w: &mut AstWriter);

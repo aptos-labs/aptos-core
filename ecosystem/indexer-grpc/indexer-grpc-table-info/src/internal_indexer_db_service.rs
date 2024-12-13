@@ -206,7 +206,7 @@ impl InternalIndexerDBService {
         end_version: Option<Version>,
     ) -> Result<()> {
         let mut start_version = self.get_start_version(node_config).await?;
-        while start_version <= end_version.unwrap_or(std::u64::MAX) {
+        while start_version <= end_version.unwrap_or(u64::MAX) {
             let next_version = self.db_indexer.process_a_batch(start_version)?;
             if next_version == start_version {
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;

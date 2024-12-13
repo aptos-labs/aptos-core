@@ -14,7 +14,7 @@ pub struct AccountGenerator {
 
 impl AccountGenerator {
     const MAX_ACCOUNT_GEN_PER_RNG: u64 = 40000;
-    const SEED_ACCOUNTS_ROOT_SEED: u64 = u64::max_value();
+    const SEED_ACCOUNTS_ROOT_SEED: u64 = u64::MAX;
     const USER_ACCOUNTS_ROOT_SEED: u64 = 0;
 
     pub fn new_for_seed_accounts(is_keyless: bool) -> Self {

@@ -42,6 +42,7 @@ pub struct FunctionInfo {
     pub visibility: Visibility,
     pub signature: FunctionSignature,
     pub acquires: BTreeMap<StructName, Loc>,
+    #[allow(dead_code)]
     pub inline: bool,
 }
 
@@ -421,7 +422,7 @@ impl ast_debug::AstDebug for Subst {
             let mut tvars = tvars.iter().collect::<Vec<_>>();
             tvars.sort_by_key(|(v, _)| *v);
             for (tvar, bt) in tvars {
-                w.write(&format!("{:?} => ", tvar));
+                w.write(format!("{:?} => ", tvar));
                 bt.ast_debug(w);
                 w.new_line();
             }
@@ -431,7 +432,7 @@ impl ast_debug::AstDebug for Subst {
             let mut num_vars = num_vars.keys().collect::<Vec<_>>();
             num_vars.sort();
             for tvar in num_vars {
-                w.writeln(&format!("{:?}", tvar))
+                w.writeln(format!("{:?}", tvar))
             }
         })
     }
@@ -519,7 +520,7 @@ pub trait InferAbilityContext {
     fn struct_tparams(&self, m: &ModuleIdent, n: &StructName) -> Vec<StructTypeParameter>;
 }
 
-impl<'env> InferAbilityContext for Context<'env> {
+impl InferAbilityContext for Context<'_> {
     fn struct_declared_abilities(&self, m: &ModuleIdent, n: &StructName) -> AbilitySet {
         self.struct_definition(m, n).abilities.clone()
     }

@@ -302,7 +302,7 @@ pub enum Opcodes {
 }
 
 /// Upper limit on the binary size
-pub const BINARY_SIZE_LIMIT: usize = usize::max_value();
+pub const BINARY_SIZE_LIMIT: usize = usize::MAX;
 
 /// A wrapper for the binary vector
 #[derive(Default, Debug)]
@@ -688,7 +688,7 @@ pub(crate) mod versioned_data {
         }
     }
 
-    impl<'a> Read for VersionedCursor<'a> {
+    impl Read for VersionedCursor<'_> {
         fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
             self.cursor.read(buf)
         }

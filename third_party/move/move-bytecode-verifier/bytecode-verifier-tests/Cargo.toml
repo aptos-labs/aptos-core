@@ -21,3 +21,4 @@ proptest = { workspace = true }
 
 [features]
 fuzzing = ["move-binary-format/fuzzing"]
+address32 = []

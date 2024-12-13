@@ -151,7 +151,7 @@ fn test_end_to_end_impl(d: TestData) {
             TransactionRestoreOpt {
                 manifest_handle: txn_manifest,
                 replay_from_version: Some(
-                    d.state_snapshot_ver.unwrap_or(Version::max_value() - 1) + 1,
+                    d.state_snapshot_ver.unwrap_or(Version::MAX - 1) + 1,
                 ),
                 kv_only_replay: Some(false),
             },

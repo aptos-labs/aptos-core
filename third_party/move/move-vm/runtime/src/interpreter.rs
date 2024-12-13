@@ -87,7 +87,7 @@ struct TypeWithLoader<'a, 'b, 'c> {
     resolver: &'b Resolver<'c>,
 }
 
-impl<'a, 'b, 'c> TypeView for TypeWithLoader<'a, 'b, 'c> {
+impl TypeView for TypeWithLoader<'_, '_, '_> {
     fn to_type_tag(&self) -> TypeTag {
         self.resolver
             .loader()

@@ -50,7 +50,7 @@ struct Inliner<'l> {
 
 // Manually implement Debug so we don't have to include field pre_compiled_lib,
 // which may be huge.
-impl<'l> fmt::Debug for Inliner<'l> {
+impl fmt::Debug for Inliner<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Inliner")
             .field("env", &self.env)
@@ -94,7 +94,7 @@ pub fn run_inlining(
     .run(prog)
 }
 
-impl<'l> Inliner<'l> {
+impl Inliner<'_> {
     fn run(&mut self, prog: &mut Program) {
         // First collect all definitions of inlined functions so we can expand them later in the AST.
         // Also check that all local inline functions are not native.
@@ -257,7 +257,7 @@ struct OuterVisitor<'l, 'r> {
     inliner: &'l mut Inliner<'r>,
 }
 
-impl<'l, 'r> Visitor for OuterVisitor<'l, 'r> {
+impl Visitor for OuterVisitor<'_, '_> {
     fn exp(&mut self, ex: &mut Exp) -> VisitorContinuation {
         match &mut ex.exp.value {
             UnannotatedExp_::ModuleCall(mcall) => {
@@ -308,7 +308,7 @@ struct SubstitutionVisitor<'l, 'r> {
     shadowed: VecDeque<BTreeSet<Symbol>>,
 }
 
-impl<'l, 'r> Visitor for SubstitutionVisitor<'l, 'r> {
+impl Visitor for SubstitutionVisitor<'_, '_> {
     fn type_(&mut self, ty: &mut Type) -> VisitorContinuation {
         visit_type(&self.type_arguments, ty);
         VisitorContinuation::Descend
@@ -396,7 +396,7 @@ impl<'l, 'r> Visitor for SubstitutionVisitor<'l, 'r> {
     }
 }
 
-impl<'l, 'r> SubstitutionVisitor<'l, 'r> {
+impl SubstitutionVisitor<'_, '_> {
     /// Called when a variable is used in call position. In this case, this must be call to
     /// a function parameter of an inline function, and a frame parameter is expected to
     /// represent a lambda. Inlining the lambda leads to an anonymous frame on the inlining stack.
@@ -596,7 +596,7 @@ struct RenamingVisitor<'l, 'r> {
     renamings: VecDeque<BTreeMap<Symbol, Symbol>>,
 }
 
-impl<'l, 'r> Visitor for RenamingVisitor<'l, 'r> {
+impl Visitor for RenamingVisitor<'_, '_> {
     fn enter_scope(&mut self) {
         self.renamings.push_front(BTreeMap::new());
     }
@@ -637,7 +637,7 @@ struct SignatureExtractionVisitor<'l, 'r> {
     used_type_params: BTreeSet<TParam>,
 }
 
-impl<'l, 'r> Visitor for SignatureExtractionVisitor<'l, 'r> {
+impl Visitor for SignatureExtractionVisitor<'_, '_> {
     fn type_(&mut self, t: &mut Type) -> VisitorContinuation {
         if let Type_::Param(param) = &t.value {
             self.used_type_params.insert(param.clone());
@@ -682,7 +682,7 @@ impl<'l, 'r> Visitor for SignatureExtractionVisitor<'l, 'r> {
 // =============================================================================================
 // Expansion of a call
 
-impl<'l> Inliner<'l> {
+impl Inliner<'_> {
     /// Process a call and initiate inlining. This checks for potential cycles and launches
     /// a `SubstitutionVisitor` for inlined functions.
     fn module_call(&mut self, call_loc: Loc, mcall: &mut ModuleCall) -> Option<UnannotatedExp_> {
@@ -948,7 +948,7 @@ fn post_inlining_check(inliner: &mut Inliner, name: &str, fdef: &mut Function) {
     }
 }
 
-impl<'l, 'r> Visitor for CheckerVisitor<'l, 'r> {
+impl Visitor for CheckerVisitor<'_, '_> {
     fn exp(&mut self, ex: &mut Exp) -> VisitorContinuation {
         match &mut ex.exp.value {
             UnannotatedExp_::ModuleCall(mcall) => {
@@ -989,7 +989,7 @@ impl<'l, 'r> Visitor for CheckerVisitor<'l, 'r> {
 // =============================================================================================
 // Ability Inference
 
-impl<'l> InferAbilityContext for Inliner<'l> {
+impl InferAbilityContext for Inliner<'_> {
     fn struct_declared_abilities(&self, m: &ModuleIdent, n: &StructName) -> AbilitySet {
         let res = self
             .get_struct_def(m, n)
@@ -1005,7 +1005,7 @@ impl<'l> InferAbilityContext for Inliner<'l> {
     }
 }
 
-impl<'l> Inliner<'l> {
+impl Inliner<'_> {
     #[allow(clippy::single_match)]
     fn infer_abilities(&mut self, ty: &mut Type) {
         match &mut ty.value {

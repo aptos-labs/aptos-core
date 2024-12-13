@@ -665,7 +665,7 @@ impl UniformSampler for UniformU256 {
             "UniformSampler::sample_single_inclusive: low > high"
         );
         let range = high.wrapping_sub(low).wrapping_add(U256::one());
-        // If the above resulted in wrap-around to 0, the range is U256::MIN..=U256::MAX,
+        // If the above resulted in wrap-around to 0, the range is U256::MIN..=U256::max_value(),
         // and any integer will do.
         if range == U256::zero() {
             return rng.gen();
@@ -714,7 +714,7 @@ impl dearbitrary::Dearbitrary for U256 {
 
 #[test]
 fn wrapping_add() {
-    // a + b overflows U256::MAX by 100
+    // a + b overflows U256::max_value() by 100
     // By definition in std::instrinsics, a.wrapping_add(b) = (a + b) % (2^N), where N is bit width
 
     let a = U256::from(1234u32);

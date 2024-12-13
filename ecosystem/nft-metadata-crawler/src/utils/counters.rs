@@ -205,7 +205,7 @@ pub static FAILED_TO_OPTIMIZE_IMAGE_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// GCS METRICS
+// GCS METRICS
 
 /// Number of times the NFT Metadata Crawler Parser has attempted to upload to GCS
 pub static GCS_UPLOAD_INVOCATION_COUNT: Lazy<IntCounter> = Lazy::new(|| {

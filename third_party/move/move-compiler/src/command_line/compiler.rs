@@ -412,7 +412,7 @@ ast_stepped_compilers!(
     (PASS_CFGIR, cfgir, CFGIR, at_cfgir, new_at_cfgir)
 );
 
-impl<'a> SteppedCompiler<'a, PASS_COMPILATION> {
+impl SteppedCompiler<'_, PASS_COMPILATION> {
     pub fn into_compiled_units(self) -> (Vec<AnnotatedCompiledUnit>, Diagnostics) {
         let Self {
             compilation_env: _,

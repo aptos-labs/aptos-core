@@ -40,7 +40,7 @@ pub enum BorrowedOrOwned<'a, T> {
     Owned(T),
 }
 
-impl<'a, T> Deref for BorrowedOrOwned<'a, T> {
+impl< T> Deref for BorrowedOrOwned<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -127,8 +127,8 @@ impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> UnsyncModuleStorageIm
     }
 }
 
-impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> ModuleCodeBuilder
-    for UnsyncModuleStorageImpl<'s, S, E>
+impl<S: ModuleBytesStorage, E: WithRuntimeEnvironment> ModuleCodeBuilder
+    for UnsyncModuleStorageImpl<'_, S, E>
 {
     type Deserialized = CompiledModule;
     type Extension = BytesWithHash;
