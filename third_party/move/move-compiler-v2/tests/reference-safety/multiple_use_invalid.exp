@@ -9,7 +9,7 @@ error: cannot transfer mutable value since it is borrowed
   │         │ previously mutably borrowed here
   │         transfer attempted here
 
-error: cannot transfer mutable local `r` since it is borrowed
+error: cannot transfer mutable value since it is borrowed
    ┌─ tests/reference-safety/multiple_use_invalid.move:11:9
    │
 10 │         let x = r;

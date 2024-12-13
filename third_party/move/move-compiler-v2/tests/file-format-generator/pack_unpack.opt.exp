@@ -11,15 +11,12 @@ struct S {
 }
 
 pack(Arg0: u64, Arg1: u64): S /* def_idx: 0 */ {
-L2:	loc0: T
 B0:
-	0: MoveLoc[1](Arg1: u64)
-	1: Pack[0](T)
-	2: StLoc[2](loc0: T)
-	3: MoveLoc[0](Arg0: u64)
-	4: MoveLoc[2](loc0: T)
-	5: Pack[1](S)
-	6: Ret
+	0: MoveLoc[0](Arg0: u64)
+	1: MoveLoc[1](Arg1: u64)
+	2: Pack[0](T)
+	3: Pack[1](S)
+	4: Ret
 }
 unpack(Arg0: S): u64 * u64 /* def_idx: 1 */ {
 B0:

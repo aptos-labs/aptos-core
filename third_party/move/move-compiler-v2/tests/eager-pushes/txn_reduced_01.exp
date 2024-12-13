@@ -12,38 +12,44 @@ public fun m::test($t0: &signer, $t1: vector<address>, $t2: vector<u64>) {
      var $t4: &vector<address>
      var $t5: u64
      var $t6: bool
-     var $t7: &address
-     var $t8: &vector<address>
-     var $t9: &u64
-     var $t10: &vector<u64>
-     var $t11: address
-     var $t12: u64
-     var $t13: u64
+     var $t7: u64
+     var $t8: &address
+     var $t9: &vector<address>
+     var $t10: &u64
+     var $t11: &vector<u64>
+     var $t12: &signer
+     var $t13: address
      var $t14: u64
+     var $t15: u64
+     var $t16: u64
+     var $t17: u64
   0: $t4 := borrow_local($t1)
   1: $t3 := vector::length<address>($t4)
   2: $t5 := 0
   3: label L0
-  4: $t6 := <($t5, $t3)
-  5: if ($t6) goto 6 else goto 18
-  6: label L2
-  7: $t8 := borrow_local($t1)
-  8: $t7 := vector::borrow<address>($t8, $t5)
-  9: $t10 := borrow_local($t2)
- 10: $t9 := vector::borrow<u64>($t10, $t5)
- 11: $t11 := read_ref($t7)
- 12: $t12 := read_ref($t9)
- 13: m::call_other($t0, $t11, $t12)
- 14: $t14 := 1
- 15: $t13 := +($t5, $t14)
- 16: $t5 := infer($t13)
- 17: goto 20
- 18: label L3
- 19: goto 22
- 20: label L4
- 21: goto 3
- 22: label L1
- 23: return ()
+  4: $t7 := infer($t5)
+  5: $t6 := <($t7, $t3)
+  6: if ($t6) goto 7 else goto 21
+  7: label L2
+  8: $t9 := borrow_local($t1)
+  9: $t8 := vector::borrow<address>($t9, $t5)
+ 10: $t11 := borrow_local($t2)
+ 11: $t10 := vector::borrow<u64>($t11, $t5)
+ 12: $t12 := infer($t0)
+ 13: $t13 := read_ref($t8)
+ 14: $t14 := read_ref($t10)
+ 15: m::call_other($t12, $t13, $t14)
+ 16: $t16 := infer($t5)
+ 17: $t17 := 1
+ 18: $t15 := +($t16, $t17)
+ 19: $t5 := infer($t15)
+ 20: goto 23
+ 21: label L3
+ 22: goto 25
+ 23: label L4
+ 24: goto 3
+ 25: label L1
+ 26: return ()
 }
 
 ============ after LiveVarAnalysisProcessor: ================
@@ -63,14 +69,17 @@ public fun m::test($t0: &signer, $t1: vector<address>, $t2: vector<u64>) {
      var $t4: &vector<address>
      var $t5: u64
      var $t6: bool
-     var $t7: &address
-     var $t8: &vector<address> [unused]
-     var $t9: &u64
-     var $t10: &vector<u64>
-     var $t11: address
-     var $t12: u64
-     var $t13: u64 [unused]
+     var $t7: u64
+     var $t8: &address
+     var $t9: &vector<address> [unused]
+     var $t10: &u64
+     var $t11: &vector<u64>
+     var $t12: &signer
+     var $t13: address
      var $t14: u64 [unused]
+     var $t15: u64 [unused]
+     var $t16: u64 [unused]
+     var $t17: u64
      # live vars: $t0, $t1, $t2
   0: $t4 := borrow_local($t1)
      # live vars: $t0, $t1, $t2, $t4
@@ -80,39 +89,45 @@ public fun m::test($t0: &signer, $t1: vector<address>, $t2: vector<u64>) {
      # live vars: $t0, $t1, $t2, $t3, $t5
   3: label L0
      # live vars: $t0, $t1, $t2, $t3, $t5
-  4: $t6 := <($t5, $t3)
-     # live vars: $t0, $t1, $t2, $t3, $t5, $t6
-  5: if ($t6) goto 6 else goto 18
-     # live vars: $t0, $t1, $t2, $t3, $t5
-  6: label L2
-     # live vars: $t0, $t1, $t2, $t3, $t5
-  7: $t4 := borrow_local($t1)
-     # live vars: $t0, $t1, $t2, $t3, $t4, $t5
-  8: $t7 := vector::borrow<address>($t4, $t5)
+  4: $t7 := copy($t5)
      # live vars: $t0, $t1, $t2, $t3, $t5, $t7
-  9: $t10 := borrow_local($t2)
-     # live vars: $t0, $t1, $t2, $t3, $t5, $t7, $t10
- 10: $t9 := vector::borrow<u64>($t10, $t5)
-     # live vars: $t0, $t1, $t2, $t3, $t5, $t7, $t9
- 11: $t11 := read_ref($t7)
-     # live vars: $t0, $t1, $t2, $t3, $t5, $t9, $t11
- 12: $t12 := read_ref($t9)
-     # live vars: $t0, $t1, $t2, $t3, $t5, $t11, $t12
- 13: m::call_other($t0, $t11, $t12)
+  5: $t6 := <($t7, $t3)
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t6
+  6: if ($t6) goto 7 else goto 21
      # live vars: $t0, $t1, $t2, $t3, $t5
- 14: $t12 := 1
-     # live vars: $t0, $t1, $t2, $t3, $t5, $t12
- 15: $t12 := +($t5, $t12)
-     # live vars: $t0, $t1, $t2, $t3, $t12
- 16: $t5 := move($t12)
+  7: label L2
      # live vars: $t0, $t1, $t2, $t3, $t5
- 17: goto 3
+  8: $t4 := borrow_local($t1)
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5
+  9: $t8 := vector::borrow<address>($t4, $t5)
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t8
+ 10: $t11 := borrow_local($t2)
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t8, $t11
+ 11: $t10 := vector::borrow<u64>($t11, $t5)
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t8, $t10
+ 12: $t12 := copy($t0)
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t8, $t10, $t12
+ 13: $t13 := read_ref($t8)
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t10, $t12, $t13
+ 14: $t7 := read_ref($t10)
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t7, $t12, $t13
+ 15: m::call_other($t12, $t13, $t7)
      # live vars: $t0, $t1, $t2, $t3, $t5
- 18: label L3
+ 16: $t7 := move($t5)
+     # live vars: $t0, $t1, $t2, $t3, $t7
+ 17: $t17 := 1
+     # live vars: $t0, $t1, $t2, $t3, $t7, $t17
+ 18: $t7 := +($t7, $t17)
+     # live vars: $t0, $t1, $t2, $t3, $t7
+ 19: $t5 := move($t7)
+     # live vars: $t0, $t1, $t2, $t3, $t5
+ 20: goto 3
+     # live vars: $t0, $t1, $t2, $t3, $t5
+ 21: label L3
      # live vars: $t0
- 19: drop($t0)
+ 22: drop($t0)
      # live vars:
- 20: return ()
+ 23: return ()
 }
 
 
@@ -130,10 +145,8 @@ B0:
 public test(Arg0: &signer, Arg1: vector<address>, Arg2: vector<u64>) /* def_idx: 1 */ {
 L3:	loc0: u64
 L4:	loc1: u64
-L5:	loc2: &u64
-L6:	loc3: &address
-L7:	loc4: u64
-L8:	loc5: address
+L5:	loc2: &address
+L6:	loc3: &u64
 B0:
 	0: ImmBorrowLoc[1](Arg1: vector<address>)
 	1: VecLen(3)
@@ -144,33 +157,31 @@ B1:
 	5: CopyLoc[4](loc1: u64)
 	6: CopyLoc[3](loc0: u64)
 	7: Lt
-	8: BrFalse(30)
+	8: BrFalse(28)
 B2:
 	9: ImmBorrowLoc[1](Arg1: vector<address>)
 	10: CopyLoc[4](loc1: u64)
 	11: VecImmBorrow(3)
-	12: ImmBorrowLoc[2](Arg2: vector<u64>)
-	13: CopyLoc[4](loc1: u64)
-	14: VecImmBorrow(4)
-	15: StLoc[5](loc2: &u64)
-	16: ReadRef
-	17: MoveLoc[5](loc2: &u64)
-	18: ReadRef
-	19: StLoc[7](loc4: u64)
-	20: StLoc[8](loc5: address)
-	21: CopyLoc[0](Arg0: &signer)
-	22: MoveLoc[8](loc5: address)
-	23: MoveLoc[7](loc4: u64)
-	24: Call call_other(&signer, address, u64)
-	25: MoveLoc[4](loc1: u64)
-	26: LdU64(1)
-	27: Add
-	28: StLoc[4](loc1: u64)
-	29: Branch(5)
+	12: StLoc[5](loc2: &address)
+	13: ImmBorrowLoc[2](Arg2: vector<u64>)
+	14: CopyLoc[4](loc1: u64)
+	15: VecImmBorrow(4)
+	16: StLoc[6](loc3: &u64)
+	17: CopyLoc[0](Arg0: &signer)
+	18: MoveLoc[5](loc2: &address)
+	19: ReadRef
+	20: MoveLoc[6](loc3: &u64)
+	21: ReadRef
+	22: Call call_other(&signer, address, u64)
+	23: MoveLoc[4](loc1: u64)
+	24: LdU64(1)
+	25: Add
+	26: StLoc[4](loc1: u64)
+	27: Branch(5)
 B3:
-	30: MoveLoc[0](Arg0: &signer)
-	31: Pop
-	32: Ret
+	28: MoveLoc[0](Arg0: &signer)
+	29: Pop
+	30: Ret
 }
 }
 ============ bytecode verification succeeded ========
