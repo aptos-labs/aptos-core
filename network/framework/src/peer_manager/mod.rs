@@ -9,7 +9,7 @@
 //!
 //! The PeerManager is implemented as a number of actors:
 //!  * A main event loop actor which is responsible for handling requests and sending
-//!  notification about new/lost Peers to the rest of the network stack.
+//!    notification about new/lost Peers to the rest of the network stack.
 //!  * An actor responsible for dialing and listening for new connections.
 use crate::{
     constants,
