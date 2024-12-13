@@ -115,7 +115,7 @@ impl<'a> DropLogger<'a> {
     }
 }
 
-impl<'a> Drop for DropLogger<'a> {
+impl Drop for DropLogger<'_> {
     fn drop(&mut self) {
         // Get some process info, e.g. the POD_NAME in case we're in a k8s context.
         let process_info = ProcessInfo {

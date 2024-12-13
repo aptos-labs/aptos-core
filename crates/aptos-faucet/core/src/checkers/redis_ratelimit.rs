@@ -305,6 +305,7 @@ impl CheckerTrait for RedisRatelimitChecker {
 
     /// All we have to do here is decrement the counter if the request was a failure due
     /// to something wrong on our end.
+    #[allow(dependency_on_unit_never_type_fallback)]
     async fn complete(&self, data: CompleteData) -> Result<(), AptosTapError> {
         if !data.response_is_500 {
             return Ok(());
