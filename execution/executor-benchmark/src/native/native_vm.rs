@@ -69,7 +69,7 @@ use move_core_types::{
 };
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{collections::BTreeMap, fmt::Debug, sync::Arc, u128};
+use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
 
 pub struct NativeVMBlockExecutor;
 

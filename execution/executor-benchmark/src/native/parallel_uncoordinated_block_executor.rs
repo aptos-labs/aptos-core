@@ -47,7 +47,6 @@ use std::{
     collections::BTreeMap,
     hash::RandomState,
     sync::atomic::{AtomicU64, Ordering},
-    u64,
 };
 use thread_local::ThreadLocal;
 

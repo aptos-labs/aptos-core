@@ -282,7 +282,7 @@ impl<'a> ProofReader<'a> {
     }
 }
 
-impl<'a> ProofRead for ProofReader<'a> {
+impl ProofRead for ProofReader<'_> {
     fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt> {
         self.proofs.and_then(|proofs| proofs.get(&key))
     }
