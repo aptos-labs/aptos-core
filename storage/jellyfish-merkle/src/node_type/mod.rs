@@ -295,11 +295,11 @@ pub struct InternalNode {
 /// However, if an internal node doesn't have all 16 children exist at height 0 but just a few of
 /// them, we have a modified hashing rule on top of what is stated above:
 /// 1. From top to bottom, a node will be replaced by a leaf child if the subtree rooted at this
-/// node has only one child at height 0 and it is a leaf child.
+///    node has only one child at height 0 and it is a leaf child.
 /// 2. From top to bottom, a node will be replaced by the placeholder node if the subtree rooted at
-/// this node doesn't have any child at height 0. For example, if an internal node has 3 leaf
-/// children at index 0, 3, 8, respectively, and 1 internal node at index C, then the computation
-/// graph will be like:
+///    this node doesn't have any child at height 0. For example, if an internal node has 3 leaf
+///    children at index 0, 3, 8, respectively, and 1 internal node at index C, then the computation
+///    graph will be like:
 ///
 /// ```text
 ///   4 ->              +------ root hash ------+

@@ -782,12 +782,12 @@ impl StateStore {
     /// Put storage usage stats and State key and value indices into the batch.
     /// The state KV indices will be generated as follows:
     /// 1. A deletion at current version is always coupled with stale index for the tombstone with
-    /// `stale_since_version` equal to the version, to ensure tombstone is cleared from db after
-    /// pruner processes the current version.
+    ///    `stale_since_version` equal to the version, to ensure tombstone is cleared from db after
+    ///    pruner processes the current version.
     /// 2. An update at current version will first try to find the corresponding old value, if it
-    /// exists, a stale index of that old value will be added. Otherwise, it's a no-op. Because
-    /// non-existence means either the key never shows up or it got deleted. Neither case needs
-    /// extra stale index as 1 cover the latter case.
+    ///    exists, a stale index of that old value will be added. Otherwise, it's a no-op. Because
+    ///    non-existence means either the key never shows up or it got deleted. Neither case needs
+    ///    extra stale index as 1 cover the latter case.
     pub fn put_stats_and_indices(
         &self,
         state_update_refs: &ShardedStateUpdateRefs,

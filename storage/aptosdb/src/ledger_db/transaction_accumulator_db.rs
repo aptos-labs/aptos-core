@@ -141,10 +141,11 @@ impl TransactionAccumulatorDb {
     /// To avoid always pruning a full left subtree, we uses the following algorithm.
     /// For each leaf with an odd leaf index.
     /// 1. From the bottom upwards, find the first ancestor that's a left child of its parent.
-    /// (the position of which can be got by popping "1"s from the right of the leaf address).
-    /// Note that this node DOES NOT become non-useful.
+    ///    (the position of which can be got by popping "1"s from the right of the leaf address).
+    ///    Note that this node DOES NOT become non-useful.
     /// 2. From the node found from the previous step, delete both its children non-useful, and go
-    /// to the right child to repeat the process until we reach a leaf node.
+    ///    to the right child to repeat the process until we reach a leaf node.
+    ///
     /// More details are in this issue https://github.com/aptos-labs/aptos-core/issues/1288.
     pub(crate) fn prune(begin: Version, end: Version, db_batch: &SchemaBatch) -> Result<()> {
         for version_to_delete in begin..end {
