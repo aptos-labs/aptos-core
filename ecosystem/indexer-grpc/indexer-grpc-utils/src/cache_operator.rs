@@ -129,7 +129,8 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         Ok(version_inserted)
     }
 
-    pub async fn set_chain_id(&mut self, chain_id: u64) -> anyhow::Result<()> {
+    #[allow(dependency_on_unit_never_type_fallback)]
+    pub async fn set_chain_id(&mut self, chain_id: u64) -> Result<(), anyhow::Error> {
         self.conn
             .set(CACHE_KEY_CHAIN_ID, chain_id)
             .await
@@ -177,6 +178,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         }
     }
 
+    #[allow(dependency_on_unit_never_type_fallback)]
     pub async fn update_file_store_latest_version(
         &mut self,
         latest_version: u64,
