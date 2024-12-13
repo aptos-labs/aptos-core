@@ -42,11 +42,7 @@
 //! In all these cases, the file format generator can avoid extra stack operations due
 //! to eager flushing.
 
-use crate::{
-    experiments::Experiment,
-    pipeline::livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
-    Options,
-};
+use crate::pipeline::livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset};
 use itertools::Itertools;
 use move_binary_format::file_format::CodeOffset;
 use move_model::{ast::TempIndex, model::FunctionEnv};
@@ -180,15 +176,6 @@ impl FunctionTargetProcessor for FlushWritesProcessor {
         let use_def_links = UseDefLinks::new(code, live_vars);
         let cfg = StacklessControlFlowGraph::new_forward(code);
         let mut flush_writes: BTreeMap<CodeOffset, BTreeSet<TempIndex>> = BTreeMap::new();
-        // TODO: After comparison testing, remove the `assign_optimize` flag and always
-        // perform the optimization. It currently is passed around so that existing behavior
-        // is retained when the flag is off.
-        let assign_optimize = func_env
-            .module_env
-            .env
-            .get_extension::<Options>()
-            .expect("Options is available")
-            .experiment_on(Experiment::RETAIN_TEMPS_FOR_ARGS);
         for block_id in cfg.blocks() {
             if let Some((lower, upper)) = cfg.instr_offset_bounds(block_id) {
                 Self::extract_flush_writes_in_block(
@@ -196,7 +183,6 @@ impl FunctionTargetProcessor for FlushWritesProcessor {
                     code,
                     &use_def_links,
                     &mut flush_writes,
-                    assign_optimize,
                 );
             }
         }
@@ -219,7 +205,6 @@ impl FlushWritesProcessor {
         code: &[Bytecode],
         use_def_links: &UseDefLinks,
         flush_writes: &mut BTreeMap<CodeOffset, BTreeSet<TempIndex>>,
-        assign_optimize: bool,
     ) {
         let upper = *block_range.end();
         // Traverse the block in reverse order: for each definition starting from the
@@ -231,23 +216,12 @@ impl FlushWritesProcessor {
             // Only `Assign`, `Call`, and `Load` instructions push temps to the stack.
             // We need to find if any of these temps are better flushed right away.
             if matches!(instr, Assign(..) | Call(..) | Load(..)) {
-                if !assign_optimize && matches!(instr, Assign(..)) {
-                    // Retain previous behavior.
-                    continue;
-                }
                 for (dest_index, dest) in instr.dests().into_iter().enumerate().rev() {
                     let def = DefOrUsePoint {
                         offset,
                         index: dest_index,
                     };
-                    if Self::could_flush_right_away(
-                        def,
-                        upper,
-                        code,
-                        use_def_links,
-                        flush_writes,
-                        assign_optimize,
-                    ) {
+                    if Self::could_flush_right_away(def, upper, code, use_def_links, flush_writes) {
                         flush_writes.entry(offset).or_default().insert(dest);
                     }
                 }
@@ -263,7 +237,6 @@ impl FlushWritesProcessor {
         code: &[Bytecode],
         use_def_links: &UseDefLinks,
         flush_writes: &BTreeMap<CodeOffset, BTreeSet<TempIndex>>,
-        assign_optimize: bool,
     ) -> bool {
         use_def_links.def_to_use.get(&def).map_or(true, |uses| {
             let exactly_one_use = uses.len() == 1;
@@ -287,7 +260,6 @@ impl FlushWritesProcessor {
                     code,
                     use_def_links,
                     flush_writes,
-                    assign_optimize,
                 )
         })
     }
@@ -328,11 +300,7 @@ impl FlushWritesProcessor {
         code: &[Bytecode],
         use_def_links: &UseDefLinks,
         flush_writes: &BTreeMap<CodeOffset, BTreeSet<TempIndex>>,
-        assign_optimize: bool,
     ) -> bool {
-        if !assign_optimize {
-            return false;
-        }
         // For each definition in between `def` and `use_`, is there at least one that is:
         // 1. not marked to be flushed right away?
         // 2. not consumed before `use_`?

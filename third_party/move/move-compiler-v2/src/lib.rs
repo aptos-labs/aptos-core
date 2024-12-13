@@ -484,11 +484,7 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
 
     if options.experiment_on(Experiment::DEAD_CODE_ELIMINATION) {
         pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(true)));
-        // TODO: after comparison testing passes, always call with `eliminate_all_self_assigns` set
-        // to `false` when instantiating `DeadStoreElimination`.
-        pipeline.add_processor(Box::new(DeadStoreElimination::new(
-            !options.experiment_on(Experiment::RETAIN_TEMPS_FOR_ARGS),
-        )));
+        pipeline.add_processor(Box::new(DeadStoreElimination::new(false)));
     }
 
     // Run live var analysis again because it could be invalidated by previous pipeline steps,
