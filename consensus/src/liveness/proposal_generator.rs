@@ -172,12 +172,16 @@ impl PipelineBackpressureConfig {
                     // so we filter out shorter locks
                     if execution_time_ms > config.min_block_time_ms_to_activate as u128 {
                         if let Some(gas_used) = summary.gas_used {
-                            Some(
-                                ((config.target_block_time_ms as f64 / execution_time_ms as f64
-                                    * gas_used as f64)
-                                    .floor() as u64)
-                                    .max(1),
-                            )
+                            if gas_used >= config.min_calibrated_block_gas_limit {
+                                Some(
+                                    ((config.target_block_time_ms as f64 / execution_time_ms as f64
+                                        * gas_used as f64)
+                                        .floor() as u64)
+                                        .max(1),
+                                )
+                            } else {
+                                None
+                            }
                         } else {
                             warn!("Block execution summary missing gas used, skipping");
                             None
