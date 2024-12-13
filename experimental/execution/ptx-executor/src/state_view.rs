@@ -30,7 +30,7 @@ impl<'view> OverlayedStateView<'view> {
     }
 }
 
-impl<'view> TStateView for OverlayedStateView<'view> {
+impl TStateView for OverlayedStateView<'_> {
     type Key = StateKey;
 
     fn get_state_value(&self, state_key: &Self::Key) -> StateViewResult<Option<StateValue>> {

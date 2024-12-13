@@ -202,7 +202,7 @@ enum PendingBuild<'a, K, V> {
     BelowPeakFeet,
 }
 
-impl< K, V> PendingBuild<'_, K, V> {
+impl<K, V> PendingBuild<'_, K, V> {
     fn seal_with_node(&mut self, node: NodeRef<K, V>) -> BuiltSubTree<K, V> {
         match self {
             PendingBuild::AbovePeakFeet => unreachable!("Trying to put node above peak feet."),
