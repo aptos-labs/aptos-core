@@ -541,7 +541,7 @@ impl LifetimeState {
     /// represents an abstract borrow operation.
     ///
     /// 1) All edges which lead into the same node are considered to be part of the same hyper
-    /// edge. Consider:
+    ///    edge. Consider:
     ///
     /// ```text
     ///           \     /
@@ -553,7 +553,7 @@ impl LifetimeState {
     /// group because `n` has a 'weak' borrow history, it can either stem from `e1` or `e2`.
     ///
     /// 2) For all other edges not leading into the same node, they are grouped according
-    /// their kind. Consider:
+    ///    their kind. Consider:
     ///
     /// ```text
     ///            |    |
@@ -939,7 +939,7 @@ impl<'env> LifeTimeAnalysis<'env> {
 // -------------------------------------------------------------------------------------------------
 // Analysing and Diagnosing
 
-impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
+impl LifetimeAnalysisStep<'_, '_> {
     /// Get the location associated with bytecode attribute.
     fn loc(&self, id: AttrId) -> Loc {
         self.target().get_bytecode_loc(id)
@@ -1517,7 +1517,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
 // -------------------------------------------------------------------------------------------------
 // Program Steps
 
-impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
+impl LifetimeAnalysisStep<'_, '_> {
     /// Process an assign instruction. This checks whether the source is currently borrowed and
     /// rejects a move if so.
     fn assign(&mut self, dest: TempIndex, src: TempIndex, kind: AssignKind) {
@@ -1628,9 +1628,9 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     /// Process a function call. For now, we implement standard Move semantics, where
     /// 1) every output immutable reference is a child of all input references;
     /// 2) every output mutable reference is a child of all input mutable references,
-    /// because mutable references cannot be derived from immutable references.
-    /// Here would be the point where to
-    /// evaluate lifetime modifiers in future language versions.
+    ///    because mutable references cannot be derived from immutable references.
+    ///
+    /// Here would be the point where to evaluate lifetime modifiers in future language versions.
     fn call_operation(&mut self, oper: Operation, dests: &[TempIndex], srcs: &[TempIndex]) {
         // If this a function call, check acquires conditions for global borrows.
         if let Operation::Function(mid, fid, inst) = &oper {
@@ -1959,7 +1959,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
 // -------------------------------------------------------------------------------------------------
 // Transfer Function
 
-impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
+impl TransferFunctions for LifeTimeAnalysis<'_> {
     type State = LifetimeState;
 
     const BACKWARD: bool = false;
@@ -1976,20 +1976,17 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
         #[allow(clippy::single_match)]
         match instr {
             // Call operations which can take references
-            Call(_, _, oper, srcs, ..) => match oper {
-                Operation::ReadRef
-                | Operation::WriteRef
-                | Operation::Function(..)
-                | Operation::Eq
-                | Operation::Neq => {
+            Call(_, _, Operation::ReadRef
+            | Operation::WriteRef
+            | Operation::Function(..)
+            | Operation::Eq
+            | Operation::Neq, srcs, ..) => {
                     let exclusive_refs = srcs
                         .iter()
                         .filter(|t| step.is_ref(**t))
                         .cloned()
                         .collect_vec();
                     step.check_borrow_safety(&exclusive_refs)
-                },
-                _ => {},
             },
             Ret(_, srcs) => {
                 let exclusive_refs = srcs
@@ -2066,7 +2063,7 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
 }
 
 /// Instantiate the data flow analysis framework based on the transfer function
-impl<'env> DataflowAnalysis for LifeTimeAnalysis<'env> {}
+impl DataflowAnalysis for LifeTimeAnalysis<'_> {}
 
 // ===============================================================================
 // Processor
@@ -2156,7 +2153,7 @@ impl LifetimeInfo for LifetimeState {
 // Display
 
 struct BorrowEdgeDisplay<'a>(&'a FunctionTarget<'a>, &'a BorrowEdge, bool);
-impl<'a> Display for BorrowEdgeDisplay<'a> {
+impl Display for BorrowEdgeDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let edge = &self.1;
         write!(f, "{}", edge.kind.display(self.0))?;
@@ -2180,7 +2177,7 @@ impl BorrowEdge {
 }
 
 struct BorrowEdgeKindDisplay<'a>(&'a FunctionTarget<'a>, &'a BorrowEdgeKind);
-impl<'a> Display for BorrowEdgeKindDisplay<'a> {
+impl Display for BorrowEdgeKindDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         use BorrowEdgeKind::*;
         let mut_str = if self.1.is_mut() { "mut" } else { "imm" };
@@ -2212,7 +2209,7 @@ impl Display for LifetimeLabel {
 }
 
 struct MemoryLocationDisplay<'a>(&'a FunctionTarget<'a>, &'a MemoryLocation);
-impl<'a> Display for MemoryLocationDisplay<'a> {
+impl Display for MemoryLocationDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         use MemoryLocation::*;
         let env = self.0.global_env();
@@ -2235,7 +2232,7 @@ impl MemoryLocation {
 }
 
 struct LifetimeNodeDisplay<'a>(&'a FunctionTarget<'a>, &'a LifetimeNode);
-impl<'a> Display for LifetimeNodeDisplay<'a> {
+impl Display for LifetimeNodeDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -2260,7 +2257,7 @@ impl LifetimeNode {
 }
 
 struct LifetimeStateDisplay<'a>(&'a FunctionTarget<'a>, &'a LifetimeState);
-impl<'a> Display for LifetimeStateDisplay<'a> {
+impl Display for LifetimeStateDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let LifetimeState {
             graph,

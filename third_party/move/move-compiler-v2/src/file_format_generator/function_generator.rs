@@ -335,7 +335,7 @@ impl<'a> FunctionGenerator<'a> {
                 self.emit(FF::Bytecode::Branch(0));
             },
             Bytecode::Abort(_, temp) => {
-                self.balance_stack_end_of_block(ctx, &vec![*temp]);
+                self.balance_stack_end_of_block(ctx, vec![*temp]);
                 self.emit(FF::Bytecode::Abort);
                 self.abstract_pop(ctx)
             },
@@ -973,7 +973,7 @@ impl<'a> FunctionGenerator<'a> {
                     if ctx.is_alive_after(*temp, &temps_to_push[pos + 1..], true) {
                         if !fun_ctx.is_copyable(*temp) {
                             fun_ctx.module.internal_error(
-                                &ctx.fun_ctx.fun.get_bytecode_loc(ctx.attr_id),
+                                ctx.fun_ctx.fun.get_bytecode_loc(ctx.attr_id),
                                 format!("value in `$t{}` expected to be copyable", temp),
                             )
                         }
@@ -992,6 +992,7 @@ impl<'a> FunctionGenerator<'a> {
     /// If a temp already on the abstract stack is both:
     ///   - not a source of the current instruction
     ///   - destination of the current instruction
+    ///
     /// then, we have a conflicting write to that temp.
     ///
     /// This method ensures that conflicting writes do not happen by flushing out such temps
@@ -1179,7 +1180,7 @@ impl<'a> FunctionGenerator<'a> {
     }
 }
 
-impl<'env> FunctionContext<'env> {
+impl FunctionContext<'_> {
     /// Emits an internal error for this function.
     pub fn internal_error(&self, msg: impl AsRef<str>) {
         self.module.internal_error(
@@ -1212,7 +1213,7 @@ impl<'env> FunctionContext<'env> {
     }
 }
 
-impl<'env> BytecodeContext<'env> {
+impl BytecodeContext<'_> {
     /// Determine whether `temp` is alive (used) in the reachable code after this point,
     /// or is part of the remaining argument list. When `dest_check` is true, we additionally
     /// check if `temp` is also written to by the current instruction; if it is, then the

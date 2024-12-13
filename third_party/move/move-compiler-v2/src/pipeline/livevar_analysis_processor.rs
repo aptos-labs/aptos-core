@@ -333,7 +333,7 @@ struct LiveVarAnalysis<'a> {
 }
 
 /// Implements the necessary transfer function to instantiate the data flow framework
-impl<'a> TransferFunctions for LiveVarAnalysis<'a> {
+impl TransferFunctions for LiveVarAnalysis<'_> {
     type State = LiveVarState;
 
     const BACKWARD: bool = true;
@@ -395,9 +395,9 @@ impl<'a> TransferFunctions for LiveVarAnalysis<'a> {
 }
 
 /// Implements various entry points to the framework based on the transfer function.
-impl<'a> DataflowAnalysis for LiveVarAnalysis<'a> {}
+impl DataflowAnalysis for LiveVarAnalysis<'_> {}
 
-impl<'a> LiveVarAnalysis<'a> {
+impl LiveVarAnalysis<'_> {
     fn livevar_info(&self, id: &AttrId, offset: CodeOffset) -> LiveVarInfo {
         LiveVarInfo {
             usages: once((self.func_target.get_bytecode_loc(*id), offset)).collect(),

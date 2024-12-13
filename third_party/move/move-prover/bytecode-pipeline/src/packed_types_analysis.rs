@@ -26,6 +26,7 @@ use std::collections::BTreeSet;
 /// - Transaction scripts have at most 1 type argument
 /// - The only values that can be bound to a transaction script type argument are XUS and
 ///   XDX. Passing any other values will lead to an aborted transaction.
+///
 /// The first assumption is checked and will trigger an assert failure if violated. The second
 /// is unchecked, but would be a nice property for the prover.
 pub fn get_packed_types(
@@ -87,7 +88,7 @@ struct PackedTypesAnalysis<'a> {
     cache: SummaryCache<'a>,
 }
 
-impl<'a> TransferFunctions for PackedTypesAnalysis<'a> {
+impl TransferFunctions for PackedTypesAnalysis<'_> {
     type State = PackedTypesState;
 
     const BACKWARD: bool = false;
@@ -147,8 +148,8 @@ impl<'a> TransferFunctions for PackedTypesAnalysis<'a> {
     }
 }
 
-impl<'a> DataflowAnalysis for PackedTypesAnalysis<'a> {}
-impl<'a> CompositionalAnalysis<PackedTypesState> for PackedTypesAnalysis<'a> {
+impl DataflowAnalysis for PackedTypesAnalysis<'_> {}
+impl CompositionalAnalysis<PackedTypesState> for PackedTypesAnalysis<'_> {
     fn to_summary(
         &self,
         state: PackedTypesState,

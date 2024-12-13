@@ -11,7 +11,7 @@ use move_core_types::metadata::Metadata;
 use move_ethereum_abi::abi_move_type::{ABIMoveSignature, ABI_ETHER_MOVE_KEY};
 use std::{collections::BTreeMap, str};
 
-/// Generate Metadata for move signature
+// Generate Metadata for move signature
 
 pub(crate) fn generate_abi_move_metadata(ctx: &Context, receive: bool, fallback: bool) -> Metadata {
     let mut event_map = BTreeMap::new();

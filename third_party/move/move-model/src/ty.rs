@@ -979,17 +979,14 @@ impl Type {
 
     /// Returns true if this is any number type.
     pub fn is_number(&self) -> bool {
-        if let Type::Primitive(p) = self {
-            if let PrimitiveType::U8
-            | PrimitiveType::U16
-            | PrimitiveType::U32
-            | PrimitiveType::U64
-            | PrimitiveType::U128
-            | PrimitiveType::U256
-            | PrimitiveType::Num = p
-            {
+        if let Type::Primitive(PrimitiveType::U8
+                               | PrimitiveType::U16
+                               | PrimitiveType::U32
+                               | PrimitiveType::U64
+                               | PrimitiveType::U128
+                               | PrimitiveType::U256
+                               | PrimitiveType::Num) = self {
                 return true;
-            }
         }
         false
     }
@@ -2507,6 +2504,7 @@ impl TypeUnificationAdapter {
     /// - any type parameter on the LHS with index < P will be treated as concrete types and
     /// - only type parameters on the LHS with index >= P are treated as variables and thus,
     ///   participate in the type unification process.
+    ///
     /// The same rule applies to the RHS parameters via `treat_rhs_type_param_as_var_after_index`.
     fn new<'a, I>(
         lhs_types: I,
@@ -3303,6 +3301,7 @@ impl TypeInstantiationDerivation {
     /// - be assigned with a concrete type already and hence, ceases to be a type parameter, or
     /// - does not have any matching instantiation and hence, either remains a type parameter or is
     ///   represented as a type error.
+    ///
     /// But in anyway, these type parameters no longer participate in type unification anymore.
     ///
     /// If `target_lhs` is True, derive instantiations for the type parameter with
@@ -3364,6 +3363,7 @@ impl TypeInstantiationDerivation {
     ///     - finds all possible instantiations for parameter at index 2 (`inst_param_2`)
     ///     - for each instantiation in `inst_param_2`,
     ///       - ......
+    ///
     /// The process continues until all type parameters are analyzed (i.e., reaching the type
     /// parameter at index `N`).
     ///
@@ -3549,7 +3549,7 @@ impl Type {
     }
 }
 
-impl<'a> fmt::Display for TypeDisplay<'a> {
+impl fmt::Display for TypeDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         use Type::*;
         let comma_list = |f: &mut Formatter<'_>, ts: &[Type]| -> fmt::Result {
@@ -3663,7 +3663,7 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
     }
 }
 
-impl<'a> TypeDisplay<'a> {
+impl TypeDisplay<'_> {
     fn type_var_str(&self, idx: u32) -> String {
         if self.context.display_type_vars {
             format!("_{}", idx)
@@ -3825,7 +3825,7 @@ impl<'a> AbilityInferer<'a> {
     }
 }
 
-impl<'a> AbilityContext for AbilityInferer<'a> {
+impl AbilityContext for AbilityInferer<'_> {
     fn type_param(&self, idx: u16) -> TypeParameter {
         self.type_params[idx as usize].clone()
     }
@@ -3843,4 +3843,4 @@ impl<'a> AbilityContext for AbilityInferer<'a> {
     }
 }
 
-impl<'a> AbilityInference for AbilityInferer<'a> {}
+impl AbilityInference for AbilityInferer<'_> {}

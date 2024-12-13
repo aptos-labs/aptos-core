@@ -73,7 +73,7 @@ fn modify_check_fails_message(
 }
 
 //  ================================================================================================
-/// # Spec Instrumenter
+// # Spec Instrumenter
 
 pub struct SpecInstrumentationProcessor {}
 
@@ -1088,7 +1088,7 @@ impl<'a> Instrumenter<'a> {
 }
 
 //  ================================================================================================
-/// # Modifies Checker
+// # Modifies Checker
 
 /// Check modifies annotations. This is depending on usage analysis and is therefore
 /// invoked here from the initialize trait function of this processor.

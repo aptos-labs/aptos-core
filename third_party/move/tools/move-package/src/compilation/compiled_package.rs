@@ -601,16 +601,8 @@ impl CompiledPackage {
             .compiler_config
             .known_attributes
             .clone();
-        match &resolution_graph.build_options.architecture {
-            Some(x) => {
-                match x {
-                    Architecture::Move => (),
-                    Architecture::Ethereum => {
-                        flags = flags.set_flavor("evm");
-                    },
-                };
-            },
-            None => (),
+        if let Some(Architecture::Ethereum) = &resolution_graph.build_options.architecture {
+            flags = flags.set_flavor("evm");
         };
         attr_derivation::add_attributes_for_flavor(&flags, &mut known_attributes);
 

@@ -39,6 +39,7 @@
 //!    ```
 //!    Instead, by flushing `a` eagerly when it is written, we can avoid flushing and
 //!    reloading `b`.
+//!
 //! In all these cases, the file format generator can avoid extra stack operations due
 //! to eager flushing.
 

@@ -164,7 +164,7 @@ struct ClosureFunction {
     def: Exp,
 }
 
-impl<'a> LambdaLifter<'a> {
+impl LambdaLifter<'_> {
     fn gen_parameter_name(&self, parameter_pos: usize) -> Symbol {
         self.fun_env
             .module_env
@@ -543,7 +543,7 @@ impl<'a> LambdaLifter<'a> {
     }
 }
 
-impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
+impl ExpRewriterFunctions for LambdaLifter<'_> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         // Intercept descent and compute lambdas being exempted from lifting, currently
         // those passed as parameters to inline functions.

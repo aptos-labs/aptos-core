@@ -201,7 +201,7 @@ impl<'a> FunctionGenerator<'a> {
 // ================================================================================================
 // Bytecode
 
-impl<'a> FunctionGenerator<'a> {
+impl FunctionGenerator<'_> {
     /// Generate Yul statement for a bytecode.
     fn bytecode(
         &mut self,
@@ -727,7 +727,7 @@ impl<'a> FunctionGenerator<'a> {
 // ================================================================================================
 // Memory
 
-impl<'a> FunctionGenerator<'a> {
+impl FunctionGenerator<'_> {
     /// If this is a local which is borrowed and evaded to memory, return pointer to its memory.
     fn local_ptr(borrowed_locals: &BTreeMap<TempIndex, usize>, idx: TempIndex) -> Option<String> {
         borrowed_locals.get(&idx).map(|pos| {

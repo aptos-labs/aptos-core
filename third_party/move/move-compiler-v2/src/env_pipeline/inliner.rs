@@ -380,6 +380,7 @@ impl<'env> Inliner<'env> {
     ///   - the mapping found in `self.inline_results` for `callee`, or
     ///   - the original body of `callee` (as obtained from `self.env: &GlobalEnv`)
     /// - stores a mapping from `target` to inlining result in `self.inline_results`
+    ///
     /// Otherwise, stores a mapping from `target` to `InlineResult::Unchanged` in
     /// `self.inline_results`
     ///
@@ -453,7 +454,7 @@ impl<'env, 'inliner> OuterInlinerRewriter<'env, 'inliner> {
     }
 }
 
-impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inliner> {
+impl ExpRewriterFunctions for OuterInlinerRewriter<'_, '_> {
     /// recognize call to inline function and rewrite it using `InlinedRewriter::inline_call`
     fn rewrite_call(&mut self, call_id: NodeId, oper: &Operation, args: &[Exp]) -> Option<Exp> {
         if let Operation::MoveFunction(module_id, fun_id) = oper {
@@ -1037,7 +1038,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
     }
 }
 
-impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> {
+impl ExpRewriterFunctions for InlinedRewriter<'_, '_> {
     /// Override default implementation to flag an error on an disallowed Return,
     /// as well as Break and Continue expressions outside of loops.
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
