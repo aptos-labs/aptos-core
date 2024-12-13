@@ -730,7 +730,7 @@ impl BufferManager {
         let signature = match signature_result {
             Ok(sig) => sig,
             Err(e) => {
-                error!("Signing failed {:?}", e);
+                warn!("error: Signing failed {:?}", e);
                 return;
             },
         };
@@ -792,11 +792,11 @@ impl BufferManager {
                             item.try_advance_to_aggregated(&self.epoch_state.verifier)
                         },
                         Err(e) => {
-                            error!(
+                            warn!(
                                 error = ?e,
                                 author = author,
                                 commit_info = commit_info,
-                                "Failed to add commit vote",
+                                "error: Failed to add commit vote",
                             );
                             reply_nack(protocol, response_sender);
                             item

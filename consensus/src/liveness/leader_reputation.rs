@@ -27,8 +27,10 @@ use std::{
     cmp::max,
     collections::{HashMap, HashSet},
     convert::TryFrom,
-    sync::Arc,
+    sync::{atomic::AtomicU64, Arc},
 };
+
+const U32_MASK: u64 = u32::MAX as u64;
 
 pub type VotingPowerRatio = f64;
 
@@ -56,6 +58,7 @@ pub struct AptosDBBackend {
     seek_len: usize,
     aptos_db: Arc<dyn DbReader>,
     db_result: Mutex<Option<(Vec<VersionedNewBlockEvent>, u64, bool)>>,
+    max_asked: AtomicU64,
 }
 
 impl AptosDBBackend {
@@ -65,6 +68,7 @@ impl AptosDBBackend {
             seek_len,
             aptos_db,
             db_result: Mutex::new(None),
+            max_asked: AtomicU64::new(0),
         }
     }
 
@@ -108,6 +112,11 @@ impl AptosDBBackend {
         events: &Vec<VersionedNewBlockEvent>,
         hit_end: bool,
     ) -> (Vec<NewBlockEvent>, HashValue) {
+        let previous_max_asked = self.max_asked.fetch_max(
+            (target_epoch & U32_MASK) << 32 | (target_round & U32_MASK),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+
         // Do not warn when round==0, because check will always be unsure of whether we have
         // all events from the previous epoch. If there is an actual issue, next round will log it.
         if target_round != 0 {
@@ -135,8 +144,10 @@ impl AptosDBBackend {
         }
 
         if result.len() < self.window_size && !hit_end {
-            error!(
-                "We are not fetching far enough in history, we filtered from {} to {}, but asked for {}. Target ({}, {}), received from {:?} to {:?}.",
+            let previous_max_asked_epoch = previous_max_asked >> 32;
+            let previous_max_asked_round = previous_max_asked & U32_MASK;
+            warn!(
+                "We are not fetching far enough in history, we filtered from {} to {}, but asked for {}. Target ({}, {}), received from {:?} to {:?}. We are probably asked for too stale of a round, previous max asked: ({}, {}).",
                 events.len(),
                 result.len(),
                 self.window_size,
@@ -144,6 +155,8 @@ impl AptosDBBackend {
                 target_round,
                 events.last().map_or((0, 0), |e| (e.event.epoch(), e.event.round())),
                 events.first().map_or((0, 0), |e| (e.event.epoch(), e.event.round())),
+                previous_max_asked_epoch,
+                previous_max_asked_round,
             );
         }
 
