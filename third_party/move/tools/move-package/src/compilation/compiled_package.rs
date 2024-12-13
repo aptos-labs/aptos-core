@@ -27,9 +27,7 @@ use move_compiler::{
     shared::{Flags, NamedAddressMap, NumericalAddress, PackagePaths},
     Compiler,
 };
-use move_compiler_v2::{
-    diagnostics::DiagnosticReporter, external_checks::ExternalChecks, Experiment,
-};
+use move_compiler_v2::{external_checks::ExternalChecks, Experiment};
 use move_docgen::{Docgen, DocgenOptions};
 use move_model::{
     model::GlobalEnv, options::ModelBuilderOptions,
@@ -1159,8 +1157,7 @@ pub fn build_and_report_no_exit_v2_driver(
     options: move_compiler_v2::Options,
 ) -> CompilerDriverResult {
     let emitter = options.message_format.clone().into_emitter();
-    let mut reporter = DiagnosticReporter::new(emitter);
-    let (env, units) = move_compiler_v2::run_move_compiler_with_reporter(&mut reporter, options)?;
+    let (env, units) = move_compiler_v2::run_move_compiler_with_emitter(emitter, options)?;
     Ok((
         move_compiler_v2::make_files_source_text(&env),
         units,

@@ -7,26 +7,20 @@ pub mod human;
 pub mod json;
 pub mod message_format;
 
-pub struct DiagnosticReporter {
-    emitter: Box<dyn Emitter>,
-}
-
-impl DiagnosticReporter {
-    pub fn new(emitter: Box<dyn Emitter>) -> Self {
-        DiagnosticReporter { emitter }
-    }
+pub trait Emitter {
+    fn emit(&mut self, source_files: &Files<String>, diag: &Diagnostic<FileId>);
 
     /// Writes accumulated diagnostics of given or higher severity.
-    pub fn report_diag(&mut self, global_env: &GlobalEnv, severity: Severity) {
+    fn report_diag(&mut self, global_env: &GlobalEnv, severity: Severity) {
         global_env.report_diag_with_filter(
-            |files, diag| self.emitter.as_mut().emit(files, diag),
+            |files, diag| self.emit(files, diag),
             |d| d.severity >= severity,
         );
     }
 
     /// Helper function to report diagnostics, check for errors, and fail with a message on
     /// errors. This function is idempotent and will not report the same diagnostics again.
-    pub fn check_diag(
+    fn check_diag(
         &mut self,
         global_env: &GlobalEnv,
         report_severity: Severity,
@@ -39,8 +33,4 @@ impl DiagnosticReporter {
             Ok(())
         }
     }
-}
-
-pub trait Emitter {
-    fn emit(&mut self, source_files: &Files<String>, diag: &Diagnostic<FileId>);
 }
