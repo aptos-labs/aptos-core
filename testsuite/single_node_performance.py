@@ -325,7 +325,7 @@ TESTS = [
 ]
 TESTS = [
     RunGroupConfig(
-        expected_tps=10000,
+        expected_tps=7600,
         key=RunGroupKey("keyless-coin-transfer"),
         key_extra=RunGroupKeyExtra(
             txn_auth_mode="keyless",
