@@ -12,7 +12,7 @@ use crate::{
     native_extensions::NativeContextExtensions,
     session::SerializedReturnValues,
     storage::{code_storage::CodeStorage, module_storage::ModuleStorage},
-    RuntimeEnvironment,
+    AsFunctionValueSerDeExtension, RuntimeEnvironment,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -271,7 +271,11 @@ impl VMRuntime {
             return Err(deserialization_error());
         }
 
-        match ValueSerDeContext::new().deserialize(arg.borrow(), &layout) {
+        let function_extension = module_storage.as_function_extension();
+        match ValueSerDeContext::new()
+            .with_func_args_deserialization(&function_extension)
+            .deserialize(arg.borrow(), &layout)
+        {
             Some(val) => Ok(val),
             None => Err(deserialization_error()),
         }

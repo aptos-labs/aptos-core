@@ -11,9 +11,7 @@ use crate::{
     code_cache_global::GlobalModuleCache,
     counters,
     scheduler::{DependencyResult, DependencyStatus, Scheduler, TWaitForDependency},
-    value_exchange::{
-        does_value_need_exchange, filter_value_for_exchange, TemporaryValueToIdentifierMapping,
-    },
+    value_exchange::TemporaryValueToIdentifierMapping,
 };
 use aptos_aggregator::{
     bounded_math::{ok_overflow, BoundedMath, SignedU128},
@@ -57,7 +55,7 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_runtime::{Module, RuntimeEnvironment};
+use move_vm_runtime::{AsFunctionValueSerDeExtension, Module, RuntimeEnvironment};
 use move_vm_types::{
     delayed_values::delayed_field_id::{DelayedFieldID, ExtractUniqueIndex},
     value_serde::ValueSerDeContext,
@@ -1137,6 +1135,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         layout: &MoveTypeLayout,
     ) -> anyhow::Result<(StateValue, HashSet<DelayedFieldID>)> {
         let mapping = TemporaryValueToIdentifierMapping::new(self, self.txn_idx);
+        let function_extension = self.as_function_extension();
 
         state_value
             .map_bytes(|bytes| {
@@ -1144,14 +1143,17 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 // values with unique identifiers with the same type layout.
                 // The values are stored in aggregators multi-version data structure,
                 // see the actual trait implementation for more details.
-                let patched_value =
-                    ValueSerDeContext::new_with_delayed_fields_replacement(&mapping)
-                        .deserialize(bytes.as_ref(), layout)
-                        .ok_or_else(|| {
-                            anyhow::anyhow!("Failed to deserialize resource during id replacement")
-                        })?;
+                let patched_value = ValueSerDeContext::new()
+                    .with_delayed_fields_replacement(&mapping)
+                    .with_func_args_deserialization(&function_extension)
+                    .deserialize(bytes.as_ref(), layout)
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("Failed to deserialize resource during id replacement")
+                    })?;
 
-                ValueSerDeContext::new_with_delayed_fields_serde()
+                ValueSerDeContext::new()
+                    .with_delayed_fields_serde()
+                    .with_func_args_deserialization(&function_extension)
                     .serialize(&patched_value, layout)?
                     .ok_or_else(|| {
                         anyhow::anyhow!(
@@ -1173,7 +1175,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     ) -> anyhow::Result<(Bytes, HashSet<DelayedFieldID>)> {
         // This call will replace all occurrences of aggregator / snapshot
         // identifiers with values with the same type layout.
-        let value = ValueSerDeContext::new_with_delayed_fields_serde()
+        let function_extension = self.as_function_extension();
+        let value = ValueSerDeContext::new()
+            .with_func_args_deserialization(&function_extension)
+            .with_delayed_fields_serde()
             .deserialize(bytes, layout)
             .ok_or_else(|| {
                 anyhow::anyhow!(
@@ -1183,7 +1188,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             })?;
 
         let mapping = TemporaryValueToIdentifierMapping::new(self, self.txn_idx);
-        let patched_bytes = ValueSerDeContext::new_with_delayed_fields_replacement(&mapping)
+        let patched_bytes = ValueSerDeContext::new()
+            .with_delayed_fields_replacement(&mapping)
+            .with_func_args_deserialization(&function_extension)
             .serialize(&value, layout)?
             .ok_or_else(|| anyhow::anyhow!("Failed to serialize resource during id replacement"))?
             .into();
@@ -1205,14 +1212,13 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 }
 
                 match unsync_map.fetch_data(key) {
-                    Some(ValueWithLayout::Exchanged(value, Some(layout))) => {
-                        filter_value_for_exchange::<T>(
+                    Some(ValueWithLayout::Exchanged(value, Some(layout))) => self
+                        .filter_value_for_exchange(
                             value.as_ref(),
                             &layout,
                             delayed_write_set_ids,
                             key,
-                        )
-                    },
+                        ),
                     Some(ValueWithLayout::Exchanged(_, None)) => None,
                     Some(ValueWithLayout::RawFromStorage(_)) => Some(Err(code_invariant_error(
                         "Cannot exchange value that was not exchanged before",
@@ -1246,12 +1252,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 let mut resources_needing_delayed_field_exchange = false;
                 for data_read in inner_reads.values() {
                     if let DataRead::Versioned(_version, value, Some(layout)) = data_read {
-                        let needs_exchange = does_value_need_exchange::<T>(
-                            value,
-                            layout.as_ref(),
-                            delayed_write_set_ids,
-                        )
-                        .map_err(PartialVMError::from)?;
+                        let needs_exchange = self
+                            .does_value_need_exchange(value, layout.as_ref(), delayed_write_set_ids)
+                            .map_err(PartialVMError::from)?;
 
                         if needs_exchange {
                             resources_needing_delayed_field_exchange = true;
@@ -1306,7 +1309,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                             if let ValueWithLayout::Exchanged(value, Some(layout)) =
                                 value_with_layout
                             {
-                                let needs_exchange = does_value_need_exchange::<T>(
+                                let needs_exchange = self.does_value_need_exchange(
                                     &value,
                                     layout.as_ref(),
                                     delayed_write_set_ids,
@@ -1783,7 +1786,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
             ViewState::Sync(state) => state
                 .captured_reads
                 .borrow()
-                .get_read_values_with_delayed_fields(delayed_write_set_ids, skip),
+                .get_read_values_with_delayed_fields(self, delayed_write_set_ids, skip),
             ViewState::Unsync(state) => {
                 let read_set = state.read_set.borrow();
                 self.get_reads_needing_exchange_sequential(
@@ -3165,8 +3168,11 @@ mod test {
         let captured_reads = views.latest_view_par.take_parallel_reads();
         assert!(captured_reads.validate_data_reads(holder.versioned_map.data(), 1));
         // TODO(aggr_v2): what's up with this test case?
-        let _read_set_with_delayed_fields =
-            captured_reads.get_read_values_with_delayed_fields(&HashSet::new(), &HashSet::new());
+        let _read_set_with_delayed_fields = captured_reads.get_read_values_with_delayed_fields(
+            &views.latest_view_par,
+            &HashSet::new(),
+            &HashSet::new(),
+        );
 
         // TODO[agg_v2](test): This prints
         // read: (KeyType(4, false), Versioned(Err(StorageVersion), Some(Struct(Runtime([Struct(Runtime([Tagged(IdentifierMapping(Aggregator), U64), U64]))])))))

@@ -3756,7 +3756,7 @@ impl<'c, 'l, 'v> serde::Serialize
 
                         // The resulting value should not contain any delayed fields, we disallow
                         // this by using a context without the delayed field extension.
-                        let ctx = ValueSerDeContext::new();
+                        let ctx = self.ctx.clone_without_delayed_fields();
                         let value = SerializationReadyValue {
                             ctx: &ctx,
                             layout: layout.as_ref(),
@@ -3931,7 +3931,7 @@ impl<'d, 'c> serde::de::DeserializeSeed<'d> for DeserializationSeed<'c, &MoveTyp
                         }
 
                         let value = DeserializationSeed {
-                            ctx: &ValueSerDeContext::new(),
+                            ctx: &self.ctx.clone_without_delayed_fields(),
                             layout: layout.as_ref(),
                         }
                         .deserialize(deserializer)?;

@@ -640,7 +640,10 @@ fn display_return_values(return_values: SerializedReturnValues) -> Option<String
     if !return_values.is_empty() {
         let values = return_values
             .iter()
-            .map(|(bytes, layout)| ValueSerDeContext::new().deserialize(bytes, layout).unwrap())
+            .map(|(bytes, layout)| {
+                // TODO: add support for functions.
+                ValueSerDeContext::new().deserialize(bytes, layout).unwrap()
+            })
             .collect::<Vec<_>>();
         let printed = values
             .iter()

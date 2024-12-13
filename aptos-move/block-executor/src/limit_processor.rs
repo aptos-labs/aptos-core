@@ -368,7 +368,7 @@ mod test {
             .map(|key| match key {
                 InputOutputKey::Resource(k) => InputOutputKey::Resource(KeyType(*k, false)),
                 InputOutputKey::Group(k, t) => InputOutputKey::Group(KeyType(*k, false), *t),
-                InputOutputKey::DelayedField(i) => InputOutputKey::DelayedField((*i).into()),
+                InputOutputKey::DelayedField(i) => InputOutputKey::DelayedField(*i),
             })
             .collect()
     }

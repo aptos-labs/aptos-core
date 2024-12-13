@@ -69,7 +69,10 @@ fn native_to_bytes(
     //               implement it in a more efficient way.
     let val = ref_to_val.read_ref()?;
 
-    let serialized_value = match ValueSerDeContext::new().serialize(&val, &layout)? {
+    let serialized_value = match ValueSerDeContext::new()
+        .with_func_args_deserialization(context.resolver())
+        .serialize(&val, &layout)?
+    {
         Some(serialized_value) => serialized_value,
         None => {
             context.charge(BCS_TO_BYTES_FAILURE)?;
@@ -132,7 +135,9 @@ fn serialized_size_impl(
     let value = reference.read_ref()?;
     let ty_layout = context.type_to_type_layout(ty)?;
 
-    ValueSerDeContext::new_with_delayed_fields_serde().serialized_size(&value, &ty_layout)
+    ValueSerDeContext::new()
+        .with_delayed_fields_serde()
+        .serialized_size(&value, &ty_layout)
 }
 
 fn native_constant_serialized_size(
