@@ -332,7 +332,8 @@ fn check_aptos_packages_availability(path: PathBuf) -> bool {
 pub async fn prepare_aptos_packages(path: PathBuf) {
     let mut success = true;
     if path.exists() {
-        success = std::fs::remove_dir_all(path.clone()).is_ok();
+        return;
+        // success = std::fs::remove_dir_all(path.clone()).is_ok();
     }
     if success {
         std::fs::create_dir_all(path.clone()).unwrap();

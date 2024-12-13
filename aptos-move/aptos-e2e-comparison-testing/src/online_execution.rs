@@ -203,17 +203,17 @@ impl OnlineExecutor {
 
                         // handle source code
                         if let Some((address, package_name, map)) = source_code_data {
-                            if executor.check_package_skip(&package_name) {
-                                env::set_var(
-                                    "MOVE_COMPILER_EXP",
-                                    format!("{},{}", DISABLE_SPEC_CHECK, DISABLE_REF_CHECK),
-                                );
-                            } else {
-                                env::set_var(
-                                    "MOVE_COMPILER_EXP",
-                                    format!("{},{}", DISABLE_SPEC_CHECK, ENABLE_REF_CHECK),
-                                );
-                            }
+                            // if executor.check_package_skip(&package_name) {
+                            //     env::set_var(
+                            //         "MOVE_COMPILER_EXP",
+                            //         format!("{},{}", DISABLE_SPEC_CHECK, DISABLE_REF_CHECK),
+                            //     );
+                            // } else {
+                            //     env::set_var(
+                            //         "MOVE_COMPILER_EXP",
+                            //         format!("{},{}", DISABLE_SPEC_CHECK, ENABLE_REF_CHECK),
+                            //     );
+                            // }
                             let execution_mode_opt = Some(execution_mode);
                             let package_info_opt = Self::dump_and_check_src(
                                 version,

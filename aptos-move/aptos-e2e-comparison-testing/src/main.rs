@@ -101,15 +101,15 @@ pub struct Argument {
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Argument::parse();
-    env::set_var(
-        OVERRIDE_EXP_CACHE,
-        format!(
-            "{},{}",
-            Experiment::SPEC_CHECK,
-            Experiment::REFERENCE_SAFETY
-        ),
-    );
-    env::set_var("MOVE_COMPILER_EXP", DISABLE_SPEC_CHECK);
+    // env::set_var(
+    //     OVERRIDE_EXP_CACHE,
+    //     format!(
+    //         "{},{}",
+    //         Experiment::SPEC_CHECK,
+    //         Experiment::REFERENCE_SAFETY
+    //     ),
+    // );
+    // env::set_var("MOVE_COMPILER_EXP", DISABLE_SPEC_CHECK);
     match args.cmd {
         Cmd::Dump {
             endpoint,
