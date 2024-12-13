@@ -315,10 +315,9 @@ where
         transactions
             .par_iter()
             .map(|(t, _, _)| {
-                get_account_sequence_number(&state_view, t.sender()).map_err(|e| {
-                    error!(LogSchema::new(LogEntry::DBError).error(&e));
+                get_account_sequence_number(&state_view, t.sender()).inspect_err(|e| {
+                    error!(LogSchema::new(LogEntry::DBError).error(e));
                     counters::DB_ERROR.inc();
-                    e
                 })
             })
             .collect::<Vec<_>>()

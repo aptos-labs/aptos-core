@@ -344,6 +344,7 @@ async fn process_received_txns<NetworkClient, TransactionValidator>(
 
 /// Handles all network messages.
 /// - Network messages follow a simple Request/Response framework to accept new transactions
+///
 /// TODO: Move to RPC off of DirectSend
 async fn handle_network_event<NetworkClient, TransactionValidator>(
     bounded_executor: &BoundedExecutor,

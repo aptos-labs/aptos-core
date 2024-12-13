@@ -401,8 +401,8 @@ impl TransactionStore {
     /// Check if a transaction would be ready for broadcast in mempool upon insertion (without inserting it).
     /// Two ways this can happen:
     /// 1. txn sequence number == curr_sequence_number
-    /// (this handles both cases where, (1) txn is first possible txn for an account and (2) the
-    /// previous txn is committed).
+    ///    (this handles both cases where, (1) txn is first possible txn for an account and (2) the
+    ///    previous txn is committed).
     /// 2. The txn before this is ready for broadcast but not yet committed.
     fn check_txn_ready(&self, txn: &MempoolTransaction, curr_sequence_number: u64) -> bool {
         let tx_sequence_number = txn.sequence_info.transaction_sequence_number;
