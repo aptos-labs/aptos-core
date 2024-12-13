@@ -32,6 +32,8 @@ use std::{
 };
 use tokio::time::{sleep, sleep_until};
 
+const ALLOWED_EARLY: Duration = Duration::from_micros(500);
+
 pub struct SubmissionWorker {
     pub(crate) accounts: Vec<Arc<LocalAccount>>,
     clients: Arc<Vec<RestClient>>,
@@ -88,36 +90,12 @@ impl SubmissionWorker {
         while !self.stop.load(Ordering::Relaxed) {
             let loop_start_time = Instant::now();
 
-            let stats_clone = self.stats.clone();
-            let loop_stats = stats_clone.get_cur();
-
             if wait_duration.as_secs() > 0 {
-                let delay_s = loop_start_time
-                    .saturating_duration_since(wait_until)
-                    .as_secs_f32();
-                if delay_s > 5.0 {
-                    sample!(
-                        SampleRate::Duration(Duration::from_secs(2)),
-                        error!(
-                            "[{:?}] txn_emitter worker drifted out of sync too much: {:.3}s. Is machine underprovisioned? Is expiration too short, or 5s buffer on top of it?",
-                            self.client().path_prefix_string(),
-                            delay_s,
-                        )
-                    );
-                } else if delay_s > 0.3 {
-                    sample!(
-                        SampleRate::Duration(Duration::from_secs(5)),
-                        error!(
-                            "[{:?}] txn_emitter worker called a bit out of sync: {:.3}s. Is machine underprovisioned? Is expiration too short, or 5s buffer on top of it?",
-                            self.client().path_prefix_string(),
-                            delay_s,
-                        )
-                    );
-                }
+                self.verify_loop_start_drift(loop_start_time, wait_until);
             }
 
-            // always add expected cycle duration, to not drift from expected pace.
-            wait_until += wait_duration;
+            let stats_clone = self.stats.clone();
+            let loop_stats = stats_clone.get_cur();
 
             let requests = self.gen_requests();
             if !requests.is_empty() {
@@ -215,7 +193,12 @@ impl SubmissionWorker {
                 .await;
             }
 
-            self.sleep_check_done(wait_until).await;
+            if wait_duration.as_secs() > 0 {
+                // always add expected cycle duration, to not drift from expected pace,
+                // irrespectively of how long our iteration lasted.
+                wait_until += wait_duration;
+                self.sleep_check_done(wait_until).await;
+            }
         }
 
         self.accounts
@@ -226,8 +209,7 @@ impl SubmissionWorker {
 
     // returns true if it returned early
     async fn sleep_check_done(&self, sleep_until_time: Instant) {
-        // sleep has milisecond granularity - so round the sleep
-        let allowed_early = Duration::from_micros(500);
+        // sleep has millisecond granularity - so round the sleep
         let sleep_poll_interval = Duration::from_secs(1);
         loop {
             if self.stop.load(Ordering::Relaxed) {
@@ -235,7 +217,7 @@ impl SubmissionWorker {
             }
 
             let now = Instant::now();
-            if now + allowed_early > sleep_until_time {
+            if now + ALLOWED_EARLY > sleep_until_time {
                 return;
             }
 
@@ -243,6 +225,45 @@ impl SubmissionWorker {
                 sleep(sleep_poll_interval).await;
             } else {
                 sleep_until(sleep_until_time.into()).await;
+            }
+        }
+    }
+
+    fn verify_loop_start_drift(&self, loop_start_time: Instant, wait_until: Instant) {
+        if loop_start_time > wait_until {
+            let delay_s = loop_start_time
+                .saturating_duration_since(wait_until)
+                .as_secs_f32();
+            if delay_s > 5.0 {
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(2)),
+                    error!(
+                        "[{:?}] txn_emitter worker drifted out of sync too much: {:.3}s. Is machine underprovisioned? Is expiration too short, or 5s buffer on top of it?",
+                        self.client().path_prefix_string(),
+                        delay_s,
+                    )
+                );
+            } else if delay_s > 0.3 {
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(5)),
+                    error!(
+                        "[{:?}] txn_emitter worker called a bit out of sync: {:.3}s. Is machine underprovisioned? Is expiration too short, or 5s buffer on top of it?",
+                        self.client().path_prefix_string(),
+                        delay_s,
+                    )
+                );
+            }
+        } else {
+            let early_s = wait_until.saturating_duration_since(loop_start_time);
+            if early_s > ALLOWED_EARLY {
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(5)),
+                    error!(
+                        "[{:?}] txn_emitter worker called too early: {:.3}s. There is some bug in waiting.",
+                        self.client().path_prefix_string(),
+                        early_s.as_secs_f32(),
+                    )
+                );
             }
         }
     }
