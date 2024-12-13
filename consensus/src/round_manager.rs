@@ -459,7 +459,7 @@ impl RoundManager {
             sync_info,
             network.clone(),
             proposal_generator,
-            safety_rules,
+            safety_rules.clone(),
             proposer_election,
             parent_id,
         )
@@ -474,9 +474,19 @@ impl RoundManager {
         {
             if Self::check_whether_to_inject_reconfiguration_error() {
                 Self::attempt_to_inject_reconfiguration_error(
+                    epoch_state.clone(),
+                    network.clone(),
+                    &proposal_msg,
+                )
+                .await?;
+            }
+
+            if Self::check_whether_to_equivocate() {
+                Self::attempt_to_equivocate(
                     epoch_state,
                     network.clone(),
                     &proposal_msg,
+                    safety_rules.clone()
                 )
                 .await?;
             }
@@ -1939,6 +1949,12 @@ impl RoundManager {
         false
     }
 
+    #[cfg(feature = "failpoints")]
+    fn check_whether_to_equivocate() -> bool {
+        fail_point!("consensus::leader_equivocation", |_| true);
+        false
+    }
+
     /// Given R1 <- B2 if R1 has the reconfiguration txn, we inject error on B2 if R1.round + 1 = B2.round
     /// Direct suffix is checked by parent.has_reconfiguration && !parent.parent.has_reconfiguration
     /// The error is injected by sending proposals to half of the validators to force a timeout.
@@ -1972,5 +1988,30 @@ impl RoundManager {
         } else {
             Ok(())
         }
+    }
+
+    #[cfg(feature = "failpoints")]
+    async fn attempt_to_equivocate(
+        epoch_state: Arc<EpochState>,
+        network: Arc<NetworkSender>,
+        proposal_msg: &ProposalMsg,
+        safety_rules: Arc<Mutex<MetricsSafetyRules>>,
+    ) -> anyhow::Result<()> {
+        info!("[Test] Leader of epoch {} round {} equivocates", epoch_state.epoch, proposal_msg.proposal().round());
+
+        let all_peers: Vec<_> = epoch_state
+            .verifier
+            .get_ordered_account_addresses_iter()
+            .collect();
+        let mut timestamp = proposal_msg.proposal().block_data().timestamp_usecs();
+        for peer in all_peers {
+            timestamp += 1;
+            let mut modified_proposal_msg = proposal_msg.clone();
+            modified_proposal_msg.set_timestamp(timestamp);
+            let signature = safety_rules.lock().sign_proposal(modified_proposal_msg.proposal().block_data())?;
+            modified_proposal_msg.set_signature(signature);
+            network.send_proposal(modified_proposal_msg.clone(), vec![peer]).await;
+        }
+        Err(anyhow::anyhow!("Injected leader equivocation"))
     }
 }

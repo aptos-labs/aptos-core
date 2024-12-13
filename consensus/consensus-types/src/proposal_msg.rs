@@ -4,6 +4,7 @@
 
 use crate::{block::Block, common::Author, proof_of_store::ProofCache, sync_info::SyncInfo};
 use anyhow::{anyhow, ensure, format_err, Context, Ok, Result};
+use aptos_crypto::bls12381::Signature;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::validator_verifier::ValidatorVerifier;
 use serde::{Deserialize, Serialize};
@@ -24,6 +25,14 @@ impl ProposalMsg {
             proposal,
             sync_info,
         }
+    }
+
+    pub fn set_timestamp(&mut self, timestamp: u64) {
+        self.proposal.set_timestamp(timestamp);
+    }
+
+    pub fn set_signature(&mut self, signature: Signature) {
+        self.proposal.set_signature(signature);
     }
 
     pub fn epoch(&self) -> u64 {

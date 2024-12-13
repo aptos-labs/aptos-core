@@ -9,7 +9,7 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err};
 use aptos_bitvec::BitVec;
-use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
+use aptos_crypto::{bls12381::{self, Signature}, hash::CryptoHash, HashValue};
 use aptos_infallible::duration_since_epoch;
 use aptos_types::{
     account_address::AccountAddress,
@@ -85,6 +85,14 @@ impl Display for Block {
 impl Block {
     pub fn is_opt(&self) -> bool {
         self.is_opt
+    }
+
+    pub fn set_timestamp(&mut self, timestamp: u64) {
+        self.block_data.set_timestamp(timestamp);
+    }
+
+    pub fn set_signature(&mut self, signature: Signature) {
+        self.signature = Some(signature);
     }
 
     pub fn set_quorum_cert(&mut self, qc: QuorumCert) {
