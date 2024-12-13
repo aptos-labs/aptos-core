@@ -979,19 +979,16 @@ impl Type {
 
     /// Returns true if this is any number type.
     pub fn is_number(&self) -> bool {
-        if let Type::Primitive(
-            PrimitiveType::U8
-            | PrimitiveType::U16
-            | PrimitiveType::U32
-            | PrimitiveType::U64
-            | PrimitiveType::U128
-            | PrimitiveType::U256
-            | PrimitiveType::Num,
-        ) = self
-        {
-            return true;
-        }
-        false
+        matches!(
+            self,
+            Type::Primitive(PrimitiveType::U8)
+                | Type::Primitive(PrimitiveType::U16)
+                | Type::Primitive(PrimitiveType::U32)
+                | Type::Primitive(PrimitiveType::U64)
+                | Type::Primitive(PrimitiveType::U128)
+                | Type::Primitive(PrimitiveType::U256)
+                | Type::Primitive(PrimitiveType::Num)
+        )
     }
 
     /// Returns true if this is an address or signer type.
