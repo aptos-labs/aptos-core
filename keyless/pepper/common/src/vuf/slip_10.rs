@@ -52,9 +52,6 @@ pub struct ExtendedPepper {
 
 type HmacSha512 = Hmac<Sha512>;
 
-/// A convenience wrapper for a [`core::result::Result`] with an [`Error`]
-// pub type Result<T, E = Error> = core::result::Result<T, E>;
-
 pub fn get_aptos_derivation_path(s: &str) -> Result<DerivationPath> {
     let re = Regex::new(r"^m\/44'\/637'\/[0-9]+'\/[0-9]+'\/[0-9]+'?$").unwrap();
     if re.is_match(s) {
