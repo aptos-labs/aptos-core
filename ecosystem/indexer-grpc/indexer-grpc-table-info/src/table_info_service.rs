@@ -421,6 +421,7 @@ impl TableInfoService {
     /// Uploads the snapshot to GCS if found.
     /// 1. If current epoch is backuped, it will skip the backup.
     /// 2. If the chain id in the backup metadata does not match with the current network, it will panic.
+    ///
     /// Not thread safe.
     /// TODO(larry): improve the error handling.
     async fn backup_snapshot_if_present(

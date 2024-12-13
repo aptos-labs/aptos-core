@@ -304,7 +304,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         );
 
         let redis_result: RedisResult<()> =
-            redis_pipeline.query_async::<_,_>(&mut self.conn).await;
+            redis_pipeline.query_async::<_, _>(&mut self.conn).await;
 
         match redis_result {
             Ok(_) => Ok(()),

@@ -84,6 +84,7 @@ pub struct Entry {
     noise_port: u16,
 
     /// The port the metrics server is running on.
+    #[allow(dead_code)]
     pub metrics_port: u16,
 
     /// The public key matching the private key that the node is running with.
