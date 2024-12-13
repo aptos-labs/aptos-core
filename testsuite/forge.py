@@ -1560,7 +1560,7 @@ def test(
     asyncio.run(forge_cluster.write(context.shell))
 
     # These features and profile flags are set as strings
-    enable_failpoints = forge_enable_failpoints == "true"
+    enable_failpoints = True
     enable_performance_profile = forge_enable_performance == "true"
 
     # In the below, assume that the image is pushed to all registries
