@@ -43,7 +43,7 @@ fn native_from_bytes(
         UTIL_FROM_BYTES_BASE + UTIL_FROM_BYTES_PER_BYTE * NumBytes::new(bytes.len() as u64),
     )?;
     let val = match ValueSerDeContext::new()
-        .with_func_args_deserialization(context.resolver())
+        .with_func_args_deserialization(context.function_extension())
         .deserialize(&bytes, &layout)
     {
         Some(val) => val,

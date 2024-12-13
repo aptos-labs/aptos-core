@@ -5,7 +5,7 @@
 use crate::{
     loader::{LegacyModuleStorageAdapter, Loader},
     logging::expect_no_verification_errors,
-    storage::module_storage::FunctionValueSerDeExtensionAdapter,
+    storage::module_storage::FunctionExtensionAdapter,
     ModuleStorage,
 };
 use bytes::Bytes;
@@ -119,7 +119,7 @@ impl<'r> TransactionDataCache<'r> {
     ) -> PartialVMResult<ChangeSet> {
         let resource_converter =
             |value: Value, layout: MoveTypeLayout, _: bool| -> PartialVMResult<Bytes> {
-                let function_extension = FunctionValueSerDeExtensionAdapter { module_storage };
+                let function_extension = FunctionExtensionAdapter { module_storage };
                 ValueSerDeContext::new()
                     .with_func_args_deserialization(&function_extension)
                     .serialize(&value, &layout)?
@@ -278,7 +278,7 @@ impl<'r> TransactionDataCache<'r> {
             };
             load_res = Some(NumBytes::new(bytes_loaded as u64));
 
-            let function_extension = FunctionValueSerDeExtensionAdapter { module_storage };
+            let function_extension = FunctionExtensionAdapter { module_storage };
             let gv = match data {
                 Some(blob) => {
                     let val = match ValueSerDeContext::new()

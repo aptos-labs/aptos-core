@@ -54,7 +54,7 @@ use crate::{
     loader::modules::{StructVariantInfo, VariantFieldInfo},
     native_functions::NativeFunctions,
     storage::{
-        loader::LoaderV2, module_storage::FunctionValueSerDeExtensionAdapter,
+        loader::LoaderV2, module_storage::FunctionExtensionAdapter,
         struct_name_index_map::StructNameIndexMap, ty_cache::StructInfoCache,
     },
 };
@@ -69,7 +69,7 @@ use move_binary_format::file_format::{
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     loaded_data::runtime_types::{StructLayout, TypeBuilder},
-    value_serde::FunctionValueSerDeExtension,
+    value_serde::FunctionValueExtension,
 };
 pub use script::Script;
 pub(crate) use script::ScriptCache;
@@ -1654,14 +1654,14 @@ impl<'a> Resolver<'a> {
     }
 }
 
-impl<'a> FunctionValueSerDeExtension for Resolver<'a> {
+impl<'a> FunctionValueExtension for Resolver<'a> {
     fn get_function_arg_tys(
         &self,
         module_id: &ModuleId,
         function_name: &IdentStr,
         ty_arg_tags: Vec<TypeTag>,
     ) -> PartialVMResult<Vec<Type>> {
-        let function_extension = FunctionValueSerDeExtensionAdapter {
+        let function_extension = FunctionExtensionAdapter {
             module_storage: self.module_storage,
         };
         function_extension.get_function_arg_tys(module_id, function_name, ty_arg_tags)

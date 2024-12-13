@@ -13,7 +13,7 @@ use move_table_extension::NativeTableContext;
 use move_vm_runtime::native_extensions::NativeContextExtensions;
 #[cfg(feature = "table-extension")]
 use move_vm_test_utils::BlankStorage;
-use move_vm_types::value_serde::FunctionValueSerDeExtension;
+use move_vm_types::value_serde::FunctionValueExtension;
 use once_cell::sync::Lazy;
 use std::{fmt::Write, sync::Mutex};
 
@@ -54,7 +54,7 @@ pub(crate) fn new_extensions<'a>() -> NativeContextExtensions<'a> {
 pub(crate) fn print_change_sets<W: Write>(
     w: &mut W,
     extensions: &mut NativeContextExtensions,
-    function_extension: &impl FunctionValueSerDeExtension,
+    function_extension: &impl FunctionValueExtension,
 ) {
     #[cfg(feature = "table-extension")]
     print_table_extension(w, extensions, function_extension);
@@ -72,7 +72,7 @@ fn create_table_extension(extensions: &mut NativeContextExtensions) {
 fn print_table_extension<W: Write>(
     w: &mut W,
     extensions: &mut NativeContextExtensions,
-    function_extension: &impl FunctionValueSerDeExtension,
+    function_extension: &impl FunctionValueExtension,
 ) {
     let cs = extensions
         .remove::<NativeTableContext>()

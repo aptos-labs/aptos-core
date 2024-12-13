@@ -7,7 +7,7 @@
 use crate::{
     delayed_values::delayed_field_id::{DelayedFieldID, TryFromMoveValue, TryIntoMoveValue},
     loaded_data::runtime_types::Type,
-    value_serde::{ValueSerDeContext, MAX_DELAYED_FIELDS_PER_RESOURCE},
+    value_serde::ValueSerDeContext,
     views::{ValueView, ValueVisitor},
 };
 use itertools::Itertools;
@@ -3730,17 +3730,9 @@ impl<'c, 'l, 'v> serde::Serialize
             (L::Native(kind, layout), ValueImpl::DelayedFieldID { id }) => {
                 match &self.ctx.delayed_fields_extension {
                     Some(delayed_fields_extension) => {
-                        *delayed_fields_extension.delayed_fields_count.borrow_mut() += 1;
-                        if *delayed_fields_extension.delayed_fields_count.borrow()
-                            > MAX_DELAYED_FIELDS_PER_RESOURCE
-                        {
-                            return Err(S::Error::custom(
-                                PartialVMError::new(StatusCode::TOO_MANY_DELAYED_FIELDS)
-                                    .with_message(
-                                        "Too many Delayed fields in a single resource.".to_string(),
-                                    ),
-                            ));
-                        }
+                        delayed_fields_extension
+                            .inc_and_check_delayed_fields_count()
+                            .map_err(S::Error::custom)?;
 
                         let value = match delayed_fields_extension.mapping {
                             Some(mapping) => mapping
@@ -3919,16 +3911,9 @@ impl<'d, 'c> serde::de::DeserializeSeed<'d> for DeserializationSeed<'c, &MoveTyp
             L::Native(kind, layout) => {
                 match &self.ctx.delayed_fields_extension {
                     Some(delayed_fields_extension) => {
-                        if *delayed_fields_extension.delayed_fields_count.borrow()
-                            > MAX_DELAYED_FIELDS_PER_RESOURCE
-                        {
-                            return Err(D::Error::custom(
-                                PartialVMError::new(StatusCode::TOO_MANY_DELAYED_FIELDS)
-                                    .with_message(
-                                        "Too many Delayed fields in a single resource.".to_string(),
-                                    ),
-                            ));
-                        }
+                        delayed_fields_extension
+                            .inc_and_check_delayed_fields_count()
+                            .map_err(D::Error::custom)?;
 
                         let value = DeserializationSeed {
                             ctx: &self.ctx.clone_without_delayed_fields(),

@@ -15,7 +15,10 @@ use move_core_types::{
 };
 use std::cell::RefCell;
 
-pub trait FunctionValueSerDeExtension {
+/// An extension to (de)serializer to lookup information about function values.
+pub trait FunctionValueExtension {
+    /// Given the module's id and the function name, returns the parameter types of the
+    /// corresponding function, instantiated with the provided set of type tags.
     fn get_function_arg_tys(
         &self,
         module_id: &ModuleId,
@@ -24,15 +27,41 @@ pub trait FunctionValueSerDeExtension {
     ) -> PartialVMResult<Vec<Type>>;
 }
 
-pub(crate) struct DelayedFieldsSerDeExtension<'a> {
+/// An extension to (de)serializer to lookup information about delayed fields.
+pub(crate) struct DelayedFieldsExtension<'a> {
+    /// Number of delayed fields (de)serialized, capped.
     pub(crate) delayed_fields_count: RefCell<usize>,
+    /// Optional mapping to ids/values. The mapping is used to replace ids with values at
+    /// serialization time and values with ids at deserialization time. If [None], ids and values
+    /// are serialized as is.
     pub(crate) mapping: Option<&'a dyn ValueToIdentifierMapping>,
 }
 
+impl<'a> DelayedFieldsExtension<'a> {
+    // Temporarily limit the number of delayed fields per resource, until proper charges are
+    // implemented.
+    // TODO[agg_v2](clean):
+    //   Propagate up, so this value is controlled by the gas schedule version.
+    const MAX_DELAYED_FIELDS_PER_RESOURCE: usize = 10;
+
+    /// Increments the delayed fields count, and checks if there are too many of them. If so, an
+    /// error is returned.
+    pub(crate) fn inc_and_check_delayed_fields_count(&self) -> PartialVMResult<()> {
+        *self.delayed_fields_count.borrow_mut() += 1;
+        if *self.delayed_fields_count.borrow() > Self::MAX_DELAYED_FIELDS_PER_RESOURCE {
+            return Err(PartialVMError::new(StatusCode::TOO_MANY_DELAYED_FIELDS)
+                .with_message("Too many Delayed fields in a single resource.".to_string()));
+        }
+        Ok(())
+    }
+}
+
+/// A (de)serializer context for a single Move [Value], containing optional extensions. If
+/// extension is not provided, but required at (de)serialization time, (de)serialization fails.
 pub struct ValueSerDeContext<'a> {
     #[allow(dead_code)]
-    pub(crate) function_extension: Option<&'a dyn FunctionValueSerDeExtension>,
-    pub(crate) delayed_fields_extension: Option<DelayedFieldsSerDeExtension<'a>>,
+    pub(crate) function_extension: Option<&'a dyn FunctionValueExtension>,
+    pub(crate) delayed_fields_extension: Option<DelayedFieldsExtension<'a>>,
 }
 
 impl<'a> ValueSerDeContext<'a> {
@@ -49,12 +78,13 @@ impl<'a> ValueSerDeContext<'a> {
     /// function value deserialization.
     pub fn with_func_args_deserialization(
         mut self,
-        function_extension: &'a dyn FunctionValueSerDeExtension,
+        function_extension: &'a dyn FunctionValueExtension,
     ) -> Self {
         self.function_extension = Some(function_extension);
         self
     }
 
+    /// Returns the same extension but without allowing the delayed fields.
     pub(crate) fn clone_without_delayed_fields(&self) -> Self {
         Self {
             function_extension: self.function_extension,
@@ -70,7 +100,7 @@ impl<'a> ValueSerDeContext<'a> {
         mut self,
         mapping: &'a dyn ValueToIdentifierMapping,
     ) -> Self {
-        self.delayed_fields_extension = Some(DelayedFieldsSerDeExtension {
+        self.delayed_fields_extension = Some(DelayedFieldsExtension {
             delayed_fields_count: RefCell::new(0),
             mapping: Some(mapping),
         });
@@ -81,20 +111,23 @@ impl<'a> ValueSerDeContext<'a> {
     /// that when a delayed value is serialized, the deserialization must construct the delayed
     /// value back.
     pub fn with_delayed_fields_serde(mut self) -> Self {
-        self.delayed_fields_extension = Some(DelayedFieldsSerDeExtension {
+        self.delayed_fields_extension = Some(DelayedFieldsExtension {
             delayed_fields_count: RefCell::new(0),
             mapping: None,
         });
         self
     }
 
+    /// Serializes a [Value] based on the provided layout. For legacy reasons, all serialization
+    /// errors are mapped to [None]. If [DelayedFieldsExtension] is set, and there are too many
+    /// delayed fields, an error may be returned.
     pub fn serialize(
-        &self,
+        self,
         value: &Value,
         layout: &MoveTypeLayout,
     ) -> PartialVMResult<Option<Vec<u8>>> {
         let value = SerializationReadyValue {
-            ctx: self,
+            ctx: &self,
             layout,
             value: &value.0,
         };
@@ -104,25 +137,26 @@ impl<'a> ValueSerDeContext<'a> {
             None => {
                 // Check if the error is due to too many delayed fields. If so, to be compatible
                 // with the older implementation return an error.
-                if self.delayed_fields_extension.as_ref().is_some_and(|ext| {
-                    *ext.delayed_fields_count.borrow() > MAX_DELAYED_FIELDS_PER_RESOURCE
-                }) {
-                    Err(PartialVMError::new(StatusCode::TOO_MANY_DELAYED_FIELDS)
-                        .with_message("Too many Delayed fields in a single resource.".to_string()))
-                } else {
-                    Ok(None)
+                if let Some(delayed_fields_extension) = self.delayed_fields_extension {
+                    if delayed_fields_extension.delayed_fields_count.into_inner()
+                        > DelayedFieldsExtension::MAX_DELAYED_FIELDS_PER_RESOURCE
+                    {
+                        return Err(PartialVMError::new(StatusCode::TOO_MANY_DELAYED_FIELDS)
+                            .with_message(
+                                "Too many Delayed fields in a single resource.".to_string(),
+                            ));
+                    }
                 }
+                Ok(None)
             },
         }
     }
 
-    pub fn serialized_size(
-        &self,
-        value: &Value,
-        layout: &MoveTypeLayout,
-    ) -> PartialVMResult<usize> {
+    /// Returns the serialized size of a [Value] with the associated layout. All errors are mapped
+    /// to [StatusCode::VALUE_SERIALIZATION_ERROR].
+    pub fn serialized_size(self, value: &Value, layout: &MoveTypeLayout) -> PartialVMResult<usize> {
         let value = SerializationReadyValue {
-            ctx: self,
+            ctx: &self,
             layout,
             value: &value.0,
         };
@@ -134,16 +168,12 @@ impl<'a> ValueSerDeContext<'a> {
         })
     }
 
-    pub fn deserialize(&self, bytes: &[u8], layout: &MoveTypeLayout) -> Option<Value> {
-        let seed = DeserializationSeed { ctx: self, layout };
+    /// Deserializes the bytes using the provided layout into a Move [Value].
+    pub fn deserialize(self, bytes: &[u8], layout: &MoveTypeLayout) -> Option<Value> {
+        let seed = DeserializationSeed { ctx: &self, layout };
         bcs::from_bytes_seed(seed, bytes).ok()
     }
 }
-
-// TODO[agg_v2](clean): propagate up, so this value is controlled by the gas schedule version.
-// Temporarily limit the number of delayed fields per resource,
-// until proper charges are implemented.
-pub const MAX_DELAYED_FIELDS_PER_RESOURCE: usize = 10;
 
 /// Allow conversion between values and identifiers (delayed values). For example,
 /// this trait can be implemented to fetch a concrete Move value from the global

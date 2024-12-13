@@ -12,7 +12,7 @@ use crate::{
     native_extensions::NativeContextExtensions,
     session::SerializedReturnValues,
     storage::{code_storage::CodeStorage, module_storage::ModuleStorage},
-    AsFunctionValueSerDeExtension, RuntimeEnvironment,
+    AsFunctionValueExtension, RuntimeEnvironment,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -359,7 +359,9 @@ impl VMRuntime {
             return Err(serialization_error());
         }
 
+        let function_extension = module_storage.as_function_extension();
         let bytes = ValueSerDeContext::new()
+            .with_func_args_deserialization(&function_extension)
             .serialize(&value, &layout)?
             .ok_or_else(serialization_error)?;
         Ok((bytes, layout))

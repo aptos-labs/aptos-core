@@ -25,7 +25,7 @@ use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, WithBytes, WithHash, WithSize},
     loaded_data::runtime_types::{StructType, Type},
     module_cyclic_dependency_error, module_linker_error,
-    value_serde::FunctionValueSerDeExtension,
+    value_serde::FunctionValueExtension,
 };
 use std::sync::Arc;
 
@@ -114,6 +114,9 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
         module_name: &IdentStr,
     ) -> VMResult<Option<Arc<Module>>>;
 
+    /// Returns the verified module. If it does not exist, a linker error is returned. All other
+    /// errors are mapped using [expect_no_verification_errors] - since on-chain code should not
+    /// fail bytecode verification.
     fn fetch_existing_verified_module(
         &self,
         address: &AccountAddress,
@@ -125,7 +128,7 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
     }
 
     /// Returns a struct type corresponding to the specified name. The module containing the struct
-    /// is loaded.
+    /// will be fetched and cached beforehand.
     fn fetch_struct_ty(
         &self,
         address: &AccountAddress,
@@ -150,8 +153,8 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
     }
 
     /// Returns a runtime type corresponding to the specified type tag (file format type
-    /// representation). In case struct types are transitively loaded, the module containing
-    /// the struct definition is also loaded.
+    /// representation). If a struct type is constructed, the module containing the struct
+    /// definition is fetched and cached.
     fn fetch_ty(&self, ty_tag: &TypeTag) -> PartialVMResult<Type> {
         // TODO(loader_v2): Loader V1 uses VMResults everywhere, but partial VM errors
         //                  seem better fit. Here we map error to VMError to reuse existing
@@ -171,7 +174,7 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
     }
 
     /// Returns the function definition corresponding to the specified name, as well as the module
-    /// where this function is defined.
+    /// where this function is defined. The returned module is also verified.
     fn fetch_function_without_ty_args(
         &self,
         address: &AccountAddress,
@@ -396,23 +399,25 @@ where
     Ok(module.code().verified().clone())
 }
 
-pub struct FunctionValueSerDeExtensionAdapter<'a> {
+/// Avoids the orphan rule to implement external [FunctionValueExtension] for any generic type that
+/// implements [ModuleStorage].
+pub struct FunctionExtensionAdapter<'a> {
     pub(crate) module_storage: &'a dyn ModuleStorage,
 }
 
-pub trait AsFunctionValueSerDeExtension {
-    fn as_function_extension(&self) -> FunctionValueSerDeExtensionAdapter;
+pub trait AsFunctionValueExtension {
+    fn as_function_extension(&self) -> FunctionExtensionAdapter;
 }
 
-impl<T: ModuleStorage> AsFunctionValueSerDeExtension for T {
-    fn as_function_extension(&self) -> FunctionValueSerDeExtensionAdapter {
-        FunctionValueSerDeExtensionAdapter {
+impl<T: ModuleStorage> AsFunctionValueExtension for T {
+    fn as_function_extension(&self) -> FunctionExtensionAdapter {
+        FunctionExtensionAdapter {
             module_storage: self,
         }
     }
 }
 
-impl<'a> FunctionValueSerDeExtension for FunctionValueSerDeExtensionAdapter<'a> {
+impl<'a> FunctionValueExtension for FunctionExtensionAdapter<'a> {
     fn get_function_arg_tys(
         &self,
         module_id: &ModuleId,
@@ -427,15 +432,7 @@ impl<'a> FunctionValueSerDeExtension for FunctionValueSerDeExtensionAdapter<'a> 
         let (_, function) = self
             .module_storage
             .fetch_function_without_ty_args(module_id.address(), module_id.name(), function_name)
-            .map_err(|_| {
-                // Note: legacy loader implementation used this error, so we need to remap.
-                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(format!(
-                    "Module or function do not exist for {}::{}::{}",
-                    module_id.address(),
-                    module_id.name(),
-                    function_name
-                ))
-            })?;
+            .map_err(|err| err.to_partial())?;
 
         let ty_builder = &self
             .module_storage

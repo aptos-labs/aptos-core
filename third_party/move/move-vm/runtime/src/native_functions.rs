@@ -22,7 +22,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     loaded_data::runtime_types::Type, natives::function::NativeResult,
-    value_serde::FunctionValueSerDeExtension, values::Value,
+    value_serde::FunctionValueExtension, values::Value,
 };
 use std::{
     collections::{HashMap, VecDeque},
@@ -198,7 +198,7 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         self.traversal_context
     }
 
-    pub fn resolver(&self) -> &dyn FunctionValueSerDeExtension {
+    pub fn function_extension(&self) -> &dyn FunctionValueExtension {
         self.resolver
     }
 
