@@ -64,14 +64,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIdentifierMapping
     for TemporaryValueToIdentifierMapping<'a, T, S, X>
 {
-    type Identifier = DelayedFieldID;
-
     fn value_to_identifier(
         &self,
         kind: &IdentifierMappingKind,
         layout: &MoveTypeLayout,
         value: Value,
-    ) -> PartialVMResult<Self::Identifier> {
+    ) -> PartialVMResult<DelayedFieldID> {
         let (base_value, width) = DelayedFieldValue::try_from_move_value(layout, value, kind)?;
         let id = self.generate_delayed_field_id(width);
         match &self.latest_view.latest_view {
@@ -85,7 +83,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
     fn identifier_to_value(
         &self,
         layout: &MoveTypeLayout,
-        identifier: Self::Identifier,
+        identifier: DelayedFieldID,
     ) -> PartialVMResult<Value> {
         self.delayed_field_ids.borrow_mut().insert(identifier);
         let delayed_field = match &self.latest_view.latest_view {

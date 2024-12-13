@@ -63,7 +63,7 @@ fn native_to_bytes(
     };
     // serialize value
     let val = ref_to_val.read_ref()?;
-    let serialized_value = match ValueSerDeContext::new().serialize(&val, &layout) {
+    let serialized_value = match ValueSerDeContext::new().serialize(&val, &layout)? {
         Some(serialized_value) => serialized_value,
         None => {
             cost += gas_params.failure;

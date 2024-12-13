@@ -530,7 +530,7 @@ fn get_table_handle(table: &StructRef) -> PartialVMResult<TableHandle> {
 
 fn serialize_key(layout: &MoveTypeLayout, key: &Value) -> PartialVMResult<Vec<u8>> {
     ValueSerDeContext::new()
-        .serialize(key, layout)
+        .serialize(key, layout)?
         .ok_or_else(|| partial_extension_error("cannot serialize table key"))
 }
 
@@ -541,13 +541,13 @@ fn serialize_value(
     let serialization_result = if layout_info.has_identifier_mappings {
         // Value contains delayed fields, so we should be able to serialize it.
         ValueSerDeContext::new_with_delayed_fields_serde()
-            .serialize(val, layout_info.layout.as_ref())
+            .serialize(val, layout_info.layout.as_ref())?
             .map(|bytes| (bytes.into(), Some(layout_info.layout.clone())))
     } else {
         // No delayed fields, make sure serialization fails if there are any
         // native values.
         ValueSerDeContext::new()
-            .serialize(val, layout_info.layout.as_ref())
+            .serialize(val, layout_info.layout.as_ref())?
             .map(|bytes| (bytes.into(), None))
     };
     serialization_result.ok_or_else(|| partial_extension_error("cannot serialize table value"))

@@ -69,7 +69,7 @@ fn native_to_bytes(
     //               implement it in a more efficient way.
     let val = ref_to_val.read_ref()?;
 
-    let serialized_value = match ValueSerDeContext::new().serialize(&val, &layout) {
+    let serialized_value = match ValueSerDeContext::new().serialize(&val, &layout)? {
         Some(serialized_value) => serialized_value,
         None => {
             context.charge(BCS_TO_BYTES_FAILURE)?;

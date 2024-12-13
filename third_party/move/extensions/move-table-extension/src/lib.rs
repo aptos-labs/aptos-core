@@ -688,7 +688,7 @@ fn get_table_handle(table: &StructRef) -> PartialVMResult<TableHandle> {
 
 fn serialize(layout: &MoveTypeLayout, val: &Value) -> PartialVMResult<Vec<u8>> {
     ValueSerDeContext::new()
-        .serialize(val, layout)
+        .serialize(val, layout)?
         .ok_or_else(|| partial_extension_error("cannot serialize table key or value"))
 }
 

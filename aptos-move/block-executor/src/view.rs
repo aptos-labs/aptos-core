@@ -1152,7 +1152,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         })?;
 
                 ValueSerDeContext::new_with_delayed_fields_serde()
-                    .serialize(&patched_value, layout)
+                    .serialize(&patched_value, layout)?
                     .ok_or_else(|| {
                         anyhow::anyhow!(
                             "Failed to serialize value {} after id replacement",
@@ -1184,7 +1184,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
         let mapping = TemporaryValueToIdentifierMapping::new(self, self.txn_idx);
         let patched_bytes = ValueSerDeContext::new_with_delayed_fields_replacement(&mapping)
-            .serialize(&value, layout)
+            .serialize(&value, layout)?
             .ok_or_else(|| anyhow::anyhow!("Failed to serialize resource during id replacement"))?
             .into();
         Ok((patched_bytes, mapping.into_inner()))
@@ -2493,6 +2493,7 @@ mod test {
         StateValue::new_legacy(
             ValueSerDeContext::new()
                 .serialize(value, layout)
+                .unwrap()
                 .unwrap()
                 .into(),
         )
