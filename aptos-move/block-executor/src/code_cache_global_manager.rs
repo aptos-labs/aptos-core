@@ -317,7 +317,10 @@ mod test {
         code::{mock_verified_code, MockExtension},
         loaded_data::runtime_types::StructIdentifier,
     };
-    use std::{collections::HashMap, time::Duration};
+    use std::{
+        collections::HashMap,
+        sync::atomic::{AtomicU64, Ordering},
+    };
 
     #[test]
     fn test_prefetch_existing_aptos_framework() {
@@ -531,7 +534,7 @@ mod test {
         assert_eq!(manager.module_cache.num_modules(), 2);
         assert_eq!(manager.module_cache.size_in_bytes(), 16);
 
-        // Case 5: Type cache is too large.
+        // Case 6: Type cache is too large.
         let metadata_6 = TransactionSliceMetadata::block_from_u64(6, 5);
         assert!(metadata_6.is_immediately_after(&metadata_5));
 
@@ -562,16 +565,27 @@ mod test {
         let config = Arc::new(BlockExecutorModuleCacheLocalConfig::default());
         let metadata = TransactionSliceMetadata::block_from_u64(0, 1);
 
-        let mut handles = Vec::with_capacity(4);
-        for _ in 0..2 {
+        let counter = Arc::new(AtomicU64::new(0));
+        let num_threads = 8;
+        let mut handles = Vec::with_capacity(num_threads);
+
+        for _ in 0..num_threads {
             let handle = std::thread::spawn({
                 let manager = manager.clone();
                 let state_view = state_view.clone();
                 let config = config.clone();
+                let counter = counter.clone();
+
                 move || {
                     let guard = assert_ok!(manager.try_lock_inner(&state_view, &config, metadata));
-                    // Hold the guard for 1 second to make sure other thread runs at the same time.
-                    std::thread::sleep(Duration::from_secs(1));
+
+                    // Wait for all threads to complete.
+                    counter.fetch_add(1, Ordering::SeqCst);
+                    loop {
+                        if counter.load(Ordering::SeqCst) == num_threads as u64 {
+                            break;
+                        }
+                    }
                     if matches!(guard, AptosModuleCacheManagerGuard::Guard { .. }) {
                         1
                     } else {
