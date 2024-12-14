@@ -37,7 +37,7 @@ impl Default for QuorumStoreBackPressureConfig {
             decrease_duration_ms: 1000,
             increase_duration_ms: 1000,
             decrease_fraction: 0.5,
-            dynamic_min_txn_per_s: 160,
+            dynamic_min_txn_per_s: 10000,
             dynamic_max_txn_per_s: 12000,
             // When the QS is no longer backpressured, we increase number of txns to be pulled from mempool
             // by this amount every second until we reach dynamic_max_txn_per_s
@@ -106,7 +106,7 @@ impl Default for QuorumStoreConfig {
             channel_size: 1000,
             proof_timeout_ms: 10000,
             batch_generation_poll_interval_ms: 25,
-            batch_generation_min_non_empty_interval_ms: 100,
+            batch_generation_min_non_empty_interval_ms: 200,
             batch_generation_max_interval_ms: 250,
             sender_max_batch_txns: DEFEAULT_MAX_BATCH_TXNS,
             // TODO: on next release, remove BATCH_PADDING_BYTES
