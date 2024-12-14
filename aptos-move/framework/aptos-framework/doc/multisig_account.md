@@ -4056,6 +4056,11 @@ Add new owners, remove owners to remove, update signatures required.
 ### Module-level Specification
 
 
+<pre><code><b>pragma</b> aborts_if_is_partial;
+</code></pre>
+
+
+
 <a id="@Specification_1_metadata"></a>
 
 ### Function `metadata`
