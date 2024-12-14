@@ -124,6 +124,8 @@ pub struct NetworkConfig {
     pub max_parallel_deserialization_tasks: Option<usize>,
     /// Whether or not to enable latency aware peer dialing
     pub enable_latency_aware_dialing: bool,
+    /// Whether to enable network messages with metadata
+    pub enable_messages_with_metadata: bool,
 }
 
 impl Default for NetworkConfig {
@@ -165,6 +167,7 @@ impl NetworkConfig {
             outbound_tx_buffer_size_bytes: None,
             max_parallel_deserialization_tasks: None,
             enable_latency_aware_dialing: true,
+            enable_messages_with_metadata: true,
         };
 
         // Configure the number of parallel deserialization tasks

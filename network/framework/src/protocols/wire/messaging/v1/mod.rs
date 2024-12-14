@@ -90,16 +90,42 @@ impl NetworkMessage {
         NetworkMessage::DirectSendMsg(direct_send_message)
     }
 
+    /// Creates a direct send message with the default priority and metadata
+    pub fn new_direct_send_and_metadata(
+        protocol_id: ProtocolId,
+        application_send_time: SystemTime,
+        serialized_message: Vec<u8>,
+    ) -> Self {
+        let message_wire_metadata = MessageWireMetadata::new(
+            protocol_id,
+            Priority::default(),
+            Some(application_send_time),
+            None, // The wire send time is updated later (just before sending)
+        );
+        let direct_send_and_metadata =
+            DirectSendAndMetadata::new(serialized_message, message_wire_metadata);
+        NetworkMessage::DirectSendAndMetadata(direct_send_and_metadata)
+    }
+
     /// Creates an RPC response message with the default priority
     pub fn new_rpc_response(request_id: RequestId, raw_response: Vec<u8>) -> Self {
         let rpc_response = RpcResponse::new(request_id, Priority::default(), raw_response);
         NetworkMessage::RpcResponse(rpc_response)
     }
 
-    /// Creates an RPC response message for testing.
-    /// Note: this cannot be marked as `#[cfg(test)]` because of several non-wrapped test utils.
-    pub fn rpc_response_for_testing(raw_response: Vec<u8>) -> Self {
-        Self::new_rpc_response(0, raw_response)
+    /// Creates an RPC response message with the given priority and given metadata
+    pub fn new_rpc_response_and_metadata(
+        protocol_id: ProtocolId,
+        priority: Priority,
+        request_id: RequestId,
+        application_send_time: Option<SystemTime>,
+        serialized_response: Vec<u8>,
+    ) -> Self {
+        let message_wire_metadata =
+            MessageWireMetadata::new(protocol_id, priority, application_send_time, None);
+        let rpc_response_and_metadata =
+            RpcResponseAndMetadata::new(request_id, serialized_response, message_wire_metadata);
+        NetworkMessage::RpcResponseAndMetadata(rpc_response_and_metadata)
     }
 
     /// Creates an RPC request message with the default priority
@@ -113,10 +139,44 @@ impl NetworkMessage {
         NetworkMessage::RpcRequest(rpc_request)
     }
 
+    /// Creates an RPC request message with the default priority and given metadata
+    pub fn new_rpc_request_and_metadata(
+        protocol_id: ProtocolId,
+        request_id: RequestId,
+        application_send_time: SystemTime,
+        serialized_request: Vec<u8>,
+    ) -> Self {
+        let message_wire_metadata = MessageWireMetadata::new(
+            protocol_id,
+            Priority::default(),
+            Some(application_send_time),
+            None, // The wire send time is updated later (just before sending)
+        );
+        let rpc_request_and_metadata =
+            RpcRequestAndMetadata::new(request_id, serialized_request, message_wire_metadata);
+        NetworkMessage::RpcRequestAndMetadata(rpc_request_and_metadata)
+    }
+
     /// Creates an RPC request message for testing.
     /// Note: this cannot be marked as `#[cfg(test)]` because of several non-wrapped test utils.
     pub fn rpc_request_for_testing(protocol_id: ProtocolId, raw_request: Vec<u8>) -> Self {
         Self::new_rpc_request(protocol_id, 0, raw_request)
+    }
+
+    /// Updates the wire send time for messages that support metadata
+    pub fn update_wire_send_time(&mut self, wire_send_time: SystemTime) {
+        // Get the message wire metadata
+        let message_wire_metadata = match self {
+            NetworkMessage::RpcRequestAndMetadata(request) => &mut request.message_wire_metadata,
+            NetworkMessage::RpcResponseAndMetadata(response) => &mut response.message_wire_metadata,
+            NetworkMessage::DirectSendAndMetadata(message) => &mut message.message_wire_metadata,
+            _ => {
+                return; // This message format does not support metadata
+            },
+        };
+
+        // Update the wire send time
+        message_wire_metadata.update_wire_send_time(wire_send_time);
     }
 }
 
@@ -212,16 +272,9 @@ impl RpcRequest {
     /// Converts a legacy RCP request into a new RPC request and metadata.
     /// Note: this should only be required during the migration period.
     pub fn into_rpc_request_and_metadata(self) -> RpcRequestAndMetadata {
-        RpcRequestAndMetadata {
-            request_id: self.request_id,
-            serialized_request: self.raw_request,
-            message_wire_metadata: MessageWireMetadata {
-                protocol_id: self.protocol_id,
-                priority: self.priority,
-                application_send_time: None,
-                wire_send_time: None,
-            },
-        }
+        let message_wire_metadata =
+            MessageWireMetadata::new(self.protocol_id, self.priority, None, None);
+        RpcRequestAndMetadata::new(self.request_id, self.raw_request, message_wire_metadata)
     }
 
     /// Returns the priority of the RPC request
@@ -285,16 +338,13 @@ impl RpcResponse {
     /// Converts a legacy RPC response into a new RPC response and metadata.
     /// Note: this should only be required during the migration period.
     pub fn into_rpc_response_and_metadata(self) -> RpcResponseAndMetadata {
-        RpcResponseAndMetadata {
-            request_id: self.request_id,
-            serialized_response: self.raw_response,
-            message_wire_metadata: MessageWireMetadata {
-                protocol_id: ProtocolId::Unknown, // Once we fully migrate, this can be removed
-                priority: self.priority,
-                application_send_time: None,
-                wire_send_time: None,
-            },
-        }
+        let message_wire_metadata = MessageWireMetadata::new(
+            ProtocolId::Unknown, // Once we fully migrate, this can be removed
+            self.priority,
+            None,
+            None,
+        );
+        RpcResponseAndMetadata::new(self.request_id, self.raw_response, message_wire_metadata)
     }
 
     /// Returns the ID of the RPC request
@@ -332,15 +382,9 @@ impl DirectSendMsg {
     /// Converts a legacy direct send message into a new direct send and metadata.
     /// Note: this should only be required during the migration period.
     pub fn into_direct_send_and_metadata(self) -> DirectSendAndMetadata {
-        DirectSendAndMetadata {
-            serialized_message: self.raw_msg,
-            message_wire_metadata: MessageWireMetadata {
-                protocol_id: self.protocol_id,
-                priority: self.priority,
-                application_send_time: None,
-                wire_send_time: None,
-            },
-        }
+        let message_wire_metadata =
+            MessageWireMetadata::new(self.protocol_id, self.priority, None, None);
+        DirectSendAndMetadata::new(self.raw_msg, message_wire_metadata)
     }
 }
 
@@ -362,6 +406,27 @@ pub struct MessageWireMetadata {
     priority: Priority,                        // The priority of the message
     application_send_time: Option<SystemTime>, // The time the message was sent by the application
     wire_send_time: Option<SystemTime>,        // The time the message was sent on the wire
+}
+
+impl MessageWireMetadata {
+    pub fn new(
+        protocol_id: ProtocolId,
+        priority: Priority,
+        application_send_time: Option<SystemTime>,
+        wire_send_time: Option<SystemTime>,
+    ) -> Self {
+        Self {
+            protocol_id,
+            priority,
+            application_send_time,
+            wire_send_time,
+        }
+    }
+
+    /// Updates the wire send time to the given value
+    pub fn update_wire_send_time(&mut self, wire_send_time: SystemTime) {
+        self.wire_send_time = Some(wire_send_time);
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]

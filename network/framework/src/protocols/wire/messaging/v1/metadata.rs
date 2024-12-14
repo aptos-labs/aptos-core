@@ -5,7 +5,7 @@ use crate::{
     counters,
     protocols::wire::{
         handshake::v1::ProtocolId,
-        messaging::v1::{MultiplexMessage, NetworkMessage, RpcResponse},
+        messaging::v1::{MultiplexMessage, NetworkMessage, Priority, RequestId},
     },
 };
 use aptos_config::network_id::NetworkId;
@@ -74,37 +74,76 @@ impl MultiplexMessageWithMetadata {
     }
 }
 
-/// A simple struct that wraps an RPC response with metadata.
+/// A simple struct that wraps an RPC response with various pieces of metadata.
 /// Note: this is not sent along the wire, it is only used internally.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RpcResponseWithMetadata {
-    /// The metadata about the message
-    message_metadata: MessageMetadata,
+    /// The protocol ID for the response
+    protocol_id: ProtocolId,
 
-    /// The response to send along the wire
-    response: RpcResponse,
+    /// The request ID for the response (this is the same as the received request ID)
+    request_id: RequestId,
+
+    /// The priority of the response (this is the same as the received request priority)
+    priority: Priority,
+
+    /// The serialized response data
+    serialized_response: Vec<u8>,
+
+    /// The sent metadata about the message
+    sent_message_metadata: SentMessageMetadata,
 }
 
 impl RpcResponseWithMetadata {
-    pub fn new(message_metadata: MessageMetadata, response: RpcResponse) -> Self {
+    pub fn new(
+        protocol_id: ProtocolId,
+        request_id: RequestId,
+        priority: Priority,
+        serialized_response: Vec<u8>,
+        sent_message_metadata: SentMessageMetadata,
+    ) -> Self {
         Self {
-            message_metadata,
-            response,
+            protocol_id,
+            request_id,
+            priority,
+            serialized_response,
+            sent_message_metadata,
         }
     }
 
-    /// Transforms the message into an RPC response network message with metadata
-    pub fn into_network_message(self) -> NetworkMessageWithMetadata {
-        // Create the RPC response network message
-        let network_message = NetworkMessage::RpcResponse(self.response);
-
-        // Create and return the network message with metadata
-        NetworkMessageWithMetadata::new(self.message_metadata, network_message)
+    /// Returns the length of the data in the response
+    pub fn data_length(&self) -> u64 {
+        self.serialized_response.len() as u64
     }
 
-    /// Returns a reference to the RPC response
-    pub fn rpc_response(&self) -> &RpcResponse {
-        &self.response
+    /// Transforms the message into an RPC response network message with metadata
+    pub fn into_network_message(
+        self,
+        enable_messages_with_metadata: bool,
+    ) -> NetworkMessageWithMetadata {
+        // Create the RPC response network message
+        let network_message = if enable_messages_with_metadata {
+            // Use the new network message with metadata
+            NetworkMessage::new_rpc_response_and_metadata(
+                self.protocol_id,
+                self.priority,
+                self.request_id,
+                self.sent_message_metadata.application_send_time(),
+                self.serialized_response,
+            )
+        } else {
+            // Use the legacy RPC response network message
+            NetworkMessage::new_rpc_response(self.request_id, self.serialized_response)
+        };
+
+        // Create and return the network message with metadata
+        let message_metadata = MessageMetadata::new_sent_metadata(self.sent_message_metadata);
+        NetworkMessageWithMetadata::new(message_metadata, network_message)
+    }
+
+    /// Returns the request ID for the response
+    pub fn request_id(&self) -> RequestId {
+        self.request_id
     }
 }
 

@@ -58,7 +58,7 @@ use crate::{
                 MessageMetadata, MessageReceiveType, MessageSendType, NetworkMessageWithMetadata,
                 ReceivedMessageMetadata, RpcResponseWithMetadata, SentMessageMetadata,
             },
-            IncomingRequest, NetworkMessage, RequestId, RpcResponse, RpcResponseAndMetadata,
+            IncomingRequest, NetworkMessage, RequestId, RpcResponseAndMetadata,
         },
     },
     ProtocolId,
@@ -178,16 +178,28 @@ impl OutboundRpcRequest {
         self,
         network_id: NetworkId,
         request_id: RequestId,
+        enable_messages_with_metadata: bool,
     ) -> (
         NetworkMessageWithMetadata,
         oneshot::Sender<Result<Bytes, RpcError>>,
     ) {
         // Create the RPC network message
-        let network_message = NetworkMessage::new_rpc_request(
-            self.protocol_id,
-            request_id,
-            Vec::from(self.data.as_ref()),
-        );
+        let network_message = if enable_messages_with_metadata {
+            // Use the new network message with metadata
+            NetworkMessage::new_rpc_request_and_metadata(
+                self.protocol_id,
+                request_id,
+                self.application_send_time,
+                Vec::from(self.data.as_ref()),
+            )
+        } else {
+            // Use the legacy RPC network message
+            NetworkMessage::new_rpc_request(
+                self.protocol_id,
+                request_id,
+                Vec::from(self.data.as_ref()),
+            )
+        };
 
         // Create the network message with metadata
         let sent_message_metadata = SentMessageMetadata::new(
@@ -370,17 +382,15 @@ impl InboundRpcs {
                             MessageSendType::RpcResponse,
                             Some(SystemTime::now()),
                         );
-                        let message_metadata =
-                            MessageMetadata::new_sent_metadata(sent_message_metadata);
 
                         // Create an RPC response with metadata
-                        let rpc_response = RpcResponse::new(
+                        let response_with_metadata = RpcResponseWithMetadata::new(
+                            protocol_id,
                             request_id,
                             priority,
                             Vec::from(response_bytes.as_ref()),
+                            sent_message_metadata,
                         );
-                        let response_with_metadata =
-                            RpcResponseWithMetadata::new(message_metadata, rpc_response);
 
                         Ok((response_with_metadata, protocol_id))
                     },
@@ -458,7 +468,7 @@ impl InboundRpcs {
                 return Err(err);
             },
         };
-        let res_len = response_with_metadata.rpc_response().data_length();
+        let response_length = response_with_metadata.data_length();
 
         // Send outbound response to remote peer.
         trace!(
@@ -466,13 +476,14 @@ impl InboundRpcs {
             "{} Sending rpc response to peer {} for request_id {}",
             network_context,
             self.remote_peer_id.short_str(),
-            response_with_metadata.rpc_response().request_id(),
+            response_with_metadata.request_id(),
         );
-        let message = response_with_metadata.into_network_message();
+        let message = response_with_metadata
+            .into_network_message(self.network_context.enable_messages_with_metadata());
         write_reqs_tx.push((), message)?;
 
         // Update the outbound RPC response metrics
-        self.update_outbound_rpc_response_metrics(protocol_id, res_len);
+        self.update_outbound_rpc_response_metrics(protocol_id, response_length);
 
         Ok(())
     }
@@ -608,8 +619,11 @@ impl OutboundRpcs {
         // Convert the message into a network message with metadata
         let request_length = request.data_length();
         let timeout = request.timeout();
-        let (network_message, mut application_response_tx) =
-            request.into_network_message(network_context.network_id(), request_id);
+        let (network_message, mut application_response_tx) = request.into_network_message(
+            network_context.network_id(),
+            request_id,
+            network_context.enable_messages_with_metadata(),
+        );
 
         // Start the timer to collect the outbound RPC latency
         let timer =

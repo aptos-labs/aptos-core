@@ -286,7 +286,7 @@ where
                 maybe_response = self.inbound_rpcs.next_completed_response() => {
                     // Extract the relevant metadata from the message
                     let message_metadata = match &maybe_response {
-                        Ok((response_with_metadata, protocol_id)) => Some((response_with_metadata.rpc_response().request_id(), *protocol_id)),
+                        Ok((response_with_metadata, protocol_id)) => Some((response_with_metadata.request_id(), *protocol_id)),
                         _ => None,
                     };
 
@@ -376,7 +376,7 @@ where
                 futures::select! {
                     message_with_metadata = stream.select_next_some() => {
                         // Extract the message and metadata
-                        let (message_metadata, message) = message_with_metadata.into_parts();
+                        let (message_metadata, mut message) = message_with_metadata.into_parts();
                         let mut sent_message_metadata = match message_metadata.into_sent_metadata() {
                             Some(sent_message_metadata) => sent_message_metadata,
                             None => {
@@ -388,7 +388,15 @@ where
                             }
                         };
 
-                        // Update the wire send start time for the message
+                        // Update the wire send start time for the message and metadata
+                        match &mut message {
+                            MultiplexMessage::Message(network_message) => {
+                                network_message.update_wire_send_time(SystemTime::now());
+                            }
+                            MultiplexMessage::Stream(_stream_message) => {
+                                // TODO: handle stream messages and wire send times!
+                            }
+                        };
                         sent_message_metadata.update_wire_send_start_time();
 
                         // Send the message along the wire
@@ -715,7 +723,7 @@ where
                         self.network_context.network_id(),
                         None,
                         MessageSendType::DirectSend,
-                        None,
+                        Some(SystemTime::now()),
                     );
                     let message_with_metadata = NetworkMessageWithMetadata::new(
                         MessageMetadata::new_sent_metadata(sent_message_metadata),
@@ -768,8 +776,10 @@ where
                 let protocol_id = message.protocol_id();
 
                 // Convert the message into a network message with metadata
-                let message_with_metadata =
-                    message.into_network_message(self.network_context.network_id());
+                let message_with_metadata = message.into_network_message(
+                    self.network_context.network_id(),
+                    self.network_context.enable_messages_with_metadata(),
+                );
 
                 // Send the message to the outbound writer queue
                 match write_reqs_tx.push((), message_with_metadata) {

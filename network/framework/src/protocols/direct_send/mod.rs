@@ -46,10 +46,23 @@ impl Message {
     }
 
     /// Transforms the message into a direct send network message with metadata
-    pub fn into_network_message(self, network_id: NetworkId) -> NetworkMessageWithMetadata {
+    pub fn into_network_message(
+        self,
+        network_id: NetworkId,
+        enable_messages_with_metadata: bool,
+    ) -> NetworkMessageWithMetadata {
         // Create the direct send network message
-        let network_message =
-            NetworkMessage::new_direct_send(self.protocol_id, Vec::from(self.data.as_ref()));
+        let network_message = if enable_messages_with_metadata {
+            // Use the new network message with metadata
+            NetworkMessage::new_direct_send_and_metadata(
+                self.protocol_id,
+                self.application_send_time,
+                Vec::from(self.data.as_ref()),
+            )
+        } else {
+            // Use the legacy direct send network message
+            NetworkMessage::new_direct_send(self.protocol_id, Vec::from(self.data.as_ref()))
+        };
 
         // Create and return the network message with metadata
         let sent_message_metadata = SentMessageMetadata::new(
