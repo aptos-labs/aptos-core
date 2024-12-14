@@ -101,6 +101,14 @@ module aptos_framework::permissioned_signer {
         Capacity(u256),
     }
 
+    enum Permission<K> {
+        V1 {
+            owner_address: address,
+            key: K,
+            perm: StoredPermission,
+        }
+    }
+
     /// Create an ephermeral permission handle based on the master signer.
     ///
     /// This handle can be used to derive a signer that can be used in the context of
@@ -558,6 +566,83 @@ module aptos_framework::permissioned_signer {
                 &copyable_any::pack(perm)
             );
         }
+    }
+
+    /// =====================================================================================================
+    /// Another flavor of api to extract and store permissions
+    ///
+    public(friend) fun extract_permission<PermKey: copy + drop + store>(
+        s: &signer, weight: u256, perm: PermKey
+    ): Permission<PermKey> acquires PermissionStorage {
+        assert!(
+            check_permission_consume(s, weight, perm),
+            error::permission_denied(ECANNOT_EXTRACT_PERMISSION)
+        );
+        Permission::V1 {
+            owner_address: signer::address_of(s),
+            key: perm,
+            perm: StoredPermission::Capacity(weight),
+        }
+    }
+
+    public(friend) fun extract_all_permission<PermKey: copy + drop + store>(
+        s: &signer, perm_key: PermKey
+    ): Permission<PermKey> acquires PermissionStorage {
+        assert!(
+            is_permissioned_signer(s),
+            error::permission_denied(ECANNOT_EXTRACT_PERMISSION)
+        );
+        let addr = permission_address(s);
+        assert!(
+            exists<PermissionStorage>(addr),
+            error::permission_denied(ECANNOT_EXTRACT_PERMISSION)
+        );
+        let key = copyable_any::pack(perm_key);
+        let storage = &mut borrow_global_mut<PermissionStorage>(addr).perms;
+        let (_, value) = simple_map::remove(storage, &key);
+
+        Permission::V1 {
+            owner_address: signer::address_of(s),
+            key: perm_key,
+            perm: value,
+        }
+    }
+
+    public(friend) fun address_of<PermKey>(perm: &Permission<PermKey>): address {
+        perm.owner_address
+    }
+
+    public(friend) fun consume_permission<PermKey: copy + drop + store>(
+        perm: &mut Permission<PermKey>, weight: u256, perm_key: PermKey
+    ): bool {
+        if (perm.key != perm_key) {
+            return false
+        };
+        consume_capacity(&mut perm.perm, weight)
+    }
+
+    public(friend) fun store_permission<PermKey: copy + drop + store>(
+        s: &signer, perm: Permission<PermKey>
+    ) acquires PermissionStorage {
+        assert!(
+            is_permissioned_signer(s),
+            error::permission_denied(ENOT_PERMISSIONED_SIGNER)
+        );
+        let Permission::V1 { key, perm, owner_address } = perm;
+
+        assert!(
+            signer::address_of(s) == owner_address,
+            error::permission_denied(E_PERMISSION_MISMATCH)
+        );
+
+        insert_or(
+            s,
+            key,
+            |stored_permission| {
+                merge(stored_permission, perm);
+            },
+            perm,
+        )
     }
 
     // =====================================================================================================

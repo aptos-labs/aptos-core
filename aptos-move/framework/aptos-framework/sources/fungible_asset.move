@@ -6,7 +6,7 @@ module aptos_framework::fungible_asset {
     use aptos_framework::event;
     use aptos_framework::function_info::{Self, FunctionInfo};
     use aptos_framework::object::{Self, Object, ConstructorRef, DeleteRef, ExtendRef};
-    use aptos_framework::permissioned_signer;
+    use aptos_framework::permissioned_signer::{Self, Permission};
     use std::string;
     use std::features;
 
@@ -792,6 +792,21 @@ module aptos_framework::fungible_asset {
     ): FungibleAsset acquires FungibleStore, DispatchFunctionStore, ConcurrentFungibleBalance {
         withdraw_sanity_check(owner, store, true);
         withdraw_permission_check(owner, store, amount);
+        withdraw_internal(object::object_address(&store), amount)
+    }
+
+    public fun withdraw_with_permission<T: key>(
+        perm: &mut Permission<WithdrawPermission>,
+        store: Object<T>,
+        amount: u64,
+    ): FungibleAsset acquires FungibleStore, DispatchFunctionStore, ConcurrentFungibleBalance {
+        withdraw_sanity_check_impl(permissioned_signer::address_of(perm), store, true);
+        assert!(
+            permissioned_signer::consume_permission(perm, amount as u256, WithdrawPermission::ByStore {
+                store_address: object::object_address(&store),
+            }),
+            error::permission_denied(EWITHDRAW_PERMISSION_DENIED)
+        );
         withdraw_internal(object::object_address(&store), amount)
     }
 
