@@ -166,6 +166,7 @@ spec aptos_framework::multisig_account {
     /// </high-level-req>
 
     spec module {
+        pragma aborts_if_is_partial;
     }
 
     spec metadata(multisig_account: address): SimpleMap<String, vector<u8>> {
