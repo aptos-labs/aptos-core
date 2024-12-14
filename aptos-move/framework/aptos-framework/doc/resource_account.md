@@ -486,6 +486,7 @@ the SignerCapability.
 
 <pre><code><b>let</b> source_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(origin);
 <b>let</b> resource_addr = <a href="account.md#0x1_account_spec_create_resource_address">account::spec_create_resource_address</a>(source_addr, seed);
+<b>let</b> resource = <a href="create_signer.md#0x1_create_signer_spec_create_signer">create_signer::spec_create_signer</a>(resource_addr);
 <b>include</b> <a href="resource_account.md#0x1_resource_account_RotateAccountAuthenticationKeyAndStoreCapabilityAbortsIfWithoutAccountLimit">RotateAccountAuthenticationKeyAndStoreCapabilityAbortsIfWithoutAccountLimit</a>;
 </code></pre>
 
