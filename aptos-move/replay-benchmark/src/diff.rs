@@ -3,11 +3,13 @@
 
 use aptos_types::{
     contract_event::ContractEvent,
+    fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{ExecutionStatus, TransactionOutput},
-    write_set::{WriteOp, WriteSet},
+    write_set::{WriteOp, WriteSet, TOTAL_SUPPLY_STATE_KEY},
 };
 use claims::assert_ok;
+use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
 use std::collections::BTreeMap;
 
 /// Different parts of [TransactionOutput] that can be different:
@@ -44,11 +46,33 @@ pub(crate) struct TransactionDiff {
     diffs: Vec<Diff>,
 }
 
-impl TransactionDiff {
+/// Builds [TransactionDiff]s for transaction outputs. The builder can be configured to ignore the
+/// differences in outputs sometimes.
+pub(crate) struct TransactionDiffBuilder {
+    /// If true, differences related to the gas usage are ignored. These include:
+    ///   - total gas used is not compared,
+    ///   - `EmitFeeStatement` event is not compared,
+    ///   - total APT supply is not compared,
+    ///   - account balances are no compared.
+    /// Note that for
+    allow_different_gas_usage: bool,
+}
+
+impl TransactionDiffBuilder {
+    #[allow(clippy::new_without_default)]
+    pub(crate) fn new() -> Self {
+        Self {
+            allow_different_gas_usage: false,
+        }
+    }
+
     /// Given a pair of transaction outputs, computes its [TransactionDiff] that includes the gas
     /// used, execution status, events and write sets.
-    // TODO: Make comparison configurable, so we can skip gas differences, etc.
-    pub(crate) fn from_outputs(left: TransactionOutput, right: TransactionOutput) -> Self {
+    pub(crate) fn build_from_outputs(
+        &self,
+        left: TransactionOutput,
+        right: TransactionOutput,
+    ) -> TransactionDiff {
         let (left_write_set, left_events, left_gas_used, left_transaction_status, _) =
             left.unpack();
         let (right_write_set, right_events, right_gas_used, right_transaction_status, _) =
@@ -66,26 +90,21 @@ impl TransactionDiff {
             });
         }
 
-        if left_gas_used != right_gas_used {
+        if left_gas_used != right_gas_used && !self.allow_different_gas_usage {
             diffs.push(Diff::GasUsed {
                 left: left_gas_used,
                 right: right_gas_used,
             });
         }
 
-        Self::diff_events(&mut diffs, left_events, right_events);
-        Self::diff_write_sets(&mut diffs, left_write_set, right_write_set);
+        diffs.extend(self.diff_events(left_events, right_events));
+        diffs.extend(self.diff_write_sets(left_write_set, right_write_set));
 
-        Self { diffs }
+        TransactionDiff { diffs }
     }
 
-    /// Returns true if the diff is empty, and transaction outputs match.
-    pub(crate) fn is_empty(&self) -> bool {
-        self.diffs.is_empty()
-    }
-
-    /// Computes the differences between a pair of event vectors, and adds them to the diff.
-    fn diff_events(diffs: &mut Vec<Diff>, left: Vec<ContractEvent>, right: Vec<ContractEvent>) {
+    /// Computes the differences between a pair of event vectors.
+    fn diff_events(&self, left: Vec<ContractEvent>, right: Vec<ContractEvent>) -> Vec<Diff> {
         let event_vec_to_map = |events: Vec<ContractEvent>| {
             events
                 .into_iter()
@@ -96,11 +115,21 @@ impl TransactionDiff {
         let left = event_vec_to_map(left);
         let mut right = event_vec_to_map(right);
 
+        let mut diffs = vec![];
         for (left_ty_tag, left_event) in left {
             let maybe_right_event = right.remove(&left_ty_tag);
             if maybe_right_event
                 .as_ref()
                 .is_some_and(|right_event| left_event.event_data() == right_event.event_data())
+            {
+                continue;
+            }
+
+            // If there are two fee statement events, and we allow different gas usage - ignore the
+            // comparison.
+            if self.allow_different_gas_usage
+                && left_ty_tag == TypeTag::Struct(Box::new(FeeStatement::struct_tag()))
+                && maybe_right_event.is_some()
             {
                 continue;
             }
@@ -117,13 +146,15 @@ impl TransactionDiff {
                 right: Some(right_event),
             });
         }
+        diffs
     }
 
-    /// Computes the differences between a pair of write sets, and adds them to the diff.
-    fn diff_write_sets(diffs: &mut Vec<Diff>, left: WriteSet, right: WriteSet) {
+    /// Computes the differences between a pair of write sets.
+    fn diff_write_sets(&self, left: WriteSet, right: WriteSet) -> Vec<Diff> {
         let left = left.into_mut().into_inner();
         let mut right = right.into_mut().into_inner();
 
+        let mut diffs = vec![];
         for (left_state_key, left_write_op) in left {
             let maybe_right_write_op = right.remove(&left_state_key);
             if maybe_right_write_op
@@ -132,6 +163,12 @@ impl TransactionDiff {
             {
                 continue;
             }
+
+            // Skip total APT supply comparisons. Those should always be part of the write set.
+            if self.allow_different_gas_usage && left_state_key == *TOTAL_SUPPLY_STATE_KEY {
+                continue;
+            }
+            // TODO: compare accounts. How do we ensure that account related change is a fee change.
 
             diffs.push(Diff::WriteSet {
                 state_key: left_state_key,
@@ -147,6 +184,7 @@ impl TransactionDiff {
                 right: Some(right_write_op),
             });
         }
+        diffs
     }
 }
 
@@ -221,8 +259,6 @@ mod test {
 
     #[test]
     fn test_diff_events() {
-        let mut diffs = vec![];
-
         let events_1 = vec![
             ContractEvent::new_v2_with_type_tag_str("0x1::event::EventA", vec![0, 1, 2]),
             ContractEvent::new_v2_with_type_tag_str("0x1::event::EventB", vec![0, 1, 2]),
@@ -262,16 +298,13 @@ mod test {
             },
         ];
 
-        TransactionDiff::diff_events(&mut diffs, events_1, events_2);
-
+        let diffs = TransactionDiffBuilder::new().diff_events(events_1, events_2);
         assert_eq!(diffs.len(), 3);
         assert!(diffs.iter().all(|diff| expected_diffs.contains(diff)));
     }
 
     #[test]
     fn test_diff_write_sets() {
-        let mut diffs = vec![];
-
         let write_set_1 = WriteSetMut::new(vec![
             // Same in 2nd write set.
             (
@@ -368,8 +401,7 @@ mod test {
             },
         ];
 
-        TransactionDiff::diff_write_sets(&mut diffs, write_set_1, write_set_2);
-
+        let diffs = TransactionDiffBuilder::new().diff_write_sets(write_set_1, write_set_2);
         assert_eq!(diffs.len(), 5);
         assert!(diffs.iter().all(|diff| expected_diffs.contains(diff)));
     }

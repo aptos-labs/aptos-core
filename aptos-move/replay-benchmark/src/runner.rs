@@ -1,9 +1,25 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::block::Block;
+use crate::{execution::execute_workload, state_view::ReadSet, workload::Workload};
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
 use std::time::Instant;
+
+/// Represents a block for benchmarking: a workload consisting of a block of transactions with the
+/// input pre-block state.
+pub struct Block {
+    /// Stores transactions to execute, corresponding to a single block.
+    pub(crate) workload: Workload,
+    /// Stores all data corresponding to the pre-block state.
+    pub(crate) inputs: ReadSet,
+}
+
+impl Block {
+    /// Executes the workload using the specified concurrency level.
+    pub(crate) fn run(&self, executor: &AptosVMBlockExecutor, concurrency_level: usize) {
+        execute_workload(executor, &self.workload, &self.inputs, concurrency_level);
+    }
+}
 
 /// Holds configuration for running the benchmarks and measuring the time taken.
 pub struct BenchmarkRunner {
@@ -28,9 +44,7 @@ impl BenchmarkRunner {
         }
     }
 
-    // TODO:
-    //   This measures execution time from a cold-start. Ideally, we want to warm-up with executing
-    //   1-2 blocks prior to selected range, but not timing them.
+    /// Runs a sequence of blocks, measuring the execution time.
     pub fn measure_execution_time(&self, blocks: &[Block]) {
         for concurrency_level in &self.concurrency_levels {
             if self.measure_per_block_instead_of_overall_time {
@@ -41,7 +55,7 @@ impl BenchmarkRunner {
         }
     }
 
-    /// Runs a sequence of blocks, measuring execution time for each block. The median is reported.
+    /// Runs a sequence of blocks, measuring the execution time for each block.
     fn measure_block_execution_times(&self, blocks: &[Block], concurrency_level: usize) {
         let mut times = (0..blocks.len())
             .map(|_| Vec::with_capacity(self.num_repeats))
@@ -67,6 +81,7 @@ impl BenchmarkRunner {
         }
 
         for (idx, mut time) in times.into_iter().enumerate() {
+            // Only report measurements for non-skipped blocks.
             if idx >= self.num_blocks_to_skip {
                 time.sort();
                 let min_time = *time.first().unwrap();
@@ -86,7 +101,7 @@ impl BenchmarkRunner {
         }
     }
 
-    /// Runs the sequence of blocks, measuring end-to-end execution time.
+    /// Runs the sequence of blocks, measuring the end-to-end execution time.
     fn measure_overall_execution_time(&self, blocks: &[Block], concurrency_level: usize) {
         let mut times = Vec::with_capacity(self.num_repeats);
         for i in 0..self.num_repeats {
