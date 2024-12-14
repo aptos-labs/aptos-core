@@ -82,11 +82,13 @@ pub(crate) fn realistic_env_sweep_wrap(
 pub(crate) fn realistic_env_load_sweep_test() -> ForgeConfig {
     realistic_env_sweep_wrap(10, 5, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
-        workloads: Workloads::TPS(vec![100, 10000]),
+        workloads: Workloads::TPS(vec![1000, 5000, 10000, 15000, 20000]),
         criteria: [
             (95, 0.9, 1.1, 1.2, 0),
-            (6700, 2.5, 3.5, 5.0, 0),
-            // TODO add 9k or 10k. Allow some expired transactions (high-load)
+            (95, 0.9, 1.1, 1.2, 0),
+            (95, 0.9, 1.1, 1.2, 0),
+            (95, 0.9, 1.1, 1.2, 0),
+            (95, 0.9, 1.1, 1.2, 0),
         ]
         .into_iter()
         .map(
