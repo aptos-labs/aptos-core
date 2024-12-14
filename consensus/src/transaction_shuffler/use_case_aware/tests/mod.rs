@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::transaction::use_case::{UseCaseAwareTransaction, UseCaseKey};
+use aptos_types::transaction::{
+    transaction_shuffler::iterator_item::TransactionShufflerIteratorItem, use_case::UseCaseKey,
+};
 use move_core_types::account_address::AccountAddress;
 use proptest_derive::Arbitrary;
 use std::fmt::Debug;
@@ -61,7 +63,7 @@ impl Debug for Transaction {
     }
 }
 
-impl UseCaseAwareTransaction for Transaction {
+impl TransactionShufflerIteratorItem for Transaction {
     fn parse_sender(&self) -> AccountAddress {
         self.sender.as_account_address()
     }

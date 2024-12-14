@@ -7,7 +7,7 @@
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{
-        use_case::{UseCaseAwareTransaction, UseCaseKey},
+        transaction_shuffler::iterator_item::TransactionShufflerIteratorItem, use_case::UseCaseKey,
         Transaction,
     },
 };
@@ -189,8 +189,9 @@ mod tests {
         block_metadata::BlockMetadata,
         chain_id::ChainId,
         transaction::{
-            use_case::UseCaseAwareTransaction, ChangeSet, RawTransaction, Script,
-            SignedTransaction, Transaction, TransactionPayload, WriteSetPayload,
+            transaction_shuffler::iterator_item::TransactionShufflerIteratorItem, ChangeSet,
+            RawTransaction, Script, SignedTransaction, Transaction, TransactionPayload,
+            WriteSetPayload,
         },
         write_set::WriteSetMut,
     };

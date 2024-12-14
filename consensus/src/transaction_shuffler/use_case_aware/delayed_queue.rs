@@ -6,7 +6,9 @@ use crate::transaction_shuffler::use_case_aware::{
     utils::StrictMap,
     Config,
 };
-use aptos_types::transaction::use_case::{UseCaseAwareTransaction, UseCaseKey};
+use aptos_types::transaction::{
+    transaction_shuffler::iterator_item::TransactionShufflerIteratorItem, use_case::UseCaseKey,
+};
 use move_core_types::account_address::AccountAddress;
 use std::{
     collections::{hash_map, BTreeMap, HashMap, VecDeque},
@@ -63,7 +65,7 @@ struct Account<Txn> {
 
 impl<Txn> Account<Txn>
 where
-    Txn: UseCaseAwareTransaction,
+    Txn: TransactionShufflerIteratorItem,
 {
     fn new_with_txn(try_delay_till: OutputIdx, input_idx: InputIdx, txn: Txn) -> Self {
         let txns = vec![TxnWithInputIdx { input_idx, txn }].into();
@@ -147,7 +149,7 @@ impl UseCase {
         account: &Account<Txn>,
     ) -> Self
     where
-        Txn: UseCaseAwareTransaction,
+        Txn: TransactionShufflerIteratorItem,
     {
         let mut account_by_delay = BTreeMap::new();
         account_by_delay.strict_insert(account.delay_key(), address);
@@ -193,7 +195,7 @@ impl UseCase {
 
     fn add_account<Txn>(&mut self, address: AccountAddress, account: &Account<Txn>)
     where
-        Txn: UseCaseAwareTransaction,
+        Txn: TransactionShufflerIteratorItem,
     {
         let account_delay_key = account.delay_key();
         self.account_by_delay
@@ -255,7 +257,7 @@ pub(crate) struct DelayedQueue<Txn> {
 
 impl<Txn> DelayedQueue<Txn>
 where
-    Txn: UseCaseAwareTransaction,
+    Txn: TransactionShufflerIteratorItem,
 {
     pub fn new(config: Config) -> Self {
         Self {

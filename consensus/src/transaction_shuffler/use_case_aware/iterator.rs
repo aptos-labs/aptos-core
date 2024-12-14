@@ -6,7 +6,9 @@ use crate::transaction_shuffler::use_case_aware::{
     types::{InputIdx, OutputIdx},
     Config,
 };
-use aptos_types::transaction::use_case::UseCaseAwareTransaction;
+use aptos_types::transaction::transaction_shuffler::{
+    iterator::TransactionShufflerIterator, iterator_item::TransactionShufflerIteratorItem,
+};
 use std::{collections::VecDeque, fmt::Debug};
 
 #[derive(Debug)]
@@ -19,7 +21,7 @@ pub struct ShuffledTransactionIterator<Txn> {
 
 impl<Txn> ShuffledTransactionIterator<Txn>
 where
-    Txn: UseCaseAwareTransaction + Debug,
+    Txn: TransactionShufflerIteratorItem + Debug,
 {
     pub fn new(config: Config) -> Self {
         Self {
@@ -69,11 +71,20 @@ where
 
 impl<Txn> Iterator for ShuffledTransactionIterator<Txn>
 where
-    Txn: UseCaseAwareTransaction + Debug,
+    Txn: TransactionShufflerIteratorItem + Debug,
 {
     type Item = Txn;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.select_next_txn()
+    }
+}
+
+impl<Txn> TransactionShufflerIterator for ShuffledTransactionIterator<Txn>
+where
+    Txn: TransactionShufflerIteratorItem + Debug,
+{
+    fn iter(&self) -> impl Iterator<Item = &Self::Item> + '_ {
+        self
     }
 }

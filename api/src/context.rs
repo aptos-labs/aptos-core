@@ -42,7 +42,7 @@ use aptos_types::{
     },
     transaction::{
         block_epilogue::BlockEndInfo,
-        use_case::{UseCaseAwareTransaction, UseCaseKey},
+        transaction_shuffler::iterator_item::TransactionShufflerIteratorItem, use_case::UseCaseKey,
         SignedTransaction, Transaction, TransactionWithProof, Version,
     },
 };
