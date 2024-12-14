@@ -36,7 +36,10 @@ the resolution process.
 -  [Struct `CreateProposalEvent`](#0x1_voting_CreateProposalEvent)
 -  [Struct `RegisterForumEvent`](#0x1_voting_RegisterForumEvent)
 -  [Struct `VoteEvent`](#0x1_voting_VoteEvent)
+-  [Struct `VotePermission`](#0x1_voting_VotePermission)
 -  [Constants](#@Constants_0)
+-  [Function `check_signer_permission`](#0x1_voting_check_signer_permission)
+-  [Function `grant_permission`](#0x1_voting_grant_permission)
 -  [Function `register`](#0x1_voting_register)
 -  [Function `create_proposal`](#0x1_voting_create_proposal)
 -  [Function `create_proposal_v2`](#0x1_voting_create_proposal_v2)
@@ -98,6 +101,7 @@ the resolution process.
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs">0x1::from_bcs</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map">0x1::simple_map</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
@@ -595,6 +599,33 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
 
 </details>
 
+<a id="0x1_voting_VotePermission"></a>
+
+## Struct `VotePermission`
+
+
+
+<pre><code><b>struct</b> <a href="voting.md#0x1_voting_VotePermission">VotePermission</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="@Constants_0"></a>
 
 ## Constants
@@ -627,6 +658,16 @@ Cannot vote if the specified multi-step proposal is in execution.
 
 
 <pre><code><b>const</b> <a href="voting.md#0x1_voting_EMULTI_STEP_PROPOSAL_IN_EXECUTION">EMULTI_STEP_PROPOSAL_IN_EXECUTION</a>: u64 = 9;
+</code></pre>
+
+
+
+<a id="0x1_voting_ENO_VOTE_PERMISSION"></a>
+
+Cannot call <code><a href="voting.md#0x1_voting_is_multi_step_proposal_in_execution">is_multi_step_proposal_in_execution</a>()</code> on single-step proposals.
+
+
+<pre><code><b>const</b> <a href="voting.md#0x1_voting_ENO_VOTE_PERMISSION">ENO_VOTE_PERMISSION</a>: u64 = 13;
 </code></pre>
 
 
@@ -780,6 +821,59 @@ Key used to track the resolvable time in the proposal's metadata.
 
 
 
+<a id="0x1_voting_check_signer_permission"></a>
+
+## Function `check_signer_permission`
+
+Permissions
+
+
+<pre><code><b>fun</b> <a href="voting.md#0x1_voting_check_signer_permission">check_signer_permission</a>(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="voting.md#0x1_voting_check_signer_permission">check_signer_permission</a>(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <b>assert</b>!(
+        <a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_exists">permissioned_signer::check_permission_exists</a>(s, <a href="voting.md#0x1_voting_VotePermission">VotePermission</a> {}),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="voting.md#0x1_voting_ENO_VOTE_PERMISSION">ENO_VOTE_PERMISSION</a>),
+    );
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_voting_grant_permission"></a>
+
+## Function `grant_permission`
+
+Grant permission to vote on behalf of the master signer.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_grant_permission">grant_permission</a>(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_grant_permission">grant_permission</a>(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <a href="permissioned_signer.md#0x1_permissioned_signer_authorize_unlimited">permissioned_signer::authorize_unlimited</a>(master, <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>, <a href="voting.md#0x1_voting_VotePermission">VotePermission</a> {})
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_voting_register"></a>
 
 ## Function `register`
@@ -796,6 +890,7 @@ Key used to track the resolvable time in the proposal's metadata.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_register">register</a>&lt;ProposalType: store&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <a href="voting.md#0x1_voting_check_signer_permission">check_signer_permission</a>(<a href="account.md#0x1_account">account</a>);
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
     <b>assert</b>!(!<b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="voting.md#0x1_voting_EVOTING_FORUM_ALREADY_REGISTERED">EVOTING_FORUM_ALREADY_REGISTERED</a>));
 
@@ -1926,7 +2021,8 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+<pre><code><b>aborts_if</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">permissioned_signer::spec_is_permissioned_signer</a>(<a href="account.md#0x1_account">account</a>);
+<b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(addr);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
 <b>let</b> register_account = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);

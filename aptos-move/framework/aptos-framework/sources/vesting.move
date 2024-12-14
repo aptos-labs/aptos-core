@@ -53,6 +53,7 @@ module aptos_framework::vesting {
     use aptos_framework::staking_contract;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
+    use aptos_framework::permissioned_signer;
 
     friend aptos_framework::genesis;
 
@@ -90,6 +91,8 @@ module aptos_framework::vesting {
     const EPERMISSION_DENIED: u64 = 15;
     /// Zero items were provided to a *_many function.
     const EVEC_EMPTY_FOR_MANY_FUNCTION: u64 = 16;
+    /// Current permissioned signer cannot perform vesting operations.
+    const ENO_VESTING_PERMISSION: u64 = 17;
 
     /// Maximum number of shareholders a vesting pool can support.
     const MAXIMUM_SHAREHOLDERS: u64 = 30;
@@ -328,6 +331,22 @@ module aptos_framework::vesting {
         amount: u64,
     }
 
+    /// Permissions to mutate the vesting config for a given account.
+    struct VestPermission has copy, drop, store {}
+
+    /// Permissions
+    inline fun check_vest_permission(s: &signer) {
+        assert!(
+            permissioned_signer::check_permission_exists(s, VestPermission {}),
+            error::permission_denied(ENO_VESTING_PERMISSION),
+        );
+    }
+
+    /// Grant permission to perform vesting operations on behalf of the master signer.
+    public fun grant_permission(master: &signer, permissioned_signer: &signer) {
+        permissioned_signer::authorize_unlimited(master, permissioned_signer, VestPermission {})
+    }
+
     #[view]
     /// Return the address of the underlying stake pool (separate resource account) of the vesting contract.
     ///
@@ -535,6 +554,7 @@ module aptos_framework::vesting {
         // Optional seed used when creating the staking contract account.
         contract_creation_seed: vector<u8>,
     ): address acquires AdminStore {
+        check_vest_permission(admin);
         assert!(
             !system_addresses::is_reserved_address(withdrawal_address),
             error::invalid_argument(EINVALID_WITHDRAWAL_ADDRESS),
@@ -1053,6 +1073,7 @@ module aptos_framework::vesting {
         contract_address: address,
         shareholder: address,
     ) acquires VestingAccountManagement, VestingContract {
+        check_vest_permission(account);
         let vesting_contract = borrow_global_mut<VestingContract>(contract_address);
         let addr = signer::address_of(account);
         assert!(
@@ -1132,6 +1153,7 @@ module aptos_framework::vesting {
         admin: &signer,
         contract_creation_seed: vector<u8>,
     ): (signer, SignerCapability) acquires AdminStore {
+        check_vest_permission(admin);
         let admin_store = borrow_global_mut<AdminStore>(signer::address_of(admin));
         let seed = bcs::to_bytes(&signer::address_of(admin));
         vector::append(&mut seed, bcs::to_bytes(&admin_store.nonce));
@@ -1151,6 +1173,7 @@ module aptos_framework::vesting {
     }
 
     fun verify_admin(admin: &signer, vesting_contract: &VestingContract) {
+        check_vest_permission(admin);
         assert!(signer::address_of(admin) == vesting_contract.admin, error::unauthenticated(ENOT_ADMIN));
     }
 
