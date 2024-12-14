@@ -29,7 +29,10 @@ on a proposal multiple times as long as the total voting power of these votes do
 -  [Struct `CreateProposal`](#0x1_aptos_governance_CreateProposal)
 -  [Struct `Vote`](#0x1_aptos_governance_Vote)
 -  [Struct `UpdateConfig`](#0x1_aptos_governance_UpdateConfig)
+-  [Struct `GovernancePermission`](#0x1_aptos_governance_GovernancePermission)
 -  [Constants](#@Constants_0)
+-  [Function `check_signer_permission`](#0x1_aptos_governance_check_signer_permission)
+-  [Function `grant_permission`](#0x1_aptos_governance_grant_permission)
 -  [Function `store_signer_cap`](#0x1_aptos_governance_store_signer_cap)
 -  [Function `initialize`](#0x1_aptos_governance_initialize)
 -  [Function `update_governance_config`](#0x1_aptos_governance_update_governance_config)
@@ -109,6 +112,7 @@ on a proposal multiple times as long as the total voting power of these votes do
 <b>use</b> <a href="governance_proposal.md#0x1_governance_proposal">0x1::governance_proposal</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/math64.md#0x1_math64">0x1::math64</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
 <b>use</b> <a href="randomness_config.md#0x1_randomness_config">0x1::randomness_config</a>;
 <b>use</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg">0x1::reconfiguration_with_dkg</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
@@ -644,6 +648,33 @@ Event emitted when the governance configs are updated.
 
 </details>
 
+<a id="0x1_aptos_governance_GovernancePermission"></a>
+
+## Struct `GovernancePermission`
+
+
+
+<pre><code><b>struct</b> <a href="aptos_governance.md#0x1_aptos_governance_GovernancePermission">GovernancePermission</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="@Constants_0"></a>
 
 ## Constants
@@ -738,6 +769,16 @@ The proposal in the argument is not a partial voting proposal.
 
 
 
+<a id="0x1_aptos_governance_ENO_GOVERNANCE_PERMISSION"></a>
+
+Current permissioned signer cannot perform governance operations.
+
+
+<pre><code><b>const</b> <a href="aptos_governance.md#0x1_aptos_governance_ENO_GOVERNANCE_PERMISSION">ENO_GOVERNANCE_PERMISSION</a>: u64 = 15;
+</code></pre>
+
+
+
 <a id="0x1_aptos_governance_ENO_VOTING_POWER"></a>
 
 The specified stake pool must be part of the validator set
@@ -826,6 +867,59 @@ Proposal metadata attribute keys.
 </code></pre>
 
 
+
+<a id="0x1_aptos_governance_check_signer_permission"></a>
+
+## Function `check_signer_permission`
+
+Permissions
+
+
+<pre><code><b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_check_signer_permission">check_signer_permission</a>(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_check_signer_permission">check_signer_permission</a>(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <b>assert</b>!(
+        <a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_exists">permissioned_signer::check_permission_exists</a>(s, <a href="aptos_governance.md#0x1_aptos_governance_GovernancePermission">GovernancePermission</a> {}),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="aptos_governance.md#0x1_aptos_governance_ENO_GOVERNANCE_PERMISSION">ENO_GOVERNANCE_PERMISSION</a>),
+    );
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aptos_governance_grant_permission"></a>
+
+## Function `grant_permission`
+
+Grant permission to perform governance operations on behalf of the master signer.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_grant_permission">grant_permission</a>(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_grant_permission">grant_permission</a>(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <a href="permissioned_signer.md#0x1_permissioned_signer_authorize_unlimited">permissioned_signer::authorize_unlimited</a>(master, <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>, <a href="aptos_governance.md#0x1_aptos_governance_GovernancePermission">GovernancePermission</a> {})
+}
+</code></pre>
+
+
+
+</details>
 
 <a id="0x1_aptos_governance_store_signer_cap"></a>
 
@@ -1310,6 +1404,7 @@ Return proposal_id when a proposal is successfully created.
     metadata_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     is_multi_step_proposal: bool,
 ): u64 <b>acquires</b> <a href="aptos_governance.md#0x1_aptos_governance_GovernanceConfig">GovernanceConfig</a>, <a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a> {
+    <a href="aptos_governance.md#0x1_aptos_governance_check_signer_permission">check_signer_permission</a>(proposer);
     <b>let</b> proposer_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(proposer);
     <b>assert</b>!(
         <a href="stake.md#0x1_stake_get_delegated_voter">stake::get_delegated_voter</a>(stake_pool) == proposer_address,
@@ -1542,6 +1637,7 @@ cannot vote on the proposal even after partial governance voting is enabled.
     voting_power: u64,
     should_pass: bool,
 ) <b>acquires</b> <a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>, <a href="aptos_governance.md#0x1_aptos_governance_VotingRecords">VotingRecords</a>, <a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a>, <a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a> {
+    <a href="permissioned_signer.md#0x1_permissioned_signer_assert_master_signer">permissioned_signer::assert_master_signer</a>(voter);
     <b>let</b> voter_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(voter);
     <b>assert</b>!(<a href="stake.md#0x1_stake_get_delegated_voter">stake::get_delegated_voter</a>(stake_pool) == voter_address, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="aptos_governance.md#0x1_aptos_governance_ENOT_DELEGATED_VOTER">ENOT_DELEGATED_VOTER</a>));
 
@@ -2163,6 +2259,7 @@ Limit addition overflow.
 
 <pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 <b>let</b> register_account = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
+<b>aborts_if</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">permissioned_signer::spec_is_permissioned_signer</a>(aptos_framework);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(addr);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
 <b>aborts_if</b> register_account.guid_creation_num + 7 &gt; <a href="aptos_governance.md#0x1_aptos_governance_MAX_U64">MAX_U64</a>;
