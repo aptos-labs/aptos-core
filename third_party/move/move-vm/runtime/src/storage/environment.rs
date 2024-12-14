@@ -295,6 +295,15 @@ impl RuntimeEnvironment {
     ) -> PartialVMResult<StructNameIndex> {
         self.struct_name_index_map.struct_name_to_idx(&struct_name)
     }
+
+    /// Test-only function to be able to check cached struct names.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn idx_to_struct_name_for_test(
+        &self,
+        idx: StructNameIndex,
+    ) -> PartialVMResult<StructIdentifier> {
+        self.struct_name_index_map.idx_to_struct_name(idx)
+    }
 }
 
 impl Clone for RuntimeEnvironment {
