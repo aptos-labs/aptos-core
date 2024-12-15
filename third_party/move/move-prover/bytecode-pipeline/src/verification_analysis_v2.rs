@@ -661,7 +661,7 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessorV2 {
             _ => {},
         }
 
-        let target_modules = global_env.get_target_modules();
+        let target_modules = global_env.get_primary_target_modules();
         let target_fun_ids: BTreeSet<QualifiedId<FunId>> = target_modules
             .iter()
             .flat_map(|mod_env| mod_env.get_functions())
