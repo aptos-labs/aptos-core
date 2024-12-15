@@ -13,10 +13,8 @@ error: global memory invariant does not hold
    =     at tests/sources/regression/mono_after_global_invariant.move:9: put_b
    =         s = <redacted>
    =     at tests/sources/regression/mono_after_global_invariant.move:10: put_b
-   =         <redacted> = <redacted>
    =     at tests/sources/regression/mono_after_global_invariant.move:14: put_b
    =     at tests/sources/regression/mono_after_global_invariant.move:32: put_r
-   =         <redacted> = <redacted>
    =     at tests/sources/regression/mono_after_global_invariant.move:30: put_r
    =     at tests/sources/regression/mono_after_global_invariant.move:32: put_r
    =     at tests/sources/regression/mono_after_global_invariant.move:44
