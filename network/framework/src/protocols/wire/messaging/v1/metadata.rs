@@ -147,18 +147,22 @@ impl RpcResponseWithMetadata {
     }
 }
 
-/// A simple enum to track the message send latency metric
+/// A simple enum to track the different types of message latencies
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum MessageSendLatency {
+pub enum MessageLatencyType {
     ApplicationToWire,
     WireSend,
+    ApplicationSendToReceive,
+    WireSendToReceive,
 }
 
-impl MessageSendLatency {
+impl MessageLatencyType {
     pub fn get_label(&self) -> &'static str {
         match self {
-            MessageSendLatency::ApplicationToWire => "ApplicationToWire",
-            MessageSendLatency::WireSend => "WireSend",
+            MessageLatencyType::ApplicationToWire => "ApplicationToWire",
+            MessageLatencyType::WireSend => "WireSend",
+            MessageLatencyType::ApplicationSendToReceive => "ApplicationSendToReceive",
+            MessageLatencyType::WireSendToReceive => "WireSendToReceive",
         }
     }
 }
@@ -333,7 +337,7 @@ impl SentMessageMetadata {
                     &self.protocol_id,
                     &self.message_send_type,
                     &self.message_stream_type,
-                    MessageSendLatency::ApplicationToWire,
+                    &MessageLatencyType::ApplicationToWire,
                     application_to_wire_latency,
                 );
 
@@ -343,7 +347,7 @@ impl SentMessageMetadata {
                     &self.protocol_id,
                     &self.message_send_type,
                     &self.message_stream_type,
-                    MessageSendLatency::WireSend,
+                    &MessageLatencyType::WireSend,
                     wire_send_latency,
                 );
             }

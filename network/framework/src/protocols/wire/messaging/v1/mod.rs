@@ -423,9 +423,24 @@ impl MessageWireMetadata {
         }
     }
 
+    /// Returns the application send time of the message
+    pub fn application_send_time(&self) -> Option<SystemTime> {
+        self.application_send_time
+    }
+
+    /// Returns the protocol ID of the message
+    pub fn protocol_id(&self) -> ProtocolId {
+        self.protocol_id
+    }
+
     /// Updates the wire send time to the given value
     pub fn update_wire_send_time(&mut self, wire_send_time: SystemTime) {
         self.wire_send_time = Some(wire_send_time);
+    }
+
+    /// Returns the wire send time of the message
+    pub fn wire_send_time(&self) -> Option<SystemTime> {
+        self.wire_send_time
     }
 }
 
@@ -464,6 +479,11 @@ impl RpcRequestAndMetadata {
     /// Returns the ID of the RPC request
     pub fn request_id(&self) -> RequestId {
         self.request_id
+    }
+
+    /// Returns a reference to the message wire metadata
+    pub fn message_wire_metadata(&self) -> &MessageWireMetadata {
+        &self.message_wire_metadata
     }
 }
 
@@ -518,6 +538,11 @@ impl RpcResponseAndMetadata {
     pub fn request_id(&self) -> RequestId {
         self.request_id
     }
+
+    /// Returns a reference to the message wire metadata
+    pub fn message_wire_metadata(&self) -> &MessageWireMetadata {
+        &self.message_wire_metadata
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
@@ -539,6 +564,11 @@ impl DirectSendAndMetadata {
     /// Returns a mutable reference to the raw data of the direct send message
     pub fn data_mut(&mut self) -> &mut Vec<u8> {
         &mut self.serialized_message
+    }
+
+    /// Returns a reference to the message wire metadata
+    pub fn message_wire_metadata(&self) -> &MessageWireMetadata {
+        &self.message_wire_metadata
     }
 }
 

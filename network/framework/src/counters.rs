@@ -5,7 +5,7 @@
 use crate::protocols::wire::{
     handshake::v1::ProtocolId,
     messaging::v1::metadata::{
-        MessageReceiveType, MessageSendLatency, MessageSendType, MessageStreamType,
+        MessageLatencyType, MessageReceiveType, MessageSendType, MessageStreamType,
     },
 };
 use aptos_config::network_id::{NetworkContext, NetworkId};
@@ -49,9 +49,6 @@ const PRE_DIAL_LABEL: &str = "pre_dial";
 // Serialization labels
 pub const SERIALIZATION_LABEL: &str = "serialization";
 pub const DESERIALIZATION_LABEL: &str = "deserialization";
-
-// Unknown protocol ID label
-pub const UNKNOWN_PROTOCOL_ID_LABEL: &str = "Unknown";
 
 pub static APTOS_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
@@ -238,6 +235,23 @@ pub static APTOS_NETWORK_MESSAGE_SEND_LATENCY: Lazy<HistogramVec> = Lazy::new(||
     .unwrap()
 });
 
+/// Time it takes for messages to be transported across the wire
+pub static APTOS_NETWORK_MESSAGE_TRANSPORT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_network_message_transport_latency",
+        "Time it takes for messages to be transported across the wire",
+        &[
+            "network_id",
+            "protocol_id",
+            "message_type",
+            "message_stream_type",
+            "latency_label",
+        ],
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
 /// Observes the message receive latency
 pub fn observe_message_receive_latency(
     network_id: &NetworkId,
@@ -247,16 +261,13 @@ pub fn observe_message_receive_latency(
     value: f64,
 ) {
     // Get the protocol ID
-    let protocol_id = protocol_id
-        .as_ref()
-        .map(|id| id.as_str())
-        .unwrap_or(UNKNOWN_PROTOCOL_ID_LABEL);
+    let protocol_id = protocol_id.unwrap_or(ProtocolId::Unknown);
 
     // Update the histogram
     APTOS_NETWORK_MESSAGE_RECEIVE_LATENCY
         .with_label_values(&[
             network_id.as_str(),
-            protocol_id,
+            protocol_id.as_str(),
             message_receive_type.get_label(),
             message_stream_type.get_label(),
         ])
@@ -269,23 +280,40 @@ pub fn observe_message_send_latency(
     protocol_id: &Option<ProtocolId>,
     message_send_type: &MessageSendType,
     message_stream_type: &MessageStreamType,
-    message_send_latency: MessageSendLatency,
+    message_latency_type: &MessageLatencyType,
     value: f64,
 ) {
     // Get the protocol ID
-    let protocol_id = protocol_id
-        .as_ref()
-        .map(|id| id.as_str())
-        .unwrap_or(UNKNOWN_PROTOCOL_ID_LABEL);
+    let protocol_id = protocol_id.unwrap_or(ProtocolId::Unknown);
 
     // Update the histogram
     APTOS_NETWORK_MESSAGE_SEND_LATENCY
         .with_label_values(&[
             network_id.as_str(),
-            protocol_id,
+            protocol_id.as_str(),
             message_send_type.get_label(),
             message_stream_type.get_label(),
-            message_send_latency.get_label(),
+            message_latency_type.get_label(),
+        ])
+        .observe(value)
+}
+
+/// Observes the message transport latency (i.e., latencies across the wire)
+pub fn observe_message_transport_latency(
+    network_id: &NetworkId,
+    protocol_id: &ProtocolId,
+    message_receive_type: &MessageReceiveType,
+    message_stream_type: &MessageStreamType,
+    message_latency_type: &MessageLatencyType,
+    value: f64,
+) {
+    APTOS_NETWORK_MESSAGE_TRANSPORT_LATENCY
+        .with_label_values(&[
+            network_id.as_str(),
+            protocol_id.as_str(),
+            message_receive_type.get_label(),
+            message_stream_type.get_label(),
+            message_latency_type.get_label(),
         ])
         .observe(value)
 }
@@ -308,14 +336,11 @@ pub fn observe_message_stream_fragment_count(
     fragment_count: usize,
 ) {
     // Get the protocol ID
-    let protocol_id = protocol_id
-        .as_ref()
-        .map(|id| id.as_str())
-        .unwrap_or(UNKNOWN_PROTOCOL_ID_LABEL);
+    let protocol_id = protocol_id.unwrap_or(ProtocolId::Unknown);
 
     // Update the histogram
     APTOS_NETWORK_MESSAGE_STREAM_FRAGMENT_COUNT
-        .with_label_values(&[network_id.as_str(), protocol_id])
+        .with_label_values(&[network_id.as_str(), protocol_id.as_str()])
         .observe(fragment_count as f64)
 }
 

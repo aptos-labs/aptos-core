@@ -29,9 +29,9 @@ use crate::{
         stream::{InboundStreamBuffer, OutboundStream, StreamMessage},
         wire::messaging::v1::{
             metadata::{
-                MessageMetadata, MessageReceiveType, MessageSendType, MessageStreamType,
-                MultiplexMessageWithMetadata, NetworkMessageWithMetadata, ReceivedMessageMetadata,
-                SentMessageMetadata,
+                MessageLatencyType, MessageMetadata, MessageReceiveType, MessageSendType,
+                MessageStreamType, MultiplexMessageWithMetadata, NetworkMessageWithMetadata,
+                ReceivedMessageMetadata, SentMessageMetadata,
             },
             DirectSendAndMetadata, ErrorCode, IncomingRequest, MultiplexMessage,
             MultiplexMessageSink, MultiplexMessageStream, NetworkMessage, ReadError,
@@ -42,7 +42,7 @@ use crate::{
     ProtocolId,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::{NetworkContext, PeerNetworkId};
+use aptos_config::network_id::{NetworkContext, NetworkId, PeerNetworkId};
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
@@ -388,14 +388,18 @@ where
                             }
                         };
 
-                        // Update the wire send start time for the message and metadata
+                        // Update the wire send start time for the message and metadata.
+                        // Note: for streamed messages, we only update the send time of
+                        // the network message in the header, as that will eventually
+                        // be reconstructed by the receiver (after the stream completes).
                         match &mut message {
                             MultiplexMessage::Message(network_message) => {
                                 network_message.update_wire_send_time(SystemTime::now());
                             }
-                            MultiplexMessage::Stream(_stream_message) => {
-                                // TODO: handle stream messages and wire send times!
+                            MultiplexMessage::Stream(StreamMessage::Header(ref mut header)) => {
+                                header.message.update_wire_send_time(SystemTime::now());
                             }
+                            _ => { /* We don't update the send time for stream fragments */ }
                         };
                         sent_message_metadata.update_wire_send_start_time();
 
@@ -502,7 +506,12 @@ where
         &mut self,
         network_message: NetworkMessage,
         received_message_metadata: ReceivedMessageMetadata,
+        streamed_message: bool,
     ) -> Result<(), PeerManagerError> {
+        // Update the message transport latency metrics
+        let network_id = self.network_context.network_id();
+        update_transport_latency_metrics(network_id, &network_message, streamed_message);
+
         // Process the inbound network message
         match network_message {
             NetworkMessage::DirectSendMsg(message) => {
@@ -687,6 +696,7 @@ where
                     self.handle_inbound_network_message(
                         network_message,
                         received_message_metadata,
+                        true,
                     )?;
                 }
             },
@@ -751,7 +761,7 @@ where
                 );
 
                 // Handle the message
-                self.handle_inbound_network_message(message, received_message_metadata)
+                self.handle_inbound_network_message(message, received_message_metadata, false)
             },
             MultiplexMessage::Stream(message) => self.handle_inbound_stream_message(message),
         }
@@ -889,6 +899,72 @@ where
             "{} Peer actor for '{}' terminated",
             self.network_context,
             remote_peer_id.short_str()
+        );
+    }
+}
+
+/// Updates the transport latency metrics for the received message
+fn update_transport_latency_metrics(
+    network_id: NetworkId,
+    message: &NetworkMessage,
+    streamed_message: bool,
+) {
+    // Get the message receive type and metadata
+    let (message_receive_type, message_wire_metadata) = match message {
+        NetworkMessage::RpcRequestAndMetadata(request_and_metadata) => (
+            MessageReceiveType::RpcRequest,
+            request_and_metadata.message_wire_metadata(),
+        ),
+        NetworkMessage::RpcResponseAndMetadata(response_and_metadata) => (
+            MessageReceiveType::RpcResponse,
+            response_and_metadata.message_wire_metadata(),
+        ),
+        NetworkMessage::DirectSendAndMetadata(message_and_metadata) => (
+            MessageReceiveType::DirectSend,
+            message_and_metadata.message_wire_metadata(),
+        ),
+        _ => return, // There's no message metadata to extract
+    };
+
+    // Determine the message stream type
+    let message_stream_type = if streamed_message {
+        MessageStreamType::StreamedMessageTail
+    } else {
+        MessageStreamType::NonStreamedMessage
+    };
+
+    // Observe the application to receive time
+    if let Some(application_send_time) = message_wire_metadata.application_send_time() {
+        // Calculate the application to receive time
+        let application_to_receive_time = application_send_time
+            .elapsed()
+            .unwrap_or_default()
+            .as_secs_f64();
+
+        // Update the latency metrics
+        counters::observe_message_transport_latency(
+            &network_id,
+            &message_wire_metadata.protocol_id(),
+            &message_receive_type,
+            &message_stream_type,
+            &MessageLatencyType::ApplicationSendToReceive,
+            application_to_receive_time,
+        );
+    }
+
+    // Observe the wire to receive time
+    if let Some(wire_send_time) = message_wire_metadata.wire_send_time() {
+        // Calculate the wire send to receive time
+        let wire_send_to_receive_time = wire_send_time.elapsed().unwrap_or_default().as_secs_f64();
+
+        // Update the latency metrics
+        counters::observe_message_transport_latency(
+            &network_id,
+            &message_wire_metadata.protocol_id(),
+            &message_receive_type,
+            &message_stream_type,
+            &MessageLatencyType::WireSendToReceive,
+            wire_send_to_receive_time,
         );
     }
 }
