@@ -1657,6 +1657,11 @@ pub struct TransactionOptions {
     #[clap(flatten)]
     pub prompt_options: PromptOptions,
 
+    /// If true, skip simulation. If this is set, you must set --max-gas. Be careful,
+    /// setting this means you could submit a transaction that will fail.
+    #[clap(long)]
+    pub(crate) skip_simulation: bool,
+
     /// If this option is set, simulate the transaction locally.
     #[clap(long)]
     pub(crate) local: bool,
@@ -1791,58 +1796,66 @@ impl TransactionOptions {
         let chain_id = ChainId::new(state.chain_id);
         // TODO: Check auth key against current private key and provide a better message
 
-        let max_gas = if let Some(max_gas) = self.gas_options.max_gas {
-            // If the gas unit price was estimated ask, but otherwise you've chosen hwo much you want to spend
-            if ask_to_confirm_price {
-                let message = format!("Do you want to submit transaction for a maximum of {} Octas at a gas unit price of {} Octas?",  max_gas * gas_unit_price, gas_unit_price);
+        let max_gas = match self.gas_options.max_gas {
+            Some(max_gas) => {
+                // If the gas unit price was estimated ask, but otherwise you've chosen hwo much you want to spend
+                if ask_to_confirm_price {
+                    let message = format!("Do you want to submit transaction for a maximum of {} Octas at a gas unit price of {} Octas?",  max_gas * gas_unit_price, gas_unit_price);
+                    prompt_yes_with_override(&message, self.prompt_options)?;
+                }
+                max_gas
+            },
+            None => {
+                if self.skip_simulation {
+                    return Err(CliError::CommandArgumentError(
+                        "Must set --max-gas if --skip-simulation is set".to_string(),
+                    ));
+                }
+                let transaction_factory =
+                    TransactionFactory::new(chain_id).with_gas_unit_price(gas_unit_price);
+
+                let unsigned_transaction = transaction_factory
+                    .payload(payload.clone())
+                    .sender(sender_address)
+                    .sequence_number(sequence_number)
+                    .expiration_timestamp_secs(expiration_time_secs)
+                    .build();
+
+                let signed_transaction = SignedTransaction::new(
+                    unsigned_transaction,
+                    sender_public_key.clone(),
+                    Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
+                );
+
+                let txns = client
+                    .simulate_with_gas_estimation(&signed_transaction, true, false)
+                    .await?
+                    .into_inner();
+                let simulated_txn = txns.first().unwrap();
+
+                // Check if the transaction will pass, if it doesn't then fail
+                if !simulated_txn.info.success {
+                    return Err(CliError::SimulationError(
+                        simulated_txn.info.vm_status.clone(),
+                    ));
+                }
+
+                // Take the gas used and use a headroom factor on it
+                let gas_used = simulated_txn.info.gas_used.0;
+                let adjusted_max_gas =
+                    adjust_gas_headroom(gas_used, simulated_txn.request.max_gas_amount.0);
+
+                // Ask if you want to accept the estimate amount
+                let upper_cost_bound = adjusted_max_gas * gas_unit_price;
+                let lower_cost_bound = gas_used * gas_unit_price;
+                let message = format!(
+                        "Do you want to submit a transaction for a range of [{} - {}] Octas at a gas unit price of {} Octas?",
+                        lower_cost_bound,
+                        upper_cost_bound,
+                        gas_unit_price);
                 prompt_yes_with_override(&message, self.prompt_options)?;
-            }
-            max_gas
-        } else {
-            let transaction_factory =
-                TransactionFactory::new(chain_id).with_gas_unit_price(gas_unit_price);
-
-            let unsigned_transaction = transaction_factory
-                .payload(payload.clone())
-                .sender(sender_address)
-                .sequence_number(sequence_number)
-                .expiration_timestamp_secs(expiration_time_secs)
-                .build();
-
-            let signed_transaction = SignedTransaction::new(
-                unsigned_transaction,
-                sender_public_key.clone(),
-                Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
-            );
-
-            let txns = client
-                .simulate_with_gas_estimation(&signed_transaction, true, false)
-                .await?
-                .into_inner();
-            let simulated_txn = txns.first().unwrap();
-
-            // Check if the transaction will pass, if it doesn't then fail
-            if !simulated_txn.info.success {
-                return Err(CliError::SimulationError(
-                    simulated_txn.info.vm_status.clone(),
-                ));
-            }
-
-            // Take the gas used and use a headroom factor on it
-            let gas_used = simulated_txn.info.gas_used.0;
-            let adjusted_max_gas =
-                adjust_gas_headroom(gas_used, simulated_txn.request.max_gas_amount.0);
-
-            // Ask if you want to accept the estimate amount
-            let upper_cost_bound = adjusted_max_gas * gas_unit_price;
-            let lower_cost_bound = gas_used * gas_unit_price;
-            let message = format!(
-                    "Do you want to submit a transaction for a range of [{} - {}] Octas at a gas unit price of {} Octas?",
-                    lower_cost_bound,
-                    upper_cost_bound,
-                    gas_unit_price);
-            prompt_yes_with_override(&message, self.prompt_options)?;
-            adjusted_max_gas
+                adjusted_max_gas
+            },
         };
 
         // Build a transaction
