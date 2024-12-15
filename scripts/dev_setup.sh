@@ -507,7 +507,7 @@ function install_cargo_machete {
 
 function install_cargo_nextest {
   if ! command -v cargo-nextest &>/dev/null; then
-    cargo install cargo-nextest --locked
+    cargo install cargo-nextest --locked --version 0.9.85
   fi
 }
 
