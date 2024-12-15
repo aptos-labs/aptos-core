@@ -46,8 +46,6 @@ runs:
         rm nextest_output.json
       shell: bash
       env:
-        MOVE_COMPILER_V2: true
-        MOVE_LANGUAGE_V2: true
         NEXTEST_EXPERIMENTAL_LIBTEST_JSON: 1
         INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
         RUST_MIN_STACK: "4297152"
