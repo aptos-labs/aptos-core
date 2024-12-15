@@ -70,7 +70,7 @@ use tokio_util::compat::{
 #[cfg(test)]
 mod test;
 
-#[cfg(any(test, feature = "fuzzing"))]
+#[cfg(test)]
 pub mod fuzzing;
 
 /// Requests [`Peer`] receives from the [`PeerManager`](crate::peer_manager::PeerManager).
@@ -399,7 +399,9 @@ where
                             MultiplexMessage::Stream(StreamMessage::Header(ref mut header)) => {
                                 header.message.update_wire_send_time(SystemTime::now());
                             }
-                            _ => { /* We don't update the send time for stream fragments */ }
+                            MultiplexMessage::Stream(StreamMessage::Fragment(_)) => {
+                                /* We don't update the send time for stream fragments */
+                            }
                         };
                         sent_message_metadata.update_wire_send_start_time();
 

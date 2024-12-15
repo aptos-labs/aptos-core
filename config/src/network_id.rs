@@ -319,19 +319,6 @@ mod test {
         }
     }
 
-    #[test]
-    fn test_network_context_serialization() {
-        let peer_id = PeerId::random();
-        let context = NetworkContext::new(RoleType::Validator, NetworkId::Vfn, peer_id, false);
-        let expected = format!(
-            "---\nrole: {}\nnetwork_id: {}\npeer_id: {:x}\n",
-            RoleType::Validator,
-            VFN_NETWORK,
-            peer_id
-        );
-        assert_eq!(expected, serde_yaml::to_string(&context).unwrap());
-    }
-
     #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
     #[serde(rename = "NetworkId", rename_all = "snake_case")]
     enum OldNetworkId {

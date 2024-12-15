@@ -182,12 +182,77 @@ fn arb_direct_send_msg(max_frame_size: usize) -> impl Strategy<Value = DirectSen
     })
 }
 
-fn arb_network_message(max_frame_size: usize) -> impl Strategy<Value = NetworkMessage> {
+fn arb_rpc_request_and_metadata(
+    max_frame_size: usize,
+) -> impl Strategy<Value = RpcRequestAndMetadata> {
+    (
+        any::<ProtocolId>(),
+        any::<RequestId>(),
+        any::<Priority>(),
+        (0..max_frame_size).prop_map(|size| vec![0u8; size]),
+    )
+        .prop_map(|(protocol_id, request_id, priority, raw_request)| {
+            let message_wire_metadata = MessageWireMetadata::new(
+                protocol_id,
+                priority,
+                Some(SystemTime::now()),
+                Some(SystemTime::now()),
+            );
+            RpcRequestAndMetadata::new(request_id, raw_request, message_wire_metadata)
+        })
+}
+
+fn arb_rpc_response_and_metadata(
+    max_frame_size: usize,
+) -> impl Strategy<Value = RpcResponseAndMetadata> {
+    (
+        any::<ProtocolId>(),
+        any::<RequestId>(),
+        any::<Priority>(),
+        (0..max_frame_size).prop_map(|size| vec![0u8; size]),
+    )
+        .prop_map(|(protocol_id, request_id, priority, raw_response)| {
+            let message_wire_metadata = MessageWireMetadata::new(
+                protocol_id,
+                priority,
+                Some(SystemTime::now()),
+                Some(SystemTime::now()),
+            );
+            RpcResponseAndMetadata::new(request_id, raw_response, message_wire_metadata)
+        })
+}
+
+fn arb_direct_send_and_metadata(
+    max_frame_size: usize,
+) -> impl Strategy<Value = DirectSendAndMetadata> {
+    let args = (
+        any::<ProtocolId>(),
+        any::<Priority>(),
+        (0..max_frame_size).prop_map(|size| vec![0u8; size]),
+    );
+    args.prop_map(|(protocol_id, priority, raw_msg)| {
+        let message_wire_metadata = MessageWireMetadata::new(
+            protocol_id,
+            priority,
+            Some(SystemTime::now()),
+            Some(SystemTime::now()),
+        );
+        DirectSendAndMetadata::new(raw_msg, message_wire_metadata)
+    })
+}
+
+pub fn arb_network_message(max_frame_size: usize) -> impl Strategy<Value = NetworkMessage> {
     prop_oneof![
         any::<ErrorCode>().prop_map(NetworkMessage::Error),
         arb_rpc_request(max_frame_size).prop_map(NetworkMessage::RpcRequest),
         arb_rpc_response(max_frame_size).prop_map(NetworkMessage::RpcResponse),
         arb_direct_send_msg(max_frame_size).prop_map(NetworkMessage::DirectSendMsg),
+        arb_rpc_request_and_metadata(max_frame_size)
+            .prop_map(NetworkMessage::RpcRequestAndMetadata),
+        arb_rpc_response_and_metadata(max_frame_size)
+            .prop_map(NetworkMessage::RpcResponseAndMetadata),
+        arb_direct_send_and_metadata(max_frame_size)
+            .prop_map(NetworkMessage::DirectSendAndMetadata),
     ]
     .prop_filter("larger than max frame size", move |msg| {
         bcs::serialized_size(&msg).unwrap() <= max_frame_size
@@ -198,8 +263,22 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(100))]
 
     #[test]
-    fn network_message_canonical_serialization(message in any::<MultiplexMessage>()) {
-        assert_canonical_encode_decode(message);
+    fn network_message_canonical_serialization(network_message in arb_network_message(64 * 255)) {
+        let multiplex_message = MultiplexMessage::Message(network_message);
+        assert_canonical_encode_decode(multiplex_message);
+    }
+
+    #[test]
+    fn stream_message_canonical_serialization(network_message in arb_network_message(64 * 255), stream_message in any::<StreamMessage>()) {
+        let multiplex_message = if let StreamMessage::Header(header) = &stream_message {
+            // Update the stream network message header to include a well-formed message
+            let mut header = header.clone();
+            header.message = network_message;
+            StreamMessage::Header(header)
+        } else {
+            stream_message
+        };
+        assert_canonical_encode_decode(multiplex_message);
     }
 
     /// Test that MultiplexMessageSink and MultiplexMessageStream can understand each

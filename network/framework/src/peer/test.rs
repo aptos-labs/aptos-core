@@ -26,7 +26,6 @@ use crate::{
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{config::PeerRole, network_id::NetworkContext};
-use aptos_logger::info;
 use aptos_memsocket::MemorySocket;
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_time_service::{MockTimeService, TimeService};
@@ -43,7 +42,7 @@ use std::{
     collections::{HashMap, HashSet},
     str::FromStr,
     sync::Arc,
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 use tokio::runtime::{Handle, Runtime};
 use tokio_util::compat::{
@@ -245,10 +244,11 @@ fn test_upstream_handlers() -> (
     (upstream_handlers, receiver)
 }
 
-// Reading an inbound DirectSendMsg off the wire should notify the PeerManager of
-// an inbound DirectSend.
+// Reading an inbound DirectSendAndMetadata off the wire should notify the PeerManager of
+// an inbound DirectSendAndMetadata.
 #[test]
 fn peer_recv_message() {
+    // Create a new peer
     ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let (upstream_handlers, mut receiver) = test_upstream_handlers();
@@ -259,37 +259,100 @@ fn peer_recv_message() {
         upstream_handlers,
     );
 
+    // Create a message to send (this will be a direct send and metadata)
+    let send_msg = MultiplexMessage::Message(NetworkMessage::new_direct_send_and_metadata(
+        PROTOCOL,
+        SystemTime::now(),
+        Vec::from("hello world"),
+    ));
+
+    // Create the client task
+    let send_msg_clone = send_msg.clone();
+    let client = async move {
+        let mut connection = MultiplexMessageSink::new(connection, MAX_FRAME_SIZE);
+        for _ in 0..30 {
+            // The client should then send the network message.
+            connection.send(&send_msg_clone).await.unwrap();
+        }
+        // Client then closes connection.
+        connection.close().await.unwrap();
+    };
+
+    // Create the server task
+    let server = async move {
+        for _ in 0..30 {
+            // Wait to receive notification of DirectSendMsg from Peer.
+            let received = receiver.next().await.unwrap();
+
+            // Verify the message that is received
+            let received_msg = received.network_message().clone();
+            assert_eq!(send_msg, MultiplexMessage::Message(received_msg));
+        }
+    };
+
+    // Run all tasks
+    rt.block_on(future::join3(peer.start(), server, client));
+}
+
+// Reading an inbound DirectSendMsg off the wire should notify the PeerManager of
+// an inbound DirectSendAndMetadata.
+#[test]
+fn peer_recv_message_legacy() {
+    // Create a new peer
+    ::aptos_logger::Logger::init_for_testing();
+    let rt = Runtime::new().unwrap();
+    let (upstream_handlers, mut receiver) = test_upstream_handlers();
+    let (peer, _peer_handle, connection, _connection_notifs_rx) = build_test_peer(
+        rt.handle().clone(),
+        TimeService::mock(),
+        ConnectionOrigin::Inbound,
+        upstream_handlers,
+    );
+
+    // Create a message to send (this will be a legacy direct send message)
     let send_msg = MultiplexMessage::Message(NetworkMessage::new_direct_send(
         PROTOCOL,
         Vec::from("hello world"),
     ));
-    let recv_msg = NetworkMessage::new_direct_send(PROTOCOL, Vec::from("hello world"));
 
+    // Transform the sent message into a direct send with metadata (this will be received internally)
+    let expected_receive_msg = match &send_msg {
+        MultiplexMessage::Message(NetworkMessage::DirectSendMsg(direct_send)) => {
+            direct_send.clone().into_direct_send_and_metadata()
+        },
+        _ => panic!("Found unexpected MultiplexMessage: {:?}", send_msg),
+    };
+
+    // Create the client task
     let client = async move {
-        info!("client start");
         let mut connection = MultiplexMessageSink::new(connection, MAX_FRAME_SIZE);
         for _ in 0..30 {
             // The client should then send the network message.
             connection.send(&send_msg).await.unwrap();
         }
-        info!("client sent");
         // Client then closes connection.
         connection.close().await.unwrap();
-        info!("client exiting");
     };
 
+    // Create the server task
     let server = async move {
-        info!("server start");
         for _ in 0..30 {
             // Wait to receive notification of DirectSendMsg from Peer.
             let received = receiver.next().await.unwrap();
-            assert_eq!(recv_msg, received.network_message().clone());
+
+            // Verify the message that is received
+            let received_msg = received.network_message().clone();
+            match received_msg {
+                NetworkMessage::DirectSendAndMetadata(direct_send_and_metadata) => {
+                    assert_eq!(expected_receive_msg, direct_send_and_metadata);
+                },
+                _ => panic!("Found unexpected NetworkMessage: {:?}", received_msg),
+            }
         }
-        info!("server exiting");
     };
-    info!("waiting");
+
+    // Run all tasks
     rt.block_on(future::join3(peer.start(), server, client));
-    info!("done");
 }
 
 // Two connected Peer actors should be able to send/recv a DirectSend from each
@@ -325,14 +388,20 @@ fn peers_send_message_concurrent() {
         // Check that each peer received the other's message
         let notif_a = prot_a_rx.next().await;
         let notif_b = prot_b_rx.next().await;
-        assert_eq!(
-            notif_a.unwrap().network_message().clone(),
-            NetworkMessage::new_direct_send(PROTOCOL, msg_b.data().clone().into())
-        );
-        assert_eq!(
-            notif_b.unwrap().network_message().clone(),
-            NetworkMessage::new_direct_send(PROTOCOL, msg_a.data().clone().into())
-        );
+        match notif_a.unwrap().network_message().clone() {
+            NetworkMessage::DirectSendAndMetadata(direct_send_and_metadata) => {
+                assert_eq!(direct_send_and_metadata.protocol_id(), PROTOCOL);
+                assert_eq!(direct_send_and_metadata.data(), msg_b.data());
+            },
+            network_message => panic!("Found unexpected NetworkMessage: {:?}", network_message),
+        }
+        match notif_b.unwrap().network_message().clone() {
+            NetworkMessage::DirectSendAndMetadata(direct_send_and_metadata) => {
+                assert_eq!(direct_send_and_metadata.protocol_id(), PROTOCOL);
+                assert_eq!(direct_send_and_metadata.data(), msg_a.data());
+            },
+            network_message => panic!("Found unexpected NetworkMessage: {:?}", network_message),
+        }
 
         // Shut one peers and the other should shutdown due to ConnectionLost
         drop(peer_handle_a);
@@ -357,6 +426,7 @@ fn peers_send_message_concurrent() {
 
 #[test]
 fn peer_recv_rpc() {
+    // Create a new peer
     ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let (upstream_handlers, mut prot_rx) = test_upstream_handlers();
@@ -368,49 +438,133 @@ fn peer_recv_rpc() {
     );
     let (mut client_sink, mut client_stream) = build_network_sink_stream(&mut connection);
 
-    let send_msg = MultiplexMessage::Message(NetworkMessage::new_rpc_request(
+    // Create a message to send (this will be an RPC request with metadata)
+    let send_msg = MultiplexMessage::Message(NetworkMessage::new_rpc_request_and_metadata(
         PROTOCOL,
         123,
+        SystemTime::now(),
         Vec::from("hello world"),
     ));
-    let resp_msg = MultiplexMessage::Message(NetworkMessage::new_rpc_response(
-        123,
-        Vec::from("goodbye world"),
-    ));
 
+    // Create the client task
+    let send_msg_clone = send_msg.clone();
     let client = async move {
         for _ in 0..30 {
-            // Client should send the rpc request.
-            client_sink.send(&send_msg).await.unwrap();
-            // Client should then receive the expected rpc response.
-            let received = client_stream.next().await.unwrap().unwrap();
-            assert_eq!(received, resp_msg);
+            // Client should send the rpc request
+            client_sink.send(&send_msg_clone).await.unwrap();
+
+            // Verify that an RPC response is received
+            let received_msg = client_stream.next().await.unwrap().unwrap();
+            match received_msg {
+                MultiplexMessage::Message(rpc_response) => {
+                    let expected_response =
+                        NetworkMessage::new_rpc_response(123, Vec::from("goodbye world"));
+                    assert_eq!(rpc_response, expected_response);
+                },
+                _ => panic!("Found unexpected MultiplexMessage: {:?}", received_msg),
+            }
         }
         // Client then closes connection.
         client_sink.close().await.unwrap();
     };
+
+    // Create the server task
     let server = async move {
         for _ in 0..30 {
             // Wait to receive RpcRequest from Peer.
             let received_message = prot_rx.next().await.unwrap();
             let (message, _, _, rpc_replier) = received_message.into_parts();
-            assert_eq!(
-                message,
-                NetworkMessage::new_rpc_request(PROTOCOL, 123, Vec::from("hello world"))
-            );
 
-            // Send response to rpc.
+            // Verify the message that is received
+            assert_eq!(MultiplexMessage::Message(message.clone()), send_msg);
+
+            // Send a response to the RPC
+            let response = Ok(Bytes::from("goodbye world"));
+            let rpc_replier = Arc::into_inner(rpc_replier.expect("rpc without replier"))
+                .expect("Arc unpack fail");
+            rpc_replier.send(response).expect("rpc reply send fail");
+        }
+    };
+
+    // Run all tasks
+    rt.block_on(future::join3(peer.start(), server, client));
+}
+
+#[test]
+fn peer_recv_rpc_legacy() {
+    // Create a new peer
+    ::aptos_logger::Logger::init_for_testing();
+    let rt = Runtime::new().unwrap();
+    let (upstream_handlers, mut prot_rx) = test_upstream_handlers();
+    let (peer, _peer_handle, mut connection, _connection_notifs_rx) = build_test_peer(
+        rt.handle().clone(),
+        TimeService::mock(),
+        ConnectionOrigin::Inbound,
+        upstream_handlers,
+    );
+    let (mut client_sink, mut client_stream) = build_network_sink_stream(&mut connection);
+
+    // Create a message to send (this will be a legacy RCP request)
+    let send_msg = MultiplexMessage::Message(NetworkMessage::new_rpc_request(
+        PROTOCOL,
+        123,
+        Vec::from("hello world"),
+    ));
+
+    // Transform the sent message into an RPC request with metadata (this will be received internally)
+    let expected_receive_request = match &send_msg {
+        MultiplexMessage::Message(NetworkMessage::RpcRequest(rpc_request)) => {
+            rpc_request.clone().into_rpc_request_and_metadata()
+        },
+        _ => panic!("Found unexpected MultiplexMessage: {:?}", send_msg),
+    };
+
+    // Create the client task
+    let client = async move {
+        for _ in 0..30 {
+            // Client should send the rpc request.
+            client_sink.send(&send_msg).await.unwrap();
+
+            // Verify that an RPC response is received
+            let received_msg = client_stream.next().await.unwrap().unwrap();
+            match received_msg {
+                MultiplexMessage::Message(rpc_response) => {
+                    let expected_response =
+                        NetworkMessage::new_rpc_response(123, Vec::from("goodbye world"));
+                    assert_eq!(rpc_response, expected_response);
+                },
+                _ => panic!("Found unexpected MultiplexMessage: {:?}", received_msg),
+            }
+        }
+        // Client then closes connection.
+        client_sink.close().await.unwrap();
+    };
+
+    // Create the server task
+    let server = async move {
+        for _ in 0..30 {
+            // Wait to receive RpcRequest from Peer.
+            let received_message = prot_rx.next().await.unwrap();
+            let (message, _, _, rpc_replier) = received_message.into_parts();
+
+            // Verify the message that is received and send a response
             match message {
-                NetworkMessage::RpcRequest(_req) => {
+                NetworkMessage::RpcRequestAndMetadata(request_and_metadata) => {
+                    // Verify the message that is received
+                    assert_eq!(request_and_metadata, expected_receive_request);
+
+                    // Send the response to the RPC
                     let response = Ok(Bytes::from("goodbye world"));
                     let rpc_replier = Arc::into_inner(rpc_replier.expect("rpc without replier"))
                         .expect("Arc unpack fail");
                     rpc_replier.send(response).expect("rpc reply send fail")
                 },
-                msg => panic!("Unexpected NetworkMessage: {:?}", msg),
+                _ => panic!("Found unexpected NetworkMessage: {:?}", message),
             }
         }
     };
+
+    // Run all tasks
     rt.block_on(future::join3(peer.start(), server, client));
 }
 
@@ -459,8 +613,8 @@ fn peer_recv_rpc_concurrent() {
         for _ in 0..30 {
             let mut received = prot_rx.next().await.unwrap();
             match received.network_message() {
-                NetworkMessage::RpcRequest(req) => {
-                    assert_eq!(&Vec::from("hello world"), req.data());
+                NetworkMessage::RpcRequestAndMetadata(request_and_metadata) => {
+                    assert_eq!(&Vec::from("hello world"), request_and_metadata.data());
                     let arcsender = received.take_rpc_replier().unwrap();
                     let sender = Arc::into_inner(arcsender).unwrap();
                     res_txs.push(sender)
@@ -479,7 +633,78 @@ fn peer_recv_rpc_concurrent() {
 }
 
 #[test]
-fn peer_recv_rpc_timeout() {
+fn peer_recv_rpc_concurrent_legacy() {
+    // Create a new peer
+    ::aptos_logger::Logger::init_for_testing();
+    let rt = Runtime::new().unwrap();
+    let (upstream_handlers, mut prot_rx) = test_upstream_handlers();
+    let (peer, _peer_handle, mut connection, _connection_notifs_rx) = build_test_peer(
+        rt.handle().clone(),
+        TimeService::mock(),
+        ConnectionOrigin::Inbound,
+        upstream_handlers,
+    );
+    let (mut client_sink, mut client_stream) = build_network_sink_stream(&mut connection);
+
+    // Create the rpc request and response messages
+    let send_msg = MultiplexMessage::Message(NetworkMessage::new_rpc_request(
+        PROTOCOL,
+        123,
+        Vec::from("hello world"),
+    ));
+    let resp_msg = MultiplexMessage::Message(NetworkMessage::new_rpc_response(
+        123,
+        Vec::from("goodbye world"),
+    ));
+
+    // Create the client task
+    let client = async move {
+        // The client should send many rpc requests.
+        for _ in 0..30 {
+            client_sink.send(&send_msg).await.unwrap();
+        }
+
+        // The client should then receive the expected rpc responses.
+        for _ in 0..30 {
+            let received = client_stream.next().await.unwrap().unwrap();
+            assert_eq!(received, resp_msg);
+        }
+
+        // Client then closes connection.
+        client_sink.close().await.unwrap();
+    };
+
+    // Create the server task
+    let server = async move {
+        let mut res_txs = vec![];
+
+        // Wait to receive RpcRequests from Peer.
+        for _ in 0..30 {
+            let mut received = prot_rx.next().await.unwrap();
+            match received.network_message() {
+                NetworkMessage::RpcRequestAndMetadata(request_and_metadata) => {
+                    assert_eq!(&Vec::from("hello world"), request_and_metadata.data());
+                    let arcsender = received.take_rpc_replier().unwrap();
+                    let sender = Arc::into_inner(arcsender).unwrap();
+                    res_txs.push(sender)
+                },
+                _ => panic!("Unexpected NetworkMessage: {:?}", received),
+            };
+        }
+
+        // Send all rpc responses to client.
+        for res_tx in res_txs.into_iter() {
+            let response = Bytes::from("goodbye world");
+            res_tx.send(Ok(response)).unwrap();
+        }
+    };
+
+    // Run all tasks
+    rt.block_on(future::join3(peer.start(), server, client));
+}
+
+#[test]
+fn peer_recv_rpc_timeout_legacy() {
     ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let mock_time = MockTimeService::new();
@@ -507,8 +732,8 @@ fn peer_recv_rpc_timeout() {
 
         // Pull out the request completion handle.
         let mut res_tx = match received.network_message() {
-            NetworkMessage::RpcRequest(req) => {
-                assert_eq!(&Vec::from("hello world"), req.data());
+            NetworkMessage::RpcRequestAndMetadata(request_and_metadata) => {
+                assert_eq!(&Vec::from("hello world"), request_and_metadata.data());
                 let arcsender = received.take_rpc_replier().unwrap();
                 Arc::into_inner(arcsender).unwrap()
             },
@@ -563,8 +788,8 @@ fn peer_recv_rpc_cancel() {
 
         // Pull out the request completion handle.
         let res_tx = match received.network_message() {
-            NetworkMessage::RpcRequest(req) => {
-                assert_eq!(&Vec::from("hello world"), req.data());
+            NetworkMessage::RpcRequestAndMetadata(request_and_metadata) => {
+                assert_eq!(&Vec::from("hello world"), request_and_metadata.data());
                 let arcsender = received.take_rpc_replier().unwrap();
                 Arc::into_inner(arcsender).unwrap()
             },
@@ -950,14 +1175,20 @@ fn peers_send_multiplex() {
         // Check that each peer received the other's message
         let notif_a = prot_a_rx.next().await;
         let notif_b = prot_b_rx.next().await;
-        assert_eq!(
-            notif_a.unwrap().network_message().clone(),
-            NetworkMessage::new_direct_send(PROTOCOL, msg_b.data().clone().into())
-        );
-        assert_eq!(
-            notif_b.unwrap().network_message().clone(),
-            NetworkMessage::new_direct_send(PROTOCOL, msg_a.data().clone().into())
-        );
+        match notif_a.unwrap().network_message().clone() {
+            NetworkMessage::DirectSendAndMetadata(direct_send_and_metadata) => {
+                assert_eq!(direct_send_and_metadata.protocol_id(), PROTOCOL);
+                assert_eq!(direct_send_and_metadata.data(), msg_b.data());
+            },
+            network_message => panic!("Found unexpected NetworkMessage: {:?}", network_message),
+        }
+        match notif_b.unwrap().network_message().clone() {
+            NetworkMessage::DirectSendAndMetadata(direct_send_and_metadata) => {
+                assert_eq!(direct_send_and_metadata.protocol_id(), PROTOCOL);
+                assert_eq!(direct_send_and_metadata.data(), msg_a.data());
+            },
+            network_message => panic!("Found unexpected NetworkMessage: {:?}", network_message),
+        }
 
         // Shut one peers and the other should shutdown due to ConnectionLost
         drop(peer_handle_a);

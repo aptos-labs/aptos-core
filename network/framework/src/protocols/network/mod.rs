@@ -341,6 +341,15 @@ fn received_message_to_event<TMessage: Message>(
             request_to_network_event(peer_id, &message_and_metadata)
                 .map(|msg| Event::Message(peer_id, msg))
         },
+        // TODO: remove support for these once we've migrated to the new message formats (above)
+        NetworkMessage::RpcRequest(request) => {
+            let rpc_replier = Arc::into_inner(rpc_replier.unwrap()).unwrap();
+            request_to_network_event(peer_id, &request)
+                .map(|msg| Event::RpcRequest(peer_id, msg, request.protocol_id(), rpc_replier))
+        },
+        NetworkMessage::DirectSendMsg(message) => {
+            request_to_network_event(peer_id, &message).map(|msg| Event::Message(peer_id, msg))
+        },
         _ => {
             error!(
                 "Failed to transform message into event! Unexpected message type: {:?}",

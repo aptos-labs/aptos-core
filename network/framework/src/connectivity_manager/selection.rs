@@ -603,7 +603,7 @@ mod test {
             RoleType::Validator,
             NetworkId::Validator,
             PeerId::random(),
-            false,
+            true,
         );
 
         // Verify that we don't select peers by latency for the validator network
@@ -615,7 +615,7 @@ mod test {
 
         // Create a VFN network context
         let vfn_network_context =
-            NetworkContext::new(RoleType::FullNode, NetworkId::Vfn, PeerId::random(), false);
+            NetworkContext::new(RoleType::FullNode, NetworkId::Vfn, PeerId::random(), true);
 
         // Verify that we don't select peers by latency for the VFN network
         let enable_latency_aware_dialing = true;
@@ -629,7 +629,7 @@ mod test {
             RoleType::FullNode,
             NetworkId::Public,
             PeerId::random(),
-            false,
+            true,
         );
 
         // Verify that we select peers by latency for the public network

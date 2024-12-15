@@ -35,7 +35,7 @@ use tokio_util::{
 
 pub mod metadata;
 #[cfg(test)]
-mod test;
+pub mod test;
 
 /// The most primitive message type sent on the network
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
