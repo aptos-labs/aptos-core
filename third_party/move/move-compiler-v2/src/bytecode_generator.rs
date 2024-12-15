@@ -1108,22 +1108,12 @@ impl<'env> Generator<'env> {
     /// Generate the code for a list of arguments.
     /// Note that the arguments are evaluated in left-to-right order.
     fn gen_arg_list(&mut self, exps: &[Exp]) -> Vec<TempIndex> {
-        // If all args are side-effect free, we don't need to force temporary generation
-        // to get left-to-right evaluation.
-        // TODO: after comparison testing, remove depending on the experiment and always
-        // have `with_forced_temp` be true.
-        let options = self
-            .env()
-            .get_extension::<Options>()
-            .expect("Options is available");
-        let with_forced_temp = options.experiment_on(Experiment::RETAIN_TEMPS_FOR_ARGS)
-            || !exps.iter().all(is_definitely_pure);
         let len = exps.len();
-        // Generate code with (potentially) forced creation of temporaries for all except last arg.
+        // Generate code with forced creation of temporaries for all except last arg.
         let mut args = exps
             .iter()
             .take(if len == 0 { 0 } else { len - 1 })
-            .map(|exp| self.gen_escape_auto_ref_arg(exp, with_forced_temp))
+            .map(|exp| self.gen_escape_auto_ref_arg(exp, true))
             .collect::<Vec<_>>();
         // If there is a last arg, we don't need to force create a temporary for it.
         if let Some(last_arg) = exps
@@ -2445,6 +2435,7 @@ impl<'a> fmt::Display for ValueShapeDisplay<'a> {
 // Helpers
 
 /// Is this a leaf expression which cannot contain another expression?
+#[allow(dead_code)]
 fn is_leaf_exp(exp: &Exp) -> bool {
     matches!(
         exp.as_ref(),
@@ -2453,6 +2444,7 @@ fn is_leaf_exp(exp: &Exp) -> bool {
 }
 
 /// Can we be certain that this expression is side-effect free?
+#[allow(dead_code)]
 fn is_definitely_pure(exp: &Exp) -> bool {
     is_leaf_exp(exp) // A leaf expression is pure.
         || match exp.as_ref() {

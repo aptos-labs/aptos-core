@@ -15,20 +15,14 @@ B0:
 	0: Ret
 }
 public foo(Arg0: u64) /* def_idx: 2 */ {
-L1:	loc0: u64
-L2:	loc1: u64
 B0:
 	0: MutBorrowLoc[0](Arg0: u64)
 	1: Call bar(&mut u64)
-	2: LdU64(1)
-	3: LdU64(2)
-	4: StLoc[1](loc0: u64)
-	5: StLoc[2](loc1: u64)
-	6: MoveLoc[0](Arg0: u64)
-	7: MoveLoc[2](loc1: u64)
-	8: MoveLoc[1](loc0: u64)
-	9: Call baz(u64, u64, u64)
-	10: Ret
+	2: MoveLoc[0](Arg0: u64)
+	3: LdU64(1)
+	4: LdU64(2)
+	5: Call baz(u64, u64, u64)
+	6: Ret
 }
 }
 ============ bytecode verification succeeded ========
