@@ -5,6 +5,6 @@ error: cannot transfer mutable local `x` since it is borrowed
   │
 8 │         mut_ref(x, x)
   │         ^^^^^^^^^^^^^
-  │         │
+  │         │       │
+  │         │       previously mutably borrowed here
   │         transfer attempted here
-  │         previously mutably borrowed here

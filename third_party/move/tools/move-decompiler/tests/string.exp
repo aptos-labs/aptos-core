@@ -19,18 +19,16 @@ module 0x1::string {
         vector::append<u8>(&mut self.bytes, *&(&r).bytes);
     }
     public fun insert(self: &mut String, at: u64, o: String) {
-        let _t7;
         let _t6;
         let _t4;
         let _t3;
         _t3 = &self.bytes;
-        _t4 = at;
-        if (_t4 <= vector::length<u8>(_t3)) _t6 = internal_is_char_boundary(_t3, at) else _t6 = false;
-        if (!_t6) abort 2;
-        _t7 = sub_string(/*freeze*/self, 0, at);
-        append(&mut _t7, o);
-        append(&mut _t7, sub_string(/*freeze*/self, at, length(/*freeze*/self)));
-        *self = _t7;
+        if (at <= vector::length<u8>(_t3)) _t4 = internal_is_char_boundary(_t3, at) else _t4 = false;
+        if (!_t4) abort 2;
+        _t6 = sub_string(/*freeze*/self, 0, at);
+        append(&mut _t6, o);
+        append(&mut _t6, sub_string(/*freeze*/self, at, length(/*freeze*/self)));
+        *self = _t6;
     }
     native fun internal_is_char_boundary(v: &vector<u8>, i: u64): bool;
     public fun sub_string(self: &String, i: u64, j: u64): String {
