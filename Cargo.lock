@@ -317,7 +317,7 @@ dependencies = [
  "aptos-workspace-server",
  "async-trait",
  "base64 0.13.1",
- "bcs 0.1.4",
+ "bcs",
  "bollard",
  "chrono",
  "clap 4.5.23",
@@ -412,7 +412,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-system-utils 0.1.0",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "futures-channel",
  "http 0.2.12",
  "hyper 0.14.31",
@@ -426,7 +426,7 @@ name = "aptos-aggregator"
 version = "0.1.0"
 dependencies = [
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "claims",
  "move-binary-format",
  "move-core-types",
@@ -461,7 +461,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-types",
  "aptos-vm",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "fail",
  "futures",
@@ -512,7 +512,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-logging",
  "aptos-vm-validator",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "goldenfile",
  "hyper 0.14.31",
@@ -563,7 +563,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "async-trait",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "hex",
  "indoc",
@@ -603,7 +603,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-environment",
  "async-trait",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "clap 4.5.23",
  "csv",
@@ -642,7 +642,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "hyper 0.14.31",
  "once_cell",
@@ -665,7 +665,7 @@ dependencies = [
 name = "aptos-bitvec"
 version = "0.1.0"
 dependencies = [
- "bcs 0.1.4",
+ "bcs",
  "proptest",
  "proptest-derive",
  "serde",
@@ -691,7 +691,7 @@ dependencies = [
  "aptos-vm-logging",
  "aptos-vm-types",
  "arc-swap",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "claims",
  "concurrent-queue",
@@ -725,7 +725,7 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "clap 4.5.23",
  "criterion",
  "dashmap 5.5.3",
@@ -762,7 +762,7 @@ dependencies = [
  "aptos-framework",
  "aptos-package-builder",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "move-core-types",
  "once_cell",
  "proptest",
@@ -823,7 +823,7 @@ dependencies = [
  "aptos-types",
  "aptos-validator-interface",
  "aptos-vm",
- "bcs 0.1.4",
+ "bcs",
  "clap 4.5.23",
  "futures",
  "itertools 0.13.0",
@@ -847,7 +847,7 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "lz4",
  "once_cell",
  "rand 0.7.3",
@@ -868,7 +868,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "arr_macro",
- "bcs 0.1.4",
+ "bcs",
  "byteorder",
  "cfg-if",
  "get_if_addrs",
@@ -930,7 +930,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-validator",
  "async-trait",
- "bcs 0.1.4",
+ "bcs",
  "byteorder",
  "bytes",
  "chrono",
@@ -1000,7 +1000,7 @@ dependencies = [
  "aptos-logger",
  "aptos-short-hex-str",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "derivative",
  "fail",
  "futures",
@@ -1043,7 +1043,7 @@ dependencies = [
  "ark-serialize",
  "ark-std",
  "base64 0.13.1",
- "bcs 0.1.4",
+ "bcs",
  "bitvec 1.0.1",
  "blake2",
  "blake2-rfc",
@@ -1122,7 +1122,7 @@ dependencies = [
  "aptos-types",
  "arc-swap",
  "async-trait",
- "bcs 0.1.4",
+ "bcs",
  "claims",
  "dashmap 5.5.3",
  "futures",
@@ -1191,7 +1191,7 @@ dependencies = [
  "aptos-types",
  "arc-swap",
  "arr_macro",
- "bcs 0.1.4",
+ "bcs",
  "byteorder",
  "claims",
  "clap 4.5.23",
@@ -1232,7 +1232,7 @@ dependencies = [
  "aptos-schemadb",
  "aptos-storage-interface",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "dashmap 5.5.3",
  "move-core-types",
@@ -1250,7 +1250,7 @@ dependencies = [
  "aptos-schemadb",
  "aptos-storage-interface",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "byteorder",
  "proptest",
  "proptest-derive",
@@ -1278,7 +1278,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
- "bcs 0.1.4",
+ "bcs",
  "clap 4.5.23",
  "itertools 0.13.0",
  "rayon",
@@ -1309,7 +1309,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-runtimes",
- "bcs 0.1.4",
+ "bcs",
  "blst",
  "blstrs",
  "criterion",
@@ -1357,7 +1357,7 @@ dependencies = [
  "aptos-types",
  "aptos-validator-transaction-pool",
  "async-trait",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "fail",
  "futures",
@@ -1388,7 +1388,7 @@ version = "0.1.1"
 dependencies = [
  "anyhow",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "e2e-move-tests",
  "getrandom 0.2.15",
  "hex",
@@ -1429,7 +1429,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
- "bcs 0.1.4",
+ "bcs",
  "claims",
  "futures",
  "move-binary-format",
@@ -1469,7 +1469,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-genesis",
  "arr_macro",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "criterion",
  "dashmap 5.5.3",
@@ -1518,7 +1518,7 @@ dependencies = [
  "aptos-vm-logging",
  "aptos-vm-types",
  "async-trait",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "chrono",
  "clap 4.5.23",
@@ -1556,7 +1556,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-types",
  "aptos-vm",
- "bcs 0.1.4",
+ "bcs",
  "clap 4.5.23",
  "crossbeam-channel",
  "ctrlc",
@@ -1603,7 +1603,7 @@ dependencies = [
  "aptos-secure-net",
  "aptos-storage-interface",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "criterion",
  "derive_more",
  "itertools 0.13.0",
@@ -1883,7 +1883,7 @@ dependencies = [
  "ark-ff",
  "ark-serialize",
  "ark-std",
- "bcs 0.1.4",
+ "bcs",
  "better_any",
  "blake2-rfc",
  "bulletproofs",
@@ -1955,7 +1955,7 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-language-e2e-tests",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "clap 4.5.23",
  "float-cmp",
  "move-binary-format",
@@ -2019,7 +2019,7 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-package-builder",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "clap 4.5.23",
  "move-core-types",
  "move-model",
@@ -2044,7 +2044,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
- "bcs 0.1.4",
+ "bcs",
  "rand 0.7.3",
  "serde",
  "serde_yaml 0.8.26",
@@ -2087,7 +2087,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-types",
  "async-trait",
- "bcs 0.1.4",
+ "bcs",
  "bigdecimal",
  "chrono",
  "diesel",
@@ -2263,7 +2263,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-validator",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "chrono",
  "futures",
@@ -2406,7 +2406,7 @@ dependencies = [
  "aptos-indexer-transaction-stream",
  "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb)",
  "async-trait",
- "bcs 0.1.4",
+ "bcs",
  "bigdecimal",
  "chrono",
  "derive_builder",
@@ -2529,7 +2529,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-types",
  "arr_macro",
- "bcs 0.1.4",
+ "bcs",
  "byteorder",
  "itertools 0.13.0",
  "num-derive",
@@ -2616,7 +2616,7 @@ dependencies = [
  "ark-ff",
  "ark-serialize",
  "ark-std",
- "bcs 0.1.4",
+ "bcs",
  "blstrs",
  "derivation-path",
  "ed25519-dalek 1.0.1",
@@ -2641,7 +2641,7 @@ dependencies = [
  "aptos-types",
  "ark-bls12-381",
  "ark-serialize",
- "bcs 0.1.4",
+ "bcs",
  "firestore",
  "hex",
  "reqwest 0.11.27",
@@ -2666,7 +2666,7 @@ dependencies = [
  "ark-ec",
  "ark-ff",
  "ark-serialize",
- "bcs 0.1.4",
+ "bcs",
  "dashmap 5.5.3",
  "firestore",
  "hex",
@@ -2708,7 +2708,7 @@ dependencies = [
  "aptos-vm-genesis",
  "aptos-vm-logging",
  "aptos-vm-types",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "claims",
  "goldenfile",
@@ -2836,7 +2836,7 @@ dependencies = [
  "aptos-time-service",
  "aptos-types",
  "aptos-vm-validator",
- "bcs 0.1.4",
+ "bcs",
  "enum_dispatch",
  "fail",
  "futures",
@@ -2903,7 +2903,7 @@ dependencies = [
  "aptos-vm-environment",
  "aptos-vm-logging",
  "aptos-vm-types",
- "bcs 0.1.4",
+ "bcs",
  "clap 4.5.23",
  "itertools 0.13.0",
  "regex",
@@ -2950,7 +2950,7 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-native-interface",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "dir-diff",
  "file_diff",
  "move-cli",
@@ -3020,7 +3020,7 @@ dependencies = [
  "aptos-gas-algebra",
  "aptos-gas-schedule",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "move-binary-format",
  "move-core-types",
@@ -3069,7 +3069,7 @@ dependencies = [
  "aptos-types",
  "arc-swap",
  "async-trait",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "futures",
  "futures-util",
@@ -3127,7 +3127,7 @@ dependencies = [
  "aptos-network-discovery",
  "aptos-time-service",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "futures",
  "maplit",
  "rand 0.7.3",
@@ -3169,7 +3169,7 @@ dependencies = [
  "aptos-temppath",
  "aptos-time-service",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "futures",
  "once_cell",
  "rand 0.7.3",
@@ -3266,7 +3266,7 @@ dependencies = [
  "aptos-validator-transaction-pool",
  "aptos-vm",
  "aptos-vm-environment",
- "bcs 0.1.4",
+ "bcs",
  "clap 4.5.23",
  "either",
  "fail",
@@ -3400,7 +3400,7 @@ dependencies = [
  "aptos-peer-monitoring-service-types",
  "aptos-time-service",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "enum_dispatch",
  "futures",
  "maplit",
@@ -3431,7 +3431,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-time-service",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "claims",
  "futures",
@@ -3450,7 +3450,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-config",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "serde",
  "thiserror 1.0.69",
 ]
@@ -3565,7 +3565,7 @@ dependencies = [
  "aptos-vm-environment",
  "aptos-vm-logging",
  "aptos-vm-types",
- "bcs 0.1.4",
+ "bcs",
  "clap 4.5.23",
  "futures",
  "git2 0.16.1",
@@ -3624,7 +3624,7 @@ dependencies = [
  "aptos-rest-client",
  "aptos-types",
  "aptos-vm",
- "bcs 0.1.4",
+ "bcs",
  "claims",
  "clap 4.5.23",
  "parking_lot 0.12.3",
@@ -3657,7 +3657,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "clap 4.5.23",
  "hex",
@@ -3702,7 +3702,7 @@ dependencies = [
  "aptos-sdk",
  "aptos-types",
  "aptos-warp-webserver",
- "bcs 0.1.4",
+ "bcs",
  "clap 4.5.23",
  "futures",
  "hex",
@@ -3821,7 +3821,7 @@ dependencies = [
  "aptos-rest-client",
  "aptos-types",
  "base64 0.13.1",
- "bcs 0.1.4",
+ "bcs",
  "ed25519-dalek-bip32",
  "hex",
  "move-core-types",
@@ -3844,7 +3844,7 @@ dependencies = [
  "aptos-cached-packages",
  "aptos-framework",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "clap 4.5.23",
  "heck 0.4.1",
  "move-core-types",
@@ -3865,7 +3865,7 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-protos 1.3.1",
- "bcs 0.1.4",
+ "bcs",
  "crossbeam-channel",
  "once_cell",
  "serde",
@@ -3887,7 +3887,7 @@ dependencies = [
  "aptos-time-service",
  "aptos-vault-client",
  "base64 0.13.1",
- "bcs 0.1.4",
+ "bcs",
  "chrono",
  "enum_dispatch",
  "rand 0.7.3",
@@ -3956,7 +3956,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-genesis",
  "async-trait",
- "bcs 0.1.4",
+ "bcs",
  "claims",
  "futures",
  "mockall 0.11.4",
@@ -3986,7 +3986,7 @@ dependencies = [
  "aptos-vm",
  "arr_macro",
  "assert_unordered",
- "bcs 0.1.4",
+ "bcs",
  "crossbeam-channel",
  "dashmap 5.5.3",
  "once_cell",
@@ -4043,7 +4043,7 @@ dependencies = [
  "aptos-time-service",
  "aptos-types",
  "arc-swap",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "claims",
  "dashmap 5.5.3",
@@ -4067,7 +4067,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-time-service",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "claims",
  "num-traits",
  "proptest",
@@ -4184,7 +4184,7 @@ dependencies = [
  "aptos-rest-client",
  "aptos-types",
  "base64 0.13.1",
- "bcs 0.1.4",
+ "bcs",
  "chrono",
  "claims",
  "clap 4.5.23",
@@ -4239,7 +4239,7 @@ dependencies = [
  "aptos-types",
  "assert_approx_eq",
  "async-trait",
- "bcs 0.1.4",
+ "bcs",
  "csv",
  "futures",
  "hex",
@@ -4399,7 +4399,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-environment",
  "aptos-vm-genesis",
- "bcs 0.1.4",
+ "bcs",
  "clap 4.5.23",
  "codespan-reporting",
  "datatest-stable",
@@ -4442,7 +4442,7 @@ dependencies = [
  "ark-std",
  "async-trait",
  "base64 0.13.1",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "ciborium",
  "claims",
@@ -4511,7 +4511,7 @@ dependencies = [
  "aptos-types",
  "async-recursion",
  "async-trait",
- "bcs 0.1.4",
+ "bcs",
  "lru 0.7.8",
  "move-core-types",
  "tokio",
@@ -4577,7 +4577,7 @@ dependencies = [
  "aptos-vm-types",
  "ark-bn254",
  "ark-groth16",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "claims",
  "crossbeam-channel",
@@ -4609,7 +4609,7 @@ dependencies = [
  "aptos-framework",
  "aptos-language-e2e-tests",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "clap 4.5.23",
  "move-binary-format",
  "move-core-types",
@@ -4627,7 +4627,7 @@ dependencies = [
  "aptos-table-natives",
  "aptos-types",
  "aptos-vm-types",
- "bcs 0.1.4",
+ "bcs",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
@@ -4650,7 +4650,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-types",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "claims",
  "move-binary-format",
@@ -4692,7 +4692,7 @@ dependencies = [
  "aptos-table-natives",
  "aptos-types",
  "aptos-vm",
- "bcs 0.1.4",
+ "bcs",
  "clap 4.5.23",
  "glob",
  "move-binary-format",
@@ -4717,7 +4717,7 @@ dependencies = [
  "aptos-language-e2e-tests",
  "aptos-types",
  "aptos-vm",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "claims",
  "either",
@@ -4762,7 +4762,7 @@ dependencies = [
  "aptos-api-types",
  "aptos-config",
  "aptos-logger",
- "bcs 0.1.4",
+ "bcs",
  "hyper 0.14.31",
  "serde",
  "serde_json",
@@ -5545,16 +5545,6 @@ dependencies = [
 name = "bcs"
 version = "0.1.4"
 source = "git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d#d31fab9d81748e2594be5cd5cdf845786a30562d"
-dependencies = [
- "serde",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "bcs"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85b6598a2f5d564fb7855dc6b06fd1c38cff5a72bd8b863a4d021938497b440a"
 dependencies = [
  "serde",
  "thiserror 1.0.69",
@@ -7681,7 +7671,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-environment",
  "aptos-vm-types",
- "bcs 0.1.4",
+ "bcs",
  "claims",
  "hex",
  "move-binary-format",
@@ -8588,7 +8578,7 @@ dependencies = [
  "aptos-types",
  "arbitrary",
  "base64 0.21.7",
- "bcs 0.1.4",
+ "bcs",
  "clap 4.5.23",
  "csv",
  "dearbitrary",
@@ -8611,7 +8601,7 @@ dependencies = [
  "aptos-vm",
  "arbitrary",
  "base64 0.13.1",
- "bcs 0.1.4",
+ "bcs",
  "libfuzzer-sys",
  "move-binary-format",
  "move-bytecode-verifier",
@@ -8702,7 +8692,7 @@ dependencies = [
  "aptos-crypto-derive",
  "aptos-network",
  "aptos-types",
- "bcs 0.1.4",
+ "bcs",
  "clap 4.5.23",
  "move-core-types",
  "rand 0.7.3",
@@ -9977,26 +9967,21 @@ dependencies = [
 
 [[package]]
 name = "include_dir"
-version = "0.6.2"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24b56e147e6187d61e9d0f039f10e070d0c0a887e24fe0bb9ca3f29bfde62cab"
+checksum = "923d117408f1e49d914f1a379a309cffe4f18c05cf4e3d12e613a15fc81bd0dd"
 dependencies = [
- "glob",
- "include_dir_impl",
- "proc-macro-hack",
+ "include_dir_macros",
 ]
 
 [[package]]
-name = "include_dir_impl"
-version = "0.6.2"
+name = "include_dir_macros"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a0c890c85da4bab7bce4204c707396bbd3c6c8a681716a51c8814cfc2b682df"
+checksum = "7cab85a7ed0bd5f0e76d93846e0147172bed2e2d3f859bcc33a8d9699cad1a75"
 dependencies = [
- "anyhow",
- "proc-macro-hack",
  "proc-macro2",
  "quote",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -11166,7 +11151,7 @@ name = "move-abigen"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bcs 0.1.4",
+ "bcs",
  "codespan-reporting",
  "datatest-stable",
  "heck 0.4.1",
@@ -11224,7 +11209,7 @@ name = "move-bytecode-source-map"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bcs 0.1.4",
+ "bcs",
  "move-binary-format",
  "move-command-line-common",
  "move-core-types",
@@ -11343,7 +11328,7 @@ name = "move-compiler"
 version = "0.0.1"
 dependencies = [
  "anyhow",
- "bcs 0.1.4",
+ "bcs",
  "clap 4.5.23",
  "codespan-reporting",
  "datatest-stable",
@@ -11379,7 +11364,7 @@ version = "0.1.0"
 dependencies = [
  "abstract-domain-derive",
  "anyhow",
- "bcs 0.1.4",
+ "bcs",
  "clap 4.5.23",
  "codespan",
  "codespan-reporting",
@@ -11430,7 +11415,7 @@ version = "0.0.4"
 dependencies = [
  "anyhow",
  "arbitrary",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "dearbitrary",
  "ethnum",
@@ -11456,7 +11441,7 @@ name = "move-coverage"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bcs 0.1.4",
+ "bcs",
  "clap 4.5.23",
  "codespan",
  "colored",
@@ -11474,7 +11459,7 @@ name = "move-decompiler"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bcs 0.1.4",
+ "bcs",
  "clap 4.5.23",
  "codespan",
  "codespan-reporting",
@@ -11562,7 +11547,7 @@ dependencies = [
 name = "move-explain"
 version = "0.1.0"
 dependencies = [
- "bcs 0.1.4",
+ "bcs",
  "clap 4.5.23",
  "move-command-line-common",
  "move-core-types",
@@ -11573,7 +11558,7 @@ name = "move-ir-compiler"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bcs 0.1.4",
+ "bcs",
  "clap 4.5.23",
  "move-binary-format",
  "move-bytecode-source-map",
@@ -12122,7 +12107,7 @@ name = "move-vm-types"
 version = "0.1.0"
 dependencies = [
  "ambassador",
- "bcs 0.1.4",
+ "bcs",
  "bytes",
  "claims",
  "crossbeam",
@@ -13845,7 +13830,7 @@ dependencies = [
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=51a34901b40d7f75767ac907b4d2478104d6a515)",
  "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb)",
  "async-trait",
- "bcs 0.1.4",
+ "bcs",
  "bigdecimal",
  "bitflags 2.6.0",
  "canonical_json",
@@ -15441,11 +15426,10 @@ dependencies = [
 [[package]]
 name = "serde-generate"
 version = "0.20.6"
-source = "git+https://github.com/aptos-labs/serde-reflection?rev=73b6bbf748334b71ff6d7d09d06a29e3062ca075#73b6bbf748334b71ff6d7d09d06a29e3062ca075"
 dependencies = [
- "bcs 0.1.6",
+ "bcs",
  "bincode",
- "heck 0.3.3",
+ "heck 0.4.1",
  "include_dir",
  "maplit",
  "serde",
@@ -15453,7 +15437,7 @@ dependencies = [
  "serde_bytes",
  "serde_yaml 0.8.26",
  "structopt",
- "textwrap 0.13.4",
+ "textwrap 0.15.2",
 ]
 
 [[package]]
@@ -15469,7 +15453,6 @@ dependencies = [
 [[package]]
 name = "serde-reflection"
 version = "0.3.5"
-source = "git+https://github.com/aptos-labs/serde-reflection?rev=73b6bbf748334b71ff6d7d09d06a29e3062ca075#73b6bbf748334b71ff6d7d09d06a29e3062ca075"
 dependencies = [
  "once_cell",
  "serde",
@@ -16061,7 +16044,7 @@ dependencies = [
  "aptos-vault-client",
  "aptos-vm",
  "base64 0.13.1",
- "bcs 0.1.4",
+ "bcs",
  "diesel",
  "digest 0.9.0",
  "futures",
@@ -16637,16 +16620,6 @@ version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d326610f408c7a4eb6f51c37c330e496b08506c9457c9d34287ecc38809fb060"
 dependencies = [
- "unicode-width 0.1.14",
-]
-
-[[package]]
-name = "textwrap"
-version = "0.13.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd05616119e612a8041ef58f2b578906cc2531a6069047ae092cfb86a325d835"
-dependencies = [
- "smawk",
  "unicode-width 0.1.14",
 ]
 
