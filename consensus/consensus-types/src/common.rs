@@ -488,6 +488,23 @@ impl Payload {
         Ok(())
     }
 
+    pub fn verify_inline_batches<'a>(
+        inline_batches: impl Iterator<Item = (&'a BatchInfo, &'a Vec<SignedTransaction>)>,
+    ) -> anyhow::Result<()> {
+        for (batch, payload) in inline_batches {
+            // TODO: Can cloning be avoided here?
+            let computed_digest = BatchPayload::new(batch.author(), payload.clone()).hash();
+            ensure!(
+                computed_digest == *batch.digest(),
+                "Hash of the received inline batch doesn't match the digest value for batch {}: {} != {}",
+                batch,
+                computed_digest,
+                batch.digest()
+            );
+        }
+        Ok(())
+    }
+
     pub fn verify(
         &self,
         validator: &ValidatorVerifier,
@@ -506,20 +523,20 @@ impl Payload {
             ),
             (true, Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)) => {
                 Self::verify_with_cache(&proof_with_data.proofs, validator, proof_cache)?;
-                for (batch, payload) in inline_batches.iter() {
-                    // TODO: Can cloning be avoided here?
-                    if BatchPayload::new(batch.author(), payload.clone()).hash() != *batch.digest()
-                    {
-                        return Err(anyhow::anyhow!(
-                            "Hash of the received inline batch doesn't match the digest value",
-                        ));
-                    }
-                }
+                Self::verify_inline_batches(
+                    inline_batches.iter().map(|(info, txns)| (info, txns)),
+                )?;
                 Ok(())
             },
             (true, Payload::OptQuorumStore(opt_quorum_store)) => {
                 let proof_with_data = opt_quorum_store.proof_with_data();
                 Self::verify_with_cache(&proof_with_data.batch_summary, validator, proof_cache)?;
+                Self::verify_inline_batches(
+                    opt_quorum_store
+                        .inline_batches()
+                        .iter()
+                        .map(|batch| (batch.info(), batch.transactions())),
+                )?;
                 Ok(())
             },
             (_, _) => Err(anyhow::anyhow!(

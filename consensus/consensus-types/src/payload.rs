@@ -188,6 +188,10 @@ impl InlineBatch {
     pub fn info(&self) -> &BatchInfo {
         &self.batch_info
     }
+
+    pub fn transactions(&self) -> &Vec<SignedTransaction> {
+        &self.transactions
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
