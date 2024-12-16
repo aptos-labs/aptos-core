@@ -1016,9 +1016,17 @@ module aptos_framework::native_bridge {
         // Create an account for our recipient
         initialize_for_test(aptos_framework);
         aptos_account::create_account(sender_address);
+        let insurance_fund = @0xbeaf;
 
         let bridge_transfer_id = b"guessing the id";
 
+        aptos_account::create_account(insurance_fund);
+        update_insurance_fund(aptos_framework, insurance_fund);
+
+        // grant the insurance fund 4 * amount of coins
+        mint(insurance_fund, 1000 * 4 + 4);
+
+        timestamp::set_time_has_started_for_testing(aptos_framework);
         // As relayer I send a complete request and it should fail
         complete_bridge_transfer(
             aptos_framework,
