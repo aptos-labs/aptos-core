@@ -119,6 +119,10 @@ module aptos_token_objects::token {
         new_value: String
     }
 
+    struct CollectionTransferPermission {
+        collection_addr: address,
+    }
+
     inline fun create_common(
         creator: &signer,
         constructor_ref: &ConstructorRef,
@@ -854,6 +858,15 @@ module aptos_token_objects::token {
             );
         };
         token.uri = uri;
+    }
+
+    /// This shouldn't require any signer/refs/permissions to do, as it just backfills - so can be called in the script directly.
+    /// For new tokens, we can 
+    public entry fun configure_collection_transfer_permission(token: Object<Token>) {
+        let collection = borrow(token).collection;
+        object::set_custom_transfer_permission_internal(object::object_address(token), CollectionTransferPermission {
+            collection: object::object_address(collection),
+        })
     }
 
     #[test(creator = @0x123, trader = @0x456)]

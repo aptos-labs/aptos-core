@@ -22,7 +22,8 @@ module aptos_framework::object {
     use std::vector;
 
     use aptos_std::from_bcs;
-
+    use aptos_std::copyable_any::{Self, Any};
+    
     use aptos_framework::account;
     use aptos_framework::transaction_context;
     use aptos_framework::create_signer::create_signer;
@@ -53,6 +54,8 @@ module aptos_framework::object {
     const EOBJECT_NOT_TRANSFERRABLE: u64 = 9;
     /// Objects cannot be burnt
     const EBURN_NOT_ALLOWED: u64 = 10;
+    /// Custom transfer permission already set
+    const ECUSTOM_TRANSFER_PERMISSION_ALREADY_SET: u64 = 11;
 
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const INIT_GUID_CREATION_NUM: u64 = 0x4000000000000;
@@ -119,6 +122,11 @@ module aptos_framework::object {
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// The existence of this renders all `TransferRef`s irrelevant. The object cannot be moved.
     struct Untransferable has key {}
+
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    struct CustomTransferPermission has key {
+        permission_key: Any,
+    }
 
     #[resource_group(scope = global)]
     /// A shared resource group for storing object resources together in storage.
@@ -464,6 +472,21 @@ module aptos_framework::object {
         move_to(&object_signer, Untransferable {});
     }
 
+    public fun set_custom_transfer_permission<PermKey: copy, drop, store>(ref: &ConstructorRef, permission_key: PermKey) {
+        set_custom_transfer_permission_internal(ref.self, permission_key);
+    }
+
+    public(friend) fun set_custom_transfer_permission_internal(object_addr: address, permission_key: PermKey) {
+        let permision_key = copyable_any::pack(permission_key);
+        if (exists<CustomTransferPermission>(ref.self)) {
+            assert!(borrow_global<CustomTransferPermission>(ref.self).permision_key == permision_key, error::invalid_state(ECUSTOM_TRANSFER_PERMISSION_ALREADY_SET));
+        } else {
+            assert!(!exists<CustomTransferPermission>(ref.self), error::invalid_state(ECUSTOM_TRANSFER_PERMISSION_ALREADY_SET));
+            let object_signer = create_signer(object_addr);
+            move_to(&object_signer, CustomTransferPermission { permission_key});
+        }
+    }
+
     /// Enable direct transfer.
     public fun enable_ungated_transfer(ref: &TransferRef) acquires ObjectCore {
         assert!(!exists<Untransferable>(ref.self), error::permission_denied(EOBJECT_NOT_TRANSFERRABLE));
@@ -536,6 +559,17 @@ module aptos_framework::object {
         transfer_raw(owner, object.inner, to)
     }
 
+    fun check_transfer_permission(owner: &signer, object: address): bool {
+        if (permissioned_signer::check_permission_exists(owner, TransferPermission { object })) {
+            true
+        } else if (exists<CustomTransferPermission>(object)) {
+            let permission = copyable_any::unpack(borrow_global<CustomTransferPermission>(object).permission_key);
+            permissioned_signer::check_permission_exists(owner, permission)
+        } else {
+            false
+        }
+    }
+
     /// Attempts to transfer using addresses only. Transfers the given object if
     /// allow_ungated_transfer is set true. Note, that this allows the owner of a nested object to
     /// transfer that object, so long as allow_ungated_transfer is enabled at each stage in the
@@ -547,7 +581,7 @@ module aptos_framework::object {
     ) acquires ObjectCore {
         let owner_address = signer::address_of(owner);
         assert!(
-            permissioned_signer::check_permission_exists(owner, TransferPermission { object }),
+            check_transfer_permission(owner, object),
             error::permission_denied(EOBJECT_NOT_TRANSFERRABLE)
         );
         verify_ungated_and_descendant(owner_address, object);
