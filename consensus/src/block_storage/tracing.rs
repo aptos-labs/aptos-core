@@ -30,6 +30,9 @@ impl BlockStage {
     pub const SIGNED: &'static str = "signed";
     pub const SYNCED: &'static str = "synced";
     pub const VOTED: &'static str = "voted";
+    pub const STARTED_EXECUTION: &'static str = "started_execution";
+    pub const STARTED_PRECOMMIT: &'static str = "started_precommit";
+    pub const STARTED_CERTIFICATION: &'static str = "started_certification";
 }
 
 /// Record the time during each stage of a block.

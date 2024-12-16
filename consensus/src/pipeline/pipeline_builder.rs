@@ -468,6 +468,7 @@ impl PipelineBuilder {
             .await
             .map_err(|_| anyhow!("randomness tx cancelled"))?;
 
+        observe_block(block.timestamp_usecs(), BlockStage::STARTED_EXECUTION);
         tracker.start();
         let metadata_txn = if is_randomness_enabled {
             block.new_metadata_with_randomness(&validator, maybe_rand)
@@ -611,6 +612,7 @@ impl PipelineBuilder {
                 return Err(anyhow!("all receivers dropped"))?;
             }
         }
+        observe_block(block.timestamp_usecs(), BlockStage::STARTED_CERTIFICATION);
         tracker.start();
 
         let mut block_info = block.gen_block_info(
@@ -667,6 +669,7 @@ impl PipelineBuilder {
             commit_proof_fut.await?;
         }
 
+        observe_block(block.timestamp_usecs(), BlockStage::STARTED_PRECOMMIT);
         tracker.start();
         tokio::task::spawn_blocking(move || {
             executor
