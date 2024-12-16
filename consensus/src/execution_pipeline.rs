@@ -9,6 +9,7 @@ use crate::{
     monitor,
     pipeline::pipeline_phase::CountedRequest,
     state_computer::StateComputeResultFut,
+    transaction_shuffler::TransactionShuffler,
 };
 use aptos_consensus_types::{
     block::Block, pipeline_execution_result::PipelineExecutionResult,
@@ -112,6 +113,7 @@ impl ExecutionPipeline {
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         pre_commit_hook: PreCommitHook,
         lifetime_guard: CountedRequest<()>,
+        shuffler: Arc<dyn TransactionShuffler>,
     ) -> StateComputeResultFut {
         let (result_tx, result_rx) = oneshot::channel();
         let block_round = block.round();
@@ -127,6 +129,7 @@ impl ExecutionPipeline {
                 command_creation_time: Instant::now(),
                 pre_commit_hook,
                 lifetime_guard,
+                shuffler,
             })
             .expect("Failed to send block to execution pipeline.");
 
@@ -161,6 +164,7 @@ impl ExecutionPipeline {
             result_tx,
             command_creation_time,
             lifetime_guard,
+            shuffler,
         } = command;
         counters::PREPARE_BLOCK_WAIT_TIME.observe_duration(command_creation_time.elapsed());
         debug!("prepare_block received block {}.", block.id());
@@ -202,6 +206,7 @@ impl ExecutionPipeline {
                     result_tx,
                     command_creation_time: Instant::now(),
                     lifetime_guard,
+                    shuffler,
                 })
                 .expect("Failed to send block to execution pipeline.");
         })
@@ -237,6 +242,7 @@ impl ExecutionPipeline {
             result_tx,
             command_creation_time,
             lifetime_guard,
+            shuffler,
         }) = block_rx.recv().await
         {
             let now = Instant::now();
@@ -335,11 +341,17 @@ impl ExecutionPipeline {
                         "Execution: Split validator txns from user txns in {} micros",
                         timer.elapsed().as_micros()
                     );
-                    let shuffle_iterator = crate::transaction_shuffler::use_case_aware::iterator::ShuffledTransactionIterator::new(crate::transaction_shuffler::use_case_aware::Config {
-                            sender_spread_factor: 32,
-                            platform_use_case_spread_factor: 0,
-                            user_use_case_spread_factor: 4,
-                        }).extended_with(txns);
+
+                    // TODO: Putting this as a reminder on the goal of the changes here:
+                    // TODO: The `shuffler` is a new trait object parameter for this function.
+                    // We want to be able to generate any shuffler iterator based on this trait object
+                    //
+                    // TODO: REVISIT: Previously the transaction config was defined via
+                    // `crate::transaction_shuffler::use_case_aware::Config`, but the config
+                    // should be defined on the shuffler itself so you don't even need to do instantiate
+                    // a config here?
+                    // i.e., see `UseCaseAwareShuffler`, it has a `config` field
+                    let shuffle_iterator = shuffler.signature_verified_transaction_iterator(txns);
                     for (idx, txn) in validator_txns
                         .into_iter()
                         .chain(shuffle_iterator)
@@ -577,6 +589,7 @@ struct PrepareBlockCommand {
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
     command_creation_time: Instant,
     lifetime_guard: CountedRequest<()>,
+    shuffler: Arc<dyn TransactionShuffler>,
 }
 
 struct ExecuteBlockCommand {
@@ -589,6 +602,7 @@ struct ExecuteBlockCommand {
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
     command_creation_time: Instant,
     lifetime_guard: CountedRequest<()>,
+    shuffler: Arc<dyn TransactionShuffler>,
 }
 
 struct LedgerApplyCommand {

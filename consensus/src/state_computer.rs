@@ -265,6 +265,7 @@ impl StateComputer for ExecutionProxy {
                 block_executor_onchain_config,
                 self.pre_commit_hook(block, payload_manager),
                 lifetime_guard,
+                transaction_shuffler,
             )
             .await;
         observe_block(timestamp, BlockStage::EXECUTION_PIPELINE_INSERTED);
