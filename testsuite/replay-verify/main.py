@@ -10,6 +10,8 @@ import urllib.parse
 import json
 import argparse
 import sys
+from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
+
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
@@ -251,6 +253,14 @@ class WorkerPod:
                 return container_status.state.terminated.exit_code
         return None
 
+    @retry(
+        stop=stop_after_attempt(MAX_RETRIES),
+        wait=wait_fixed(RETRY_DELAY),
+        retry=retry_if_exception_type(ApiException),
+        before_sleep=lambda retry_state: logger.warning(
+            f"Retry {retry_state.attempt_number}/{MAX_RETRIES} failed: {retry_state.outcome.exception()}"
+        )
+    )
     def get_pod_status(self):
         pod_status = self.client.read_namespaced_pod_status(
             name=self.name, namespace=self.namespace
