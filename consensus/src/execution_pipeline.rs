@@ -27,7 +27,7 @@ use aptos_types::{
     },
 };
 use fail::fail_point;
-use futures::future::BoxFuture;
+use futures::{future::BoxFuture, FutureExt};
 use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::{
@@ -147,7 +147,9 @@ impl ExecutionPipeline {
         } = command;
         counters::PREPARE_BLOCK_WAIT_TIME.observe_duration(command_creation_time.elapsed());
         debug!("prepare_block received block {}.", block.id());
-        let input_txns = block_preparer.prepare_block(&block, block_qc).await;
+        let input_txns = block_preparer
+            .prepare_block(&block, async { block_qc }.shared())
+            .await;
         if let Err(e) = input_txns {
             result_tx
                 .send(Err(e))

@@ -275,15 +275,6 @@ impl BlockStore {
 
         assert!(!blocks_to_commit.is_empty());
 
-        for block in &blocks_to_commit {
-            // Given the block is ready to commit, then it certainly must have a QC.
-            // However, we keep it an Option to be safe.
-            block.set_qc(
-                self.get_quorum_cert_for_block(block.id())
-                    .expect(&format!("QC for block {} must exist", block.id())),
-            );
-        }
-
         let block_tree = self.inner.clone();
         let storage = self.storage.clone();
         let finality_proof_clone = finality_proof.clone();
@@ -458,6 +449,7 @@ impl BlockStore {
                     pipelined_block.block().timestamp_usecs(),
                     BlockStage::QC_ADDED,
                 );
+                pipelined_block.set_qc(Arc::new(qc.clone()));
             },
             None => bail!("Insert {} without having the block in store first", qc),
         };

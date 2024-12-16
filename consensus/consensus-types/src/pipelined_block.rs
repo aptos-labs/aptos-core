@@ -105,6 +105,7 @@ impl PipelineFutures {
 }
 
 pub struct PipelineInputTx {
+    pub qc_tx: Option<oneshot::Sender<Arc<QuorumCert>>>,
     pub rand_tx: Option<oneshot::Sender<Option<Randomness>>>,
     pub order_vote_tx: Option<oneshot::Sender<()>>,
     pub order_proof_tx: Option<oneshot::Sender<()>>,
@@ -112,6 +113,7 @@ pub struct PipelineInputTx {
 }
 
 pub struct PipelineInputRx {
+    pub qc_rx: oneshot::Receiver<Arc<QuorumCert>>,
     pub rand_rx: oneshot::Receiver<Option<Randomness>>,
     pub order_vote_rx: oneshot::Receiver<()>,
     pub order_proof_fut: TaskFuture<()>,
@@ -290,7 +292,10 @@ impl PipelinedBlock {
     }
 
     pub fn set_qc(&self, qc: Arc<QuorumCert>) {
-        *self.block_qc.lock() = Some(qc)
+        *self.block_qc.lock() = Some(qc.clone());
+        if let Some(tx) = self.pipeline_tx().lock().as_mut() {
+            tx.qc_tx.take().map(|tx| tx.send(qc));
+        }
     }
 }
 

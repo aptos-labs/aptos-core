@@ -6,7 +6,7 @@ use crate::{
     payload::{OptQuorumStorePayload, PayloadExecutionLimit},
     proof_of_store::{BatchInfo, ProofCache, ProofOfStore},
 };
-use anyhow::{bail, ensure};
+use anyhow::ensure;
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher},
     HashValue,

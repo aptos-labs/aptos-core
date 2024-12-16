@@ -12,7 +12,8 @@ use aptos_consensus_types::{block::Block, quorum_cert::QuorumCert};
 use aptos_executor_types::ExecutorResult;
 use aptos_types::transaction::SignedTransaction;
 use fail::fail_point;
-use std::{sync::Arc, time::Instant};
+use futures::future::Shared;
+use std::{future::Future, sync::Arc, time::Instant};
 
 pub struct BlockPreparer {
     payload_manager: Arc<dyn TPayloadManager>,
@@ -39,7 +40,7 @@ impl BlockPreparer {
     pub async fn prepare_block(
         &self,
         block: &Block,
-        block_qc: Option<Arc<QuorumCert>>,
+        block_qc_fut: Shared<impl Future<Output = Option<Arc<QuorumCert>>>>,
     ) -> ExecutorResult<Vec<SignedTransaction>> {
         fail_point!("consensus::prepare_block", |_| {
             use aptos_executor_types::ExecutorError;
@@ -48,11 +49,19 @@ impl BlockPreparer {
             Err(ExecutorError::CouldNotGetData)
         });
         let start_time = Instant::now();
-        let signers = block_qc.map(|proof| proof.ledger_info().get_voters_bitvec().clone());
-        let (txns, max_txns_from_block_to_execute) = self
-            .payload_manager
-            .get_transactions(block, signers)
-            .await?;
+
+        let mut block_voters = None;
+        let (txns, max_txns_from_block_to_execute) = loop {
+            tokio::select! {
+                // Poll the block qc future until a QC is received. Ignore None outcomes.
+                Some(qc) = block_qc_fut.clone(), if block_voters.is_none() => {
+                    block_voters = Some(qc.ledger_info().get_voters_bitvec().clone());
+                },
+                result = self.payload_manager.get_transactions(block, block_voters.clone()) => {
+                   break result?;
+                }
+            }
+        };
         let txn_filter = self.txn_filter.clone();
         let txn_deduper = self.txn_deduper.clone();
         let txn_shuffler = self.txn_shuffler.clone();
