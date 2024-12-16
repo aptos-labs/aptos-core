@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    check_aptos_packages_availability, compile_aptos_packages, compile_package,
-    data_state_view::DataStateView, generate_compiled_blob, is_aptos_package, CompilationCache,
-    DataManager, IndexReader, PackageInfo, TxnIndex, APTOS_COMMONS, DISABLE_REF_CHECK,
-    DISABLE_SPEC_CHECK, ENABLE_REF_CHECK,
+    check_aptos_packages_availability, compile_aptos_packages, compile_package, data_state_view::DataStateView, generate_compiled_blob, is_aptos_package, CompilationCache, DataManager, IndexReader, PackageInfo, TxnIndex, APTOS_COMMONS, APTOS_COMMONS_V2, DISABLE_REF_CHECK, DISABLE_SPEC_CHECK, ENABLE_REF_CHECK
 };
 use anyhow::Result;
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
@@ -31,6 +28,7 @@ use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
 use aptos_types::block_executor::config::BlockExecutorConfigFromOnchain;
 use aptos_types::account_config::{WithdrawFAEvent, DepositFAEvent};
 use aptos_types::write_set::WriteOp;
+use aptos_types::fee_statement::FeeStatement;
 use std::collections::BTreeMap;
 // use std::cmp::min;
 
@@ -151,8 +149,12 @@ impl Execution {
 
     pub async fn execute_txns(&self, begin: Version, num_txns_to_execute: u64) -> Result<()> {
         let aptos_commons_path = self.input_path.join(APTOS_COMMONS);
-        if !check_aptos_packages_availability(aptos_commons_path.clone()) {
+        if self.execution_mode.is_v1_or_compare() && !check_aptos_packages_availability(aptos_commons_path.clone()) {
             return Err(anyhow::Error::msg("aptos packages are missing"));
+        }
+        let aptos_commons_path_v2 = self.input_path.join(APTOS_COMMONS_V2);
+        if self.execution_mode.is_v2_or_compare() && !check_aptos_packages_availability(aptos_commons_path_v2.clone()){
+            return Err(anyhow::Error::msg("aptos packages are missing for v2"));
         }
 
         let mut compiled_cache = CompilationCache::default();
@@ -165,7 +167,7 @@ impl Execution {
         }
         if self.execution_mode.is_v2_or_compare() {
             compile_aptos_packages(
-                &aptos_commons_path,
+                &aptos_commons_path_v2,
                 &mut compiled_cache.compiled_package_cache_v2,
                 true,
             )?;
@@ -1135,6 +1137,11 @@ impl Execution {
                         if self.is_deposit_event_key(event_1) && !write_set_error {
                             println!("Deposit event v1:{:?}", bcs::from_bytes::<DepositFAEvent>(&event_1.event_data()));
                             println!("Deposit event v2:{:?}", bcs::from_bytes::<DepositFAEvent>(&event_2.event_data()));
+                            continue;
+                        }
+                        if self.is_fee_statement_event_key(event_1) && !write_set_error {
+                            println!("FeeStatement v1:{:?}", bcs::from_bytes::<FeeStatement>(&event_1.event_data()));
+                            println!("FeeStatement v2:{:?}", bcs::from_bytes::<FeeStatement>(&event_2.event_data()));
                             continue;
                         }
                         event_error = true;
