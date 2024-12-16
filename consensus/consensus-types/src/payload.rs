@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::proof_of_store::{BatchInfo, ProofOfStore};
-use anyhow::bail;
+use anyhow::{bail, ensure};
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
 use aptos_types::{transaction::SignedTransaction, PeerId};
@@ -290,19 +290,21 @@ impl OptQuorumStorePayloadV1 {
     }
 
     pub fn check_epoch(&self, epoch: u64) -> anyhow::Result<()> {
-        if self
-            .inline_batches
-            .iter()
-            .any(|b| b.info().epoch() != epoch)
-        {
-            bail!("OptQS InlineBatch epoch doesn't match given epoch");
-        }
-        if self.opt_batches.iter().any(|b| b.info().epoch() != epoch) {
-            bail!("OptQS OptBatch epoch doesn't match given epoch");
-        }
-        if self.proofs.iter().any(|b| b.info().epoch() != epoch) {
-            bail!("OptQS Proof epoch doesn't match given epoch");
-        }
+        ensure!(
+            self.inline_batches
+                .iter()
+                .all(|b| b.info().epoch() == epoch),
+            "OptQS InlineBatch epoch doesn't match given epoch"
+        );
+        ensure!(
+            self.opt_batches.iter().all(|b| b.info().epoch() == epoch),
+            "OptQS OptBatch epoch doesn't match given epoch"
+        );
+
+        ensure!(
+            self.proofs.iter().all(|b| b.info().epoch() == epoch),
+            "OptQS Proof epoch doesn't match given epoch"
+        );
 
         Ok(())
     }

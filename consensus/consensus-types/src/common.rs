@@ -6,7 +6,7 @@ use crate::{
     payload::{OptQuorumStorePayload, PayloadExecutionLimit},
     proof_of_store::{BatchInfo, ProofCache, ProofOfStore},
 };
-use anyhow::bail;
+use anyhow::{bail, ensure};
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher},
     HashValue,
@@ -534,27 +534,30 @@ impl Payload {
         match self {
             Payload::DirectMempool(_) => return Ok(()),
             Payload::InQuorumStore(proof_with_data) => {
-                if proof_with_data.proofs.iter().any(|p| p.epoch() != epoch) {
-                    bail!("Payload epoch doesn't match given epoch");
-                }
+                ensure!(
+                    proof_with_data.proofs.iter().all(|p| p.epoch() == epoch),
+                    "Payload epoch doesn't match given epoch"
+                );
             },
             Payload::InQuorumStoreWithLimit(proof_with_data_with_txn_limit) => {
-                if proof_with_data_with_txn_limit
-                    .proof_with_data
-                    .proofs
-                    .iter()
-                    .any(|p| p.epoch() != epoch)
-                {
-                    bail!("Payload epoch doesn't match given epoch");
-                }
+                ensure!(
+                    proof_with_data_with_txn_limit
+                        .proof_with_data
+                        .proofs
+                        .iter()
+                        .all(|p| p.epoch() == epoch),
+                    "Payload epoch doesn't match given epoch"
+                );
             },
             Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
-                if proof_with_data.proofs.iter().any(|p| p.epoch() != epoch) {
-                    bail!("Payload proof epoch doesn't match given epoch");
-                }
-                if inline_batches.iter().any(|b| b.0.epoch() != epoch) {
-                    bail!("Payload inline batch epoch doesn't match given epoch");
-                }
+                ensure!(
+                    proof_with_data.proofs.iter().all(|p| p.epoch() == epoch),
+                    "Payload proof epoch doesn't match given epoch"
+                );
+                ensure!(
+                    inline_batches.iter().all(|b| b.0.epoch() == epoch),
+                    "Payload inline batch epoch doesn't match given epoch"
+                )
             },
             Payload::OptQuorumStore(opt_quorum_store_payload) => {
                 opt_quorum_store_payload.check_epoch(epoch)?;

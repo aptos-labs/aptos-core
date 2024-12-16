@@ -77,9 +77,6 @@ impl ProposalMsg {
             "Proposal {} does not define an author",
             self.proposal
         );
-        self.proposal
-            .payload()
-            .map_or(Ok(()), |p| p.verify_epoch(self.proposal.epoch()))?;
         Ok(())
     }
 

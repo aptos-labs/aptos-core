@@ -56,7 +56,7 @@ pub trait TPayloadManager: Send + Sync {
     async fn get_transactions(
         &self,
         block: &Block,
-        block_signers: Option<BitVec>,
+        block_voters: Option<BitVec>,
     ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)>;
 }
 
@@ -396,7 +396,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
 
         let transaction_payload = match payload {
             Payload::InQuorumStore(proof_with_data) => {
-                let transactions = process_payload(
+                let transactions = process_qs_payload(
                     proof_with_data,
                     self.batch_reader.clone(),
                     block,
@@ -409,7 +409,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 )
             },
             Payload::InQuorumStoreWithLimit(proof_with_data) => {
-                let transactions = process_payload(
+                let transactions = process_qs_payload(
                     &proof_with_data.proof_with_data,
                     self.batch_reader.clone(),
                     block,
@@ -428,7 +428,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 max_txns_to_execute,
             ) => {
                 let all_transactions = {
-                    let mut all_txns = process_payload(
+                    let mut all_txns = process_qs_payload(
                         proof_with_data,
                         self.batch_reader.clone(),
                         block,
@@ -456,7 +456,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 )
             },
             Payload::OptQuorumStore(opt_qs_payload) => {
-                let opt_batch_txns = process_payload_helper(
+                let opt_batch_txns = process_optqs_payload(
                     opt_qs_payload.opt_batches(),
                     self.batch_reader.clone(),
                     block,
@@ -464,7 +464,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                     block_signers.as_ref(),
                 )
                 .await?;
-                let proof_batch_txns = process_payload_helper(
+                let proof_batch_txns = process_optqs_payload(
                     opt_qs_payload.proof_with_data(),
                     self.batch_reader.clone(),
                     block,
@@ -591,7 +591,7 @@ async fn request_txns_from_quorum_store(
     Ok(ret)
 }
 
-async fn process_payload_helper<T: TDataInfo>(
+async fn process_optqs_payload<T: TDataInfo>(
     data_ptr: &BatchPointer<T>,
     batch_reader: Arc<dyn BatchReader>,
     block: &Block,
@@ -660,7 +660,7 @@ async fn process_payload_helper<T: TDataInfo>(
 
 /// This is deprecated. Use `process_payload_helper` instead after migrating to
 /// OptQuorumStore payload
-async fn process_payload(
+async fn process_qs_payload(
     proof_with_data: &ProofWithData,
     batch_reader: Arc<dyn BatchReader>,
     block: &Block,
