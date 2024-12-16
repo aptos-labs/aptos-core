@@ -237,6 +237,14 @@ class WorkerPod:
                 )
                 time.sleep(RETRY_DELAY)
 
+    @retry(
+        stop=stop_after_attempt(MAX_RETRIES),
+        wait=wait_fixed(RETRY_DELAY),
+        retry=retry_if_exception_type(ApiException),
+        before_sleep=lambda retry_state: logger.warning(
+            f"Retry {retry_state.attempt_number}/{MAX_RETRIES} failed: {retry_state.outcome.exception()}"
+        ),
+    )
     def delete_pod(self):
         response = self.client.delete_namespaced_pod(
             name=self.name,
@@ -259,7 +267,7 @@ class WorkerPod:
         retry=retry_if_exception_type(ApiException),
         before_sleep=lambda retry_state: logger.warning(
             f"Retry {retry_state.attempt_number}/{MAX_RETRIES} failed: {retry_state.outcome.exception()}"
-        )
+        ),
     )
     def get_pod_status(self):
         pod_status = self.client.read_namespaced_pod_status(
