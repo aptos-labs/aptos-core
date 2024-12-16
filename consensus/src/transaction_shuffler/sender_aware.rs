@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{counters::NUM_SENDERS_IN_BLOCK, transaction_shuffler::TransactionShuffler};
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::{
+    signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
+};
 use move_core_types::account_address::AccountAddress;
 use std::collections::{HashMap, VecDeque};
 
@@ -79,6 +81,22 @@ impl TransactionShuffler for SenderAwareShuffler {
             sliding_window.add_transaction(txn)
         }
         sliding_window.finalize()
+    }
+
+    fn signed_transaction_iterator(
+        &self,
+        txns: Vec<SignedTransaction>,
+    ) -> Box<dyn Iterator<Item = SignedTransaction> + 'static> {
+        // TODO? Is there more complex logic here? Should this be `unimplemented!()`
+        Box::new(txns.into_iter())
+    }
+
+    fn signature_verified_transaction_iterator(
+        &self,
+        txns: Vec<SignatureVerifiedTransaction>,
+    ) -> Box<dyn Iterator<Item = SignatureVerifiedTransaction> + 'static> {
+        // TODO? Is there more complex logic here? Should this be `unimplemented!()`
+        Box::new(txns.into_iter())
     }
 }
 

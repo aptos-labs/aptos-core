@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_logger::info;
-use aptos_types::{on_chain_config::TransactionShufflerType, transaction::SignedTransaction};
+use aptos_types::{
+    on_chain_config::TransactionShufflerType,
+    transaction::{
+        signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
+    },
+};
 use sender_aware::SenderAwareShuffler;
 use std::sync::Arc;
 
@@ -19,6 +24,20 @@ pub mod transaction_shuffler_fuzzing {
 /// Interface to shuffle transactions
 pub trait TransactionShuffler: Send + Sync {
     fn shuffle(&self, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction>;
+
+    /// Given a configuration and a vector of SignedTransactions, return an iterator that
+    /// produces them in a particular shuffled order.
+    fn signed_transaction_iterator(
+        &self,
+        txns: Vec<SignedTransaction>,
+    ) -> Box<dyn Iterator<Item = SignedTransaction> + 'static>;
+
+    /// Given a configuration and a vector of SignatureVerifiedTransaction, return an iterator of
+    /// SignedTransaction.
+    fn signature_verified_transaction_iterator(
+        &self,
+        txns: Vec<SignatureVerifiedTransaction>,
+    ) -> Box<dyn Iterator<Item = SignatureVerifiedTransaction> + 'static>;
 }
 
 /// No Op Shuffler to maintain backward compatibility
@@ -27,6 +46,20 @@ pub struct NoOpShuffler {}
 impl TransactionShuffler for NoOpShuffler {
     fn shuffle(&self, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
         txns
+    }
+
+    fn signed_transaction_iterator(
+        &self,
+        txns: Vec<SignedTransaction>,
+    ) -> Box<dyn Iterator<Item = SignedTransaction>> {
+        Box::new(txns.into_iter())
+    }
+
+    fn signature_verified_transaction_iterator(
+        &self,
+        txns: Vec<SignatureVerifiedTransaction>,
+    ) -> Box<dyn Iterator<Item = SignatureVerifiedTransaction>> {
+        Box::new(txns.into_iter())
     }
 }
 
