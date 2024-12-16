@@ -15,9 +15,13 @@ module aptos_framework::governed_gas_pool {
     use aptos_framework::fungible_asset::{Self};
     use aptos_framework::object::{Self};
     use aptos_framework::aptos_coin::{Self, AptosCoin};
-    use aptos_framework::coin::{Self, Coin};
+    use aptos_framework::coin::{Self, Coin, MintCapability, BurnCapability};
     use std::features;
     use aptos_framework::signer;
+    use aptos_framework::aptos_account::{Self};
+
+    #[test_only]
+    use aptos_framework::fungible_asset::{BurnRef};
 
     const MODULE_SALT: vector<u8> = b"aptos_framework::governed_gas_pool";
 
@@ -57,7 +61,10 @@ module aptos_framework::governed_gas_pool {
 
         let (governed_gas_pool_signer, governed_gas_pool_signer_cap) = account::create_resource_account(aptos_framework, seed);
 
-        move_to(&governed_gas_pool_signer, GovernedGasPool{
+        // register apt
+        aptos_account::register_apt(&governed_gas_pool_signer);
+
+        move_to(aptos_framework, GovernedGasPool{
             signer_capability: governed_gas_pool_signer_cap,
         });
     }
@@ -79,6 +86,9 @@ module aptos_framework::governed_gas_pool {
     /// @param account The account to be funded.
     /// @param amount The amount of coin to be funded.
     public fun fund<CoinType>(aptos_framework: &signer, account: address, amount: u64) acquires GovernedGasPool {
+        // Check that the Aptos framework is the caller
+        // This is what ensures that funding can only be done by the Aptos framework,
+        // i.e., via a governance proposal.
         system_addresses::assert_aptos_framework(aptos_framework);
         let governed_gas_signer = &governed_gas_signer();
         coin::deposit(account, coin::withdraw<CoinType>(governed_gas_signer, amount));
@@ -133,16 +143,173 @@ module aptos_framework::governed_gas_pool {
 
     }
 
-    #[test]
+    #[test_only]
+    /// The AptosCoin mint capability
+    struct AptosCoinMintCapability has key {
+        mint_cap: MintCapability<AptosCoin>,
+    }
+
+    #[test_only]
+    /// The AptosCoin burn capability
+    struct AptosCoinBurnCapability has key {
+        burn_cap: BurnCapability<AptosCoin>,
+    }
+
+    #[test_only]
+    /// The AptosFA burn capabilities
+    struct AptosFABurnCapabilities has key {
+        burn_ref: BurnRef,
+    }
+
+
+    #[test_only]
+    /// Stores the mint capability for AptosCoin.
+    ///
+    /// @param aptos_framework The signer representing the Aptos framework.
+    /// @param mint_cap The mint capability for AptosCoin.
+    public fun store_aptos_coin_mint_cap(aptos_framework: &signer, mint_cap: MintCapability<AptosCoin>) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        move_to(aptos_framework, AptosCoinMintCapability { mint_cap })
+    }
+
+    #[test_only]
+    /// Stores the burn capability for AptosCoin, converting to a fungible asset reference if the feature is enabled.
+    ///
+    /// @param aptos_framework The signer representing the Aptos framework.
+    /// @param burn_cap The burn capability for AptosCoin.
+    public fun store_aptos_coin_burn_cap(aptos_framework: &signer, burn_cap: BurnCapability<AptosCoin>) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        if (features::operations_default_to_fa_apt_store_enabled()) {
+            let burn_ref = coin::convert_and_take_paired_burn_ref(burn_cap);
+            move_to(aptos_framework, AptosFABurnCapabilities { burn_ref });
+        } else {
+            move_to(aptos_framework, AptosCoinBurnCapability { burn_cap })
+        }
+    }
+
+    #[test_only]
     /// Initializes the governed gas pool around a fixed creation seed for testing
+    ///
     /// @param aptos_framework The signer of the aptos_framework module.
-    public fun initialize_for_testing(
+    public fun initialize_for_test(
         aptos_framework: &signer,
     ) {
+
+        // initialize the AptosCoin module
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(aptos_framework);
         
+        // Initialize the governed gas pool
         let seed : vector<u8> = b"test";
         initialize(aptos_framework, seed);
 
+        // add the mint capability to the governed gas pool
+        store_aptos_coin_mint_cap(aptos_framework, mint_cap);
+        store_aptos_coin_burn_cap(aptos_framework, burn_cap);
+
+    }
+
+    #[test_only]
+    /// Mints some coin to an account for testing purposes.
+    ///
+    /// @param account The account to which the coin is to be minted.
+    /// @param amount The amount of coin to be minted.
+    public fun mint_for_test(account: address, amount: u64) acquires AptosCoinMintCapability {
+         coin::deposit(account, coin::mint(
+            amount,
+            &borrow_global<AptosCoinMintCapability>(@aptos_framework).mint_cap
+        ));
+    }
+
+    #[test(aptos_framework = @aptos_framework, depositor = @0xdddd)]
+    /// Deposits some coin into the governed gas pool.
+    ///
+    /// @param aptos_framework is the signer of the aptos_framework module.
+    fun test_governed_gas_pool_deposit(aptos_framework: &signer, depositor: &signer) acquires GovernedGasPool, AptosCoinMintCapability {
+       
+        // initialize the modules
+        initialize_for_test(aptos_framework);
+    
+        // create the depositor account and fund it
+        aptos_account::create_account(signer::address_of(depositor));
+        mint_for_test(signer::address_of(depositor), 1000);
+
+        // get the balances for the depositor and the governed gas pool
+        let depositor_balance = coin::balance<AptosCoin>(signer::address_of(depositor));
+        let governed_gas_pool_balance = coin::balance<AptosCoin>(governed_gas_pool_address());
+
+        // deposit some coin into the governed gas pool
+        deposit_from<AptosCoin>(signer::address_of(depositor), 100);
+
+        // check the balances after the deposit
+        assert!(coin::balance<AptosCoin>(signer::address_of(depositor)) == depositor_balance - 100, 1);
+        assert!(coin::balance<AptosCoin>(governed_gas_pool_address()) == governed_gas_pool_balance + 100, 2);
+    
+    }
+
+    #[test(aptos_framework = @aptos_framework, depositor = @0xdddd)]
+    /// Deposits some coin from an account to the governed gas pool as gas fees.
+    ///
+    /// @param aptos_framework is the signer of the aptos_framework module.
+    /// @param depositor is the signer of the account from which the coin is to be deposited.
+    fun test_governed_gas_pool_deposit_gas_fee(aptos_framework: &signer, depositor: &signer) acquires GovernedGasPool, AptosCoinMintCapability {
+       
+        // initialize the modules
+        initialize_for_test(aptos_framework);
+    
+        // create the depositor account and fund it
+        aptos_account::create_account(signer::address_of(depositor));
+        mint_for_test(signer::address_of(depositor), 1000);
+
+        // get the balances for the depositor and the governed gas pool
+        let depositor_balance = coin::balance<AptosCoin>(signer::address_of(depositor));
+        let governed_gas_pool_balance = coin::balance<AptosCoin>(governed_gas_pool_address());
+
+        // deposit some coin into the governed gas pool as gas fees
+        deposit_gas_fee(signer::address_of(depositor), 100);
+
+        // check the balances after the deposit
+        assert!(coin::balance<AptosCoin>(signer::address_of(depositor)) == depositor_balance - 100, 1);
+        assert!(coin::balance<AptosCoin>(governed_gas_pool_address()) == governed_gas_pool_balance + 100, 2);
+    
+    }
+
+    #[test(aptos_framework = @aptos_framework, depositor = @0xdddd, beneficiary = @0xbbbb)]
+    /// Funds the destination account with a given amount of coin.
+    ///
+    /// @param aptos_framework is the signer of the aptos_framework module.
+    /// @param depositor is the signer of the account from which the coin is to be funded.
+    /// @param beneficiary is the address of the account to be funded.
+    fun test_governed_gas_pool_fund(aptos_framework: &signer, depositor: &signer, beneficiary: &signer) acquires GovernedGasPool, AptosCoinMintCapability {
+       
+        // initialize the modules
+        initialize_for_test(aptos_framework);
+    
+        // create the depositor account and fund it
+        aptos_account::create_account(signer::address_of(depositor));
+        mint_for_test(signer::address_of(depositor), 1000);
+
+        // get the balances for the depositor and the governed gas pool
+        let depositor_balance = coin::balance<AptosCoin>(signer::address_of(depositor));
+        let governed_gas_pool_balance = coin::balance<AptosCoin>(governed_gas_pool_address());
+
+        // collect gas fees from the depositor
+        deposit_gas_fee(signer::address_of(depositor), 100);
+
+        // check the balances after the deposit
+        assert!(coin::balance<AptosCoin>(signer::address_of(depositor)) == depositor_balance - 100, 1);
+        assert!(coin::balance<AptosCoin>(governed_gas_pool_address()) == governed_gas_pool_balance + 100, 2);
+
+        // ensure the beneficiary account has registered with the AptosCoin module
+        aptos_account::create_account(signer::address_of(beneficiary));
+        aptos_account::register_apt(beneficiary);
+
+        // fund the beneficiary account
+        fund<AptosCoin>(aptos_framework, signer::address_of(beneficiary), 100);
+
+        // check the balances after the funding
+        assert!(coin::balance<AptosCoin>(governed_gas_pool_address()) == governed_gas_pool_balance, 3);
+        assert!(coin::balance<AptosCoin>(signer::address_of(beneficiary)) == 100, 4);
+    
     }
     
 }
