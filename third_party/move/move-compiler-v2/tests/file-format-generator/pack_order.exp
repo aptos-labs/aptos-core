@@ -21,64 +21,88 @@ L3:	loc0: u8
 L4:	loc1: u8
 B0:
 	0: MoveLoc[0](Arg0: u8)
-	1: StLoc[3](loc0: u8)
-	2: MoveLoc[1](Arg1: u8)
+	1: MoveLoc[1](Arg1: u8)
+	2: StLoc[3](loc0: u8)
 	3: StLoc[4](loc1: u8)
-	4: MoveLoc[3](loc0: u8)
+	4: MoveLoc[4](loc1: u8)
 	5: MoveLoc[2](Arg2: u8)
-	6: MoveLoc[4](loc1: u8)
+	6: MoveLoc[3](loc0: u8)
 	7: Pack[0](S)
 	8: Ret
 }
 pack3(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 2 */ {
 L3:	loc0: u8
+L4:	loc1: u8
+L5:	loc2: u8
 B0:
 	0: MoveLoc[0](Arg0: u8)
-	1: StLoc[3](loc0: u8)
-	2: MoveLoc[1](Arg1: u8)
-	3: MoveLoc[3](loc0: u8)
-	4: MoveLoc[2](Arg2: u8)
-	5: Pack[0](S)
-	6: Ret
+	1: MoveLoc[1](Arg1: u8)
+	2: StLoc[3](loc0: u8)
+	3: StLoc[4](loc1: u8)
+	4: MoveLoc[4](loc1: u8)
+	5: StLoc[5](loc2: u8)
+	6: MoveLoc[3](loc0: u8)
+	7: MoveLoc[5](loc2: u8)
+	8: MoveLoc[2](Arg2: u8)
+	9: Pack[0](S)
+	10: Ret
 }
 pack4(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 3 */ {
 L3:	loc0: u8
 L4:	loc1: u8
+L5:	loc2: u8
+L6:	loc3: u8
 B0:
 	0: MoveLoc[0](Arg0: u8)
-	1: StLoc[3](loc0: u8)
-	2: MoveLoc[1](Arg1: u8)
-	3: StLoc[4](loc1: u8)
-	4: MoveLoc[2](Arg2: u8)
-	5: MoveLoc[3](loc0: u8)
-	6: MoveLoc[4](loc1: u8)
-	7: Pack[0](S)
-	8: Ret
+	1: MoveLoc[1](Arg1: u8)
+	2: MoveLoc[2](Arg2: u8)
+	3: StLoc[3](loc0: u8)
+	4: StLoc[4](loc1: u8)
+	5: StLoc[5](loc2: u8)
+	6: MoveLoc[5](loc2: u8)
+	7: StLoc[6](loc3: u8)
+	8: MoveLoc[3](loc0: u8)
+	9: MoveLoc[6](loc3: u8)
+	10: MoveLoc[4](loc1: u8)
+	11: Pack[0](S)
+	12: Ret
 }
 pack5(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 4 */ {
 L3:	loc0: u8
+L4:	loc1: u8
+L5:	loc2: u8
 B0:
 	0: MoveLoc[0](Arg0: u8)
-	1: StLoc[3](loc0: u8)
-	2: MoveLoc[1](Arg1: u8)
-	3: MoveLoc[2](Arg2: u8)
-	4: MoveLoc[3](loc0: u8)
-	5: Pack[0](S)
-	6: Ret
+	1: MoveLoc[1](Arg1: u8)
+	2: MoveLoc[2](Arg2: u8)
+	3: StLoc[3](loc0: u8)
+	4: StLoc[4](loc1: u8)
+	5: StLoc[5](loc2: u8)
+	6: MoveLoc[4](loc1: u8)
+	7: MoveLoc[3](loc0: u8)
+	8: MoveLoc[5](loc2: u8)
+	9: Pack[0](S)
+	10: Ret
 }
 pack6(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 5 */ {
 L3:	loc0: u8
 L4:	loc1: u8
+L5:	loc2: u8
+L6:	loc3: u8
 B0:
 	0: MoveLoc[0](Arg0: u8)
-	1: StLoc[3](loc0: u8)
-	2: MoveLoc[1](Arg1: u8)
-	3: StLoc[4](loc1: u8)
-	4: MoveLoc[2](Arg2: u8)
+	1: MoveLoc[1](Arg1: u8)
+	2: MoveLoc[2](Arg2: u8)
+	3: StLoc[3](loc0: u8)
+	4: StLoc[4](loc1: u8)
 	5: MoveLoc[4](loc1: u8)
-	6: MoveLoc[3](loc0: u8)
-	7: Pack[0](S)
-	8: Ret
+	6: StLoc[5](loc2: u8)
+	7: StLoc[6](loc3: u8)
+	8: MoveLoc[3](loc0: u8)
+	9: MoveLoc[5](loc2: u8)
+	10: MoveLoc[6](loc3: u8)
+	11: Pack[0](S)
+	12: Ret
 }
 }
 ============ bytecode verification succeeded ========
