@@ -56,6 +56,7 @@ const INDEX_FILE: &str = "version_index.txt";
 const ERR_LOG: &str = "err_log.txt";
 const ROCKS_INDEX_DB: &str = "rocks_txn_idx_db";
 pub const APTOS_COMMONS: &str = "aptos-commons";
+pub const APTOS_COMMONS_V2: &str = "aptos-commons-v2";
 const MAX_TO_FLUSH: usize = 50000;
 pub const DISABLE_SPEC_CHECK: &str = "spec-check=off";
 pub const DISABLE_REF_CHECK: &str = "reference-safety=off";
@@ -293,11 +294,12 @@ fn get_aptos_dir(package_name: &str) -> Option<&str> {
     None
 }
 
-async fn download_aptos_packages(path: &Path) -> anyhow::Result<()> {
+async fn download_aptos_packages(path: &Path, branch_opt: Option<String>) -> anyhow::Result<()> {
     let git_url = "https://github.com/aptos-labs/aptos-core";
     let tmp_dir = TempDir::new()?;
+    let branch = branch_opt.unwrap_or("main".to_string());
     Command::new("git")
-        .args(["clone", git_url, tmp_dir.path().to_str().unwrap(), "--depth", "1"])
+        .args(["clone", "--branch", &branch, git_url, tmp_dir.path().to_str().unwrap(), "--depth", "1"])
         //.args(["clone", "--branch", "aptos-release-v1.20", git_url, tmp_dir.path().to_str().unwrap(), "--depth", "1"])
         .output()
         .map_err(|_| anyhow::anyhow!("Failed to clone Git repository"))?;
@@ -329,7 +331,7 @@ fn check_aptos_packages_availability(path: PathBuf) -> bool {
     true
 }
 
-pub async fn prepare_aptos_packages(path: PathBuf) {
+pub async fn prepare_aptos_packages(path: PathBuf, branch_opt: Option<String>) {
     let mut success = true;
     if path.exists() {
         return;
@@ -337,7 +339,7 @@ pub async fn prepare_aptos_packages(path: PathBuf) {
     }
     if success {
         std::fs::create_dir_all(path.clone()).unwrap();
-        download_aptos_packages(&path).await.unwrap();
+        download_aptos_packages(&path, branch_opt).await.unwrap();
     }
 }
 

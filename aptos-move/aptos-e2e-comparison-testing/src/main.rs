@@ -3,8 +3,7 @@
 
 use anyhow::Result;
 use aptos_comparison_testing::{
-    prepare_aptos_packages, DataCollection, Execution, ExecutionMode, OnlineExecutor,
-    APTOS_COMMONS, DISABLE_SPEC_CHECK, SAMPLING_RATE,
+    prepare_aptos_packages, DataCollection, Execution, ExecutionMode, OnlineExecutor, APTOS_COMMONS, APTOS_COMMONS_V2, DISABLE_SPEC_CHECK, SAMPLING_RATE
 };
 use aptos_rest_client::Client;
 use clap::{Parser, Subcommand};
@@ -81,6 +80,12 @@ pub enum Cmd {
         /// Packages to be skipped for reference safety check
         #[clap(long)]
         skip_ref_packages: Option<String>,
+        /// Branch of framework for v1
+        #[clap(long)]
+        branch_v1: Option<String>,
+        /// Branch of framework for v2
+        #[clap(long)]
+        branch_v2: Option<String>,
     },
 }
 
@@ -131,7 +136,7 @@ async fn main() -> Result<()> {
                 std::fs::create_dir_all(output.as_path()).unwrap();
             }
             if !skip_source_code {
-                prepare_aptos_packages(output.join(APTOS_COMMONS)).await;
+                prepare_aptos_packages(output.join(APTOS_COMMONS), None).await;
             }
             let data_collector = DataCollection::new_with_rest_client(
                 Client::new(Url::parse(&endpoint)?),
@@ -165,7 +170,7 @@ async fn main() -> Result<()> {
             if !output.exists() {
                 std::fs::create_dir_all(output.as_path()).unwrap();
             }
-            prepare_aptos_packages(output.join(APTOS_COMMONS)).await;
+            prepare_aptos_packages(output.join(APTOS_COMMONS), None).await;
             let online = OnlineExecutor::new_with_rest_client(
                 Client::new(Url::parse(&endpoint)?),
                 output.clone(),
@@ -182,15 +187,23 @@ async fn main() -> Result<()> {
             input_path,
             execution_mode,
             skip_ref_packages,
+            branch_v1,
+            branch_v2,
         } => {
             let input = if let Some(path) = input_path {
                 path
             } else {
                 PathBuf::from(".")
             };
-            prepare_aptos_packages(input.join(APTOS_COMMONS)).await;
+            let exec_mode = execution_mode.unwrap_or_default();
+            if exec_mode.is_v1_or_compare() {
+                prepare_aptos_packages(input.join(APTOS_COMMONS), branch_v1).await;
+            }
+            if exec_mode.is_v2_or_compare() {
+                prepare_aptos_packages(input.join(APTOS_COMMONS_V2), branch_v2).await;
+            }
             let executor =
-                Execution::new(input, execution_mode.unwrap_or_default(), skip_ref_packages);
+                Execution::new(input, exec_mode, skip_ref_packages);
             executor
                 .execute_txns(args.begin_version, args.limit)
                 .await?;
