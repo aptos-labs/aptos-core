@@ -17,20 +17,20 @@ Additionally, it provides a way to lookup and iterate over sorted keys, making r
 take O(log N + R) time (where R is number of elements in the range).
 
 Most methods operate with OrderedMap being <code>self</code>.
-All methods that start with iter_*, operate with Iterator being <code>self</code>.
+All methods that start with iter_*, operate with IteratorPtr being <code>self</code>.
 
 Uses cmp::compare for ordering, which compares primitive types natively, and uses common
 lexicographical sorting for complex types.
 
 TODO: all iterator functions are public(friend) for now, so that they can be modified in a
-backward incompatible way.
-They are waiting for Move improvement that will allow references to be part of the struct
-Allowing cleaner iterator APIs
+backward incompatible way. Type is also named IteratorPtr, so that Iterator is free to use later.
+They are waiting for Move improvement that will allow references to be part of the struct,
+allowing cleaner iterator APIs.
 
 
 -  [Struct `Entry`](#0x1_ordered_map_Entry)
 -  [Enum `OrderedMap`](#0x1_ordered_map_OrderedMap)
--  [Enum `Iterator`](#0x1_ordered_map_Iterator)
+-  [Enum `IteratorPtr`](#0x1_ordered_map_IteratorPtr)
 -  [Constants](#@Constants_0)
 -  [Function `new`](#0x1_ordered_map_new)
 -  [Function `new_from`](#0x1_ordered_map_new_from)
@@ -155,14 +155,16 @@ The OrderedMap datastructure.
 
 </details>
 
-<a id="0x1_ordered_map_Iterator"></a>
+<a id="0x1_ordered_map_IteratorPtr"></a>
 
-## Enum `Iterator`
+## Enum `IteratorPtr`
 
-An iterator pointing to a position between two elements in the
+An iterator pointing to a valid position in an ordered map, or to the end.
+
+TODO: Once fields can be (mutable) references, this class will be deprecated.
 
 
-<pre><code>enum <a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a> <b>has</b> <b>copy</b>, drop
+<pre><code>enum <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a> <b>has</b> <b>copy</b>, drop
 </code></pre>
 
 
@@ -746,7 +748,7 @@ Returns an iterator pointing to the first element that is greater or equal to th
 key, or an end iterator if such element doesn't exist.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_lower_bound">lower_bound</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: &K): <a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_lower_bound">lower_bound</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: &K): <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>
 </code></pre>
 
 
@@ -755,7 +757,7 @@ key, or an end iterator if such element doesn't exist.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_lower_bound">lower_bound</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, key: &K): <a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_lower_bound">lower_bound</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, key: &K): <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a> {
     <b>let</b> entries = &self.entries;
     <b>let</b> len = entries.<a href="ordered_map.md#0x1_ordered_map_length">length</a>();
 
@@ -780,7 +782,7 @@ Returns an iterator pointing to the element that equals to the provided key, or 
 iterator if the key is not found.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_find">find</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: &K): <a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_find">find</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: &K): <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>
 </code></pre>
 
 
@@ -789,7 +791,7 @@ iterator if the key is not found.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_find">find</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, key: &K): <a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_find">find</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, key: &K): <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a> {
     <b>let</b> lower_bound = self.<a href="ordered_map.md#0x1_ordered_map_lower_bound">lower_bound</a>(key);
     <b>if</b> (lower_bound.<a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>(self)) {
         lower_bound
@@ -812,7 +814,7 @@ iterator if the key is not found.
 Returns the begin iterator.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_new_begin_iter">new_begin_iter</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): <a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_new_begin_iter">new_begin_iter</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>
 </code></pre>
 
 
@@ -821,9 +823,9 @@ Returns the begin iterator.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_new_begin_iter">new_begin_iter</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): <a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_new_begin_iter">new_begin_iter</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a> {
     <b>if</b> (self.<a href="ordered_map.md#0x1_ordered_map_is_empty">is_empty</a>()) {
-        <b>return</b> Iterator::End;
+        <b>return</b> IteratorPtr::End;
     };
 
     <a href="ordered_map.md#0x1_ordered_map_new_iter">new_iter</a>(0)
@@ -841,7 +843,7 @@ Returns the begin iterator.
 Returns the end iterator.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_new_end_iter">new_end_iter</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): <a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_new_end_iter">new_end_iter</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>
 </code></pre>
 
 
@@ -850,8 +852,8 @@ Returns the end iterator.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_new_end_iter">new_end_iter</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): <a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a> {
-    Iterator::End
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_new_end_iter">new_end_iter</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a> {
+    IteratorPtr::End
 }
 </code></pre>
 
@@ -867,7 +869,7 @@ Returns the next iterator, or none if already at the end iterator.
 Note: Requires that the map is not changed after the input iterator is generated.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_next">iter_next</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): <a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_next">iter_next</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>
 </code></pre>
 
 
@@ -876,7 +878,7 @@ Note: Requires that the map is not changed after the input iterator is generated
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_next">iter_next</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): <a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_next">iter_next</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a> {
     <b>assert</b>!(!self.<a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>(map), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="ordered_map.md#0x1_ordered_map_EITER_OUT_OF_BOUNDS">EITER_OUT_OF_BOUNDS</a>));
 
     <b>let</b> index = self.index + 1;
@@ -900,7 +902,7 @@ Returns the previous iterator, or none if already at the begin iterator.
 Note: Requires that the map is not changed after the input iterator is generated.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_prev">iter_prev</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): <a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_prev">iter_prev</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>
 </code></pre>
 
 
@@ -909,10 +911,10 @@ Note: Requires that the map is not changed after the input iterator is generated
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_prev">iter_prev</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): <a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_prev">iter_prev</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a> {
     <b>assert</b>!(!self.<a href="ordered_map.md#0x1_ordered_map_iter_is_begin">iter_is_begin</a>(map), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="ordered_map.md#0x1_ordered_map_EITER_OUT_OF_BOUNDS">EITER_OUT_OF_BOUNDS</a>));
 
-    <b>let</b> index = <b>if</b> (self is Iterator::End) {
+    <b>let</b> index = <b>if</b> (self is IteratorPtr::End) {
         map.entries.<a href="ordered_map.md#0x1_ordered_map_length">length</a>() - 1
     } <b>else</b> {
         self.index - 1
@@ -933,7 +935,7 @@ Note: Requires that the map is not changed after the input iterator is generated
 Returns whether the iterator is a begin iterator.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_begin">iter_is_begin</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): bool
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_begin">iter_is_begin</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): bool
 </code></pre>
 
 
@@ -942,8 +944,8 @@ Returns whether the iterator is a begin iterator.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_begin">iter_is_begin</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): bool {
-    <b>if</b> (self is Iterator::End) {
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_begin">iter_is_begin</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): bool {
+    <b>if</b> (self is IteratorPtr::End) {
         map.<a href="ordered_map.md#0x1_ordered_map_is_empty">is_empty</a>()
     } <b>else</b> {
         self.index == 0
@@ -964,7 +966,7 @@ Returns true iff the iterator is a begin iterator from a non-empty collection.
 This method doesn't require having access to map, unlike iter_is_begin.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_begin_from_non_empty">iter_is_begin_from_non_empty</a>(self: &<a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_begin_from_non_empty">iter_is_begin_from_non_empty</a>(self: &<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>): bool
 </code></pre>
 
 
@@ -973,8 +975,8 @@ This method doesn't require having access to map, unlike iter_is_begin.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_begin_from_non_empty">iter_is_begin_from_non_empty</a>(self: &<a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a>): bool {
-    <b>if</b> (self is Iterator::End) {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_begin_from_non_empty">iter_is_begin_from_non_empty</a>(self: &<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a>): bool {
+    <b>if</b> (self is IteratorPtr::End) {
         <b>false</b>
     } <b>else</b> {
         self.index == 0
@@ -993,7 +995,7 @@ This method doesn't require having access to map, unlike iter_is_begin.
 Returns whether the iterator is an end iterator.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>, _map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, _map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): bool
 </code></pre>
 
 
@@ -1002,8 +1004,8 @@ Returns whether the iterator is an end iterator.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a>, _map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): bool {
-    self is Iterator::End
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a>, _map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): bool {
+    self is IteratorPtr::End
 }
 </code></pre>
 
@@ -1019,7 +1021,7 @@ Borrows the key given iterator points to.
 Note: Requires that the map is not changed after the input iterator is generated.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_borrow_key">iter_borrow_key</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): &K
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_borrow_key">iter_borrow_key</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): &K
 </code></pre>
 
 
@@ -1028,8 +1030,8 @@ Note: Requires that the map is not changed after the input iterator is generated
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_borrow_key">iter_borrow_key</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): &K {
-    <b>assert</b>!(!(self is Iterator::End), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="ordered_map.md#0x1_ordered_map_EITER_OUT_OF_BOUNDS">EITER_OUT_OF_BOUNDS</a>));
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_borrow_key">iter_borrow_key</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): &K {
+    <b>assert</b>!(!(self is IteratorPtr::End), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="ordered_map.md#0x1_ordered_map_EITER_OUT_OF_BOUNDS">EITER_OUT_OF_BOUNDS</a>));
 
     &map.entries.<a href="ordered_map.md#0x1_ordered_map_borrow">borrow</a>(self.index).key
 }
@@ -1047,7 +1049,7 @@ Borrows the value given iterator points to.
 Note: Requires that the map is not changed after the input iterator is generated.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_borrow">iter_borrow</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): &V
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_borrow">iter_borrow</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): &V
 </code></pre>
 
 
@@ -1056,8 +1058,8 @@ Note: Requires that the map is not changed after the input iterator is generated
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_borrow">iter_borrow</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): &V {
-    <b>assert</b>!(!(self is Iterator::End), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="ordered_map.md#0x1_ordered_map_EITER_OUT_OF_BOUNDS">EITER_OUT_OF_BOUNDS</a>));
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_borrow">iter_borrow</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): &V {
+    <b>assert</b>!(!(self is IteratorPtr::End), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="ordered_map.md#0x1_ordered_map_EITER_OUT_OF_BOUNDS">EITER_OUT_OF_BOUNDS</a>));
     &map.entries.<a href="ordered_map.md#0x1_ordered_map_borrow">borrow</a>(self.index).value
 }
 </code></pre>
@@ -1074,7 +1076,7 @@ Mutably borrows the value iterator points to.
 Note: Requires that the map is not changed after the input iterator is generated.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_borrow_mut">iter_borrow_mut</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>, map: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): &<b>mut</b> V
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_borrow_mut">iter_borrow_mut</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, map: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): &<b>mut</b> V
 </code></pre>
 
 
@@ -1083,8 +1085,8 @@ Note: Requires that the map is not changed after the input iterator is generated
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_borrow_mut">iter_borrow_mut</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a>, map: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): &<b>mut</b> V {
-    <b>assert</b>!(!(self is Iterator::End), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="ordered_map.md#0x1_ordered_map_EITER_OUT_OF_BOUNDS">EITER_OUT_OF_BOUNDS</a>));
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_borrow_mut">iter_borrow_mut</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a>, map: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): &<b>mut</b> V {
+    <b>assert</b>!(!(self is IteratorPtr::End), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="ordered_map.md#0x1_ordered_map_EITER_OUT_OF_BOUNDS">EITER_OUT_OF_BOUNDS</a>));
     &<b>mut</b> map.entries.<a href="ordered_map.md#0x1_ordered_map_borrow_mut">borrow_mut</a>(self.index).value
 }
 </code></pre>
@@ -1102,7 +1104,7 @@ Aborts with EKEY_NOT_FOUND if iterator is pointing to the end.
 Note: Requires that the map is not changed after the input iterator is generated.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_remove">iter_remove</a>&lt;K: drop, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>, map: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): V
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_remove">iter_remove</a>&lt;K: drop, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, map: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): V
 </code></pre>
 
 
@@ -1111,8 +1113,8 @@ Note: Requires that the map is not changed after the input iterator is generated
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_remove">iter_remove</a>&lt;K: drop, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a>, map: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): V {
-    <b>assert</b>!(!(self is Iterator::End), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="ordered_map.md#0x1_ordered_map_EKEY_NOT_FOUND">EKEY_NOT_FOUND</a>));
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_remove">iter_remove</a>&lt;K: drop, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a>, map: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): V {
+    <b>assert</b>!(!(self is IteratorPtr::End), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="ordered_map.md#0x1_ordered_map_EKEY_NOT_FOUND">EKEY_NOT_FOUND</a>));
 
     <b>let</b> <a href="ordered_map.md#0x1_ordered_map_Entry">Entry</a> { key: _, value } = map.entries.<a href="ordered_map.md#0x1_ordered_map_remove">remove</a>(self.index);
     value
@@ -1132,7 +1134,7 @@ Aborts with EKEY_NOT_FOUND if iterator is pointing to the end.
 Note: Requires that the map is not changed after the input iterator is generated.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_replace">iter_replace</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>, map: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, value: V): V
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_replace">iter_replace</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, map: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, value: V): V
 </code></pre>
 
 
@@ -1141,8 +1143,8 @@ Note: Requires that the map is not changed after the input iterator is generated
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_replace">iter_replace</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a>, map: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, value: V): V {
-    <b>assert</b>!(!(self is Iterator::End), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="ordered_map.md#0x1_ordered_map_EKEY_NOT_FOUND">EKEY_NOT_FOUND</a>));
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_replace">iter_replace</a>&lt;K, V&gt;(self: <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a>, map: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, value: V): V {
+    <b>assert</b>!(!(self is IteratorPtr::End), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="ordered_map.md#0x1_ordered_map_EKEY_NOT_FOUND">EKEY_NOT_FOUND</a>));
 
     <b>let</b> entry = map.entries.<a href="ordered_map.md#0x1_ordered_map_borrow_mut">borrow_mut</a>(self.index);
     <a href="../../move-stdlib/doc/mem.md#0x1_mem_replace">mem::replace</a>(&<b>mut</b> entry.value, value)
@@ -1382,7 +1384,7 @@ Apply the function to a mutable reference of each key-value pair in the table.
 
 
 
-<pre><code><b>fun</b> <a href="ordered_map.md#0x1_ordered_map_new_iter">new_iter</a>(index: u64): <a href="ordered_map.md#0x1_ordered_map_Iterator">ordered_map::Iterator</a>
+<pre><code><b>fun</b> <a href="ordered_map.md#0x1_ordered_map_new_iter">new_iter</a>(index: u64): <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>
 </code></pre>
 
 
@@ -1391,8 +1393,8 @@ Apply the function to a mutable reference of each key-value pair in the table.
 <summary>Implementation</summary>
 
 
-<pre><code>inline <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_new_iter">new_iter</a>(index: u64): <a href="ordered_map.md#0x1_ordered_map_Iterator">Iterator</a> {
-    Iterator::Position {
+<pre><code>inline <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_new_iter">new_iter</a>(index: u64): <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a> {
+    IteratorPtr::Position {
         index: index,
     }
 }
@@ -1421,7 +1423,7 @@ Apply the function to a mutable reference of each key-value pair in the table.
     <b>let</b> l = start;
     <b>let</b> r = end;
     <b>while</b> (l != r) {
-        <b>let</b> mid = l + (r - l) / 2;
+        <b>let</b> mid = l + (r - l) &gt;&gt; 1;
         <b>let</b> comparison = <a href="../../move-stdlib/doc/cmp.md#0x1_cmp_compare">cmp::compare</a>(&entries.<a href="ordered_map.md#0x1_ordered_map_borrow">borrow</a>(mid).key, key);
         <b>if</b> (comparison.is_lt()) {
             l = mid + 1;
