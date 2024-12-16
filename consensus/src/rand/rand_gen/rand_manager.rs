@@ -189,7 +189,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             .flat_map(|b| b.ordered_blocks.iter().map(|b3| b3.round()))
             .collect();
         fail_point!("rand_manager::process_ready_blocks", |_| {});
-        info!(rounds = rounds, "Processing rand-ready blocks.");
+        info!(epoch = self.epoch_state.epoch, rounds = rounds, "Processing rand-ready blocks.");
 
         for blocks in ready_blocks {
             let _ = self.outgoing_blocks.unbounded_send(blocks);
