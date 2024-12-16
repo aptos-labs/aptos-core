@@ -201,7 +201,7 @@ def generate_disk_name(run_id: str, snapshot_name: str, pvc_id: int) -> str:
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=4, max=10),
-    retry=retry_if_exception_type((ApiException, Exception)),
+    retry=retry_if_exception_type(ApiException),
     before_sleep=lambda retry_state: logger.warning(
         f"Retrying initial disk creation after error: {retry_state.outcome.exception()}"
     ),
@@ -493,6 +493,14 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+    retry=retry_if_exception_type((ApiException, Exception)),
+    before_sleep=lambda retry_state: logger.warning(
+        f"Retrying creating pvc from snapshot after error: {retry_state.outcome.exception()}"
+    ),
+)
 def create_one_pvc_from_snapshot(
     pvc_name: str, snapshot_name: str, namespace: str, label: str
 ) -> str:
