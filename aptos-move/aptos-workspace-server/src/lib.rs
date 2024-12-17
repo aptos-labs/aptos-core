@@ -28,16 +28,18 @@ mod services;
 
 use anyhow::{anyhow, Context, Result};
 use aptos_localnet::docker::get_docker;
+use clap::Parser;
 use common::make_shared;
 use futures::TryFutureExt;
 use services::{
     docker_common::create_docker_network_permanent, indexer_api::start_indexer_api,
     processors::start_all_processors,
 };
+use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-pub async fn run_all_services() -> Result<()> {
+async fn run_all_services(timeout: u64) -> Result<()> {
     let test_dir = tempfile::tempdir()?;
     let test_dir = test_dir.path();
     println!("Created test directory: {}", test_dir.display());
@@ -51,9 +53,15 @@ pub async fn run_all_services() -> Result<()> {
         //       waiting for it to trigger.
         let shutdown = shutdown.clone();
         tokio::spawn(async move {
-            tokio::signal::ctrl_c().await.unwrap();
-
-            println!("\nCtrl-C received. Shutting down services. This may take a while.\n");
+            tokio::select! {
+                res = tokio::signal::ctrl_c() => {
+                    res.unwrap();
+                    println!("\nCtrl-C received. Shutting down services. This may take a while.\n");
+                }
+                _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
+                    println!("\nTimeout reached. Shutting down services. This may take a while.\n");
+                }
+            }
 
             shutdown.cancel();
         });
@@ -188,4 +196,20 @@ pub async fn run_all_services() -> Result<()> {
     println!("Finished running all services");
 
     Ok(())
+}
+
+#[derive(Parser)]
+pub enum WorkspaceCommand {
+    Run {
+        #[arg(long, default_value_t = 1800)]
+        timeout: u64,
+    },
+}
+
+impl WorkspaceCommand {
+    pub async fn run(self) -> Result<()> {
+        match self {
+            WorkspaceCommand::Run { timeout } => run_all_services(timeout).await,
+        }
+    }
 }
