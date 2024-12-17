@@ -13,6 +13,7 @@ use aptos_executor_types::ExecutorResult;
 use aptos_types::transaction::SignedTransaction;
 use fail::fail_point;
 use std::{sync::Arc, time::Instant};
+use aptos_logger::info;
 
 pub struct BlockPreparer {
     payload_manager: Arc<dyn TPayloadManager>,
