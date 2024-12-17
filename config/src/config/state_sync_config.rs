@@ -127,7 +127,7 @@ pub struct StateSyncDriverConfig {
 impl Default for StateSyncDriverConfig {
     fn default() -> Self {
         Self {
-            bootstrapping_mode: BootstrappingMode::ExecuteOrApplyFromGenesis,
+            bootstrapping_mode: BootstrappingMode::ExecuteTransactionsFromGenesis,
             commit_notification_timeout_ms: 5000,
             continuous_syncing_mode: ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs,
             enable_auto_bootstrapping: false,
