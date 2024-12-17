@@ -7,12 +7,14 @@ fun m::test(): u64 {
      var $t2: u64
      var $t3: u64
      var $t4: u64
+     var $t5: u64
   0: $t1 := 1
   1: $t2 := 2
   2: $t3 := 3
-  3: $t4 := +($t1, $t2)
-  4: $t0 := +($t4, $t3)
-  5: return $t0
+  3: $t5 := infer($t1)
+  4: $t4 := +($t5, $t2)
+  5: $t0 := +($t4, $t3)
+  6: return $t0
 }
 
 ============ after DeadStoreElimination: ================
@@ -24,12 +26,14 @@ fun m::test(): u64 {
      var $t2: u64
      var $t3: u64
      var $t4: u64
+     var $t5: u64
   0: $t1 := 1
   1: $t2 := 2
   2: $t3 := 3
-  3: $t4 := +($t1, $t2)
-  4: $t0 := +($t4, $t3)
-  5: return $t0
+  3: $t5 := move($t1)
+  4: $t4 := +($t5, $t2)
+  5: $t0 := +($t4, $t3)
+  6: return $t0
 }
 
 ============ after VariableCoalescingAnnotator: ================
@@ -41,6 +45,7 @@ fun m::test(): u64 {
      var $t2: u64
      var $t3: u64
      var $t4: u64
+     var $t5: u64
      # live vars:
      # events: b:$t1
   0: $t1 := 1
@@ -51,14 +56,17 @@ fun m::test(): u64 {
      # events: b:$t3
   2: $t3 := 3
      # live vars: $t1, $t2, $t3
-     # events: e:$t1, e:$t2, b:$t4
-  3: $t4 := +($t1, $t2)
+     # events: e:$t1, b:$t5
+  3: $t5 := move($t1)
+     # live vars: $t2, $t3, $t5
+     # events: e:$t2, e:$t5, b:$t4
+  4: $t4 := +($t5, $t2)
      # live vars: $t3, $t4
      # events: e:$t3, e:$t4, b:$t0
-  4: $t0 := +($t4, $t3)
+  5: $t0 := +($t4, $t3)
      # live vars: $t0
      # events: e:$t0
-  5: return $t0
+  6: return $t0
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -70,12 +78,14 @@ fun m::test(): u64 {
      var $t2: u64
      var $t3: u64
      var $t4: u64 [unused]
+     var $t5: u64 [unused]
   0: $t1 := 1
   1: $t2 := 2
   2: $t3 := 3
-  3: $t1 := +($t1, $t2)
-  4: $t1 := +($t1, $t3)
-  5: return $t1
+  3: $t1 := move($t1)
+  4: $t1 := +($t1, $t2)
+  5: $t1 := +($t1, $t3)
+  6: return $t1
 }
 
 ============ after DeadStoreElimination: ================
@@ -87,6 +97,7 @@ fun m::test(): u64 {
      var $t2: u64
      var $t3: u64
      var $t4: u64 [unused]
+     var $t5: u64 [unused]
   0: $t1 := 1
   1: $t2 := 2
   2: $t3 := 3

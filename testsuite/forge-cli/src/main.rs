@@ -170,6 +170,8 @@ struct CleanUp {
         help = "The kubernetes namespace to clean up. If unset, attemps to cleanup all by using forge-management configmaps"
     )]
     namespace: Option<String>,
+    #[clap(long, help = "If set, skips the actual cleanup")]
+    dry_run: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -345,7 +347,7 @@ fn main() -> Result<()> {
                 if let Some(namespace) = cleanup.namespace {
                     runtime.block_on(uninstall_testnet_resources(namespace))?;
                 } else {
-                    runtime.block_on(cleanup_cluster_with_management())?;
+                    runtime.block_on(cleanup_cluster_with_management(cleanup.dry_run))?;
                 }
                 Ok(())
             },

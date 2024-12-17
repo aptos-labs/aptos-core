@@ -56,11 +56,13 @@ pub struct RuntimeEnvironment {
     ///
     /// SAFETY:
     /// Here we informally show that it is safe to share type cache across multiple threads.
-    ///   1) Struct has been already published.
-    ///      In this case, it is fine to have multiple transactions concurrently accessing and
-    ///      caching struct tags, layouts and depth formulas. Even if transaction failed due to
-    ///      speculation, and is re-executed later, the speculative aborted execution cached a non-
-    ///      speculative existing struct information. It is safe for other threads to access it.
+    ///
+    ///  1) Struct has been already published.
+    ///     In this case, it is fine to have multiple transactions concurrently accessing and
+    ///     caching struct tags, layouts and depth formulas. Even if transaction failed due to
+    ///     speculation, and is re-executed later, the speculative aborted execution cached a non-
+    ///     speculative existing struct information. It is safe for other threads to access it.
+    ///
     ///  2) Struct is being published with a module.
     ///     The design of V2 loader ensures that when modules are published, i.e., staged on top of
     ///     the existing module storage, the runtime environment is cloned. Hence, it is not even
@@ -291,7 +293,7 @@ impl RuntimeEnvironment {
         &self,
         struct_name: StructIdentifier,
     ) -> PartialVMResult<StructNameIndex> {
-        self.struct_name_index_map.struct_name_to_idx(struct_name)
+        self.struct_name_index_map.struct_name_to_idx(&struct_name)
     }
 }
 

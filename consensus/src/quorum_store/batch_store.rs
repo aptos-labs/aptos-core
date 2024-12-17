@@ -123,6 +123,7 @@ pub struct BatchStore {
 impl BatchStore {
     pub(crate) fn new(
         epoch: u64,
+        is_new_epoch: bool,
         last_certified_time: u64,
         db: Arc<dyn QuorumStoreStorage>,
         memory_quota: usize,
@@ -146,18 +147,73 @@ impl BatchStore {
             persist_subscribers: DashMap::new(),
             expiration_buffer_usecs,
         };
-        let db_content = db_clone
-            .get_all_batches()
-            .expect("failed to read data from db");
-        let mut expired_keys = Vec::new();
-        trace!(
-            "QS: Batchreader {} {} {}",
+
+        if is_new_epoch {
+            tokio::task::spawn_blocking(move || {
+                Self::gc_previous_epoch_batches_from_db(db_clone, epoch);
+            });
+        } else {
+            Self::populate_cache_and_gc_expired_batches(
+                db_clone,
+                epoch,
+                last_certified_time,
+                expiration_buffer_usecs,
+                &batch_store,
+            );
+        }
+
+        batch_store
+    }
+
+    fn gc_previous_epoch_batches_from_db(db: Arc<dyn QuorumStoreStorage>, current_epoch: u64) {
+        let db_content = db.get_all_batches().expect("failed to read data from db");
+        info!(
+            epoch = current_epoch,
+            "QS: Read batches from storage. Len: {}",
             db_content.len(),
-            epoch,
+        );
+
+        let mut expired_keys = Vec::new();
+        for (digest, value) in db_content {
+            let epoch = value.epoch();
+
+            trace!(
+                "QS: Batchreader recovery content epoch {:?}, digest {}",
+                epoch,
+                digest
+            );
+
+            if epoch < current_epoch {
+                expired_keys.push(digest);
+            }
+        }
+
+        info!(
+            "QS: Batch store bootstrap expired keys len {}",
+            expired_keys.len()
+        );
+        db.delete_batches(expired_keys)
+            .expect("Deletion of expired keys should not fail");
+    }
+
+    fn populate_cache_and_gc_expired_batches(
+        db: Arc<dyn QuorumStoreStorage>,
+        current_epoch: u64,
+        last_certified_time: u64,
+        expiration_buffer_usecs: u64,
+        batch_store: &BatchStore,
+    ) {
+        let db_content = db.get_all_batches().expect("failed to read data from db");
+        info!(
+            epoch = current_epoch,
+            "QS: Read batches from storage. Len: {}, Last Cerified Time: {}",
+            db_content.len(),
             last_certified_time
         );
+
+        let mut expired_keys = Vec::new();
         for (digest, value) in db_content {
-            let expiration = value.expiration();
+            let expiration = value.expiration().saturating_sub(expiration_buffer_usecs);
 
             trace!(
                 "QS: Batchreader recovery content exp {:?}, digest {}",
@@ -173,15 +229,15 @@ impl BatchStore {
                     .expect("Storage limit exceeded upon BatchReader construction");
             }
         }
-        trace!(
-            "QS: Batchreader recovery expired keys len {}",
+
+        info!(
+            "QS: Batch store bootstrap expired keys len {}",
             expired_keys.len()
         );
-        db_clone
-            .delete_batches(expired_keys)
-            .expect("Deletion of expired keys should not fail");
-
-        batch_store
+        tokio::task::spawn_blocking(move || {
+            db.delete_batches(expired_keys)
+                .expect("Deletion of expired keys should not fail");
+        });
     }
 
     fn epoch(&self) -> u64 {

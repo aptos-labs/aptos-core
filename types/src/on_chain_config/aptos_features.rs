@@ -64,7 +64,7 @@ pub enum FeatureFlag {
     _DEPRECATED_RECONFIGURE_WITH_DKG = 45,
     KEYLESS_ACCOUNTS = 46,
     KEYLESS_BUT_ZKLESS_ACCOUNTS = 47,
-    REMOVE_DETAILED_ERROR_FROM_HASH = 48,
+    _DEPRECATED_REMOVE_DETAILED_ERROR_FROM_HASH = 48, // This feature is not used
     JWK_CONSENSUS = 49,
     CONCURRENT_FUNGIBLE_ASSETS = 50,
     REFUNDABLE_BYTES = 51,
@@ -122,9 +122,12 @@ impl FeatureFlag {
             FeatureFlag::BLS12_381_STRUCTURES,
             FeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH,
             FeatureFlag::STRUCT_CONSTRUCTORS,
+            FeatureFlag::PERIODICAL_REWARD_RATE_DECREASE,
+            FeatureFlag::PARTIAL_GOVERNANCE_VOTING,
             FeatureFlag::SIGNATURE_CHECKER_V2,
             FeatureFlag::STORAGE_SLOT_METADATA,
             FeatureFlag::CHARGE_INVARIANT_VIOLATION,
+            FeatureFlag::DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING,
             FeatureFlag::APTOS_UNIQUE_IDENTIFIERS,
             FeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::BULLETPROOFS_NATIVES,
@@ -163,7 +166,6 @@ impl FeatureFlag {
             FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION,
             FeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS,
             FeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET,
-            FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH,
             FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
             FeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API,
             FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
@@ -305,10 +307,6 @@ impl Features {
 
     pub fn is_federated_keyless_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::FEDERATED_KEYLESS)
-    }
-
-    pub fn is_remove_detailed_error_from_hash_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH)
     }
 
     pub fn is_refundable_bytes_enabled(&self) -> bool {

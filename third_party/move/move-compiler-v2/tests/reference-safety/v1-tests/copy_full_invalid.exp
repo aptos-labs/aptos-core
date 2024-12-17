@@ -6,7 +6,7 @@ error: cannot copy local `x` which is still mutably borrowed
 12 │         let f = &mut x;
    │                 ------ local `x` previously mutably borrowed here
 13 │         x + 0;
-   │         ^^^^^ copy attempted here
+   │         ^ copy attempted here
 14 │         *f;
    │         -- conflicting reference `f` used here
 
@@ -16,6 +16,6 @@ error: cannot copy local `x` which is still mutably borrowed
 18 │         let f = id_mut(&mut x);
    │                 -------------- local `x` previously mutably borrowed here
 19 │         x + 0;
-   │         ^^^^^ copy attempted here
+   │         ^ copy attempted here
 20 │         *f;
    │         -- conflicting reference `f` used here

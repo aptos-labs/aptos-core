@@ -372,7 +372,7 @@ impl ModuleGenerator {
                 ctx.error(
                     loc,
                     format!(
-                        "Unexpected type: {}",
+                        "Unimplemented type: {}",
                         ty.display(&ctx.env.get_type_display_ctx())
                     ),
                 );

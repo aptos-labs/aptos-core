@@ -1,12 +1,17 @@
 import argparse
 from google.cloud import compute_v1
 from kubernetes import client, config
-import time
 import logging
 import concurrent.futures
 import time
 import yaml
 from kubernetes.client.rest import ApiException
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+)
 
 
 # Constants
@@ -20,6 +25,16 @@ import subprocess
 
 TESTNET_SNAPSHOT_NAME = "testnet-archive"
 MAINNET_SNAPSHOT_NAME = "mainnet-archive"
+
+PROJECT = "aptos-devinfra-0"
+REGION = "us-central1"
+CLUSTER_NAME = "devinfra-usce1-0"
+NAMESPACE = "replay-verify"
+ZONE = "us-central1-a"
+
+
+def get_region_from_zone(zone):
+    return zone.rsplit("-", 1)[0]
 
 
 def get_kubectl_credentials(project_id, region, cluster_name):
@@ -122,7 +137,7 @@ def create_snapshot_with_gcloud(
         delete_operation = snapshot_client.delete(
             project=target_project, snapshot=snapshot_name
         )
-        del_res = delete_operation.result()
+        del_res = delete_operation.result(timeout=1800)
         logger.info(f"Snapshot {snapshot_name} {del_res}.")
     except Exception as e:
         logger.info(
@@ -141,6 +156,8 @@ def create_snapshot_with_gcloud(
         source_disk_link,
         "--project",
         target_project,
+        "--storage-location",
+        get_region_from_zone(source_zone),
     ]
 
     try:
@@ -156,10 +173,61 @@ def create_snapshot_with_gcloud(
         raise Exception(f"Error creating snapshot: {e}")
 
 
+def delete_disk(disk_client, project, zone, disk_name):
+    # Check if the disk already exists
+
+    try:
+        disk = disk_client.get(project=project, zone=zone, disk=disk_name)
+        logger.info(f"Disk {disk_name} already exists. Deleting it.")
+        # Delete the existing disk
+        operation = disk_client.delete(project=project, zone=zone, disk=disk_name)
+        wait_for_operation(
+            project, zone, operation.name, compute_v1.ZoneOperationsClient()
+        )
+        logger.info(f"Disk {disk_name} deleted.")
+    except Exception as e:
+        logger.info(f"Disk {e} {disk_name} does not exist, no delete needed.")
+
+
+def generate_disk_name(run_id, snapshot_name, pvc_id):
+    return f"{snapshot_name}-{run_id}-{pvc_id}"
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+    retry=retry_if_exception_type((ApiException, Exception)),
+    before_sleep=lambda retry_state: logger.warning(
+        f"Retrying initial disk creation after error: {retry_state.outcome.exception()}"
+    ),
+)
+def create_disk_from_snapshot(
+    disk_client, snapshot_client, project, zone, snapshot_name, disk_name
+):
+    start_time = time.time()
+    delete_disk(disk_client, project, zone, disk_name)
+
+    # Create a new disk from the snapshot
+    logger.info(f"Creating disk {disk_name} from snapshot {snapshot_name}.")
+    snapshot = snapshot_client.get(project=project, snapshot=snapshot_name)
+    disk_body = compute_v1.Disk(
+        name=disk_name,
+        source_snapshot=snapshot.self_link,
+        type=f"projects/{project}/zones/{zone}/diskTypes/pd-ssd",
+    )
+
+    operation = disk_client.insert(project=project, zone=zone, disk_resource=disk_body)
+    wait_for_operation(project, zone, operation.name, compute_v1.ZoneOperationsClient())
+    duration = time.time() - start_time
+    logger.info(
+        f"Disk {disk_name} created from snapshot {snapshot_name} with {duration}."
+    )
+
+
 # Creating disk from import snapshots
 # require getting a hold of the kubectrl of the cluster
 # eg: gcloud container clusters get-credentials replay-on-archive --region us-central1 --project replay-verify
-def create_disk_pv_pvc_from_snapshot(
+def create_final_snapshot(
     project,
     zone,
     cluster_name,
@@ -172,41 +240,24 @@ def create_disk_pv_pvc_from_snapshot(
 ):
     disk_client = compute_v1.DisksClient()
     snapshot_client = compute_v1.SnapshotsClient()
-
-    # Check if the disk already exists
-    try:
-        disk = disk_client.get(project=project, zone=zone, disk=disk_name)
-        logger.info(f"Disk {disk_name} already exists. Deleting it.")
-        # Delete the existing disk
-        operation = disk_client.delete(project=project, zone=zone, disk=disk_name)
-        wait_for_operation(
-            project, zone, operation.name, compute_v1.ZoneOperationsClient()
-        )
-        logger.info(f"Disk {disk_name} deleted.")
-    except Exception as e:
-        logger.info(f"Disk {e} {disk_name} does not exist. Creating a new one.")
-
-    # Create a new disk from the snapshot
-    logger.info(f"Creating disk {disk_name} from snapshot {og_snapshot_name}.")
-    snapshot = snapshot_client.get(project=project, snapshot=og_snapshot_name)
-    disk_body = compute_v1.Disk(
-        name=disk_name,
-        source_snapshot=snapshot.self_link,
-        type=f"projects/{project}/zones/{zone}/diskTypes/pd-ssd",
+    create_disk_from_snapshot(
+        disk_client,
+        snapshot_client,
+        project,
+        zone,
+        og_snapshot_name,
+        disk_name,
     )
-
-    operation = disk_client.insert(project=project, zone=zone, disk_resource=disk_body)
-    wait_for_operation(project, zone, operation.name, compute_v1.ZoneOperationsClient())
-    logger.info(f"Disk {disk_name} created from snapshot {og_snapshot_name}.")
-
-    region_name = zone.rsplit("-", 1)[0]
+    region_name = get_region_from_zone(zone)
     get_kubectl_credentials(project, region_name, cluster_name)
     # create_persistent_volume(disk_name, pv_name, pvc_name, namespace, True)
     # this is only for xfs replaying logs to repair the disk
     repair_pv = f"{pv_name}-repair"
     repair_pvc = f"{pvc_name}-repair"
     repair_job_name = f"xfs-repair-{pvc_name}"
-    create_persistent_volume(disk_name, repair_pv, repair_pvc, namespace, False)
+    create_persistent_volume(
+        project, zone, disk_name, repair_pv, repair_pvc, namespace, False
+    )
     # start a pod to mount the disk and run simple task
     with open("xfs-disk-repair.yaml", "r") as f:
         pod_manifest = yaml.safe_load(f)
@@ -228,6 +279,11 @@ def create_disk_pv_pvc_from_snapshot(
         time.sleep(10)
     logger.info(f"creating final snapshot")
     create_snapshot_with_gcloud(snapshot_name, project, disk_name, zone, project)
+    logger.info("deleting repair disks")
+    # delete the disk used for repair
+    delete_disk(disk_client, project, zone, disk_name)
+    # delete the pv and pvc
+    delete_pv_and_pvc(repair_pv, repair_pvc, namespace)
 
 
 def is_job_pod_cleanedup(namespace, job_name):
@@ -235,71 +291,112 @@ def is_job_pod_cleanedup(namespace, job_name):
     v1 = client.BatchV1Api()
     try:
         job = v1.read_namespaced_job(job_name, namespace)
+        # Check if job has timed out (active for too long)
+        if job.status.start_time:
+            job_duration = time.time() - job.status.start_time.timestamp()
+            if job_duration > 240:
+                logger.error(
+                    f"Job {job_name} has been running for over {job_duration:.0f} seconds"
+                )
+                return True
         return False
-    except Exception as e:
+    except client.exceptions.ApiException as e:
+        if e.status != 404:
+            logger.error(f"Error checking job {job_name}: {e}")
         return True
 
 
 def wait_for_operation(project, zone, operation_name, zone_operations_client):
+    start_time = time.time()
+    timeout = 3600  # 1 hour timeout
+
     while True:
+        if time.time() - start_time > timeout:
+            raise TimeoutError(
+                f"Operation {operation_name} timed out after {timeout} seconds"
+            )
+
         result = zone_operations_client.get(
             project=project, zone=zone, operation=operation_name
         )
         logger.info(f"Waiting for operation {operation_name} {result}")
 
         if result.status == compute_v1.Operation.Status.DONE:
-            if "error" in result:
+            if hasattr(result, "error") and result.error:
                 raise Exception(result.error)
             return result
 
         time.sleep(20)
 
 
-def create_persistent_volume(disk_name, pv_name, pvc_name, namespace, read_only):
+def delete_pv_and_pvc(pv_name, pvc_name, namespace):
     config.load_kube_config()
     v1 = client.CoreV1Api()
+    try:
+        v1.delete_namespaced_persistent_volume_claim(name=pvc_name, namespace=namespace)
+        logger.info(f"PVC {pvc_name} deleted.")
+    except client.exceptions.ApiException as e:
+        if e.status != 404:
+            logger.error(f"Error deleting PVC {pvc_name}: {e}")
+    try:
+        v1.delete_persistent_volume(name=pv_name)
+        logger.info(f"PV {pv_name} deleted.")
+    except client.exceptions.ApiException as e:
+        if e.status != 404:
+            logger.error(f"Error deleting PV {pv_name}: {e}")
+
+
+def create_persistent_volume(
+    project, zone, disk_name, pv_name, pvc_name, namespace, read_only, label=""
+):
+    config.load_kube_config()
+    v1 = client.CoreV1Api()
+    access_mode = "ReadWriteOnce" if not read_only else "ReadOnlyMany"
+    storage_size = "10Ti" if TESTNET_SNAPSHOT_NAME in disk_name else "8Ti"
 
     # Delete existing PVC if it exists
     try:
-        existing_pvc = v1.read_namespaced_persistent_volume_claim(
-            name=pvc_name, namespace=namespace
-        )
-        if existing_pvc:
-            logger.info(f"PVC {pvc_name} already exists. Deleting it.")
-            v1.delete_namespaced_persistent_volume_claim(
-                name=pvc_name, namespace=namespace
-            )
-            logger.info(f"PVC {pvc_name} deleted.")
+        v1.read_namespaced_persistent_volume_claim(name=pvc_name, namespace=namespace)
+        logger.info(f"PVC {pvc_name} already exists. Deleting it.")
+        v1.delete_namespaced_persistent_volume_claim(name=pvc_name, namespace=namespace)
+        logger.info(f"PVC {pvc_name} deleted.")
     except client.exceptions.ApiException as e:
         if e.status != 404:
             raise
 
     # Delete existing PV if it exists
     try:
-        existing_pv = v1.read_persistent_volume(name=pv_name)
-        if existing_pv:
-            logger.info(f"PV {pv_name} already exists. Deleting it.")
-            v1.delete_persistent_volume(name=pv_name)
-            logger.info(f"PV {pv_name} deleted.")
+        v1.read_persistent_volume(name=pv_name)
+        logger.info(f"PV {pv_name} already exists. Deleting it.")
+        v1.delete_persistent_volume(name=pv_name)
+        logger.info(f"PV {pv_name} deleted.")
     except client.exceptions.ApiException as e:
         if e.status != 404:
             raise
 
     # Create PersistentVolume
+    volume_handle = f"projects/{project}/zones/{zone}/disks/{disk_name}"
     pv = client.V1PersistentVolume(
         api_version="v1",
         kind="PersistentVolume",
-        metadata=client.V1ObjectMeta(name=pv_name),
+        metadata=client.V1ObjectMeta(
+            name=pv_name,
+            labels={
+                "run": f"{label}",
+                "topology.kubernetes.io/zone": zone,  # Add zone label to PV
+            },
+        ),
         spec=client.V1PersistentVolumeSpec(
-            capacity={"storage": "10000Gi"},
-            access_modes=["ReadOnlyMany"],
-            gce_persistent_disk=client.V1GCEPersistentDiskVolumeSource(
-                pd_name=disk_name,
+            capacity={"storage": storage_size},
+            access_modes=[access_mode],
+            csi=client.V1CSIPersistentVolumeSource(
+                driver="pd.csi.storage.gke.io",
+                volume_handle=volume_handle,
                 fs_type="xfs",
                 read_only=read_only,
             ),
-            persistent_volume_reclaim_policy="Retain",
-            storage_class_name="standard",
+            persistent_volume_reclaim_policy="Delete",
+            storage_class_name="ssd-data-xfs",
         ),
     )
 
@@ -307,17 +404,65 @@ def create_persistent_volume(disk_name, pv_name, pvc_name, namespace, read_only)
     pvc = client.V1PersistentVolumeClaim(
         api_version="v1",
         kind="PersistentVolumeClaim",
-        metadata=client.V1ObjectMeta(name=pvc_name, namespace=namespace),
+        metadata=client.V1ObjectMeta(
+            name=pvc_name,
+            namespace=namespace,
+        ),
         spec=client.V1PersistentVolumeClaimSpec(
-            access_modes=["ReadOnlyMany"],
-            resources=client.V1ResourceRequirements(requests={"storage": "10000Gi"}),
-            storage_class_name="standard",
+            access_modes=[access_mode],
+            resources=client.V1ResourceRequirements(requests={"storage": storage_size}),
+            storage_class_name="ssd-data-xfs",
             volume_name=pv_name,
+            # Remove the selector since we're using volume_name for direct binding
         ),
     )
 
     v1.create_persistent_volume(body=pv)
     v1.create_namespaced_persistent_volume_claim(namespace=namespace, body=pvc)
+
+
+def create_repair_disk_and_its_snapshot(
+    project, zone, cluster_name, og_snapshot_name, snapshot_name, prefix, namespace
+):
+    tasks = []
+
+    for copy in range(DISK_COPIES):
+        disk_name = f"{prefix}-repair-{copy}"
+        pv_name = f"{prefix}-{copy}"
+        pvc_name = f"{prefix}-claim-{copy}"
+        tasks.append(
+            (
+                project,
+                zone,
+                cluster_name,
+                og_snapshot_name,
+                snapshot_name,
+                disk_name,
+                pv_name,
+                pvc_name,
+                namespace,
+            )
+        )
+
+    # Execute tasks in parallel
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [executor.submit(create_final_snapshot, *task) for task in tasks]
+        for future in concurrent.futures.as_completed(futures, timeout=3600):
+            try:
+                result = future.result()
+                logger.info(f"Task result: {result}")
+            except Exception as e:
+                logger.error(f"Task generated an exception: {e}")
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=__doc__,
+    )
+    parser.add_argument("--network", required=True, choices=["testnet", "mainnet"])
+    args = parser.parse_args()
+    return args
 
 
 def create_one_pvc_from_snapshot(pvc_name, snapshot_name, namespace, label):
@@ -354,9 +499,12 @@ def create_one_pvc_from_snapshot(pvc_name, snapshot_name, namespace, label):
     return pvc_name
 
 
-def create_pvcs_from_snapshot(run_id, snapshot_name, namespace, pvc_num, label):
+def create_replay_verify_pvcs_from_snapshot(
+    run_id, snapshot_name, namespace, pvc_num, label
+):
     config.load_kube_config()
     api_instance = client.CustomObjectsApi()
+
     volume_snapshot_content = {
         "apiVersion": "snapshot.storage.k8s.io/v1",
         "kind": "VolumeSnapshotContent",
@@ -407,9 +555,13 @@ def create_pvcs_from_snapshot(run_id, snapshot_name, namespace, pvc_num, label):
         if e.status != 409:
             logger.error(f"Error creating new volumesnapshots: {e}")
 
-    # Execute tasks in parallel
     tasks = [
-        (f"{run_id}-{snapshot_name}-{pvc_id}", snapshot_name, namespace, label)
+        (
+            generate_disk_name(run_id, snapshot_name, pvc_id),
+            snapshot_name,
+            namespace,
+            label,
+        )
         for pvc_id in range(pvc_num)
     ]
     res = []
@@ -427,64 +579,16 @@ def create_pvcs_from_snapshot(run_id, snapshot_name, namespace, pvc_num, label):
     return res
 
 
-def create_disk_pv_pvc(
-    project, zone, cluster_name, og_snapshot_name, snapshot_name, prefix, namespace
-):
-    tasks = []
-
-    for copy in range(DISK_COPIES):
-        disk_name = f"{prefix}-{copy}"
-        pv_name = f"{prefix}-{copy}"
-        pvc_name = f"{prefix}-claim-{copy}"
-        tasks.append(
-            (
-                project,
-                zone,
-                cluster_name,
-                og_snapshot_name,
-                snapshot_name,
-                disk_name,
-                pv_name,
-                pvc_name,
-                namespace,
-            )
-        )
-
-    # Execute tasks in parallel
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = [
-            executor.submit(create_disk_pv_pvc_from_snapshot, *task) for task in tasks
-        ]
-        for future in concurrent.futures.as_completed(futures):
-            try:
-                result = future.result()
-                logger.info(f"Task result: {result}")
-            except Exception as e:
-                logger.error(f"Task generated an exception: {e}")
-
-    # start a self deleteing job to mount the xfs disks for repairing
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=__doc__,
-    )
-    parser.add_argument("--network", required=True, choices=["testnet", "mainnet"])
-    args = parser.parse_args()
-    return args
-
-
 if __name__ == "__main__":
     # check input arg network
     args = parse_args()
     network = args.network
     source_project_id = "aptos-platform-compute-0"
-    region = "us-central1"
-    project_id = "aptos-devinfra-0"
-    target_namespace = "default"
-    zone = "us-central1-a"
-    cluster_name = "devinfra-usce1-0"
+    region = REGION
+    project_id = PROJECT
+    target_namespace = NAMESPACE
+    zone = ZONE
+    cluster_name = CLUSTER_NAME
 
     if network == "testnet":
         source_cluster_id = "general-usce1-0"
@@ -506,7 +610,7 @@ if __name__ == "__main__":
         source_namespace,
         project_id,
     )
-    create_disk_pv_pvc(
+    create_repair_disk_and_its_snapshot(
         project_id,
         zone,
         cluster_name,

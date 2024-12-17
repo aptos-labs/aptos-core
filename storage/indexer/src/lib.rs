@@ -6,9 +6,10 @@ mod db;
 pub mod db_indexer;
 pub mod db_ops;
 pub mod db_v2;
+pub mod event_v2_translator;
 pub mod indexer_reader;
 mod metrics;
-mod utils;
+pub mod utils;
 
 use crate::db::INDEX_DB_NAME;
 use aptos_config::config::RocksdbConfig;
