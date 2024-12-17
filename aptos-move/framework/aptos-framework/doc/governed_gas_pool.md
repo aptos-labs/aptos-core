@@ -28,6 +28,7 @@ The implementation provided is based on Aptos Lab's Delegation Pool implementati
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
+<b>use</b> <a href="aptos_account.md#0x1_aptos_account">0x1::aptos_account</a>;
 <b>use</b> <a href="aptos_coin.md#0x1_aptos_coin">0x1::aptos_coin</a>;
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
@@ -167,7 +168,10 @@ Initializes the governed gas pool around a resource account creation seed.
 
     <b>let</b> (governed_gas_pool_signer, governed_gas_pool_signer_cap) = <a href="account.md#0x1_account_create_resource_account">account::create_resource_account</a>(aptos_framework, seed);
 
-    <b>move_to</b>(&governed_gas_pool_signer, <a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPool">GovernedGasPool</a>{
+    // register apt
+    <a href="aptos_account.md#0x1_aptos_account_register_apt">aptos_account::register_apt</a>(&governed_gas_pool_signer);
+
+    <b>move_to</b>(aptos_framework, <a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPool">GovernedGasPool</a>{
         signer_capability: governed_gas_pool_signer_cap,
     });
 }
@@ -249,6 +253,9 @@ Funds the destination account with a given amount of coin.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_fund">fund</a>&lt;CoinType&gt;(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64) <b>acquires</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPool">GovernedGasPool</a> {
+    // Check that the Aptos framework is the caller
+    // This is what <b>ensures</b> that funding can only be done by the Aptos framework,
+    // i.e., via a governance proposal.
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
     <b>let</b> governed_gas_signer = &<a href="governed_gas_pool.md#0x1_governed_gas_pool_governed_gas_signer">governed_gas_signer</a>();
     <a href="coin.md#0x1_coin_deposit">coin::deposit</a>(<a href="account.md#0x1_account">account</a>, <a href="coin.md#0x1_coin_withdraw">coin::withdraw</a>&lt;CoinType&gt;(governed_gas_signer, amount));
