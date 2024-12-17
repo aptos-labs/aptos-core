@@ -8,13 +8,13 @@ use super::{
 use crate::common::{make_shared, ArcError, IP_LOCAL_HOST};
 use anyhow::{anyhow, Context, Result};
 use aptos_localnet::{
-    docker,
     health_checker::HealthChecker,
     indexer_api::{post_metadata, HASURA_IMAGE, HASURA_METADATA},
 };
 use bollard::{
     container::{CreateContainerOptions, WaitContainerOptions},
     secret::{ContainerInspectResponse, HostConfig, PortBinding},
+    Docker,
 };
 use futures::TryStreamExt;
 use maplit::hashmap;
@@ -124,6 +124,7 @@ fn create_container_options_and_config(
 pub fn start_indexer_api(
     instance_id: Uuid,
     shutdown: CancellationToken,
+    fut_docker: impl Future<Output = Result<Docker, ArcError>> + Clone + Send + 'static,
     fut_docker_network: impl Future<Output = Result<String, ArcError>> + Clone + Send + 'static,
     fut_postgres: impl Future<Output = Result<u16, ArcError>> + Clone + Send + 'static,
     fut_all_processors_ready: impl Future<Output = Result<(), ArcError>> + Clone + Send + 'static,
@@ -135,6 +136,7 @@ pub fn start_indexer_api(
     let fut_container_clean_up = Arc::new(Mutex::new(None));
 
     let fut_create_indexer_api = make_shared({
+        let fut_docker = fut_docker.clone();
         let fut_container_clean_up = fut_container_clean_up.clone();
 
         async move {
@@ -148,7 +150,7 @@ pub fn start_indexer_api(
             let (options, config) =
                 create_container_options_and_config(instance_id, docker_network_name);
             let (fut_container, fut_container_cleanup) =
-                create_start_and_inspect_container(shutdown.clone(), options, config);
+                create_start_and_inspect_container(shutdown.clone(), fut_docker, options, config);
             *fut_container_clean_up.lock().await = Some(fut_container_cleanup);
 
             let container_info = fut_container
@@ -201,7 +203,7 @@ pub fn start_indexer_api(
     };
 
     let fut_indexer_api_finish = async move {
-        let docker = docker::get_docker()
+        let docker = fut_docker
             .await
             .context("failed to wait on indexer api container")?;
 

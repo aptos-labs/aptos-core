@@ -27,6 +27,7 @@ mod common;
 mod services;
 
 use anyhow::{anyhow, Context, Result};
+use aptos_localnet::docker::get_docker;
 use common::make_shared;
 use futures::TryFutureExt;
 use services::{
@@ -72,10 +73,14 @@ pub async fn run_all_services() -> Result<()> {
         fut_indexer_grpc.clone(),
     );
 
+    // Docker
+    let fut_docker = make_shared(get_docker());
+
     // Docker Network
     let docker_network_name = "aptos-workspace".to_string();
     let fut_docker_network = make_shared(create_docker_network_permanent(
         shutdown.clone(),
+        fut_docker.clone(),
         docker_network_name,
     ));
 
@@ -83,6 +88,7 @@ pub async fn run_all_services() -> Result<()> {
     let (fut_postgres, fut_postgres_finish, fut_postgres_clean_up) =
         services::postgres::start_postgres(
             shutdown.clone(),
+            fut_docker.clone(),
             fut_docker_network.clone(),
             instance_id,
         );
@@ -100,6 +106,7 @@ pub async fn run_all_services() -> Result<()> {
     let (fut_indexer_api, fut_indexer_api_finish, fut_indexer_api_clean_up) = start_indexer_api(
         instance_id,
         shutdown.clone(),
+        fut_docker.clone(),
         fut_docker_network.clone(),
         fut_postgres.clone(),
         fut_all_processors_ready.clone(),
