@@ -166,6 +166,7 @@ fn test_runner_for_feature(path: &Path, feature: &Feature) -> datatest_stable::R
     options.backend.check_tool_versions()?;
     options.prover.stable_test_output = true;
     options.backend.stable_test_output = true;
+    options.prover.use_bv_by_default = true;
 
     let mut error_writer = Buffer::no_color();
     let result = if feature.v2 {
@@ -243,6 +244,8 @@ fn get_flags_and_baseline(
 
     // Add flags specified via environment variable.
     flags.extend(shell_words::split(&read_env_var(ENV_FLAGS))?);
+
+    // flags.push("--keep".to_string());
 
     // Create a temporary file for output. We inject the modifier to potentially prevent
     // any races between similar named files in different directories, as it appears TempPath

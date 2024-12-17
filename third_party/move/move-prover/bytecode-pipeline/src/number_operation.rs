@@ -14,7 +14,9 @@ use move_model::{
     ty::Type,
 };
 use move_stackless_bytecode::COMPILED_MODULE_AVAILABLE;
+use core::num;
 use std::{collections::BTreeMap, ops::Deref, str};
+use crate::options::ProverOptions;
 
 static PARSING_ERROR: &str = "error happened when parsing the bv pragma";
 
@@ -225,7 +227,7 @@ impl GlobalNumberOperationState {
                 } else {
                     local_ty.is_number()
                 };
-                if arith_flag {
+                if arith_flag && !ProverOptions::get(func_env.module_env.env).use_bv_by_default {
                     default_map.insert(i, Arithmetic);
                 } else {
                     default_map.insert(i, Bottom);
@@ -246,7 +248,7 @@ impl GlobalNumberOperationState {
                 } else {
                     ret_ty.is_number()
                 };
-                if arith_flag {
+                if arith_flag && !ProverOptions::get(func_env.module_env.env).use_bv_by_default {
                     default_ret_operation_map.insert(i, Arithmetic);
                 } else {
                     default_ret_operation_map.insert(i, Bottom);
@@ -288,7 +290,7 @@ impl GlobalNumberOperationState {
                 } else {
                     field_ty.is_number()
                 };
-                if arith_flag {
+                if arith_flag && !ProverOptions::get(struct_env.module_env.env).use_bv_by_default {
                     field_oper_map.insert(field_id, Arithmetic);
                 } else {
                     field_oper_map.insert(field_id, Bottom);
@@ -341,12 +343,13 @@ impl GlobalNumberOperationState {
     ) -> bool {
         let mods = &mut self.exp_operation_map;
         let oper = mods.get_mut(&node_id).expect("node exist");
-        if !allow && oper.conflict(&num_oper) {
-            false
-        } else {
-            *oper = num_oper;
-            true
-        }
+        *oper = num_oper;
+        //let update_flag = allow || !oper.conflict(&num_oper);
+        let ret = *oper != num_oper && !oper.conflict(&num_oper);
+        // if update_flag {
+        //     *oper = num_oper;
+        // }
+        ret
     }
 
     pub fn get_num_operation_field(

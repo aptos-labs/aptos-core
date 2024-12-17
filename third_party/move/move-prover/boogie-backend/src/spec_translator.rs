@@ -32,7 +32,7 @@ use move_model::{
     },
     pragmas::INTRINSIC_TYPE_MAP,
     symbol::Symbol,
-    ty::{PrimitiveType, Type},
+    ty::{self, PrimitiveType, Type},
     well_known::{TYPE_INFO_SPEC, TYPE_NAME_GET_SPEC, TYPE_NAME_SPEC, TYPE_SPEC_IS_STRUCT},
 };
 use move_prover_bytecode_pipeline::{
@@ -1767,9 +1767,9 @@ impl<'env> SpecTranslator<'env> {
             num_oper == Bitwise,
         );
         emit!(self.writer, "{}'{}'(", boogie_val_fun, suffix);
-        self.translate_exp(&args[0]);
+        self.translate_exp_with_bv(&args[0], num_oper == Bitwise);
         emit!(self.writer, ", ");
-        self.translate_exp(&args[1]);
+        self.translate_exp_with_bv(&args[1], num_oper == Bitwise);
         emit!(self.writer, ")");
     }
 
@@ -1794,8 +1794,9 @@ impl<'env> SpecTranslator<'env> {
             .env
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
-        let num_oper = global_state.get_node_num_oper(args[0].node_id());
-        if num_oper == Bitwise {
+        let num_oper_0 = global_state.get_node_num_oper(args[0].node_id());
+        let num_oper_1 = global_state.get_node_num_oper(args[1].node_id());
+        if num_oper_0 == Bitwise || num_oper_1 == Bitwise {
             let oper_base = match self.env.get_node_type(args[0].node_id()).skip_reference() {
                 Type::Primitive(PrimitiveType::U8) => "Bv8",
                 Type::Primitive(PrimitiveType::U16) => "Bv16",
@@ -1807,7 +1808,7 @@ impl<'env> SpecTranslator<'env> {
                 _ => unreachable!(),
             };
             emit!(self.writer, "${}'{}'(", bv_op, oper_base);
-            self.translate_seq(args.iter(), ", ", |e| self.translate_exp(e));
+            self.translate_seq(args.iter(), ", ", |e| self.translate_exp_with_bv(e, true));
             emit!(self.writer, ")");
         } else {
             emit!(self.writer, "(");
@@ -1815,6 +1816,26 @@ impl<'env> SpecTranslator<'env> {
             emit!(self.writer, " {} ", boogie_op);
             self.translate_exp(&args[1]);
             emit!(self.writer, ")");
+        }
+    }
+
+    fn translate_exp_with_bv(&self, e: &Exp, bv_flag: bool) {
+        let global_state = &self
+            .env
+            .get_extension::<GlobalNumberOperationState>()
+            .expect("global number operation state");
+        let num_oper_e = global_state.get_node_num_oper(e.node_id());
+        let ty_e = self.env.get_node_type(e.node_id());
+        if num_oper_e != Bitwise && bv_flag {
+            emit!(
+                self.writer,
+                "$int2bv.{}(",
+                boogie_num_type_base(&ty_e)
+            );
+        }
+        self.translate_exp(e);
+        if num_oper_e != Bitwise && bv_flag {
+            emit!(self.writer, ")")
         }
     }
 
@@ -1862,10 +1883,17 @@ impl<'env> SpecTranslator<'env> {
     }
 
     fn translate_rel_op(&self, boogie_op: &str, args: &[Exp]) {
+        let global_state = &self
+        .env
+        .get_extension::<GlobalNumberOperationState>()
+        .expect("global number operation state");
+        let num_oper_arg0 = global_state.get_node_num_oper(args[0].node_id());
+        let num_oper_arg1 = global_state.get_node_num_oper(args[1].node_id());
+        let bv_flag = num_oper_arg0 == Bitwise || num_oper_arg1 == Bitwise;
         emit!(self.writer, "(");
-        self.translate_exp(&args[0]);
+        self.translate_exp_with_bv(&args[0], bv_flag);
         emit!(self.writer, " {} ", boogie_op);
-        self.translate_exp(&args[1]);
+        self.translate_exp_with_bv(&args[1], bv_flag);
         emit!(self.writer, ")");
     }
 
@@ -1929,7 +1957,7 @@ impl<'env> SpecTranslator<'env> {
         } else {
             emit!(self.writer, "{}(", fun);
         }
-        self.translate_seq(args.iter(), ", ", |e| self.translate_exp(e));
+        self.translate_seq(args.iter(), ", ", |e| self.translate_exp_with_bv(e, num_oper == Bitwise));
         emit!(self.writer, ")");
     }
 
@@ -1972,7 +2000,7 @@ impl<'env> SpecTranslator<'env> {
             };
             emit!(self.writer, "{}(", format!("{}{}", fun, fun_num).as_str());
         }
-        self.translate_seq(args.iter(), ", ", |e| self.translate_exp(e));
+        self.translate_seq(args.iter(), ", ", |e| self.translate_exp_with_bv(e, num_oper == Bitwise));
         emit!(self.writer, ")");
     }
 

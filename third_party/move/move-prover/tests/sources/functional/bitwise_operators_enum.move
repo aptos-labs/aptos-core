@@ -26,7 +26,7 @@ address 0x123 {
         a2: 2
       };
       spec {
-         assert (((int2bv(_b.a.f1) as u64) & (1 as u64)) as u64) == (1 as u64);
+        assert (((int2bv(_b.a.f1) as u64) & (1 as u64)) as u64) == (1 as u64);
       };
       x
     }
