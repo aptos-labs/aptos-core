@@ -134,6 +134,7 @@ pub enum FeatureFlag {
     NativeMemoryOperations,
     EnableLoaderV2,
     DisallowInitModuleToPublishModules,
+    PermissionedSigner,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -357,6 +358,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::DisallowInitModuleToPublishModules => {
                 AptosFeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES
             },
+            FeatureFlag::PermissionedSigner => AptosFeatureFlag::PERMISSIONED_SIGNER,
         }
     }
 }
@@ -507,6 +509,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES => {
                 FeatureFlag::DisallowInitModuleToPublishModules
             },
+            AptosFeatureFlag::PERMISSIONED_SIGNER => FeatureFlag::PermissionedSigner,
         }
     }
 }
