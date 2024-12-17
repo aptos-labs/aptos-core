@@ -64,8 +64,8 @@ fn generate_script(gas_schedule: &GasScheduleV2) -> Result<String> {
     emitln!(writer, "script {");
     writer.indent();
 
-    emitln!(writer, "use aptos_framework::supra_governance;");
-    emitln!(writer, "use aptos_framework::gas_schedule;");
+    emitln!(writer, "use supra_framework::supra_governance;");
+    emitln!(writer, "use supra_framework::gas_schedule;");
     emitln!(writer);
 
     emitln!(writer, "fun main(proposal_id: u64) {");
@@ -73,7 +73,7 @@ fn generate_script(gas_schedule: &GasScheduleV2) -> Result<String> {
 
     emitln!(
         writer,
-        "let framework_signer = supra_governance::resolve(proposal_id, @{});\n",
+        "let framework_signer = supra_governance::supra_resolve(proposal_id, @{});\n",
         AccountAddress::ONE,
     );
 
@@ -83,8 +83,9 @@ fn generate_script(gas_schedule: &GasScheduleV2) -> Result<String> {
 
     emitln!(
         writer,
-        "gas_schedule::set_gas_schedule(&framework_signer, gas_schedule_blob);"
+        "gas_schedule::set_for_next_epoch(&framework_signer, gas_schedule_blob);"
     );
+    emitln!(writer, "supra_governance::reconfigure(&framework_signer);");
 
     writer.unindent();
     emitln!(writer, "}");
@@ -98,7 +99,7 @@ fn generate_script(gas_schedule: &GasScheduleV2) -> Result<String> {
 fn aptos_framework_path() -> PathBuf {
     Path::join(
         Path::new(env!("CARGO_MANIFEST_DIR")),
-        "../framework/aptos-framework",
+        "../framework/supra-framework",
     )
 }
 
@@ -133,7 +134,7 @@ pub fn generate_update_proposal(args: &GenArgs) -> Result<()> {
         &generate_script(&current_gas_schedule(feature_version))?,
     );
     // TODO: use relative path here
-    pack.add_local_dep("AptosFramework", &aptos_framework_path().to_string_lossy());
+    pack.add_local_dep("SupraFramework", &aptos_framework_path().to_string_lossy());
 
     pack.write_to_disk(args.output.as_deref().unwrap_or("./proposal"))?;
 
