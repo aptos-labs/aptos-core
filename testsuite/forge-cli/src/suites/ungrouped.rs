@@ -403,16 +403,19 @@ fn consensus_stress_test() -> ForgeConfig {
     )
 }
 
-fn background_emit_request() -> EmitJobRequest {
-    EmitJobRequest::default()
+fn background_emit_request(high_gas_price: bool) -> EmitJobRequest {
+    let mut result = EmitJobRequest::default()
         .num_accounts_mode(NumAccountsMode::TransactionsPerAccount(1))
-        .mode(EmitJobMode::ConstTps { tps: 10 })
-        .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+        .mode(EmitJobMode::ConstTps { tps: 10 });
+    if high_gas_price {
+        result = result.gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE);
+    }
+    result
 }
 
 pub fn background_traffic_for_sweep(num_cases: usize) -> Option<BackgroundTraffic> {
     Some(BackgroundTraffic {
-        traffic: background_emit_request(),
+        traffic: background_emit_request(true),
         criteria: std::iter::repeat(9.5)
             .take(num_cases)
             .map(|min_tps| {
@@ -426,9 +429,10 @@ pub fn background_traffic_for_sweep(num_cases: usize) -> Option<BackgroundTraffi
 
 pub fn background_traffic_for_sweep_with_latency(
     criteria: &[(f32, f32)],
+    high_gas_price: bool,
 ) -> Option<BackgroundTraffic> {
     Some(BackgroundTraffic {
-        traffic: background_emit_request(),
+        traffic: background_emit_request(high_gas_price),
         criteria: criteria
             .iter()
             .map(|(p50, p90)| {
