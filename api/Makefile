@@ -2,20 +2,14 @@
 # Parts of the project are originally copyright © Meta Platforms, Inc.
 # SPDX-License-Identifier: Apache-2.0
 
-test: clean lint-v0 lint-v1 test-code-gen-v0 test-code-gen-v1 test-api-spec-v0 test-api-spec-v1 clean
+test: clean lint test-code-gen test-api-spec clean
 
-lint-v0:
-	$(call lint,doc/v0/openapi.yaml)
-
-lint-v1:
-	$(call lint,doc/v1/spec.yaml)
-
-test-code-gen-v0:
-	$(call test_code_gen,doc/v0/openapi.yaml)
+lint:
+	$(call lint,doc/spec.yaml)
 
 # This doesn't work right now: https://github.com/OpenAPITools/openapi-generator/issues/13038.
-test-code-gen-v1:
-	$(call test_code_gen,doc/v1/spec.yaml)
+test-code-gen:
+	$(call test_code_gen,doc/spec.yaml)
 
 clean:
 	- pkill aptos-node
@@ -23,10 +17,7 @@ clean:
 	- rm -f openapitools.json
 	- rm -rf .hypothesis
 
-test-api-spec-v0:
-	$(call test_api_spec,openapi.yaml)
-
-test-api-spec-v1:
+test-api-spec:
 	$(call test_api_spec,spec.yaml)
 
 serve:
@@ -60,4 +51,4 @@ define test_code_gen
 	cd /tmp/aptos_api_client && cargo build
 endef
 
-.PHONY: test lint-v0 lint-v1 test-code-gen-v0 test-code-gen-v1 test-api-spec-v0 test-api-spec-v1 clean serve
+.PHONY: test lint test-code-gen test-api-spec clean serve
