@@ -14,6 +14,7 @@
 /// After introducing the core functionality, examples are provided for withdraw limit on accounts, and
 /// for blind signing.
 module aptos_framework::permissioned_signer {
+    use std::features;
     use std::signer;
     use std::error;
     use std::vector;
@@ -61,6 +62,9 @@ module aptos_framework::permissioned_signer {
     /// destroying permission handle that has already been revoked or not owned by the
     /// given master signer.
     const E_NOT_ACTIVE: u64 = 8;
+
+    /// Permissioned signer feature is not activated.
+    const EPERMISSION_SIGNER_DISABLED: u64 = 9;
 
     const U256_MAX: u256 =
         115792089237316195423570985008687907853269984665640564039457584007913129639935;
@@ -210,6 +214,10 @@ module aptos_framework::permissioned_signer {
     /// signer interacts with various framework functions, it would subject to permission checks
     /// and would abort if check fails.
     public fun signer_from_permissioned_handle(p: &PermissionedHandle): signer {
+        assert!(
+            features::is_permissioned_signer_enabled(),
+            error::permission_denied(EPERMISSION_SIGNER_DISABLED)
+        );
         signer_from_permissioned_handle_impl(
             p.master_account_addr, p.permissions_storage_addr
         )
@@ -219,6 +227,10 @@ module aptos_framework::permissioned_signer {
     public(friend) fun signer_from_storable_permissioned_handle(
         p: &StorablePermissionedHandle
     ): signer {
+        assert!(
+            features::is_permissioned_signer_enabled(),
+            error::permission_denied(EPERMISSION_SIGNER_DISABLED)
+        );
         assert!(
             timestamp::now_seconds() < p.expiration_time,
             error::permission_denied(E_PERMISSION_EXPIRED)
