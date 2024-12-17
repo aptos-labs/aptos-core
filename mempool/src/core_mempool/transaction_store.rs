@@ -225,7 +225,8 @@ impl TransactionStore {
         let address = txn.get_sender();
         let txn_seq_num = txn.sequence_info.transaction_sequence_number;
         let acc_seq_num = txn.sequence_info.account_sequence_number;
-
+        info!("mempool insert txn: (address: {:?}, replay_protector: {:?}, expiration_timestamp_secs: {:?})", txn.txn.sender(), txn_seq_num, txn.txn.expiration_timestamp_secs());
+        
         // If the transaction is already in Mempool, we only allow the user to
         // increase the gas unit price to speed up a transaction, but not the max gas.
         //
