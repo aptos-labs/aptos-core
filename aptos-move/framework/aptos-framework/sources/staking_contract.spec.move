@@ -619,4 +619,12 @@ spec aptos_framework::staking_contract {
             resource_addr
         ) && acc.guid_creation_num + 12 >= account::MAX_GUID_CREATION_NUM;
     }
+
+    spec destroy_staking_contract(
+        staker: &signer,
+        operator: address,
+    ): (u64, address, OwnerCapability, u64, Pool, SignerCapability) {
+        // TODO: temporary mockup
+        pragma verify = false;
+    }
 }
