@@ -97,10 +97,13 @@ where
 }
 
 /// Run move compiler and print errors to given writer. Returns the set of compiled units.
-pub fn run_move_compiler_with_emitter(
-    emitter: &mut dyn Emitter,
+pub fn run_move_compiler_with_emitter<E>(
+    emitter: &mut E,
     options: Options,
-) -> anyhow::Result<(GlobalEnv, Vec<AnnotatedCompiledUnit>)> {
+) -> anyhow::Result<(GlobalEnv, Vec<AnnotatedCompiledUnit>)>
+where
+    E: Emitter + ?Sized,
+{
     logging::setup_logging();
     info!("Move Compiler v2");
 
@@ -618,7 +621,10 @@ fn get_vm_error_loc(env: &GlobalEnv, source_map: &SourceMap, e: &VMError) -> Opt
 }
 
 /// Report any diags in the env to the writer and fail if there are errors.
-pub fn check_errors(env: &GlobalEnv, emitter: &mut dyn Emitter, msg: &str) -> anyhow::Result<()> {
+pub fn check_errors<E>(env: &GlobalEnv, emitter: &mut E, msg: &str) -> anyhow::Result<()>
+where
+    E: Emitter + ?Sized,
+{
     let options = env.get_extension::<Options>().unwrap_or_default();
 
     emitter.report_diag(env, options.report_severity());
