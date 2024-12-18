@@ -13,13 +13,7 @@ use clap::{
 };
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use itertools::Itertools;
-use log::LevelFilter;
-use move_compiler::shared::{known_attributes::KnownAttribute, PackagePaths};
-use move_compiler_v2::{env_pipeline::rewrite_target::RewritingScope, Experiment};
-use move_model::{
-    model::{FunctionEnv, GlobalEnv, ModuleEnv, VerificationScope},
-    parse_addresses_from_options, run_model_builder_with_options,
-};
+use move_model::model::{FunctionEnv, GlobalEnv, ModuleEnv, VerificationScope};
 use move_prover::{
     check_errors, cli::Options, create_and_process_bytecode, create_init_num_operation_state,
     generate_boogie, verify_boogie,
@@ -149,27 +143,9 @@ fn run_benchmark(
     } else {
         Options::default()
     };
-    let addrs = parse_addresses_from_options(options.move_named_address_values.clone())?;
+    options.move_sources.append(&mut modules.to_vec());
     options.move_deps.append(&mut dep_dirs.to_vec());
-    let skip_attribute_checks = true;
-    let known_attributes = KnownAttribute::get_all_attribute_names().clone();
-    let mut env = run_model_builder_with_options(
-        vec![PackagePaths {
-            name: None,
-            paths: modules.to_vec(),
-            named_address_map: addrs.clone(),
-        }],
-        vec![],
-        vec![PackagePaths {
-            name: None,
-            paths: options.move_deps.clone(),
-            named_address_map: addrs,
-        }],
-        options.model_builder.clone(),
-        skip_attribute_checks,
-        &known_attributes,
-    )?;
-    let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
+    options.skip_attribute_checks = true;
 
     if use_aptos_natives {
         options.backend.custom_natives =
@@ -184,14 +160,16 @@ fn run_benchmark(
     // Do not allow any benchmark to run longer than 60s. If this is exceeded it usually
     // indicates a bug in boogie or the solver, because we already propagate soft timeouts, but
     // they are ignored.
-    options.backend.hard_timeout_secs = 400;
+    options.backend.hard_timeout_secs = 60;
     options.backend.global_timeout_overwrite = false;
-    options.backend.vc_timeout = 300;
-
-    options.verbosity_level = LevelFilter::Warn;
+    options.backend.vc_timeout = 400;
+    options.set_quiet();
     options.backend.proc_cores = 1;
     options.backend.derive_options();
     options.setup_logging();
+
+    let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
+    let env = move_prover::create_move_prover_v2_model(&mut error_writer, options.clone())?;
     check_errors(&env, &options, &mut error_writer, "unexpected build errors")?;
 
     let config_descr = if let Some(config) = config_file_opt {
@@ -216,17 +194,6 @@ fn run_benchmark(
         Notice that execution is slow because we enforce single core execution.",
         config_descr
     );
-    // Need to run the pipeline to
-    let compiler_options = move_compiler_v2::Options::default()
-        .set_experiment(Experiment::OPTIMIZE, false)
-        .set_experiment(Experiment::SPEC_REWRITE, true);
-    env.set_extension(compiler_options.clone());
-    let pipeline = move_compiler_v2::check_and_rewrite_pipeline(
-        &compiler_options,
-        true,
-        RewritingScope::Everything,
-    );
-    pipeline.run(&mut env);
     runner.bench(&env)
 }
 
@@ -261,13 +228,13 @@ impl Runner {
         // Write data record of benchmark result
         writeln!(
             self.out,
-            "{:<40} {:>12} {:>12}",
+            "{:<50} {:>15} {:>15}",
             fun.get_full_name_str(),
             duration.as_millis(),
             status
         )?;
 
-        println!("\x08\x08{:.3}s {}.", duration.as_secs_f64(), status);
+        println!(" {:.3}s {}.", duration.as_secs_f64(), status);
         Ok(())
     }
 
