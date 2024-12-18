@@ -11,10 +11,7 @@ use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColo
 use log::{debug, info, warn};
 use move_abigen::Abigen;
 use move_compiler::shared::{known_attributes::KnownAttribute, PackagePaths};
-use move_compiler_v2::{
-    env_pipeline::rewrite_target::RewritingScope,
-    Experiment,
-};
+use move_compiler_v2::{env_pipeline::rewrite_target::RewritingScope, Experiment};
 use move_docgen::Docgen;
 use move_errmapgen::ErrmapGen;
 use move_model::{

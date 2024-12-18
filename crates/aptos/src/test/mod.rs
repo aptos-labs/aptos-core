@@ -64,7 +64,6 @@ use aptos_rest_client::{
 use aptos_sdk::move_types::{account_address::AccountAddress, language_storage::ModuleId};
 use aptos_temppath::TempPath;
 use aptos_types::on_chain_config::ValidatorSet;
-use move_compiler_v2::diagnostics::message_format::MessageFormat;
 use move_core_types::ident_str;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};

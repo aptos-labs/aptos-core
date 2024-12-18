@@ -1155,8 +1155,9 @@ pub fn build_and_report_v2_driver(options: move_compiler_v2::Options) -> Compile
 pub fn build_and_report_no_exit_v2_driver(
     options: move_compiler_v2::Options,
 ) -> CompilerDriverResult {
-    let emitter = options.to_emitter();
-    let (env, units) = move_compiler_v2::run_move_compiler_with_emitter(emitter, options)?;
+    let mut stderr = StandardStream::stderr(ColorChoice::Auto);
+    let mut emitter = options.to_emitter(&mut stderr);
+    let (env, units) = move_compiler_v2::run_move_compiler_with_emitter(emitter.as_mut(), options)?;
     Ok((
         move_compiler_v2::make_files_source_text(&env),
         units,

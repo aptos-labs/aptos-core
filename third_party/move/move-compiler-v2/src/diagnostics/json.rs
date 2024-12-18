@@ -1,20 +1,19 @@
 use crate::diagnostics::Emitter;
 use codespan::{FileId, Files};
 use codespan_reporting::diagnostic::Diagnostic;
-use std::io;
+use std::io::Write;
 
-pub struct JsonEmitter<W: io::Write> {
-    writer: W,
+pub struct JsonEmitter<'w, W: Write> {
+    writer: &'w mut W,
 }
 
-impl<W: io::Write> JsonEmitter<W> {
-    pub fn new(writer: W) -> Box<Self> {
-        let emitter = JsonEmitter { writer };
-        Box::new(emitter)
+impl<'w, W: Write> JsonEmitter<'w, W> {
+    pub fn new(writer: &'w mut W) -> Self {
+        JsonEmitter { writer }
     }
 }
 
-impl<W: io::Write> Emitter for JsonEmitter<W> {
+impl<'w, W: Write> Emitter for JsonEmitter<'w, W> {
     fn emit(&mut self, _source_files: &Files<String>, diag: &Diagnostic<FileId>) {
         serde_json::to_writer(&mut self.writer, diag).expect("emit must not fail");
         writeln!(&mut self.writer).unwrap();

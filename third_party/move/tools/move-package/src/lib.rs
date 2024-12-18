@@ -22,9 +22,7 @@ use clap::*;
 use move_compiler::{
     command_line::SKIP_ATTRIBUTE_CHECKS, shared::known_attributes::KnownAttribute,
 };
-use move_compiler_v2::{
-    external_checks::ExternalChecks,
-};
+use move_compiler_v2::external_checks::ExternalChecks;
 use move_core_types::account_address::AccountAddress;
 use move_model::{
     metadata::{CompilerVersion, LanguageVersion},

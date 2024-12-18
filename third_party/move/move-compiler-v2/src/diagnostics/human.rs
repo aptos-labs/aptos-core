@@ -5,21 +5,20 @@ use codespan_reporting::{
     term::{emit, termcolor::WriteColor, Config},
 };
 
-pub struct HumanEmitter<W: WriteColor> {
-    writer: W,
+pub struct HumanEmitter<'w, W: WriteColor> {
+    writer: &'w mut W,
 }
 
-impl<W> HumanEmitter<W>
+impl<'w, W> HumanEmitter<'w, W>
 where
     W: WriteColor,
 {
-    pub fn new(writer: W) -> Box<Self> {
-        let emitter = HumanEmitter { writer };
-        Box::new(emitter)
+    pub fn new(writer: &'w mut W) -> Self {
+        HumanEmitter { writer }
     }
 }
 
-impl<W> Emitter for HumanEmitter<W>
+impl<'w, W> Emitter for HumanEmitter<'w, W>
 where
     W: WriteColor,
 {

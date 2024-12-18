@@ -6,21 +6,19 @@ use anyhow::bail;
 use codespan::{FileId, Files};
 use codespan_reporting::{
     diagnostic::{Diagnostic, Severity},
-    term::termcolor::{ColorChoice, StandardStream},
+    term::termcolor::StandardStream,
 };
 use move_model::model::GlobalEnv;
 
 pub mod human;
 pub mod json;
-pub mod message_format;
 
 impl options::Options {
-    pub fn to_emitter(&self) -> Box<dyn Emitter> {
-        let stderr = StandardStream::stderr(ColorChoice::Auto);
+    pub fn to_emitter<'w>(&self, stderr: &'w mut StandardStream) -> Box<dyn Emitter + 'w> {
         if self.experiment_on(Experiment::MESSAGE_FORMAT_JSON) {
-            JsonEmitter::new(stderr)
+            Box::new(JsonEmitter::new(stderr))
         } else {
-            HumanEmitter::new(stderr)
+            Box::new(HumanEmitter::new(stderr))
         }
     }
 }

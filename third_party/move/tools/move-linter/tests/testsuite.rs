@@ -7,7 +7,6 @@ use move_linter::MoveLintChecks;
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_prover_test_utils::baseline_test;
 use std::path::{Path, PathBuf};
-use move_compiler_v2::diagnostics::Emitter;
 
 /// Extension for expected output files.
 pub const EXP_EXT: &str = "exp";
