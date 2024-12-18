@@ -26,7 +26,8 @@ impl NetworkLoadTest for PerformanceBenchmark {
         duration: Duration,
     ) -> Result<()> {
         let validators = { swarm.read().await.get_validator_clients_with_names() };
-        let num_bad_leaders = validators.len() / 5;
+        // 10 vals, test 1,2,3 failures
+        let num_bad_leaders = 3;
         for (name, validator)  in validators[..num_bad_leaders].iter() {
             validator
                     .set_failpoint(
