@@ -71,19 +71,26 @@ pub fn run_move_prover_v2<W: WriteColor>(
     options: Options,
 ) -> anyhow::Result<()> {
     let now = Instant::now();
-    let cloned_options = options.clone();
+    let mut env = create_move_prover_v2_model(error_writer, options.clone())?;
+    run_move_prover_with_model_v2(&mut env, error_writer, options, now)
+}
+
+pub fn create_move_prover_v2_model<W: WriteColor>(
+    error_writer: &mut W,
+    options: Options,
+) -> anyhow::Result<GlobalEnv> {
     let compiler_options = move_compiler_v2::Options {
-        dependencies: cloned_options.move_deps,
-        named_address_mapping: cloned_options.move_named_address_values,
-        output_dir: cloned_options.output_path,
-        language_version: cloned_options.language_version,
+        dependencies: options.move_deps,
+        named_address_mapping: options.move_named_address_values,
+        output_dir: options.output_path,
+        language_version: options.language_version,
         compiler_version: None, // TODO: need to pass v2.x here
         skip_attribute_checks: true,
         known_attributes: Default::default(),
-        testing: cloned_options.backend.stable_test_output,
+        testing: options.backend.stable_test_output,
         experiments: vec![],
         experiment_cache: Default::default(),
-        sources: cloned_options.move_sources,
+        sources: options.move_sources,
         sources_deps: vec![],
         warn_deprecated: false,
         warn_of_deprecation_use_in_aptos_libs: false,
@@ -94,8 +101,7 @@ pub fn run_move_prover_v2<W: WriteColor>(
         external_checks: vec![],
     };
 
-    let mut env = move_compiler_v2::run_move_compiler_for_analysis(error_writer, compiler_options)?;
-    run_move_prover_with_model_v2(&mut env, error_writer, options, now)
+    move_compiler_v2::run_move_compiler_for_analysis(error_writer, compiler_options)
 }
 
 /// Create the initial number operation state for each function and struct

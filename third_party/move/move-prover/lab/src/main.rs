@@ -5,7 +5,7 @@
 #![forbid(unsafe_code)]
 
 use itertools::Itertools;
-use prover_lab::{benchmark, plot};
+use move_prover_lab::{benchmark, plot};
 
 fn main() {
     let args = std::env::args().collect_vec();
