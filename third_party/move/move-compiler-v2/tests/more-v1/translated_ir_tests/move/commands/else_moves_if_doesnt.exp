@@ -6,4 +6,4 @@ error: cannot move local `x` since it is still in use
 4 │     let y = if (true) 0 else move x; y;
   │                              ^^^^^^ attempted to move here
 5 │     assert!(x == 0, 42);
-  │             ------ used here
+  │             - used here

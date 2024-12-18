@@ -75,4 +75,18 @@ fun test::f1() {
 }
 
 
+============ disassembled file-format ==================
+// Move bytecode v7
+module 815.test {
+
+
+f1() /* def_idx: 0 */ {
+B0:
+	0: Branch(2)
+B1:
+	1: Branch(0)
+B2:
+	2: Branch(0)
+}
+}
 ============ bytecode verification succeeded ========
