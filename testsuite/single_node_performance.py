@@ -64,7 +64,7 @@ NUM_ACCOUNTS = max(
     ]
 )
 MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
-NUM_KEYLESS_ACCOUNTS = 20000  # 20k keyless accounts should take ~1 min.
+NUM_KEYLESS_ACCOUNTS = 20000  # Creating 20k keyless accounts should take ~1 min.
 MAX_BLOCK_SIZE_KEYLESS = 10000
 
 NOISE_LOWER_LIMIT = 0.98 if IS_MAINNET else 0.8
@@ -322,8 +322,7 @@ TESTS = [
         (True, [] if FA_MIGRATION_COMPLETE else ["VM", "NativeVM"])
     ]
     for executor_type in executor_types
-]
-TESTS = [
+] + [
     RunGroupConfig(
         expected_tps=7600,
         key=RunGroupKey("keyless-coin-transfer"),
@@ -689,7 +688,7 @@ with tempfile.TemporaryDirectory() as tmpdirname, tempfile.TemporaryDirectory() 
             key=RunGroupKey("warmup-keyless"),
             single_node_result=extract_run_results(output_keyless, "Overall", create_db=True),
             number_of_threads_results={},
-            block_size=MAX_BLOCK_SIZE,
+            block_size=MAX_BLOCK_SIZE_KEYLESS,
             expected_tps=0,
         ),
     ]
@@ -819,7 +818,7 @@ with tempfile.TemporaryDirectory() as tmpdirname, tempfile.TemporaryDirectory() 
         number_of_threads_results = {}
 
         for execution_threads in EXECUTION_ONLY_NUMBER_OF_THREADS:
-            test_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {execution_threads} --skip-commit {common_command_suffix} --blocks {NUM_BLOCKS}"
+            test_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {execution_threads} --skip-commit {common_command_suffix} --blocks {NUM_BLOCKS_DETAILED}"
             output = execute_command(test_db_command)
 
             number_of_threads_results[execution_threads] = extract_run_results(
@@ -909,7 +908,7 @@ with tempfile.TemporaryDirectory() as tmpdirname, tempfile.TemporaryDirectory() 
                 ],
             )
             print_table(
-                results[1:],
+                results[2:],
                 by_levels=True,
                 only_fields=[
                     ("g/s", lambda r: int(round(r.single_node_result.gps))),
@@ -921,7 +920,7 @@ with tempfile.TemporaryDirectory() as tmpdirname, tempfile.TemporaryDirectory() 
                 ],
             )
             print_table(
-                results[1:],
+                results[2:],
                 by_levels=True,
                 only_fields=[
                     (
@@ -952,7 +951,7 @@ with tempfile.TemporaryDirectory() as tmpdirname, tempfile.TemporaryDirectory() 
                 ],
             )
             print_table(
-                results[1:],
+                results[2:],
                 by_levels=True,
                 only_fields=[
                     (
