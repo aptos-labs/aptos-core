@@ -19,12 +19,14 @@ use aptos_dkg::{
     },
 };
 use fixed::types::U64F64;
+use num_bigint::BigUint;
 use num_traits::Zero;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, sync::Arc, time::Instant};
 
 pub mod rounding;
+pub mod rounding_v2;
 
 pub type WTrx = pvss::das::WeightedTranscript;
 pub type DkgPP = <WTrx as Transcript>::PublicParameters;
@@ -107,6 +109,20 @@ pub fn build_dkg_pvss_config(
         maybe_fast_path_secrecy_threshold,
     );
     let rounding_time = timer.elapsed();
+
+    let timer = Instant::now();
+    let stakes = validator_stakes.iter().map(|s| BigUint::from(*s)).collect();
+    let (rounded_v2, rounding_v2_err) = match rounding_v2::main(
+        stakes,
+        BigUint::from(secrecy_threshold.to_bits()),
+        BigUint::from(reconstruct_threshold.to_bits()),
+        maybe_fast_path_secrecy_threshold.map(|v| BigUint::from(v.to_bits())),
+    ) {
+        Ok(rounded) => (Some(rounded), None),
+        Err(e) => (None, Some(e.to_string())),
+    };
+    let rounding_v2_time = timer.elapsed();
+
     let validator_consensus_keys: Vec<bls12381::PublicKey> = next_validators
         .iter()
         .map(|vi| vi.public_key.clone())
@@ -120,10 +136,14 @@ pub fn build_dkg_pvss_config(
     let pp = DkgPP::default_with_bls_base();
 
     let rounding_summary = RoundingSummary {
+        stakes: validator_stakes,
         method: rounding_method,
         output: profile,
         exec_time: rounding_time,
         error: rounding_error,
+        rounded_v2,
+        rounding_v2_err,
+        rounding_v2_time,
     };
 
     DKGPvssConfig::new(
