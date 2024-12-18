@@ -11,28 +11,32 @@ fun m::bar($t0: &mut u64, $t1: u64) {
 public fun m::foo($t0: &mut u64, $t1: u64) {
      var $t2: bool
      var $t3: u64
-     var $t4: &mut u64
-     var $t5: u64
+     var $t4: u64
+     var $t5: &mut u64
      var $t6: u64
      var $t7: u64
+     var $t8: u64
+     var $t9: u64
   0: label L0
-  1: $t3 := 0
-  2: $t2 := >($t1, $t3)
-  3: if ($t2) goto 4 else goto 12
-  4: label L2
-  5: $t4 := infer($t0)
-  6: $t5 := m::one()
-  7: m::bar($t4, $t5)
-  8: $t7 := 1
-  9: $t6 := -($t1, $t7)
- 10: $t1 := infer($t6)
- 11: goto 14
- 12: label L3
+  1: $t3 := infer($t1)
+  2: $t4 := 0
+  3: $t2 := >($t3, $t4)
+  4: if ($t2) goto 5 else goto 14
+  5: label L2
+  6: $t5 := infer($t0)
+  7: $t6 := m::one()
+  8: m::bar($t5, $t6)
+  9: $t8 := infer($t1)
+ 10: $t9 := 1
+ 11: $t7 := -($t8, $t9)
+ 12: $t1 := infer($t7)
  13: goto 16
- 14: label L4
- 15: goto 0
- 16: label L1
- 17: return ()
+ 14: label L3
+ 15: goto 18
+ 16: label L4
+ 17: goto 0
+ 18: label L1
+ 19: return ()
 }
 
 
@@ -58,40 +62,46 @@ fun m::bar($t0: &mut u64, $t1: u64) {
 public fun m::foo($t0: &mut u64, $t1: u64) {
      var $t2: bool
      var $t3: u64
-     var $t4: &mut u64
-     var $t5: u64 [unused]
+     var $t4: u64
+     var $t5: &mut u64
      var $t6: u64 [unused]
      var $t7: u64 [unused]
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
      # live vars: $t0, $t1
   0: label L0
      # live vars: $t0, $t1
-  1: $t3 := 0
+  1: $t3 := copy($t1)
      # live vars: $t0, $t1, $t3
-  2: $t2 := >($t1, $t3)
-     # live vars: $t0, $t1, $t2
-  3: if ($t2) goto 4 else goto 12
-     # live vars: $t0, $t1
-  4: label L2
-     # live vars: $t0, $t1
-  5: $t4 := copy($t0)
-     # live vars: $t0, $t1, $t4
-  6: $t3 := m::one()
+  2: $t4 := 0
      # live vars: $t0, $t1, $t3, $t4
-  7: m::bar($t4, $t3)
+  3: $t2 := >($t3, $t4)
+     # live vars: $t0, $t1, $t2
+  4: if ($t2) goto 5 else goto 14
      # live vars: $t0, $t1
-  8: $t3 := 1
-     # live vars: $t0, $t1, $t3
-  9: $t3 := -($t1, $t3)
+  5: label L2
+     # live vars: $t0, $t1
+  6: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t5
+  7: $t3 := m::one()
+     # live vars: $t0, $t1, $t3, $t5
+  8: m::bar($t5, $t3)
+     # live vars: $t0, $t1
+  9: $t3 := move($t1)
      # live vars: $t0, $t3
- 10: $t1 := move($t3)
+ 10: $t4 := 1
+     # live vars: $t0, $t3, $t4
+ 11: $t3 := -($t3, $t4)
+     # live vars: $t0, $t3
+ 12: $t1 := move($t3)
      # live vars: $t0, $t1
- 11: goto 0
+ 13: goto 0
      # live vars: $t0, $t1
- 12: label L3
+ 14: label L3
      # live vars: $t0
- 13: drop($t0)
+ 15: drop($t0)
      # live vars:
- 14: return ()
+ 16: return ()
 }
 
 
@@ -118,7 +128,6 @@ B0:
 	3: Ret
 }
 public foo(Arg0: &mut u64, Arg1: u64) /* def_idx: 1 */ {
-L2:	loc0: u64
 B0:
 	0: CopyLoc[1](Arg1: u64)
 	1: LdU64(0)

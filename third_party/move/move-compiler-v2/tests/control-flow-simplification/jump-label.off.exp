@@ -9,7 +9,6 @@ use 0000000000000000000000000000000000000000000000000000000000000001::string;
 
 test<Ty0>(Arg0: vector<u8>): Ty0 /* def_idx: 0 */ {
 L1:	loc0: String
-L2:	loc1: String
 B0:
 	0: Call foo<Ty0>(): String
 	1: StLoc[1](loc0: String)
@@ -35,21 +34,19 @@ B3:
 	18: Call bar<Ty0>(bool): Ty0
 	19: Ret
 B4:
-	20: LdConst[2](Vector(U8): [3, 117, 54, 52])
-	21: Call string::utf8(vector<u8>): String
-	22: StLoc[2](loc1: String)
-	23: MoveLoc[1](loc0: String)
-	24: MoveLoc[2](loc1: String)
-	25: Eq
-	26: BrFalse(31)
+	20: MoveLoc[1](loc0: String)
+	21: LdConst[2](Vector(U8): [3, 117, 54, 52])
+	22: Call string::utf8(vector<u8>): String
+	23: Eq
+	24: BrFalse(29)
 B5:
-	27: MoveLoc[0](Arg0: vector<u8>)
-	28: Call baz<bool>(vector<u8>): bool
-	29: Call bar<Ty0>(bool): Ty0
-	30: Ret
+	25: MoveLoc[0](Arg0: vector<u8>)
+	26: Call baz<bool>(vector<u8>): bool
+	27: Call bar<Ty0>(bool): Ty0
+	28: Ret
 B6:
-	31: LdU64(0)
-	32: Abort
+	29: LdU64(0)
+	30: Abort
 }
 bar<Ty0>(Arg0: bool): Ty0 /* def_idx: 1 */ {
 B0:

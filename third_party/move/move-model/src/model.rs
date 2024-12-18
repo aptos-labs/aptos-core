@@ -885,6 +885,17 @@ impl GlobalEnv {
         target_modules
     }
 
+    /// Find all primary target modules and return in a vector
+    pub fn get_primary_target_modules(&self) -> Vec<ModuleEnv> {
+        let mut target_modules: Vec<ModuleEnv> = vec![];
+        for module_env in self.get_modules() {
+            if module_env.is_primary_target() {
+                target_modules.push(module_env);
+            }
+        }
+        target_modules
+    }
+
     fn add_backtrace(msg: &str, _is_bug: bool) -> String {
         // Note that you need both MOVE_COMPILER_BACKTRACE=1 and RUST_BACKTRACE=1 for this to
         // actually generate a backtrace.

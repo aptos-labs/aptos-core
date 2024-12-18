@@ -17,6 +17,7 @@ aptos-backup-cli = { workspace = true }
 aptos-block-executor = { workspace = true }
 aptos-config = { workspace = true }
 aptos-db = { workspace = true, features = ["db-debugger"] }
+aptos-db-indexer = { workspace = true }
 aptos-executor = { workspace = true }
 aptos-executor-types = { workspace = true }
 aptos-logger = { workspace = true }
@@ -35,3 +36,4 @@ tokio = { workspace = true }
 aptos-backup-cli = { workspace = true, features = ["testing"] }
 aptos-backup-service = { workspace = true }
 aptos-executor-test-helpers = { workspace = true }
+aptos-indexer-grpc-table-info = { workspace = true }

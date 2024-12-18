@@ -88,3 +88,9 @@ name = "use_case_aware_shuffler"
 path = "fuzz_targets/use_case_aware_shuffler.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "deserialize_script_module"
+path = "fuzz_targets/move/deserialize_script_module.rs"
+test = false
+doc = false

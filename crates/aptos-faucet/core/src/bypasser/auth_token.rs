@@ -5,6 +5,7 @@ use super::BypasserTrait;
 use crate::{
     checkers::CheckerData,
     common::{ListManager, ListManagerConfig},
+    firebase_jwt::X_IS_JWT_HEADER,
 };
 use anyhow::Result;
 use aptos_logger::info;
@@ -29,6 +30,11 @@ impl AuthTokenBypasser {
 #[async_trait]
 impl BypasserTrait for AuthTokenBypasser {
     async fn request_can_bypass(&self, data: CheckerData) -> Result<bool> {
+        // Don't check if the request has X_IS_JWT_HEADER set.
+        if data.headers.contains_key(X_IS_JWT_HEADER) {
+            return Ok(false);
+        }
+
         let auth_token = match data
             .headers
             .get(AUTHORIZATION)
@@ -38,6 +44,7 @@ impl BypasserTrait for AuthTokenBypasser {
             Some(auth_token) => auth_token,
             None => return Ok(false),
         };
+
         Ok(self.manager.contains(auth_token))
     }
 }
