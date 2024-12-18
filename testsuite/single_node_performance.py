@@ -64,8 +64,7 @@ NUM_ACCOUNTS = max(
     ]
 )
 MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
-NUM_KEYLESS_ACCOUNTS = 20000  # Creating 20k keyless accounts should take ~1 min.
-MAX_BLOCK_SIZE_KEYLESS = 10000
+NUM_KEYLESS_ACCOUNTS = 10000  # Creating 10k keyless accounts should take ~30s.
 
 NOISE_LOWER_LIMIT = 0.98 if IS_MAINNET else 0.8
 NOISE_LOWER_LIMIT_WARN = 0.9
@@ -328,7 +327,7 @@ TESTS = [
         key=RunGroupKey("keyless-coin-transfer"),
         key_extra=RunGroupKeyExtra(
             txn_auth_mode="keyless",
-            transaction_type_override="non-conflicting-coin-transfer"
+            transaction_type_override="no-op"
         ),
         included_in=LAND_BLOCKING_AND_C,
     )
@@ -630,7 +629,9 @@ def print_table(
 
 errors = []
 warnings = []
-results = []
+main_results = []
+default_warmup_result = None
+keyless_warmup_result = None
 
 with tempfile.TemporaryDirectory() as tmpdirname, tempfile.TemporaryDirectory() as keyless_tmp_dir:
     move_e2e_benchmark_failed = False
@@ -671,27 +672,13 @@ with tempfile.TemporaryDirectory() as tmpdirname, tempfile.TemporaryDirectory() 
     print(f"Warmup - creating a DB with {NUM_ACCOUNTS} default accounts")
     create_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-executor-type aptos-vm-with-block-stm --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db {FEATURE_FLAGS} --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
-
-    print(f"Warmup - creating another DB with {NUM_KEYLESS_ACCOUNTS} keyless accounts")
-    create_db_command_keyless = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-executor-type aptos-vm-with-block-stm --block-size {MAX_BLOCK_SIZE_KEYLESS} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} --use-keyless-accounts create-db {FEATURE_FLAGS} --data-dir {keyless_tmp_dir}/db --num-accounts {NUM_KEYLESS_ACCOUNTS}"
-    output_keyless = execute_command(create_db_command_keyless)
-
-    results += [
-        RunGroupInstance(
-            key=RunGroupKey("warmup"),
-            single_node_result=extract_run_results(output, "Overall", create_db=True),
-            number_of_threads_results={},
-            block_size=MAX_BLOCK_SIZE,
-            expected_tps=0,
-        ),
-        RunGroupInstance(
-            key=RunGroupKey("warmup-keyless"),
-            single_node_result=extract_run_results(output_keyless, "Overall", create_db=True),
-            number_of_threads_results={},
-            block_size=MAX_BLOCK_SIZE_KEYLESS,
-            expected_tps=0,
-        ),
-    ]
+    default_warmup_result = RunGroupInstance(
+        key=RunGroupKey("warmup"),
+        single_node_result=extract_run_results(output, "Overall", create_db=True),
+        number_of_threads_results={},
+        block_size=MAX_BLOCK_SIZE,
+        expected_tps=0,
+    )
 
     for (
         test_index,
@@ -699,6 +686,18 @@ with tempfile.TemporaryDirectory() as tmpdirname, tempfile.TemporaryDirectory() 
     ) in enumerate(TESTS):
         if SELECTED_FLOW not in test.included_in:
             continue
+
+        if test.key_extra.txn_auth_mode == 'keyless' and keyless_warmup_result == None:
+            print(f"Warmup - creating another DB with {NUM_KEYLESS_ACCOUNTS} keyless accounts")
+            create_db_command_keyless = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-executor-type aptos-vm-with-block-stm --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} --use-keyless-accounts create-db {FEATURE_FLAGS} --data-dir {keyless_tmp_dir}/db --num-accounts {NUM_KEYLESS_ACCOUNTS}"
+            output_keyless = execute_command(create_db_command_keyless)
+            keyless_warmup_result = RunGroupInstance(
+                key=RunGroupKey("warmup-keyless"),
+                single_node_result=extract_run_results(output_keyless, "Overall", create_db=True),
+                number_of_threads_results={},
+                block_size=MAX_BLOCK_SIZE,
+                expected_tps=0,
+            )
 
         if test.expected_tps is not None:
             print(f"WARNING: using uncalibrated TPS for {test.key}")
@@ -735,8 +734,7 @@ with tempfile.TemporaryDirectory() as tmpdirname, tempfile.TemporaryDirectory() 
             )
 
         # target 250ms blocks, a bit larger than prod
-        max_block_size = MAX_BLOCK_SIZE_KEYLESS if test.key_extra.txn_auth_mode == "keyless" else MAX_BLOCK_SIZE
-        cur_block_size = max(4, int(min([criteria.expected_tps / 4, max_block_size])))
+        cur_block_size = max(4, int(min([criteria.expected_tps / 4, MAX_BLOCK_SIZE])))
 
         print(f"Testing {test.key}")
         if test.key_extra.transaction_type_override == "":
@@ -803,15 +801,16 @@ with tempfile.TemporaryDirectory() as tmpdirname, tempfile.TemporaryDirectory() 
         pipeline_extra_args_str = " ".join(pipeline_extra_args)
 
         if test.key_extra.single_block_dst_working_set:
-            additional_dst_pool_accounts = max_block_size
+            additional_dst_pool_accounts = MAX_BLOCK_SIZE
         else:
-            additional_dst_pool_accounts = 2 * max_block_size * NUM_BLOCKS
+            additional_dst_pool_accounts = 2 * MAX_BLOCK_SIZE * NUM_BLOCKS
 
         data_dir = tmpdirname
         keyless_flags = ""
         if test.key_extra.txn_auth_mode == "keyless":
             data_dir = keyless_tmp_dir
             keyless_flags = "--use-keyless-accounts"
+            additional_dst_pool_accounts = 0
 
         common_command_suffix = f"{executor_type_str} {pipeline_extra_args_str} --block-size {cur_block_size} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} {keyless_flags} run-executor {FEATURE_FLAGS} {workload_args_str} --module-working-set-size {test.key.module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {additional_dst_pool_accounts} --data-dir {data_dir}/db  --checkpoint-dir {data_dir}/cp"
 
@@ -838,7 +837,7 @@ with tempfile.TemporaryDirectory() as tmpdirname, tempfile.TemporaryDirectory() 
             else:
                 break
 
-        results.append(
+        main_results.append(
             RunGroupInstance(
                 key=test.key,
                 single_node_result=single_node_result,
@@ -849,7 +848,7 @@ with tempfile.TemporaryDirectory() as tmpdirname, tempfile.TemporaryDirectory() 
         )
 
         for stage, stage_node_result in stage_node_results:
-            results.append(
+            main_results.append(
                 RunGroupInstance(
                     key=RunGroupKey(
                         transaction_type=test.key.transaction_type
@@ -898,8 +897,9 @@ with tempfile.TemporaryDirectory() as tmpdirname, tempfile.TemporaryDirectory() 
         )
 
         if not HIDE_OUTPUT:
+            all_results = list(filter(None, [default_warmup_result, keyless_warmup_result])) + main_results
             print_table(
-                results,
+                all_results,
                 by_levels=True,
                 only_fields=[
                     ("block_size", lambda r: r.block_size),
@@ -908,7 +908,7 @@ with tempfile.TemporaryDirectory() as tmpdirname, tempfile.TemporaryDirectory() 
                 ],
             )
             print_table(
-                results[2:],
+                main_results,
                 by_levels=True,
                 only_fields=[
                     ("g/s", lambda r: int(round(r.single_node_result.gps))),
@@ -920,7 +920,7 @@ with tempfile.TemporaryDirectory() as tmpdirname, tempfile.TemporaryDirectory() 
                 ],
             )
             print_table(
-                results[2:],
+                main_results,
                 by_levels=True,
                 only_fields=[
                     (
@@ -951,7 +951,7 @@ with tempfile.TemporaryDirectory() as tmpdirname, tempfile.TemporaryDirectory() 
                 ],
             )
             print_table(
-                results[2:],
+                main_results,
                 by_levels=True,
                 only_fields=[
                     (
@@ -1014,7 +1014,7 @@ with tempfile.TemporaryDirectory() as tmpdirname, tempfile.TemporaryDirectory() 
                     ),
                 ],
             )
-            print_table(results, by_levels=False, only_fields=None)
+            print_table(all_results, by_levels=False, only_fields=None)
 
         if single_node_result.tps < criteria.min_tps:
             text = f"regression detected {single_node_result.tps}, expected median {criteria.expected_tps}, threshold: {criteria.min_tps}), {test.key} didn't meet TPS requirements"
@@ -1042,7 +1042,8 @@ with tempfile.TemporaryDirectory() as tmpdirname, tempfile.TemporaryDirectory() 
             warnings.append(text)
 
 if HIDE_OUTPUT:
-    print_table(results, by_levels=False, single_field=None)
+    all_results = list(filter(None, [default_warmup_result, keyless_warmup_result])) + main_results
+    print_table(all_results, by_levels=False, single_field=None)
 
 if warnings:
     print("Warnings: ")
