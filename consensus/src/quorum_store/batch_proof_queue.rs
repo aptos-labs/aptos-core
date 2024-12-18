@@ -934,8 +934,17 @@ impl BatchProofQueue {
     }
 
     // Mark in the hashmap committed PoS, but keep them until they expire
-    pub(crate) fn mark_committed(&mut self, batches: Vec<BatchInfo>) {
+    pub(crate) fn mark_committed(
+        &mut self,
+        batches: Vec<BatchInfo>,
+        txns: Vec<TxnSummaryWithExpiration>,
+    ) {
         let start = Instant::now();
+        // TODO: does this later need some kind of GC for dangling references?
+        for txn in txns.into_iter() {
+            self.txn_summary_num_occurrences.remove(&txn);
+        }
+
         for batch in batches.into_iter() {
             let batch_key = BatchKey::from_info(&batch);
             if let Some(item) = self.items.get(&batch_key) {
