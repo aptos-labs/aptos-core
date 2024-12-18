@@ -8,7 +8,7 @@ use crate::{
 use aptos_framework::{BuildOptions, BuiltPackage};
 use async_trait::async_trait;
 use clap::Parser;
-use move_compiler_v2::{diagnostics::message_format::MessageFormat, Experiment};
+use move_compiler_v2::Experiment;
 use move_linter::MoveLintChecks;
 use move_model::metadata::{CompilerVersion, LanguageVersion, LATEST_STABLE_LANGUAGE_VERSION};
 use move_package::source_package::std_lib::StdVersion;
@@ -76,8 +76,9 @@ pub struct LintPackage {
     #[clap(long, env = "APTOS_CHECK_TEST_CODE")]
     pub check_test_code: bool,
 
-    #[clap(long, default_value = "human")]
-    pub message_format: MessageFormat,
+    /// Experiments
+    #[clap(long, hide(true))]
+    pub experiments: Vec<String>,
 }
 
 impl LintPackage {
@@ -92,7 +93,7 @@ impl LintPackage {
             language_version,
             skip_attribute_checks,
             check_test_code,
-            message_format: _,
+            experiments,
         } = self.clone();
         MovePackageDir {
             dev,
@@ -104,6 +105,7 @@ impl LintPackage {
             language_version,
             skip_attribute_checks,
             check_test_code,
+            experiments,
             ..MovePackageDir::new()
         }
     }
@@ -130,7 +132,6 @@ impl CliCommand<&'static str> for LintPackage {
         let package_path = move_options.get_package_path()?;
         let included_artifacts = IncludedArtifacts::Sparse;
         let build_options = BuildOptions {
-            message_format: self.message_format,
             ..included_artifacts.build_options_with_experiments(
                 &move_options,
                 more_experiments,

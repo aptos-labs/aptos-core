@@ -9,7 +9,6 @@ use aptos_framework::extended_checks;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
-use move_compiler_v2::diagnostics::message_format::MessageFormat;
 use move_coverage::{
     coverage_map::CoverageMap,
     format_csv_summary, format_human_summary,
@@ -179,7 +178,6 @@ fn compile_coverage(
             compiler_version: move_options.compiler_version,
             language_version: move_options.language_version,
             experiments: experiments_from_opt_level(&move_options.optimize),
-            message_format: MessageFormat::default(),
         },
         ..Default::default()
     };

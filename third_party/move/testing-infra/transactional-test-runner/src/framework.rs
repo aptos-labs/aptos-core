@@ -59,6 +59,7 @@ use std::{
     path::Path,
 };
 use tempfile::NamedTempFile;
+use move_compiler_v2::diagnostics::buffer::BufferEmitter;
 
 pub struct ProcessedModule {
     module: CompiledModule,

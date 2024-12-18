@@ -15,6 +15,7 @@ use std::{
     collections::BTreeSet,
     path::{Path, PathBuf},
 };
+use move_compiler_v2::diagnostics::buffer::BufferEmitter;
 
 /// Extension for expected output files
 pub const EXP_EXT: &str = "exp";

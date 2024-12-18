@@ -699,7 +699,6 @@ impl CompiledPackage {
                         compile_test_code: flags.keep_testing_functions(),
                         experiments: config.experiments.clone(),
                         external_checks,
-                        message_format: config.message_format.clone(),
                         ..Default::default()
                     };
                     options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
@@ -1156,7 +1155,7 @@ pub fn build_and_report_v2_driver(options: move_compiler_v2::Options) -> Compile
 pub fn build_and_report_no_exit_v2_driver(
     options: move_compiler_v2::Options,
 ) -> CompilerDriverResult {
-    let emitter = options.message_format.clone().into_emitter();
+    let emitter = options.to_emitter();
     let (env, units) = move_compiler_v2::run_move_compiler_with_emitter(emitter, options)?;
     Ok((
         move_compiler_v2::make_files_source_text(&env),

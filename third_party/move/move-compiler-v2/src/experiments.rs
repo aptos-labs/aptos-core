@@ -276,6 +276,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             description: "Avoid storing to a local during assigns".to_string(),
             default: Inherited(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string()),
         },
+        Experiment {
+            name: Experiment::MESSAGE_FORMAT_JSON.to_string(),
+            description: "Enable json format for compiler messages".to_string(),
+            default: Given(false),
+        }
     ];
     experiments
         .into_iter()
@@ -330,4 +335,5 @@ impl Experiment {
     pub const USAGE_CHECK: &'static str = "usage-check";
     pub const VARIABLE_COALESCING: &'static str = "variable-coalescing";
     pub const VARIABLE_COALESCING_ANNOTATE: &'static str = "variable-coalescing-annotate";
+    pub const MESSAGE_FORMAT_JSON: &'static str = "message-format-json";
 }

@@ -12,7 +12,7 @@ use log::{debug, info, warn};
 use move_abigen::Abigen;
 use move_compiler::shared::{known_attributes::KnownAttribute, PackagePaths};
 use move_compiler_v2::{
-    diagnostics::message_format::MessageFormat, env_pipeline::rewrite_target::RewritingScope,
+    env_pipeline::rewrite_target::RewritingScope,
     Experiment,
 };
 use move_docgen::Docgen;
@@ -95,7 +95,6 @@ pub fn run_move_prover_v2<W: WriteColor>(
         compile_test_code: false,
         compile_verify_code: true,
         external_checks: vec![],
-        message_format: MessageFormat::default(),
     };
 
     let mut env = move_compiler_v2::run_move_compiler_for_analysis(error_writer, compiler_options)?;

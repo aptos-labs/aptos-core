@@ -20,7 +20,7 @@ use move_binary_format::{file_format_common::VERSION_7, CompiledModule};
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
 use move_compiler_v2::{
-    diagnostics::message_format::MessageFormat, external_checks::ExternalChecks, options::Options,
+    external_checks::ExternalChecks, options::Options,
     Experiment,
 };
 use move_core_types::{language_storage::ModuleId, metadata::Metadata};
@@ -110,8 +110,6 @@ pub struct BuildOptions {
     /// Select bytecode, language, compiler for Move 2
     #[clap(long)]
     pub move_2: bool,
-    #[clap(long, default_value = "human")]
-    pub message_format: MessageFormat,
 }
 
 // Because named_addresses has no parser, we can't use clap's default impl. This must be aligned
@@ -140,7 +138,6 @@ impl Default for BuildOptions {
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             experiments: vec![],
             move_2: false,
-            message_format: MessageFormat::default(),
         }
     }
 }
@@ -213,7 +210,6 @@ pub fn build_model(
             skip_attribute_checks,
             known_attributes,
             experiments,
-            message_format: MessageFormat::default(),
         },
     };
     let compiler_version = compiler_version.unwrap_or_default();
@@ -270,7 +266,6 @@ impl BuiltPackage {
                     skip_attribute_checks,
                     known_attributes: options.known_attributes.clone(),
                     experiments: options.experiments.clone(),
-                    message_format: options.message_format.clone(),
                 },
             };
 

@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    diagnostics::message_format::MessageFormat,
     experiments::{DefaultValue, EXPERIMENTS},
     external_checks::ExternalChecks,
 };
@@ -130,9 +129,6 @@ pub struct Options {
     /// External checks to be performed.
     #[clap(skip)]
     pub external_checks: Vec<Arc<dyn ExternalChecks>>,
-
-    #[clap(long, default_value = "human")]
-    pub message_format: MessageFormat,
 }
 
 impl Default for Options {

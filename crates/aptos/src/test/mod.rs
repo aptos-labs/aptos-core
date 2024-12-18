@@ -857,7 +857,6 @@ impl CliTestFramework {
             included_artifacts_args: IncludedArtifactsArgs {
                 included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
             },
-            message_format: MessageFormat::default(),
         }
         .execute()
         .await

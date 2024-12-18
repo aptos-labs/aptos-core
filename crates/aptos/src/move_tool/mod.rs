@@ -60,7 +60,7 @@ use colored::Colorize;
 use itertools::Itertools;
 use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::{address::NumericalAddress, env::MOVE_HOME};
-use move_compiler_v2::{diagnostics::message_format::MessageFormat, Experiment};
+use move_compiler_v2::Experiment;
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, u256::U256};
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
@@ -390,9 +390,6 @@ pub struct CompilePackage {
     #[clap(long)]
     pub save_metadata: bool,
 
-    #[clap(long, default_value = "human")]
-    pub message_format: MessageFormat,
-
     #[clap(flatten)]
     pub included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
@@ -408,7 +405,6 @@ impl CliCommand<Vec<String>> for CompilePackage {
     async fn execute(self) -> CliTypedResult<Vec<String>> {
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
-            message_format: self.message_format.clone(),
             ..self
                 .included_artifacts_args
                 .included_artifacts
@@ -571,7 +567,6 @@ impl CliCommand<&'static str> for TestPackage {
                 compiler_version: self.move_options.compiler_version,
                 language_version: self.move_options.language_version,
                 experiments: experiments_from_opt_level(&self.move_options.optimize),
-                message_format: MessageFormat::default(),
             },
             ..Default::default()
         };

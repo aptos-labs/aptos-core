@@ -13,8 +13,9 @@ impl<W> HumanEmitter<W>
 where
     W: WriteColor,
 {
-    pub fn new(writer: W) -> Self {
-        HumanEmitter { writer }
+    pub fn new(writer: W) -> Box<Self> {
+        let emitter = HumanEmitter { writer };
+        Box::new(emitter)
     }
 }
 

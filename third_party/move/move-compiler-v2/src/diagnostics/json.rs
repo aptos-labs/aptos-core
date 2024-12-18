@@ -8,8 +8,9 @@ pub struct JsonEmitter<W: io::Write> {
 }
 
 impl<W: io::Write> JsonEmitter<W> {
-    pub fn new(writer: W) -> Self {
-        JsonEmitter { writer }
+    pub fn new(writer: W) -> Box<Self> {
+        let emitter = JsonEmitter { writer };
+        Box::new(emitter)
     }
 }
 

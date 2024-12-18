@@ -1,11 +1,29 @@
+use crate::{
+    diagnostics::{human::HumanEmitter, json::JsonEmitter},
+    options, Experiment,
+};
 use anyhow::bail;
 use codespan::{FileId, Files};
-use codespan_reporting::diagnostic::{Diagnostic, Severity};
+use codespan_reporting::{
+    diagnostic::{Diagnostic, Severity},
+    term::termcolor::{ColorChoice, StandardStream},
+};
 use move_model::model::GlobalEnv;
 
 pub mod human;
 pub mod json;
 pub mod message_format;
+
+impl options::Options {
+    pub fn to_emitter(&self) -> Box<dyn Emitter> {
+        let stderr = StandardStream::stderr(ColorChoice::Auto);
+        if self.experiment_on(Experiment::MESSAGE_FORMAT_JSON) {
+            JsonEmitter::new(stderr)
+        } else {
+            HumanEmitter::new(stderr)
+        }
+    }
+}
 
 pub trait Emitter {
     fn emit(&mut self, source_files: &Files<String>, diag: &Diagnostic<FileId>);
