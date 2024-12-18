@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, ensure, Result};
 use num_bigint::BigUint;
 use num_integer::Integer;
 use num_traits::{One, ToPrimitive, Zero};
@@ -63,22 +63,26 @@ pub fn main(
     recon_threshold_shl64 = min(recon_threshold_shl64, BigUint::from(1u128 << 64));
     let mut total_weight_max = BigUint::from(n) + BigUint::from(4u64);
     total_weight_max <<= 64;
+    ensure!(
+        recon_threshold_shl64 > secrecy_threshold_shl64,
+        "main() failed: recon_thre > secrecy_thre not satisfied!"
+    );
     total_weight_max = total_weight_max.div_ceil(
         &((recon_threshold_shl64.clone() - secrecy_threshold_shl64.clone()) * BigUint::from(2u64)),
     );
     let stakes_total: BigUint = stakes.clone().into_iter().sum();
+    ensure!(!stakes_total.is_zero(), "main() failed: stakes_total is 0!");
     let bar = (stakes_total.clone() * recon_threshold_shl64.clone()) >> 64;
     let mut lo = 0;
-    let mut hi = total_weight_max
+    let mut hi = (total_weight_max * BigUint::from(2_u64))
         .to_u128()
-        .ok_or_else(|| anyhow!("total_weight_max is not a u128!"))?
-        * 2;
+        .ok_or_else(|| anyhow!("main() failed: total_weight_max*2 is not a u128!"))?;
     // This^ ensures the first `ideal_weight` to try is `total_weight_max`,
     // which should always result in a valid weight assignment that satisfies `recon_threshold_shl64`.
 
     let mut profile = Profile::naive(n);
     while lo + 1 < hi {
-        let ideal_weight = (lo + hi) / 2;
+        let ideal_weight = lo + (hi - lo) / 2;
         let mut weight_per_stake_shl64 = BigUint::from(ideal_weight);
         weight_per_stake_shl64 <<= 64;
         weight_per_stake_shl64 = weight_per_stake_shl64.div_ceil(&stakes_total);
@@ -88,7 +92,8 @@ pub fn main(
             &stakes,
             BigUint::from(ideal_weight),
             weight_per_stake_shl64,
-        );
+        )
+        .map_err(|e| anyhow!("main() failed with profile err: {e}"))?;
         if cur_profile.threshold_default_path.in_stakes <= bar {
             hi = ideal_weight;
             profile = cur_profile;
@@ -105,27 +110,30 @@ pub fn main(
     } = profile;
     let mut weights = Vec::with_capacity(n);
     for w in validator_weights {
-        let w = w.to_u64().ok_or_else(|| anyhow!("some w is not u64!"))?;
+        let w = w
+            .to_u64()
+            .ok_or_else(|| anyhow!("main() failed: some weight is not u64!"))?;
         weights.push(w);
     }
-    let reconstruct_threshold_fast_path =
-        if let Some(t) = threshold_fast_path {
-            Some(t.in_weights.to_u128().ok_or_else(|| {
-                anyhow!("reconstruct_threshold_fast_path.in_weights is not a u128!")
-            })?)
-        } else {
-            None
-        };
+    let reconstruct_threshold_fast_path = if let Some(t) = threshold_fast_path {
+        Some(t.in_weights.to_u128().ok_or_else(|| {
+            anyhow!("main() failed: recon_thre_fast_path.in_weights is not a u128!")
+        })?)
+    } else {
+        None
+    };
 
     Ok(RoundedV2 {
         ideal_total_weight: ideal_total_weight
             .to_u128()
-            .ok_or_else(|| anyhow!("ideal_total_weight is not a u128"))?,
+            .ok_or_else(|| anyhow!("main() failed: ideal_total_weight is not a u128"))?,
         weights,
         reconstruct_threshold_default_path: threshold_default_path
             .in_weights
             .to_u128()
-            .ok_or_else(|| anyhow!("threshold_default_path.in_weights is not a u128!"))?,
+            .ok_or_else(|| {
+                anyhow!("main() failed: recon_thre_default_path.in_weights is not a u128!")
+            })?,
         reconstruct_threshold_fast_path,
     })
 }
@@ -137,7 +145,7 @@ fn compute_threshold(
     weight_total: BigUint,
     weight_gain_shl64: BigUint,
     weight_loss_shl64: BigUint,
-) -> ReconstructThresholdInfo {
+) -> Result<ReconstructThresholdInfo> {
     let mut final_thresh = (((weight_gain_shl64 << 64)
         + stake_total * secrecy_threshold_shl64 * weight_per_stake_shl64.clone())
         >> 128)
@@ -146,11 +154,15 @@ fn compute_threshold(
     let mut stakes_required = final_thresh.clone();
     stakes_required <<= 64;
     stakes_required += weight_loss_shl64;
+    ensure!(
+        !weight_per_stake_shl64.is_zero(),
+        "compute_threshold() failed with weight_per_stake=0!"
+    );
     stakes_required = stakes_required.div_ceil(&weight_per_stake_shl64);
-    ReconstructThresholdInfo {
+    Ok(ReconstructThresholdInfo {
         in_weights: final_thresh,
         in_stakes: stakes_required,
-    }
+    })
 }
 
 fn compute_profile(
@@ -159,7 +171,7 @@ fn compute_profile(
     stakes: &[BigUint],
     ideal_total_weight: BigUint,
     weight_per_stake_shl64: BigUint,
-) -> Profile {
+) -> Result<Profile> {
     let n = stakes.len();
     let mut validator_weights = Vec::with_capacity(n);
     let mut weight_loss_shl64 = BigUint::zero();
@@ -186,9 +198,10 @@ fn compute_profile(
         total_weight.clone(),
         weight_gain_shl64.clone(),
         weight_loss_shl64.clone(),
-    );
-    let threshold_fast_path = fast_path_secrecy_threshold_shl64.map(|v| {
-        compute_threshold(
+    )
+    .map_err(|e| anyhow!("compute_profile() failed with default threshold err: {e}"))?;
+    let threshold_fast_path = if let Some(v) = fast_path_secrecy_threshold_shl64 {
+        let t = compute_threshold(
             v,
             weight_per_stake_shl64,
             total_stake,
@@ -196,11 +209,15 @@ fn compute_profile(
             weight_gain_shl64,
             weight_loss_shl64,
         )
-    });
-    Profile {
+        .map_err(|e| anyhow!("compute_profile() failed with fast threshold err: {e}"))?;
+        Some(t)
+    } else {
+        None
+    };
+    Ok(Profile {
         ideal_total_weight,
         validator_weights,
         threshold_default_path,
         threshold_fast_path,
-    }
+    })
 }
