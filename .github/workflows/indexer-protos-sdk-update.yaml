@@ -1,0 +1,89 @@
+name: Checks the proto changes and release
+'on':
+  pull_request:
+    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
+    branches:
+      - main
+    paths:
+      - protos/proto/aptos/transaction/v1/transaction.proto
+
+jobs:
+  check-protos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Install buf, which we use to generate code from the protos for Rust and TS.
+      - name: Install buf
+        uses: bufbuild/buf-setup-action@v1.24.0
+        with:
+          version: 1.28.1
+      - uses: pre-commit/action@v3.0.0
+      # Install protoc itself.
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v2
+        with:
+          version: "25.x"
+      # Set up pnpm.
+      - uses: pnpm/action-setup@v4
+      # Set up Poetry.
+      - name: Install Python deps for generating code from protos
+        uses: ./.github/actions/python-setup
+        with:
+          pyproject_directory: ./protos/python
+      # Install the Rust, TS, and Python codegen deps.
+      - name: Install deps for generating code from protos
+        run: cd protos && ./scripts/install_deps.sh
+      # Finally, generate code based on the protos.
+      - name: Generate code
+        run: cd protos && ./scripts/build_protos.sh
+
+      - name: Confirm that nothing has changed
+        run: git diff --exit-code
+  update-sdk:
+    runs-on: ubuntu-latest
+    if: | # Only run on each PR once an appropriate event occurs
+      (
+        github.event_name == 'push' ||
+        contains(github.event.pull_request.labels.*.name, 'indexer-sdk-update')
+      )
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Install buf, which we use to generate code from the protos for Rust and TS.
+      - name: Install buf
+        uses: bufbuild/buf-setup-action@v1.24.0
+        with:
+          version: 1.28.1
+    
+      - name: Check the format of the proto files
+        run: |
+          set -e
+          buf format -d aptos/transaction/v1/transaction.proto --exit-code
+        working-directory: protos/proto
+      - name: Capture the commit hash
+        id: commit_hash
+        run: |
+          # Echo the commit hash to the output
+          echo "::set-output name=commit_hash::$(echo $GITHUB_SHA)"
+          # Echo the PR branch name to the output
+          echo "::set-output name=branch_name::${{ github.head_ref }}"
+      - name: Dispatch Event to SDK Repo
+        uses: peter-evans/repository-dispatch@v3.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: 'aptos-labs/aptos-indexer-processor-sdk'
+          event-type: 'proto-dependency-update'
+          client-payload: '{"commit_hash": "${{ github.sha }}", "branch_name": "${{ steps.commit_hash.outputs.branch_name }}"}'
+      # TOOD: enable this once the forge test is stable.
+      # - name: Run Forge Tests
+      #   uses: ./.github/workflows/workflow-run-forge
+      #   with:
+      #     GIT_SHA: ${{ github.sha }}
+      #     FORGE_TEST_SUITE: sdk_update
+      #     IMAGE_TAG: ${{ github.sha }}
+      #     FORGE_RUNNER_DURATION_SECS: 3600
+      #     COMMENT_HEADER: forge-sdk-update
+      #     FORGE_NAMESPACE: forge-sdk-update-namespace
+      #     SKIP_JOB: ${{ !contains(github.event.pull_request.labels.*.name, 'CICD:run-sdk-update-test') }}
+      #     SEND_RESULTS_TO_TRUNK: true
