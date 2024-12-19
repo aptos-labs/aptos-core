@@ -229,6 +229,15 @@ impl StateKey {
             _ => false,
         }
     }
+
+    pub fn is_code(&self) -> bool {
+        match self.inner() {
+            StateKeyInner::AccessPath(access_path) => {
+                access_path.is_code()
+            },
+            _ => false,
+        }
+    }
 }
 
 impl CryptoHash for StateKey {
