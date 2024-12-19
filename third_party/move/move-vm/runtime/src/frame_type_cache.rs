@@ -2,16 +2,27 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::loader::Resolver;
+use crate::LoadedFunction;
 use move_binary_format::{
     errors::*,
     file_format::{
-        FieldInstantiationIndex, SignatureIndex, StructDefInstantiationIndex,
-        StructVariantInstantiationIndex, VariantFieldInstantiationIndex,
+        FieldInstantiationIndex, FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex,
+        StructDefInstantiationIndex, StructVariantInstantiationIndex,
+        VariantFieldInstantiationIndex,
     },
 };
 use move_core_types::gas_algebra::NumTypeNodes;
 use move_vm_types::loaded_data::runtime_types::Type;
+use std::cell::RefCell;
 use std::collections::BTreeMap;
+use std::rc::Rc;
+
+#[derive(Clone)]
+pub(crate) enum PerInstructionCache {
+    Nothing,
+    PackGeneric,
+    Pack(u16),
+}
 
 #[derive(Default)]
 pub(crate) struct FrameTypeCache {
@@ -31,6 +42,11 @@ pub(crate) struct FrameTypeCache {
     variant_field_instantiation:
         BTreeMap<VariantFieldInstantiationIndex, ((Type, NumTypeNodes), (Type, NumTypeNodes))>,
     single_sig_token_type: BTreeMap<SignatureIndex, (Type, NumTypeNodes)>,
+    pub(crate) generic_sub_frame_cache:
+        BTreeMap<FunctionInstantiationIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
+    pub(crate) sub_frame_cache:
+        BTreeMap<FunctionHandleIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
+    pub(crate) per_instruction_cache: Vec<PerInstructionCache>,
 }
 
 impl FrameTypeCache {
