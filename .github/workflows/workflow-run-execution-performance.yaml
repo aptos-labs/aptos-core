@@ -10,7 +10,7 @@ on:
         description: The git SHA1 to test.
       RUNNER_NAME:
         required: false
-        default: executor-benchmark-runner 
+        default: executor-benchmark-runner
         type: string
       FLOW:
         required: false
@@ -50,21 +50,21 @@ on:
         description: The git SHA1 to test.
       RUNNER_NAME:
         required: false
-        default: executor-benchmark-runner 
+        default: executor-benchmark-runner
         type: choice
         options:
-        - executor-benchmark-runner
-        - executor-benchmark-ext4
-        - executor-benchmark-xfs
-        - benchmark-t2d-32
-        - benchmark-t2d-60
-        - benchmark-c3d-30
-        - benchmark-c3d-60
-        - benchmark-c3d-180
-        - benchmark-n4-32
-        - benchmark-c4-32
-        - benchmark-c4-48
-        - benchmark-c4-96
+          - executor-benchmark-runner
+          - executor-benchmark-ext4
+          - executor-benchmark-xfs
+          - benchmark-t2d-32
+          - benchmark-t2d-60
+          - benchmark-c3d-30
+          - benchmark-c3d-60
+          - benchmark-c3d-180
+          - benchmark-n4-32
+          - benchmark-c4-32
+          - benchmark-c4-48
+          - benchmark-c4-96
         description: The name of the runner to use for the test. (which decides machine specs)
       NUMBER_OF_EXECUTION_THREADS:
         required: false
@@ -75,11 +75,11 @@ on:
         required: false
         default: LAND_BLOCKING
         options:
-        - LAND_BLOCKING
-        - CONTINUOUS
-        - MAINNET
-        - MAINNET_LARGE_DB
-        - EXECUTORS
+          - LAND_BLOCKING
+          - CONTINUOUS
+          - MAINNET
+          - MAINNET_LARGE_DB
+          - EXECUTORS
         type: choice
         description: Which set of tests to run. MAINNET/MAINNET_LARGE_DB are for performance validation of mainnet nodes.
       SKIP_MOVE_E2E:
@@ -101,9 +101,13 @@ on:
         required: false
         default: ADHOC
         options:
-        - ADHOC
+          - ADHOC
         type: choice
         description: Test source (always adhoc from here)
+
+permissions:
+  id-token: write
+
 jobs:
   # This job determines which tests to run
   test-target-determinator:
@@ -116,11 +120,50 @@ jobs:
         id: determine_test_targets
         uses: ./.github/actions/test-target-determinator
 
+  create-runner:
+    if: ${{ inputs.IGNORE_TARGET_DETERMINATION || needs.test-target-determinator.outputs.run_execution_performance_test == 'true' }}
+    needs: test-target-determinator
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.create-runner.outputs.label }}
+    steps:
+      - uses: "actions/checkout@v4"
+
+      - uses: "google-github-actions/auth@v2"
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: github-actions-compute@aptos-ci.iam.gserviceaccount.com
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - id: secrets
+        uses: "google-github-actions/get-secretmanager-secrets@v2"
+        with:
+          secrets: |-
+            token:aptos-ci/github-actions-repository-dispatch
+
+      - name: Set Runner Configuration
+        id: set-config
+        run: |
+          config=$(jq -r --arg name "${{ inputs.RUNNER_NAME }}" '.[$name]' .github/runner-configs.json)
+          echo "disk_size=$(echo $config | jq -r '.disk_size')" >> $GITHUB_ENV
+          echo "machine_type=$(echo $config | jq -r '.machine_type')" >> $GITHUB_ENV
+          echo "boot_disk_type=$(echo $config | jq -r '.boot_disk_type')" >> $GITHUB_ENV
+
+      - id: create-runner
+        uses: aptos-labs/gce-github-runner@d1d7f72ed58f1e1dfbe530200b0f221e1c4accec
+        with:
+          token: ${{ steps.secrets.outputs.token }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          disk_size: ${{ env.disk_size }}
+          machine_type: ${{ env.machine_type }}
+          boot_disk_type: ${{ env.boot_disk_type }}
+          machine_zone: us-central1-c
+
   # Run single node execution performance tests
   single-node-performance:
-    needs: test-target-determinator
+    needs: create-runner
     timeout-minutes: 120
-    runs-on: ${{ inputs.RUNNER_NAME }}
+    runs-on: ${{ needs.create-runner.outputs.label }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -134,8 +177,5 @@ jobs:
 
       - name: Run single node execution benchmark in performance build mode
         shell: bash
-        run: TABULATE_INSTALL=lib-only pip install tabulate && FLOW="${{ inputs.FLOW }}" SOURCE="${{ inputs.SOURCE }}" RUNNER_NAME="${{ inputs.RUNNER_NAME }}" SKIP_MOVE_E2E="${{ inputs.SKIP_MOVE_E2E && '1' || '' }}" DISABLE_FA_APT="${{ inputs.USE_COIN_APT && '1' || '' }}" NUMBER_OF_EXECUTION_THREADS="${{ inputs.NUMBER_OF_EXECUTION_THREADS }}" testsuite/single_node_performance.py
+        run: TABULATE_INSTALL=lib-only pip install --break-system-packages tabulate && FLOW="${{ inputs.FLOW }}" SOURCE="${{ inputs.SOURCE }}" RUNNER_NAME="${{ inputs.RUNNER_NAME }}" SKIP_MOVE_E2E="${{ inputs.SKIP_MOVE_E2E && '1' || '' }}" DISABLE_FA_APT="${{ inputs.USE_COIN_APT && '1' || '' }}" NUMBER_OF_EXECUTION_THREADS="${{ inputs.NUMBER_OF_EXECUTION_THREADS }}" testsuite/single_node_performance.py
         if: ${{ (inputs.IGNORE_TARGET_DETERMINATION || needs.test-target-determinator.outputs.run_execution_performance_test == 'true') }}
-
-      - run: echo "Skipping single node execution performance! Unrelated changes detected."
-        if: ${{ !inputs.IGNORE_TARGET_DETERMINATION && needs.test-target-determinator.outputs.run_execution_performance_test != 'true' }}
