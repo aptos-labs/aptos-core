@@ -12,7 +12,9 @@ use crate::{
 pub use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PublicKey, HashValue};
 use aptos_global_constants::{GAS_UNIT_PRICE, MAX_GAS_AMOUNT};
-use aptos_types::transaction::{EntryFunction, Script};
+use aptos_types::transaction::{
+    EntryFunction, Script, TransactionExtraConfig, TransactionPayloadV2,
+};
 
 pub struct TransactionBuilder {
     sender: Option<AccountAddress>,
@@ -72,11 +74,30 @@ impl TransactionBuilder {
         self
     }
 
+    pub fn has_nonce(&self) -> bool {
+        match self.payload {
+            TransactionPayload::V2(TransactionPayloadV2::V1 {
+                extra_config:
+                    TransactionExtraConfig::V1 {
+                        replay_protection_nonce,
+                        ..
+                    },
+                ..
+            }) => replay_protection_nonce.is_some(),
+            _ => false,
+        }
+    }
+
     pub fn build(self) -> RawTransaction {
+        let sequence_number = if self.has_nonce() {
+            u64::MAX
+        } else {
+            self.sequence_number
+                .expect("sequence number must have been set")
+        };
         RawTransaction::new(
             self.sender.expect("sender must have been set"),
-            self.sequence_number
-                .expect("sequence number must have been set"),
+            sequence_number,
             self.payload,
             self.max_gas_amount,
             self.gas_unit_price,
@@ -146,6 +167,7 @@ impl TransactionFactory {
     }
 
     pub fn entry_function(&self, func: EntryFunction) -> TransactionBuilder {
+        // TODO: Change this to use TransactionPayload::V2 once it's available
         self.payload(TransactionPayload::EntryFunction(func))
     }
 
@@ -270,6 +292,7 @@ impl TransactionFactory {
     //
 
     pub fn script(&self, script: Script) -> TransactionBuilder {
+        // TODO: Change this to use TransactionPayload::V2 once it's available
         self.payload(TransactionPayload::Script(script))
     }
 

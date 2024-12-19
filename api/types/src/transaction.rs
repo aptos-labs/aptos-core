@@ -28,9 +28,7 @@ use aptos_types::{
         authenticator::{
             AccountAuthenticator, AnyPublicKey, AnySignature, MultiKey, MultiKeyAuthenticator,
             SingleKeyAuthenticator, TransactionAuthenticator, MAX_NUM_OF_SIGS,
-        },
-        webauthn::{PartialAuthenticatorAssertionResponse, MAX_WEBAUTHN_SIGNATURE_BYTES},
-        Script, SignedTransaction, TransactionOutput, TransactionWithProof,
+        }, webauthn::{PartialAuthenticatorAssertionResponse, MAX_WEBAUTHN_SIGNATURE_BYTES}, Script, SignedTransaction, TransactionOutput, TransactionWithProof,
     },
 };
 use once_cell::sync::Lazy;
@@ -180,6 +178,23 @@ impl
             changes: write_set,
         }
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+#[serde(tag = "type")]
+pub struct TransactionSummary {
+    pub sender: Address,
+    pub version: U64,
+    pub transaction_hash: HashValue,
+    pub replay_protector: ReplayProtector,
+    // pub timestamp: U64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
+#[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
+pub enum ReplayProtector {
+    Nonce(U64),
+    SequenceNumber(U64),
 }
 
 /// Enum of the different types of transactions in Aptos
@@ -380,7 +395,6 @@ impl From<(SignedTransaction, TransactionPayload)> for PendingTransaction {
         }
     }
 }
-
 /// A transaction submitted by a user to change the state of the blockchain
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct UserTransaction {
@@ -496,16 +510,17 @@ pub struct UserTransactionRequest {
     pub signature: Option<TransactionSignature>,
 }
 
-/// Request to create signing messages
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
-pub struct UserCreateSigningMessageRequest {
-    #[serde(flatten)]
-    #[oai(flatten)]
-    pub transaction: UserTransactionRequest,
-    /// Secondary signer accounts of the request for Multi-agent
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub secondary_signers: Option<Vec<Address>>,
-}
+// (We are not using this anymore)
+// /// Request to create signing messages
+// #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+// pub struct UserCreateSigningMessageRequest {
+//     #[serde(flatten)]
+//     #[oai(flatten)]
+//     pub transaction: UserTransactionRequest,
+//     /// Secondary signer accounts of the request for Multi-agent
+//     #[serde(skip_serializing_if = "Option::is_none")]
+//     pub secondary_signers: Option<Vec<Address>>,
+// }
 
 /// Request to encode a submission
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
@@ -924,12 +939,12 @@ pub enum GenesisPayload {
 pub enum TransactionPayload {
     EntryFunctionPayload(EntryFunctionPayload),
     ScriptPayload(ScriptPayload),
-
     // Deprecated. We cannot remove the enum variant because it breaks the
     // ordering, unfortunately.
     ModuleBundlePayload(DeprecatedModuleBundlePayload),
-
     MultisigPayload(MultisigPayload),
+
+    V2(TransactionPayloadV2),
 }
 
 impl VerifyInput for TransactionPayload {
@@ -943,6 +958,7 @@ impl VerifyInput for TransactionPayload {
             TransactionPayload::ModuleBundlePayload(_) => {
                 bail!("Module bundle payload has been removed")
             },
+            TransactionPayload::V2(inner) => inner.verify(),
         }
     }
 }
@@ -1004,6 +1020,108 @@ impl TryFrom<Script> for ScriptPayload {
                 .map(|arg| MoveValue::from(arg).json())
                 .collect::<anyhow::Result<_>>()?,
         })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
+pub enum TransactionExecutable {
+    EntryFunctionPayload(EntryFunctionPayload),
+    ScriptPayload(ScriptPayload),
+    Empty(Empty),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct Empty;
+
+impl VerifyInput for TransactionExecutable {
+    fn verify(&self) -> anyhow::Result<()> {
+        match self {
+            TransactionExecutable::EntryFunctionPayload(inner) => inner.verify(),
+            TransactionExecutable::ScriptPayload(inner) => inner.verify(),
+            TransactionExecutable::Empty(_) => Ok(()),
+        }
+    }
+}
+
+impl TransactionExecutable {
+    pub fn is_empty(&self) -> bool {
+        matches!(self, TransactionExecutable::Empty(_))
+    }
+
+    pub fn is_entry_function(&self) -> bool {
+        matches!(self, TransactionExecutable::EntryFunctionPayload(_))
+    }
+
+    pub fn is_script(&self) -> bool {
+        matches!(self, TransactionExecutable::ScriptPayload(_))
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
+pub enum TransactionExtraConfig {
+    V1(TransactionExtraConfigV1),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct TransactionExtraConfigV1 {
+    pub multisig_address: Option<Address>,
+    pub replay_protection_nonce: Option<u64>,
+}
+
+impl TransactionExtraConfig {
+    pub fn is_multisig(&self) -> bool {
+        match self {
+            TransactionExtraConfig::V1(inner) => inner.is_multisig(),
+        }
+    }
+}
+
+impl TransactionExtraConfigV1 {
+    pub fn is_multisig(&self) -> bool {
+        self.multisig_address.is_some()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
+pub enum TransactionPayloadV2 {
+    V1(TransactionPayloadV2V1),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+/// TODO: This is worst possible name in the history of coding. Change it.
+pub struct TransactionPayloadV2V1 {
+    pub executable: TransactionExecutable,
+    pub extra_config: TransactionExtraConfig,
+}
+
+impl VerifyInput for TransactionPayloadV2V1 {
+    fn verify(&self) -> anyhow::Result<()> {
+        self.executable.verify()?;
+
+        // Only multisig transactions can have an empty executable
+        if self.executable.is_empty() {
+            assert!(self.extra_config.is_multisig());
+        }
+
+        if self.extra_config.is_multisig() {
+            assert!(self.executable.is_empty() || self.executable.is_entry_function());
+        };
+
+        Ok(())
+    }
+}
+
+impl VerifyInput for TransactionPayloadV2 {
+    fn verify(&self) -> anyhow::Result<()> {
+        match self {
+            TransactionPayloadV2::V1(inner) => inner.verify(),
+        }
     }
 }
 

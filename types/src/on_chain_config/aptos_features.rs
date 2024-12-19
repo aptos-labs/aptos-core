@@ -100,6 +100,7 @@ pub enum FeatureFlag {
     /// AIP-105 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-105.md)
     NATIVE_MEMORY_OPERATIONS = 80,
     ENABLE_LOADER_V2 = 81,
+    ORDERLESS_TRANSACTIONS = 82,
 }
 
 impl FeatureFlag {
@@ -181,6 +182,7 @@ impl FeatureFlag {
             FeatureFlag::NATIVE_MEMORY_OPERATIONS,
             FeatureFlag::COLLECTION_OWNER,
             FeatureFlag::ENABLE_LOADER_V2,
+            FeatureFlag::ORDERLESS_TRANSACTIONS,
         ]
     }
 }
@@ -327,6 +329,10 @@ impl Features {
 
     pub fn is_loader_v2_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ENABLE_LOADER_V2)
+    }
+
+    pub fn is_orderless_txns_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ORDERLESS_TRANSACTIONS)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {
