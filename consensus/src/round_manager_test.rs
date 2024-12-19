@@ -482,6 +482,7 @@ impl NodeSetup {
         self.vote_queue.pop_front().unwrap()
     }
 
+    #[allow(unused)]
     pub async fn next_order_vote(&mut self) -> OrderVoteMsg {
         while self.order_vote_queue.is_empty() {
             self.next_network_message().await;

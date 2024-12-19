@@ -56,6 +56,7 @@ pub trait TPayloadManager: Send + Sync {
     async fn get_transactions(
         &self,
         block: &Block,
+        block_voters: Option<BitVec>,
     ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)>;
 }
 
@@ -81,6 +82,7 @@ impl TPayloadManager for DirectMempoolPayloadManager {
     async fn get_transactions(
         &self,
         block: &Block,
+        _block_signers: Option<BitVec>,
     ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
         let Some(payload) = block.payload() else {
             return Ok((Vec::new(), None));
@@ -126,7 +128,7 @@ impl QuorumStorePayloadManager {
     }
 
     fn request_transactions(
-        batches: Vec<(BatchInfo, Vec<PeerId>)>,
+        batches: Vec<(BatchInfo, Arc<Mutex<Vec<PeerId>>>)>,
         block_timestamp: u64,
         batch_reader: Arc<dyn BatchReader>,
     ) -> Vec<(
@@ -146,7 +148,7 @@ impl QuorumStorePayloadManager {
                     batch_reader.get_batch(
                         *batch_info.digest(),
                         batch_info.expiration(),
-                        responders,
+                        responders.clone(),
                     ),
                 ));
             } else {
@@ -226,7 +228,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                         .map(|proof| {
                             (
                                 proof.info().clone(),
-                                proof.shuffled_signers(&self.ordered_authors),
+                                Arc::new(Mutex::new(proof.shuffled_signers(&self.ordered_authors))),
                             )
                         })
                         .collect(),
@@ -250,20 +252,25 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 return;
             }
 
-            let batches_and_responders = data_pointer
+            let (batches_and_responders, responders) = data_pointer
                 .batch_summary
                 .iter()
                 .map(|proof| {
                     let signers = proof.signers(ordered_authors);
+                    let responders = Arc::new(Mutex::new(signers));
                     // TODO(ibalajiarun): Add block author to signers
-                    (proof.info().clone(), signers)
+                    ((proof.info().clone(), responders.clone()), responders)
                 })
-                .collect();
+                .unzip();
             let fut =
                 request_txns_from_quorum_store(batches_and_responders, timestamp, batch_reader)
                     .boxed()
                     .shared();
-            *data_fut = Some(DataFetchFut { fut, iteration: 0 })
+            *data_fut = Some(DataFetchFut {
+                fut,
+                iteration: 0,
+                responders,
+            })
         }
 
         match payload {
@@ -381,6 +388,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
     async fn get_transactions(
         &self,
         block: &Block,
+        block_signers: Option<BitVec>,
     ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
         let Some(payload) = block.payload() else {
             return Ok((Vec::new(), None));
@@ -388,7 +396,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
 
         let transaction_payload = match payload {
             Payload::InQuorumStore(proof_with_data) => {
-                let transactions = process_payload(
+                let transactions = process_qs_payload(
                     proof_with_data,
                     self.batch_reader.clone(),
                     block,
@@ -401,7 +409,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 )
             },
             Payload::InQuorumStoreWithLimit(proof_with_data) => {
-                let transactions = process_payload(
+                let transactions = process_qs_payload(
                     &proof_with_data.proof_with_data,
                     self.batch_reader.clone(),
                     block,
@@ -420,7 +428,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 max_txns_to_execute,
             ) => {
                 let all_transactions = {
-                    let mut all_txns = process_payload(
+                    let mut all_txns = process_qs_payload(
                         proof_with_data,
                         self.batch_reader.clone(),
                         block,
@@ -448,18 +456,20 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 )
             },
             Payload::OptQuorumStore(opt_qs_payload) => {
-                let opt_batch_txns = process_payload_helper(
+                let opt_batch_txns = process_optqs_payload(
                     opt_qs_payload.opt_batches(),
                     self.batch_reader.clone(),
                     block,
                     &self.ordered_authors,
+                    block_signers.as_ref(),
                 )
                 .await?;
-                let proof_batch_txns = process_payload_helper(
+                let proof_batch_txns = process_optqs_payload(
                     opt_qs_payload.proof_with_data(),
                     self.batch_reader.clone(),
                     block,
                     &self.ordered_authors,
+                    None,
                 )
                 .await?;
                 let inline_batch_txns = opt_qs_payload.inline_batches().transactions();
@@ -549,7 +559,7 @@ async fn get_transactions_for_observer(
 }
 
 async fn request_txns_from_quorum_store(
-    batches_and_responders: Vec<(BatchInfo, Vec<PeerId>)>,
+    batches_and_responders: Vec<(BatchInfo, Arc<Mutex<Vec<PeerId>>>)>,
     timestamp: u64,
     batch_reader: Arc<dyn BatchReader>,
 ) -> ExecutorResult<Vec<SignedTransaction>> {
@@ -581,19 +591,41 @@ async fn request_txns_from_quorum_store(
     Ok(ret)
 }
 
-async fn process_payload_helper<T: TDataInfo>(
+async fn process_optqs_payload<T: TDataInfo>(
     data_ptr: &BatchPointer<T>,
     batch_reader: Arc<dyn BatchReader>,
     block: &Block,
     ordered_authors: &[PeerId],
+    additional_peers_to_request: Option<&BitVec>,
 ) -> ExecutorResult<Vec<SignedTransaction>> {
-    let (iteration, fut) = {
+    let (iteration, fut, existing_responders) = {
         let data_fut_guard = data_ptr.data_fut.lock();
         let data_fut = data_fut_guard.as_ref().expect("must be initialized");
-        (data_fut.iteration, data_fut.fut.clone())
+        (
+            data_fut.iteration,
+            data_fut.fut.clone(),
+            data_fut.responders.clone(),
+        )
     };
 
+    let mut signers = Vec::new();
+    if let Some(peers) = additional_peers_to_request {
+        for i in peers.iter_ones() {
+            if let Some(author) = ordered_authors.get(i) {
+                signers.push(*author);
+            }
+        }
+    }
+
+    // Append the additional peers to existing responders list
+    // NB: this might append the same signers multiple times, but this
+    // should be very rare and has no negative effects.
+    for responders in existing_responders {
+        responders.lock().append(&mut signers.clone());
+    }
+
     let result = fut.await;
+
     // If error, reschedule before returning the result
     if result.is_err() {
         let mut data_fut_guard = data_ptr.data_fut.lock();
@@ -603,12 +635,14 @@ async fn process_payload_helper<T: TDataInfo>(
             let batches_and_responders = data_ptr
                 .batch_summary
                 .iter()
-                .map(|proof| {
-                    let mut signers = proof.signers(ordered_authors);
+                .map(|summary| {
+                    let mut signers = signers.clone();
+                    signers.append(&mut summary.signers(ordered_authors));
                     if let Some(author) = block.author() {
                         signers.push(author);
                     }
-                    (proof.info().clone(), signers)
+
+                    (summary.info().clone(), Arc::new(Mutex::new(signers)))
                 })
                 .collect();
             data_fut.fut = request_txns_from_quorum_store(
@@ -626,7 +660,7 @@ async fn process_payload_helper<T: TDataInfo>(
 
 /// This is deprecated. Use `process_payload_helper` instead after migrating to
 /// OptQuorumStore payload
-async fn process_payload(
+async fn process_qs_payload(
     proof_with_data: &ProofWithData,
     batch_reader: Arc<dyn BatchReader>,
     block: &Block,
@@ -667,7 +701,9 @@ async fn process_payload(
                                 .map(|proof| {
                                     (
                                         proof.info().clone(),
-                                        proof.shuffled_signers(ordered_authors),
+                                        Arc::new(Mutex::new(
+                                            proof.shuffled_signers(ordered_authors),
+                                        )),
                                     )
                                 })
                                 .collect(),
@@ -692,7 +728,9 @@ async fn process_payload(
                                 .map(|proof| {
                                     (
                                         proof.info().clone(),
-                                        proof.shuffled_signers(ordered_authors),
+                                        Arc::new(Mutex::new(
+                                            proof.shuffled_signers(ordered_authors),
+                                        )),
                                     )
                                 })
                                 .collect(),
@@ -753,6 +791,7 @@ impl TPayloadManager for ConsensusObserverPayloadManager {
     async fn get_transactions(
         &self,
         block: &Block,
+        _block_signers: Option<BitVec>,
     ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
         return get_transactions_for_observer(block, &self.txns_pool, &self.consensus_publisher)
             .await;
