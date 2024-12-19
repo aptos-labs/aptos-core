@@ -329,7 +329,7 @@ Note: it does not move the underlying object.
 ## Function `transfer_assert_minimum_deposit`
 
 Transfer an <code>amount</code> of fungible asset from <code>from_store</code>, which should be owned by <code>sender</code>, to <code>receiver</code>.
-The recipient is guranteed to receive asset greater than the expected amount.
+The recipient is guaranteed to receive asset greater than the expected amount.
 Note: it does not move the underlying object.
 
 

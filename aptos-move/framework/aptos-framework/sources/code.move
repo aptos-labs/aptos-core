@@ -75,7 +75,7 @@ module aptos_framework::code {
         is_upgrade: bool,
     }
 
-    /// Package contains duplicate module names with existing modules publised in other packages on this address
+    /// Package contains duplicate module names with existing modules published in other packages on this address
     const EMODULE_NAME_CLASH: u64 = 0x1;
 
     /// Cannot upgrade an immutable package
