@@ -471,6 +471,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                             }
                         })
                         .collect::<Vec<_>>();
+                    info!("Rebroadcasting message_id: {:?} to peer {:?}", message_id, peer);
                     (message_id.clone(), txns, metric_label)
                 },
                 None => {
@@ -479,11 +480,12 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                     // If the peer doesn't have any sender_buckets assigned, let's not broadcast to the peer
                     let mut sender_buckets: Vec<(MempoolSenderBucket, BroadcastPeerPriority)> =
                         if self.node_type.is_validator() {
-                            (0..self.mempool_config.num_sender_buckets)
-                                .map(|sender_bucket| {
-                                    (sender_bucket, BroadcastPeerPriority::Primary)
-                                })
-                                .collect()
+                            vec![]
+                            // (0..self.mempool_config.num_sender_buckets)
+                            //     .map(|sender_bucket| {
+                            //         (sender_bucket, BroadcastPeerPriority::Primary)
+                            //     })
+                            //     .collect()
                         } else {
                             self.prioritized_peers_state
                                 .get_sender_buckets_for_peer(&peer)
@@ -507,7 +509,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                             std::cmp::Ordering::Greater
                         }
                     });
-
+                    info!("Broadcasting buckets {:?} to peer {:?}", sender_buckets, peer);
                     let max_txns = self.mempool_config.shared_mempool_batch_size;
                     let mut output_txns = vec![];
                     let mut output_updates = vec![];
@@ -541,7 +543,9 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                                 .push((sender_bucket, (old_timeline_id.clone(), new_timeline_id)));
                         }
                     }
-
+                    for (txn, _, peer_priority) in &output_txns {
+                        info!("Broadcasting txn: (address: {:?}, replay_protector: {:?}) to peer {:?} with peer_priority {:?}", txn.sender(), txn.replay_protector(), peer, peer_priority);
+                    }
                     (
                         MempoolMessageId::from_timeline_ids(output_updates),
                         output_txns,

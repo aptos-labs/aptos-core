@@ -29,11 +29,13 @@ pub struct QuorumStoreBackPressureConfig {
 impl Default for QuorumStoreBackPressureConfig {
     fn default() -> QuorumStoreBackPressureConfig {
         QuorumStoreBackPressureConfig {
+            // TODO: Reset these configs before landing
+
             // QS will be backpressured if the remaining total txns is more than this number
             // Roughly, target TPS * commit latency seconds
-            backlog_txn_limit_count: 36_000,
+            backlog_txn_limit_count: 50_000,
             // QS will create batches at the max rate until this number is reached
-            backlog_per_validator_batch_limit_count: 20,
+            backlog_per_validator_batch_limit_count: 100,
             decrease_duration_ms: 1000,
             increase_duration_ms: 1000,
             decrease_fraction: 0.5,

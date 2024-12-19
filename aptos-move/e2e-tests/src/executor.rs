@@ -847,6 +847,10 @@ impl FakeExecutor {
                     TransactionPayload::ModuleBundle(..) => {
                         unreachable!("Module bundle payload has been removed")
                     },
+
+                    TransactionPayload::V2(_) => {
+                        unimplemented!("Nested transaction payload is not yet supported")
+                    },
                 };
                 gas_profiler
             },
