@@ -152,11 +152,14 @@ impl FeatureFlag {
             FeatureFlag::WEBAUTHN_SIGNATURE,
             FeatureFlag::KEYLESS_ACCOUNTS,
             FeatureFlag::FEDERATED_KEYLESS,
+            // Enabled on devnet for ease of development (no need for prover service to be involved). 
+            // Will not be enabled on testnet/mainnet unless there is an emergency & we need to disable the ZK mode.
             FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
             FeatureFlag::JWK_CONSENSUS,
             FeatureFlag::REFUNDABLE_BYTES,
             FeatureFlag::OBJECT_CODE_DEPLOYMENT,
             FeatureFlag::MAX_OBJECT_NESTING_CHECK,
+            // Enabled on devnet for devs to play with. Will not enable on testnet/mainnet until we know there is a clear demand. 
             FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS,
             FeatureFlag::MULTISIG_V2_ENHANCEMENT,
             FeatureFlag::DELEGATION_POOL_ALLOWLISTING,
