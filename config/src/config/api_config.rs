@@ -81,6 +81,12 @@ pub struct ApiConfig {
     pub simulation_filter: Filter,
     /// Configuration to filter view function requests.
     pub view_filter: ViewFilter,
+    /// Maximum time state (onchain timestamp) is allowed to be stale, for the node
+    /// to respond to requests that require executing move code.
+    /// Preventing running code on extremely stale state avoids triggering code paths
+    /// that should otherwise never be triggered.
+    /// This is on top of above `simulation_filter` and `view_filter`.
+    pub max_stale_state_to_execute_move_code_on_s: u64,
     /// Periodically log stats for view function and simulate transaction usage
     pub periodic_function_stats_sec: Option<u64>,
     /// The time wait_by_hash will wait before returning 404.
@@ -141,6 +147,8 @@ impl Default for ApiConfig {
             wait_by_hash_timeout_ms: 1_000,
             wait_by_hash_poll_interval_ms: 20,
             wait_by_hash_max_active_connections: 100,
+            // by default, don't execute move code, if state is more than 1 day stale
+            max_stale_state_to_execute_move_code_on_s: 24 * 3600,
         }
     }
 }
