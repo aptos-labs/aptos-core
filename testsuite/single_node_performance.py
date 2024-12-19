@@ -807,12 +807,14 @@ with tempfile.TemporaryDirectory() as tmpdirname, tempfile.TemporaryDirectory() 
 
         data_dir = tmpdirname
         keyless_flags = ""
+        main_signer_accounts = MAIN_SIGNER_ACCOUNTS
         if test.key_extra.txn_auth_mode == "keyless":
             data_dir = keyless_tmp_dir
             keyless_flags = "--use-keyless-accounts"
             additional_dst_pool_accounts = 0
+            main_signer_accounts = NUM_KEYLESS_ACCOUNTS
 
-        common_command_suffix = f"{executor_type_str} {pipeline_extra_args_str} --block-size {cur_block_size} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} {keyless_flags} run-executor {FEATURE_FLAGS} {workload_args_str} --module-working-set-size {test.key.module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {additional_dst_pool_accounts} --data-dir {data_dir}/db  --checkpoint-dir {data_dir}/cp"
+        common_command_suffix = f"{executor_type_str} {pipeline_extra_args_str} --block-size {cur_block_size} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} {keyless_flags} run-executor {FEATURE_FLAGS} {workload_args_str} --module-working-set-size {test.key.module_working_set_size} --main-signer-accounts {main_signer_accounts} --additional-dst-pool-accounts {additional_dst_pool_accounts} --data-dir {data_dir}/db  --checkpoint-dir {data_dir}/cp"
 
         number_of_threads_results = {}
 
