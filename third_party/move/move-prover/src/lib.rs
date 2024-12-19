@@ -15,8 +15,8 @@ use move_compiler_v2::{env_pipeline::rewrite_target::RewritingScope, Experiment}
 use move_docgen::Docgen;
 use move_errmapgen::ErrmapGen;
 use move_model::{
-    code_writer::CodeWriter, model::GlobalEnv, parse_addresses_from_options,
-    run_model_builder_with_options,
+    code_writer::CodeWriter, metadata::LATEST_STABLE_COMPILER_VERSION_VALUE, model::GlobalEnv,
+    parse_addresses_from_options, run_model_builder_with_options,
 };
 use move_prover_boogie_backend::{
     add_prelude, boogie_wrapper::BoogieWrapper, bytecode_translator::BoogieTranslator,
@@ -84,7 +84,7 @@ pub fn create_move_prover_v2_model<W: WriteColor>(
         named_address_mapping: options.move_named_address_values,
         output_dir: options.output_path,
         language_version: options.language_version,
-        compiler_version: None, // TODO: need to pass v2.x here
+        compiler_version: Some(LATEST_STABLE_COMPILER_VERSION_VALUE),
         skip_attribute_checks: true,
         known_attributes: Default::default(),
         testing: options.backend.stable_test_output,
