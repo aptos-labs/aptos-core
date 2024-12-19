@@ -1,0 +1,14 @@
+[package]
+name = "redemption"
+version = "0.0.0"
+upgrade_policy = "immutable"
+
+[addresses]
+aptos_framework = "0x1"
+redemption = "_"
+
+[dev-addresses]
+redemption = "0xcafe"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
