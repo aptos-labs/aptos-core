@@ -94,6 +94,7 @@ impl AptosVM {
             storage_gas_params,
             false,
             gas_meter_balance.into(),
+            None,
         );
 
         let change_set_configs = &self
