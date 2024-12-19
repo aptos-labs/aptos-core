@@ -148,21 +148,7 @@ impl NodeSetup {
         onchain_randomness_config: Option<OnChainRandomnessConfig>,
         onchain_jwk_consensus_config: Option<OnChainJWKConsensusConfig>,
     ) -> Vec<Self> {
-        let mut onchain_consensus_config = onchain_consensus_config.unwrap_or_default();
-        // With order votes feature, the validators additionally send order votes.
-        // next_proposal and next_vote functions could potentially break because of it.
-        if let OnChainConsensusConfig::V3 {
-            alg:
-                ConsensusAlgorithmConfig::JolteonV2 {
-                    main: _,
-                    quorum_store_enabled: _,
-                    order_vote_enabled,
-                },
-            vtxn: _,
-        } = &mut onchain_consensus_config
-        {
-            *order_vote_enabled = false;
-        }
+        let onchain_consensus_config = onchain_consensus_config.unwrap_or_default();
         let onchain_randomness_config =
             onchain_randomness_config.unwrap_or_else(OnChainRandomnessConfig::default_if_missing);
         let onchain_jwk_consensus_config = onchain_jwk_consensus_config
@@ -291,7 +277,6 @@ impl NodeSetup {
             time_service.clone(),
             10,
             Arc::from(DirectMempoolPayloadManager::new()),
-            false,
             Arc::new(Mutex::new(PendingBlocks::new())),
             None,
         ));
@@ -371,7 +356,7 @@ impl NodeSetup {
     pub fn restart(self, playground: &mut NetworkPlayground, executor: Handle) -> Self {
         let recover_data = self
             .storage
-            .try_start(self.onchain_consensus_config.order_vote_enabled())
+            .try_start()
             .unwrap_or_else(|e| panic!("fail to restart due to: {}", e));
         Self::new(
             playground,
@@ -2498,7 +2483,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     let alg_config = ConsensusAlgorithmConfig::JolteonV2 {
         main: ConsensusConfigV1::default(),
         quorum_store_enabled: true,
-        order_vote_enabled: false,
+        order_vote_enabled: true,
     };
     let vtxn_config = ValidatorTxnConfig::V1 {
         per_block_limit_txn_count: 5,
