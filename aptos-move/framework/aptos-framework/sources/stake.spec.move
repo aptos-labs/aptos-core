@@ -586,6 +586,10 @@ spec aptos_framework::stake {
         }
     }
 
+    spec fun spec_get_lockup_secs(pool_address: address): u64 {
+        global<StakePool>(pool_address).locked_until_secs
+    }
+
     spec calculate_rewards_amount {
         pragma opaque;
         // TODO: set because of timeout (property proved)

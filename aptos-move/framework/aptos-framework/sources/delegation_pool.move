@@ -954,6 +954,7 @@ module aptos_framework::delegation_pool {
         if (voting_power > remaining_voting_power) {
             voting_power = remaining_voting_power;
         };
+        aptos_governance::assert_proposal_expiration(pool_address, proposal_id);
         assert!(voting_power > 0, error::invalid_argument(ENO_VOTING_POWER));
 
         let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
@@ -4816,7 +4817,7 @@ module aptos_framework::delegation_pool {
         validator: &signer,
         delegator1: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolAllowlisting {
-        // This test case checks the scenario where delegation_pool_partial_governance_voting is disabled.
+        // This test case begins with the delegation_pool_partial_governance_voting feature disabled.
         features::change_feature_flags_for_testing(
             aptos_framework,
             vector[],
@@ -4831,6 +4832,124 @@ module aptos_framework::delegation_pool {
         account::create_account_for_test(delegator1_address);
 
         // Delegator1 has no stake. Abort.
+        vote(delegator1, pool_address, proposal1_id, 10 * ONE_APT, true);
+    }
+
+    #[test(aptos_framework = @aptos_framework, validator1 = @0x123, validator2 = @0x234, delegator1 = @0x010, delegator2 = @0x020)]
+    #[expected_failure(abort_code = 65539, location = aptos_framework::aptos_governance)]
+    public entry fun test_vote_should_failed_due_to_insufficient_stake_lockup (
+        aptos_framework: &signer,
+        validator1: &signer,
+        validator2: &signer,
+        delegator1: &signer,
+        delegator2: &signer,
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolAllowlisting {
+        // This test case begins with the delegation_pool_partial_governance_voting feature disabled.
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[],
+            vector[features::get_delegation_pool_partial_governance_voting()]
+        );
+
+        let _ = setup_vote(aptos_framework, validator1, false);
+
+        let validator1_address = signer::address_of(validator1);
+        let pool1_address = get_owned_pool_address(validator1_address);
+        let delegator1_address = signer::address_of(delegator1);
+        account::create_account_for_test(delegator1_address);
+        stake::mint(delegator1, 110 * ONE_APT);
+        add_stake(delegator1, pool1_address, 10 * ONE_APT);
+
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS - 500);
+        end_aptos_epoch();
+
+        initialize_test_validator(validator2, 100 * ONE_APT, true, true);
+        let validator2_address = signer::address_of(validator2);
+        let pool2_address = get_owned_pool_address(validator2_address);
+        let delegator2_address = signer::address_of(delegator2);
+        account::create_account_for_test(delegator2_address);
+        stake::mint(delegator2, 110 * ONE_APT);
+        add_stake(delegator2, pool2_address, 10 * ONE_APT);
+
+        let proposal_id = aptos_governance::create_proposal_v2_impl(
+            validator2,
+            pool2_address,
+            b"0",
+            b"",
+            b"",
+            true,
+        );
+
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[features::get_delegation_pool_partial_governance_voting()],
+            vector[]
+        );
+        enable_partial_governance_voting(pool1_address);
+        enable_partial_governance_voting(pool2_address);
+
+        vote(delegator2, pool2_address, proposal_id, 10 * ONE_APT, true);
+        // Should abort with the error EINSUFFICIENT_STAKE_LOCKUP.
+        vote(delegator1, pool1_address, proposal_id, 10 * ONE_APT, true);
+    }
+
+    #[test(aptos_framework = @aptos_framework, validator = @0x123, delegator1 = @0x010)]
+    #[expected_failure(abort_code = 65551, location = aptos_framework::aptos_governance)]
+    public entry fun test_vote_should_failed_due_to_proposal_expired(
+        aptos_framework: &signer,
+        validator: &signer,
+        delegator1: &signer,
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolAllowlisting {
+        // This test case begins with the delegation_pool_partial_governance_voting feature disabled.
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[],
+            vector[features::get_delegation_pool_partial_governance_voting()]
+        );
+        // partial voing hasn't been enabled yet. A proposal has been created by the validator.
+        let proposal1_id = setup_vote(aptos_framework, validator, true);
+
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+        let delegator1_address = signer::address_of(delegator1);
+        account::create_account_for_test(delegator1_address);
+
+        stake::mint(delegator1, 110 * ONE_APT);
+        add_stake(delegator1, pool_address, 10 * ONE_APT);
+
+        timestamp::fast_forward_seconds(2000);
+        end_aptos_epoch();
+
+        // Should abort with the error EPROPOSAL_EXPIRED.
+        vote(delegator1, pool_address, proposal1_id, 10 * ONE_APT, true);
+    }
+
+    #[test(aptos_framework = @aptos_framework, validator = @0x123, delegator1 = @0x010)]
+    #[expected_failure(abort_code = 0x10010, location = Self)]
+    public entry fun test_vote_should_failed_due_to_insufficient_voting_power(
+        aptos_framework: &signer,
+        validator: &signer,
+        delegator1: &signer,
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolAllowlisting {
+        // This test case checks the scenario where delegation_pool_partial_governance_voting is disabled.
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[],
+            vector[features::get_delegation_pool_partial_governance_voting()]
+        );
+        // partial voing hasn't been enabled yet. A proposal has been created by the validator.
+        let proposal1_id = setup_vote(aptos_framework, validator, true);
+
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+        let delegator1_address = signer::address_of(delegator1);
+        account::create_account_for_test(delegator1_address);
+
+        stake::mint(delegator1, 110 * ONE_APT);
+        add_stake(delegator1, pool_address, 10 * ONE_APT);
+        end_aptos_epoch();
+        vote(delegator1, pool_address, proposal1_id, 10 * ONE_APT, true);
+        // Should abort with the error ENO_VOTING_POWER.
         vote(delegator1, pool_address, proposal1_id, 10 * ONE_APT, true);
     }
 
