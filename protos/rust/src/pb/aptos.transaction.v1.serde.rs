@@ -715,6 +715,9 @@ impl serde::Serialize for Block {
         if self.chain_id != 0 {
             len += 1;
         }
+        if self.nothing != 0 {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.Block", len)?;
         if let Some(v) = self.timestamp.as_ref() {
             struct_ser.serialize_field("timestamp", v)?;
@@ -727,6 +730,9 @@ impl serde::Serialize for Block {
         }
         if self.chain_id != 0 {
             struct_ser.serialize_field("chainId", &self.chain_id)?;
+        }
+        if self.nothing != 0 {
+            struct_ser.serialize_field("nothing", ToString::to_string(&self.nothing).as_str())?;
         }
         struct_ser.end()
     }
@@ -743,6 +749,7 @@ impl<'de> serde::Deserialize<'de> for Block {
             "transactions",
             "chain_id",
             "chainId",
+            "nothing",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -751,6 +758,7 @@ impl<'de> serde::Deserialize<'de> for Block {
             Height,
             Transactions,
             ChainId,
+            Nothing,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -776,6 +784,7 @@ impl<'de> serde::Deserialize<'de> for Block {
                             "height" => Ok(GeneratedField::Height),
                             "transactions" => Ok(GeneratedField::Transactions),
                             "chainId" | "chain_id" => Ok(GeneratedField::ChainId),
+                            "nothing" => Ok(GeneratedField::Nothing),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -799,6 +808,7 @@ impl<'de> serde::Deserialize<'de> for Block {
                 let mut height__ = None;
                 let mut transactions__ = None;
                 let mut chain_id__ = None;
+                let mut nothing__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::Timestamp => {
@@ -829,6 +839,14 @@ impl<'de> serde::Deserialize<'de> for Block {
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
+                        GeneratedField::Nothing => {
+                            if nothing__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("nothing"));
+                            }
+                            nothing__ =
+                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
+                        }
                     }
                 }
                 Ok(Block {
@@ -836,6 +854,7 @@ impl<'de> serde::Deserialize<'de> for Block {
                     height: height__.unwrap_or_default(),
                     transactions: transactions__.unwrap_or_default(),
                     chain_id: chain_id__.unwrap_or_default(),
+                    nothing: nothing__.unwrap_or_default(),
                 })
             }
         }
