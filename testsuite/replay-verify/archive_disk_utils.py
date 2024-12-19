@@ -12,6 +12,7 @@ from tenacity import (
     wait_exponential,
     retry_if_exception_type,
 )
+from typing import Tuple, List, Optional, Any
 
 
 # Constants
@@ -33,11 +34,11 @@ NAMESPACE = "replay-verify"
 ZONE = "us-central1-a"
 
 
-def get_region_from_zone(zone):
+def get_region_from_zone(zone: str) -> str:
     return zone.rsplit("-", 1)[0]
 
 
-def get_kubectl_credentials(project_id, region, cluster_name):
+def get_kubectl_credentials(project_id: str, region: str, cluster_name: str) -> None:
     try:
         # Command to get kubectl credentials for the cluster
         command = [
@@ -57,7 +58,9 @@ def get_kubectl_credentials(project_id, region, cluster_name):
         logger.error(f"Error fetching kubectl credentials: {e}")
 
 
-def get_snapshot_source_pv_and_zone(project_id, region, cluster_id, namespace):
+def get_snapshot_source_pv_and_zone(
+    project_id: str, region: str, cluster_id: str, namespace: str
+) -> Tuple[str, Optional[str]]:
     get_kubectl_credentials(project_id, region, cluster_id)
 
     # Use the Kubernetes API
@@ -101,13 +104,13 @@ def get_snapshot_source_pv_and_zone(project_id, region, cluster_id, namespace):
 
 
 def create_snapshot_from_backup_pods(
-    snapshot_name,
-    source_project,
-    source_cluster,
-    source_region,
-    source_namespace,
-    target_project,
-):
+    snapshot_name: str,
+    source_project: str,
+    source_cluster: str,
+    source_region: str,
+    source_namespace: str,
+    target_project: str,
+) -> None:
     (volume_name, zone) = get_snapshot_source_pv_and_zone(
         source_project, source_region, source_cluster, source_namespace
     )
@@ -121,12 +124,12 @@ def create_snapshot_from_backup_pods(
 
 
 def create_snapshot_with_gcloud(
-    snapshot_name,
-    source_project,
-    source_volume,
-    source_zone,
-    target_project,
-):
+    snapshot_name: str,
+    source_project: str,
+    source_volume: str,
+    source_zone: str,
+    target_project: str,
+) -> None:
     # delete the snapshot if it already exists
     snapshot_client = compute_v1.SnapshotsClient()
     try:
@@ -173,7 +176,9 @@ def create_snapshot_with_gcloud(
         raise Exception(f"Error creating snapshot: {e}")
 
 
-def delete_disk(disk_client, project, zone, disk_name):
+def delete_disk(
+    disk_client: compute_v1.DisksClient, project: str, zone: str, disk_name: str
+) -> None:
     # Check if the disk already exists
 
     try:
@@ -189,21 +194,26 @@ def delete_disk(disk_client, project, zone, disk_name):
         logger.info(f"Disk {e} {disk_name} does not exist, no delete needed.")
 
 
-def generate_disk_name(run_id, snapshot_name, pvc_id):
+def generate_disk_name(run_id: str, snapshot_name: str, pvc_id: int) -> str:
     return f"{snapshot_name}-{run_id}-{pvc_id}"
 
 
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=4, max=10),
-    retry=retry_if_exception_type((ApiException, Exception)),
+    retry=retry_if_exception_type(ApiException),
     before_sleep=lambda retry_state: logger.warning(
         f"Retrying initial disk creation after error: {retry_state.outcome.exception()}"
     ),
 )
 def create_disk_from_snapshot(
-    disk_client, snapshot_client, project, zone, snapshot_name, disk_name
-):
+    disk_client: compute_v1.DisksClient,
+    snapshot_client: compute_v1.SnapshotsClient,
+    project: str,
+    zone: str,
+    snapshot_name: str,
+    disk_name: str,
+) -> None:
     start_time = time.time()
     delete_disk(disk_client, project, zone, disk_name)
 
@@ -228,16 +238,16 @@ def create_disk_from_snapshot(
 # require getting a hold of the kubectrl of the cluster
 # eg: gcloud container clusters get-credentials replay-on-archive --region us-central1 --project replay-verify
 def create_final_snapshot(
-    project,
-    zone,
-    cluster_name,
-    og_snapshot_name,
-    snapshot_name,
-    disk_name,
-    pv_name,
-    pvc_name,
-    namespace,
-):
+    project: str,
+    zone: str,
+    cluster_name: str,
+    og_snapshot_name: str,
+    snapshot_name: str,
+    disk_name: str,
+    pv_name: str,
+    pvc_name: str,
+    namespace: str,
+) -> None:
     disk_client = compute_v1.DisksClient()
     snapshot_client = compute_v1.SnapshotsClient()
     create_disk_from_snapshot(
@@ -286,7 +296,7 @@ def create_final_snapshot(
     delete_pv_and_pvc(repair_pv, repair_pvc, namespace)
 
 
-def is_job_pod_cleanedup(namespace, job_name):
+def is_job_pod_cleanedup(namespace: str, job_name: str) -> bool:
     config.load_kube_config()
     v1 = client.BatchV1Api()
     try:
@@ -306,7 +316,12 @@ def is_job_pod_cleanedup(namespace, job_name):
         return True
 
 
-def wait_for_operation(project, zone, operation_name, zone_operations_client):
+def wait_for_operation(
+    project: str,
+    zone: str,
+    operation_name: str,
+    zone_operations_client: compute_v1.ZoneOperationsClient,
+) -> Any:
     start_time = time.time()
     timeout = 3600  # 1 hour timeout
 
@@ -329,7 +344,7 @@ def wait_for_operation(project, zone, operation_name, zone_operations_client):
         time.sleep(20)
 
 
-def delete_pv_and_pvc(pv_name, pvc_name, namespace):
+def delete_pv_and_pvc(pv_name: str, pvc_name: str, namespace: str) -> None:
     config.load_kube_config()
     v1 = client.CoreV1Api()
     try:
@@ -347,8 +362,15 @@ def delete_pv_and_pvc(pv_name, pvc_name, namespace):
 
 
 def create_persistent_volume(
-    project, zone, disk_name, pv_name, pvc_name, namespace, read_only, label=""
-):
+    project: str,
+    zone: str,
+    disk_name: str,
+    pv_name: str,
+    pvc_name: str,
+    namespace: str,
+    read_only: bool,
+    label: str = "",
+) -> None:
     config.load_kube_config()
     v1 = client.CoreV1Api()
     access_mode = "ReadWriteOnce" if not read_only else "ReadOnlyMany"
@@ -422,8 +444,14 @@ def create_persistent_volume(
 
 
 def create_repair_disk_and_its_snapshot(
-    project, zone, cluster_name, og_snapshot_name, snapshot_name, prefix, namespace
-):
+    project: str,
+    zone: str,
+    cluster_name: str,
+    og_snapshot_name: str,
+    snapshot_name: str,
+    prefix: str,
+    namespace: str,
+) -> None:
     tasks = []
 
     for copy in range(DISK_COPIES):
@@ -455,7 +483,7 @@ def create_repair_disk_and_its_snapshot(
                 logger.error(f"Task generated an exception: {e}")
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=__doc__,
@@ -465,7 +493,17 @@ def parse_args():
     return args
 
 
-def create_one_pvc_from_snapshot(pvc_name, snapshot_name, namespace, label):
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+    retry=retry_if_exception_type((ApiException, Exception)),
+    before_sleep=lambda retry_state: logger.warning(
+        f"Retrying creating pvc from snapshot after error: {retry_state.outcome.exception()}"
+    ),
+)
+def create_one_pvc_from_snapshot(
+    pvc_name: str, snapshot_name: str, namespace: str, label: str
+) -> str:
     config.load_kube_config()
     api_instance = client.CoreV1Api()
     storage_size = "10Ti" if TESTNET_SNAPSHOT_NAME in snapshot_name else "8Ti"
@@ -500,8 +538,8 @@ def create_one_pvc_from_snapshot(pvc_name, snapshot_name, namespace, label):
 
 
 def create_replay_verify_pvcs_from_snapshot(
-    run_id, snapshot_name, namespace, pvc_num, label
-):
+    run_id: str, snapshot_name: str, namespace: str, pvc_num: int, label: str
+) -> List[str]:
     config.load_kube_config()
     api_instance = client.CustomObjectsApi()
 
