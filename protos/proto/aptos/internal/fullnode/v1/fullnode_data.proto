@@ -6,6 +6,7 @@ syntax = "proto3";
 package aptos.internal.fullnode.v1;
 
 import "aptos/transaction/v1/transaction.proto";
+import "aptos/indexer/v1/grpc.proto";
 
 // Transaction data is transferred via 1 stream with batches until terminated.
 // One stream consists:
@@ -52,6 +53,14 @@ message TransactionsFromNodeResponse {
   uint32 chain_id = 3;
 }
 
+message PingFullnodeRequest {
+}
+
+message PingFullnodeResponse {
+    optional aptos.indexer.v1.FullnodeInfo info = 1;
+}
+
 service FullnodeData {
+  rpc Ping(PingFullnodeRequest) returns (PingFullnodeResponse);
   rpc GetTransactionsFromNode(GetTransactionsFromNodeRequest) returns (stream TransactionsFromNodeResponse);
 }

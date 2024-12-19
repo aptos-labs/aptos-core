@@ -2,15 +2,26 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{counters::CHANNEL_SIZE, stream_coordinator::IndexerStreamCoordinator, ServiceContext};
-use aptos_indexer_grpc_utils::counters::{log_grpc_step_fullnode, IndexerGrpcStep};
+use aptos_indexer_grpc_utils::{
+    counters::{log_grpc_step_fullnode, IndexerGrpcStep},
+    timestamp_now_proto,
+};
 use aptos_logger::{error, info};
 use aptos_moving_average::MovingAverage;
-use aptos_protos::internal::fullnode::v1::{
-    fullnode_data_server::FullnodeData, stream_status::StatusType, transactions_from_node_response,
-    GetTransactionsFromNodeRequest, StreamStatus, TransactionsFromNodeResponse,
+use aptos_protos::{
+    indexer::v1::FullnodeInfo,
+    internal::fullnode::v1::{
+        fullnode_data_server::FullnodeData, stream_status::StatusType,
+        transactions_from_node_response, GetTransactionsFromNodeRequest, PingFullnodeRequest,
+        PingFullnodeResponse, StreamStatus, TransactionsFromNodeResponse,
+    },
+    util::timestamp::Timestamp,
 };
 use futures::Stream;
-use std::pin::Pin;
+use std::{
+    pin::Pin,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -155,6 +166,25 @@ impl FullnodeData for FullnodeDataService {
         Ok(Response::new(
             Box::pin(output_stream) as Self::GetTransactionsFromNodeStream
         ))
+    }
+
+    async fn ping(
+        &self,
+        _request: Request<PingFullnodeRequest>,
+    ) -> Result<Response<PingFullnodeResponse>, Status> {
+        let timestamp = timestamp_now_proto();
+
+        let info = FullnodeInfo {
+            timestamp: Some(timestamp),
+            known_latest_version: self
+                .service_context
+                .context
+                .db
+                .get_synced_version()
+                .map_err(|e| Status::internal(format!("{e}")))?,
+        };
+        let response = PingFullnodeResponse { info: Some(info) };
+        Ok(Response::new(response))
     }
 }
 
