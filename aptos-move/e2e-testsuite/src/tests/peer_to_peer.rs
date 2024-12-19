@@ -6,9 +6,11 @@ use aptos_language_e2e_tests::{
     account::Account, common_transactions::peer_to_peer_txn, executor::FakeExecutor,
 };
 use aptos_types::{
-    account_config::{DepositEvent, WithdrawEvent},
+    account_config::{DepositEvent, DepositFAEvent, WithdrawEvent, WithdrawFAEvent},
+    fee_statement::FeeStatement,
     transaction::{ExecutionStatus, SignedTransaction, TransactionOutput, TransactionStatus},
 };
+use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
 use std::{convert::TryFrom, time::Instant};
 
 #[test]
@@ -40,21 +42,23 @@ fn single_peer_to_peer_with_event() {
         .read_account_resource(sender.account())
         .expect("sender must exist");
     let updated_sender_balance = executor
-        .read_apt_coin_store_resource(sender.account())
+        .read_apt_pfs_resource(sender.account())
         .expect("sender balance must exist");
     let updated_receiver_balance = executor
-        .read_apt_coin_store_resource(receiver.account())
+        .read_apt_pfs_resource(receiver.account())
         .expect("receiver balance must exist");
-    assert_eq!(receiver_balance, updated_receiver_balance.coin());
-    assert_eq!(sender_balance, updated_sender_balance.coin());
+    assert_eq!(receiver_balance, updated_receiver_balance.balance());
+    assert_eq!(sender_balance, updated_sender_balance.balance());
     assert_eq!(11, updated_sender.sequence_number());
 
-    let rec_ev_path = receiver.received_events_key();
-    let sent_ev_path = sender.sent_events_key();
     for event in output.events() {
-        let event_key = event.event_key();
-        if let Some(event_key) = event_key {
-            assert!(rec_ev_path == event_key || sent_ev_path == event_key);
+        if event.is_v2() {
+            let event_type = event.type_tag();
+            assert!(
+                &TypeTag::Struct(Box::new(WithdrawFAEvent::struct_tag())) == event_type
+                    || &TypeTag::Struct(Box::new(DepositFAEvent::struct_tag())) == event_type
+                    || &TypeTag::Struct(Box::new(FeeStatement::struct_tag())) == event_type
+            );
         }
     }
 }
@@ -100,27 +104,27 @@ fn few_peer_to_peer_with_event() {
         }
 
         let original_sender_balance = executor
-            .read_apt_coin_store_resource(sender.account())
+            .read_apt_pfs_resource(sender.account())
             .expect("sender balance must exist");
         let original_receiver_balance = executor
-            .read_apt_coin_store_resource(receiver.account())
+            .read_apt_pfs_resource(receiver.account())
             .expect("receiver balcne must exist");
         executor.apply_write_set(txn_output.write_set());
 
         // check that numbers in stored DB are correct
-        let sender_balance = original_sender_balance.coin() - transfer_amount;
-        let receiver_balance = original_receiver_balance.coin() + transfer_amount;
+        let sender_balance = original_sender_balance.balance() - transfer_amount;
+        let receiver_balance = original_receiver_balance.balance() + transfer_amount;
         let updated_sender = executor
             .read_account_resource(sender.account())
             .expect("sender must exist");
         let updated_sender_balance = executor
-            .read_apt_coin_store_resource(sender.account())
+            .read_apt_pfs_resource(sender.account())
             .expect("sender balance must exist");
         let updated_receiver_balance = executor
-            .read_apt_coin_store_resource(receiver.account())
+            .read_apt_pfs_resource(receiver.account())
             .expect("receiver balance must exist");
-        assert_eq!(receiver_balance, updated_receiver_balance.coin());
-        assert_eq!(sender_balance, updated_sender_balance.coin());
+        assert_eq!(receiver_balance, updated_receiver_balance.balance());
+        assert_eq!(sender_balance, updated_sender_balance.balance());
         assert_eq!(11 + idx as u64, updated_sender.sequence_number());
     }
 }
@@ -242,14 +246,14 @@ pub(crate) fn check_and_apply_transfer_output(
             .read_account_resource(sender)
             .expect("sender must exist");
         let sender_balance = executor
-            .read_apt_coin_store_resource(sender)
+            .read_apt_pfs_resource(sender)
             .expect("sender balance must exist");
-        let sender_initial_balance = sender_balance.coin();
+        let sender_initial_balance = sender_balance.balance();
         let sender_seq_num = sender_resource.sequence_number();
         let receiver_initial_balance = executor
-            .read_apt_coin_store_resource(receiver)
+            .read_apt_pfs_resource(receiver)
             .expect("receiver balance must exist")
-            .coin();
+            .balance();
 
         // apply single transaction to DB
         let txn_output = &output[i];
@@ -262,13 +266,13 @@ pub(crate) fn check_and_apply_transfer_output(
             .read_account_resource(sender)
             .expect("sender must exist");
         let updated_sender_balance = executor
-            .read_apt_coin_store_resource(sender)
+            .read_apt_pfs_resource(sender)
             .expect("sender balance must exist");
         let updated_receiver_balance = executor
-            .read_apt_coin_store_resource(receiver)
+            .read_apt_pfs_resource(receiver)
             .expect("receiver balance must exist");
-        assert_eq!(receiver_balance, updated_receiver_balance.coin());
-        assert_eq!(sender_balance, updated_sender_balance.coin());
+        assert_eq!(receiver_balance, updated_receiver_balance.balance());
+        assert_eq!(sender_balance, updated_sender_balance.balance());
         assert_eq!(sender_seq_num + 1, updated_sender.sequence_number());
     }
 }

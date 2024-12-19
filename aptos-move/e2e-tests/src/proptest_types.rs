@@ -23,25 +23,16 @@ impl AccountData {
         // be generated.
         // XXX should we also test edge cases around large sequence numbers?
         let sequence_strategy = 0u64..(1 << 32);
-        let event_count_strategy = 0u64..(1 << 32);
 
-        (
-            any::<Account>(),
-            balance_strategy,
-            sequence_strategy,
-            event_count_strategy.clone(),
-            event_count_strategy,
+        (any::<Account>(), balance_strategy, sequence_strategy).prop_map(
+            |(account, balance, sequence_number)| {
+                AccountData::with_account_and_fungible_store(
+                    account,
+                    balance,
+                    sequence_number,
+                    false,
+                )
+            },
         )
-            .prop_map(
-                |(account, balance, sequence_number, sent_events_count, received_events_count)| {
-                    AccountData::with_account_and_event_counts(
-                        account,
-                        balance,
-                        sequence_number,
-                        sent_events_count,
-                        received_events_count,
-                    )
-                },
-            )
     }
 }

@@ -222,9 +222,7 @@ module aptos_framework::aptos_account {
     }
 
     public(friend) fun register_apt(account_signer: &signer) {
-        if (features::new_accounts_default_to_fa_apt_store_enabled()) {
-            ensure_primary_fungible_store_exists(signer::address_of(account_signer));
-        } else {
+        if (!features::new_accounts_default_to_fa_apt_store_enabled()) {
             coin::register<AptosCoin>(account_signer);
         }
     }
@@ -320,7 +318,6 @@ module aptos_framework::aptos_account {
         let (resource_account, _) = account::create_resource_account(alice, vector[]);
         let resource_acc_addr = signer::address_of(&resource_account);
         let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(core);
-        assert!(!coin::is_account_registered<AptosCoin>(resource_acc_addr), 0);
 
         create_account(signer::address_of(alice));
         coin::deposit(signer::address_of(alice), coin::mint(10000, &mint_cap));
