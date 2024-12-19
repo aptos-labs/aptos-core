@@ -875,6 +875,7 @@ move-prover = { path = "third_party/move/move-prover" }
 move-prover-boogie-backend = { path = "third_party/move/move-prover/boogie-backend" }
 move-prover-bytecode-pipeline = { path = "third_party/move/move-prover/bytecode-pipeline" }
 move-prover-test-utils = { path = "third_party/move/move-prover/test-utils" }
+move-prover-lab = { path = "third_party/move/move-prover/lab" }
 aptos-move-stdlib = { path = "aptos-move/framework/move-stdlib" }
 aptos-table-natives = { path = "aptos-move/framework/table-natives" }
 move-resource-viewer = { path = "third_party/move/tools/move-resource-viewer" }
