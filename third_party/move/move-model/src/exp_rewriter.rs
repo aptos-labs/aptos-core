@@ -341,7 +341,7 @@ pub trait ExpRewriterFunctions {
                     exp
                 }
             },
-            Invoke(id, target, args) => {
+            InvokeFunction(id, target, args) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 let (target_changed, new_target) = self.internal_rewrite_exp(target);
                 let new_args_opt = self.internal_rewrite_vec(args);
@@ -358,7 +358,7 @@ pub trait ExpRewriterFunctions {
                     } else {
                         args.to_owned()
                     };
-                    Invoke(new_id, new_target, args_owned).into_exp()
+                    InvokeFunction(new_id, new_target, args_owned).into_exp()
                 } else {
                     exp
                 }

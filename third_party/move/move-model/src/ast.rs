@@ -639,7 +639,7 @@ pub enum ExpData {
     /// (including operators, constants, ...) as well as user functions.
     Call(NodeId, Operation, Vec<Exp>),
     /// Represents an invocation of a function value, as a lambda.
-    Invoke(NodeId, Exp, Vec<Exp>),
+    InvokeFunction(NodeId, Exp, Vec<Exp>),
     /// Represents a lambda.
     Lambda(NodeId, Pattern, Exp, LambdaCaptureKind, AbilitySet),
     /// Represents a quantified formula over multiple variables and ranges.
@@ -820,7 +820,7 @@ impl ExpData {
             | LocalVar(node_id, ..)
             | Temporary(node_id, ..)
             | Call(node_id, ..)
-            | Invoke(node_id, ..)
+            | InvokeFunction(node_id, ..)
             | Lambda(node_id, ..)
             | Quant(node_id, ..)
             | Block(node_id, ..)
@@ -1435,7 +1435,7 @@ impl ExpData {
                     exp.visit_positions_impl(visitor)?;
                 }
             },
-            Invoke(_, target, args) => {
+            InvokeFunction(_, target, args) => {
                 target.visit_positions_impl(visitor)?;
                 for exp in args {
                     exp.visit_positions_impl(visitor)?;
@@ -1819,9 +1819,9 @@ pub enum Operation {
     /// arguments will be bound, in order, to the leading parameters of that function,
     /// generating a function which takes the remaining parameters and then calls
     /// the function with the complete set of parameters.
-    ///     (move |x, y| f(z, x, y)) === ExpData::Call(_, EarlyBind, vec![f, z])
-    ///     (move || f(z, x, y)) === ExpData::Call(_, EarlyBind, vec![f, z, x, y])
-    EarlyBind,
+    ///     (move |x, y| f(z, x, y)) === ExpData::Call(_, EarlyBindFunction, vec![f, z])
+    ///     (move || f(z, x, y)) === ExpData::Call(_, EarlyBindFunction, vec![f, z, x, y])
+    EarlyBindFunction,
     Pack(ModuleId, StructId, /*variant*/ Option<Symbol>),
     Tuple,
     Select(ModuleId, StructId, FieldId),
@@ -2674,7 +2674,7 @@ impl Operation {
             Select(..) => false,         // Move-related
             SelectVariants(..) => false, // Move-related
             UpdateField(..) => false,    // Move-related
-            EarlyBind => true,
+            EarlyBindFunction => true,
 
             // Specification specific
             Result(..) => false, // Spec
@@ -2888,7 +2888,7 @@ impl ExpData {
                         is_pure = false;
                     }
                 },
-                Invoke(..) => {
+                InvokeFunction(..) => {
                     // Leave it alone for now, but with more analysis maybe we can do something.
                     is_pure = false;
                 },
@@ -3340,7 +3340,7 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     body.display_cont(self)
                 )
             },
-            Invoke(_, fun, args) => {
+            InvokeFunction(_, fun, args) => {
                 write!(f, "({})({})", fun.display_cont(self), self.fmt_exps(args))
             },
             IfElse(_, cond, if_exp, else_exp) => {
@@ -3571,7 +3571,7 @@ impl<'a> fmt::Display for OperationDisplay<'a> {
                         .unwrap_or_else(|| "<?unknown function?>".to_string())
                 )
             },
-            EarlyBind => {
+            EarlyBindFunction => {
                 write!(f, "earlybind")
             },
             Global(label_opt) => {

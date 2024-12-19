@@ -6,29 +6,35 @@
 //! instruction, in particular, for the bytecode instructions that come in both generic and
 //! non-generic flavors. It also checks constraints on instructions like VecPack/VecUnpack.
 
+use crate::VerifierConfig;
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
         Bytecode, CodeOffset, CodeUnit, CompiledModule, CompiledScript, FieldHandleIndex,
-        FunctionDefinitionIndex, FunctionHandleIndex, StructDefinitionIndex,
-        StructVariantHandleIndex, TableIndex, VariantFieldHandleIndex,
+        FunctionDefinitionIndex, FunctionHandleIndex, SignatureIndex, SignatureToken,
+        StructDefinitionIndex, StructVariantHandleIndex, TableIndex, VariantFieldHandleIndex,
     },
 };
 use move_core_types::vm_status::StatusCode;
 
 pub struct InstructionConsistency<'a> {
+    config: &'a VerifierConfig,
     resolver: BinaryIndexedView<'a>,
     current_function: Option<FunctionDefinitionIndex>,
 }
 
 impl<'a> InstructionConsistency<'a> {
-    pub fn verify_module(module: &'a CompiledModule) -> VMResult<()> {
-        Self::verify_module_impl(module).map_err(|e| e.finish(Location::Module(module.self_id())))
+    pub fn verify_module(config: &'a VerifierConfig, module: &'a CompiledModule) -> VMResult<()> {
+        Self::verify_module_impl(config, module)
+            .map_err(|e| e.finish(Location::Module(module.self_id())))
     }
 
-    fn verify_module_impl(module: &'a CompiledModule) -> PartialVMResult<()> {
+    fn verify_module_impl(
+        config: &'a VerifierConfig,
+        module: &'a CompiledModule,
+    ) -> PartialVMResult<()> {
         let resolver = BinaryIndexedView::Module(module);
 
         for (idx, func_def) in module.function_defs().iter().enumerate() {
@@ -36,6 +42,7 @@ impl<'a> InstructionConsistency<'a> {
                 None => (),
                 Some(code) => {
                     let checker = Self {
+                        config,
                         resolver,
                         current_function: Some(FunctionDefinitionIndex(idx as TableIndex)),
                     };
@@ -46,12 +53,16 @@ impl<'a> InstructionConsistency<'a> {
         Ok(())
     }
 
-    pub fn verify_script(module: &'a CompiledScript) -> VMResult<()> {
-        Self::verify_script_impl(module).map_err(|e| e.finish(Location::Script))
+    pub fn verify_script(config: &'a VerifierConfig, module: &'a CompiledScript) -> VMResult<()> {
+        Self::verify_script_impl(config, module).map_err(|e| e.finish(Location::Script))
     }
 
-    pub fn verify_script_impl(script: &'a CompiledScript) -> PartialVMResult<()> {
+    pub fn verify_script_impl(
+        config: &'a VerifierConfig,
+        script: &'a CompiledScript,
+    ) -> PartialVMResult<()> {
         let checker = Self {
+            config,
             resolver: BinaryIndexedView::Script(script),
             current_function: None,
         };
@@ -96,6 +107,32 @@ impl<'a> InstructionConsistency<'a> {
                 CallGeneric(idx) => {
                     let func_inst = self.resolver.function_instantiation_at(*idx);
                     self.check_function_op(offset, func_inst.handle, /* generic */ true)?;
+                },
+                LdFunction(idx) => {
+                    if !self.config.enable_function_values {
+                        return self.function_value_disabled_error(offset);
+                    };
+                    self.check_ld_function_op(offset, *idx, /* generic */ false)?;
+                },
+                LdFunctionGeneric(idx) => {
+                    if !self.config.enable_function_values {
+                        return self.function_value_disabled_error(offset);
+                    };
+                    let func_inst = self.resolver.function_instantiation_at(*idx);
+                    self.check_ld_function_op(offset, func_inst.handle, /* generic */ true)?;
+                },
+                InvokeFunction(sig_idx) => {
+                    if !self.config.enable_function_values {
+                        return self.function_value_disabled_error(offset);
+                    };
+                    // reuse code to check for signature issues.
+                    self.check_bind_count(offset, *sig_idx, 0)?;
+                },
+                EarlyBindFunction(sig_idx, count) => {
+                    if !self.config.enable_function_values {
+                        return self.function_value_disabled_error(offset);
+                    };
+                    self.check_bind_count(offset, *sig_idx, *count)?;
                 },
                 Pack(idx) | Unpack(idx) => {
                     self.check_struct_op(offset, *idx, /* generic */ false)?;
@@ -212,6 +249,22 @@ impl<'a> InstructionConsistency<'a> {
         Ok(())
     }
 
+    fn check_ld_function_op(
+        &self,
+        offset: usize,
+        func_handle_index: FunctionHandleIndex,
+        generic: bool,
+    ) -> PartialVMResult<()> {
+        let function_handle = self.resolver.function_handle_at(func_handle_index);
+        if function_handle.type_parameters.is_empty() == generic {
+            return Err(
+                PartialVMError::new(StatusCode::GENERIC_MEMBER_OPCODE_MISMATCH)
+                    .at_code_offset(self.current_function(), offset as CodeOffset),
+            );
+        }
+        Ok(())
+    }
+
     fn check_function_op(
         &self,
         offset: usize,
@@ -226,5 +279,37 @@ impl<'a> InstructionConsistency<'a> {
             );
         }
         Ok(())
+    }
+
+    fn check_bind_count(
+        &self,
+        offset: usize,
+        sig_index: SignatureIndex,
+        count: u8,
+    ) -> PartialVMResult<()> {
+        let signature = self.resolver.signature_at(sig_index);
+        if let Some(sig_token) = signature.0.first() {
+            if let SignatureToken::Function(params, ..) = sig_token {
+                if count as usize > params.len() {
+                    return Err(
+                        PartialVMError::new(StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH)
+                            .at_code_offset(self.current_function(), offset as CodeOffset),
+                    );
+                }
+            } else {
+                return Err(PartialVMError::new(StatusCode::REQUIRES_FUNCTION)
+                    .at_code_offset(self.current_function(), offset as CodeOffset));
+            }
+        } else {
+            return Err(PartialVMError::new(StatusCode::UNKNOWN_SIGNATURE_TYPE)
+                .at_code_offset(self.current_function(), offset as CodeOffset));
+        }
+        Ok(())
+    }
+
+    fn function_value_disabled_error(&self, offset: usize) -> PartialVMResult<()> {
+        Err(PartialVMError::new(StatusCode::FEATURE_NOT_ENABLED)
+            .at_code_offset(self.current_function(), offset as CodeOffset)
+            .with_message("function values feature not enabled".to_string()))
     }
 }

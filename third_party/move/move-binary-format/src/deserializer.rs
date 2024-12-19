@@ -114,6 +114,12 @@ impl Table {
     }
 }
 
+fn read_u8_internal(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u8> {
+    cursor.read_u8().map_err(|_| {
+        PartialVMError::new(StatusCode::MALFORMED).with_message("Unexpected EOF".to_string())
+    })
+}
+
 fn read_u16_internal(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u16> {
     let mut u16_bytes = [0; 2];
     cursor
@@ -1131,6 +1137,13 @@ fn load_signature_token(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Sign
             arity: usize,
             ty_args: Vec<SignatureToken>,
         },
+        Function {
+            args_arity: u64,
+            res_arity: u64,
+            args: Vec<SignatureToken>,
+            results: Vec<SignatureToken>,
+            abilities: AbilitySet,
+        },
     }
 
     impl TypeBuilder {
@@ -1154,6 +1167,37 @@ fn load_signature_token(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Sign
                             sh_idx,
                             arity,
                             ty_args,
+                        }
+                    }
+                },
+                T::Function {
+                    args_arity,
+                    res_arity,
+                    mut args,
+                    mut results,
+                    abilities,
+                } => {
+                    if args.len() >= args_arity as usize {
+                        results.push(tok);
+                        if results.len() >= res_arity as usize {
+                            T::Saturated(SignatureToken::Function(args, results, abilities))
+                        } else {
+                            T::Function {
+                                args_arity,
+                                res_arity,
+                                args,
+                                results,
+                                abilities,
+                            }
+                        }
+                    } else {
+                        args.push(tok);
+                        T::Function {
+                            args_arity,
+                            res_arity,
+                            args,
+                            results,
+                            abilities,
                         }
                     }
                 },
@@ -1223,6 +1267,19 @@ fn load_signature_token(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Sign
                     let idx = load_type_parameter_index(cursor)?;
                     T::Saturated(SignatureToken::TypeParameter(idx))
                 },
+                S::FUNCTION => {
+                    let args_arity = load_signature_size(cursor)?;
+                    let res_arity = load_signature_size(cursor)?;
+                    let abilities =
+                        load_ability_set(cursor, AbilitySetPosition::FunctionValueType)?;
+                    T::Function {
+                        args_arity,
+                        res_arity,
+                        abilities,
+                        args: vec![],
+                        results: vec![],
+                    }
+                },
             })
         } else {
             Err(PartialVMError::new(StatusCode::MALFORMED)
@@ -1257,6 +1314,7 @@ enum AbilitySetPosition {
     FunctionTypeParameters,
     StructTypeParameters,
     StructHandle,
+    FunctionValueType,
 }
 
 fn load_ability_set(
@@ -1306,10 +1364,16 @@ fn load_ability_set(
                     DeprecatedKind::RESOURCE => AbilitySet::EMPTY | Ability::Key,
                 };
                 Ok(match pos {
-                    AbilitySetPosition::StructHandle => unreachable!(),
+                    AbilitySetPosition::StructHandle | AbilitySetPosition::FunctionValueType => {
+                        unreachable!()
+                    },
                     AbilitySetPosition::FunctionTypeParameters => set | Ability::Store,
                     AbilitySetPosition::StructTypeParameters => set,
                 })
+            },
+            AbilitySetPosition::FunctionValueType => {
+                // This is a new type, shouldn't show up here.
+                Err(PartialVMError::new(StatusCode::UNKNOWN_ABILITY))
             },
         }
     } else {
@@ -1814,6 +1878,16 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
             Opcodes::CAST_U16 => Bytecode::CastU16,
             Opcodes::CAST_U32 => Bytecode::CastU32,
             Opcodes::CAST_U256 => Bytecode::CastU256,
+
+            Opcodes::LD_FUNCTION => Bytecode::LdFunction(load_function_handle_index(cursor)?),
+            Opcodes::LD_FUNCTION_GENERIC => {
+                Bytecode::LdFunctionGeneric(load_function_inst_index(cursor)?)
+            },
+            Opcodes::INVOKE_FUNCTION => Bytecode::InvokeFunction(load_signature_index(cursor)?),
+            Opcodes::EARLY_BIND_FUNCTION => Bytecode::EarlyBindFunction(
+                load_signature_index(cursor)?,
+                read_u8_internal(cursor)?,
+            ),
         };
         code.push(bytecode);
     }

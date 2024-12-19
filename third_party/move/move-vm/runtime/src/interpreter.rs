@@ -1537,6 +1537,15 @@ impl Frame {
                 )?;
 
                 match instruction {
+                    // TODO(LAMBDA): implement closures
+                    Bytecode::LdFunction(..)
+                    | Bytecode::LdFunctionGeneric(..)
+                    | Bytecode::InvokeFunction(..)
+                    | Bytecode::EarlyBindFunction(..) => {
+                        return Err(PartialVMError::new(StatusCode::UNIMPLEMENTED_FEATURE)
+                            .with_message("closure opcodes in interpreter".to_owned()))
+                    },
+
                     Bytecode::Pop => {
                         let popped_val = interpreter.operand_stack.pop()?;
                         gas_meter.charge_pop(popped_val)?;

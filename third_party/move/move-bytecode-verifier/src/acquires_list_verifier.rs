@@ -102,6 +102,14 @@ impl<'a> AcquiresVerifier<'a> {
                 self.struct_acquire(si.def, offset)
             },
 
+            Bytecode::LdFunction(idx) => self.ld_function_acquire(*idx, offset),
+            Bytecode::LdFunctionGeneric(idx) => {
+                let fi = self.module.function_instantiation_at(*idx);
+                self.ld_function_acquire(fi.handle, offset)
+            },
+            Bytecode::EarlyBindFunction(_sig_idx, _count) => Ok(()),
+            Bytecode::InvokeFunction(_sig_idx) => self.invoke_acquire(offset),
+
             Bytecode::Pop
             | Bytecode::BrTrue(_)
             | Bytecode::BrFalse(_)
@@ -199,6 +207,26 @@ impl<'a> AcquiresVerifier<'a> {
         }
         self.actual_acquires
             .append(&mut function_acquired_resources);
+        Ok(())
+    }
+
+    fn ld_function_acquire(
+        &mut self,
+        _fh_idx: FunctionHandleIndex,
+        _offset: CodeOffset,
+    ) -> PartialVMResult<()> {
+        // Note that function values are dynamically disallowed to be called from the module hosting
+        // their implementation function, and to be called while their host module is on the stack,
+        // so we don't need to do anything about acquires at this point.
+        // TODO(LAMBDA) In the future this may change.
+        Ok(())
+    }
+
+    fn invoke_acquire(&mut self, _offset: CodeOffset) -> PartialVMResult<()> {
+        // Note that function values are dynamically disallowed to be called from their
+        // hosting module, or if that module appears on the stack at all.  This means
+        // that a dynamic call cannot affect local resources in the caller.
+        // TODO(LAMBDA) In the future this may change.
         Ok(())
     }
 

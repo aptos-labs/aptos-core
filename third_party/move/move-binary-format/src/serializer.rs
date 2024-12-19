@@ -800,6 +800,12 @@ fn serialize_signature_token_single_node_impl(
             binary.push(SerializedType::TYPE_PARAMETER as u8)?;
             serialize_type_parameter_index(binary, *idx)?;
         },
+        SignatureToken::Function(args, results, abilities) => {
+            binary.push(SerializedType::FUNCTION as u8)?;
+            serialize_signature_size(binary, args.len())?;
+            serialize_signature_size(binary, results.len())?;
+            serialize_ability_set(binary, *abilities)?;
+        },
     }
     Ok(())
 }
@@ -1092,6 +1098,25 @@ fn serialize_instruction_inner(
             binary.push(Opcodes::TEST_VARIANT_GENERIC as u8)?;
             serialize_struct_variant_inst_index(binary, class_idx)
         },
+
+        Bytecode::LdFunction(method_idx) => {
+            binary.push(Opcodes::LD_FUNCTION as u8)?;
+            serialize_function_handle_index(binary, method_idx)
+        },
+        Bytecode::LdFunctionGeneric(method_idx) => {
+            binary.push(Opcodes::LD_FUNCTION_GENERIC as u8)?;
+            serialize_function_inst_index(binary, method_idx)
+        },
+        Bytecode::InvokeFunction(sig_idx) => {
+            binary.push(Opcodes::INVOKE_FUNCTION as u8)?;
+            serialize_signature_index(binary, sig_idx)
+        },
+        Bytecode::EarlyBindFunction(sig_idx, value) => {
+            binary.push(Opcodes::EARLY_BIND_FUNCTION as u8)?;
+            serialize_signature_index(binary, sig_idx)?;
+            binary.push(*value)
+        },
+
         Bytecode::ReadRef => binary.push(Opcodes::READ_REF as u8),
         Bytecode::WriteRef => binary.push(Opcodes::WRITE_REF as u8),
         Bytecode::Add => binary.push(Opcodes::ADD as u8),

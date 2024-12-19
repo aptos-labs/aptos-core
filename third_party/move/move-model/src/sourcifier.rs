@@ -758,7 +758,7 @@ impl<'a> ExpSourcifier<'a> {
                     emit!(self.wr(), " '{}", self.sym(*label))
                 }
             }),
-            Invoke(_, fun, args) => self.parenthesize(context_prio, Prio::Postfix, || {
+            InvokeFunction(_, fun, args) => self.parenthesize(context_prio, Prio::Postfix, || {
                 self.print_exp(Prio::Postfix, false, fun);
                 self.print_exp_list("(", ")", args);
             }),
@@ -823,7 +823,7 @@ impl<'a> ExpSourcifier<'a> {
                     self.print_exp_list("(", ")", args)
                 })
             },
-            Operation::EarlyBind => self.parenthesize(context_prio, Prio::Postfix, || {
+            Operation::EarlyBindFunction => self.parenthesize(context_prio, Prio::Postfix, || {
                 emit!(self.wr(), "earlybind");
                 self.print_node_inst(id);
                 self.print_exp_list("(", ")", args)

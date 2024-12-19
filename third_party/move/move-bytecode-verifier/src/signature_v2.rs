@@ -173,6 +173,18 @@ fn check_ty<const N: usize>(
                 param_constraints,
             )?;
         },
+        Function(args, results, abilities) => {
+            assert_abilities(*abilities, required_abilities)?;
+            for ty in args.iter().chain(results.iter()) {
+                check_ty(
+                    struct_handles,
+                    ty,
+                    false,
+                    required_abilities.requires(),
+                    param_constraints,
+                )?;
+            }
+        },
         Struct(sh_idx) => {
             let handle = &struct_handles[sh_idx.0 as usize];
             assert_abilities(handle.abilities, required_abilities)?;
@@ -259,6 +271,11 @@ fn check_phantom_params(
 
     match ty {
         Vector(ty) => check_phantom_params(struct_handles, context, false, ty)?,
+        Function(args, results, ..) => {
+            for ty in args.iter().chain(results) {
+                check_phantom_params(struct_handles, context, false, ty)?
+            }
+        },
         StructInstantiation(idx, type_arguments) => {
             let sh = &struct_handles[idx.0 as usize];
             for (i, ty) in type_arguments.iter().enumerate() {
@@ -803,6 +820,8 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
         let mut checked_struct_def_insts = BTreeMap::<StructDefInstantiationIndex, ()>::new();
         let mut checked_struct_def_insts_with_key =
             BTreeMap::<StructDefInstantiationIndex, ()>::new();
+        let mut checked_fun_insts = BTreeMap::<SignatureIndex, ()>::new();
+        let mut checked_early_bind_insts = BTreeMap::<(SignatureIndex, u8), ()>::new();
         let mut checked_vec_insts = BTreeMap::<SignatureIndex, ()>::new();
         let mut checked_field_insts = BTreeMap::<FieldInstantiationIndex, ()>::new();
         let mut checked_variant_field_insts = BTreeMap::<VariantFieldInstantiationIndex, ()>::new();
@@ -822,7 +841,7 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                 })
             };
             match instr {
-                CallGeneric(idx) => {
+                CallGeneric(idx) | LdFunctionGeneric(idx) => {
                     if let btree_map::Entry::Vacant(entry) = checked_func_insts.entry(*idx) {
                         let constraints = self.verify_function_instantiation_contextless(*idx)?;
                         map_err(constraints.check_in_context(&ability_context))?;
@@ -881,6 +900,34 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                         entry.insert(());
                     }
                 },
+                InvokeFunction(idx) => map_err(self.verify_fun_sig_idx(
+                    *idx,
+                    &mut checked_fun_insts,
+                    &ability_context,
+                ))?,
+                EarlyBindFunction(idx, count) => {
+                    map_err(self.verify_fun_sig_idx(
+                        *idx,
+                        &mut checked_fun_insts,
+                        &ability_context,
+                    ))?;
+                    if let btree_map::Entry::Vacant(entry) =
+                        checked_early_bind_insts.entry((*idx, *count))
+                    {
+                        // Note non-function case is checked in `verify_fun_sig_idx` above.
+                        if let Some(SignatureToken::Function(args, ..)) =
+                            self.resolver.signature_at(*idx).0.first()
+                        {
+                            if *count as usize > args.len() {
+                                return map_err(Err(PartialVMError::new(
+                                    StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH,
+                                )
+                                .with_message("in EarlyBindFunction".to_string())));
+                            };
+                        };
+                        entry.insert(());
+                    }
+                },
                 VecPack(idx, _)
                 | VecLen(idx)
                 | VecImmBorrow(idx)
@@ -936,6 +983,7 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                 | LdTrue
                 | LdFalse
                 | Call(_)
+                | LdFunction(..)
                 | Pack(_)
                 | Unpack(_)
                 | TestVariant(_)
@@ -1091,6 +1139,37 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
             self.verify_struct_def(struct_def)
                 .map_err(|err| err.at_index(IndexKind::StructDefinition, idx as u16))?;
         }
+        Ok(())
+    }
+
+    // Checks that a `sig_idx` parameter to `InvokeFunction` or `EarlyBindFunction` is well-formed.
+    fn verify_fun_sig_idx(
+        &self,
+        idx: SignatureIndex,
+        checked_fun_insts: &mut BTreeMap<SignatureIndex, ()>,
+        ability_context: &BitsetTypeParameterConstraints<N>,
+    ) -> PartialVMResult<()> {
+        if let btree_map::Entry::Vacant(entry) = checked_fun_insts.entry(idx) {
+            let ty_args = &self.resolver.signature_at(idx).0;
+            if ty_args.len() != 1 {
+                return Err(PartialVMError::new(
+                    StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH,
+                ))
+                .map_err(|err| {
+                    err.with_message(format!(
+                        "expected 1 type token for function operations, got {}",
+                        ty_args.len()
+                    ))
+                });
+            }
+            if !ty_args[0].is_function() {
+                return Err(PartialVMError::new(StatusCode::INVALID_SIGNATURE_TOKEN))
+                    .map_err(|err| err.with_message("function required".to_string()));
+            }
+            self.verify_signature_in_context(ability_context, idx)?;
+
+            entry.insert(());
+        };
         Ok(())
     }
 }
