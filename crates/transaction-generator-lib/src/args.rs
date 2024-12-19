@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    publishing::module_simple::LoopType, EntryPoints, TransactionType, WorkflowKind,
-    WorkflowProgress,
+    publishing::module_simple::LoopType, token_workflow::TokenWorkflowKind, EntryPoints,
+    TransactionType, WorkflowProgress,
 };
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
@@ -91,7 +91,7 @@ impl TransactionTypeArg {
     ) -> TransactionType {
         let call_custom_module = |entry_point: EntryPoints| -> TransactionType {
             TransactionType::CallCustomModules {
-                entry_point,
+                entry_point: Box::new(entry_point),
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             }
@@ -170,7 +170,10 @@ impl TransactionTypeArg {
                 })
             },
             TransactionTypeArg::RepublishAndCall => TransactionType::CallCustomModulesMix {
-                entry_points: vec![(EntryPoints::Nop, 1), (EntryPoints::Republish, 1)],
+                entry_points: vec![
+                    (Box::new(EntryPoints::Nop), 1),
+                    (Box::new(EntryPoints::Republish), 1),
+                ],
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -286,10 +289,10 @@ impl TransactionTypeArg {
                 call_custom_module(EntryPoints::TokenV2AmbassadorMint { numbered: true })
             },
             TransactionTypeArg::TokenV2AmbassadorMintAndBurn1M => TransactionType::Workflow {
-                workflow_kind: WorkflowKind::CreateMintBurn {
+                workflow_kind: Box::new(TokenWorkflowKind::CreateMintBurn {
                     count: 10000,
                     creation_balance: 200000,
-                },
+                }),
                 num_modules: 1,
                 use_account_pool: sender_use_account_pool,
                 progress_type: workflow_progress_type,

@@ -5,7 +5,9 @@ use anyhow::{bail, format_err, Result};
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, encoding_type::EncodingType};
 use aptos_sdk::types::chain_id::ChainId;
-use aptos_transaction_generator_lib::{args::TransactionTypeArg, AccountType};
+use aptos_transaction_generator_lib::{
+    args::TransactionTypeArg, AccountType, TransactionType, WorkflowProgress,
+};
 use clap::{ArgGroup, Parser};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -105,30 +107,7 @@ impl ClusterArgs {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
-#[clap(group(
-    ArgGroup::new("mode")
-        .required(true)
-        .args(&["mempool_backlog", "target_tps"]),
-))]
-pub struct EmitArgs {
-    #[clap(long)]
-    /// Number of transactions outstanding in mempool - this is needed to ensure that the emitter
-    /// is producing enough load to get the highest TPS in the system. Typically this should be
-    /// configured to be ~4x of the max achievable TPS.
-    /// 0 if target_tps used.
-    pub mempool_backlog: Option<usize>,
-
-    /// Target constant TPS, 0 if mempool_backlog used
-    #[clap(long)]
-    pub target_tps: Option<usize>,
-
-    #[clap(long, default_value_t = 30)]
-    pub txn_expiration_time_secs: u64,
-
-    /// Time to run --emit-tx for in seconds.
-    #[clap(long, default_value_t = 60)]
-    pub duration: u64,
-
+pub struct EmitWorkloadArgs {
     #[clap(
         long,
         value_enum,
@@ -158,6 +137,45 @@ pub struct EmitArgs {
 
     #[clap(long, num_args = 0..)]
     pub transaction_phases: Vec<usize>,
+}
+
+impl EmitWorkloadArgs {
+    pub fn args_to_transaction_mix_per_phase(&self) -> Vec<Vec<(TransactionType, usize)>> {
+        TransactionTypeArg::args_to_transaction_mix_per_phase(
+            &self.transaction_type,
+            &self.transaction_weights,
+            &self.transaction_phases,
+            self.module_working_set_size.unwrap_or(1),
+            self.sender_use_account_pool.unwrap_or(false),
+            WorkflowProgress::when_done_default(),
+        )
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
+#[clap(group(
+    ArgGroup::new("mode")
+        .required(true)
+        .args(&["mempool_backlog", "target_tps"]),
+))]
+pub struct EmitArgs {
+    #[clap(long)]
+    /// Number of transactions outstanding in mempool - this is needed to ensure that the emitter
+    /// is producing enough load to get the highest TPS in the system. Typically this should be
+    /// configured to be ~4x of the max achievable TPS.
+    /// 0 if target_tps used.
+    pub mempool_backlog: Option<usize>,
+
+    /// Target constant TPS, 0 if mempool_backlog used
+    #[clap(long)]
+    pub target_tps: Option<usize>,
+
+    #[clap(long, default_value_t = 30)]
+    pub txn_expiration_time_secs: u64,
+
+    /// Time to run --emit-tx for in seconds.
+    #[clap(long, default_value_t = 60)]
+    pub duration: u64,
 
     #[clap(long)]
     pub gas_price: Option<u64>,

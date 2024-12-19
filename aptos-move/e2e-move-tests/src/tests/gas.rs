@@ -17,8 +17,9 @@ use aptos_gas_algebra::GasQuantity;
 use aptos_gas_profiling::TransactionGasLog;
 use aptos_language_e2e_tests::account::Account;
 use aptos_transaction_generator_lib::{
+    entry_point_trait::{EntryPointTrait, MultiSigConfig},
     publishing::{
-        module_simple::{LoopType, MultiSigConfig},
+        module_simple::{LoopType, PreBuiltPackagesImpl},
         publish_util::PackageHandler,
     },
     EntryPoints,
@@ -674,7 +675,8 @@ fn test_txn_generator_workloads_calibrate_gas() {
             let publisher = runner.harness.new_account_with_key_pair();
             let user = runner.harness.new_account_with_key_pair();
 
-            let mut package_handler = PackageHandler::new(entry_point.package_name());
+            let mut package_handler =
+                PackageHandler::new(entry_point.pre_built_packages(), entry_point.package_name());
             let mut rng = StdRng::seed_from_u64(14);
             let package = package_handler.pick_package(&mut rng, *publisher.address());
             runner
@@ -728,7 +730,7 @@ fn test_txn_generator_workloads_calibrate_gas() {
         if use_large_db_numbers { 1583.0 } else { 2215. },
     );
 
-    let mut package_handler = PackageHandler::new("simple");
+    let mut package_handler = PackageHandler::new(&PreBuiltPackagesImpl, "simple");
     let mut rng = StdRng::seed_from_u64(14);
     let package = package_handler.pick_package(&mut rng, *account_1.address());
     runner.run_with_tps_estimate(

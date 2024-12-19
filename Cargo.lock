@@ -4266,6 +4266,7 @@ dependencies = [
  "aptos-logger",
  "aptos-sdk",
  "aptos-transaction-emitter-lib",
+ "aptos-transaction-generator-lib",
  "clap 4.5.21",
  "futures",
  "rand 0.7.3",
@@ -11011,6 +11012,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-framework",
+ "aptos-transaction-generator-lib",
  "bcs 0.1.4",
  "clap 4.5.21",
  "move-binary-format",

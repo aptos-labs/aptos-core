@@ -22,7 +22,7 @@ use crate::{
 use aptos_block_executor::counters::{
     self as block_executor_counters, GasType, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK,
 };
-use aptos_config::config::{NodeConfig, PrunerConfig};
+use aptos_config::config::{NodeConfig, PrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_db::AptosDB;
 use aptos_executor::{
     block_executor::BlockExecutor,
@@ -44,8 +44,9 @@ use aptos_transaction_generator_lib::{
     create_txn_generator_creator, AlwaysApproveRootAccountHandle, TransactionGeneratorCreator,
     TransactionType::{self, CoinTransfer},
 };
-use aptos_types::on_chain_config::Features;
-use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
+use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
+use db_generator::create_db_with_accounts;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
 use metrics::TIMER;
 use pipeline::PipelineConfig;
@@ -102,6 +103,19 @@ pub enum BenchmarkWorkload {
     },
 }
 
+enum InitializedBenchmarkWorkload {
+    TransactionMix {
+        transaction_generators: Vec<Box<dyn aptos_transaction_generator_lib::TransactionGenerator>>,
+        phase: Arc<AtomicUsize>,
+        workload_name: String,
+    },
+    Transfer {
+        connected_tx_grps: usize,
+        shuffle_connected_txns: bool,
+        hotspot_probability: Option<f32>,
+    },
+}
+
 /// Runs the benchmark with given parameters.
 #[allow(clippy::too_many_arguments)]
 pub fn run_benchmark<V>(
@@ -136,66 +150,7 @@ pub fn run_benchmark<V>(
     let root_account = TransactionGenerator::read_root_account(genesis_key, &db);
     let root_account = Arc::new(root_account);
 
-    let transaction_generators = if let BenchmarkWorkload::TransactionMix(transaction_mix) =
-        &workload
-    {
-        let num_existing_accounts = TransactionGenerator::read_meta(&source_dir);
-        let num_accounts_to_be_loaded = std::cmp::min(
-            num_existing_accounts,
-            num_main_signer_accounts + num_additional_dst_pool_accounts,
-        );
-
-        let mut num_accounts_to_skip = 0;
-        for (transaction_type, _) in transaction_mix {
-            if matches!(transaction_type, CoinTransfer { non_conflicting, .. } if *non_conflicting)
-            {
-                // In case of random non-conflicting coin transfer using `P2PTransactionGenerator`,
-                // `3*block_size` addresses is required:
-                // `block_size` number of signers, and 2 groups of burn-n-recycle recipients used alternatively.
-                if num_accounts_to_be_loaded < block_size * 3 {
-                    panic!("Cannot guarantee random non-conflicting coin transfer using `P2PTransactionGenerator`.");
-                }
-                num_accounts_to_skip = block_size;
-            }
-        }
-
-        let accounts_cache = TransactionGenerator::gen_user_account_cache(
-            db.reader.clone(),
-            num_accounts_to_be_loaded,
-            num_accounts_to_skip,
-            is_keyless,
-        );
-        let (main_signer_accounts, burner_accounts) =
-            accounts_cache.split(num_main_signer_accounts);
-
-        let (transaction_generator_creator, phase) = init_workload::<AptosVMBlockExecutor>(
-            transaction_mix.clone(),
-            root_account.clone(),
-            main_signer_accounts,
-            burner_accounts,
-            db.clone(),
-            // Initialization pipeline is temporary, so needs to be fully committed.
-            // No discards/aborts allowed during initialization, even if they are allowed later.
-            &PipelineConfig::default(),
-        );
-        // need to initialize all workers and finish with all transactions before we start the timer:
-        Some((
-            (0..pipeline_config.num_generator_workers)
-                .map(|_| transaction_generator_creator.create_transaction_generator())
-                .collect::<Vec<_>>(),
-            phase,
-        ))
-    } else {
-        None
-    };
-
-    let start_version = db.reader.expect_synced_version();
-    let executor = BlockExecutor::<V>::new(db.clone());
-    let (pipeline, block_sender) =
-        Pipeline::new(executor, start_version, &pipeline_config, Some(num_blocks));
-
     let mut num_accounts_to_load = num_main_signer_accounts;
-
     if let BenchmarkWorkload::TransactionMix(mix) = &workload {
         for (transaction_type, _) in mix {
             if matches!(transaction_type, CoinTransfer { non_conflicting, .. } if *non_conflicting)
@@ -213,6 +168,75 @@ pub fn run_benchmark<V>(
             }
         }
     }
+
+    let initialized_workload = match workload {
+        BenchmarkWorkload::TransactionMix(transaction_mix) => {
+            let workload_name = format!("{:?} via txn generator", transaction_mix);
+
+            let num_existing_accounts = TransactionGenerator::read_meta(&source_dir);
+            let num_accounts_to_be_loaded = std::cmp::min(
+                num_existing_accounts,
+                num_main_signer_accounts + num_additional_dst_pool_accounts,
+            );
+
+            let mut num_accounts_to_skip = 0;
+            for (transaction_type, _) in &transaction_mix {
+                if matches!(transaction_type, CoinTransfer { non_conflicting, .. } if *non_conflicting)
+                {
+                    // In case of random non-conflicting coin transfer using `P2PTransactionGenerator`,
+                    // `3*block_size` addresses is required:
+                    // `block_size` number of signers, and 2 groups of burn-n-recycle recipients used alternatively.
+                    if num_accounts_to_be_loaded < block_size * 3 {
+                        panic!("Cannot guarantee random non-conflicting coin transfer using `P2PTransactionGenerator`.");
+                    }
+                    num_accounts_to_skip = block_size;
+                }
+            }
+
+            let accounts_cache = TransactionGenerator::gen_user_account_cache(
+                db.reader.clone(),
+                num_accounts_to_be_loaded,
+                num_accounts_to_skip,
+                is_keyless,
+            );
+            let (main_signer_accounts, burner_accounts) =
+                accounts_cache.split(num_main_signer_accounts);
+
+            let (transaction_generator_creator, phase) = init_workload::<AptosVMBlockExecutor>(
+                transaction_mix,
+                root_account.clone(),
+                main_signer_accounts,
+                burner_accounts,
+                db.clone(),
+                // Initialization pipeline is temporary, so needs to be fully committed.
+                // No discards/aborts allowed during initialization, even if they are allowed later.
+                &PipelineConfig::default(),
+            );
+            // need to initialize all workers and finish with all transactions before we start the timer:
+            InitializedBenchmarkWorkload::TransactionMix {
+                transaction_generators: (0..pipeline_config.num_generator_workers)
+                    .map(|_| transaction_generator_creator.create_transaction_generator())
+                    .collect::<Vec<_>>(),
+                phase,
+                workload_name,
+            }
+        },
+        BenchmarkWorkload::Transfer {
+            connected_tx_grps,
+            shuffle_connected_txns,
+            hotspot_probability,
+        } => InitializedBenchmarkWorkload::Transfer {
+            connected_tx_grps,
+            shuffle_connected_txns,
+            hotspot_probability,
+        },
+    };
+
+    let start_version = db.reader.expect_synced_version();
+    let executor = BlockExecutor::<V>::new(db.clone());
+    let (pipeline, block_sender) =
+        Pipeline::new(executor, start_version, &pipeline_config, Some(num_blocks));
+
     let root_account = Arc::into_inner(root_account).unwrap();
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
@@ -226,9 +250,12 @@ pub fn run_benchmark<V>(
 
     let mut overall_measuring = OverallMeasuring::start();
 
-    let (num_blocks_created, workload_name) = match workload {
-        BenchmarkWorkload::TransactionMix(mix) => {
-            let (transaction_generators, phase) = transaction_generators.unwrap();
+    let (num_blocks_created, workload_name) = match initialized_workload {
+        InitializedBenchmarkWorkload::TransactionMix {
+            transaction_generators,
+            phase,
+            workload_name,
+        } => {
             let num_blocks_created = generator.run_workload(
                 block_size,
                 num_blocks,
@@ -236,9 +263,9 @@ pub fn run_benchmark<V>(
                 phase,
                 transactions_per_sender,
             );
-            (num_blocks_created, format!("{:?} via txn generator", mix))
+            (num_blocks_created, workload_name)
         },
-        BenchmarkWorkload::Transfer {
+        InitializedBenchmarkWorkload::Transfer {
             connected_tx_grps,
             shuffle_connected_txns,
             hotspot_probability,
@@ -314,7 +341,7 @@ where
         };
 
         let result = create_txn_generator_creator(
-            &[transaction_mix],
+            vec![transaction_mix],
             AlwaysApproveRootAccountHandle { root_account },
             &mut main_signer_accounts,
             burner_accounts,
@@ -777,6 +804,98 @@ fn log_total_supply(db_reader: &Arc<dyn DbReader>) {
     let total_supply =
         DbAccessUtil::get_total_supply(&db_reader.latest_state_checkpoint_view().unwrap()).unwrap();
     info!("total supply is {:?} octas", total_supply)
+}
+
+pub enum SingleRunMode {
+    TEST,
+    BENCHMARK { approx_tps: usize },
+}
+
+pub fn run_single_with_default_params(
+    transaction_type: TransactionType,
+    test_folder: impl AsRef<Path>,
+    concurrency_level: usize,
+    mode: SingleRunMode,
+) {
+    aptos_logger::Logger::new().init();
+
+    AptosVM::set_num_shards_once(1);
+    AptosVM::set_concurrency_level_once(concurrency_level);
+    AptosVM::set_processed_transactions_detailed_counters();
+
+    rayon::ThreadPoolBuilder::new()
+        .thread_name(|index| format!("rayon-global-{}", index))
+        .build_global()
+        .expect("Failed to build rayon global thread pool.");
+
+    let verify_sequence_numbers = false;
+    let is_keyless = false;
+    let num_accounts = match mode {
+        SingleRunMode::TEST => 100,
+        SingleRunMode::BENCHMARK { .. } => 100000,
+    };
+    let benchmark_block_size = match mode {
+        SingleRunMode::TEST => 10,
+        SingleRunMode::BENCHMARK { approx_tps } => {
+            debug_assert!(false, "Benchmark shouldn't be run in debug mode, use --release instead.");
+            std::cmp::max(10, std::cmp::min(10000, approx_tps / 4))
+        },
+    };
+
+    let num_main_signer_accounts = num_accounts / 5;
+    let num_dst_pool_accounts = num_accounts / 2;
+
+    let storage_dir = test_folder.as_ref().join("db");
+    let checkpoint_dir = test_folder.as_ref().join("cp");
+
+    println!("db_generator::create_db_with_accounts");
+
+    let mut features = default_benchmark_features();
+    features.enable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
+    features.enable(FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE);
+
+    let init_pipeline_config = PipelineConfig {
+        num_sig_verify_threads: std::cmp::max(1, num_cpus::get() / 3),
+        ..Default::default()
+    };
+
+    create_db_with_accounts::<AptosVMBlockExecutor>(
+        num_accounts,   /* num_accounts */
+        10_000_000_000, /* init_account_balance */
+        10000,          /* block_size */
+        &storage_dir,
+        NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
+        verify_sequence_numbers,
+        true,
+        init_pipeline_config,
+        features.clone(),
+        is_keyless,
+    );
+
+    println!("run_benchmark");
+
+    let execute_pipeline_config = PipelineConfig {
+        generate_then_execute: true,
+        num_sig_verify_threads: std::cmp::max(1, num_cpus::get() / 3),
+        ..Default::default()
+    };
+
+    run_benchmark::<AptosVMBlockExecutor>(
+        benchmark_block_size, /* block_size */
+        30,                   /* num_blocks */
+        BenchmarkWorkload::TransactionMix(vec![(transaction_type, 1)]),
+        1, /* transactions per sender */
+        num_main_signer_accounts,
+        num_dst_pool_accounts,
+        &storage_dir,
+        checkpoint_dir,
+        verify_sequence_numbers,
+        NO_OP_STORAGE_PRUNER_CONFIG,
+        true,
+        execute_pipeline_config,
+        features,
+        is_keyless,
+    );
 }
 
 #[cfg(test)]

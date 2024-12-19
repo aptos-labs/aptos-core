@@ -8,6 +8,7 @@ use anyhow::{Context, Result};
 use aptos_logger::{Level, Logger};
 use aptos_transaction_emitter_lib::{
     create_accounts_command, emit_transactions, Cluster, ClusterArgs, CreateAccountsArgs, EmitArgs,
+    EmitWorkloadArgs,
 };
 use clap::{Parser, Subcommand};
 use diag::diag;
@@ -44,6 +45,9 @@ struct EmitTx {
 
     #[clap(flatten)]
     emit_args: EmitArgs,
+
+    #[clap(flatten)]
+    emit_workload_args: EmitWorkloadArgs,
 }
 
 #[derive(Parser, Debug)]
@@ -76,10 +80,14 @@ pub async fn main() -> Result<()> {
     // TODO: Check if I need DisplayChain here in the error case.
     match args.command {
         TxnEmitterCommand::EmitTx(args) => {
-            let stats = emit_transactions(&args.cluster_args, &args.emit_args)
-                .await
-                .map_err(|e| panic!("Emit transactions failed {:?}", e))
-                .unwrap();
+            let stats = emit_transactions(
+                &args.cluster_args,
+                &args.emit_args,
+                args.emit_workload_args.args_to_transaction_mix_per_phase(),
+            )
+            .await
+            .map_err(|e| panic!("Emit transactions failed {:?}", e))
+            .unwrap();
             println!("Total stats: {}", stats);
             println!("Average rate: {}", stats.rate());
             Ok(())

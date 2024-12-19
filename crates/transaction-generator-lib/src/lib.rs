@@ -14,6 +14,7 @@ use aptos_sdk::{
 use args::TransactionTypeArg;
 use async_trait::async_trait;
 use clap::{Parser, ValueEnum};
+use publishing::entry_point_trait::EntryPointTrait;
 use rand::{rngs::StdRng, seq::SliceRandom, Rng};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -24,19 +25,21 @@ use std::{
     },
     time::Duration,
 };
+use workflow_delegator::WorkflowKind;
 
 mod account_generator;
 mod accounts_pool_wrapper;
 pub mod args;
 mod batch_transfer;
 mod bounded_batch_wrapper;
-mod call_custom_modules;
+pub mod call_custom_modules;
 mod entry_points;
 mod p2p_transaction_generator;
 pub mod publish_modules;
 pub mod publishing;
+mod token_workflow;
 mod transaction_mix_generator;
-mod workflow_delegator;
+pub mod workflow_delegator;
 use self::{
     account_generator::AccountGeneratorCreator,
     call_custom_modules::CustomModulesDelegationGeneratorCreator,
@@ -50,7 +53,10 @@ use crate::{
     entry_points::EntryPointTransactionGenerator, p2p_transaction_generator::SamplingMode,
     workflow_delegator::WorkflowTxnGeneratorCreator,
 };
-pub use publishing::module_simple::EntryPoints;
+pub use publishing::{
+    entry_point_trait, module_simple::EntryPoints,
+    prebuild_packages::create_prebuilt_packages_rs_file,
+};
 
 pub const SEND_AMOUNT: u64 = 1;
 
@@ -71,12 +77,12 @@ pub enum TransactionType {
         use_account_pool: bool,
     },
     CallCustomModules {
-        entry_point: EntryPoints,
+        entry_point: Box<dyn EntryPointTrait>,
         num_modules: usize,
         use_account_pool: bool,
     },
     CallCustomModulesMix {
-        entry_points: Vec<(EntryPoints, usize)>,
+        entry_points: Vec<(Box<dyn EntryPointTrait>, usize)>,
         num_modules: usize,
         use_account_pool: bool,
     },
@@ -84,7 +90,7 @@ pub enum TransactionType {
         batch_size: usize,
     },
     Workflow {
-        workflow_kind: WorkflowKind,
+        workflow_kind: Box<dyn WorkflowKind>,
         num_modules: usize,
         use_account_pool: bool,
         progress_type: WorkflowProgress,
@@ -96,11 +102,6 @@ pub enum AccountType {
     #[default]
     Local,
     Keyless,
-}
-
-#[derive(Debug, Copy, Clone)]
-pub enum WorkflowKind {
-    CreateMintBurn { count: usize, creation_balance: u64 },
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -238,7 +239,7 @@ impl RootAccountHandle for AlwaysApproveRootAccountHandle {
 }
 
 pub async fn create_txn_generator_creator(
-    transaction_mix_per_phase: &[Vec<(TransactionType, usize)>],
+    transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>,
     root_account: impl RootAccountHandle,
     source_accounts: &mut [LocalAccount],
     initial_burner_accounts: Vec<LocalAccount>,
@@ -296,15 +297,15 @@ pub async fn create_txn_generator_creator(
                         txn_factory.clone(),
                         SEND_AMOUNT,
                         addresses_pool.clone(),
-                        *invalid_transaction_ratio,
-                        *use_fa_transfer,
-                        if *non_conflicting {
+                        invalid_transaction_ratio,
+                        use_fa_transfer,
+                        if non_conflicting {
                             SamplingMode::BurnAndRecycle(addresses_pool.len() / 2)
                         } else {
                             SamplingMode::Basic
                         },
                     )),
-                    *sender_use_account_pool,
+                    sender_use_account_pool,
                     &accounts_pool,
                 ),
                 TransactionType::AccountGeneration {
@@ -314,19 +315,19 @@ pub async fn create_txn_generator_creator(
                 } => Box::new(AccountGeneratorCreator::new(
                     txn_factory.clone(),
                     add_created_accounts_to_pool.then(|| {
-                        addresses_pool.reserve(*max_account_working_set);
+                        addresses_pool.reserve(max_account_working_set);
                         addresses_pool.clone()
                     }),
                     add_created_accounts_to_pool.then(|| {
-                        addresses_pool.reserve(*max_account_working_set);
+                        addresses_pool.reserve(max_account_working_set);
                         accounts_pool.clone()
                     }),
-                    *max_account_working_set,
-                    *creation_balance,
+                    max_account_working_set,
+                    creation_balance,
                 )),
                 TransactionType::PublishPackage { use_account_pool } => wrap_accounts_pool(
                     Box::new(PublishPackageCreator::new(txn_factory.clone())),
-                    *use_account_pool,
+                    use_account_pool,
                     &accounts_pool,
                 ),
                 TransactionType::CallCustomModules {
@@ -340,13 +341,14 @@ pub async fn create_txn_generator_creator(
                             init_txn_factory.clone(),
                             &root_account,
                             txn_executor,
-                            *num_modules,
+                            num_modules,
+                            entry_point.pre_built_packages(),
                             entry_point.package_name(),
-                            &mut EntryPointTransactionGenerator::new_singleton(*entry_point),
+                            &mut EntryPointTransactionGenerator::new_singleton(entry_point),
                         )
                         .await,
                     ),
-                    *use_account_pool,
+                    use_account_pool,
                     &accounts_pool,
                 ),
                 TransactionType::CallCustomModulesMix {
@@ -360,13 +362,14 @@ pub async fn create_txn_generator_creator(
                             init_txn_factory.clone(),
                             &root_account,
                             txn_executor,
-                            *num_modules,
+                            num_modules,
+                            entry_points[0].0.pre_built_packages(),
                             entry_points[0].0.package_name(),
-                            &mut EntryPointTransactionGenerator::new(entry_points.clone()),
+                            &mut EntryPointTransactionGenerator::new(entry_points),
                         )
                         .await,
                     ),
-                    *use_account_pool,
+                    use_account_pool,
                     &accounts_pool,
                 ),
                 TransactionType::BatchTransfer { batch_size } => {
@@ -374,7 +377,7 @@ pub async fn create_txn_generator_creator(
                         txn_factory.clone(),
                         SEND_AMOUNT,
                         addresses_pool.clone(),
-                        *batch_size,
+                        batch_size,
                     ))
                 },
                 TransactionType::Workflow {
@@ -384,20 +387,20 @@ pub async fn create_txn_generator_creator(
                     progress_type,
                 } => Box::new(
                     WorkflowTxnGeneratorCreator::create_workload(
-                        *workflow_kind,
+                        workflow_kind,
                         txn_factory.clone(),
                         init_txn_factory.clone(),
                         &root_account,
                         txn_executor,
-                        *num_modules,
+                        num_modules,
                         use_account_pool.then(|| accounts_pool.clone()),
                         cur_phase.clone(),
-                        *progress_type,
+                        progress_type,
                     )
                     .await,
                 ),
             };
-            txn_generator_creator_mix.push((txn_generator_creator, *weight));
+            txn_generator_creator_mix.push((txn_generator_creator, weight));
         }
         txn_generator_creator_mix_per_phase.push(txn_generator_creator_mix)
     }
@@ -422,14 +425,20 @@ pub struct ObjectPool<T> {
     pool: RwLock<Vec<T>>,
 }
 
+impl<T> Default for ObjectPool<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> ObjectPool<T> {
-    pub(crate) fn new_initial(initial: Vec<T>) -> Self {
+    pub fn new_initial(initial: Vec<T>) -> Self {
         Self {
             pool: RwLock::new(initial),
         }
     }
 
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self::new_initial(Vec::new())
     }
 
@@ -437,7 +446,7 @@ impl<T> ObjectPool<T> {
         self.pool.write().reserve(additional);
     }
 
-    pub(crate) fn add_to_pool(&self, mut addition: Vec<T>) {
+    pub fn add_to_pool(&self, mut addition: Vec<T>) {
         assert!(!addition.is_empty());
         let mut current = self.pool.write();
         current.append(&mut addition);
@@ -447,12 +456,7 @@ impl<T> ObjectPool<T> {
         );
     }
 
-    pub(crate) fn add_to_pool_bounded(
-        &self,
-        mut addition: Vec<T>,
-        max_size: usize,
-        rng: &mut StdRng,
-    ) {
+    pub fn add_to_pool_bounded(&self, mut addition: Vec<T>, max_size: usize, rng: &mut StdRng) {
         assert!(!addition.is_empty());
         assert!(addition.len() <= max_size);
 
@@ -482,12 +486,7 @@ impl<T> ObjectPool<T> {
         }
     }
 
-    pub(crate) fn take_from_pool(
-        &self,
-        needed: usize,
-        return_partial: bool,
-        rng: &mut StdRng,
-    ) -> Vec<T> {
+    pub fn take_from_pool(&self, needed: usize, return_partial: bool, rng: &mut StdRng) -> Vec<T> {
         let mut current = self.pool.write();
         let num_in_pool = current.len();
         if !return_partial && num_in_pool < needed {

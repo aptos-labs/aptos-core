@@ -2,6 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(unused)]
 
+pub use super::raw_module_data::PreBuiltPackagesImpl;
+use super::{
+    entry_point_trait::{
+        get_payload, AutomaticArgs, EntryPointTrait, MultiSigConfig, PreBuiltPackages,
+    },
+    raw_module_data,
+};
 use crate::publishing::publish_util::Package;
 use aptos_framework::natives::code::{MoveOption, PackageMetadata};
 use aptos_sdk::{
@@ -19,84 +26,11 @@ use move_binary_format::{
     file_format::{FunctionHandleIndex, IdentifierIndex, SignatureToken},
     CompiledModule,
 };
+use once_cell::sync::Lazy;
 use rand::{distributions::Alphanumeric, prelude::StdRng, seq::SliceRandom, Rng};
 use rand_core::RngCore;
 use serde::{Deserialize, Serialize};
-
-//
-// Contains all the code to work on the Simple package
-//
-
-//
-// Functions to load and update the original package
-//
-
-pub fn version(module: &mut CompiledModule, rng: &mut StdRng) {
-    // change `const COUNTER_STEP` in Simple.move
-    // That is the only u64 in the constant pool
-    for constant in &mut module.constant_pool {
-        if constant.type_ == SignatureToken::U64 {
-            let mut v: u64 = bcs::from_bytes(&constant.data).expect("U64 must deserialize");
-            v += 1;
-            constant.data = bcs::to_bytes(&v).expect("U64 must serialize");
-            break;
-        }
-    }
-}
-
-pub fn scramble(module: &mut CompiledModule, fn_count: usize, rng: &mut StdRng) {
-    // change `const RANDOM` in Simple.move
-    // That is the only vector<u64> in the constant pool
-    let const_len = rng.gen_range(0usize, 5000usize);
-    let mut v = Vec::<u64>::with_capacity(const_len);
-    for i in 0..const_len {
-        v.push(i as u64);
-    }
-    // module.constant_pool
-    for constant in &mut module.constant_pool {
-        if constant.type_ == SignatureToken::Vector(Box::new(SignatureToken::U64)) {
-            constant.data = bcs::to_bytes(&v).expect("U64 vector must serialize");
-            break;
-        }
-    }
-
-    // find the copy_pasta* function in Simple.move
-    let mut def = None;
-    let mut handle = None;
-    let mut func_name = String::new();
-    for func_def in &module.function_defs {
-        let func_handle = &module.function_handles[func_def.function.0 as usize];
-        let name = module.identifiers[func_handle.name.0 as usize].as_str();
-        if name.starts_with("copy_pasta") {
-            def = Some(func_def.clone());
-            handle = Some(func_handle.clone());
-            func_name = String::from(name);
-            break;
-        }
-    }
-    if let Some(fd) = def {
-        for suffix in 0..fn_count {
-            let mut func_handle = handle.clone().expect("Handle must be defined");
-            let mut func_def = fd.clone();
-            let mut name = func_name.clone();
-            name.push_str(suffix.to_string().as_str());
-            module
-                .identifiers
-                .push(Identifier::new(name.as_str()).expect("Identifier name must be valid"));
-            func_handle.name = IdentifierIndex((module.identifiers.len() - 1) as u16);
-            module.function_handles.push(func_handle);
-            func_def.function = FunctionHandleIndex((module.function_handles.len() - 1) as u16);
-            module.function_defs.push(func_def);
-        }
-    }
-}
-
-pub enum MultiSigConfig {
-    None,
-    Random(usize),
-    Publisher,
-    FeePayerPublisher,
-}
+use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct BCSStream {
@@ -109,15 +43,6 @@ pub enum LoopType {
     NoOp,
     Arithmetic,
     BcsToBytes { len: u64 },
-}
-
-/// Automatic arguments function expects (i.e. signer, or multiple signers, etc)
-/// That execution can add before the call.
-#[derive(Debug, Copy, Clone)]
-pub enum AutomaticArgs {
-    None,
-    Signer,
-    SignerAndMultiSig,
 }
 
 //
@@ -295,8 +220,12 @@ pub enum EntryPoints {
     SimpleScript,
 }
 
-impl EntryPoints {
-    pub fn package_name(&self) -> &'static str {
+impl EntryPointTrait for EntryPoints {
+    fn pre_built_packages(&self) -> &'static dyn PreBuiltPackages {
+        &PreBuiltPackagesImpl
+    }
+
+    fn package_name(&self) -> &'static str {
         match self {
             EntryPoints::Republish
             | EntryPoints::Nop
@@ -357,7 +286,7 @@ impl EntryPoints {
         }
     }
 
-    pub fn module_name(&self) -> &'static str {
+    fn module_name(&self) -> &'static str {
         match self {
             EntryPoints::Republish
             | EntryPoints::Nop
@@ -421,7 +350,7 @@ impl EntryPoints {
         }
     }
 
-    pub fn create_payload(
+    fn create_payload(
         &self,
         package: &Package,
         module_name: &str,
@@ -457,7 +386,7 @@ impl EntryPoints {
             EntryPoints::Double => get_payload_void(module_id, ident_str!("double").to_owned()),
             EntryPoints::Half => get_payload_void(module_id, ident_str!("half").to_owned()),
             EntryPoints::SimpleScript => {
-                Package::script(*other.expect("Must provide sender's address"))
+                package.script(*other.expect("Must provide sender's address"))
             },
             // 1 arg
             EntryPoints::Loop {
@@ -818,7 +747,7 @@ impl EntryPoints {
         }
     }
 
-    pub fn initialize_entry_point(&self) -> Option<EntryPoints> {
+    fn initialize_entry_point(&self) -> Option<Box<dyn EntryPointTrait>> {
         match self {
             EntryPoints::TokenV1MintAndStoreNFTParallel
             | EntryPoints::TokenV1MintAndStoreNFTSequential
@@ -826,27 +755,31 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndTransferNFTSequential
             | EntryPoints::TokenV1MintAndStoreFT
             | EntryPoints::TokenV1MintAndTransferFT => {
-                Some(EntryPoints::TokenV1InitializeCollection)
+                Some(Box::new(EntryPoints::TokenV1InitializeCollection))
             },
             EntryPoints::LiquidityPoolSwap { is_stable } => {
-                Some(EntryPoints::LiquidityPoolSwapInit {
+                Some(Box::new(EntryPoints::LiquidityPoolSwapInit {
                     is_stable: *is_stable,
-                })
+                }))
             },
             EntryPoints::VectorPicture { length } | EntryPoints::VectorPictureRead { length } => {
-                Some(EntryPoints::InitializeVectorPicture { length: *length })
+                Some(Box::new(EntryPoints::InitializeVectorPicture {
+                    length: *length,
+                }))
             },
-            EntryPoints::SmartTablePicture { .. } => Some(EntryPoints::InitializeSmartTablePicture),
+            EntryPoints::SmartTablePicture { .. } => {
+                Some(Box::new(EntryPoints::InitializeSmartTablePicture))
+            },
             EntryPoints::IncGlobalMilestoneAggV2 { milestone_every } => {
-                Some(EntryPoints::CreateGlobalMilestoneAggV2 {
+                Some(Box::new(EntryPoints::CreateGlobalMilestoneAggV2 {
                     milestone_every: *milestone_every,
-                })
+                }))
             },
             _ => None,
         }
     }
 
-    pub fn multi_sig_additional_num(&self) -> MultiSigConfig {
+    fn multi_sig_additional_num(&self) -> MultiSigConfig {
         match self {
             EntryPoints::Republish => MultiSigConfig::Publisher,
             EntryPoints::NopFeePayer => MultiSigConfig::FeePayerPublisher,
@@ -866,7 +799,7 @@ impl EntryPoints {
         }
     }
 
-    pub fn automatic_args(&self) -> AutomaticArgs {
+    fn automatic_args(&self) -> AutomaticArgs {
         match self {
             EntryPoints::Republish => AutomaticArgs::Signer,
             EntryPoints::Nop
@@ -930,63 +863,6 @@ impl EntryPoints {
             EntryPoints::CreateGlobalMilestoneAggV2 { .. } => AutomaticArgs::Signer,
         }
     }
-}
-
-const SIMPLE_ENTRY_POINTS: &[EntryPoints; 9] = &[
-    EntryPoints::Nop,
-    EntryPoints::Step,
-    EntryPoints::GetCounter,
-    EntryPoints::ResetData,
-    EntryPoints::Double,
-    EntryPoints::Half,
-    EntryPoints::Loop {
-        loop_count: None,
-        loop_type: LoopType::NoOp,
-    },
-    EntryPoints::GetFromConst { const_idx: None },
-    EntryPoints::SetId,
-];
-const GEN_ENTRY_POINTS: &[EntryPoints; 12] = &[
-    EntryPoints::Nop,
-    EntryPoints::Step,
-    EntryPoints::GetCounter,
-    EntryPoints::ResetData,
-    EntryPoints::Double,
-    EntryPoints::Half,
-    EntryPoints::Loop {
-        loop_count: None,
-        loop_type: LoopType::NoOp,
-    },
-    EntryPoints::GetFromConst { const_idx: None },
-    EntryPoints::SetId,
-    EntryPoints::SetName,
-    EntryPoints::MakeOrChange {
-        string_length: None,
-        data_length: None,
-    },
-    EntryPoints::BytesMakeOrChange { data_length: None },
-];
-
-pub fn rand_simple_function(
-    package: &Package,
-    module_name: &str,
-    rng: &mut StdRng,
-) -> TransactionPayload {
-    SIMPLE_ENTRY_POINTS
-        .choose(rng)
-        .unwrap()
-        .create_payload(package, module_name, Some(rng), None)
-}
-
-pub fn rand_gen_function(
-    package: &Package,
-    module_name: &str,
-    rng: &mut StdRng,
-) -> TransactionPayload {
-    GEN_ENTRY_POINTS
-        .choose(rng)
-        .unwrap()
-        .create_payload(package, module_name, Some(rng), None)
 }
 
 //
@@ -1074,8 +950,4 @@ fn bytes_make_or_change(
 
 fn get_payload_void(module_id: ModuleId, func: Identifier) -> TransactionPayload {
     get_payload(module_id, func, vec![])
-}
-
-fn get_payload(module_id: ModuleId, func: Identifier, args: Vec<Vec<u8>>) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(module_id, func, vec![], args))
 }

@@ -10,6 +10,7 @@ use anyhow::{Context, Result};
 use aptos_sdk::types::chain_id::ChainId;
 use aptos_transaction_emitter_lib::{
     emit_transactions_with_cluster, Cluster, ClusterArgs, CoinSourceArgs, EmitArgs,
+    EmitWorkloadArgs,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error as ThisError;
@@ -54,6 +55,9 @@ pub struct TpsCheckerConfig {
 
     #[serde(flatten)]
     pub emit_config: EmitArgs,
+
+    #[serde(flatten)]
+    pub emit_workload_configs: EmitWorkloadArgs,
 
     // Ed25519PrivateKey, either on the CLI or from a file, for minting coins.
     // We choose to take this in in the baseline config because we can't
@@ -134,9 +138,15 @@ impl Checker for TpsChecker {
             .await
             .map_err(TpsCheckerError::BuildClusterError)?;
 
-        let stats = emit_transactions_with_cluster(&cluster, &self.config.emit_config)
-            .await
-            .map_err(TpsCheckerError::TransactionEmitterError)?;
+        let stats = emit_transactions_with_cluster(
+            &cluster,
+            &self.config.emit_config,
+            self.config
+                .emit_workload_configs
+                .args_to_transaction_mix_per_phase(),
+        )
+        .await
+        .map_err(TpsCheckerError::TransactionEmitterError)?;
 
         // AKA stats per second.
         let rate = stats.rate();

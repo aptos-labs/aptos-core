@@ -6,8 +6,9 @@ use aptos_language_e2e_tests::{
     executor::{ExecFuncTimerDynamicArgs, FakeExecutor, GasMeterType, Measurement},
 };
 use aptos_transaction_generator_lib::{
+    entry_point_trait::{AutomaticArgs, EntryPointTrait, MultiSigConfig},
     publishing::{
-        module_simple::{AutomaticArgs, LoopType, MultiSigConfig},
+        module_simple::LoopType,
         publish_util::{Package, PackageHandler},
     },
     EntryPoints,
@@ -254,7 +255,8 @@ fn main() {
             .expected_time_micros;
         let publisher = executor.new_account_at(AccountAddress::random());
 
-        let mut package_handler = PackageHandler::new(entry_point.package_name());
+        let mut package_handler =
+            PackageHandler::new(entry_point.pre_built_packages(), entry_point.package_name());
         let mut rng = StdRng::seed_from_u64(14);
         let package = package_handler.pick_package(&mut rng, *publisher.address());
         execute_txn(

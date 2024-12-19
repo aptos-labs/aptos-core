@@ -1,7 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
-    publishing::publish_util::PackageHandler, TransactionGenerator, TransactionGeneratorCreator,
+    publishing::{module_simple::PreBuiltPackagesImpl, publish_util::PackageHandler},
+    TransactionGenerator, TransactionGeneratorCreator,
 };
 use aptos_infallible::RwLock;
 use aptos_sdk::{
@@ -49,12 +50,10 @@ impl TransactionGenerator for PublishPackageGenerator {
                 .payload(package.publish_transaction_payload()),
         );
         requests.push(txn);
-        // use module published
-        // for _ in 1..transactions_per_account - 1 {
-        for _ in 1..num_to_create {
-            let request = package.use_random_transaction(&mut self.rng, account, &self.txn_factory);
-            requests.push(request);
-        }
+        // for _ in 1..num_to_create {
+        //     let request = package.use_random_transaction(&mut self.rng, account, &self.txn_factory);
+        //     requests.push(request);
+        // }
         // republish
         // let package = self
         //     .package_handler
@@ -75,7 +74,10 @@ impl PublishPackageCreator {
     pub fn new(txn_factory: TransactionFactory) -> Self {
         Self {
             txn_factory,
-            package_handler: Arc::new(RwLock::new(PackageHandler::new("simple"))),
+            package_handler: Arc::new(RwLock::new(PackageHandler::new(
+                &PreBuiltPackagesImpl,
+                "simple",
+            ))),
         }
     }
 }
