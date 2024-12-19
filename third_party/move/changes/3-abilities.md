@@ -4,7 +4,7 @@
 
 ## Introduction
 
-Abilities are a new feature in Move version 1.2 to give more control over what actions are permissible for values of a given type. Previously in Move’s type system, there were copyable values and `resource` values. In this old system, copyable values were unrestricted, but resource values could not be copied and had to be used. With abilities, Move’s type system grants more fine grained control, allowing types to specifically allow certain operations for their values that were previously implicitly allowed/denied depending on the “kind” (copyable or resource).
+Abilities are a new feature in Move version 1.2 to give more control over what actions are permissible for values of a given type. Previously in Move’s type system, there were copyable values and `resource` values. In this old system, copyable values were unrestricted, but resource values could not be copied and had to be used. With abilities, Move’s type system grants more fine-grained control, allowing types to specifically allow certain operations for their values that were previously implicitly allowed/denied depending on the “kind” (copyable or resource).
 
 ## Motivations
 
