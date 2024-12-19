@@ -244,6 +244,8 @@ fn get_flags_and_baseline(
     // Add flags specified via environment variable.
     flags.extend(shell_words::split(&read_env_var(ENV_FLAGS))?);
 
+    flags.push("--keep".to_string());
+
     // Create a temporary file for output. We inject the modifier to potentially prevent
     // any races between similar named files in different directories, as it appears TempPath
     // isn't working always.

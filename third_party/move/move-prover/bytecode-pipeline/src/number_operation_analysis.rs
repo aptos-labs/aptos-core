@@ -17,13 +17,14 @@ use itertools::Either;
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
     ast::{Exp, ExpData, Operation as ASTOperation, TempIndex},
-    model::{FieldId, FunId, GlobalEnv, ModuleId, Parameter, StructId},
+    model::{FieldId, FunId, FunctionEnv, GlobalEnv, ModuleId, Parameter, StructId},
     ty::{PrimitiveType, Type},
 };
 use move_stackless_bytecode::{
     dataflow_analysis::{DataflowAnalysis, TransferFunctions},
     dataflow_domains::{AbstractDomain, JoinResult},
     function_target::FunctionTarget,
+    function_target::FunctionData,
     function_target_pipeline::{
         FunctionTargetPipeline, FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant,
     },
@@ -46,13 +47,13 @@ impl NumberOperationProcessor {
 
     /// Create initial number operation state for expressions
     pub fn create_initial_exp_oper_state(&self, env: &GlobalEnv) {
-        let mut default_exp = BTreeMap::new();
+        let mut global_state = env.get_cloned_extension::<GlobalNumberOperationState>();
         let exp_info_map = env.get_nodes();
         for id in exp_info_map {
-            default_exp.insert(id, Bottom);
+            if !global_state.exp_operation_map.contains_key(&id) {
+                global_state.exp_operation_map.insert(id, Bottom);
+            }
         }
-        let mut global_state = env.get_cloned_extension::<GlobalNumberOperationState>();
-        global_state.exp_operation_map = default_exp;
         env.set_extension(global_state);
     }
 
@@ -96,7 +97,7 @@ impl NumberOperationProcessor {
         if !target.func_env.is_native_or_intrinsic() {
             let cfg = StacklessControlFlowGraph::one_block(target.get_bytecode());
             let analyzer = NumberOperationAnalysis {
-                func_target: target,
+                func_target: target.clone(),
                 ban_int_2_bv_conversion: ProverOptions::get(env).ban_int_2_bv,
             };
             analyzer.analyze_function(
@@ -110,7 +111,7 @@ impl NumberOperationProcessor {
 
 impl FunctionTargetProcessor for NumberOperationProcessor {
     fn is_single_run(&self) -> bool {
-        true
+        false
     }
 
     fn run(&self, env: &GlobalEnv, targets: &mut FunctionTargetsHolder) {
@@ -120,6 +121,18 @@ impl FunctionTargetProcessor for NumberOperationProcessor {
     fn name(&self) -> String {
         "number_operation_analysis".to_string()
     }
+
+    fn process(
+        &self,
+        _targets: &mut FunctionTargetsHolder,
+        _fun_env: &FunctionEnv,
+        _data: FunctionData,
+        _scc_opt: Option<&[FunctionEnv]>,
+    ) -> FunctionData {
+        self.analyze(_fun_env.module_env.env, _targets);
+        _data
+    }
+
 }
 
 struct NumberOperationAnalysis<'a> {
