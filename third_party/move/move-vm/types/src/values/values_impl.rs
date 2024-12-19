@@ -284,7 +284,10 @@ impl Container {
     }
 
     fn signer(x: AccountAddress) -> Self {
-        Container::Struct(Rc::new(RefCell::new(vec![ValueImpl::Address(x)])))
+        Container::Struct(Rc::new(RefCell::new(vec![
+            ValueImpl::U16(0),
+            ValueImpl::Address(x),
+        ])))
     }
 }
 
@@ -1506,7 +1509,31 @@ impl Locals {
 
 impl SignerRef {
     pub fn borrow_signer(&self) -> PartialVMResult<Value> {
-        Ok(Value(self.0.borrow_elem(0)?))
+        Ok(Value(self.0.borrow_elem(1)?))
+    }
+
+    pub fn is_permissioned(&self) -> PartialVMResult<bool> {
+        match &self.0 {
+            ContainerRef::Local(Container::Struct(s)) => {
+                Ok(*s.borrow()[0].as_value_ref::<u16>()? == 1)
+            },
+            _ => Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(format!("unexpected signer value: {:?}", self)),
+            ),
+        }
+    }
+
+    pub fn permission_address(&self) -> PartialVMResult<Value> {
+        match &self.0 {
+            ContainerRef::Local(Container::Struct(s)) => Ok(Value::address(
+                *s.borrow()[2].as_value_ref::<AccountAddress>()?,
+            )),
+            _ => Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(format!("unexpected signer value: {:?}", self)),
+            ),
+        }
     }
 }
 
@@ -1667,6 +1694,13 @@ impl Value {
 
     pub fn signer(x: AccountAddress) -> Self {
         Self(ValueImpl::Container(Container::signer(x)))
+    }
+
+    pub fn permissioned_signer(x: AccountAddress, perm_storage_address: AccountAddress) -> Self {
+        Self::struct_(Struct::pack_variant(1, vec![
+            Value::address(x),
+            Value::address(perm_storage_address),
+        ]))
     }
 
     /// Create a "unowned" reference to a signer value (&signer) for populating the &signer in
@@ -3647,6 +3681,17 @@ impl Value {
             custom_serializer: None::<&RelaxedCustomSerDe>,
             layout,
             value: &self.0,
+            legacy_signer: false,
+        })
+        .ok()
+    }
+
+    pub fn simple_serialize_with_legacy_signer(&self, layout: &MoveTypeLayout) -> Option<Vec<u8>> {
+        bcs::to_bytes(&SerializationReadyValue {
+            custom_serializer: None::<&RelaxedCustomSerDe>,
+            layout,
+            value: &self.0,
+            legacy_signer: true,
         })
         .ok()
     }
@@ -3666,6 +3711,7 @@ impl Struct {
             custom_serializer: None::<&RelaxedCustomSerDe>,
             layout,
             value: &self.fields,
+            legacy_signer: false,
         })
         .ok()
     }
@@ -3680,6 +3726,7 @@ pub(crate) struct SerializationReadyValue<'c, 'l, 'v, L, V, C> {
     pub(crate) layout: &'l L,
     // Value to serialize.
     pub(crate) value: &'v V,
+    pub(crate) legacy_signer: bool,
 }
 
 fn invariant_violation<S: serde::Serializer>(message: String) -> S::Error {
@@ -3711,6 +3758,7 @@ impl<'c, 'l, 'v, C: CustomSerializer> serde::Serialize
                     custom_serializer: self.custom_serializer,
                     layout: struct_layout,
                     value: &*r.borrow(),
+                    legacy_signer: self.legacy_signer,
                 })
                 .serialize(serializer)
             },
@@ -3735,6 +3783,7 @@ impl<'c, 'l, 'v, C: CustomSerializer> serde::Serialize
                                 custom_serializer: self.custom_serializer,
                                 layout,
                                 value,
+                                legacy_signer: self.legacy_signer,
                             })?;
                         }
                         t.end()
@@ -3748,19 +3797,25 @@ impl<'c, 'l, 'v, C: CustomSerializer> serde::Serialize
 
             // Signer.
             (L::Signer, ValueImpl::Container(Container::Struct(r))) => {
-                let v = r.borrow();
-                if v.len() != 1 {
-                    return Err(invariant_violation::<S>(format!(
-                        "cannot serialize container as a signer -- expected 1 field got {}",
-                        v.len()
-                    )));
+                if self.legacy_signer {
+                    r.borrow()[1]
+                        .as_value_ref::<AccountAddress>()
+                        .map_err(|_| {
+                            invariant_violation::<S>(format!(
+                                "cannot serialize container {:?} as {:?}",
+                                self.value, self.layout
+                            ))
+                        })?
+                        .serialize(serializer)
+                } else {
+                    (SerializationReadyValue {
+                        custom_serializer: self.custom_serializer,
+                        layout: &MoveStructLayout::signer(),
+                        value: &*r.borrow(),
+                        legacy_signer: self.legacy_signer,
+                    })
+                    .serialize(serializer)
                 }
-                (SerializationReadyValue {
-                    custom_serializer: self.custom_serializer,
-                    layout: &L::Address,
-                    value: &v[0],
-                })
-                .serialize(serializer)
             },
 
             // Delayed values. For their serialization, we must have custom
@@ -3821,6 +3876,7 @@ impl<'c, 'l, 'v, C: CustomSerializer> serde::Serialize
                         custom_serializer: self.custom_serializer,
                         layout: &variant_layouts[0],
                         value: &values[0],
+                        legacy_signer: self.legacy_signer,
                     },
                 ),
                 _ => {
@@ -3835,6 +3891,7 @@ impl<'c, 'l, 'v, C: CustomSerializer> serde::Serialize
                             custom_serializer: self.custom_serializer,
                             layout,
                             value,
+                            legacy_signer: self.legacy_signer,
                         })?
                     }
                     t.end()
@@ -3854,6 +3911,7 @@ impl<'c, 'l, 'v, C: CustomSerializer> serde::Serialize
                     custom_serializer: self.custom_serializer,
                     layout: field_layout,
                     value,
+                    legacy_signer: self.legacy_signer,
                 })?;
             }
             t.end()
@@ -3892,7 +3950,13 @@ impl<'d, 'c, C: CustomDeserializer> serde::de::DeserializeSeed<'d>
             L::U128 => u128::deserialize(deserializer).map(Value::u128),
             L::U256 => u256::U256::deserialize(deserializer).map(Value::u256),
             L::Address => AccountAddress::deserialize(deserializer).map(Value::address),
-            L::Signer => AccountAddress::deserialize(deserializer).map(Value::signer),
+            L::Signer => {
+                let seed = DeserializationSeed {
+                    custom_deserializer: self.custom_deserializer,
+                    layout: &MoveStructLayout::signer(),
+                };
+                Ok(Value::struct_(seed.deserialize(deserializer)?))
+            },
 
             // Structs.
             L::Struct(struct_layout) => {
@@ -4658,10 +4722,7 @@ impl ValueImpl {
 
             (L::Signer, ValueImpl::Container(Container::Struct(r))) => {
                 let v = r.borrow();
-                if v.len() != 1 {
-                    panic!("Unexpected signer layout: {:?}", v);
-                }
-                match &v[0] {
+                match &v[1] {
                     ValueImpl::Address(a) => MoveValue::Signer(*a),
                     v => panic!("Unexpected non-address while converting signer: {:?}", v),
                 }

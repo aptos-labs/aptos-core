@@ -62,7 +62,7 @@ fn native_to_bytes(
     };
     // serialize value
     let val = ref_to_val.read_ref()?;
-    let serialized_value = match val.simple_serialize(&layout) {
+    let serialized_value = match val.simple_serialize_with_legacy_signer(&layout) {
         Some(serialized_value) => serialized_value,
         None => {
             cost += gas_params.failure;

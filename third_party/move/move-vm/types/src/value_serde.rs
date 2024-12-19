@@ -104,6 +104,7 @@ impl CustomSerializer for RelaxedCustomSerDe {
             custom_serializer: None::<&RelaxedCustomSerDe>,
             layout,
             value: &value.0,
+            legacy_signer: false,
         }
         .serialize(serializer)
     }
@@ -134,6 +135,7 @@ pub fn serialize_and_allow_delayed_values(
         custom_serializer: Some(&native_serializer),
         layout,
         value: &value.0,
+        legacy_signer: false,
     };
     bcs::to_bytes(&value)
         .ok()
@@ -163,6 +165,7 @@ pub fn serialized_size_allowing_delayed_values(
         custom_serializer: Some(&native_serializer),
         layout,
         value: &value.0,
+        legacy_signer: true,
     };
     bcs::serialized_size(&value).map_err(|e| {
         PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR).with_message(format!(
@@ -232,6 +235,7 @@ impl<'a, I: From<u64> + ExtractWidth + ExtractUniqueIndex> CustomSerializer
             custom_serializer: None::<&RelaxedCustomSerDe>,
             layout,
             value: &value.0,
+            legacy_signer: false,
         }
         .serialize(serializer)
     }
@@ -291,6 +295,7 @@ pub fn serialize_and_replace_ids_with_values<I: From<u64> + ExtractWidth + Extra
         custom_serializer: Some(&custom_serializer),
         layout,
         value: &value.0,
+        legacy_signer: false,
     };
     bcs::to_bytes(&value).ok().filter(|_| {
         // Should never happen, it should always fail first in serialize_and_allow_delayed_values

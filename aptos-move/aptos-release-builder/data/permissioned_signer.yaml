@@ -1,0 +1,13 @@
+---
+remote_endpoint: ~
+name: "v1.26-enable-permissioned_signer"
+proposals:
+  - name: feature_flags
+    metadata:
+      title: "Enable permissioned signer feature flag"
+      description: "Enable permissioned signer in the aptos framework"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - permissioned_signer

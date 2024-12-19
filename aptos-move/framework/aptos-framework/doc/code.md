@@ -12,8 +12,11 @@ This module supports functionality related to code management.
 -  [Struct `ModuleMetadata`](#0x1_code_ModuleMetadata)
 -  [Struct `UpgradePolicy`](#0x1_code_UpgradePolicy)
 -  [Struct `PublishPackage`](#0x1_code_PublishPackage)
+-  [Struct `CodePermission`](#0x1_code_CodePermission)
 -  [Struct `AllowedDep`](#0x1_code_AllowedDep)
 -  [Constants](#@Constants_0)
+-  [Function `check_signer_permission`](#0x1_code_check_signer_permission)
+-  [Function `grant_permission`](#0x1_code_grant_permission)
 -  [Function `upgrade_policy_arbitrary`](#0x1_code_upgrade_policy_arbitrary)
 -  [Function `upgrade_policy_compat`](#0x1_code_upgrade_policy_compat)
 -  [Function `upgrade_policy_immutable`](#0x1_code_upgrade_policy_immutable)
@@ -50,6 +53,7 @@ This module supports functionality related to code management.
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
@@ -302,6 +306,33 @@ Event emitted when code is published to an address.
 
 </details>
 
+<a id="0x1_code_CodePermission"></a>
+
+## Struct `CodePermission`
+
+
+
+<pre><code><b>struct</b> <a href="code.md#0x1_code_CodePermission">CodePermission</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="0x1_code_AllowedDep"></a>
 
 ## Struct `AllowedDep`
@@ -413,6 +444,16 @@ Not the owner of the package registry.
 
 
 
+<a id="0x1_code_ENO_CODE_PERMISSION"></a>
+
+Current permissioned signer cannot publish codes.
+
+
+<pre><code><b>const</b> <a href="code.md#0x1_code_ENO_CODE_PERMISSION">ENO_CODE_PERMISSION</a>: u64 = 11;
+</code></pre>
+
+
+
 <a id="0x1_code_EPACKAGE_DEP_MISSING"></a>
 
 Dependency could not be resolved to any published package.
@@ -442,6 +483,59 @@ Cannot downgrade a package's upgradability policy
 </code></pre>
 
 
+
+<a id="0x1_code_check_signer_permission"></a>
+
+## Function `check_signer_permission`
+
+Permissions
+
+
+<pre><code><b>fun</b> <a href="code.md#0x1_code_check_signer_permission">check_signer_permission</a>(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="code.md#0x1_code_check_signer_permission">check_signer_permission</a>(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <b>assert</b>!(
+        <a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_exists">permissioned_signer::check_permission_exists</a>(s, <a href="code.md#0x1_code_CodePermission">CodePermission</a> {}),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="code.md#0x1_code_ENO_CODE_PERMISSION">ENO_CODE_PERMISSION</a>),
+    );
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_code_grant_permission"></a>
+
+## Function `grant_permission`
+
+Grant permission to publish code on behalf of the master signer.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="code.md#0x1_code_grant_permission">grant_permission</a>(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="code.md#0x1_code_grant_permission">grant_permission</a>(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <a href="permissioned_signer.md#0x1_permissioned_signer_authorize_unlimited">permissioned_signer::authorize_unlimited</a>(master, <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>, <a href="code.md#0x1_code_CodePermission">CodePermission</a> {})
+}
+</code></pre>
+
+
+
+</details>
 
 <a id="0x1_code_upgrade_policy_arbitrary"></a>
 
@@ -598,6 +692,7 @@ package.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="code.md#0x1_code_publish_package">publish_package</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pack: <a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a>, <a href="code.md#0x1_code">code</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;) <b>acquires</b> <a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a> {
+    <a href="code.md#0x1_code_check_signer_permission">check_signer_permission</a>(owner);
     // Disallow incompatible upgrade mode. Governance can decide later <b>if</b> this should be reconsidered.
     <b>assert</b>!(
         pack.upgrade_policy.policy &gt; <a href="code.md#0x1_code_upgrade_policy_arbitrary">upgrade_policy_arbitrary</a>().policy,
@@ -679,6 +774,7 @@ package.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="code.md#0x1_code_freeze_code_object">freeze_code_object</a>(publisher: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, code_object: Object&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;) <b>acquires</b> <a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a> {
+    <a href="code.md#0x1_code_check_signer_permission">check_signer_permission</a>(publisher);
     <b>let</b> code_object_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&code_object);
     <b>assert</b>!(<b>exists</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(code_object_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="code.md#0x1_code_ECODE_OBJECT_DOES_NOT_EXIST">ECODE_OBJECT_DOES_NOT_EXIST</a>));
     <b>assert</b>!(

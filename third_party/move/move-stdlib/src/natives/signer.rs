@@ -37,10 +37,9 @@ fn native_borrow_address(
     debug_assert!(arguments.len() == 1);
 
     let signer_reference = pop_arg!(arguments, SignerRef);
+    let out = signer_reference.borrow_signer()?;
 
-    Ok(NativeResult::ok(gas_params.base, smallvec![
-        signer_reference.borrow_signer()?
-    ]))
+    Ok(NativeResult::ok(gas_params.base, smallvec![out]))
 }
 
 pub fn make_native_borrow_address(gas_params: BorrowAddressGasParameters) -> NativeFunction {
