@@ -23,7 +23,13 @@ use move_core_types::{
     account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS,
     move_resource::MoveStructType,
 };
+use once_cell::sync::Lazy;
+use regex::Regex;
 use serde::Deserialize;
+
+static FIREBASE_ISS_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^https://securetoken\.google\.com/[a-zA-Z0-9-_]+$").unwrap());
+const FIREBASE_ISS: &str = "https://securetoken.google.com/google";
 
 macro_rules! value_deserialization_error {
     ($message:expr) => {{
@@ -123,7 +129,12 @@ fn get_jwk_for_authenticator(
         .parse_jwt_header()
         .map_err(|_| invalid_signature!("Failed to parse JWT header"))?;
 
-    let jwk_move_struct = jwks.get_jwk(&pk.iss_val, &jwt_header.kid).map_err(|_| {
+    let iss = if FIREBASE_ISS_REGEX.is_match(&pk.iss_val) {
+        FIREBASE_ISS
+    } else {
+        &pk.iss_val
+    };
+    let jwk_move_struct = jwks.get_jwk(iss, &jwt_header.kid).map_err(|_| {
         invalid_signature!(format!(
             "JWK for {} with KID {} was not found",
             pk.iss_val, jwt_header.kid
