@@ -3,8 +3,8 @@
 
 use crate::common::IP_LOCAL_HOST;
 use anyhow::{anyhow, Context, Result};
+use aptos::node::local_testnet::HealthChecker;
 use aptos_faucet_core::server::{FunderKeyEnum, RunConfig};
-use aptos_localnet::health_checker::HealthChecker;
 use futures::channel::oneshot;
 use std::{future::Future, path::PathBuf, sync::Arc};
 use url::Url;

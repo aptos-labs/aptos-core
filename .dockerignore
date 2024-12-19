@@ -25,7 +25,7 @@
 !aptos-move/framework/
 !aptos-move/move-examples/hello_blockchain/
 !crates/aptos/src/move_tool/*.bpl
-!crates/aptos-localnet/src/hasura_metadata.json
+!crates/aptos/src/node/local_testnet/hasura_metadata.json
 !crates/aptos-faucet/doc/
 !crates/transaction-emitter-lib/src/emitter/test_proofs_for_localnet_txn_emitter.txt
 !api/doc/

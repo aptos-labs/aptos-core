@@ -3,7 +3,7 @@
 
 use crate::common::make_shared;
 use anyhow::{anyhow, bail, Context, Result};
-use aptos_localnet::docker;
+use aptos::node::local_testnet::docker;
 use bollard::{
     container::{CreateContainerOptions, InspectContainerOptions, StartContainerOptions},
     network::CreateNetworkOptions,
