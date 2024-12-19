@@ -88,7 +88,7 @@ use std::{
 static DEBUG_TRACE: bool = true;
 
 // =================================================================================================
-/// # Constants
+// # Constants
 
 /// A name we use to represent a script as a module.
 pub const SCRIPT_MODULE_NAME: &str = "<SELF>";
@@ -100,7 +100,7 @@ pub const SCRIPT_BYTECODE_FUN_NAME: &str = "<SELF>";
 pub const GHOST_MEMORY_PREFIX: &str = "Ghost$";
 
 // =================================================================================================
-/// # Locations
+// # Locations
 
 /// A location, consisting of a FileId and a span in this file.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
@@ -225,17 +225,17 @@ pub type MoveIrLoc = move_ir_types::location::Loc;
 pub type MoveIrByteIndex = move_ir_types::location::ByteIndex;
 
 // =================================================================================================
-/// # Identifiers
-///
-/// Identifiers are opaque values used to reference entities in the environment.
-///
-/// We have two kinds of ids: those based on an index, and those based on a symbol. We use
-/// the symbol based ids where we do not have control of the definition index order in bytecode
-/// (i.e. we do not know in which order move-compiler enters functions and structs into file format),
-/// and index based ids where we do have control (for modules, SpecFun and SpecVar).
-///
-/// In any case, ids are opaque in the sense that if someone has a StructId or similar in hand,
-/// it is known to be defined in the environment, as it has been obtained also from the environment.
+// # Identifiers
+//
+// Identifiers are opaque values used to reference entities in the environment.
+//
+// We have two kinds of ids: those based on an index, and those based on a symbol. We use
+// the symbol based ids where we do not have control of the definition index order in bytecode
+// (i.e. we do not know in which order move-compiler enters functions and structs into file format),
+// and index based ids where we do have control (for modules, SpecFun and SpecVar).
+//
+// In any case, ids are opaque in the sense that if someone has a StructId or similar in hand,
+// it is known to be defined in the environment, as it has been obtained also from the environment.
 
 /// Raw index type used in ids. 16 bits are sufficient currently.
 pub type RawIndex = u16;
@@ -490,7 +490,7 @@ impl QualifiedInstId<StructId> {
 }
 
 // =================================================================================================
-/// # Verification Scope
+// # Verification Scope
 
 /// Defines what functions to verify.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -533,7 +533,7 @@ impl VerificationScope {
 }
 
 // =================================================================================================
-/// # Global Environment
+// # Global Environment
 
 /// Global environment for a set of modules.
 #[derive(Debug)]
@@ -2715,7 +2715,7 @@ impl GlobalEnv {
 }
 
 // =================================================================================================
-/// # Module Environment
+// # Module Environment
 
 /// Represents data for a module.
 #[derive(Debug)]
@@ -3891,7 +3891,7 @@ pub struct FieldEnv<'env> {
     data: &'env FieldData,
 }
 
-impl<'env> FieldEnv<'env> {
+impl FieldEnv<'_> {
     /// Gets the name of this field.
     pub fn get_name(&self) -> Symbol {
         self.data.name
@@ -3996,7 +3996,7 @@ pub struct NamedConstantEnv<'env> {
     data: &'env NamedConstantData,
 }
 
-impl<'env> NamedConstantEnv<'env> {
+impl NamedConstantEnv<'_> {
     /// Returns the name of this constant
     pub fn get_name(&self) -> Symbol {
         self.data.name
@@ -4038,7 +4038,7 @@ impl<'env> NamedConstantEnv<'env> {
 }
 
 // =================================================================================================
-/// # Function Environment
+// # Function Environment
 
 pub trait EqIgnoringLoc {
     fn eq_ignoring_loc(&self, other: &Self) -> bool;
@@ -4796,12 +4796,12 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Returns associated specification.
-    pub fn get_spec(&'env self) -> Ref<Spec> {
+    pub fn get_spec(&'env self) -> Ref<'env, Spec> {
         self.data.spec.borrow()
     }
 
     /// Returns associated mutable reference to specification.
-    pub fn get_mut_spec(&'env self) -> RefMut<Spec> {
+    pub fn get_mut_spec(&'env self) -> RefMut<'env, Spec> {
         self.data.spec.borrow_mut()
     }
 
@@ -5063,7 +5063,7 @@ impl<'env> FunctionEnv<'env> {
 }
 
 // =================================================================================================
-/// # Expression Environment
+// # Expression Environment
 
 /// Represents context for an expression.
 #[derive(Debug, Clone)]
@@ -5087,7 +5087,7 @@ impl ExpInfo {
 }
 
 // =================================================================================================
-/// # Formatting
+// # Formatting
 
 enum Mode {
     LineOnly,
@@ -5127,7 +5127,7 @@ impl Loc {
     }
 }
 
-impl<'env> fmt::Display for LocDisplay<'env> {
+impl fmt::Display for LocDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some((fname, pos)) = self.env.get_file_and_location(self.loc) {
             match &self.mode {
@@ -5194,7 +5194,7 @@ where
     }
 }
 
-impl<'a, Id: Clone> fmt::Display for EnvDisplay<'a, QualifiedId<Id>>
+impl<Id: Clone> fmt::Display for EnvDisplay<'_, QualifiedId<Id>>
 where
     QualifiedId<Id>: GetNameString,
 {
@@ -5203,7 +5203,7 @@ where
     }
 }
 
-impl<'a, Id: Clone> fmt::Display for EnvDisplay<'a, QualifiedInstId<Id>>
+impl<Id: Clone> fmt::Display for EnvDisplay<'_, QualifiedInstId<Id>>
 where
     QualifiedId<Id>: GetNameString,
 {
@@ -5223,13 +5223,13 @@ where
     }
 }
 
-impl<'a> fmt::Display for EnvDisplay<'a, Symbol> {
+impl fmt::Display for EnvDisplay<'_, Symbol> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.val.display(self.env.symbol_pool()))
     }
 }
 
-impl<'a> fmt::Display for EnvDisplay<'a, Parameter> {
+impl fmt::Display for EnvDisplay<'_, Parameter> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let p = self.val;
         write!(

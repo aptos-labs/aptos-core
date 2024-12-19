@@ -28,3 +28,6 @@ walkdir = { workspace = true }
 [[test]]
 name = "testsuite"
 harness = false
+
+[features]
+invariant_trace = []

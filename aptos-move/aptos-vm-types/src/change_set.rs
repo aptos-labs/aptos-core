@@ -214,6 +214,7 @@ impl VMChangeSet {
     /// serialized changes. The conversion fails if:
     /// - deltas are not materialized.
     /// - resource group writes are not (combined &) converted to resource writes.
+    ///
     /// In addition, the caller can include changes to published modules.
     pub fn try_combine_into_storage_change_set(
         self,
@@ -852,7 +853,7 @@ pub trait ChangeSetInterface {
         &'a mut self,
         executor_view: &'a dyn ExecutorView,
         module_storage: &'a impl AptosModuleStorage,
-    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>>;
+    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo<'a>>>;
 }
 
 impl ChangeSetInterface for VMChangeSet {
@@ -877,7 +878,7 @@ impl ChangeSetInterface for VMChangeSet {
         &'a mut self,
         executor_view: &'a dyn ExecutorView,
         _module_storage: &'a impl AptosModuleStorage,
-    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
+    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo<'a>>> {
         let resources = self.resource_write_set.iter_mut().map(|(key, op)| {
             Ok(WriteOpInfo {
                 key,

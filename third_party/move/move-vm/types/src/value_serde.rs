@@ -212,8 +212,8 @@ impl<'a, I: From<u64> + ExtractWidth + ExtractUniqueIndex> CustomSerDeWithExchan
     }
 }
 
-impl<'a, I: From<u64> + ExtractWidth + ExtractUniqueIndex> CustomSerializer
-    for CustomSerDeWithExchange<'a, I>
+impl<I: From<u64> + ExtractWidth + ExtractUniqueIndex> CustomSerializer
+    for CustomSerDeWithExchange<'_, I>
 {
     fn custom_serialize<S: Serializer>(
         &self,
@@ -237,8 +237,8 @@ impl<'a, I: From<u64> + ExtractWidth + ExtractUniqueIndex> CustomSerializer
     }
 }
 
-impl<'a, I: From<u64> + ExtractWidth + ExtractUniqueIndex> CustomDeserializer
-    for CustomSerDeWithExchange<'a, I>
+impl<I: From<u64> + ExtractWidth + ExtractUniqueIndex> CustomDeserializer
+    for CustomSerDeWithExchange<'_, I>
 {
     fn custom_deserialize<'d, D: Deserializer<'d>>(
         &self,

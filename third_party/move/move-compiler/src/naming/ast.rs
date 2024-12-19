@@ -669,13 +669,13 @@ impl AstDebug for Program {
     fn ast_debug(&self, w: &mut AstWriter) {
         let Program { modules, scripts } = self;
         for (m, mdef) in modules.key_cloned_iter() {
-            w.write(&format!("module {}", m));
+            w.write(format!("module {}", m));
             w.block(|w| mdef.ast_debug(w));
             w.new_line();
         }
 
         for (n, s) in scripts {
-            w.write(&format!("script {}", n));
+            w.write(format!("script {}", n));
             w.block(|w| s.ast_debug(w));
             w.new_line()
         }
@@ -693,7 +693,7 @@ impl AstDebug for Script {
             function,
         } = self;
         if let Some(n) = package_name {
-            w.writeln(&format!("{}", n))
+            w.writeln(format!("{}", n))
         }
         attributes.ast_debug(w);
         for cdef in constants.key_cloned_iter() {
@@ -717,7 +717,7 @@ impl AstDebug for ModuleDefinition {
             functions,
         } = self;
         if let Some(n) = package_name {
-            w.writeln(&format!("{}", n))
+            w.writeln(format!("{}", n))
         }
         attributes.ast_debug(w);
         if *is_source_module {
@@ -725,9 +725,9 @@ impl AstDebug for ModuleDefinition {
         } else {
             w.writeln("source module")
         }
-        w.writeln(&format!("dependency order #{}", dependency_order));
+        w.writeln(format!("dependency order #{}", dependency_order));
         for (mident, _loc) in friends.key_cloned_iter() {
-            w.write(&format!("friend {};", mident));
+            w.write(format!("friend {};", mident));
             w.new_line();
         }
         for sdef in structs.key_cloned_iter() {
@@ -760,14 +760,14 @@ impl AstDebug for (StructName, &StructDefinition) {
         if let StructFields::Native(_) = fields {
             w.write("native ");
         }
-        w.write(&format!("struct {}", name));
+        w.write(format!("struct {}", name));
         type_parameters.ast_debug(w);
         ability_modifiers_ast_debug(w, abilities);
         if let StructFields::Defined(fields) = fields {
             w.block(|w| {
                 w.list(fields, ",", |w, (_, f, idx_st)| {
                     let (idx, st) = idx_st;
-                    w.write(&format!("{}#{}: ", idx, f));
+                    w.write(format!("{}#{}: ", idx, f));
                     st.ast_debug(w);
                     true
                 })
@@ -793,20 +793,20 @@ impl AstDebug for (FunctionName, &Function) {
         attributes.ast_debug(w);
         visibility.ast_debug(w);
         if entry.is_some() {
-            w.write(&format!("{} ", ENTRY_MODIFIER));
+            w.write(format!("{} ", ENTRY_MODIFIER));
         }
         if let FunctionBody_::Native = &body.value {
             w.write("native ");
         }
         if *inline {
-            w.write(&format!("inline fun {}", name));
+            w.write(format!("inline fun {}", name));
         } else {
-            w.write(&format!("fun {}", name));
+            w.write(format!("fun {}", name));
         }
         signature.ast_debug(w);
         if !acquires.is_empty() {
             w.write(" acquires ");
-            w.comma(acquires.keys(), |w, s| w.write(&format!("{}", s)));
+            w.comma(acquires.keys(), |w, s| w.write(format!("{}", s)));
             w.write(" ")
         }
         match &body.value {
@@ -826,7 +826,7 @@ impl AstDebug for FunctionSignature {
         type_parameters.ast_debug(w);
         w.write("(");
         w.comma(parameters, |w, (v, st)| {
-            w.write(&format!("{}: ", v));
+            w.write(format!("{}: ", v));
             st.ast_debug(w);
         });
         w.write("): ");
@@ -866,7 +866,7 @@ impl AstDebug for (ConstantName, &Constant) {
             },
         ) = self;
         attributes.ast_debug(w);
-        w.write(&format!("const {}:", name));
+        w.write(format!("const {}:", name));
         signature.ast_debug(w);
         w.write(" = ");
         value.ast_debug(w);
@@ -876,16 +876,16 @@ impl AstDebug for (ConstantName, &Constant) {
 
 impl AstDebug for BuiltinTypeName_ {
     fn ast_debug(&self, w: &mut AstWriter) {
-        w.write(&format!("{}", self));
+        w.write(format!("{}", self));
     }
 }
 
 impl AstDebug for TypeName_ {
     fn ast_debug(&self, w: &mut AstWriter) {
         match self {
-            TypeName_::Multiple(len) => w.write(&format!("Multiple({})", len)),
+            TypeName_::Multiple(len) => w.write(format!("Multiple({})", len)),
             TypeName_::Builtin(bt) => bt.ast_debug(w),
-            TypeName_::ModuleType(m, s) => w.write(&format!("{}::{}", m, s)),
+            TypeName_::ModuleType(m, s) => w.write(format!("{}::{}", m, s)),
         }
     }
 }
@@ -897,7 +897,7 @@ impl AstDebug for TParam {
             user_specified_name,
             abilities,
         } = self;
-        w.write(&format!("{}#{}", user_specified_name, id.0));
+        w.write(format!("{}#{}", user_specified_name, id.0));
         ability_constraints_ast_debug(w, abilities);
     }
 }
@@ -959,7 +959,7 @@ impl AstDebug for Type_ {
                     }),
                 }
             },
-            Type_::Var(tv) => w.write(&format!("#{}", tv.0)),
+            Type_::Var(tv) => w.write(format!("#{}", tv.0)),
             Type_::Anything => w.write("_"),
             Type_::UnresolvedError => w.write("_|_"),
         }
@@ -1009,13 +1009,13 @@ impl AstDebug for Exp_ {
                 trailing: _trailing,
             } => w.write("/*()*/"),
             E::Value(v) => v.ast_debug(w),
-            E::Move(v) => w.write(&format!("move {}", v)),
-            E::Copy(v) => w.write(&format!("copy {}", v)),
-            E::Use(v) => w.write(&format!("{}", v)),
-            E::Constant(None, c) => w.write(&format!("{}", c)),
-            E::Constant(Some(m), c) => w.write(&format!("{}::{}", m, c)),
+            E::Move(v) => w.write(format!("move {}", v)),
+            E::Copy(v) => w.write(format!("copy {}", v)),
+            E::Use(v) => w.write(format!("{}", v)),
+            E::Constant(None, c) => w.write(format!("{}", c)),
+            E::Constant(Some(m), c) => w.write(format!("{}::{}", m, c)),
             E::ModuleCall(m, f, is_macro, tys_opt, sp!(_, rhs)) => {
-                w.write(&format!("{}::{}", m, f));
+                w.write(format!("{}::{}", m, f));
                 if *is_macro {
                     w.write("!");
                 }
@@ -1029,7 +1029,7 @@ impl AstDebug for Exp_ {
                 w.write(")");
             },
             E::VarCall(var, sp!(_, rhs)) => {
-                w.write(&format!("{}", var));
+                w.write(format!("{}", var));
                 w.write("(");
                 w.comma(rhs, |w, e| e.ast_debug(w));
                 w.write(")");
@@ -1052,7 +1052,7 @@ impl AstDebug for Exp_ {
                 w.write("]");
             },
             E::Pack(m, s, tys_opt, fields) => {
-                w.write(&format!("{}::{}", m, s));
+                w.write(format!("{}::{}", m, s));
                 if let Some(ss) = tys_opt {
                     w.write("<");
                     ss.ast_debug(w);
@@ -1061,7 +1061,7 @@ impl AstDebug for Exp_ {
                 w.write("{");
                 w.comma(fields, |w, (_, f, idx_e)| {
                     let (idx, e) = idx_e;
-                    w.write(&format!("{}#{}: ", idx, f));
+                    w.write(format!("{}#{}: ", idx, f));
                     e.ast_debug(w);
                 });
                 w.write("}");
@@ -1166,15 +1166,15 @@ impl AstDebug for Exp_ {
                 w.write(")");
             },
             E::Spec(u, used_vars, used_func_ptrs) => {
-                w.write(&format!("spec #{}", u));
+                w.write(format!("spec #{}", u));
                 if !used_vars.is_empty() {
                     w.write(" uses [");
-                    w.comma(used_vars, |w, n| w.write(&format!("{}", n)));
+                    w.comma(used_vars, |w, n| w.write(format!("{}", n)));
                     w.write("]");
                 }
                 if !used_func_ptrs.is_empty() {
                     w.write(" applies [");
-                    w.comma(used_func_ptrs, |w, n| w.write(&format!("{}", n)));
+                    w.comma(used_func_ptrs, |w, n| w.write(format!("{}", n)));
                     w.write("]");
                 }
             },
@@ -1211,7 +1211,7 @@ impl AstDebug for ExpDotted_ {
             D::Exp(e) => e.ast_debug(w),
             D::Dot(e, n) => {
                 e.ast_debug(w);
-                w.write(&format!(".{}", n))
+                w.write(format!(".{}", n))
             },
         }
     }
@@ -1235,9 +1235,9 @@ impl AstDebug for LValue_ {
         use LValue_ as L;
         match self {
             L::Ignore => w.write("_"),
-            L::Var(v) => w.write(&format!("{}", v)),
+            L::Var(v) => w.write(format!("{}", v)),
             L::Unpack(m, s, tys_opt, fields) => {
-                w.write(&format!("{}::{}", m, s));
+                w.write(format!("{}::{}", m, s));
                 if let Some(ss) = tys_opt {
                     w.write("<");
                     ss.ast_debug(w);
@@ -1246,7 +1246,7 @@ impl AstDebug for LValue_ {
                 w.write("{");
                 w.comma(fields, |w, (_, f, idx_b)| {
                     let (idx, b) = idx_b;
-                    w.write(&format!("{}#{}: ", idx, f));
+                    w.write(format!("{}#{}: ", idx, f));
                     b.ast_debug(w);
                 });
                 w.write("}");

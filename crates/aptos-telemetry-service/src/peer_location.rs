@@ -14,9 +14,11 @@ const ANALYTICS_PROJECT_ID: &str = "analytics-test-345723";
 
 #[derive(Clone, Debug)]
 pub struct PeerLocation {
+    #[allow(dead_code)]
     pub peer_id: PeerId,
     pub country: Option<String>,
     pub region: Option<String>,
+    #[allow(dead_code)]
     pub geo_updated_at: Option<String>,
 }
 

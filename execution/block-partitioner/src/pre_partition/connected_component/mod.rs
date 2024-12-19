@@ -97,7 +97,7 @@ impl PrePartitioner for ConnectedComponentPartitioner {
             .iter()
             .enumerate()
             .flat_map(|(set_idx, txns)| {
-                let num_chunks = (txns.len() + group_size_limit - 1) / group_size_limit;
+                let num_chunks = txns.len().div_ceil(group_size_limit);
                 let mut ret = vec![(set_idx, group_size_limit); num_chunks];
                 let last_chunk_size = txns.len() - group_size_limit * (num_chunks - 1);
                 ret[num_chunks - 1] = (set_idx, last_chunk_size);

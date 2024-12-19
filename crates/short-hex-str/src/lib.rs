@@ -126,7 +126,7 @@ impl AsShortHexStr for [u8; 32] {
 mod test {
     use super::*;
     use proptest::prelude::*;
-    use std::{str, u8};
+    use std::str;
 
     #[test]
     fn test_hex_encode() {

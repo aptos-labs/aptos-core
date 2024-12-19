@@ -73,9 +73,9 @@ in E is either currently being executed or (its last incarnation) has completed.
 
 Each thread repeats the following (loop in 'executor.rs'):
 - Check done: if V and E are empty and no other thread is performing a task,
-then return.
+  then return.
 - Find next task: Perform the task with the smallest transaction index tx in V
-and E:
+  and E:
   1. Execution task: Execute the next incarnation of tx. If a value marked as
      ESTIMATE is read, abort execution and add tx back to E. Otherwise:
      (a) If there is a write to a memory location to which the previous finished
@@ -91,6 +91,7 @@ and E:
          currently in E or being executed and add them to V.
      (c) Create an execution task for transaction tx with an incremented
          incarnation number, and add it to E.
+
 When a transaction tx_k reads an ESTIMATE marker written by tx_j (with j < k),
 we say that tx_k encounters a dependency (we treat tx_k as tx_j's dependency
 because its read depends on a value that tx_j is estimated to write).

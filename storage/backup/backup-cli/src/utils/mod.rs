@@ -294,7 +294,7 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
     type Error = anyhow::Error;
 
     fn try_from(opt: GlobalRestoreOpt) -> anyhow::Result<Self> {
-        let target_version = opt.target_version.unwrap_or(Version::max_value());
+        let target_version = opt.target_version.unwrap_or(Version::MAX);
         let concurrent_downloads = opt.concurrent_downloads.get();
         let replay_concurrency_level = opt.replay_concurrency_level.get();
         let run_mode = if let Some(db_dir) = &opt.db_dir {

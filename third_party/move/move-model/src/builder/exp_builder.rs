@@ -136,7 +136,7 @@ pub(crate) enum OldExpStatus {
     InsideOld,
 }
 
-/// # General
+// # General
 
 impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'module_translator> {
     pub fn new(parent: &'module_translator mut ModuleBuilder<'env, 'translator>) -> Self {
@@ -780,11 +780,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 }
 
-/// # Unification Context
+// # Unification Context
 
-impl<'env, 'builder, 'module_builder> UnificationContext
-    for ExpTranslator<'env, 'builder, 'module_builder>
-{
+impl UnificationContext for ExpTranslator<'_, '_, '_> {
     fn get_struct_field_decls(
         &self,
         id: &QualifiedInstId<StructId>,
@@ -830,11 +828,9 @@ impl<'env, 'builder, 'module_builder> UnificationContext
     }
 }
 
-/// # Ability Context
+// # Ability Context
 
-impl<'env, 'builder, 'module_builder> AbilityContext
-    for ExpTranslator<'env, 'builder, 'module_builder>
-{
+impl AbilityContext for ExpTranslator<'_, '_, '_> {
     fn type_param(&self, idx: u16) -> TypeParameter {
         let (name, _, kind, loc) = &self.type_params[idx as usize];
         TypeParameter(*name, kind.clone(), loc.clone())
@@ -861,9 +857,9 @@ impl<'env, 'builder, 'module_builder> AbilityContext
     }
 }
 
-/// # Type Translation
+// # Type Translation
 
-impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'module_translator> {
+impl ExpTranslator<'_, '_, '_> {
     /// Translates an hlir type into a target AST type.
     pub fn translate_hlir_single_type(&mut self, ty: &HA::SingleType) -> Type {
         use HA::SingleType_::*;
@@ -1131,9 +1127,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 }
 
-/// # Access Specifier Translation
+// # Access Specifier Translation
 
-impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'module_translator> {
+impl ExpTranslator<'_, '_, '_> {
     pub(crate) fn translate_access_specifiers(
         &mut self,
         specifiers: &Option<Vec<EA::AccessSpecifier>>,
@@ -1373,9 +1369,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 }
 
-/// # Expression Translation
+// # Expression Translation
 
-impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'module_translator> {
+impl ExpTranslator<'_, '_, '_> {
     /// Translates an expression representing a modify target
     pub fn translate_modify_target(&mut self, exp: &EA::Exp) -> ExpData {
         let loc = self.to_loc(&exp.loc);
@@ -2026,10 +2022,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
     /// This function:
     /// 1) Post processes any placeholders which have been generated while translating expressions
-    /// with this builder. This rewrites the given result expression and fills in placeholders
-    /// with the final expressions.
+    ///    with this builder. This rewrites the given result expression and fills in placeholders
+    ///    with the final expressions.
     /// 2) Instantiates types for all all struct patterns in the block expression
-    /// This step is necessary because struct pattern may contain uninstantiated variable types
+    ///    This step is necessary because struct pattern may contain uninstantiated variable types
     pub fn post_process_body(&mut self, result_exp: Exp) -> Exp {
         let subs = self.subs.clone();
         ExpData::rewrite_exp_and_pattern(

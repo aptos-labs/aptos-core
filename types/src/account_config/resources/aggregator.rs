@@ -36,7 +36,7 @@ pub struct DerivedStringSnapshotResource {
     padding: Vec<u8>,
 }
 
-/// Deprecated:
+// Deprecated:
 
 /// Rust representation of Aggregator Move struct.
 #[derive(Debug, Serialize, Deserialize)]

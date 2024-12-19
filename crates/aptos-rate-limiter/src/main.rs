@@ -32,10 +32,6 @@ const BYTES_TO_TRANSFER: usize = 100_000_000;
 const ALLOWED_BYTES_PER_SEC: usize = 10_000;
 /// Chunk size to write bytes to the stream at a time
 const CHUNK_SIZE: usize = 10_000;
-/// Buffer size used by Tokio when reading, backpressure only occurs after this is full
-// const READ_BUFFER_SIZE: usize = 100;
-/// Buffer size used by Tokio when writing
-// const WRITE_BUFFER_SIZE: usize = 100;
 
 /// Holder for statistics of a single experiment and reader/writer
 struct RunStats {

@@ -30,16 +30,16 @@ use move_vm_types::code::{
 };
 use std::sync::Arc;
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> WithRuntimeEnvironment
-    for LatestView<'a, T, S, X>
+impl<T: Transaction, S: TStateView<Key = T::Key>, X: Executable> WithRuntimeEnvironment
+    for LatestView<'_, T, S, X>
 {
     fn runtime_environment(&self) -> &RuntimeEnvironment {
         self.runtime_environment
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCodeBuilder
-    for LatestView<'a, T, S, X>
+impl<T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCodeBuilder
+    for LatestView<'_, T, S, X>
 {
     type Deserialized = CompiledModule;
     type Extension = AptosModuleExtension;
@@ -64,8 +64,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCodeB
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCache
-    for LatestView<'a, T, S, X>
+impl<T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCache
+    for LatestView<'_, T, S, X>
 {
     type Deserialized = CompiledModule;
     type Extension = AptosModuleExtension;
@@ -187,8 +187,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCache
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModuleStorage
-    for LatestView<'a, T, S, X>
+impl<T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModuleStorage
+    for LatestView<'_, T, S, X>
 {
     fn fetch_state_value_metadata(
         &self,
@@ -206,7 +206,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModule
 
 #[delegate_to_methods]
 #[delegate(ScriptCache, target_ref = "as_script_cache")]
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
+impl<T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'_, T, S, X> {
     /// Returns the script cache.
     fn as_script_cache(
         &self,

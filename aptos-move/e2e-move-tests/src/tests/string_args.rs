@@ -287,7 +287,7 @@ fn string_args_good() {
             "hello".as_bytes(),
         ],
     ];
-    let u64_vec_max = vec![std::u64::MAX, std::u64::MAX, std::u64::MAX];
+    let u64_vec_max = vec![u64::MAX, u64::MAX, u64::MAX];
     let u64_long = vec![0xABCDEFu64; 100];
     let i = 0u64;
     let j = 0u64;
@@ -625,7 +625,7 @@ fn string_args_generic_instantiation() {
         ],
     ];
     let u8_vec = vec![0xFFu8; 100];
-    let u64_vec = vec![std::u64::MAX, std::u64::MAX, std::u64::MAX];
+    let u64_vec = vec![u64::MAX, u64::MAX, u64::MAX];
     let val1 = long_addr;
     let val2 = "hi there! hello".as_bytes();
     let i = 0u64;

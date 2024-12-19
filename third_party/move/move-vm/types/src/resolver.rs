@@ -2,6 +2,8 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+//! Traits for resolving Move modules and resources from persistent storage
+
 use bytes::Bytes;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
@@ -10,8 +12,6 @@ use move_core_types::{
     metadata::Metadata,
     value::MoveTypeLayout,
 };
-
-/// Traits for resolving Move modules and resources from persistent storage
 
 /// A persistent storage backend that can resolve modules by address + name.
 /// Storage backends should return

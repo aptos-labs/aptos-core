@@ -2115,7 +2115,7 @@ impl crate::shared::ast_debug::AstDebug for ExpDotted_ {
             D::Dot(e, n, ty) => {
                 e.ast_debug(w);
                 w.write(".");
-                w.annotate(|w| w.write(&format!("{}", n)), ty)
+                w.annotate(|w| w.write(format!("{}", n)), ty)
             },
         }
     }

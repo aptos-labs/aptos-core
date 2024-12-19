@@ -26,11 +26,11 @@ pub fn total_weight_lower_bound(validator_stakes: &[u64]) -> usize {
 /// - A validator with stake `cur_stake` gets rounded weight `round((3*n+12)*cur_stake/stake_total)`;
 /// - `rounding_weight_gain_total` and `rounding_weight_loss_total` are determined, whose sum is at most `n/2` (since everyone's rounding error is at most `1/2`);
 /// - `reconstruction_threshold` is set to be `ceil(1.5n + 6 + rounding_weight_gain_total) + 1`.
+///
 /// Now, a validator subset of stake ratio `r` has `weight_sub_total` in range:
 ///   `[(3*n+12)*r - rounding_weight_loss_total, (3*n+12)*r + rounding_weight_gain_total]`
 /// - when `r <= 1/2`, `weight_sub_total <= 1.5*n + 6 + rounding_weight_gain_total < reconstruction_threshold`.
 /// - when `r > 2/3`, `weight_sub_total >= 2*n + 8 - rounding_weight_loss_total >= 1.5*n + 8 + rounding_weight_gain_total > reconstruction_threshold`.
-
 pub fn total_weight_upper_bound(
     validator_stakes: &[u64],
     mut reconstruct_threshold_in_stake_ratio: U64F64,

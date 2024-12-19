@@ -80,7 +80,7 @@ pub const DELEGATE_INVARIANTS_TO_CALLER_PRAGMA: &str = "delegate_invariants_to_c
 /// to a certain depth *when there are no invariants specified*
 pub const UNROLL_PRAGMA: &str = "unroll";
 
-/// # Pragmas for intrinsic table declaration
+// # Pragmas for intrinsic table declaration
 
 /// The intrinsic type for `Map<K, V>`
 pub const INTRINSIC_TYPE_MAP: &str = "map";

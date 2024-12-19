@@ -82,6 +82,7 @@ pub enum EntryFunctionCall {
         property_types: Vec<Vec<u8>>,
     },
 
+    ///
     TokenDirectTransferScript {
         creators_address: AccountAddress,
         collection: Vec<u8>,
@@ -90,6 +91,7 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    ///
     TokenInitializeTokenScript {},
 
     /// Mint more token from an existing token_data. Mint only adds more token to property_version 0
@@ -115,9 +117,8 @@ pub enum EntryFunctionCall {
         types: Vec<Vec<u8>>,
     },
 
-    TokenOptInDirectTransfer {
-        opt_in: bool,
-    },
+    ///
+    TokenOptInDirectTransfer { opt_in: bool },
 
     /// Transfers `amount` of tokens from `from` to `to`.
     /// The receiver `to` has to opt-in direct transfer first
@@ -142,6 +143,7 @@ pub enum EntryFunctionCall {
         _locked_until_secs: u64,
     },
 
+    ///
     TokenTransfersCancelOfferScript {
         receiver: AccountAddress,
         creator: AccountAddress,
@@ -150,6 +152,7 @@ pub enum EntryFunctionCall {
         property_version: u64,
     },
 
+    ///
     TokenTransfersClaimScript {
         sender: AccountAddress,
         creator: AccountAddress,
@@ -158,6 +161,7 @@ pub enum EntryFunctionCall {
         property_version: u64,
     },
 
+    ///
     TokenTransfersOfferScript {
         receiver: AccountAddress,
         creator: AccountAddress,

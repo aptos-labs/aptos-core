@@ -41,12 +41,12 @@ pub struct StateSnapshotBackup {
     /// BCS serialized
     /// `Tuple(TransactionInfoWithProof, LedgerInfoWithSignatures)`.
     ///   - The `TransactionInfoWithProof` is at `Version` above, and carries the same `root_hash`
-    /// above; It proves that at specified version the root hash is as specified in a chain
-    /// represented by the LedgerInfo below.
+    ///     above; It proves that at specified version the root hash is as specified in a chain
+    ///     represented by the LedgerInfo below.
     ///   - The signatures on the `LedgerInfoWithSignatures` has a version greater than or equal to
-    /// the version of this backup but is within the same epoch, so the signatures on it can be
-    /// verified by the validator set in the same epoch, which can be provided by an
-    /// `EpochStateBackup` recovered prior to this to the DB; Requiring it to be in the same epoch
-    /// limits the requirement on such `EpochStateBackup` to no older than the same epoch.
+    ///     the version of this backup but is within the same epoch, so the signatures on it can be
+    ///     verified by the validator set in the same epoch, which can be provided by an
+    ///     `EpochStateBackup` recovered prior to this to the DB; Requiring it to be in the same epoch
+    ///     limits the requirement on such `EpochStateBackup` to no older than the same epoch.
     pub proof: FileHandle,
 }

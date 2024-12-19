@@ -119,7 +119,7 @@ impl CachedPackageRegistry {
     }
 }
 
-impl<'a> CachedPackageMetadata<'a> {
+impl CachedPackageMetadata<'_> {
     pub fn name(&self) -> &str {
         &self.metadata.name
     }
@@ -243,7 +243,7 @@ impl<'a> CachedPackageMetadata<'a> {
     }
 }
 
-impl<'a> CachedModuleMetadata<'a> {
+impl CachedModuleMetadata<'_> {
     pub fn name(&self) -> &str {
         &self.metadata.name
     }

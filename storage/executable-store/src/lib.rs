@@ -103,14 +103,13 @@ impl<K: Eq + Hash, X: Executable, ID: Clone + Debug + PartialEq> Default
     }
 }
 
+///
+/// Quiescent interfaces:
+/// The following methods should be called in quiescence. These are intended to
+/// process the state of the Store between piece executions and must be called
+/// single-threaded. As such, no extra atomicity of ops within methods is needed.
+///
 impl<K: Eq + Hash, X: Executable, ID: Clone + Debug + PartialEq> ExecutableStore<K, X, ID> {
-    ///
-    /// Quiescent interfaces:
-    /// The following methods should be called in quiescence. These are intended to
-    /// process the state of the Store between piece executions and must be called
-    /// single-threaded. As such, no extra atomicity of ops within methods is needed.
-    ///
-
     /// Flushes the cache and marks the state as Empty. This happens for error handling
     /// in cases when the empty cache is sufficient to proceed despite the error. O.w.
     /// clearing an ExecutableStore is just an alternative to creating a new empty one.
@@ -235,9 +234,9 @@ impl<K: Eq + Hash, X: Executable, ID: Clone + Debug + PartialEq> ExecutableStore
         }
     }
 
-    ///
-    /// The following methods can be concurrent when invoked during the block execution.
-    ///
+    //
+    // The following methods can be concurrent when invoked during the block execution.
+    //
 
     pub fn get(&self, key: &K) -> Option<X> {
         debug_assert!(

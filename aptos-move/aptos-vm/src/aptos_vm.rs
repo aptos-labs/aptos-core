@@ -2886,7 +2886,8 @@ impl VMValidator for AptosVM {
     ///    transaction
     /// 2. The script to be executed is under given specific configuration.
     /// 3. Invokes `Account.prologue`, which checks properties such as the transaction has the
-    /// right sequence number and the sender has enough balance to pay for the gas.
+    ///    right sequence number and the sender has enough balance to pay for the gas.
+    ///
     /// TBD:
     /// 1. Transaction arguments matches the main function's type signature.
     ///    We don't check this item for now and would execute the check at execution time.

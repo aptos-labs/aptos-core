@@ -147,7 +147,7 @@ pub static BATCH_GENERATOR_MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
 // NEW QUORUM STORE
 //////////////////////
 
-/// Histograms
+// Histograms
 
 /// Histogram for the number of batches per (committed) blocks.
 pub static NUM_BATCH_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
@@ -509,7 +509,7 @@ pub static NUM_LOCAL_PROOFS_LEFT_ON_UPDATE: Lazy<Histogram> = Lazy::new(|| {
     )
 });
 
-/// Counters
+// Counters
 
 /// Count of how many times txns are pulled.
 pub static PULLED_TXNS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
@@ -815,7 +815,7 @@ pub static QS_BACKPRESSURE_DYNAMIC_MAX: Lazy<Histogram> = Lazy::new(|| {
     )
 });
 
-/// Latencies
+// Latencies
 
 /// Histogram of the time durations for batch creation.
 pub static BATCH_CREATION_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {

@@ -39,3 +39,6 @@ sha2_0_10_6 = { workspace = true }
 
 [package.metadata.cargo-machete]
 ignored = ["bcs"]
+
+[features]
+std = []

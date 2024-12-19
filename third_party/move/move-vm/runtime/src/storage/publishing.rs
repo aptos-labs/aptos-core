@@ -49,7 +49,7 @@ struct StagingModuleBytesStorage<'a, M> {
     module_storage: &'a M,
 }
 
-impl<'a, M: ModuleStorage> ModuleBytesStorage for StagingModuleBytesStorage<'a, M> {
+impl<M: ModuleStorage> ModuleBytesStorage for StagingModuleBytesStorage<'_, M> {
     fn fetch_module_bytes(
         &self,
         address: &AccountAddress,
@@ -71,6 +71,7 @@ impl<'a, M: ModuleStorage> ModuleBytesStorage for StagingModuleBytesStorage<'a, 
 ///   2) Published modules satisfy compatibility constraints.
 ///   3) Published modules are verifiable and can link to existing modules without breaking
 ///      invariants such as cyclic dependencies.
+#[allow(clippy::duplicated_attributes)]
 #[derive(Delegate)]
 #[delegate(WithRuntimeEnvironment, where = "M: ModuleStorage")]
 #[delegate(ModuleStorage, where = "M: ModuleStorage")]

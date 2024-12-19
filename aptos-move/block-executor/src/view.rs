@@ -535,7 +535,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
     }
 }
 
-impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T, X> {
+impl<T: Transaction, X: Executable> ResourceState<T> for ParallelState<'_, T, X> {
     fn set_base_value(&self, key: T::Key, value: ValueWithLayout<T::Value>) {
         self.versioned_map.data().set_base_value(key, value);
     }
@@ -677,7 +677,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
     }
 }
 
-impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<'a, T, X> {
+impl<T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<'_, T, X> {
     fn set_raw_group_base_values(
         &self,
         group_key: T::Key,
@@ -819,7 +819,7 @@ impl<'a, T: Transaction> SequentialState<'a, T> {
     }
 }
 
-impl<'a, T: Transaction> ResourceState<T> for SequentialState<'a, T> {
+impl<T: Transaction> ResourceState<T> for SequentialState<'_, T> {
     fn set_base_value(&self, key: T::Key, value: ValueWithLayout<T::Value>) {
         self.unsync_map.set_base_value(key, value);
     }
@@ -888,7 +888,7 @@ impl<'a, T: Transaction> ResourceState<T> for SequentialState<'a, T> {
     }
 }
 
-impl<'a, T: Transaction> ResourceGroupState<T> for SequentialState<'a, T> {
+impl<T: Transaction> ResourceGroupState<T> for SequentialState<'_, T> {
     fn set_raw_group_base_values(
         &self,
         group_key: T::Key,
@@ -967,7 +967,7 @@ pub(crate) enum ViewState<'a, T: Transaction, X: Executable> {
     Unsync(SequentialState<'a, T>),
 }
 
-impl<'a, T: Transaction, X: Executable> ViewState<'a, T, X> {
+impl<T: Transaction, X: Executable> ViewState<'_, T, X> {
     fn get_resource_state(&self) -> &dyn ResourceState<T> {
         match self {
             ViewState::Sync(state) => state,
@@ -1433,8 +1433,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceView
-    for LatestView<'a, T, S, X>
+impl<T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceView
+    for LatestView<'_, T, S, X>
 {
     type Key = T::Key;
     type Layout = MoveTypeLayout;
@@ -1478,8 +1478,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGroupView
-    for LatestView<'a, T, S, X>
+impl<T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGroupView
+    for LatestView<'_, T, S, X>
 {
     type GroupKey = T::Key;
     type Layout = MoveTypeLayout;
@@ -1555,8 +1555,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
-    for LatestView<'a, T, S, X>
+impl<T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
+    for LatestView<'_, T, S, X>
 {
     type Key = T::Key;
 
@@ -1619,8 +1619,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorageView
-    for LatestView<'a, T, S, X>
+impl<T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorageView
+    for LatestView<'_, T, S, X>
 {
     type Key = T::Key;
 
@@ -1638,8 +1638,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorag
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregatorV1View
-    for LatestView<'a, T, S, X>
+impl<T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregatorV1View
+    for LatestView<'_, T, S, X>
 {
     type Identifier = T::Key;
 
@@ -1656,8 +1656,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFieldView
-    for LatestView<'a, T, S, X>
+impl<T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFieldView
+    for LatestView<'_, T, S, X>
 {
     type Identifier = T::Identifier;
     type ResourceGroupTag = T::Tag;
@@ -2866,7 +2866,7 @@ mod test {
             LatestView<'a, TestTransactionType, MockStateView<KeyType<u32>>, MockExecutable>,
     }
 
-    impl<'a> ViewsComparison<'a> {
+    impl ViewsComparison<'_> {
         fn assert_res_eq<T, E>(&self, res_seq: Result<T, E>, res_par: Result<T, E>) -> Result<T, E>
         where
             T: std::fmt::Debug + PartialEq,
