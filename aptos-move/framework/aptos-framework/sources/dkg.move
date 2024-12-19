@@ -22,6 +22,15 @@ module aptos_framework::dkg {
         target_validator_set: vector<ValidatorConsensusInfo>,
     }
 
+    enum TestEnum has drop {
+        A,
+        B
+    }
+
+    fun test_a(): TestEnum {
+       TestEnum::A
+    }
+
     #[event]
     struct DKGStartEvent has drop, store {
         session_metadata: DKGSessionMetadata,
@@ -118,4 +127,10 @@ module aptos_framework::dkg {
     public fun session_dealer_epoch(session: &DKGSessionState): u64 {
         session.metadata.dealer_epoch
     }
+
+    #[test]
+    public entry fun test() {
+        test_a() == TestEnum::A;
+    }
+
 }
