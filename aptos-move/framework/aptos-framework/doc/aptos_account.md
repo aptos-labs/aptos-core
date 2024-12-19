@@ -25,7 +25,7 @@
 -  [Function `register_apt`](#0x1_aptos_account_register_apt)
 -  [Function `fungible_transfer_only`](#0x1_aptos_account_fungible_transfer_only)
 -  [Function `is_fungible_balance_at_least`](#0x1_aptos_account_is_fungible_balance_at_least)
--  [Function `burn_from_fungible_store`](#0x1_aptos_account_burn_from_fungible_store)
+-  [Function `burn_from_fungible_store_for_gas`](#0x1_aptos_account_burn_from_fungible_store_for_gas)
 -  [Function `ensure_primary_fungible_store_exists`](#0x1_aptos_account_ensure_primary_fungible_store_exists)
 -  [Function `primary_fungible_store_address`](#0x1_aptos_account_primary_fungible_store_address)
 -  [Specification](#@Specification_1)
@@ -47,7 +47,7 @@
     -  [Function `register_apt`](#@Specification_1_register_apt)
     -  [Function `fungible_transfer_only`](#@Specification_1_fungible_transfer_only)
     -  [Function `is_fungible_balance_at_least`](#@Specification_1_is_fungible_balance_at_least)
-    -  [Function `burn_from_fungible_store`](#@Specification_1_burn_from_fungible_store)
+    -  [Function `burn_from_fungible_store_for_gas`](#@Specification_1_burn_from_fungible_store_for_gas)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -707,7 +707,7 @@ to transfer APT) - if we want to allow APT PFS without account itself
     // <b>as</b> APT cannot be frozen or have dispatch, and PFS cannot be transfered
     // (PFS could potentially be burned. regular transfer would permanently unburn the store.
     // Ignoring the check here <b>has</b> the equivalent of unburning, transfers, and then burning again)
-    <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">fungible_asset::deposit_internal</a>(recipient_store, <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">fungible_asset::withdraw_internal</a>(sender_store, amount));
+    <a href="fungible_asset.md#0x1_fungible_asset_unchecked_deposit">fungible_asset::unchecked_deposit</a>(recipient_store, <a href="fungible_asset.md#0x1_fungible_asset_unchecked_withdraw">fungible_asset::unchecked_withdraw</a>(sender_store, amount));
 }
 </code></pre>
 
@@ -741,14 +741,14 @@ Is balance from APT Primary FungibleStore at least the given amount
 
 </details>
 
-<a id="0x1_aptos_account_burn_from_fungible_store"></a>
+<a id="0x1_aptos_account_burn_from_fungible_store_for_gas"></a>
 
-## Function `burn_from_fungible_store`
+## Function `burn_from_fungible_store_for_gas`
 
-Burn from APT Primary FungibleStore
+Burn from APT Primary FungibleStore for gas charge
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_burn_from_fungible_store">burn_from_fungible_store</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_burn_from_fungible_store_for_gas">burn_from_fungible_store_for_gas</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -757,7 +757,7 @@ Burn from APT Primary FungibleStore
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_burn_from_fungible_store">burn_from_fungible_store</a>(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_burn_from_fungible_store_for_gas">burn_from_fungible_store_for_gas</a>(
     ref: &BurnRef,
     <a href="account.md#0x1_account">account</a>: <b>address</b>,
     amount: u64,
@@ -765,7 +765,7 @@ Burn from APT Primary FungibleStore
     // Skip burning <b>if</b> amount is zero. This shouldn't <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a> out <b>as</b> it's called <b>as</b> part of transaction fee burning.
     <b>if</b> (amount != 0) {
         <b>let</b> store_addr = <a href="aptos_account.md#0x1_aptos_account_primary_fungible_store_address">primary_fungible_store_address</a>(<a href="account.md#0x1_account">account</a>);
-        <a href="fungible_asset.md#0x1_fungible_asset_address_burn_from">fungible_asset::address_burn_from</a>(ref, store_addr, amount);
+        <a href="fungible_asset.md#0x1_fungible_asset_address_burn_from_for_gas">fungible_asset::address_burn_from_for_gas</a>(ref, store_addr, amount);
     };
 }
 </code></pre>
@@ -1294,12 +1294,12 @@ Check if the AptosCoin under the address existed.
 
 
 
-<a id="@Specification_1_burn_from_fungible_store"></a>
+<a id="@Specification_1_burn_from_fungible_store_for_gas"></a>
 
-### Function `burn_from_fungible_store`
+### Function `burn_from_fungible_store_for_gas`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_burn_from_fungible_store">burn_from_fungible_store</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_burn_from_fungible_store_for_gas">burn_from_fungible_store_for_gas</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
 </code></pre>
 
 
