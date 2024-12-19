@@ -12,6 +12,7 @@ use crate::{
 use aptos_consensus_types::proof_of_store::BatchInfo;
 use aptos_crypto::HashValue;
 use aptos_executor_types::*;
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, validator_verifier::ValidatorVerifier, PeerId};
 use futures::{stream::FuturesUnordered, StreamExt};
@@ -20,7 +21,7 @@ use std::{sync::Arc, time::Duration};
 use tokio::{sync::oneshot, time};
 
 struct BatchRequesterState {
-    signers: Vec<PeerId>,
+    signers: Arc<Mutex<Vec<PeerId>>>,
     next_index: usize,
     ret_tx: oneshot::Sender<ExecutorResult<Vec<SignedTransaction>>>,
     num_retries: usize,
@@ -29,7 +30,7 @@ struct BatchRequesterState {
 
 impl BatchRequesterState {
     fn new(
-        signers: Vec<PeerId>,
+        signers: Arc<Mutex<Vec<PeerId>>>,
         ret_tx: oneshot::Sender<ExecutorResult<Vec<SignedTransaction>>>,
         retry_limit: usize,
     ) -> Self {
@@ -43,25 +44,25 @@ impl BatchRequesterState {
     }
 
     fn next_request_peers(&mut self, num_peers: usize) -> Option<Vec<PeerId>> {
+        let signers = self.signers.lock();
         if self.num_retries == 0 {
             let mut rng = rand::thread_rng();
             // make sure nodes request from the different set of nodes
-            self.next_index = rng.gen::<usize>() % self.signers.len();
+            self.next_index = rng.gen::<usize>() % signers.len();
             counters::SENT_BATCH_REQUEST_COUNT.inc_by(num_peers as u64);
         } else {
             counters::SENT_BATCH_REQUEST_RETRY_COUNT.inc_by(num_peers as u64);
         }
         if self.num_retries < self.retry_limit {
             self.num_retries += 1;
-            let ret = self
-                .signers
+            let ret = signers
                 .iter()
                 .cycle()
                 .skip(self.next_index)
                 .take(num_peers)
                 .cloned()
                 .collect();
-            self.next_index = (self.next_index + num_peers) % self.signers.len();
+            self.next_index = (self.next_index + num_peers) % signers.len();
             Some(ret)
         } else {
             None
@@ -132,7 +133,7 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
         &self,
         digest: HashValue,
         expiration: u64,
-        responders: Vec<PeerId>,
+        responders: Arc<Mutex<Vec<PeerId>>>,
         ret_tx: oneshot::Sender<ExecutorResult<Vec<SignedTransaction>>>,
         mut subscriber_rx: oneshot::Receiver<PersistedValue>,
     ) -> Option<(BatchInfo, Vec<SignedTransaction>)> {

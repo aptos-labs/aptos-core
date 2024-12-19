@@ -14,7 +14,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 use aptos_consensus_types::{
     block::Block, pipeline_execution_result::PipelineExecutionResult,
-    pipelined_block::PipelinedBlock,
+    pipelined_block::PipelinedBlock, quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
@@ -125,6 +125,7 @@ impl StateComputer for RandomComputeResultStateComputer {
         _block: &Block,
         parent_block_id: HashValue,
         _randomness: Option<Randomness>,
+        _block_qc: Option<Arc<QuorumCert>>,
         _lifetime_guard: CountedRequest<()>,
     ) -> StateComputeResultFut {
         // trapdoor for Execution Error
