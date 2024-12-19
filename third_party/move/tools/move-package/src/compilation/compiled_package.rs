@@ -1137,8 +1137,9 @@ pub fn unimplemented_v2_driver(_options: move_compiler_v2::Options) -> CompilerD
 
 /// Runs the v2 compiler, exiting the process if any errors occurred.
 pub fn build_and_report_v2_driver(options: move_compiler_v2::Options) -> CompilerDriverResult {
-    let mut writer = StandardStream::stderr(ColorChoice::Auto);
-    match move_compiler_v2::run_move_compiler(&mut writer, options) {
+    let mut stderr = StandardStream::stderr(ColorChoice::Auto);
+    let mut emitter = options.to_emitter(&mut stderr);
+    match move_compiler_v2::run_move_compiler(emitter.as_mut(), options) {
         Ok((env, units)) => Ok((
             move_compiler_v2::make_files_source_text(&env),
             units,
@@ -1155,8 +1156,9 @@ pub fn build_and_report_v2_driver(options: move_compiler_v2::Options) -> Compile
 pub fn build_and_report_no_exit_v2_driver(
     options: move_compiler_v2::Options,
 ) -> CompilerDriverResult {
-    let mut writer = StandardStream::stderr(ColorChoice::Auto);
-    let (env, units) = move_compiler_v2::run_move_compiler(&mut writer, options)?;
+    let mut stderr = StandardStream::stderr(ColorChoice::Auto);
+    let mut emitter = options.to_emitter(&mut stderr);
+    let (env, units) = move_compiler_v2::run_move_compiler(emitter.as_mut(), options)?;
     Ok((
         move_compiler_v2::make_files_source_text(&env),
         units,
