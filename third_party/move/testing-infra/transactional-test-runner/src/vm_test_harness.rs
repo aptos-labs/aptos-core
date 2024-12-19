@@ -502,7 +502,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
     }
 }
 
-impl<'a> SimpleVMTestAdapter<'a> {
+impl SimpleVMTestAdapter<'_> {
     fn vm_and_runtime_environment(&self) -> (Rc<MoveVM>, RuntimeEnvironmentAdapter) {
         let vm = match &self.vm_and_runtime_environment.0 {
             Some(vm) => vm.clone(),

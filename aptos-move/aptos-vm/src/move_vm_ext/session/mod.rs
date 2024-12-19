@@ -255,6 +255,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     ///   * Remove resource group data from the deltas
     ///   * Attempt to read the existing resource group data or create a new empty container
     ///   * Apply the deltas to the resource group data
+    ///
     /// The process for translating Move deltas of resource groups to resources is
     /// * Add -- insert element in container
     ///   * If entry exists, Unreachable
@@ -507,7 +508,7 @@ impl<'r, 'l> Deref for SessionExt<'r, 'l> {
     }
 }
 
-impl<'r, 'l> DerefMut for SessionExt<'r, 'l> {
+impl DerefMut for SessionExt<'_, '_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }

@@ -120,7 +120,7 @@ pub struct TransferOptions<'a> {
     pub coin_type: &'a str,
 }
 
-impl<'a> Default for TransferOptions<'a> {
+impl Default for TransferOptions<'_> {
     fn default() -> Self {
         Self {
             max_gas_amount: 5_000,

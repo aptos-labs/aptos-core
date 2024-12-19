@@ -148,7 +148,7 @@ impl Loader {
 
     versioned_loader_getter!(ty_builder, TypeBuilder);
 
-    fn ty_cache<'a>(&'a self, module_storage: &'a dyn ModuleStorage) -> &StructInfoCache {
+    fn ty_cache<'a>(&'a self, module_storage: &'a dyn ModuleStorage) -> &'a StructInfoCache {
         match self {
             Self::V1(loader) => &loader.type_cache,
             Self::V2(_) => module_storage.runtime_environment().ty_cache(),
@@ -158,7 +158,7 @@ impl Loader {
     pub(crate) fn struct_name_index_map<'a>(
         &'a self,
         module_storage: &'a dyn ModuleStorage,
-    ) -> &StructNameIndexMap {
+    ) -> &'a StructNameIndexMap {
         match self {
             Self::V1(loader) => &loader.name_cache,
             Self::V2(_) => module_storage.runtime_environment().struct_name_index_map(),
@@ -1272,7 +1272,7 @@ macro_rules! build_loaded_function {
     };
 }
 
-impl<'a> Resolver<'a> {
+impl Resolver<'_> {
     build_loaded_function!(
         build_loaded_function_from_handle_and_ty_args,
         FunctionHandleIndex,

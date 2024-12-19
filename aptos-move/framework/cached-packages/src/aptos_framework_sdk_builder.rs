@@ -97,10 +97,11 @@ pub enum EntryFunctionCall {
     /// Generic authentication key rotation function that allows the user to rotate their authentication key from any scheme to any scheme.
     /// To authorize the rotation, we need two signatures:
     /// - the first signature `cap_rotate_key` refers to the signature by the account owner's current key on a valid `RotationProofChallenge`,
-    /// demonstrating that the user intends to and has the capability to rotate the authentication key of this account;
+    ///   demonstrating that the user intends to and has the capability to rotate the authentication key of this account;
     /// - the second signature `cap_update_table` refers to the signature by the new key (that the account owner wants to rotate to) on a
-    /// valid `RotationProofChallenge`, demonstrating that the user owns the new private key, and has the authority to update the
-    /// `OriginatingAddress` map with the new address mapping `<new_address, originating_address>`.
+    ///   valid `RotationProofChallenge`, demonstrating that the user owns the new private key, and has the authority to update the
+    ///   `OriginatingAddress` map with the new address mapping `<new_address, originating_address>`.
+    ///
     /// To verify these two signatures, we need their corresponding public key and public key scheme: we use `from_scheme` and `from_public_key_bytes`
     /// to verify `cap_rotate_key`, and `to_scheme` and `to_public_key_bytes` to verify `cap_update_table`.
     /// A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to Multi-Ed25519 keys.
@@ -139,10 +140,9 @@ pub enum EntryFunctionCall {
     ///
     /// If you'd like to followup with updating the `OriginatingAddress` table, you can call
     /// `set_originating_address()`.
-    AccountRotateAuthenticationKeyCall {
-        new_auth_key: Vec<u8>,
-    },
+    AccountRotateAuthenticationKeyCall { new_auth_key: Vec<u8> },
 
+    ///
     AccountRotateAuthenticationKeyWithRotationCapability {
         rotation_cap_offerer_address: AccountAddress,
         new_scheme: u8,
@@ -179,9 +179,7 @@ pub enum EntryFunctionCall {
     },
 
     /// Basic account creation methods.
-    AptosAccountCreateAccount {
-        auth_key: AccountAddress,
-    },
+    AptosAccountCreateAccount { auth_key: AccountAddress },
 
     /// APT Primary Fungible Store specific specialized functions,
     /// Utilized internally once migration of APT to FungibleAsset is complete.
@@ -189,22 +187,14 @@ pub enum EntryFunctionCall {
     /// This would create the recipient APT PFS first, which also registers it to receive APT, before transferring.
     /// TODO: once migration is complete, rename to just "transfer_only" and make it an entry function (for cheapest way
     /// to transfer APT) - if we want to allow APT PFS without account itself
-    AptosAccountFungibleTransferOnly {
-        to: AccountAddress,
-        amount: u64,
-    },
+    AptosAccountFungibleTransferOnly { to: AccountAddress, amount: u64 },
 
     /// Set whether `account` can receive direct transfers of coins that they have not explicitly registered to receive.
-    AptosAccountSetAllowDirectCoinTransfers {
-        allow: bool,
-    },
+    AptosAccountSetAllowDirectCoinTransfers { allow: bool },
 
     /// Convenient function to transfer APT to a recipient account that might not exist.
     /// This would create the recipient account first, which also registers it to receive APT, before transferring.
-    AptosAccountTransfer {
-        to: AccountAddress,
-        amount: u64,
-    },
+    AptosAccountTransfer { to: AccountAddress, amount: u64 },
 
     /// Convenient function to transfer a custom CoinType to a recipient account that might not exist.
     /// This would create the recipient account first and register it to receive the CoinType, before transferring.
@@ -220,9 +210,7 @@ pub enum EntryFunctionCall {
 
     /// Only callable in tests and testnets where the core resources account exists.
     /// Create delegated token for the address so the account could claim MintCapability later.
-    AptosCoinDelegateMintCapability {
-        to: AccountAddress,
-    },
+    AptosCoinDelegateMintCapability { to: AccountAddress },
 
     /// Only callable in tests and testnets where the core resources account exists.
     /// Create new coins and deposit them into dst_addr's account.
@@ -231,9 +219,8 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
-    AptosGovernanceAddApprovedScriptHashScript {
-        proposal_id: u64,
-    },
+    ///
+    AptosGovernanceAddApprovedScriptHashScript { proposal_id: u64 },
 
     /// Batch vote on proposal with proposal_id and specified voting power from multiple stake_pools.
     AptosGovernanceBatchPartialVote {
@@ -316,12 +303,11 @@ pub enum EntryFunctionCall {
         code: Vec<Vec<u8>>,
     },
 
+    ///
     CoinCreateCoinConversionMap {},
 
     /// Create APT pairing by passing `AptosCoin`.
-    CoinCreatePairing {
-        coin_type: TypeTag,
-    },
+    CoinCreatePairing { coin_type: TypeTag },
 
     /// Migrate to fungible store for `CoinType` if not yet.
     CoinMigrateCoinStoreToFungibleStore {
@@ -330,9 +316,7 @@ pub enum EntryFunctionCall {
     },
 
     /// Voluntarily migrate to fungible store for `CoinType` if not yet.
-    CoinMigrateToFungibleStore {
-        coin_type: TypeTag,
-    },
+    CoinMigrateToFungibleStore { coin_type: TypeTag },
 
     /// Transfers `amount` of coins `CoinType` from `from` to `to`.
     CoinTransfer {
@@ -343,9 +327,7 @@ pub enum EntryFunctionCall {
 
     /// Upgrade total supply to use a parallelizable implementation if it is
     /// available.
-    CoinUpgradeSupply {
-        coin_type: TypeTag,
-    },
+    CoinUpgradeSupply { coin_type: TypeTag },
 
     /// Add `amount` of coins to the delegation pool `pool_address`.
     DelegationPoolAddStake {
@@ -354,9 +336,7 @@ pub enum EntryFunctionCall {
     },
 
     /// Allowlist a delegator as the pool owner.
-    DelegationPoolAllowlistDelegator {
-        delegator_address: AccountAddress,
-    },
+    DelegationPoolAllowlistDelegator { delegator_address: AccountAddress },
 
     /// A voter could create a governance proposal by this function. To successfully create a proposal, the voter's
     /// voting power in THIS delegation pool must be not less than the minimum required voting power specified in
@@ -384,14 +364,10 @@ pub enum EntryFunctionCall {
 
     /// Enable partial governance voting on a stake pool. The voter of this stake pool will be managed by this module.
     /// The existing voter will be replaced. The function is permissionless.
-    DelegationPoolEnablePartialGovernanceVoting {
-        pool_address: AccountAddress,
-    },
+    DelegationPoolEnablePartialGovernanceVoting { pool_address: AccountAddress },
 
     /// Evict a delegator that is not allowlisted by unlocking their entire stake.
-    DelegationPoolEvictDelegator {
-        delegator_address: AccountAddress,
-    },
+    DelegationPoolEvictDelegator { delegator_address: AccountAddress },
 
     /// Initialize a delegation pool of custom fixed `operator_commission_percentage`.
     /// A resource account is created from `owner` signer and its supplied `delegation_pool_creation_seed`
@@ -409,33 +385,23 @@ pub enum EntryFunctionCall {
     },
 
     /// Remove a delegator from the allowlist as the pool owner, but do not unlock their stake.
-    DelegationPoolRemoveDelegatorFromAllowlist {
-        delegator_address: AccountAddress,
-    },
+    DelegationPoolRemoveDelegatorFromAllowlist { delegator_address: AccountAddress },
 
     /// Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new
     /// beneficiary. To ensure payment to the current beneficiary, one should first call `synchronize_delegation_pool`
     /// before switching the beneficiary. An operator can set one beneficiary for delegation pools, not a separate
     /// one for each pool.
-    DelegationPoolSetBeneficiaryForOperator {
-        new_beneficiary: AccountAddress,
-    },
+    DelegationPoolSetBeneficiaryForOperator { new_beneficiary: AccountAddress },
 
     /// Allows an owner to change the delegated voter of the underlying stake pool.
-    DelegationPoolSetDelegatedVoter {
-        new_voter: AccountAddress,
-    },
+    DelegationPoolSetDelegatedVoter { new_voter: AccountAddress },
 
     /// Allows an owner to change the operator of the underlying stake pool.
-    DelegationPoolSetOperator {
-        new_operator: AccountAddress,
-    },
+    DelegationPoolSetOperator { new_operator: AccountAddress },
 
     /// Synchronize delegation and stake pools: distribute yet-undetected rewards to the corresponding internal
     /// shares pools, assign commission to operator and eventually prepare delegation pool for a new lockup cycle.
-    DelegationPoolSynchronizeDelegationPool {
-        pool_address: AccountAddress,
-    },
+    DelegationPoolSynchronizeDelegationPool { pool_address: AccountAddress },
 
     /// Unlock `amount` from the active + pending_active stake of `delegator` or
     /// at most how much active stake there is on the stake pool.
@@ -445,9 +411,7 @@ pub enum EntryFunctionCall {
     },
 
     /// Allows an owner to update the commission percentage for the operator of the underlying stake pool.
-    DelegationPoolUpdateCommissionPercentage {
-        new_commission_percentage: u64,
-    },
+    DelegationPoolUpdateCommissionPercentage { new_commission_percentage: u64 },
 
     /// Vote on a proposal with a voter's voting power. To successfully vote, the following conditions must be met:
     /// 1. The voting period of the proposal hasn't ended.
@@ -529,15 +493,10 @@ pub enum EntryFunctionCall {
     },
 
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
-    ManagedCoinBurn {
-        coin_type: TypeTag,
-        amount: u64,
-    },
+    ManagedCoinBurn { coin_type: TypeTag, amount: u64 },
 
     /// Destroys capabilities from the account, so that the user no longer has access to mint or burn.
-    ManagedCoinDestroyCaps {
-        coin_type: TypeTag,
-    },
+    ManagedCoinDestroyCaps { coin_type: TypeTag },
 
     /// Initialize new coin `CoinType` in Aptos Blockchain.
     /// Mint and Burn Capabilities will be stored under `account` in `Capabilities` resource.
@@ -558,14 +517,10 @@ pub enum EntryFunctionCall {
 
     /// Creating a resource that stores balance of `CoinType` on user's account, withdraw and deposit event handlers.
     /// Required if user wants to start accepting deposits of `CoinType` in his account.
-    ManagedCoinRegister {
-        coin_type: TypeTag,
-    },
+    ManagedCoinRegister { coin_type: TypeTag },
 
     /// Similar to add_owners, but only allow adding one owner.
-    MultisigAccountAddOwner {
-        new_owner: AccountAddress,
-    },
+    MultisigAccountAddOwner { new_owner: AccountAddress },
 
     /// Add new owners to the multisig account. This can only be invoked by the multisig account itself, through the
     /// proposal flow.
@@ -573,9 +528,7 @@ pub enum EntryFunctionCall {
     /// Note that this function is not public so it can only be invoked directly instead of via a module or script. This
     /// ensures that a multisig transaction cannot lead to another module obtaining the multisig signer and using it to
     /// maliciously alter the owners list.
-    MultisigAccountAddOwners {
-        new_owners: Vec<AccountAddress>,
-    },
+    MultisigAccountAddOwners { new_owners: Vec<AccountAddress> },
 
     /// Add owners then update number of signatures required, in a single operation.
     MultisigAccountAddOwnersAndUpdateSignaturesRequired {
@@ -698,9 +651,7 @@ pub enum EntryFunctionCall {
     },
 
     /// Remove the next transaction if it has sufficient owner rejections.
-    MultisigAccountExecuteRejectedTransaction {
-        multisig_account: AccountAddress,
-    },
+    MultisigAccountExecuteRejectedTransaction { multisig_account: AccountAddress },
 
     /// Remove the next transactions until the final_sequence_number if they have sufficient owner rejections.
     MultisigAccountExecuteRejectedTransactions {
@@ -715,9 +666,7 @@ pub enum EntryFunctionCall {
     },
 
     /// Similar to remove_owners, but only allow removing one owner.
-    MultisigAccountRemoveOwner {
-        owner_to_remove: AccountAddress,
-    },
+    MultisigAccountRemoveOwner { owner_to_remove: AccountAddress },
 
     /// Remove owners from the multisig account. This can only be invoked by the multisig account itself, through the
     /// proposal flow.
@@ -767,9 +716,7 @@ pub enum EntryFunctionCall {
     /// Note that this function is not public so it can only be invoked directly instead of via a module or script. This
     /// ensures that a multisig transaction cannot lead to another module obtaining the multisig signer and using it to
     /// maliciously alter the number of signatures required.
-    MultisigAccountUpdateSignaturesRequired {
-        new_num_signatures_required: u64,
-    },
+    MultisigAccountUpdateSignaturesRequired { new_num_signatures_required: u64 },
 
     /// Generic function that can be used to either approve or reject a multisig transaction
     MultisigAccountVoteTransaction {
@@ -838,9 +785,7 @@ pub enum EntryFunctionCall {
     },
 
     /// Add `amount` of coins from the `account` owning the StakePool.
-    StakeAddStake {
-        amount: u64,
-    },
+    StakeAddStake { amount: u64 },
 
     /// Similar to increase_lockup_with_cap but will use ownership capability from the signing account.
     StakeIncreaseLockup {},
@@ -864,9 +809,7 @@ pub enum EntryFunctionCall {
     },
 
     /// This can only called by the operator of the validator/staking pool.
-    StakeJoinValidatorSet {
-        pool_address: AccountAddress,
-    },
+    StakeJoinValidatorSet { pool_address: AccountAddress },
 
     /// Request to have `pool_address` leave the validator set. The validator is only actually removed from the set when
     /// the next epoch starts.
@@ -874,14 +817,10 @@ pub enum EntryFunctionCall {
     /// is still operational.
     ///
     /// Can only be called by the operator of the validator/staking pool.
-    StakeLeaveValidatorSet {
-        pool_address: AccountAddress,
-    },
+    StakeLeaveValidatorSet { pool_address: AccountAddress },
 
     /// Move `amount` of coins from pending_inactive to active.
-    StakeReactivateStake {
-        amount: u64,
-    },
+    StakeReactivateStake { amount: u64 },
 
     /// Rotate the consensus key of the validator, it'll take effect in next epoch.
     StakeRotateConsensusKey {
@@ -891,19 +830,13 @@ pub enum EntryFunctionCall {
     },
 
     /// Allows an owner to change the delegated voter of the stake pool.
-    StakeSetDelegatedVoter {
-        new_voter: AccountAddress,
-    },
+    StakeSetDelegatedVoter { new_voter: AccountAddress },
 
     /// Allows an owner to change the operator of the stake pool.
-    StakeSetOperator {
-        new_operator: AccountAddress,
-    },
+    StakeSetOperator { new_operator: AccountAddress },
 
     /// Similar to unlock_with_cap but will use ownership capability from the signing account.
-    StakeUnlock {
-        amount: u64,
-    },
+    StakeUnlock { amount: u64 },
 
     /// Update the network and full node addresses of the validator. This only takes effect in the next epoch.
     StakeUpdateNetworkAndFullnodeAddresses {
@@ -913,9 +846,7 @@ pub enum EntryFunctionCall {
     },
 
     /// Withdraw from `account`'s inactive stake.
-    StakeWithdraw {
-        withdraw_amount: u64,
-    },
+    StakeWithdraw { withdraw_amount: u64 },
 
     /// Add more stake to an existing staking contract.
     StakingContractAddStake {
@@ -949,16 +880,12 @@ pub enum EntryFunctionCall {
     },
 
     /// Convenient function to allow the staker to reset their stake pool's lockup period to start now.
-    StakingContractResetLockup {
-        operator: AccountAddress,
-    },
+    StakingContractResetLockup { operator: AccountAddress },
 
     /// Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new
     /// beneficiary. To ensures payment to the current beneficiary, one should first call `distribute` before switching
     /// the beneficiary. An operator can set one beneficiary for staking contract pools, not a separate one for each pool.
-    StakingContractSetBeneficiaryForOperator {
-        new_beneficiary: AccountAddress,
-    },
+    StakingContractSetBeneficiaryForOperator { new_beneficiary: AccountAddress },
 
     /// Allows staker to switch operator without going through the lenghthy process to unstake.
     StakingContractSwitchOperator {
@@ -974,9 +901,7 @@ pub enum EntryFunctionCall {
     },
 
     /// Unlock all accumulated rewards since the last recorded principals.
-    StakingContractUnlockRewards {
-        operator: AccountAddress,
-    },
+    StakingContractUnlockRewards { operator: AccountAddress },
 
     /// Staker can call this to request withdrawal of part or all of their staking_contract.
     /// This also triggers paying commission to the operator for accounting simplicity.
@@ -998,73 +923,70 @@ pub enum EntryFunctionCall {
         new_voter: AccountAddress,
     },
 
+    ///
     StakingProxySetOperator {
         old_operator: AccountAddress,
         new_operator: AccountAddress,
     },
 
-    StakingProxySetStakePoolOperator {
-        new_operator: AccountAddress,
-    },
+    ///
+    StakingProxySetStakePoolOperator { new_operator: AccountAddress },
 
-    StakingProxySetStakePoolVoter {
-        new_voter: AccountAddress,
-    },
+    ///
+    StakingProxySetStakePoolVoter { new_voter: AccountAddress },
 
+    ///
     StakingProxySetStakingContractOperator {
         old_operator: AccountAddress,
         new_operator: AccountAddress,
     },
 
+    ///
     StakingProxySetStakingContractVoter {
         operator: AccountAddress,
         new_voter: AccountAddress,
     },
 
+    ///
     StakingProxySetVestingContractOperator {
         old_operator: AccountAddress,
         new_operator: AccountAddress,
     },
 
+    ///
     StakingProxySetVestingContractVoter {
         operator: AccountAddress,
         new_voter: AccountAddress,
     },
 
+    ///
     StakingProxySetVoter {
         operator: AccountAddress,
         new_voter: AccountAddress,
     },
 
+    ///
     TransactionFeeConvertToAptosFaBurnRef {},
 
     /// Used in on-chain governances to update the major version for the next epoch.
     /// Example usage:
     /// - `aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);`
     /// - `aptos_framework::aptos_governance::reconfigure(&framework_signer);`
-    VersionSetForNextEpoch {
-        major: u64,
-    },
+    VersionSetForNextEpoch { major: u64 },
 
     /// Deprecated by `set_for_next_epoch()`.
     ///
     /// WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
     ///
     /// TODO: update all the tests that reference this function, then disable this function.
-    VersionSetVersion {
-        major: u64,
-    },
+    VersionSetVersion { major: u64 },
 
     /// Withdraw all funds to the preset vesting contract's withdrawal address. This can only be called if the contract
     /// has already been terminated.
-    VestingAdminWithdraw {
-        contract_address: AccountAddress,
-    },
+    VestingAdminWithdraw { contract_address: AccountAddress },
 
     /// Distribute any withdrawable stake from the stake pool.
-    VestingDistribute {
-        contract_address: AccountAddress,
-    },
+    VestingDistribute { contract_address: AccountAddress },
 
     /// Call `distribute` for many vesting contracts.
     VestingDistributeMany {
@@ -1078,10 +1000,10 @@ pub enum EntryFunctionCall {
         shareholder: AccountAddress,
     },
 
-    VestingResetLockup {
-        contract_address: AccountAddress,
-    },
+    ///
+    VestingResetLockup { contract_address: AccountAddress },
 
+    ///
     VestingSetBeneficiary {
         contract_address: AccountAddress,
         shareholder: AccountAddress,
@@ -1089,15 +1011,15 @@ pub enum EntryFunctionCall {
     },
 
     /// Set the beneficiary for the operator.
-    VestingSetBeneficiaryForOperator {
-        new_beneficiary: AccountAddress,
-    },
+    VestingSetBeneficiaryForOperator { new_beneficiary: AccountAddress },
 
+    ///
     VestingSetBeneficiaryResetter {
         contract_address: AccountAddress,
         beneficiary_resetter: AccountAddress,
     },
 
+    ///
     VestingSetManagementRole {
         contract_address: AccountAddress,
         role: Vec<u8>,
@@ -1105,45 +1027,43 @@ pub enum EntryFunctionCall {
     },
 
     /// Terminate the vesting contract and send all funds back to the withdrawal address.
-    VestingTerminateVestingContract {
-        contract_address: AccountAddress,
-    },
+    VestingTerminateVestingContract { contract_address: AccountAddress },
 
     /// Unlock any accumulated rewards.
-    VestingUnlockRewards {
-        contract_address: AccountAddress,
-    },
+    VestingUnlockRewards { contract_address: AccountAddress },
 
     /// Call `unlock_rewards` for many vesting contracts.
     VestingUnlockRewardsMany {
         contract_addresses: Vec<AccountAddress>,
     },
 
+    ///
     VestingUpdateCommissionPercentage {
         contract_address: AccountAddress,
         new_commission_percentage: u64,
     },
 
+    ///
     VestingUpdateOperator {
         contract_address: AccountAddress,
         new_operator: AccountAddress,
         commission_percentage: u64,
     },
 
+    ///
     VestingUpdateOperatorWithSameCommission {
         contract_address: AccountAddress,
         new_operator: AccountAddress,
     },
 
+    ///
     VestingUpdateVoter {
         contract_address: AccountAddress,
         new_voter: AccountAddress,
     },
 
     /// Unlock any vested portion of the grant.
-    VestingVest {
-        contract_address: AccountAddress,
-    },
+    VestingVest { contract_address: AccountAddress },
 
     /// Call `vest` for many vesting contracts.
     VestingVestMany {
@@ -1963,10 +1883,11 @@ pub fn account_revoke_signer_capability(
 /// Generic authentication key rotation function that allows the user to rotate their authentication key from any scheme to any scheme.
 /// To authorize the rotation, we need two signatures:
 /// - the first signature `cap_rotate_key` refers to the signature by the account owner's current key on a valid `RotationProofChallenge`,
-/// demonstrating that the user intends to and has the capability to rotate the authentication key of this account;
+///   demonstrating that the user intends to and has the capability to rotate the authentication key of this account;
 /// - the second signature `cap_update_table` refers to the signature by the new key (that the account owner wants to rotate to) on a
-/// valid `RotationProofChallenge`, demonstrating that the user owns the new private key, and has the authority to update the
-/// `OriginatingAddress` map with the new address mapping `<new_address, originating_address>`.
+///   valid `RotationProofChallenge`, demonstrating that the user owns the new private key, and has the authority to update the
+///   `OriginatingAddress` map with the new address mapping `<new_address, originating_address>`.
+///
 /// To verify these two signatures, we need their corresponding public key and public key scheme: we use `from_scheme` and `from_public_key_bytes`
 /// to verify `cap_rotate_key`, and `to_scheme` and `to_public_key_bytes` to verify `cap_update_table`.
 /// A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to Multi-Ed25519 keys.

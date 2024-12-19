@@ -25,7 +25,7 @@ impl Profiler for MemProfiler {
 
         let result = unsafe {
             jemalloc_sys::mallctl(
-                b"prof.active\0".as_ptr() as *const _,
+                c"prof.active".as_ptr() as *const _,
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
                 &mut prof_active as *mut _ as *mut _,
@@ -42,7 +42,7 @@ impl Profiler for MemProfiler {
         let mut prof_active: bool = false;
         let result = unsafe {
             jemalloc_sys::mallctl(
-                b"prof.active\0".as_ptr() as *const _,
+                c"prof.active".as_ptr() as *const _,
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
                 &mut prof_active as *mut _ as *mut _,
@@ -72,7 +72,7 @@ impl Profiler for MemProfiler {
 
         let result = unsafe {
             jemalloc_sys::mallctl(
-                b"prof.active\0".as_ptr() as *const _,
+                c"prof.active".as_ptr() as *const _,
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
                 &mut prof_active as *mut _ as *mut _,
@@ -92,7 +92,7 @@ impl Profiler for MemProfiler {
         let mut prof_active: bool = false;
         let result = unsafe {
             jemalloc_sys::mallctl(
-                b"prof.active\0".as_ptr() as *const _,
+                c"prof.active".as_ptr() as *const _,
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
                 &mut prof_active as *mut _ as *mut _,

@@ -268,7 +268,7 @@ impl<'a, K> NibbleRangeIterator<'a, K> {
     }
 }
 
-impl<'a, K> std::iter::Iterator for NibbleRangeIterator<'a, K> {
+impl<K> std::iter::Iterator for NibbleRangeIterator<'_, K> {
     type Item = (usize, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -366,9 +366,8 @@ where
     ) -> Result<(Node<K>, TreeUpdateBatch<K>)> {
         let deduped_and_sorted_kvs = value_set
             .into_iter()
-            .map(|kv| {
+            .inspect(|kv| {
                 assert!(kv.0.nibble(0) == shard_id);
-                kv
             })
             .collect::<BTreeMap<_, _>>()
             .into_iter()

@@ -72,6 +72,7 @@ pub trait WindowOptimizer {
     /// Given a `window` of bytecode, return a tuple containing:
     ///   1. an optimized version of a non-empty prefix of the `window`. [*]
     ///   2. size of this prefix (should be non-zero).
+    ///
     /// If `None` is returned, the `window` is not optimized.
     ///
     /// [*] When an optimized version is returned, the corresponding `TransformedCodeChunk`

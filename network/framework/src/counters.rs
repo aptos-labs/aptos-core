@@ -410,9 +410,9 @@ pub static PENDING_PEER_MANAGER_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-///
-/// Channel Counters
-///
+//
+// Channel Counters
+//
 
 /// Counter of pending requests in Connectivity Manager
 pub static PENDING_CONNECTIVITY_MANAGER_REQUESTS: Lazy<IntGauge> = Lazy::new(|| {

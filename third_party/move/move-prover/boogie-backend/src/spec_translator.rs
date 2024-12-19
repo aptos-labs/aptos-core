@@ -144,7 +144,7 @@ impl<'env> SpecTranslator<'env> {
 // Axioms
 // ======
 
-impl<'env> SpecTranslator<'env> {
+impl SpecTranslator<'_> {
     pub fn translate_axioms(&self, env: &GlobalEnv, mono_info: &MonoInfo) {
         let type_display_ctx = env.get_type_display_ctx();
         for (axiom, type_insts) in &mono_info.axioms {
@@ -174,7 +174,7 @@ impl<'env> SpecTranslator<'env> {
 // Specification Variables
 // =======================
 
-impl<'env> SpecTranslator<'env> {
+impl SpecTranslator<'_> {
     pub fn translate_spec_vars(&self, module_env: &ModuleEnv<'_>, mono_info: &MonoInfo) {
         let empty = &BTreeSet::new();
         let mut translated = BTreeSet::new();
@@ -226,7 +226,7 @@ impl<'env> SpecTranslator<'env> {
 // Specification Functions
 // =======================
 
-impl<'env> SpecTranslator<'env> {
+impl SpecTranslator<'_> {
     pub fn translate_spec_funs(&self, module_env: &ModuleEnv<'_>, mono_info: &MonoInfo) {
         let empty = &BTreeSet::new();
         let mut translated = BTreeSet::new();
@@ -452,7 +452,7 @@ impl<'env> SpecTranslator<'env> {
 // Emit any finalization items
 // ============================
 
-impl<'env> SpecTranslator<'env> {
+impl SpecTranslator<'_> {
     pub(crate) fn finalize(&self) {
         self.translate_choice_functions();
     }
@@ -655,7 +655,7 @@ impl<'env> SpecTranslator<'env> {
 // Expressions
 // ===========
 
-impl<'env> SpecTranslator<'env> {
+impl SpecTranslator<'_> {
     pub(crate) fn translate(&self, exp: &Exp, type_inst: &[Type]) {
         *self.fresh_var_count.borrow_mut() = 0;
         if type_inst.is_empty() {

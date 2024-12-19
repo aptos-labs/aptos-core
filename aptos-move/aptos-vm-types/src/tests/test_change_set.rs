@@ -41,40 +41,40 @@ use move_core_types::{
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{collections::BTreeMap, sync::Arc};
 
-/// Testcases:
-/// ```text
-/// *--------------*----------------*----------------*-----------------*
-/// |   state key  |  change set 1  |  change set 2  |    squashed     |
-/// +--------------*----------------*----------------*-----------------*
-/// |      0       |    create 0    |                |    create 0     |
-/// |      1       |    modify 1    |                |    modify 1     |
-/// |      2       |    delete      |                |    delete       |
-/// |      3       |                |    create 103  |    create 103   |
-/// |      4       |                |    modify 104  |    modify 104   |
-/// |      5       |                |    delete      |    delete       |
-/// |      6       |    create 6    |    create 106  |    ERROR        |
-/// |      7       |    create 7    |    modify 107  |    create 107   |
-/// |      8       |    create 8    |    delete      |                 |
-/// |      9       |    modify 9    |    create 109  |    ERROR        |
-/// |      10      |    modify 10   |    modify 110  |    modify 110   |
-/// |      11      |    modify 11   |    delete      |    delete       |
-/// |      12      |    delete      |    create 112  |    modify 112   |
-/// |      13      |    delete      |    modify 113  |    ERROR        |
-/// |      14      |    delete      |    delete      |    ERROR        |
-/// *--------------*----------------*----------------*-----------------*
-/// |      15      |    +15         |                |    +15          |
-/// |      16      |                |    +116        |    +116         |
-/// |      17      |    +17         |    +117        |    +134         |
-/// *--------------*----------------*----------------*-----------------*
-/// |      18      |    create 18   |    +118        |    create 136   |
-/// |      19      |    modify 19   |    +119        |    modify 138   |
-/// |      20      |    delete      |    +120        |    ERROR        |
-/// *--------------*----------------*----------------*-----------------*
-/// |      21      |    +21         |    create 121  |    ERROR        |
-/// |      22      |    +22         |    modify 122  |    modify 122   |
-/// |      23      |    +23         |    delete      |    delete       |
-/// *--------------*----------------*----------------*-----------------*
-/// ```
+// Testcases:
+// ```text
+// *--------------*----------------*----------------*-----------------*
+// |   state key  |  change set 1  |  change set 2  |    squashed     |
+// +--------------*----------------*----------------*-----------------*
+// |      0       |    create 0    |                |    create 0     |
+// |      1       |    modify 1    |                |    modify 1     |
+// |      2       |    delete      |                |    delete       |
+// |      3       |                |    create 103  |    create 103   |
+// |      4       |                |    modify 104  |    modify 104   |
+// |      5       |                |    delete      |    delete       |
+// |      6       |    create 6    |    create 106  |    ERROR        |
+// |      7       |    create 7    |    modify 107  |    create 107   |
+// |      8       |    create 8    |    delete      |                 |
+// |      9       |    modify 9    |    create 109  |    ERROR        |
+// |      10      |    modify 10   |    modify 110  |    modify 110   |
+// |      11      |    modify 11   |    delete      |    delete       |
+// |      12      |    delete      |    create 112  |    modify 112   |
+// |      13      |    delete      |    modify 113  |    ERROR        |
+// |      14      |    delete      |    delete      |    ERROR        |
+// *--------------*----------------*----------------*-----------------*
+// |      15      |    +15         |                |    +15          |
+// |      16      |                |    +116        |    +116         |
+// |      17      |    +17         |    +117        |    +134         |
+// *--------------*----------------*----------------*-----------------*
+// |      18      |    create 18   |    +118        |    create 136   |
+// |      19      |    modify 19   |    +119        |    modify 138   |
+// |      20      |    delete      |    +120        |    ERROR        |
+// *--------------*----------------*----------------*-----------------*
+// |      21      |    +21         |    create 121  |    ERROR        |
+// |      22      |    +22         |    modify 122  |    modify 122   |
+// |      23      |    +23         |    delete      |    delete       |
+// *--------------*----------------*----------------*-----------------*
+// ```
 
 macro_rules! resource_write_set_1 {
     ($d:ident) => {

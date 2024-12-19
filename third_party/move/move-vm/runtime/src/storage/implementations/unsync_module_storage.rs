@@ -34,7 +34,7 @@ pub enum BorrowedOrOwned<'a, T> {
     Owned(T),
 }
 
-impl<'a, T> Deref for BorrowedOrOwned<'a, T> {
+impl<T> Deref for BorrowedOrOwned<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -79,6 +79,7 @@ struct NoVersion;
 
 /// Private implementation of module storage based on non-[Sync] module cache and the baseline
 /// storage.
+#[allow(clippy::duplicated_attributes)]
 #[derive(Delegate)]
 #[delegate(
     WithRuntimeEnvironment,
@@ -121,8 +122,8 @@ impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> UnsyncModuleStorageIm
     }
 }
 
-impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> ModuleCodeBuilder
-    for UnsyncModuleStorageImpl<'s, S, E>
+impl<S: ModuleBytesStorage, E: WithRuntimeEnvironment> ModuleCodeBuilder
+    for UnsyncModuleStorageImpl<'_, S, E>
 {
     type Deserialized = CompiledModule;
     type Extension = BytesWithHash;
@@ -151,6 +152,7 @@ impl<'s, S: ModuleBytesStorage, E: WithRuntimeEnvironment> ModuleCodeBuilder
 }
 
 /// Implementation of (not thread-safe) module storage used for Move unit tests, and externally.
+#[allow(clippy::duplicated_attributes)]
 #[derive(Delegate)]
 #[delegate(
     WithRuntimeEnvironment,

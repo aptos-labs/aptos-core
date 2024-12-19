@@ -8,7 +8,7 @@ use crate::{options::ProverOptions, verification_analysis_v2::InvariantAnalysisD
 use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{debug, info, log, warn};
-#[cfg(invariant_trace)]
+#[cfg(feature = "invariant_trace")]
 use move_model::ty::TypeDisplayContext;
 use move_model::{
     ast::{ConditionKind, Exp, GlobalInvariant},
@@ -212,7 +212,7 @@ impl<'a> Instrumenter<'a> {
             .accessed
             .get_all_inst(&function_inst);
 
-        #[cfg(invariant_trace)]
+        #[cfg(feature = "invariant_trace")]
         {
             let tctx = TypeDisplayContext::WithEnv {
                 env: global_env,
@@ -745,7 +745,7 @@ impl<'a> Instrumenter<'a> {
                     /* treat_lhs_type_param_as_var */ false,
                     /* treat_rhs_type_local_as_var */ true,
                 );
-                #[cfg(invariant_trace)]
+                #[cfg(feature = "invariant_trace")]
                 println!(
                     "{} =?= {} for inv {}",
                     self.builder.global_env().display(fun_mem),
@@ -760,7 +760,7 @@ impl<'a> Instrumenter<'a> {
                 match rel {
                     None => continue,
                     Some((_, subst_rhs)) => {
-                        #[cfg(invariant_trace)]
+                        #[cfg(feature = "invariant_trace")]
                         println!("unifies {:?}", subst_rhs);
                         for (k, v) in subst_rhs {
                             per_type_param_insts

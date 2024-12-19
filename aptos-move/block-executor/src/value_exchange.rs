@@ -61,8 +61,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
 // For aggregators V2, values are replaced with identifiers at deserialization time,
 // and are replaced back when the value is serialized. The "lifted" values are cached
 // by the `LatestView` in the aggregators multi-version data structure.
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIdentifierMapping
-    for TemporaryValueToIdentifierMapping<'a, T, S, X>
+impl<T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIdentifierMapping
+    for TemporaryValueToIdentifierMapping<'_, T, S, X>
 {
     type Identifier = T::Identifier;
 

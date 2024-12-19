@@ -124,7 +124,7 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     }
 }
 
-impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
+impl<'b> NativeContext<'_, 'b, '_> {
     pub fn print_stack_trace(&self, buf: &mut String) -> PartialVMResult<()> {
         self.interpreter.debug_print_stack_trace(buf, self.resolver)
     }

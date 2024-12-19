@@ -203,9 +203,9 @@ impl ControlFlowGraphSimplifierTransformation {
 /// Invariants:
 /// 1. Fields `code_blocks`, `successors`, and `predecessors` have the same set of keys.
 /// 2. Block `A` has successor block `B` iff block `B` has predecessor block `A`, according
-/// to fields `successors` and `predecessors` respectively.
+///    to fields `successors` and `predecessors` respectively.
 /// 3. In `code_blocks`, entry and exit blocks cannot have code (mapped to empty vectors in `code_blocks`),
-/// and all other blocks must have code.
+///    and all other blocks must have code.
 /// 4. Entry block has exactly one successor, which is not the exit block.
 /// 5. All blocks except for the exit block must have at least one successor.
 /// 6. All non-trivial blocks with non-trivial predecessors must start with a label.

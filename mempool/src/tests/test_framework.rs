@@ -66,14 +66,17 @@ pub struct MempoolNode {
     /// The [`CoreMempool`] storage of the node
     pub mempool: Arc<Mutex<CoreMempool>>,
     /// A generator for [`MempoolSyncMsg`] request ids.
+    #[allow(dead_code)]
     pub request_id_generator: U32IdGenerator,
 
     // Mempool specific channels
     /// Used for incoming JSON-RPC requests (e.g. adding new transactions)
     pub mempool_client_sender: MempoolClientSender,
     /// Used for quorum store requests
+    #[allow(dead_code)]
     pub consensus_to_mempool_sender: futures::channel::mpsc::Sender<QuorumStoreRequest>,
     /// Used for StateSync commit notifications
+    #[allow(dead_code)]
     pub mempool_notifications: MempoolNotifier,
 
     // Networking specifics

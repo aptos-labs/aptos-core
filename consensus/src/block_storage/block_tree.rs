@@ -156,12 +156,11 @@ impl BlockTree {
 
     /// fetch all the quorum certs with non-empty commit info
     pub fn get_all_quorum_certs_with_commit_info(&self) -> Vec<QuorumCert> {
-        return self
-            .id_to_quorum_cert
+        self.id_to_quorum_cert
             .values()
             .filter(|qc| qc.commit_info() != &BlockInfo::empty())
             .map(|qc| (**qc).clone())
-            .collect::<Vec<QuorumCert>>();
+            .collect::<Vec<QuorumCert>>()
     }
 
     // This method will only be used in this module.

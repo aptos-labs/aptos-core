@@ -61,6 +61,7 @@
 macro_rules! impl_poem_type {
     ($ty:ty, $spec_type:literal, ($($key:ident = $value:expr),*)) => {
 
+        #[allow(non_local_definitions)]
         impl ::poem_openapi::types::Type for $ty {
             const IS_REQUIRED: bool = true;
 
@@ -117,6 +118,7 @@ macro_rules! impl_poem_type {
             }
         }
 
+        #[allow(non_local_definitions)]
         impl ::poem_openapi::types::ParseFromJSON for $ty {
             fn parse_from_json(value: Option<serde_json::Value>) -> ::poem_openapi::types::ParseResult<Self> {
                 let value = value.unwrap_or_default();
@@ -124,12 +126,14 @@ macro_rules! impl_poem_type {
             }
         }
 
+        #[allow(non_local_definitions)]
         impl ::poem_openapi::types::ToJSON for $ty {
             fn to_json(&self) -> Option<serde_json::Value> {
                 serde_json::to_value(self).ok()
             }
         }
 
+        #[allow(non_local_definitions)]
         impl ::poem_openapi::types::ToHeader for $ty {
             fn to_header(&self) -> Option<::poem::http::HeaderValue> {
                 let string = serde_json::to_value(self).ok()?.to_string();
@@ -137,6 +141,7 @@ macro_rules! impl_poem_type {
             }
         }
 
+        #[allow(non_local_definitions)]
         impl ::poem_openapi::types::IsObjectType for $ty {}
     };
 }
@@ -148,6 +153,7 @@ macro_rules! impl_poem_type {
 macro_rules! impl_poem_parameter {
     ($($ty:ty),*) => {
         $(
+        #[allow(non_local_definitions)]
         impl ::poem_openapi::types::ParseFromParameter for $ty {
             fn parse_from_parameter(value: &str) -> ::poem_openapi::types::ParseResult<Self> {
                 $crate::percent_encoding::percent_decode_str(value)
@@ -158,6 +164,7 @@ macro_rules! impl_poem_parameter {
             }
         }
 
+        #[allow(non_local_definitions)]
         impl ::poem_openapi::types::ParseFromMultipartField for $ty {
             async fn parse_from_multipart(field: Option<::poem::web::Field>) -> ::poem_openapi::types::ParseResult<Self> {
                 match field {

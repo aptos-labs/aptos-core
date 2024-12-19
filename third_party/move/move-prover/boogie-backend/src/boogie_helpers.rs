@@ -864,6 +864,7 @@ fn type_name_to_ident_tokens(
 /// The `stdlib` bool flag represents whether this type name is intended for
 /// - true  --> `std::type_name` and
 /// - false --> `ext::type_info`.
+///
 /// TODO(mengxu): the above is a very hacky, we need a better way to differentiate
 pub fn boogie_reflection_type_name(env: &GlobalEnv, ty: &Type, stdlib: bool) -> String {
     let formatter = if stdlib {

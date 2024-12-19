@@ -1,12 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! This module provides `Pruner` which manages a thread pruning old data in the background and is
+//! meant to be triggered by other threads as they commit new data to the DB.
+
 use crate::pruner::db_pruner::DBPruner;
 use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
-
-/// This module provides `Pruner` which manages a thread pruning old data in the background and is
-/// meant to be triggered by other threads as they commit new data to the DB.
 
 /// The `PrunerManager` is meant to be part of a `AptosDB` instance and runs in the background to
 /// prune old data.

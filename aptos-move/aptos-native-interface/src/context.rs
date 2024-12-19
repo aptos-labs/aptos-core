@@ -37,7 +37,7 @@ pub struct SafeNativeContext<'a, 'b, 'c, 'd> {
     pub(crate) gas_hook: Option<&'c (dyn Fn(DynamicExpression) + Send + Sync)>,
 }
 
-impl<'a, 'b, 'c, 'd> Deref for SafeNativeContext<'a, 'b, 'c, 'd> {
+impl<'a, 'b, 'd> Deref for SafeNativeContext<'a, 'b, '_, 'd> {
     type Target = NativeContext<'a, 'b, 'd>;
 
     fn deref(&self) -> &Self::Target {
@@ -45,13 +45,13 @@ impl<'a, 'b, 'c, 'd> Deref for SafeNativeContext<'a, 'b, 'c, 'd> {
     }
 }
 
-impl<'a, 'b, 'c, 'd> DerefMut for SafeNativeContext<'a, 'b, 'c, 'd> {
+impl DerefMut for SafeNativeContext<'_, '_, '_, '_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.inner
     }
 }
 
-impl<'a, 'b, 'c, 'd> SafeNativeContext<'a, 'b, 'c, 'd> {
+impl SafeNativeContext<'_, '_, '_, '_> {
     /// Always remember: first charge gas, then execute!
     ///
     /// In other words, this function **MUST** always be called **BEFORE** executing **any**
