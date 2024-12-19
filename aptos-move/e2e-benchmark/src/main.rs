@@ -236,6 +236,8 @@ fn main() {
         //     move_len: 10,
         //     repeats: 1000,
         // },
+        EntryPoints::APTPermissionedTransfer,
+        EntryPoints::APTTransfer,
     ];
 
     let mut failures = Vec::new();

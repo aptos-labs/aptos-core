@@ -2165,7 +2165,7 @@ impl Frame {
                         let resource = interpreter.operand_stack.pop()?;
                         let signer_reference = interpreter.operand_stack.pop_as::<StructRef>()?;
                         let addr = signer_reference
-                            .borrow_field(0)?
+                            .borrow_field(1)?
                             .value_as::<Reference>()?
                             .read_ref()?
                             .value_as::<AccountAddress>()?;
@@ -2177,7 +2177,7 @@ impl Frame {
                         let resource = interpreter.operand_stack.pop()?;
                         let signer_reference = interpreter.operand_stack.pop_as::<StructRef>()?;
                         let addr = signer_reference
-                            .borrow_field(0)?
+                            .borrow_field(1)?
                             .value_as::<Reference>()?
                             .read_ref()?
                             .value_as::<AccountAddress>()?;
