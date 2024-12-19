@@ -16,7 +16,7 @@ use crate::{
 };
 use aptos_types::{
     block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
-    executable::ExecutableTestType, state_store::MockStateView,
+    state_store::MockStateView,
 };
 use criterion::{BatchSize, Bencher as CBencher};
 use num_cpus;
@@ -136,7 +136,6 @@ where
             MockTask<KeyType<K>, E>,
             MockStateView<KeyType<K>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
-            ExecutableTestType,
             DefaultTxnProvider<MockTransaction<KeyType<K>, E>>,
         >::new(config, executor_thread_pool, None)
         .execute_transactions_parallel(&self.txns_provider, &state_view, &mut guard);

@@ -879,7 +879,6 @@ mod test {
         proptest_types::types::{raw_metadata, KeyType, MockEvent, ValueType},
     };
     use aptos_mvhashmap::{types::StorageVersion, MVHashMap};
-    use aptos_types::executable::ExecutableTestType;
     use claims::{
         assert_err, assert_gt, assert_matches, assert_none, assert_ok, assert_ok_eq, assert_some_eq,
     };
@@ -1459,8 +1458,7 @@ mod test {
         assert!(captured_reads.non_delayed_field_speculative_failure);
         assert!(!captured_reads.delayed_field_speculative_failure);
 
-        let mvhashmap =
-            MVHashMap::<KeyType<u32>, u32, ValueType, ExecutableTestType, DelayedFieldID>::new();
+        let mvhashmap = MVHashMap::<KeyType<u32>, u32, ValueType, DelayedFieldID>::new();
 
         captured_reads.non_delayed_field_speculative_failure = false;
         captured_reads.delayed_field_speculative_failure = false;
