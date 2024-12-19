@@ -29,7 +29,7 @@ fn module_bytes(module_code: &str) -> Bytes {
 }
 
 #[test]
-fn test_function_extension() {
+fn test_function_value_extension() {
     let mut module_bytes_storage = InMemoryStorage::new();
 
     let code = r#"
@@ -56,16 +56,16 @@ fn test_function_extension() {
 
     let runtime_environment = RuntimeEnvironment::new(vec![]);
     let module_storage = module_bytes_storage.into_unsync_module_storage(runtime_environment);
-    let function_extension = module_storage.as_function_extension();
+    let function_value_extension = module_storage.as_function_value_extension();
 
-    let result = function_extension.get_function_arg_tys(
+    let result = function_value_extension.get_function_arg_tys(
         &ModuleId::new(AccountAddress::ONE, Identifier::new("test").unwrap()),
         ident_str!("a"),
         vec![],
     );
     assert!(result.is_err());
 
-    let mut types = function_extension
+    let mut types = function_value_extension
         .get_function_arg_tys(&test_id, ident_str!("c"), vec![])
         .unwrap();
     assert_eq!(types.len(), 2);
@@ -94,14 +94,14 @@ fn test_function_extension() {
     assert_eq!(u64_ty, ty_builder.create_u64_ty());
 
     // Generic function without type parameters  should fail.
-    let result = function_extension.get_function_arg_tys(
+    let result = function_value_extension.get_function_arg_tys(
         &ModuleId::new(AccountAddress::ONE, Identifier::new("test").unwrap()),
         ident_str!("d"),
         vec![],
     );
     assert!(result.is_err());
 
-    let mut types = function_extension
+    let mut types = function_value_extension
         .get_function_arg_tys(&test_id, ident_str!("d"), vec![
             TypeTag::from_str("0x1::other_test::Bar").unwrap(),
             TypeTag::Vector(Box::new(TypeTag::U8)),

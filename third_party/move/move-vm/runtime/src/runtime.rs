@@ -271,9 +271,9 @@ impl VMRuntime {
             return Err(deserialization_error());
         }
 
-        let function_extension = module_storage.as_function_extension();
+        let function_value_extension = module_storage.as_function_value_extension();
         match ValueSerDeContext::new()
-            .with_func_args_deserialization(&function_extension)
+            .with_func_args_deserialization(&function_value_extension)
             .deserialize(arg.borrow(), &layout)
         {
             Some(val) => Ok(val),
@@ -359,9 +359,9 @@ impl VMRuntime {
             return Err(serialization_error());
         }
 
-        let function_extension = module_storage.as_function_extension();
+        let function_value_extension = module_storage.as_function_value_extension();
         let bytes = ValueSerDeContext::new()
-            .with_func_args_deserialization(&function_extension)
+            .with_func_args_deserialization(&function_value_extension)
             .serialize(&value, &layout)?
             .ok_or_else(serialization_error)?;
         Ok((bytes, layout))

@@ -198,7 +198,7 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         self.traversal_context
     }
 
-    pub fn function_extension(&self) -> &dyn FunctionValueExtension {
+    pub fn function_value_extension(&self) -> &dyn FunctionValueExtension {
         self.resolver
     }
 
@@ -228,11 +228,7 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
             Loader::V2(_) => self
                 .resolver
                 .module_storage()
-                .fetch_function_without_ty_args(
-                    module_id.address(),
-                    module_id.name(),
-                    function_name,
-                )
+                .fetch_function_definition(module_id.address(), module_id.name(), function_name)
                 // TODO(loader_v2):
                 //   Keeping this consistent with loader V1 implementation which returned that
                 //   error. Check if we can avoid remapping by replaying transactions.

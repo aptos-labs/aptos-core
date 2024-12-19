@@ -174,8 +174,9 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
     }
 
     /// Returns the function definition corresponding to the specified name, as well as the module
-    /// where this function is defined. The returned module is also verified.
-    fn fetch_function_without_ty_args(
+    /// where this function is defined. The returned function can contain uninstantiated generic
+    /// types and its signature. The returned module is verified.
+    fn fetch_function_definition(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
@@ -401,37 +402,37 @@ where
 
 /// Avoids the orphan rule to implement external [FunctionValueExtension] for any generic type that
 /// implements [ModuleStorage].
-pub struct FunctionExtensionAdapter<'a> {
+pub struct FunctionValueExtensionAdapter<'a> {
     pub(crate) module_storage: &'a dyn ModuleStorage,
 }
 
 pub trait AsFunctionValueExtension {
-    fn as_function_extension(&self) -> FunctionExtensionAdapter;
+    fn as_function_value_extension(&self) -> FunctionValueExtensionAdapter;
 }
 
 impl<T: ModuleStorage> AsFunctionValueExtension for T {
-    fn as_function_extension(&self) -> FunctionExtensionAdapter {
-        FunctionExtensionAdapter {
+    fn as_function_value_extension(&self) -> FunctionValueExtensionAdapter {
+        FunctionValueExtensionAdapter {
             module_storage: self,
         }
     }
 }
 
-impl<'a> FunctionValueExtension for FunctionExtensionAdapter<'a> {
+impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
     fn get_function_arg_tys(
         &self,
         module_id: &ModuleId,
         function_name: &IdentStr,
-        ty_arg_tags: Vec<TypeTag>,
+        substitution_ty_arg_tags: Vec<TypeTag>,
     ) -> PartialVMResult<Vec<Type>> {
-        let ty_args = ty_arg_tags
+        let substitution_ty_args = substitution_ty_arg_tags
             .into_iter()
             .map(|tag| self.module_storage.fetch_ty(&tag))
             .collect::<PartialVMResult<Vec<_>>>()?;
 
         let (_, function) = self
             .module_storage
-            .fetch_function_without_ty_args(module_id.address(), module_id.name(), function_name)
+            .fetch_function_definition(module_id.address(), module_id.name(), function_name)
             .map_err(|err| err.to_partial())?;
 
         let ty_builder = &self
@@ -442,7 +443,9 @@ impl<'a> FunctionValueExtension for FunctionExtensionAdapter<'a> {
         function
             .param_tys()
             .iter()
-            .map(|ty| ty_builder.create_ty_with_subst(ty, &ty_args))
+            .map(|ty_to_substitute| {
+                ty_builder.create_ty_with_subst(ty_to_substitute, &substitution_ty_args)
+            })
             .collect::<PartialVMResult<Vec<_>>>()
     }
 }

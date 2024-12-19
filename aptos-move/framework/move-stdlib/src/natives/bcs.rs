@@ -70,7 +70,7 @@ fn native_to_bytes(
     let val = ref_to_val.read_ref()?;
 
     let serialized_value = match ValueSerDeContext::new()
-        .with_func_args_deserialization(context.function_extension())
+        .with_func_args_deserialization(context.function_value_extension())
         .serialize(&val, &layout)?
     {
         Some(serialized_value) => serialized_value,
@@ -136,7 +136,7 @@ fn serialized_size_impl(
     let ty_layout = context.type_to_type_layout(ty)?;
 
     ValueSerDeContext::new()
-        .with_func_args_deserialization(context.function_extension())
+        .with_func_args_deserialization(context.function_value_extension())
         .with_delayed_fields_serde()
         .serialized_size(&value, &ty_layout)
 }

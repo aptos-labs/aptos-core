@@ -92,7 +92,7 @@ fn native_write_to_event_store(
 
     let blob = ValueSerDeContext::new()
         .with_delayed_fields_serde()
-        .with_func_args_deserialization(context.function_extension())
+        .with_func_args_deserialization(context.function_value_extension())
         .serialize(&msg, &layout)?
         .ok_or_else(|| {
             SafeNativeError::InvariantViolation(PartialVMError::new(
@@ -155,7 +155,7 @@ fn native_emitted_events_by_handle(
         .into_iter()
         .map(|blob| {
             ValueSerDeContext::new()
-                .with_func_args_deserialization(context.function_extension())
+                .with_func_args_deserialization(context.function_value_extension())
                 .deserialize(blob, &ty_layout)
                 .ok_or_else(|| {
                     SafeNativeError::InvariantViolation(PartialVMError::new(
@@ -187,7 +187,7 @@ fn native_emitted_events(
         .into_iter()
         .map(|blob| {
             ValueSerDeContext::new()
-                .with_func_args_deserialization(context.function_extension())
+                .with_func_args_deserialization(context.function_value_extension())
                 .with_delayed_fields_serde()
                 .deserialize(blob, &ty_layout)
                 .ok_or_else(|| {
@@ -246,7 +246,7 @@ fn native_write_module_event_to_store(
         context.type_to_type_layout_with_identifier_mappings(&ty)?;
     let blob = ValueSerDeContext::new()
         .with_delayed_fields_serde()
-        .with_func_args_deserialization(context.function_extension())
+        .with_func_args_deserialization(context.function_value_extension())
         .serialize(&msg, &layout)?
         .ok_or_else(|| {
             SafeNativeError::InvariantViolation(

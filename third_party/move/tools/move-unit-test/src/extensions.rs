@@ -53,30 +53,30 @@ pub(crate) fn new_extensions<'a>() -> NativeContextExtensions<'a> {
 #[allow(unused)]
 pub(crate) fn print_change_sets<W: Write>(
     w: &mut W,
-    extensions: &mut NativeContextExtensions,
-    function_extension: &impl FunctionValueExtension,
+    native_extensions: &mut NativeContextExtensions,
+    function_value_extension: &impl FunctionValueExtension,
 ) {
     #[cfg(feature = "table-extension")]
-    print_table_extension(w, extensions, function_extension);
+    print_table_extension(w, native_extensions, function_value_extension);
 }
 
 // =============================================================================================
 // Table Extensions
 
 #[cfg(feature = "table-extension")]
-fn create_table_extension(extensions: &mut NativeContextExtensions) {
-    extensions.add(NativeTableContext::new([0u8; 32], &*DUMMY_RESOLVER));
+fn create_table_extension(native_extensions: &mut NativeContextExtensions) {
+    native_extensions.add(NativeTableContext::new([0u8; 32], &*DUMMY_RESOLVER));
 }
 
 #[cfg(feature = "table-extension")]
 fn print_table_extension<W: Write>(
     w: &mut W,
-    extensions: &mut NativeContextExtensions,
-    function_extension: &impl FunctionValueExtension,
+    native_extensions: &mut NativeContextExtensions,
+    function_value_extension: &impl FunctionValueExtension,
 ) {
-    let cs = extensions
+    let cs = native_extensions
         .remove::<NativeTableContext>()
-        .into_change_set(function_extension);
+        .into_change_set(function_value_extension);
     if let Ok(cs) = cs {
         if !cs.new_tables.is_empty() {
             writeln!(

@@ -123,9 +123,9 @@ where
         //   2) find identifiers to populate the set.
         //   See if can cache identifiers in advance, or combine it with
         //   deserialization.
-        let function_extension = self.as_function_extension();
+        let function_value_extension = self.as_function_value_extension();
         let value = ValueSerDeContext::new()
-            .with_func_args_deserialization(&function_extension)
+            .with_func_args_deserialization(&function_value_extension)
             .with_delayed_fields_serde()
             .deserialize(bytes, layout)
             .ok_or_else(|| {

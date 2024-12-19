@@ -54,7 +54,7 @@ use crate::{
     loader::modules::{StructVariantInfo, VariantFieldInfo},
     native_functions::NativeFunctions,
     storage::{
-        loader::LoaderV2, module_storage::FunctionExtensionAdapter,
+        loader::LoaderV2, module_storage::FunctionValueExtensionAdapter,
         struct_name_index_map::StructNameIndexMap, ty_cache::StructInfoCache,
     },
 };
@@ -312,7 +312,7 @@ impl Loader {
                     .resolve_module_and_function_by_name(module_id, function_name)
                     .map_err(|err| err.finish(Location::Undefined))
             },
-            Loader::V2(_) => module_storage.fetch_function_without_ty_args(
+            Loader::V2(_) => module_storage.fetch_function_definition(
                 module_id.address(),
                 module_id.name(),
                 function_name,
@@ -1299,11 +1299,7 @@ impl<'a> Resolver<'a> {
                 .resolve_module_and_function_by_name(module_id, function_name)?,
             Loader::V2(_) => self
                 .module_storage
-                .fetch_function_without_ty_args(
-                    module_id.address(),
-                    module_id.name(),
-                    function_name,
-                )
+                .fetch_function_definition(module_id.address(), module_id.name(), function_name)
                 .map_err(|_| {
                     // Note: legacy loader implementation used this error, so we need to remap.
                     PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(
@@ -1661,10 +1657,10 @@ impl<'a> FunctionValueExtension for Resolver<'a> {
         function_name: &IdentStr,
         ty_arg_tags: Vec<TypeTag>,
     ) -> PartialVMResult<Vec<Type>> {
-        let function_extension = FunctionExtensionAdapter {
+        let function_value_extension = FunctionValueExtensionAdapter {
             module_storage: self.module_storage,
         };
-        function_extension.get_function_arg_tys(module_id, function_name, ty_arg_tags)
+        function_value_extension.get_function_arg_tys(module_id, function_name, ty_arg_tags)
     }
 }
 

@@ -1135,7 +1135,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         layout: &MoveTypeLayout,
     ) -> anyhow::Result<(StateValue, HashSet<DelayedFieldID>)> {
         let mapping = TemporaryValueToIdentifierMapping::new(self, self.txn_idx);
-        let function_extension = self.as_function_extension();
+        let function_value_extension = self.as_function_value_extension();
 
         state_value
             .map_bytes(|bytes| {
@@ -1145,7 +1145,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 // see the actual trait implementation for more details.
                 let patched_value = ValueSerDeContext::new()
                     .with_delayed_fields_replacement(&mapping)
-                    .with_func_args_deserialization(&function_extension)
+                    .with_func_args_deserialization(&function_value_extension)
                     .deserialize(bytes.as_ref(), layout)
                     .ok_or_else(|| {
                         anyhow::anyhow!("Failed to deserialize resource during id replacement")
@@ -1153,7 +1153,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
                 ValueSerDeContext::new()
                     .with_delayed_fields_serde()
-                    .with_func_args_deserialization(&function_extension)
+                    .with_func_args_deserialization(&function_value_extension)
                     .serialize(&patched_value, layout)?
                     .ok_or_else(|| {
                         anyhow::anyhow!(
@@ -1175,9 +1175,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     ) -> anyhow::Result<(Bytes, HashSet<DelayedFieldID>)> {
         // This call will replace all occurrences of aggregator / snapshot
         // identifiers with values with the same type layout.
-        let function_extension = self.as_function_extension();
+        let function_value_extension = self.as_function_value_extension();
         let value = ValueSerDeContext::new()
-            .with_func_args_deserialization(&function_extension)
+            .with_func_args_deserialization(&function_value_extension)
             .with_delayed_fields_serde()
             .deserialize(bytes, layout)
             .ok_or_else(|| {
@@ -1190,7 +1190,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         let mapping = TemporaryValueToIdentifierMapping::new(self, self.txn_idx);
         let patched_bytes = ValueSerDeContext::new()
             .with_delayed_fields_replacement(&mapping)
-            .with_func_args_deserialization(&function_extension)
+            .with_func_args_deserialization(&function_value_extension)
             .serialize(&value, layout)?
             .ok_or_else(|| anyhow::anyhow!("Failed to serialize resource during id replacement"))?
             .into();
