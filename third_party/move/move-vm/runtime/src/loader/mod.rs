@@ -54,11 +54,12 @@ use crate::{
     loader::modules::{StructVariantInfo, VariantFieldInfo},
     native_functions::NativeFunctions,
     storage::{
-        loader::LoaderV2, struct_name_index_map::StructNameIndexMap, ty_cache::StructInfoCache,
+        loader::LoaderV2, module_storage::FunctionValueExtensionAdapter,
+        struct_name_index_map::StructNameIndexMap, ty_cache::StructInfoCache,
     },
 };
-pub use function::LoadedFunction;
-pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunctionOwner};
+pub use function::{Function, LoadedFunction};
+pub(crate) use function::{FunctionHandle, FunctionInstantiation, LoadedFunctionOwner};
 pub use modules::Module;
 pub(crate) use modules::{LegacyModuleCache, LegacyModuleStorage, LegacyModuleStorageAdapter};
 use move_binary_format::file_format::{
@@ -66,7 +67,10 @@ use move_binary_format::file_format::{
     VariantFieldInstantiationIndex, VariantIndex,
 };
 use move_vm_metrics::{Timer, VM_TIMER};
-use move_vm_types::loaded_data::runtime_types::{StructLayout, TypeBuilder};
+use move_vm_types::{
+    loaded_data::runtime_types::{StructLayout, TypeBuilder},
+    value_serde::FunctionValueExtension,
+};
 pub use script::Script;
 pub(crate) use script::ScriptCache;
 use type_loader::intern_type;
@@ -308,8 +312,7 @@ impl Loader {
                     .resolve_module_and_function_by_name(module_id, function_name)
                     .map_err(|err| err.finish(Location::Undefined))
             },
-            Loader::V2(loader) => loader.load_function_without_ty_args(
-                module_storage,
+            Loader::V2(_) => module_storage.fetch_function_definition(
                 module_id.address(),
                 module_id.name(),
                 function_name,
@@ -330,8 +333,8 @@ impl Loader {
     ) -> VMResult<Type> {
         match self {
             Self::V1(loader) => loader.load_type(ty_tag, data_store, module_store),
-            Self::V2(loader) => loader
-                .load_ty(module_storage, ty_tag)
+            Self::V2(_) => module_storage
+                .fetch_ty(ty_tag)
                 .map_err(|e| e.finish(Location::Undefined)),
         }
     }
@@ -356,8 +359,7 @@ impl Loader {
             Loader::V1(_) => {
                 module_store.get_struct_type_by_identifier(&struct_name.name, &struct_name.module)
             },
-            Loader::V2(loader) => loader.load_struct_ty(
-                module_storage,
+            Loader::V2(_) => module_storage.fetch_struct_ty(
                 struct_name.module.address(),
                 struct_name.module.name(),
                 struct_name.name.as_ident_str(),
@@ -1295,13 +1297,9 @@ impl<'a> Resolver<'a> {
             Loader::V1(_) => self
                 .module_store
                 .resolve_module_and_function_by_name(module_id, function_name)?,
-            Loader::V2(loader) => loader
-                .load_function_without_ty_args(
-                    self.module_storage,
-                    module_id.address(),
-                    module_id.name(),
-                    function_name,
-                )
+            Loader::V2(_) => self
+                .module_storage
+                .fetch_function_definition(module_id.address(), module_id.name(), function_name)
                 .map_err(|_| {
                     // Note: legacy loader implementation used this error, so we need to remap.
                     PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(
@@ -1649,6 +1647,20 @@ impl<'a> Resolver<'a> {
 
     pub(crate) fn vm_config(&self) -> &VMConfig {
         self.loader().vm_config()
+    }
+}
+
+impl<'a> FunctionValueExtension for Resolver<'a> {
+    fn get_function_arg_tys(
+        &self,
+        module_id: &ModuleId,
+        function_name: &IdentStr,
+        ty_arg_tags: Vec<TypeTag>,
+    ) -> PartialVMResult<Vec<Type>> {
+        let function_value_extension = FunctionValueExtensionAdapter {
+            module_storage: self.module_storage,
+        };
+        function_value_extension.get_function_arg_tys(module_id, function_name, ty_arg_tags)
     }
 }
 
