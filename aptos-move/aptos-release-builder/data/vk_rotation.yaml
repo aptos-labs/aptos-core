@@ -1,0 +1,13 @@
+---
+remote_endpoint: ~
+name: vk_rotation_example
+proposals:
+  - name: vk_rotation_example
+    metadata:
+      title: "todo"
+      description: "todo"
+      source_code_url: "todo"
+      discussion_url: "todo"
+    execution_mode: MultiStep
+    update_sequence:
+      - RawScript: data/example_proposals/vk_rotation.move
