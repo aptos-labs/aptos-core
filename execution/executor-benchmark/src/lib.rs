@@ -989,6 +989,8 @@ mod tests {
             .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect::<HashMap<_, _>>();
+        println!("{:?}", vm_writes);
+        println!("{:?}", other_writes);
         for (key, value) in vm_writes.iter() {
             if let StateKeyInner::AccessPath(apath) = key.inner() {
                 if let Path::ResourceGroup(_) = apath.get_path() {

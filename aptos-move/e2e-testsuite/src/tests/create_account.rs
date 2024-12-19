@@ -18,7 +18,6 @@ fn create_account() {
     let new_account = executor.create_raw_account();
 
     // define the arguments to the create account transaction
-    let initial_amount = 0;
     let txn = create_account_txn(&sender, &new_account, 0);
 
     // execute transaction
@@ -34,9 +33,5 @@ fn create_account() {
         .read_account_resource(&sender)
         .expect("sender must exist");
 
-    let updated_receiver_balance = executor
-        .read_apt_coin_store_resource(&new_account)
-        .expect("receiver balance must exist");
-    assert_eq!(initial_amount, updated_receiver_balance.coin());
     assert_eq!(1, updated_sender.sequence_number());
 }

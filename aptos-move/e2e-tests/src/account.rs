@@ -506,7 +506,7 @@ impl AccountData {
     ///
     /// This constructor is non-deterministic and should not be used against golden file.
     pub fn new(balance: u64, sequence_number: u64) -> Self {
-        Self::with_account(Account::new(), balance, sequence_number, false, false)
+        Self::with_account(Account::new(), balance, sequence_number, true, false)
     }
 
     pub fn increment_sequence_number(&mut self) {
@@ -521,7 +521,7 @@ impl AccountData {
             Account::new_from_seed(seed),
             balance,
             sequence_number,
-            false,
+            true,
             false,
         )
     }
@@ -695,25 +695,5 @@ impl AccountData {
     /// Returns the initial sequence number.
     pub fn sequence_number(&self) -> u64 {
         self.sequence_number
-    }
-
-    /// Returns the unique key for this sent events stream.
-    pub fn sent_events_key(&self) -> &EventKey {
-        self.coin_store.as_ref().unwrap().withdraw_events.key()
-    }
-
-    /// Returns the initial sent events count.
-    pub fn sent_events_count(&self) -> u64 {
-        self.coin_store.as_ref().unwrap().withdraw_events.count()
-    }
-
-    /// Returns the unique key for this received events stream.
-    pub fn received_events_key(&self) -> &EventKey {
-        self.coin_store.as_ref().unwrap().deposit_events.key()
-    }
-
-    /// Returns the initial received events count.
-    pub fn received_events_count(&self) -> u64 {
-        self.coin_store.as_ref().unwrap().deposit_events.count()
     }
 }

@@ -11,20 +11,26 @@ use aptos_db::AptosDB;
 use aptos_executor::block_executor::BlockExecutor;
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_sdk::{
-    move_types::account_address::AccountAddress,
+    bcs,
+    move_types::{
+        account_address::AccountAddress, language_storage::StructTag, move_resource::MoveStructType,
+    },
     transaction_builder::TransactionFactory,
-    types::{AccountKey, LocalAccount},
+    types::{get_apt_primary_store_address, AccountKey, LocalAccount},
 };
 use aptos_storage_interface::{
     state_store::state_view::db_state_view::{DbStateViewAtVersion, VerifiedStateViewAtVersion},
     DbReaderWriter,
 };
 use aptos_types::{
-    account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
+    account_config::{
+        aptos_test_root_address, AccountResource, CoinStoreResource, FungibleStoreResource,
+        ObjectGroupResource,
+    },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     ledger_info::LedgerInfo,
-    state_store::{MoveResourceExt, StateView},
+    state_store::{state_key::StateKey, MoveResourceExt, StateView},
     test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
     transaction::{
         signature_verified_transaction::{
@@ -39,7 +45,7 @@ use aptos_types::{
 };
 use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use rand::SeedableRng;
-use std::{path::Path, sync::Arc};
+use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let path = aptos_temppath::TempPath::new();
@@ -403,6 +409,28 @@ pub fn get_account_balance(state_view: &dyn StateView, address: &AccountAddress)
     CoinStoreResource::<AptosCoinType>::fetch_move_resource(state_view, address)
         .unwrap()
         .map_or(0, |coin_store| coin_store.coin())
+        + {
+            let bytes_opt = state_view
+                .get_state_value_bytes(&StateKey::resource_group(
+                    &get_apt_primary_store_address(*address),
+                    &ObjectGroupResource::struct_tag(),
+                ))
+                .expect("account must exist in data store");
+
+            let group: Option<BTreeMap<StructTag, Vec<u8>>> = bytes_opt
+                .map(|bytes| bcs::from_bytes(&bytes))
+                .transpose()
+                .unwrap();
+            group
+                .and_then(|g| {
+                    g.get(&FungibleStoreResource::struct_tag())
+                        .map(|b| bcs::from_bytes(b))
+                })
+                .transpose()
+                .unwrap()
+                .map(|x: FungibleStoreResource| x.balance())
+                .unwrap_or(0)
+        }
 }
 
 pub fn verify_account_balance<F>(balance: u64, f: F) -> Result<()>
