@@ -365,7 +365,9 @@ function install_pkg {
     elif [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
       dnf install "$package"
     elif [[ "$PACKAGE_MANAGER" == "brew" ]]; then
-      brew install "$package"
+      if brew info "$package" | fgrep "Not installed" &>/dev/null; then
+        brew install "$package"
+      fi
     fi
   fi
 }
@@ -688,14 +690,16 @@ function install_pnpm {
 }
 
 function install_python3 {
-  if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-    install_pkg python3-all-dev "$PACKAGE_MANAGER"
-    install_pkg python3-setuptools "$PACKAGE_MANAGER"
-    install_pkg python3-pip "$PACKAGE_MANAGER"
-  elif [[ "$PACKAGE_MANAGER" == "apk" ]]; then
-    install_pkg python3-dev "$PACKAGE_MANAGER"
-  else
-    install_pkg python3 "$PACKAGE_MANAGER"
+  if ! command -v python3 &>/dev/null; then
+     if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
+         install_pkg python3-all-dev "$PACKAGE_MANAGER"
+         install_pkg python3-setuptools "$PACKAGE_MANAGER"
+         install_pkg python3-pip "$PACKAGE_MANAGER"
+     elif [[ "$PACKAGE_MANAGER" == "apk" ]]; then
+         install_pkg python3-dev "$PACKAGE_MANAGER"
+     else
+         install_pkg python3 "$PACKAGE_MANAGER"
+     fi
   fi
 }
 
@@ -1086,7 +1090,11 @@ fi
 if [[ "$INSTALL_API_BUILD_TOOLS" == "true" ]]; then
   # python and tools
   install_python3
-  "${PRE_COMMAND[@]}" python3 -m pip install schemathesis
+  if [[ "$PACKAGE_MANAGER" == "brew" ]]; then
+      pipx install schemathesis
+  else
+      "${PRE_COMMAND[@]}" python3 -m pip install schemathesis
+  fi
 fi
 
 if [[ "$INSTALL_POSTGRES" == "true" ]]; then
@@ -1103,18 +1111,23 @@ fi
 install_libudev-dev
 
 install_python3
-if [[ "$SKIP_PRE_COMMIT" == "false" ]]; then
-  if [[ "$PACKAGE_MANAGER" != "pacman" ]]; then
-    pip3 install pre-commit
-  else
-    install_pkg python-pre-commit "$PACKAGE_MANAGER"
-  fi
+if ! command -v pre-commit &>/dev/null; then
+  if [[ "$SKIP_PRE_COMMIT" == "false" ]]; then
+    if [[ "$PACKAGE_MANAGER" == "brew" ]]; then
+      install_pkg pipx "$PACKAGE_MANAGER"
+      pipx install pre-commit
+    elif [[ "$PACKAGE_MANAGER" != "pacman" ]]; then
+      pip3 install pre-commit
+    else
+      install_pkg python-pre-commit "$PACKAGE_MANAGER"
+    fi
 
-  # For now best effort install, will need to improve later
-  if command -v pre-commit; then
-    pre-commit install
-  else
-    ~/.local/bin/pre-commit install
+    # For now best effort install, will need to improve later
+    if command -v pre-commit; then
+      pre-commit install
+    else
+      ~/.local/bin/pre-commit install
+    fi
   fi
 fi
 
