@@ -11,7 +11,7 @@ use log::{info, LevelFilter};
 use move_core_types::account_address::AccountAddress;
 use move_model::{
     metadata::{CompilerVersion, LanguageVersion},
-    model::GlobalEnv,
+    model::{GlobalEnv, VerificationScope},
 };
 use move_prover::cli::Options;
 use std::{
@@ -32,6 +32,12 @@ pub struct ProverOptions {
     /// be a target, similar as with `cargo test`.
     #[clap(long, short)]
     pub filter: Option<String>,
+
+    /// Scopes verification to the specified function. This can either be a name of the
+    /// form "mod::func" or simply "func", in the later case every matching function is
+    /// taken.
+    #[clap(long, short)]
+    pub only: Option<String>,
 
     /// Whether to display additional information in error reports. This may help
     /// debugging but also can make verification slower.
@@ -117,6 +123,7 @@ impl Default for ProverOptions {
         Self {
             verbosity: None,
             filter: None,
+            only: None,
             trace: false,
             cvc5: false,
             stratification_depth: 6,
@@ -230,6 +237,11 @@ impl ProverOptions {
             output_path: "".to_string(),
             verbosity_level,
             prover: move_prover_bytecode_pipeline::options::ProverOptions {
+                verify_scope: if let Some(name) = self.only {
+                    VerificationScope::Only(name)
+                } else {
+                    VerificationScope::All
+                },
                 stable_test_output: self.stable_test_output,
                 auto_trace_level: if self.trace {
                     move_prover_bytecode_pipeline::options::AutoTraceLevel::VerifiedFunction
