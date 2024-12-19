@@ -1,12 +1,33 @@
-This script orchestrates the replay and verification of blockchain data using Kubernetes pods. It defines a WorkerPod class to manage individual pods, handling their status, logs, and environment variables. The ReplayScheduler class schedules tasks for these pods, ensuring they run sequentially while managing retries, logging, and error handling. It supports scheduling from specific blockchain versions, skipping defined ranges, and collecting logs from failed or mismatched transactions. The script uses Kubernetes API for pod management and includes configurable hyperparameters for sharding, retries, concurrency, and delays. The main function initializes the scheduler and starts the scheduling process from scratch.
+# Replay Verification Tools
 
-## Prerequiste 
-Install minikube
+This folder contains tools for managing and provisioning archive storage used in replay verifying for the Aptos blockchain networks.
 
-## Local test
-minikube start --mount --mount-string="/mnt/testnet_archive:/mnt/testnet_archive"  --memory=81920 --cpus=17
-minikb apply -f ./testnet-archive.yaml
+## Files
 
+### main.py
+
+The main script for executing replay verify tests. This script is responsible for:
+
+- Running replay verification tests against specified networks (testnet/mainnet)
+- Verifying transaction execution matches expected results
+- Handling test orchestration and reporting
+``` test with cli
+cd testsuite/replay-verify
 poetry shell
-poetry install # install kubenetes 
-poetry run
+python main.py  --image_tag YOUR_IMAGE_TAG --network testnet 
+```
+
+### archive_disk_utils.py
+
+A utility script for managing archive storage disks used in replay verification. This script:
+
+- Provisions Google Cloud Storage disks for storing blockchain archive data
+- Supports both testnet and mainnet networks
+- Is called by GitHub Actions workflows to automatically manage storage resources
+```test with cli
+cd testsuite/replay-verify
+poetry shell
+python archive_disk_utils.py --network mainnet
+```
+
+
