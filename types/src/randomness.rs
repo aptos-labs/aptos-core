@@ -6,8 +6,9 @@ use crate::{block_info::Round, on_chain_config::OnChainConfig};
 use aptos_crypto::HashValue;
 use aptos_crypto_derive::SilentDebug;
 use aptos_dkg::{weighted_vuf, weighted_vuf::traits::WeightedVUF};
-use once_cell::sync::OnceCell;
+use aptos_infallible::RwLock;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 pub type WVUF = weighted_vuf::pinkas::PinkasWUF;
 pub type WvufPP = <WVUF as WeightedVUF>::PublicParameters;
@@ -109,29 +110,28 @@ pub struct RandKeys {
     // certified augmented public key share of all validators,
     // obtained from all validators in the new epoch,
     // which necessary for verifying randomness shares
-    pub certified_apks: Vec<OnceCell<APK>>,
+    pub apks: Vec<Arc<RwLock<Option<APK>>>>,
     // public key share of all validators, obtained from the DKG transcript of last epoch
     pub pk_shares: Vec<PKShare>,
 }
 
 impl RandKeys {
     pub fn new(ask: ASK, apk: APK, pk_shares: Vec<PKShare>, num_validators: usize) -> Self {
-        let certified_apks = vec![OnceCell::new(); num_validators];
+        let apks = (0..num_validators)
+            .map(|_| Arc::new(RwLock::new(None)))
+            .collect();
 
         Self {
             ask,
             apk,
-            certified_apks,
+            apks,
             pk_shares,
         }
     }
 
-    pub fn add_certified_apk(&self, index: usize, apk: APK) -> anyhow::Result<()> {
-        assert!(index < self.certified_apks.len());
-        if self.certified_apks[index].get().is_some() {
-            return Ok(());
-        }
-        self.certified_apks[index].set(apk).unwrap();
+    pub fn set_apk(&self, index: usize, apk: APK) -> anyhow::Result<()> {
+        assert!(index < self.apks.len());
+        self.apks[index].write().replace(apk);
         Ok(())
     }
 }
