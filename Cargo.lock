@@ -4600,6 +4600,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-types",
  "once_cell",
+ "serde",
  "sha3 0.9.1",
 ]
 
