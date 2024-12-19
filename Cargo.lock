@@ -11251,6 +11251,7 @@ dependencies = [
  "anyhow",
  "bcs 0.1.4",
  "clap 4.5.21",
+ "codespan",
  "codespan-reporting",
  "datatest-stable",
  "ethnum",
@@ -11275,6 +11276,7 @@ dependencies = [
  "num 0.4.1",
  "once_cell",
  "petgraph 0.6.5",
+ "serde_json",
  "walkdir",
 ]
 

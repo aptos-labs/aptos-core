@@ -14,6 +14,7 @@ abstract-domain-derive = { path = "../move-model/bytecode/abstract_domain_derive
 anyhow = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true, features = ["derive", "env"] }
+codespan = { workspace = true }
 codespan-reporting = { workspace = true, features = ["serde", "serialization"] }
 ethnum = { workspace = true }
 flexi_logger = { workspace = true }
@@ -35,6 +36,7 @@ move-symbol-pool = { workspace = true }
 num = { workspace = true }
 once_cell = { workspace = true }
 petgraph = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }

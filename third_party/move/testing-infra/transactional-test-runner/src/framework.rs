@@ -37,6 +37,7 @@ use move_compiler::{
     },
     FullyCompiledProgram,
 };
+use move_compiler_v2::diagnostics::human::HumanEmitter;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
@@ -824,7 +825,8 @@ fn compile_source_unit_v2(
         options = options.set_experiment(exp, value)
     }
     let mut error_writer = termcolor::Buffer::no_color();
-    let result = move_compiler_v2::run_move_compiler(&mut error_writer, options);
+    let mut emitter = HumanEmitter::new(&mut error_writer);
+    let result = move_compiler_v2::run_move_compiler(&mut emitter, options);
     let error_str = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
     let (model, mut units) =
         result.map_err(|_| anyhow::anyhow!("compilation errors:\n {}", error_str))?;
