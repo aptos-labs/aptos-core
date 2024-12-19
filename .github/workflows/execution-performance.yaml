@@ -6,6 +6,9 @@ on:
   schedule:
     - cron: "0 */4 * * *" # This runs every four hours
 
+permissions:
+  id-token: write
+
 jobs:
   execution-performance:
     if: | # Only run on each PR once an appropriate event occurs
@@ -22,7 +25,7 @@ jobs:
     with:
       GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       RUNNER_NAME: executor-benchmark-runner
-       # Run all tests only on the scheduled cadence, or explicitly requested
+      # Run all tests only on the scheduled cadence, or explicitly requested
       FLOW: ${{ (github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test')) && 'CONTINUOUS' || 'LAND_BLOCKING' }}
       # Ignore target determination if on the scheduled cadence, or explicitly requested
       IGNORE_TARGET_DETERMINATION: ${{ github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-test') || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test') }}
