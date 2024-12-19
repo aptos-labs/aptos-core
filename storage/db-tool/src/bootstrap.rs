@@ -66,13 +66,13 @@ impl Command {
             .reader
             .get_pre_committed_ledger_summary()
             .with_context(|| format_err!("Failed to get latest tree state."))?;
-        println!("Db has {} transactions", ledger_summary.num_transactions());
+        println!("Db has {} transactions", ledger_summary.next_version());
         if let Some(waypoint) = self.waypoint_to_verify {
             ensure!(
-                waypoint.version() == ledger_summary.num_transactions(),
+                waypoint.version() == ledger_summary.next_version(),
                 "Trying to generate waypoint at version {}, but DB has {} transactions.",
                 waypoint.version(),
-                ledger_summary.num_transactions(),
+                ledger_summary.next_version(),
             )
         }
 

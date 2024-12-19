@@ -171,7 +171,7 @@ fn test_executor_execute_and_commit_chunk_restart() {
     let (chunks, ledger_info) = {
         let first_batch_start = 1;
         let second_batch_start = first_batch_start + first_batch_size;
-        tests::create_transaction_chunks(vec![
+        create_transaction_chunks(vec![
             first_batch_start..=first_batch_start + first_batch_size - 1,
             second_batch_start..=second_batch_start + second_batch_size - 1,
         ])

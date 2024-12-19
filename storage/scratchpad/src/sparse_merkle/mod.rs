@@ -97,7 +97,6 @@ use aptos_metrics_core::IntGaugeHelper;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble},
     proof::SparseMerkleProofExt,
-    state_store::state_storage_usage::StateStorageUsage,
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -114,7 +113,6 @@ const BITS_IN_BYTE: usize = 8;
 #[derive(Debug)]
 struct Inner<V: ArcAsyncDrop> {
     root: Option<SubTree<V>>,
-    usage: StateStorageUsage,
     children: Mutex<Vec<Arc<Inner<V>>>>,
     family: HashValue,
     generation: u64,
@@ -141,11 +139,10 @@ impl<V: ArcAsyncDrop> Drop for Inner<V> {
 }
 
 impl<V: ArcAsyncDrop> Inner<V> {
-    fn new(root: SubTree<V>, usage: StateStorageUsage) -> Arc<Self> {
+    fn new(root: SubTree<V>) -> Arc<Self> {
         let family = HashValue::random();
         let me = Arc::new(Self {
             root: Some(root),
-            usage,
             children: Mutex::new(Vec::new()),
             family,
             generation: 0,
@@ -159,14 +156,9 @@ impl<V: ArcAsyncDrop> Inner<V> {
         self.root.as_ref().expect("Root must exist.")
     }
 
-    fn spawn(
-        self: &Arc<Self>,
-        child_root: SubTree<V>,
-        child_usage: StateStorageUsage,
-    ) -> Arc<Self> {
+    fn spawn(self: &Arc<Self>, child_root: SubTree<V>) -> Arc<Self> {
         let child = Arc::new(Self {
             root: Some(child_root),
-            usage: child_usage,
             children: Mutex::new(Vec::new()),
             family: self.family,
             generation: self.generation + 1,
@@ -198,27 +190,26 @@ where
     /// Constructs a Sparse Merkle Tree with a root hash. This is often used when we restart and
     /// the scratch pad and the storage have identical state, so we use a single root hash to
     /// represent the entire state.
-    pub fn new(root_hash: HashValue, usage: StateStorageUsage) -> Self {
+    pub fn new(root_hash: HashValue) -> Self {
         let root = if root_hash != *SPARSE_MERKLE_PLACEHOLDER_HASH {
             SubTree::new_unknown(root_hash)
         } else {
-            assert!(usage.is_untracked() || usage == StateStorageUsage::zero());
             SubTree::new_empty()
         };
 
         Self {
-            inner: Inner::new(root, usage),
+            inner: Inner::new(root),
         }
     }
 
     #[cfg(test)]
     fn new_test(root_hash: HashValue) -> Self {
-        Self::new(root_hash, StateStorageUsage::new_untracked())
+        Self::new(root_hash)
     }
 
     pub fn new_empty() -> Self {
         Self {
-            inner: Inner::new(SubTree::new_empty(), StateStorageUsage::zero()),
+            inner: Inner::new(SubTree::new_empty()),
         }
     }
 
@@ -246,7 +237,7 @@ where
     #[cfg(test)]
     fn new_with_root(root: SubTree<V>) -> Self {
         Self {
-            inner: Inner::new(root, StateStorageUsage::new_untracked()),
+            inner: Inner::new(root),
         }
     }
 
@@ -271,8 +262,8 @@ where
         self.inner.family == other.inner.family
     }
 
-    pub fn usage(&self) -> StateStorageUsage {
-        self.inner.usage
+    pub fn is_descendant_of(&self, other: &Self) -> bool {
+        self.is_family(other) && self.generation() >= other.generation()
     }
 
     /// Compares an old and a new SMTs and return the newly created node hashes in between.
@@ -417,7 +408,7 @@ where
     ) -> Result<Self, UpdateError> {
         self.clone()
             .freeze(self)
-            .batch_update(updates, StateStorageUsage::Untracked, proof_reader)
+            .batch_update(updates, proof_reader)
             .map(FrozenSparseMerkleTree::unfreeze)
     }
 
@@ -466,9 +457,9 @@ impl<V> FrozenSparseMerkleTree<V>
 where
     V: Clone + CryptoHash + ArcAsyncDrop,
 {
-    fn spawn(&self, child_root: SubTree<V>, child_usage: StateStorageUsage) -> Self {
+    fn spawn(&self, child_root: SubTree<V>) -> Self {
         let smt = SparseMerkleTree {
-            inner: self.smt.inner.spawn(child_root, child_usage),
+            inner: self.smt.inner.spawn(child_root),
         };
         smt.log_generation("spawn");
 
@@ -494,7 +485,6 @@ where
     pub fn batch_update(
         &self,
         updates: Vec<(HashValue, Option<&V>)>,
-        usage: StateStorageUsage,
         proof_reader: &impl ProofRead,
     ) -> Result<Self, UpdateError> {
         // Flatten, dedup and sort the updates with a btree map since the updates between different
@@ -506,9 +496,6 @@ where
             .collect::<Vec<_>>();
 
         if kvs.is_empty() {
-            if !usage.is_untracked() {
-                assert_eq!(self.smt.inner.usage, usage);
-            }
             Ok(self.clone())
         } else {
             let current_root = self.smt.root_weak();
@@ -518,7 +505,7 @@ where
                 proof_reader,
                 self.smt.inner.generation + 1,
             )?;
-            Ok(self.spawn(root, usage))
+            Ok(self.spawn(root))
         }
     }
 
@@ -567,16 +554,18 @@ where
             }
         } // end loop
     }
-
-    pub fn usage(&self) -> StateStorageUsage {
-        self.smt.usage()
-    }
 }
 
 /// A type that implements `ProofRead` can provide proof for keys in persistent storage.
 pub trait ProofRead: Sync {
     /// Gets verified proof for this key in persistent storage.
-    fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt>;
+    fn get_proof(&self, key: HashValue, root_depth: usize) -> Option<&SparseMerkleProofExt>;
+}
+
+impl ProofRead for () {
+    fn get_proof(&self, _key: HashValue, _root_depth: usize) -> Option<&SparseMerkleProofExt> {
+        unimplemented!()
+    }
 }
 
 /// All errors `update` can possibly return.

@@ -3,7 +3,7 @@
 
 use crate::{
     db::{
-        test_helper::{arb_state_kv_sets, update_store},
+        test_helper::{arb_state_kv_sets_with_genesis, update_store},
         AptosDB,
     },
     pruner::{PrunerManager, StateKvPrunerManager, StateMerklePrunerManager},
@@ -14,26 +14,18 @@ use crate::{
     },
     state_merkle_db::StateMerkleDb,
     state_store::StateStore,
-    utils::new_sharded_kv_schema_batch,
 };
 use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_schemadb::SchemaBatch;
-use aptos_storage_interface::{
-    jmt_update_refs, jmt_updates,
-    state_store::{sharded_state_update_refs::ShardedStateUpdateRefs, NUM_STATE_SHARDS},
-    DbReader,
-};
+use aptos_storage_interface::{state_store::NUM_STATE_SHARDS, DbReader};
 use aptos_temppath::TempPath;
 use aptos_types::{
     state_store::{
         state_key::StateKey,
-        state_storage_usage::StateStorageUsage,
         state_value::{StaleStateValueByKeyHashIndex, StaleStateValueIndex, StateValue},
     },
     transaction::Version,
 };
-use arr_macro::arr;
 use proptest::{prelude::*, proptest};
 use std::{collections::HashMap, sync::Arc};
 
@@ -42,51 +34,7 @@ fn put_value_set(
     value_set: Vec<(StateKey, StateValue)>,
     version: Version,
 ) -> HashValue {
-    let mut sharded_value_set = arr![HashMap::new(); 16];
-    let value_set: HashMap<_, _> = value_set
-        .iter()
-        .map(|(key, value)| {
-            sharded_value_set[key.get_shard_id() as usize].insert(key.clone(), Some(value.clone()));
-            (key, Some(value))
-        })
-        .collect();
-    let jmt_updates = jmt_updates(&value_set);
-
-    let root = state_store
-        .merklize_value_set(
-            jmt_update_refs(&jmt_updates),
-            version,
-            version.checked_sub(1),
-        )
-        .unwrap();
-
-    let ledger_batch = SchemaBatch::new();
-    let sharded_state_kv_batches = new_sharded_kv_schema_batch();
-    let state_kv_metadata_batch = SchemaBatch::new();
-    let enable_sharding = state_store.state_kv_db.enabled_sharding();
-    state_store
-        .put_value_sets(
-            version,
-            &ShardedStateUpdateRefs::index_per_version_updates([value_set], 1),
-            StateStorageUsage::new_untracked(),
-            None,
-            &ledger_batch,
-            &sharded_state_kv_batches,
-            enable_sharding,
-            /*last_checkpoint_index=*/ None,
-        )
-        .unwrap();
-    state_store
-        .ledger_db
-        .metadata_db()
-        .write_schemas(ledger_batch)
-        .unwrap();
-    state_store
-        .state_kv_db
-        .commit(version, state_kv_metadata_batch, sharded_state_kv_batches)
-        .unwrap();
-
-    root
+    state_store.commit_block_for_test(version, [value_set.into_iter().map(|(k, v)| (k, Some(v)))])
 }
 
 fn verify_state_in_store(
@@ -357,7 +305,7 @@ proptest! {
 
     #[test]
     fn test_state_value_pruner(
-        input in arb_state_kv_sets(10, 5, 5),
+        input in arb_state_kv_sets_with_genesis(5, 3, 5),
     ) {
         verify_state_value_pruner(input);
     }
@@ -377,7 +325,7 @@ fn verify_state_value_pruner(inputs: Vec<Vec<(StateKey, Option<StateValue>)>>) {
         user_pruning_window_offset: 0,
     });
     for batch in inputs {
-        update_store(store, batch.clone().into_iter(), version, false);
+        update_store(store, batch.clone().into_iter(), version);
         for (k, v) in batch.iter() {
             if let Some((old_version, old_v_opt)) =
                 current_state_values.insert(k.clone(), (version, v.clone()))
