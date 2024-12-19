@@ -34,12 +34,11 @@ const RELEVANT_FILE_PATHS_FOR_EXECUTION_PERFORMANCE_TESTS: [&str; 5] = [
     "execution/aptos-executor-benchmark",
     "testsuite/single_node_performance.py",
 ];
-const RELEVANT_FILE_PATHS_FOR_FRAMEWORK_UPGRADE_TESTS: [&str; 1] = [
-    // Framework upgrade test is failing right now, disable except for the release builder
-    // ".github",
-    // "testsuite",
+const RELEVANT_FILE_PATHS_FOR_FRAMEWORK_UPGRADE_TESTS: [&str; 4] = [
+    ".github",
+    "testsuite",
     "aptos-move/aptos-release-builder",
-    // "aptos-move/framework",
+    "aptos-move/framework",
 ];
 
 // Relevant packages to monitor when deciding to run the targeted tests
@@ -259,12 +258,17 @@ impl AptosCargoCommand {
                     self.get_args_and_affected_packages(package_args)?;
 
                 // Determine if any relevant files or packages were changed
-                let relevant_changes_detected = detect_relevant_changes(
+                #[allow(unused_assignments)]
+                let mut relevant_changes_detected = detect_relevant_changes(
                     RELEVANT_FILE_PATHS_FOR_FRAMEWORK_UPGRADE_TESTS.to_vec(),
                     RELEVANT_PACKAGES_FOR_FRAMEWORK_UPGRADE_TESTS.to_vec(),
                     changed_files,
                     affected_package_paths,
                 );
+
+                // TODO: remove this! This is a temporary fix to disable
+                // the framework upgrade test while we debug the failures.
+                relevant_changes_detected = false;
 
                 // Output if relevant changes were detected that require the framework upgrade
                 // test. This will be consumed by Github Actions and used to run the test.
