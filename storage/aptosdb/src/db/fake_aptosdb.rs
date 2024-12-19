@@ -18,7 +18,7 @@ use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     db_ensure as ensure,
     state_store::{
-        sharded_state_updates::ShardedStateUpdates, state_delta::StateDelta,
+        state_delta::StateDelta, state_update_refs::BatchedStateUpdateRefs,
         state_view::cached_state_view::ShardedStateCache,
     },
     AptosDbError, DbReader, DbWriter, LedgerSummary, MAX_REQUEST_LIMIT,
@@ -108,7 +108,7 @@ impl FakeBufferedState {
 
     pub fn update(
         &mut self,
-        updates_until_next_checkpoint_since_current_option: Option<&ShardedStateUpdates>,
+        updates_until_next_checkpoint_since_current_option: Option<&BatchedStateUpdateRefs>,
         new_state_after_checkpoint: StateDelta,
     ) -> Result<()> {
         ensure!(
@@ -373,7 +373,7 @@ impl FakeAptosDB {
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
         latest_in_memory_state: StateDelta,
-        state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
+        state_updates_until_last_checkpoint: Option<BatchedStateUpdateRefs>,
     ) -> Result<()> {
         gauged_api("save_transactions", || {
             // Executing and committing from more than one threads not allowed -- consensus and
@@ -410,6 +410,7 @@ impl FakeAptosDB {
                     ledger_info_with_sigs,
                     sync_commit,
                     &latest_in_memory_state,
+                    true,
                 )?;
             }
 
@@ -460,7 +461,7 @@ impl DbWriter for FakeAptosDB {
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
         latest_in_memory_state: StateDelta,
-        state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
+        state_updates_until_last_checkpoint: Option<BatchedStateUpdateRefs>,
         _sharded_state_cache: Option<&ShardedStateCache>,
     ) -> Result<()> {
         debug!(
@@ -815,22 +816,22 @@ impl DbReader for FakeAptosDB {
 
     fn get_state_proof_by_version_ext(
         &self,
-        state_key: &StateKey,
+        key: &HashValue,
         version: Version,
         root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
         self.inner
-            .get_state_proof_by_version_ext(state_key, version, root_depth)
+            .get_state_proof_by_version_ext(key, version, root_depth)
     }
 
     fn get_state_value_with_proof_by_version_ext(
         &self,
-        state_key: &StateKey,
+        key_hash: &HashValue,
         version: Version,
         root_depth: usize,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         self.inner
-            .get_state_value_with_proof_by_version_ext(state_key, version, root_depth)
+            .get_state_value_with_proof_by_version_ext(key_hash, version, root_depth)
     }
 
     fn get_pre_committed_ledger_summary(&self) -> Result<LedgerSummary> {
@@ -858,10 +859,6 @@ impl DbReader for FakeAptosDB {
             );
             Ok(ledger_summary)
         })
-    }
-
-    fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>> {
-        self.inner.get_buffered_state_base()
     }
 
     fn get_latest_block_events(&self, num_events: usize) -> Result<Vec<EventWithVersion>> {

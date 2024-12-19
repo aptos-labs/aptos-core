@@ -19,7 +19,7 @@ use crate::{
 use aptos_crypto::HashValue;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{
-    db_ensure as ensure, state_store::state_delta::StateDelta, AptosDbError, Result,
+    db_ensure as ensure, state_store::state_update_refs::StateUpdateRefs, AptosDbError, Result,
 };
 use aptos_types::{
     account_config::new_block_event_key,
@@ -141,7 +141,6 @@ pub(crate) fn save_transactions(
     } else {
         let mut ledger_db_batch = LedgerDbSchemaBatches::new();
         let mut sharded_kv_schema_batch = new_sharded_kv_schema_batch();
-        let state_kv_metadata_batch = SchemaBatch::new();
         save_transactions_impl(
             Arc::clone(&state_store),
             Arc::clone(&ledger_db),
@@ -157,17 +156,12 @@ pub(crate) fn save_transactions(
         // get the last version and commit to the state kv db
         // commit the state kv before ledger in case of failure happens
         let last_version = first_version + txns.len() as u64 - 1;
-        state_store.state_db.state_kv_db.commit(
-            last_version,
-            state_kv_metadata_batch,
-            sharded_kv_schema_batch,
-        )?;
+        state_store
+            .state_db
+            .state_kv_db
+            .commit(last_version, None, sharded_kv_schema_batch)?;
 
         ledger_db.write_schemas(ledger_db_batch)?;
-
-        state_store
-            .current_state()
-            .set(StateDelta::new_empty_with_version(Some(last_version)));
     }
 
     Ok(())
@@ -256,13 +250,13 @@ pub(crate) fn save_transactions_impl(
     }
 
     if kv_replay && first_version > 0 && state_store.get_usage(Some(first_version - 1)).is_ok() {
-        state_store.put_write_sets(
-            write_sets.to_vec(),
-            first_version,
+        let ledger_state = state_store.calculate_state_and_put_updates(
+            &StateUpdateRefs::index_write_sets(first_version, write_sets, write_sets.len(), None),
             &ledger_db_batch.ledger_metadata_db_batches, // used for storing the storage usage
             state_kv_batches,
-            state_store.state_kv_db.enabled_sharding(),
         )?;
+        // n.b. ideally this is set after the batches are committed
+        state_store.set_state_ignoring_summary(ledger_state);
     }
 
     let last_version = first_version + txns.len() as u64 - 1;
