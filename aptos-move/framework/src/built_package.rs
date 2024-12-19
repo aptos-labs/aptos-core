@@ -127,26 +127,21 @@ impl Default for BuildOptions {
             // This is false by default, because it could accidentally pull new dependencies
             // while in a test (and cause some havoc)
             skip_fetch_latest_git_deps: false,
-            bytecode_version: None,
-            compiler_version: None,
-            language_version: None,
+            bytecode_version: Some(VERSION_7),
+            compiler_version: Some(CompilerVersion::latest_stable()),
+            language_version: Some(LanguageVersion::latest_stable()),
             skip_attribute_checks: false,
             check_test_code: false,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             experiments: vec![],
-            move_2: false,
+            move_2: true,
         }
     }
 }
 
 impl BuildOptions {
     pub fn move_2() -> Self {
-        BuildOptions {
-            bytecode_version: Some(VERSION_7),
-            language_version: Some(LanguageVersion::latest_stable()),
-            compiler_version: Some(CompilerVersion::latest_stable()),
-            ..Self::default()
-        }
+        Self::default()
     }
 
     pub fn inferred_bytecode_version(&self) -> u32 {
