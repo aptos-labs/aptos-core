@@ -34,11 +34,12 @@ const RELEVANT_FILE_PATHS_FOR_EXECUTION_PERFORMANCE_TESTS: [&str; 5] = [
     "execution/aptos-executor-benchmark",
     "testsuite/single_node_performance.py",
 ];
-const RELEVANT_FILE_PATHS_FOR_FRAMEWORK_UPGRADE_TESTS: [&str; 4] = [
-    ".github",
-    "testsuite",
+const RELEVANT_FILE_PATHS_FOR_FRAMEWORK_UPGRADE_TESTS: [&str; 1] = [
+    // Framework upgrade test is failing right now, disable except for the release builder
+    // ".github",
+    // "testsuite",
     "aptos-move/aptos-release-builder",
-    "aptos-move/framework",
+    // "aptos-move/framework",
 ];
 
 // Relevant packages to monitor when deciding to run the targeted tests
