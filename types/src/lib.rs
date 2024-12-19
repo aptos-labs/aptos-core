@@ -56,6 +56,7 @@ pub mod vm_status;
 pub mod waypoint;
 pub mod write_set;
 
+use crate::on_chain_config::OnChainConfig;
 pub use account_address::AccountAddress as PeerId;
 pub use utility_coin::*;
 
@@ -68,3 +69,33 @@ pub mod state_store;
 #[cfg(test)]
 mod unit_tests;
 pub mod vm;
+
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize)]
+pub struct RoundingResult {
+    pub ideal_total_weight: u64,
+    pub weights: Vec<u64>,
+    pub reconstruct_threshold_default_path: u128,
+    pub reconstruct_threshold_fast_path: Option<u128>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CurEpochRounding {
+    pub rounding: RoundingResult,
+}
+
+impl OnChainConfig for CurEpochRounding {
+    const MODULE_IDENTIFIER: &'static str = "dkg_rounding";
+    const TYPE_IDENTIFIER: &'static str = "CurEpochRounding";
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NextEpochRounding {
+    pub rounding: RoundingResult,
+}
+
+impl OnChainConfig for NextEpochRounding {
+    const MODULE_IDENTIFIER: &'static str = "dkg_rounding";
+    const TYPE_IDENTIFIER: &'static str = "NextEpochRounding";
+}
