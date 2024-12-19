@@ -1061,7 +1061,17 @@ impl BytecodeGen {
     fn check_signature_token(token: &SignatureToken) -> bool {
         use SignatureToken::*;
         match token {
-            U8 | U16 | U32 | U64 | U128 | U256 | Bool | Address | Signer | Struct(_)
+            U8
+            | U16
+            | U32
+            | U64
+            | U128
+            | U256
+            | Bool
+            | Address
+            | Signer
+            | Struct(_)
+            | Function { .. }
             | TypeParameter(_) => true,
             Vector(element_token) => BytecodeGen::check_signature_token(element_token),
             StructInstantiation(_, type_arguments) => type_arguments

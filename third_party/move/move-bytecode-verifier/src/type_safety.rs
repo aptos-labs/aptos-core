@@ -11,11 +11,12 @@ use move_binary_format::{
     control_flow_graph::ControlFlowGraph,
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        AbilitySet, Bytecode, CodeOffset, FunctionDefinitionIndex, FunctionHandle, LocalIndex,
-        Signature, SignatureToken, SignatureToken as ST, StructDefinition, StructDefinitionIndex,
-        StructFieldInformation, StructHandleIndex, VariantIndex,
+        AbilitySet, Bytecode, CodeOffset, FunctionDefinitionIndex, FunctionHandle,
+        FunctionHandleIndex, LocalIndex, Signature, SignatureToken, SignatureToken as ST,
+        StructDefinition, StructDefinitionIndex, StructFieldInformation, StructHandleIndex,
+        VariantIndex, Visibility,
     },
-    safe_unwrap,
+    safe_assert, safe_unwrap,
     views::FieldOrVariantIndex,
 };
 use move_core_types::vm_status::StatusCode;
@@ -298,6 +299,152 @@ fn call(
         verifier.push(meter, instantiate(return_type, type_actuals))?
     }
     Ok(())
+}
+
+fn invoke_function(
+    verifier: &mut TypeSafetyChecker,
+    meter: &mut impl Meter,
+    offset: CodeOffset,
+    expected_ty: &SignatureToken,
+) -> PartialVMResult<()> {
+    let SignatureToken::Function(param_tys, ret_tys, abilities) = expected_ty else {
+        // The signature checker has ensured this is a function
+        safe_assert!(false);
+        unreachable!()
+    };
+
+    // On top of the stack is the closure, pop it.
+    let closure_ty = safe_unwrap!(verifier.stack.pop());
+    // Verify that the closure type matches the expected type
+    if &closure_ty != expected_ty {
+        return Err(verifier
+            .error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset)
+            .with_message("closure type mismatch".to_owned()));
+    }
+    // Verify that the abilities match
+    let SignatureToken::Function(_, _, closure_abilities) = closure_ty else {
+        // Ensured above, but never panic
+        safe_assert!(false);
+        unreachable!()
+    };
+    if !abilities.is_subset(closure_abilities) {
+        return Err(verifier
+            .error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset)
+            .with_message("closure ability mismatch".to_owned()));
+    }
+
+    // Pop and verify arguments
+    for param_ty in param_tys.iter().rev() {
+        let arg_ty = safe_unwrap!(verifier.stack.pop());
+        if &arg_ty != param_ty {
+            return Err(verifier.error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset));
+        }
+    }
+    for ret_ty in ret_tys {
+        verifier.push(meter, ret_ty.clone())?
+    }
+    Ok(())
+}
+
+fn ld_function(
+    verifier: &mut TypeSafetyChecker,
+    meter: &mut impl Meter,
+    _offset: CodeOffset,
+    function_handle_idx: &FunctionHandleIndex,
+    type_actuals: &Signature,
+) -> PartialVMResult<()> {
+    let func_handle = verifier.resolver.function_handle_at(*function_handle_idx);
+
+    // In order to determine whether this closure can be storable, we need to figure whether
+    // this function is public.
+    // !!!TODO!!!
+    //   We currently cannot determine for an imported function if it is public or friend. A
+    //   standalone CompiledModule does not give this information. This means that we cannot
+    //   construct storable closures from imported functions for now, which is an
+    //   undesired restriction, so this should be fixed by extending the FunctionHandle data,
+    //   and adding visibility there.
+    let mut is_storable = false;
+    for fun_def in verifier.resolver.function_defs().unwrap_or(&[]) {
+        if fun_def.function == *function_handle_idx {
+            // Function defined in this module, so we can check visibility.
+            if fun_def.visibility == Visibility::Public {
+                is_storable = true;
+            }
+            break;
+        }
+    }
+    let abilities = if is_storable {
+        AbilitySet::PUBLIC_FUNCTIONS
+    } else {
+        AbilitySet::PRIVATE_FUNCTIONS
+    };
+
+    // Construct the resulting function type
+    let parameters = verifier.resolver.signature_at(func_handle.parameters);
+    let ret_sign = verifier.resolver.signature_at(func_handle.return_);
+    verifier.push(
+        meter,
+        instantiate(
+            &SignatureToken::Function(parameters.0.to_vec(), ret_sign.0.to_vec(), abilities),
+            type_actuals,
+        ),
+    )
+}
+
+fn early_bind_function(
+    verifier: &mut TypeSafetyChecker,
+    meter: &mut impl Meter,
+    offset: CodeOffset,
+    expected_ty: &SignatureToken,
+    count: u8,
+) -> PartialVMResult<()> {
+    let count = count as usize;
+    let SignatureToken::Function(param_tys, ret_tys, abilities) = expected_ty else {
+        // The signature checker has ensured this is a function
+        safe_assert!(false);
+        unreachable!()
+    };
+
+    // On top of the stack is the closure, pop it.
+    let closure_ty = safe_unwrap!(verifier.stack.pop());
+    // Verify that the closure type matches the expected type
+    if &closure_ty != expected_ty {
+        return Err(verifier
+            .error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset)
+            .with_message("closure type mismatch".to_owned()));
+    }
+    // Verify that the abilities match
+    let SignatureToken::Function(_, _, closure_abilities) = closure_ty else {
+        // Ensured above, but never panic
+        safe_assert!(false);
+        unreachable!()
+    };
+    if !abilities.is_subset(closure_abilities) {
+        return Err(verifier
+            .error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset)
+            .with_message("closure ability mismatch".to_owned()));
+    }
+
+    if param_tys.len() < count {
+        return Err(verifier.error(StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH, offset));
+    }
+
+    let binding_param_tys = &param_tys[0..count];
+    let remaining_param_tys = &param_tys[count..];
+
+    // Pop and verify arguments
+    for param_ty in binding_param_tys.iter().rev() {
+        let arg_ty = safe_unwrap!(verifier.stack.pop());
+        if &arg_ty != param_ty {
+            return Err(verifier.error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset));
+        }
+    }
+    let result_ty = SignatureToken::Function(
+        (*remaining_param_tys).to_vec(),
+        ret_tys.to_vec(),
+        *abilities,
+    );
+    verifier.push(meter, result_ty)
 }
 
 fn type_fields_signature(
@@ -725,6 +872,27 @@ fn verify_instr(
             call(verifier, meter, offset, func_handle, type_args)?
         },
 
+        Bytecode::LdFunction(idx) => ld_function(verifier, meter, offset, idx, &Signature(vec![]))?,
+
+        Bytecode::LdFunctionGeneric(idx) => {
+            let func_inst = verifier.resolver.function_instantiation_at(*idx);
+            let type_args = &verifier.resolver.signature_at(func_inst.type_parameters);
+            verifier.charge_tys(meter, &type_args.0)?;
+            ld_function(verifier, meter, offset, &func_inst.handle, type_args)?
+        },
+
+        Bytecode::EarlyBindFunction(idx, count) => {
+            // The signature checker has verified this is a function type.
+            let expected_ty = safe_unwrap!(verifier.resolver.signature_at(*idx).0.first());
+            early_bind_function(verifier, meter, offset, expected_ty, *count)?
+        },
+
+        Bytecode::InvokeFunction(idx) => {
+            // The signature checker has verified this is a function type.
+            let expected_ty = safe_unwrap!(verifier.resolver.signature_at(*idx).0.first());
+            invoke_function(verifier, meter, offset, expected_ty)?
+        },
+
         Bytecode::Pack(idx) => {
             let struct_definition = verifier.resolver.struct_def_at(*idx)?;
             pack(
@@ -1139,6 +1307,9 @@ fn instantiate(token: &SignatureToken, subst: &Signature) -> SignatureToken {
         return token.clone();
     }
 
+    let inst_vec = |v: &[SignatureToken]| -> Vec<SignatureToken> {
+        v.iter().map(|ty| instantiate(ty, subst)).collect()
+    };
     match token {
         Bool => Bool,
         U8 => U8,
@@ -1150,14 +1321,13 @@ fn instantiate(token: &SignatureToken, subst: &Signature) -> SignatureToken {
         Address => Address,
         Signer => Signer,
         Vector(ty) => Vector(Box::new(instantiate(ty, subst))),
+        Function(args, results, abilities) => {
+            Function(inst_vec(args), inst_vec(results), *abilities)
+        },
         Struct(idx) => Struct(*idx),
-        StructInstantiation(idx, struct_type_args) => StructInstantiation(
-            *idx,
-            struct_type_args
-                .iter()
-                .map(|ty| instantiate(ty, subst))
-                .collect(),
-        ),
+        StructInstantiation(idx, struct_type_args) => {
+            StructInstantiation(*idx, inst_vec(struct_type_args))
+        },
         Reference(ty) => Reference(Box::new(instantiate(ty, subst))),
         MutableReference(ty) => MutableReference(Box::new(instantiate(ty, subst))),
         TypeParameter(idx) => {
