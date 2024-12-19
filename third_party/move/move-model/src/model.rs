@@ -2988,9 +2988,7 @@ impl<'env> ModuleEnv<'env> {
 
     /// Returns the set of modules in the current package,
     /// whose public(package) functions are called or referenced in the current module.
-    /// Requires: `self` is a primary target.
     pub fn need_to_be_friended_by(&self) -> BTreeSet<ModuleId> {
-        debug_assert!(self.is_primary_target());
         let mut deps = BTreeSet::new();
         if self.is_script_module() {
             return deps;
@@ -3015,12 +3013,12 @@ impl<'env> ModuleEnv<'env> {
     }
 
     /// Returns true if functions in the current module can call a public(package) function in the given module.
-    /// Requires: `self` is a primary target.
     fn can_call_package_fun_in(&self, other: &Self) -> bool {
-        debug_assert!(self.is_primary_target());
         !self.is_script_module()
             && !other.is_script_module()
-            && other.is_primary_target()
+            // TODO: fix this when we have a way to check if
+            // two non-primary targets are in the same package
+            && (!self.is_primary_target() || other.is_primary_target())
             && self.self_address() == other.self_address()
     }
 
