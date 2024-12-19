@@ -390,6 +390,10 @@ pub struct CompilePackage {
     #[clap(long)]
     pub save_metadata: bool,
 
+    /// Fetch dependencies of a package from the network, skipping the actual compilation
+    #[clap(long)]
+    pub fetch_deps_only: bool,
+
     #[clap(flatten)]
     pub included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
@@ -410,6 +414,12 @@ impl CliCommand<Vec<String>> for CompilePackage {
                 .included_artifacts
                 .build_options(&self.move_options)?
         };
+        let package_path = self.move_options.get_package_path()?;
+        if self.fetch_deps_only {
+            let config = BuiltPackage::create_build_config(&build_options)?;
+            BuiltPackage::prepare_resolution_graph(package_path, config)?;
+            return Ok(vec![]);
+        }
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
         if self.save_metadata {
