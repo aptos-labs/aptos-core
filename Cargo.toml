@@ -177,7 +177,6 @@ members = [
     "storage/backup/backup-cli",
     "storage/backup/backup-service",
     "storage/db-tool",
-    "storage/executable-store",
     "storage/indexer",
     "storage/indexer_schemas",
     "storage/jellyfish-merkle",
@@ -330,7 +329,6 @@ aptos-dkg = { path = "crates/aptos-dkg" }
 aptos-dkg-runtime = { path = "dkg" }
 aptos-drop-helper = { path = "crates/aptos-drop-helper" }
 aptos-event-notifications = { path = "state-sync/inter-component/event-notifications" }
-aptos-executable-store = { path = "storage/executable-store" }
 aptos-executor = { path = "execution/executor" }
 aptos-block-partitioner = { path = "execution/block-partitioner" }
 aptos-enum-conversion-derive = { path = "crates/aptos-enum-conversion-derive" }

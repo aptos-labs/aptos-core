@@ -35,7 +35,7 @@ use aptos_mvhashmap::{
 };
 use aptos_types::{
     error::{code_invariant_error, expect_ok, PanicError, PanicOr},
-    executable::{Executable, ModulePath},
+    executable::{ExecutableTestType, ModulePath},
     state_store::{
         errors::StateViewError,
         state_storage_usage::StateStorageUsage,
@@ -162,8 +162,8 @@ trait ResourceGroupState<T: Transaction> {
     ) -> PartialVMResult<GroupReadResult>;
 }
 
-pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
-    pub(crate) versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+pub(crate) struct ParallelState<'a, T: Transaction> {
+    pub(crate) versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, T::Identifier>,
     scheduler: &'a Scheduler,
     start_counter: u32,
     counter: &'a AtomicU32,
@@ -449,9 +449,9 @@ fn wait_for_dependency(
     }
 }
 
-impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
+impl<'a, T: Transaction> ParallelState<'a, T> {
     pub(crate) fn new(
-        shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, T::Identifier>,
         shared_scheduler: &'a Scheduler,
         start_shared_counter: u32,
         shared_counter: &'a AtomicU32,
@@ -476,7 +476,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         &self,
         key: &T::Key,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<MVModulesOutput<T::Value, X>, MVModulesError> {
+    ) -> anyhow::Result<MVModulesOutput<T::Value, ExecutableTestType>, MVModulesError> {
         // Record for the R/W path intersection fallback for modules.
         #[allow(deprecated)]
         self.captured_reads
@@ -535,7 +535,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
     }
 }
 
-impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T, X> {
+impl<'a, T: Transaction> ResourceState<T> for ParallelState<'a, T> {
     fn set_base_value(&self, key: T::Key, value: ValueWithLayout<T::Value>) {
         self.versioned_map.data().set_base_value(key, value);
     }
@@ -677,7 +677,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
     }
 }
 
-impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<'a, T, X> {
+impl<'a, T: Transaction> ResourceGroupState<T> for ParallelState<'a, T> {
     fn set_raw_group_base_values(
         &self,
         group_key: T::Key,
@@ -962,12 +962,12 @@ impl<'a, T: Transaction> ResourceGroupState<T> for SequentialState<'a, T> {
     }
 }
 
-pub(crate) enum ViewState<'a, T: Transaction, X: Executable> {
-    Sync(ParallelState<'a, T, X>),
+pub(crate) enum ViewState<'a, T: Transaction> {
+    Sync(ParallelState<'a, T>),
     Unsync(SequentialState<'a, T>),
 }
 
-impl<'a, T: Transaction, X: Executable> ViewState<'a, T, X> {
+impl<'a, T: Transaction> ViewState<'a, T> {
     fn get_resource_state(&self) -> &dyn ResourceState<T> {
         match self {
             ViewState::Sync(state) => state,
@@ -988,16 +988,16 @@ impl<'a, T: Transaction, X: Executable> ViewState<'a, T, X> {
 /// all necessary traits, LatestView is provided to the VM and used to intercept the reads.
 /// In the Sync case, also records captured reads for later validation. latest_txn_idx
 /// must be set according to the latest transaction that the worker was / is executing.
-pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> {
+pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>> {
     base_view: &'a S,
     pub(crate) global_module_cache:
         &'a GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
     pub(crate) runtime_environment: &'a RuntimeEnvironment,
-    pub(crate) latest_view: ViewState<'a, T, X>,
+    pub(crate) latest_view: ViewState<'a, T>,
     pub(crate) txn_idx: TxnIndex,
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     pub(crate) fn new(
         base_view: &'a S,
         global_module_cache: &'a GlobalModuleCache<
@@ -1007,7 +1007,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             AptosModuleExtension,
         >,
         runtime_environment: &'a RuntimeEnvironment,
-        latest_view: ViewState<'a, T, X>,
+        latest_view: ViewState<'a, T>,
         txn_idx: TxnIndex,
     ) -> Self {
         Self {
@@ -1212,7 +1212,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
     fn get_group_reads_needing_exchange_parallel(
         &self,
-        parallel_state: &ParallelState<'a, T, X>,
+        parallel_state: &ParallelState<'a, T>,
         delayed_write_set_ids: &HashSet<T::Identifier>,
         skip: &HashSet<T::Key>,
     ) -> PartialVMResult<BTreeMap<T::Key, (StateValueMetadata, u64)>> {
@@ -1433,9 +1433,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceView
-    for LatestView<'a, T, S, X>
-{
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceView for LatestView<'a, T, S> {
     type Key = T::Key;
     type Layout = MoveTypeLayout;
 
@@ -1478,9 +1476,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGroupView
-    for LatestView<'a, T, S, X>
-{
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for LatestView<'a, T, S> {
     type GroupKey = T::Key;
     type Layout = MoveTypeLayout;
     type ResourceTag = T::Tag;
@@ -1555,9 +1551,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
-    for LatestView<'a, T, S, X>
-{
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TModuleView for LatestView<'a, T, S> {
     type Key = T::Key;
 
     fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
@@ -1619,9 +1613,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorageView
-    for LatestView<'a, T, S, X>
-{
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> StateStorageView for LatestView<'a, T, S> {
     type Key = T::Key;
 
     fn id(&self) -> StateViewId {
@@ -1638,9 +1630,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorag
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregatorV1View
-    for LatestView<'a, T, S, X>
-{
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TAggregatorV1View for LatestView<'a, T, S> {
     type Identifier = T::Key;
 
     fn get_aggregator_v1_state_value(
@@ -1656,9 +1646,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFieldView
-    for LatestView<'a, T, S, X>
-{
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for LatestView<'a, T, S> {
     type Identifier = T::Identifier;
     type ResourceGroupTag = T::Tag;
     type ResourceKey = T::Key;
@@ -1830,7 +1818,6 @@ mod test {
     };
     use aptos_types::{
         error::PanicOr,
-        executable::Executable,
         state_store::{state_value::StateValue, MockStateView},
         transaction::BlockExecutableTransaction,
         write_set::TransactionWrite,
@@ -2482,15 +2469,6 @@ mod test {
         StateValue::new_legacy(value.simple_serialize(layout).unwrap().into())
     }
 
-    #[derive(Clone)]
-    struct MockExecutable {}
-
-    impl Executable for MockExecutable {
-        fn size_bytes(&self) -> usize {
-            unimplemented!();
-        }
-    }
-
     #[test]
     fn test_id_value_exchange() {
         let unsync_map = UnsyncMap::new();
@@ -2500,14 +2478,13 @@ mod test {
         let runtime_environment = RuntimeEnvironment::new(vec![]);
         let global_module_cache = GlobalModuleCache::empty();
 
-        let latest_view =
-            LatestView::<TestTransactionType, MockStateView<KeyType<u32>>, MockExecutable>::new(
-                &base_view,
-                &global_module_cache,
-                &runtime_environment,
-                ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
-                1,
-            );
+        let latest_view = LatestView::<TestTransactionType, MockStateView<KeyType<u32>>>::new(
+            &base_view,
+            &global_module_cache,
+            &runtime_environment,
+            ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
+            1,
+        );
 
         // Test id -- value exchange for a value that does not contain delayed fields
         let layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![
@@ -2790,11 +2767,11 @@ mod test {
 
     fn create_sequential_latest_view<'a>(
         h: &'a Holder,
-    ) -> LatestView<'a, TestTransactionType, MockStateView<KeyType<u32>>, MockExecutable> {
+    ) -> LatestView<'a, TestTransactionType, MockStateView<KeyType<u32>>> {
         let sequential_state: SequentialState<'a, TestTransactionType> =
             SequentialState::new(&h.unsync_map, *h.counter.borrow(), &h.counter);
 
-        LatestView::<'a, TestTransactionType, MockStateView<KeyType<u32>>, MockExecutable>::new(
+        LatestView::<'a, TestTransactionType, MockStateView<KeyType<u32>>>::new(
             &h.base_view,
             &h.empty_global_module_cache,
             &h.runtime_environment,
@@ -2809,7 +2786,7 @@ mod test {
         counter: AtomicU32,
         base_view: MockStateView<KeyType<u32>>,
         runtime_environment: RuntimeEnvironment,
-        versioned_map: MVHashMap<KeyType<u32>, u32, ValueType, MockExecutable, DelayedFieldID>,
+        versioned_map: MVHashMap<KeyType<u32>, u32, ValueType, DelayedFieldID>,
         scheduler: Scheduler,
     }
 
@@ -2835,22 +2812,19 @@ mod test {
 
         fn new_view(&self) -> ViewsComparison<'_> {
             let latest_view_seq = create_sequential_latest_view(&self.holder);
-            let latest_view_par = LatestView::<
-                TestTransactionType,
-                MockStateView<KeyType<u32>>,
-                MockExecutable,
-            >::new(
-                &self.base_view,
-                &self.holder.empty_global_module_cache,
-                &self.runtime_environment,
-                ViewState::Sync(ParallelState::new(
-                    &self.versioned_map,
-                    &self.scheduler,
-                    self.start_counter,
-                    &self.counter,
-                )),
-                1,
-            );
+            let latest_view_par =
+                LatestView::<TestTransactionType, MockStateView<KeyType<u32>>>::new(
+                    &self.base_view,
+                    &self.holder.empty_global_module_cache,
+                    &self.runtime_environment,
+                    ViewState::Sync(ParallelState::new(
+                        &self.versioned_map,
+                        &self.scheduler,
+                        self.start_counter,
+                        &self.counter,
+                    )),
+                    1,
+                );
 
             ViewsComparison {
                 latest_view_seq,
@@ -2860,10 +2834,8 @@ mod test {
     }
 
     struct ViewsComparison<'a> {
-        latest_view_seq:
-            LatestView<'a, TestTransactionType, MockStateView<KeyType<u32>>, MockExecutable>,
-        latest_view_par:
-            LatestView<'a, TestTransactionType, MockStateView<KeyType<u32>>, MockExecutable>,
+        latest_view_seq: LatestView<'a, TestTransactionType, MockStateView<KeyType<u32>>>,
+        latest_view_par: LatestView<'a, TestTransactionType, MockStateView<KeyType<u32>>>,
     }
 
     impl<'a> ViewsComparison<'a> {
