@@ -32,10 +32,11 @@ use tokio_util::{
     compat::{Compat, FuturesAsyncReadCompatExt, FuturesAsyncWriteCompatExt},
 };
 
+pub mod metadata;
 #[cfg(test)]
 mod test;
 
-/// Most primitive message type set on the network.
+/// The most primitive message type sent on the network
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub enum NetworkMessage {
