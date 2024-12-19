@@ -3,11 +3,13 @@
 
 use self::real_dkg::RealDKG;
 use crate::{
+    contract_event::ContractEvent,
     dkg::real_dkg::rounding::DKGRoundingProfile,
     on_chain_config::{OnChainConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct},
     validator_verifier::{ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct},
+    RoundingResult,
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use aptos_crypto::Uniform;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::{
@@ -33,6 +35,15 @@ pub struct DKGTranscriptMetadata {
 pub struct DKGStartEvent {
     pub session_metadata: DKGSessionMetadata,
     pub start_time_us: u64,
+}
+
+impl DKGStartEvent {
+    pub fn to_contract_event(&self) -> Result<ContractEvent> {
+        let type_tag = TypeTag::Struct(Box::new(DKGStartEvent::struct_tag()));
+        let event_data = bcs::to_bytes(self)
+            .map_err(|e| anyhow!("DKGTranscript::to_contract_event failed with bcs error: {e}"))?;
+        Ok(ContractEvent::new_v2(type_tag, event_data))
+    }
 }
 
 impl MoveStructType for DKGStartEvent {
@@ -177,7 +188,10 @@ pub trait DKGTrait: Debug {
     type DealtPubKeyShare;
     type NewValidatorDecryptKey: Uniform;
 
-    fn new_public_params(dkg_session_metadata: &DKGSessionMetadata) -> Self::PublicParams;
+    fn new_public_params(
+        dkg_session_metadata: &DKGSessionMetadata,
+        rounding_result: Option<RoundingResult>,
+    ) -> Self::PublicParams;
     fn aggregate_input_secret(secrets: Vec<Self::InputSecret>) -> Self::InputSecret;
     fn dealt_secret_from_input(
         pub_params: &Self::PublicParams,

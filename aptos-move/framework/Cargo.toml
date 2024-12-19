@@ -13,6 +13,8 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+num-integer = { workspace = true }
+num-bigint = { workspace = true }
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
 aptos-crypto = { workspace = true }
@@ -41,6 +43,7 @@ codespan-reporting = { workspace = true }
 # we work with version 3. Instead, we use `zkcrypto/bulleproofs` which relies on `zkcrypto/curve25519-dalek-ng`.
 curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
 either = { workspace = true }
+fixed = { workspace = true }
 flate2 = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
