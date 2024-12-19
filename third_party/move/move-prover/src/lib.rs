@@ -84,7 +84,7 @@ pub fn create_move_prover_v2_model<W: WriteColor>(
         named_address_mapping: options.move_named_address_values,
         output_dir: options.output_path,
         language_version: options.language_version,
-        compiler_version: None, // TODO: need to pass v2.x here
+        compiler_version: Some(move_compiler_v2::LATEST_STABLE_VERSION),
         skip_attribute_checks: true,
         known_attributes: Default::default(),
         testing: options.backend.stable_test_output,
