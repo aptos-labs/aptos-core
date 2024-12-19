@@ -87,6 +87,11 @@ module aptos_framework::fungible_asset {
     const ECONCURRENT_BALANCE_NOT_ENABLED: u64 = 32;
     /// Provided derived_supply function type doesn't meet the signature requirement.
     const EDERIVED_SUPPLY_FUNCTION_SIGNATURE_MISMATCH: u64 = 33;
+    /// The balance ref and the fungible asset do not match.
+    const ERAW_BALANCE_REF_AND_FUNGIBLE_ASSET_MISMATCH: u64 = 34;
+    /// The supply ref and the fungible asset do not match.
+    const ERAW_SUPPLY_REF_AND_FUNGIBLE_ASSET_MISMATCH: u64 = 34;
+
 
     //
     // Constants
@@ -181,6 +186,16 @@ module aptos_framework::fungible_asset {
     /// TransferRef can be used to allow or disallow the owner of fungible assets from transferring the asset
     /// and allow the holder of TransferRef to transfer fungible assets from any account.
     struct TransferRef has drop, store {
+        metadata: Object<Metadata>
+    }
+
+    /// RawBalanceRef will be used to access the raw balance for FAs that registered `derived_balance` hook.
+    struct RawBalanceRef has drop, store {
+        metadata: Object<Metadata>
+    }
+
+    /// RawSupplyRef will be used to access the raw supply for FAs that registered `derived_supply` hook.
+    struct RawSupplyRef has drop, store {
         metadata: Object<Metadata>
     }
 
@@ -462,6 +477,22 @@ module aptos_framework::fungible_asset {
         TransferRef { metadata }
     }
 
+    /// Creates a balance ref that can be used to access raw balance of fungible assets from the given fungible
+    /// object's constructor ref.
+    /// This can only be called at object creation time as constructor_ref is only available then.
+    public fun generate_raw_balance_ref(constructor_ref: &ConstructorRef): RawBalanceRef {
+        let metadata = object::object_from_constructor_ref<Metadata>(constructor_ref);
+        RawBalanceRef { metadata }
+    }
+
+    /// Creates a supply ref that can be used to access raw supply of fungible assets from the given fungible
+    /// object's constructor ref.
+    /// This can only be called at object creation time as constructor_ref is only available then.
+    public fun generate_raw_supply_ref(constructor_ref: &ConstructorRef): RawSupplyRef {
+        let metadata = object::object_from_constructor_ref<Metadata>(constructor_ref);
+        RawSupplyRef { metadata }
+    }
+
     /// Creates a mutate metadata ref that can be used to change the metadata information of fungible assets from the
     /// given fungible object's constructor ref.
     /// This can only be called at object creation time as constructor_ref is only available then.
@@ -472,7 +503,18 @@ module aptos_framework::fungible_asset {
 
     #[view]
     /// Get the current supply from the `metadata` object.
+    ///
+    /// Note: This function will abort on FAs with `derived_supply` hook set up.
+    ///       Use `dispatchable_fungible_asset::supply` instead if you intend to work with those FAs.
     public fun supply<T: key>(metadata: Object<T>): Option<u128> acquires Supply, ConcurrentSupply {
+        assert!(
+            !has_supply_dispatch_function(object::object_address(&metadata)),
+            error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS)
+        );
+        supply_impl(metadata)
+    }
+
+    fun supply_impl<T: key>(metadata: Object<T>): Option<u128> acquires Supply, ConcurrentSupply {
         let metadata_address = object::object_address(&metadata);
         if (exists<ConcurrentSupply>(metadata_address)) {
             let supply = borrow_global<ConcurrentSupply>(metadata_address);
@@ -577,7 +619,19 @@ module aptos_framework::fungible_asset {
 
     #[view]
     /// Get the balance of a given store.
-    public fun balance<T: key>(store: Object<T>): u64 acquires FungibleStore, ConcurrentFungibleBalance {
+    ///
+    /// Note: This function will abort on FAs with `derived_balance` hook set up.
+    ///       Use `dispatchable_fungible_asset::balance` instead if you intend to work with those FAs.
+    public fun balance<T: key>(store: Object<T>): u64 acquires FungibleStore, ConcurrentFungibleBalance, DispatchFunctionStore {
+        let fa_store = borrow_store_resource(&store);
+        assert!(
+            !has_balance_dispatch_function(fa_store.metadata),
+            error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS)
+        );
+        balance_impl(store)
+    }
+
+    fun balance_impl<T: key>(store: Object<T>): u64 acquires FungibleStore, ConcurrentFungibleBalance {
         let store_addr = object::object_address(&store);
         if (store_exists_inline(store_addr)) {
             let store_balance = borrow_store_resource(&store).balance;
@@ -671,6 +725,25 @@ module aptos_framework::fungible_asset {
         }
     }
 
+    fun has_balance_dispatch_function(metadata: Object<Metadata>): bool acquires DispatchFunctionStore {
+        let metadata_addr = object::object_address(&metadata);
+        // Short circuit on APT for better perf
+        if (metadata_addr != @aptos_fungible_asset && exists<DispatchFunctionStore>(metadata_addr)) {
+            option::is_some(&borrow_global<DispatchFunctionStore>(metadata_addr).derived_balance_function)
+        } else {
+            false
+        }
+    }
+
+    fun has_supply_dispatch_function(metadata_addr: address): bool {
+        // Short circuit on APT for better perf
+        if (metadata_addr != @aptos_fungible_asset) {
+            exists<DeriveSupply>(metadata_addr)
+        } else {
+            false
+        }
+    }
+
     public(friend) fun derived_balance_dispatch_function<T: key>(store: Object<T>): Option<FunctionInfo> acquires FungibleStore, DispatchFunctionStore {
         let fa_store = borrow_store_resource(&store);
         let metadata_addr = object::object_address(&fa_store.metadata);
@@ -716,6 +789,9 @@ module aptos_framework::fungible_asset {
 
     /// Transfer an `amount` of fungible asset from `from_store`, which should be owned by `sender`, to `receiver`.
     /// Note: it does not move the underlying object.
+    ///
+    ///       This function can be in-place replaced by `dispatchable_fungible_asset::transfer`. You should use
+    ///       that function unless you DO NOT want to support fungible assets with dispatchable hooks.
     public entry fun transfer<T: key>(
         sender: &signer,
         from: Object<T>,
@@ -779,6 +855,9 @@ module aptos_framework::fungible_asset {
     }
 
     /// Withdraw `amount` of the fungible asset from `store` by the owner.
+    ///
+    /// Note: This function can be in-place replaced by `dispatchable_fungible_asset::withdraw`. You should use
+    ///       that function unless you DO NOT want to support fungible assets with dispatchable hooks.
     public fun withdraw<T: key>(
         owner: &signer,
         store: Object<T>,
@@ -817,6 +896,9 @@ module aptos_framework::fungible_asset {
     }
 
     /// Deposit `amount` of the fungible asset to `store`.
+    ///
+    /// Note: This function can be in-place replaced by `dispatchable_fungible_asset::deposit`. You should use
+    ///       that function unless you DO NOT want to support fungible assets with dispatchable hooks.
     public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore, DispatchFunctionStore, ConcurrentFungibleBalance {
         deposit_sanity_check(store, true);
         deposit_internal(object::object_address(&store), fa);
@@ -945,6 +1027,30 @@ module aptos_framework::fungible_asset {
     ) acquires FungibleStore, ConcurrentFungibleBalance {
         let fa = withdraw_with_ref(transfer_ref, from, amount);
         deposit_with_ref(transfer_ref, to, fa);
+    }
+
+    /// Access raw balance of a store using `RawBalanceRef`
+    public fun balance_with_ref<T: key>(
+        ref: &RawBalanceRef,
+        store: Object<T>,
+    ): u64 acquires FungibleStore, ConcurrentFungibleBalance {
+        assert!(
+            ref.metadata == store_metadata(store),
+            error::invalid_argument(ERAW_BALANCE_REF_AND_FUNGIBLE_ASSET_MISMATCH)
+        );
+        balance_impl(store)
+    }
+
+    /// Access raw supply of a FA using `RawSupplyRef`
+    public fun supply_with_ref<T: key>(
+        ref: &RawSupplyRef,
+        metadata: Object<T>,
+    ): Option<u128> acquires Supply, ConcurrentSupply {
+        assert!(
+            object::object_address(&ref.metadata) == object::object_address(&metadata),
+            error::invalid_argument(ERAW_BALANCE_REF_AND_FUNGIBLE_ASSET_MISMATCH)
+        );
+        supply_impl(metadata)
     }
 
     /// Mutate specified fields of the fungible asset's `Metadata`.
@@ -1375,7 +1481,7 @@ module aptos_framework::fungible_asset {
     fun test_transfer_with_ref(
         creator: &signer,
         aaron: &signer,
-    ) acquires FungibleStore, Supply, ConcurrentSupply, ConcurrentFungibleBalance {
+    ) acquires FungibleStore, Supply, ConcurrentSupply, ConcurrentFungibleBalance, DispatchFunctionStore {
         let (mint_ref, transfer_ref, _burn_ref, _mutate_metadata_ref, _) = create_fungible_asset(creator);
         let metadata = mint_ref.metadata;
         let creator_store = create_test_store(creator, metadata);
