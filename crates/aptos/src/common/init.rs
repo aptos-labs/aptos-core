@@ -372,29 +372,34 @@ impl CliCommand<()> for InitTool {
             address, profile_name,
         );
 
-        match network {
-            Network::Mainnet => {
-                eprintln!("The account has not been created on chain yet, you will need to create and fund the account by transferring funds from another account");
-            },
-            Network::Testnet => {
-                let mint_site_url = get_mint_site_url(Some(address));
-                eprintln!("The account has not been created on chain yet. To create the account and get APT on testnet you must visit {}", mint_site_url);
-                // We don't use `prompt_yes_with_override` here because we only want to
-                // automatically open the minting site if they're in an interactive setting.
-                if !self.prompt_options.assume_yes {
-                    eprint!("Press [Enter] to go there now > ");
-                    read_line("Confirmation")?;
-                    open::that(&mint_site_url).map_err(|err| {
-                        CliError::UnexpectedError(format!("Failed to open minting site: {}", err))
-                    })?;
-                }
-            },
-            wildcard => {
-                eprintln!(
-                    "See the account here: {}",
-                    explorer_account_link(address, Some(wildcard))
-                );
-            },
+        if !account_exists {
+            match network {
+                Network::Mainnet => {
+                    eprintln!("The account has not been created on chain yet, you will need to create and fund the account by transferring funds from another account");
+                },
+                Network::Testnet => {
+                    let mint_site_url = get_mint_site_url(Some(address));
+                    eprintln!("The account has not been created on chain yet. To create the account and get APT on testnet you must visit {}", mint_site_url);
+                    // We don't use `prompt_yes_with_override` here because we only want to
+                    // automatically open the minting site if they're in an interactive setting.
+                    if !self.prompt_options.assume_yes {
+                        eprint!("Press [Enter] to go there now > ");
+                        read_line("Confirmation")?;
+                        open::that(&mint_site_url).map_err(|err| {
+                            CliError::UnexpectedError(format!(
+                                "Failed to open minting site: {}",
+                                err
+                            ))
+                        })?;
+                    }
+                },
+                _ => {},
+            }
+        } else {
+            eprintln!(
+                "See the account here: {}",
+                explorer_account_link(address, Some(network))
+            );
         }
 
         Ok(())
