@@ -698,6 +698,7 @@ pub fn convert_transaction_signature(
         TransactionSignature::MultiAgentSignature(_) => transaction::signature::Type::MultiAgent,
         TransactionSignature::FeePayerSignature(_) => transaction::signature::Type::FeePayer,
         TransactionSignature::SingleSender(_) => transaction::signature::Type::SingleSender,
+        TransactionSignature::NoAccountSignature(_) => unreachable!("No account signature can't be committed onchain")
     };
 
     let signature = match signature {
@@ -744,6 +745,9 @@ pub fn convert_transaction_signature(
                 sender: Some(convert_account_signature(s)),
             })
         },
+        TransactionSignature::NoAccountSignature(s) => {
+            unreachable!("No account signature can't be committed onchain")
+        }
     };
 
     Some(transaction::Signature {
