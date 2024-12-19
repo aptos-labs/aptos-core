@@ -42,7 +42,6 @@ use std::{
     sync::Arc,
 };
 use termcolor::{ColorChoice, StandardStream};
-use move_compiler_v2::diagnostics::human::HumanEmitter;
 
 #[derive(Debug, Clone)]
 pub enum CompilationCachingStatus {
@@ -1140,7 +1139,7 @@ pub fn unimplemented_v2_driver(_options: move_compiler_v2::Options) -> CompilerD
 pub fn build_and_report_v2_driver(options: move_compiler_v2::Options) -> CompilerDriverResult {
     let mut stderr = StandardStream::stderr(ColorChoice::Auto);
     let mut emitter = options.to_emitter(&mut stderr);
-    match move_compiler_v2::run_move_compiler_with_emitter(&mut emitter, options) {
+    match move_compiler_v2::run_move_compiler(emitter.as_mut(), options) {
         Ok((env, units)) => Ok((
             move_compiler_v2::make_files_source_text(&env),
             units,
@@ -1159,7 +1158,7 @@ pub fn build_and_report_no_exit_v2_driver(
 ) -> CompilerDriverResult {
     let mut stderr = StandardStream::stderr(ColorChoice::Auto);
     let mut emitter = options.to_emitter(&mut stderr);
-    let (env, units) = move_compiler_v2::run_move_compiler_with_emitter(emitter.as_mut(), options)?;
+    let (env, units) = move_compiler_v2::run_move_compiler(emitter.as_mut(), options)?;
     Ok((
         move_compiler_v2::make_files_source_text(&env),
         units,

@@ -36,7 +36,6 @@ move-symbol-pool = { workspace = true }
 num = { workspace = true }
 once_cell = { workspace = true }
 petgraph = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 
 [dev-dependencies]

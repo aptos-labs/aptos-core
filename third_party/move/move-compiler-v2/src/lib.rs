@@ -73,7 +73,7 @@ use move_stackless_bytecode::function_target_pipeline::{
 };
 use move_symbol_pool::Symbol;
 pub use options::Options;
-use std::{collections::BTreeSet, io::Write, path::Path};
+use std::{collections::BTreeSet, path::Path};
 
 /// Run Move compiler and print errors to stderr.
 pub fn run_move_compiler_to_stderr(
@@ -81,23 +81,11 @@ pub fn run_move_compiler_to_stderr(
 ) -> anyhow::Result<(GlobalEnv, Vec<AnnotatedCompiledUnit>)> {
     let mut stderr = StandardStream::stderr(ColorChoice::Auto);
     let mut emitter = HumanEmitter::new(&mut stderr);
-    run_move_compiler_with_emitter(&mut emitter, options)
+    run_move_compiler(&mut emitter, options)
 }
 
 /// Run move compiler and print errors to given writer. Returns the set of compiled units.
-pub fn run_move_compiler<W>(
-    error_writer: &mut W,
-    options: Options,
-) -> anyhow::Result<(GlobalEnv, Vec<AnnotatedCompiledUnit>)>
-where
-    W: WriteColor + Write,
-{
-    let mut emitter = HumanEmitter::new(error_writer);
-    run_move_compiler_with_emitter(&mut emitter, options)
-}
-
-/// Run move compiler and print errors to given writer. Returns the set of compiled units.
-pub fn run_move_compiler_with_emitter<E>(
+pub fn run_move_compiler<E>(
     emitter: &mut E,
     options: Options,
 ) -> anyhow::Result<(GlobalEnv, Vec<AnnotatedCompiledUnit>)>
@@ -179,7 +167,8 @@ pub fn run_move_compiler_for_analysis(
     options.whole_program = true; // will set `treat_everything_as_target`
     options = options.set_experiment(Experiment::SPEC_REWRITE, true);
     options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
-    let (env, _units) = run_move_compiler(error_writer, options)?;
+    let mut emitter = HumanEmitter::new(error_writer);
+    let (env, _units) = run_move_compiler(&mut emitter, options)?;
     // Reset for subsequent analysis
     env.treat_everything_as_target(false);
     Ok(env)

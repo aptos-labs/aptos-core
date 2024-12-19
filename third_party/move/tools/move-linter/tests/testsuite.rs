@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
-use move_compiler_v2::{run_move_compiler, Experiment};
+use move_compiler_v2::{diagnostics::human::HumanEmitter, run_move_compiler, Experiment};
 use move_linter::MoveLintChecks;
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_prover_test_utils::baseline_test;
@@ -30,7 +30,8 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
     };
     let mut output = String::new();
     let mut error_writer = Buffer::no_color();
-    match run_move_compiler(&mut error_writer, compiler_options) {
+    let mut emitter = HumanEmitter::new(&mut error_writer);
+    match run_move_compiler(&mut emitter, compiler_options) {
         Err(e) => {
             output.push_str(&format!(
                 "Aborting with compilation errors:\n{:#}\n{}\n",
