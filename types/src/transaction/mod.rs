@@ -68,9 +68,6 @@ pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 pub use move_core_types::transaction_argument::TransactionArgument;
 use move_core_types::vm_status::AbortLocation;
-use move_vm_types::delayed_values::delayed_field_id::{
-    ExtractUniqueIndex, ExtractWidth, TryFromMoveValue, TryIntoMoveValue,
-};
 pub use multisig::{ExecutionError, Multisig, MultisigTransactionPayload};
 use once_cell::sync::OnceCell;
 pub use script::{
@@ -2063,22 +2060,6 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         + Debug
         + DeserializeOwned
         + Serialize;
-    /// Delayed field identifier type.
-    type Identifier: PartialOrd
-        + Ord
-        + Send
-        + Sync
-        + Clone
-        + Hash
-        + Eq
-        + Debug
-        + Copy
-        + From<u64>
-        + From<(u32, u32)>
-        + ExtractUniqueIndex
-        + ExtractWidth
-        + TryIntoMoveValue
-        + TryFromMoveValue<Hint = ()>;
     type Value: Send + Sync + Debug + Clone + TransactionWrite;
     type Event: Send + Sync + Debug + Clone + TransactionEvent;
 

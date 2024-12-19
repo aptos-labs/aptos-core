@@ -27,7 +27,7 @@ use move_vm_runtime::{
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunctionTable,
-    AsUnsyncModuleStorage, RuntimeEnvironment,
+    AsFunctionValueExtension, AsUnsyncModuleStorage, RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use rayon::prelude::*;
@@ -86,6 +86,7 @@ fn print_resources_and_extensions(
     cs: &ChangeSet,
     extensions: &mut NativeContextExtensions,
     storage: &InMemoryStorage,
+    natives: &NativeFunctionTable,
 ) -> Result<String> {
     use std::fmt::Write;
     let mut buf = String::new();
@@ -104,7 +105,10 @@ fn print_resources_and_extensions(
         }
     }
 
-    extensions::print_change_sets(&mut buf, extensions);
+    let runtime_environment = RuntimeEnvironment::new(natives.clone());
+    let module_storage = storage.as_unsync_module_storage(runtime_environment);
+    let function_value_extension = module_storage.as_function_value_extension();
+    extensions::print_change_sets(&mut buf, extensions, &function_value_extension);
 
     Ok(buf)
 }
@@ -339,6 +343,7 @@ impl SharedTestingConfig {
                                 &changeset,
                                 &mut extensions,
                                 &self.starting_storage_state,
+                                &self.native_function_table,
                             )
                             .ok()
                         })
