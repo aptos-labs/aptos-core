@@ -23,6 +23,7 @@ aptos-types = { workspace = true }
 # third party deps
 anyhow = { workspace = true }
 bollard = { workspace = true }
+clap = { workspace = true }
 diesel = { workspace = true, features = [
     "postgres_backend",
 ] }
