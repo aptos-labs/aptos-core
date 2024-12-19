@@ -555,6 +555,10 @@ pub trait DbWriter: Send + Sync {
         } else {
             chunk.expect_last_version()
         };
+
+        if version_to_commit > 1870558006 {
+            return Ok(());
+        }
         self.commit_ledger(version_to_commit, ledger_info_with_sigs, Some(chunk))
     }
 
