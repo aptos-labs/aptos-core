@@ -8,8 +8,9 @@ use crate::{
 };
 use anyhow::ensure;
 use aptos_forge::{
-    args::TransactionTypeArg, emitter::NumAccountsMode, AccountType, EmitJobMode, EmitJobRequest,
-    EntryPoints, NodeExt, Result, Swarm, TransactionType, TxnEmitter, TxnStats, WorkflowProgress,
+    args::TransactionTypeArg, emitter::NumAccountsMode, EconiaFlowType, EmitJobMode, AccountType,
+    EmitJobRequest, EntryPoints, NodeExt, Result, Swarm, TransactionType, TxnEmitter, TxnStats,
+    WorkflowKind, WorkflowProgress,
 };
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use aptos_types::keyless::test_utils::{get_sample_esk, get_sample_exp_date, get_sample_jwt_token};
@@ -172,6 +173,87 @@ async fn test_txn_emmitter() {
         &all_validators,
         Duration::from_secs(20),
         100,
+        vec![
+            vec![(
+                TransactionType::Workflow {
+                    workflow_kind: WorkflowKind::Econia {
+                        num_users: 100,
+                        flow_type: EconiaFlowType::Basic,
+                        num_markets: 1,
+                        reuse_accounts_for_orders: false,
+                        publish_packages: false,
+                    },
+                    num_modules: 1,
+                    use_account_pool: true,
+                    progress_type: WorkflowProgress::MoveByPhases,
+                },
+                1,
+            )],
+            // vec![(
+            //     TransactionType::AccountGeneration {
+            //         add_created_accounts_to_pool: true,
+            //         max_account_working_set: 1_000_000,
+            //         creation_balance: 1_000_000,
+            //     },
+            //     20,
+            // )],
+            // vec![
+            //     (TransactionTypeArg::CoinTransfer.materialize_default(), 20),
+            //     // // commenting this out given it consistently fails smoke test
+            //     // // and it seems to be called only from `test_txn_emmitter`
+            //     (
+            //         TransactionType::PublishPackage {
+            //             use_account_pool: false,
+            //         },
+            //         20,
+            //     ),
+            // ],
+            vec![
+                (
+                    TransactionTypeArg::NoOp.materialize(
+                        100,
+                        false,
+                        WorkflowProgress::when_done_default(),
+                    ),
+                    20,
+                ),
+                (
+                    TransactionType::CallCustomModules {
+                        entry_point: EntryPoints::MakeOrChangeTable {
+                            offset: 0,
+                            count: 60,
+                        },
+                        num_modules: 1,
+                        use_account_pool: false,
+                    },
+                    20,
+                ),
+            ],
+            // vec![(
+            //     TransactionType::CallCustomModules {
+            //         entry_point: EntryPoints::TokenV1MintAndStoreNFTSequential,
+            //         num_modules: 1,
+            //         use_account_pool: false,
+            //     },
+            //     20,
+            // )],
+            // vec![(
+            //     TransactionType::CallCustomModules {
+            //         entry_point: EntryPoints::TokenV1MintAndTransferNFTParallel,
+            //         num_modules: 1,
+            //         use_account_pool: false,
+            //     },
+            //     20,
+            // )],
+            // vec![(
+            //     TransactionType::CallCustomModules {
+            //         entry_point: EntryPoints::TokenV1MintAndTransferNFTSequential,
+            //         num_modules: 1,
+            //         use_account_pool: false,
+            //     },
+            //     20,
+            // )],
+        ],
         TRANSACTION_MIX_PER_PHASE.to_vec(),
     )
     .await

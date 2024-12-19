@@ -346,9 +346,10 @@ impl TransactionGenerator {
                         })
                         .borrow_mut();
                     transaction_generator
-                        .generate_transactions(sender, 1)
-                        .pop()
-                        .map(Transaction::UserTransaction)
+                        .generate_transactions(sender, 1, &Vec::new(), false)
+                        .iter()
+                        .map(|txn| Transaction::UserTransaction(txn.clone()))
+                        .collect()
                 },
                 |sender_idx| *sender_idx,
             );
@@ -651,7 +652,7 @@ impl TransactionGenerator {
                     self.transaction_factory
                         .transfer(account_cache.accounts[receiver_idx].address(), 1),
                 );
-                Some(Transaction::UserTransaction(txn))
+                vec![Transaction::UserTransaction(txn)]
             },
             |(sender_idx, _)| *sender_idx,
         );
@@ -668,7 +669,7 @@ impl TransactionGenerator {
     ) -> bool
     where
         T: Send,
-        F: Fn(T, &AccountCache) -> Option<Transaction> + Send + Sync,
+        F: Fn(T, &AccountCache) -> Vec<Transaction> + Send + Sync,
         S: Fn(&T) -> usize,
     {
         let _timer = TIMER.with_label_values(&["generate_block"]).start_timer();
@@ -685,9 +686,11 @@ impl TransactionGenerator {
                 let tx = tx.clone();
                 scope.spawn(move |_| {
                     for (index, job) in per_worker_jobs {
-                        if let Some(txn) = job() {
-                            tx.send((index, txn)).unwrap();
-                        }
+                        let txns = job();
+                        tx.send((index, txns)).unwrap();
+                        // if let Some(txn) = job() {
+                        //     tx.send((index, txn)).unwrap();
+                        // }
                     }
                 });
             }
@@ -700,8 +703,8 @@ impl TransactionGenerator {
 
         let mut transactions = Vec::new();
         for i in 0..block_size {
-            if let Some(txn) = transactions_by_index.get(&i) {
-                transactions.push(txn.clone());
+            if let Some(txns) = transactions_by_index.get(&i) {
+                transactions.extend(txns.clone());
             }
         }
 
