@@ -107,8 +107,8 @@ fn print_resources_and_extensions(
 
     let runtime_environment = RuntimeEnvironment::new(natives.clone());
     let module_storage = storage.as_unsync_module_storage(runtime_environment);
-    let function_extension = module_storage.as_function_extension();
-    extensions::print_change_sets(&mut buf, extensions, &function_extension);
+    let function_value_extension = module_storage.as_function_value_extension();
+    extensions::print_change_sets(&mut buf, extensions, &function_value_extension);
 
     Ok(buf)
 }

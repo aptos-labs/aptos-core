@@ -157,7 +157,7 @@ impl<'a> NativeTableContext<'a> {
     /// Computes the change set from a NativeTableContext.
     pub fn into_change_set(
         self,
-        function_extension: &impl FunctionValueExtension,
+        function_value_extension: &impl FunctionValueExtension,
     ) -> PartialVMResult<TableChangeSet> {
         let NativeTableContext { table_data, .. } = self;
         let TableData {
@@ -181,11 +181,11 @@ impl<'a> NativeTableContext<'a> {
 
                 match op {
                     Op::New(val) => {
-                        let bytes = serialize(function_extension, &value_layout, &val)?;
+                        let bytes = serialize(function_value_extension, &value_layout, &val)?;
                         entries.insert(key, Op::New(bytes.into()));
                     },
                     Op::Modify(val) => {
-                        let bytes = serialize(function_extension, &value_layout, &val)?;
+                        let bytes = serialize(function_value_extension, &value_layout, &val)?;
                         entries.insert(key, Op::Modify(bytes.into()));
                     },
                     Op::Delete => {
@@ -235,7 +235,7 @@ impl TableData {
 impl Table {
     fn get_or_create_global_value(
         &mut self,
-        function_extension: &dyn FunctionValueExtension,
+        function_value_extension: &dyn FunctionValueExtension,
         table_context: &NativeTableContext,
         key: Vec<u8>,
     ) -> PartialVMResult<(&mut GlobalValue, Option<Option<NumBytes>>)> {
@@ -246,7 +246,8 @@ impl Table {
                     .resolve_table_entry_bytes_with_layout(&self.handle, entry.key(), None)?
                 {
                     Some(val_bytes) => {
-                        let val = deserialize(function_extension, &val_bytes, &self.value_layout)?;
+                        let val =
+                            deserialize(function_value_extension, &val_bytes, &self.value_layout)?;
                         (
                             GlobalValue::cached(val)?,
                             Some(NumBytes::new(val_bytes.len() as u64)),
@@ -394,7 +395,7 @@ fn native_add_box(
     assert_eq!(ty_args.len(), 3);
     assert_eq!(args.len(), 3);
 
-    let function_extension = context.function_extension();
+    let function_value_extension = context.function_value_extension();
     let table_context = context.extensions().get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
 
@@ -406,11 +407,11 @@ fn native_add_box(
 
     let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
 
-    let key_bytes = serialize(function_extension, &table.key_layout, &key)?;
+    let key_bytes = serialize(function_value_extension, &table.key_layout, &key)?;
     cost += gas_params.per_byte_serialized * NumBytes::new(key_bytes.len() as u64);
 
     let (gv, loaded) =
-        table.get_or_create_global_value(function_extension, table_context, key_bytes)?;
+        table.get_or_create_global_value(function_value_extension, table_context, key_bytes)?;
     cost += common_gas_params.calculate_load_cost(loaded);
 
     match gv.move_to(val) {
@@ -446,7 +447,7 @@ fn native_borrow_box(
     assert_eq!(ty_args.len(), 3);
     assert_eq!(args.len(), 2);
 
-    let function_extension = context.function_extension();
+    let function_value_extension = context.function_value_extension();
     let table_context = context.extensions().get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
 
@@ -457,11 +458,11 @@ fn native_borrow_box(
 
     let mut cost = gas_params.base;
 
-    let key_bytes = serialize(function_extension, &table.key_layout, &key)?;
+    let key_bytes = serialize(function_value_extension, &table.key_layout, &key)?;
     cost += gas_params.per_byte_serialized * NumBytes::new(key_bytes.len() as u64);
 
     let (gv, loaded) =
-        table.get_or_create_global_value(function_extension, table_context, key_bytes)?;
+        table.get_or_create_global_value(function_value_extension, table_context, key_bytes)?;
     cost += common_gas_params.calculate_load_cost(loaded);
 
     match gv.borrow_global() {
@@ -497,7 +498,7 @@ fn native_contains_box(
     assert_eq!(ty_args.len(), 3);
     assert_eq!(args.len(), 2);
 
-    let function_extension = context.function_extension();
+    let function_value_extension = context.function_value_extension();
     let table_context = context.extensions().get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
 
@@ -508,11 +509,11 @@ fn native_contains_box(
 
     let mut cost = gas_params.base;
 
-    let key_bytes = serialize(function_extension, &table.key_layout, &key)?;
+    let key_bytes = serialize(function_value_extension, &table.key_layout, &key)?;
     cost += gas_params.per_byte_serialized * NumBytes::new(key_bytes.len() as u64);
 
     let (gv, loaded) =
-        table.get_or_create_global_value(function_extension, table_context, key_bytes)?;
+        table.get_or_create_global_value(function_value_extension, table_context, key_bytes)?;
     cost += common_gas_params.calculate_load_cost(loaded);
 
     let exists = Value::bool(gv.exists()?);
@@ -547,7 +548,7 @@ fn native_remove_box(
     assert_eq!(ty_args.len(), 3);
     assert_eq!(args.len(), 2);
 
-    let function_extension = context.function_extension();
+    let function_value_extension = context.function_value_extension();
     let table_context = context.extensions().get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
 
@@ -558,11 +559,11 @@ fn native_remove_box(
 
     let mut cost = gas_params.base;
 
-    let key_bytes = serialize(function_extension, &table.key_layout, &key)?;
+    let key_bytes = serialize(function_value_extension, &table.key_layout, &key)?;
     cost += gas_params.per_byte_serialized * NumBytes::new(key_bytes.len() as u64);
 
     let (gv, loaded) =
-        table.get_or_create_global_value(function_extension, table_context, key_bytes)?;
+        table.get_or_create_global_value(function_value_extension, table_context, key_bytes)?;
     cost += common_gas_params.calculate_load_cost(loaded);
 
     match gv.move_from() {
@@ -698,23 +699,23 @@ fn get_table_handle(table: &StructRef) -> PartialVMResult<TableHandle> {
 }
 
 fn serialize(
-    function_extension: &dyn FunctionValueExtension,
+    function_value_extension: &dyn FunctionValueExtension,
     layout: &MoveTypeLayout,
     val: &Value,
 ) -> PartialVMResult<Vec<u8>> {
     ValueSerDeContext::new()
-        .with_func_args_deserialization(function_extension)
+        .with_func_args_deserialization(function_value_extension)
         .serialize(val, layout)?
         .ok_or_else(|| partial_extension_error("cannot serialize table key or value"))
 }
 
 fn deserialize(
-    function_extension: &dyn FunctionValueExtension,
+    function_value_extension: &dyn FunctionValueExtension,
     bytes: &[u8],
     layout: &MoveTypeLayout,
 ) -> PartialVMResult<Value> {
     ValueSerDeContext::new()
-        .with_func_args_deserialization(function_extension)
+        .with_func_args_deserialization(function_value_extension)
         .deserialize(bytes, layout)
         .ok_or_else(|| partial_extension_error("cannot deserialize table key or value"))
 }
