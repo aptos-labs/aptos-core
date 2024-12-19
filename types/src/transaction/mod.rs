@@ -524,7 +524,7 @@ impl Debug for SignedTransaction {
         write!(
             f,
             "SignedTransaction {{ \n \
-             {{ raw_txn: {:#?}, \n \
+             {{ raw_txn: {:?}, \n \
              authenticator: {:#?}, \n \
              }} \n \
              }}",
