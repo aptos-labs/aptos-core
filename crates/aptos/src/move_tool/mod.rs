@@ -909,7 +909,6 @@ impl IncludedArtifacts {
         experiments.append(&mut move_options.experiments.clone());
         experiments.append(&mut more_experiments);
 
-        // TODO(#14441): Remove `None |` here when we update default CompilerVersion
         if matches!(
             move_options.compiler_version,
             Option::None | Some(CompilerVersion::V1)
