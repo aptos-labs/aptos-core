@@ -159,6 +159,11 @@ pub struct BoogieOptions {
     /// A hard timeout for boogie execution; if the process does not terminate within
     /// this time frame, it will be killed. Zero for no timeout.
     pub hard_timeout_secs: u64,
+    /// Whether to skip verification of type instantiations of functions. This may miss
+    /// some verification conditions if different type instantiations can create
+    /// different behavior via type reflection or storage access, but can speed up
+    /// verification.
+    pub skip_instance_check: bool,
     /// What vector theory to use.
     pub vector_theory: VectorTheory,
     /// Whether to generate a z3 trace file and where to put it.
@@ -207,6 +212,7 @@ impl Default for BoogieOptions {
             custom_natives: None,
             loop_unroll: None,
             borrow_aggregates: vec![],
+            skip_instance_check: false,
         }
     }
 }
