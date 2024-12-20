@@ -78,6 +78,7 @@ impl SenderAwareShuffler {
         // we try to find pending transaction from the corresponding sender and add it to the block.
         if let Some(sender) = sliding_window_state.last_dropped_sender() {
             if let Some(txn) = pending_txns.remove_pending_from_sender(sender) {
+                sliding_window_state.add_transaction(txn.clone());
                 return txn;
             }
         }
@@ -85,6 +86,7 @@ impl SenderAwareShuffler {
         // iterate through the original transactions and try to find the next candidate
         while let Some(txn) = orig_txns.pop_front() {
             if !sliding_window_state.has_conflict(&txn.parse_sender()) {
+                sliding_window_state.add_transaction(txn.clone());
                 return txn;
             }
             pending_txns.add_transaction(txn);
@@ -92,9 +94,11 @@ impl SenderAwareShuffler {
 
         // If we can't find any candidate in above steps, then lastly
         // add pending transactions in the order if we can't find any other candidate
-        pending_txns
+        let txn = pending_txns
             .remove_first_pending()
-            .expect("Pending should return a transaction")
+            .expect("Pending should return a transaction");
+        sliding_window_state.add_transaction(txn.clone());
+        txn
     }
 }
 
@@ -140,8 +144,7 @@ impl TransactionShuffler for SenderAwareShuffler {
         let num_transactions = txns.len();
         let mut orig_txns = VecDeque::from(txns);
         while sliding_window.num_txns() < num_transactions {
-            let txn = self.next_to_add(&mut sliding_window, &mut pending_txns, &mut orig_txns);
-            sliding_window.add_transaction(txn)
+            let _ = self.next_to_add(&mut sliding_window, &mut pending_txns, &mut orig_txns);
         }
         sliding_window.finalize()
     }
