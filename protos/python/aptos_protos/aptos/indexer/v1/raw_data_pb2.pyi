@@ -12,7 +12,7 @@ from google.protobuf.internal import containers as _containers
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class TransactionsInStorage(_message.Message):
-    __slots__ = ["transactions", "starting_version"]
+    __slots__ = ("transactions", "starting_version")
     TRANSACTIONS_FIELD_NUMBER: _ClassVar[int]
     STARTING_VERSION_FIELD_NUMBER: _ClassVar[int]
     transactions: _containers.RepeatedCompositeFieldContainer[
@@ -28,22 +28,30 @@ class TransactionsInStorage(_message.Message):
     ) -> None: ...
 
 class GetTransactionsRequest(_message.Message):
-    __slots__ = ["starting_version", "transactions_count", "batch_size"]
+    __slots__ = (
+        "starting_version",
+        "transactions_count",
+        "batch_size",
+        "txns_to_strip_filter",
+    )
     STARTING_VERSION_FIELD_NUMBER: _ClassVar[int]
     TRANSACTIONS_COUNT_FIELD_NUMBER: _ClassVar[int]
     BATCH_SIZE_FIELD_NUMBER: _ClassVar[int]
+    TXNS_TO_STRIP_FILTER_FIELD_NUMBER: _ClassVar[int]
     starting_version: int
     transactions_count: int
     batch_size: int
+    txns_to_strip_filter: str
     def __init__(
         self,
         starting_version: _Optional[int] = ...,
         transactions_count: _Optional[int] = ...,
         batch_size: _Optional[int] = ...,
+        txns_to_strip_filter: _Optional[str] = ...,
     ) -> None: ...
 
 class TransactionsResponse(_message.Message):
-    __slots__ = ["transactions", "chain_id"]
+    __slots__ = ("transactions", "chain_id")
     TRANSACTIONS_FIELD_NUMBER: _ClassVar[int]
     CHAIN_ID_FIELD_NUMBER: _ClassVar[int]
     transactions: _containers.RepeatedCompositeFieldContainer[

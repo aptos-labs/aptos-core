@@ -1,11 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::{
-    BYTES_READY_TO_TRANSFER_FROM_SERVER, BYTES_READY_TO_TRANSFER_FROM_SERVER_AFTER_STRIPPING,
-    CONNECTION_COUNT, ERROR_COUNT, LATEST_PROCESSED_VERSION_PER_PROCESSOR,
-    NUM_TRANSACTIONS_STRIPPED, PROCESSED_LATENCY_IN_SECS_PER_PROCESSOR,
-    PROCESSED_VERSIONS_COUNT_PER_PROCESSOR, SHORT_CONNECTION_COUNT,
+use crate::{
+    metrics::{
+        BYTES_READY_TO_TRANSFER_FROM_SERVER, BYTES_READY_TO_TRANSFER_FROM_SERVER_AFTER_STRIPPING,
+        CONNECTION_COUNT, ERROR_COUNT, LATEST_PROCESSED_VERSION_PER_PROCESSOR,
+        NUM_TRANSACTIONS_STRIPPED, PROCESSED_LATENCY_IN_SECS_PER_PROCESSOR,
+        PROCESSED_VERSIONS_COUNT_PER_PROCESSOR, SHORT_CONNECTION_COUNT,
+    },
+    IndexerGrpcDataServiceConfig,
 };
 use anyhow::{Context, Result};
 use aptos_indexer_grpc_utils::{
@@ -160,6 +163,22 @@ impl RawData for RawDataServerWrapper {
         let request = req.into_inner();
 
         let transactions_count = request.transactions_count;
+        let maybe_user_txn_to_strip_filter = match request.txns_to_strip_filter {
+            Some(txns_to_strip_filter) => serde_json::from_str(&txns_to_strip_filter),
+            None => Ok(IndexerGrpcDataServiceConfig::default_txns_to_strip_filter()),
+        };
+        let user_txn_to_strip_filter = match maybe_user_txn_to_strip_filter {
+            Ok(txns_to_strip_filter) => txns_to_strip_filter,
+            Err(e) => {
+                error!(
+                    error = e.to_string(),
+                    "[Data Service] Failed to parse txns_to_strip_filter."
+                );
+                return Result::Err(Status::invalid_argument(
+                    "Failed to parse txns_to_strip_filter.",
+                ));
+            },
+        };
 
         // Response channel to stream the data to the client.
         let (tx, rx) = channel(self.data_service_response_channel_size);
@@ -193,7 +212,11 @@ impl RawData for RawDataServerWrapper {
         let redis_client = self.redis_client.clone();
         let cache_storage_format = self.cache_storage_format;
         let request_metadata = Arc::new(request_metadata);
-        let txns_to_strip_filter = self.txns_to_strip_filter.clone();
+        let config_txns_to_strip_filter = self.txns_to_strip_filter.clone();
+        let txns_to_strip_filter = BooleanTransactionFilter::new_or(vec![
+            user_txn_to_strip_filter,
+            config_txns_to_strip_filter,
+        ]);
         let in_memory_cache = self.in_memory_cache.clone();
         tokio::spawn({
             let request_metadata = request_metadata.clone();
@@ -1276,6 +1299,7 @@ mod tests {
         assert_eq!(user_transaction.events.len(), 0);
         assert_eq!(txn.info.as_ref().unwrap().changes.len(), 0);
     }
+
     #[test]
     fn test_transactions_are_not_stripped() {
         let txn = create_test_transaction(

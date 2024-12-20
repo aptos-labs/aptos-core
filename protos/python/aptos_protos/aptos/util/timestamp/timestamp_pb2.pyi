@@ -7,7 +7,7 @@ from google.protobuf import message as _message
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class Timestamp(_message.Message):
-    __slots__ = ["seconds", "nanos"]
+    __slots__ = ("seconds", "nanos")
     SECONDS_FIELD_NUMBER: _ClassVar[int]
     NANOS_FIELD_NUMBER: _ClassVar[int]
     seconds: int

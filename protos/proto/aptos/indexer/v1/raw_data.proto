@@ -26,6 +26,13 @@ message GetTransactionsRequest {
   // Optional; number of transactions in each `TransactionsResponse` for current stream.
   // If not present, default to 1000. If larger than 1000, request will be rejected.
   optional uint64 batch_size = 3;
+
+  // Optional; JSON representation of BooleanTransactionFilter.
+  // Any transaction that matches this filter will be stripped. This means we remove 
+  // the payload, signature, events, and writesets from it before sending it downstream. 
+  // Generally you will want to start with this with an OR, and then list out
+  // separate filters that describe each type of txn we want to strip.
+  optional string txns_to_strip_filter = 4;
 }
 
 // TransactionsResponse is a batch of transactions.
