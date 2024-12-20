@@ -38,7 +38,17 @@ export interface GetTransactionsRequest {
    * Optional; number of transactions in each `TransactionsResponse` for current stream.
    * If not present, default to 1000. If larger than 1000, request will be rejected.
    */
-  batchSize?: bigint | undefined;
+  batchSize?:
+    | bigint
+    | undefined;
+  /**
+   * Optional; JSON representation of BooleanTransactionFilter.
+   * Any transaction that matches this filter will be stripped. This means we remove
+   * the payload, signature, events, and writesets from it before sending it downstream.
+   * Generally you will want to start with this with an OR, and then list out
+   * separate filters that describe each type of txn we want to strip.
+   */
+  txnsToStripFilter?: string | undefined;
 }
 
 /** TransactionsResponse is a batch of transactions. */
@@ -167,7 +177,12 @@ export const TransactionsInStorage = {
 };
 
 function createBaseGetTransactionsRequest(): GetTransactionsRequest {
-  return { startingVersion: undefined, transactionsCount: undefined, batchSize: undefined };
+  return {
+    startingVersion: undefined,
+    transactionsCount: undefined,
+    batchSize: undefined,
+    txnsToStripFilter: undefined,
+  };
 }
 
 export const GetTransactionsRequest = {
@@ -189,6 +204,9 @@ export const GetTransactionsRequest = {
         throw new globalThis.Error("value provided for field message.batchSize of type uint64 too large");
       }
       writer.uint32(24).uint64(message.batchSize.toString());
+    }
+    if (message.txnsToStripFilter !== undefined) {
+      writer.uint32(34).string(message.txnsToStripFilter);
     }
     return writer;
   },
@@ -220,6 +238,13 @@ export const GetTransactionsRequest = {
           }
 
           message.batchSize = longToBigint(reader.uint64() as Long);
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.txnsToStripFilter = reader.string();
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -269,6 +294,7 @@ export const GetTransactionsRequest = {
       startingVersion: isSet(object.startingVersion) ? BigInt(object.startingVersion) : undefined,
       transactionsCount: isSet(object.transactionsCount) ? BigInt(object.transactionsCount) : undefined,
       batchSize: isSet(object.batchSize) ? BigInt(object.batchSize) : undefined,
+      txnsToStripFilter: isSet(object.txnsToStripFilter) ? globalThis.String(object.txnsToStripFilter) : undefined,
     };
   },
 
@@ -283,6 +309,9 @@ export const GetTransactionsRequest = {
     if (message.batchSize !== undefined) {
       obj.batchSize = message.batchSize.toString();
     }
+    if (message.txnsToStripFilter !== undefined) {
+      obj.txnsToStripFilter = message.txnsToStripFilter;
+    }
     return obj;
   },
 
@@ -294,6 +323,7 @@ export const GetTransactionsRequest = {
     message.startingVersion = object.startingVersion ?? undefined;
     message.transactionsCount = object.transactionsCount ?? undefined;
     message.batchSize = object.batchSize ?? undefined;
+    message.txnsToStripFilter = object.txnsToStripFilter ?? undefined;
     return message;
   },
 };
