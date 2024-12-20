@@ -1,3 +1,6 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::transaction::{
     signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
 };
