@@ -700,6 +700,11 @@ impl GlobalEnv {
         self.address_alias_map = map
     }
 
+    /// Gets the global address alias map
+    pub fn get_address_alias_map(&self) -> &BTreeMap<Symbol, AccountAddress> {
+        &self.address_alias_map
+    }
+
     /// Indicates that all modules in the environment should be treated as
     /// target modules, i.e. `module.is_target()` returns true. This can be
     /// used to temporarily override the default which distinguishes
