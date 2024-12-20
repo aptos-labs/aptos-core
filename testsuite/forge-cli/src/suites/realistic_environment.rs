@@ -60,7 +60,6 @@ pub(crate) fn realistic_env_sweep_wrap(
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            config.execution.processed_transactions_detailed_counters = true;
         }))
         .add_network_test(test)
         // Test inherits the main EmitJobRequest, so update here for more precise latency measurements
