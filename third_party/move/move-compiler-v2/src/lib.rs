@@ -75,6 +75,8 @@ use move_symbol_pool::Symbol;
 pub use options::Options;
 use std::{collections::BTreeSet, path::Path};
 
+const DEBUG: bool = false;
+
 /// Run Move compiler and print errors to stderr.
 pub fn run_move_compiler_to_stderr(
     options: Options,
@@ -107,7 +109,9 @@ where
     let mut targets = run_bytecode_gen(&env);
     check_errors(&env, emitter, "code generation errors")?;
 
-    debug!("After bytecode_gen, GlobalEnv={}", env.dump_env());
+    if DEBUG {
+        debug!("After bytecode_gen, GlobalEnv={}", env.dump_env());
+    }
 
     // Run transformation pipeline
     let pipeline = bytecode_pipeline(&env);
@@ -142,10 +146,12 @@ where
     let modules_and_scripts = run_file_format_gen(&mut env, &targets);
     check_errors(&env, emitter, "assembling errors")?;
 
-    debug!(
-        "File format bytecode:\n{}",
-        disassemble_compiled_units(&modules_and_scripts)?
-    );
+    if DEBUG {
+        debug!(
+            "File format bytecode:\n{}",
+            disassemble_compiled_units(&modules_and_scripts)?
+        );
+    }
 
     let annotated_units = annotate_units(modules_and_scripts);
     run_bytecode_verifier(&annotated_units, &mut env);
