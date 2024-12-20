@@ -6,6 +6,8 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 - Add flag `--benchmark` to `aptos move prove`, which allows to benchmark verification times of individual functions in a package.
 - Add flag `--only <name>` to `aptos move prove`, which allows to scope verification to a function.
 
+- Fix `aptos init` to show the explorer link for accounts when account is already created on chain instead of prompting to fund the account.
+
 ## [5.1.0] - 2024/12/13
 - More optimizations are now default for compiler v2.
 - Downgrade bytecode version to v6 before calling the Revela decompiler, if possible, i.e. no enum types are used. This allows to continue to use Revela until the new decompiler is ready.
