@@ -1,98 +1,23 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{counters::NUM_SENDERS_IN_BLOCK, transaction_shuffler::TransactionShuffler};
+pub(crate) mod config;
+pub(crate) mod iterator;
+pub(crate) mod pending_transactions;
+pub(crate) mod sliding_window_state;
+
+use crate::transaction_shuffler::{
+    sender_aware::{
+        config::Config, iterator::ShuffledTransactionIterator,
+        pending_transactions::PendingTransactions, sliding_window_state::SlidingWindowState,
+    },
+    TransactionShuffler,
+};
 use aptos_types::transaction::{
     sender_aware::SenderAwareTransaction,
     signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
 };
-use move_core_types::account_address::AccountAddress;
-use std::{
-    collections::{HashMap, VecDeque},
-    fmt::Debug,
-};
-
-#[derive(Clone, Debug)]
-pub struct Config {
-    conflict_window_size: usize,
-}
-
-#[derive(Debug)]
-pub struct ShuffledTransactionIterator<Txn> {
-    input_num_transactions: usize,
-    input_queue: VecDeque<Txn>,
-    sliding_window_state: SlidingWindowState<Txn>,
-    pending_txns: PendingTransactions<Txn>,
-}
-
-impl<Txn> ShuffledTransactionIterator<Txn>
-where
-    Txn: SenderAwareTransaction + Debug + Clone + PartialEq,
-{
-    pub fn new(config: Config, input_txns: Vec<Txn>) -> Self {
-        let pending_txns = PendingTransactions::new();
-        let input_num_transactions = input_txns.len();
-        let orig_txns = VecDeque::from(input_txns);
-        Self {
-            input_num_transactions,
-            input_queue: orig_txns,
-            sliding_window_state: SlidingWindowState::new(
-                config.conflict_window_size,
-                input_num_transactions,
-            ),
-            pending_txns,
-        }
-    }
-
-    pub(super) fn select_next_txn_inner(&mut self) -> Txn {
-        // First check if we have a sender dropped off of conflict window in previous step, if so,
-        // we try to find pending transaction from the corresponding sender and add it to the block.
-        if let Some(sender) = self.sliding_window_state.last_dropped_sender() {
-            if let Some(txn) = self.pending_txns.remove_pending_from_sender(sender) {
-                self.sliding_window_state.add_transaction(txn.clone());
-                return txn;
-            }
-        }
-        // If we can't find any transaction from a sender dropped off of conflict window, then
-        // iterate through the original transactions and try to find the next candidate
-        while let Some(txn) = self.input_queue.pop_front() {
-            if !self.sliding_window_state.has_conflict(&txn.parse_sender()) {
-                self.sliding_window_state.add_transaction(txn.clone());
-                return txn;
-            }
-            self.pending_txns.add_transaction(txn);
-        }
-
-        // If we can't find any candidate in above steps, then lastly
-        // add pending transactions in the order if we can't find any other candidate
-        let txn = self
-            .pending_txns
-            .remove_first_pending()
-            .expect("Pending should return a transaction");
-        self.sliding_window_state.add_transaction(txn.clone());
-        txn
-    }
-
-    pub(super) fn select_next_txn(&mut self) -> Option<Txn> {
-        if self.sliding_window_state.num_txns() < self.input_num_transactions {
-            let txn = self.select_next_txn_inner();
-            Some(txn)
-        } else {
-            None
-        }
-    }
-}
-
-impl<Txn> Iterator for ShuffledTransactionIterator<Txn>
-where
-    Txn: SenderAwareTransaction + Debug + Clone + PartialEq,
-{
-    type Item = Txn;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.select_next_txn()
-    }
-}
+use std::{collections::VecDeque, fmt::Debug};
 
 pub struct SenderAwareShuffler {
     pub config: Config,
@@ -197,146 +122,6 @@ impl SenderAwareShuffler {
                 conflict_window_size,
             },
         }
-    }
-}
-
-/// A structure to maintain a set of transactions that are pending to be added to the block indexed by
-/// the sender. For a particular sender, relative ordering of transactions are maintained,
-/// so that the final block preserves the ordering of transactions by sender. It also maintains a vector
-/// to preserve the original order of the transactions. This is needed in case we can't find
-/// any non-conflicting transactions and we need to add the first pending transaction to the block.
-#[derive(Debug)]
-struct PendingTransactions<Txn> {
-    txns_by_senders: HashMap<AccountAddress, VecDeque<Txn>>,
-    // Transactions are kept in the original order. This is not kept in sync with pending transactions,
-    // so this can contain a bunch of transactions that are already added to the block.
-    ordered_txns: VecDeque<Txn>,
-}
-
-impl<Txn> PendingTransactions<Txn>
-where
-    Txn: SenderAwareTransaction + Clone + Debug + PartialEq,
-{
-    pub fn new() -> Self {
-        Self {
-            txns_by_senders: HashMap::new(),
-            ordered_txns: VecDeque::new(),
-        }
-    }
-
-    pub fn add_transaction(&mut self, txn: Txn) {
-        self.ordered_txns.push_back(txn.clone());
-        self.txns_by_senders
-            .entry(txn.parse_sender())
-            .or_default()
-            .push_back(txn);
-    }
-
-    /// Removes the first pending transaction from the sender. Please note that the transaction is not
-    /// removed from the `ordered_txns`, so the `ordered_txns` will contain a set of transactions that
-    /// are removed from pending transactions already.
-    pub fn remove_pending_from_sender(&mut self, sender: AccountAddress) -> Option<Txn> {
-        self.txns_by_senders
-            .get_mut(&sender)
-            .and_then(|txns| txns.pop_front())
-    }
-
-    pub fn remove_first_pending(&mut self) -> Option<Txn> {
-        while let Some(txn) = self.ordered_txns.pop_front() {
-            let sender = txn.parse_sender();
-            if let Some(sender_queue) = self.txns_by_senders.get(&sender) {
-                if Some(txn).as_ref() == sender_queue.front() {
-                    return self.remove_pending_from_sender(sender);
-                }
-            }
-        }
-        None
-    }
-}
-
-/// A stateful data structure maintained by the transaction shuffler during shuffling. On a
-/// high level, it maintains a sliding window of the conflicting transactions, which helps the payload
-/// generator include a set of transactions which are non-conflicting with each other within a particular
-/// window size.
-#[derive(Debug)]
-struct SlidingWindowState<Txn> {
-    // Please note that the start index can be negative in case the window size is larger than the
-    // end_index.
-    start_index: i64,
-    // Hashmap of senders to the number of transactions included in the window for the corresponding
-    // sender.
-    senders_in_window: HashMap<AccountAddress, usize>,
-    // Partially ordered transactions, needs to be updated every time add_transactions is called.
-    txns: Vec<Txn>,
-}
-
-impl<Txn> SlidingWindowState<Txn>
-where
-    Txn: SenderAwareTransaction + Debug + Clone + PartialEq,
-{
-    pub fn new(window_size: usize, num_txns: usize) -> Self {
-        Self {
-            start_index: -(window_size as i64),
-            senders_in_window: HashMap::new(),
-            txns: Vec::with_capacity(num_txns),
-        }
-    }
-
-    /// Slides the current window. Essentially, it increments the start_index and
-    /// updates the senders_in_window map if start_index is greater than 0
-    pub fn add_transaction(&mut self, txn: Txn) {
-        if self.start_index >= 0 {
-            // if the start_index is negative, then no sender falls out of the window.
-            let sender = self
-                .txns
-                .get(self.start_index as usize)
-                .expect("Transaction expected")
-                .parse_sender();
-            self.senders_in_window
-                .entry(sender)
-                .and_modify(|count| *count -= 1);
-        }
-        let count = self
-            .senders_in_window
-            .entry(txn.parse_sender())
-            .or_insert_with(|| 0);
-        *count += 1;
-        self.txns.push(txn);
-        self.start_index += 1;
-    }
-
-    pub fn has_conflict(&self, addr: &AccountAddress) -> bool {
-        self.senders_in_window
-            .get(addr)
-            .map_or(false, |count| *count != 0)
-    }
-
-    /// Returns the sender which was dropped off of the conflict window in previous iteration.
-    pub fn last_dropped_sender(&self) -> Option<AccountAddress> {
-        if self.start_index > 0 {
-            let prev_start_index = self.start_index - 1;
-            if let Some(last_sender) = self
-                .txns
-                .get(prev_start_index as usize)
-                .map(|txn| txn.parse_sender())
-            {
-                if let Some(&count) = self.senders_in_window.get(&last_sender) {
-                    if count == 0 {
-                        return Some(last_sender);
-                    }
-                }
-            }
-        }
-        None
-    }
-
-    pub fn num_txns(&self) -> usize {
-        self.txns.len()
-    }
-
-    pub fn finalize(self) -> Vec<Txn> {
-        NUM_SENDERS_IN_BLOCK.set(self.senders_in_window.len() as f64);
-        self.txns
     }
 }
 

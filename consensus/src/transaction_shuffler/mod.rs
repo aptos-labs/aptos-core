@@ -33,7 +33,7 @@ pub trait TransactionShuffler: Send + Sync {
     ) -> Box<dyn Iterator<Item = SignedTransaction> + 'static>;
 
     /// Given a configuration and a vector of SignatureVerifiedTransaction, return an iterator of
-    /// SignedTransaction.
+    /// SignatureVerifiedTransaction.
     fn signature_verified_transaction_iterator(
         &self,
         txns: Vec<SignatureVerifiedTransaction>,
