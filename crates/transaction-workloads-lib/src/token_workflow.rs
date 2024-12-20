@@ -1,19 +1,19 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
+use crate::EntryPoints;
+use aptos_sdk::transaction_builder::TransactionFactory;
+use aptos_transaction_generator_lib::{
     account_generator::AccountGeneratorCreator,
     accounts_pool_wrapper::AccountsPoolWrapperCreator,
     call_custom_modules::CustomModulesDelegationGeneratorCreator,
+    entry_point_trait::EntryPointTrait,
     entry_points::EntryPointTransactionGenerator,
-    publishing::entry_point_trait::EntryPointTrait,
     workflow_delegator::{
         StageSwitchCondition, StageTracking, WorkflowKind, WorkflowTxnGeneratorCreator,
     },
-    EntryPoints, ObjectPool, ReliableTransactionSubmitter, RootAccountHandle,
-    TransactionGeneratorCreator,
+    ObjectPool, ReliableTransactionSubmitter, RootAccountHandle, TransactionGeneratorCreator,
 };
-use aptos_sdk::transaction_builder::TransactionFactory;
 use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};
 

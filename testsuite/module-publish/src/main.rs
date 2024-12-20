@@ -9,7 +9,7 @@ use clap::Parser;
 #[clap(
     name = "module-publish",
     about = "Write Move packages binaries in a Rust file (raw_module_data.rs). Defaults to \n\
-         aptos-core/crates/transaction-emitter-lib/src/transaction_generator/publishing/raw_module_data.rs"
+         aptos-core/crates/transaction-workloads-lib/src/raw_module_data.rs"
 )]
 struct Args {
     #[clap(long, help = "Optional output directory for raw_module_data.rs")]
@@ -67,7 +67,7 @@ fn main() -> Result<()> {
     // If directory structure changes this breaks.
     // However it is a test that is ignored and runs only with the intent of creating files
     // for the modules compiled, so people can change it as they wish and need to.
-    let base_path = base_dir.join("../../crates/transaction-generator-lib/src/publishing/");
+    let base_path = base_dir.join("../../crates/transaction-workloads-lib/src/");
     let output_file = base_path.join("raw_module_data.rs");
 
     create_prebuilt_packages_rs_file(base_dir, packages_to_build, output_file)

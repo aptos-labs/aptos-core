@@ -10,7 +10,7 @@ mod instance;
 mod wrappers;
 
 // These are the top level things you should need to run the emitter.
-pub use args::{ClusterArgs, CoinSourceArgs, CreateAccountsArgs, EmitArgs, EmitWorkloadArgs};
+pub use args::{ClusterArgs, CoinSourceArgs, CreateAccountsArgs, EmitArgs};
 // We export these if you want finer grained control.
 pub use cluster::Cluster;
 pub use emitter::{

@@ -10,8 +10,8 @@ use anyhow::{Context, Result};
 use aptos_sdk::types::chain_id::ChainId;
 use aptos_transaction_emitter_lib::{
     emit_transactions_with_cluster, Cluster, ClusterArgs, CoinSourceArgs, EmitArgs,
-    EmitWorkloadArgs,
 };
+use aptos_transaction_workloads_lib::args::EmitWorkloadArgs;
 use serde::{Deserialize, Serialize};
 use thiserror::Error as ThisError;
 

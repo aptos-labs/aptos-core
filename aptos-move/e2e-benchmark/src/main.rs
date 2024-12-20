@@ -7,12 +7,9 @@ use aptos_language_e2e_tests::{
 };
 use aptos_transaction_generator_lib::{
     entry_point_trait::{AutomaticArgs, EntryPointTrait, MultiSigConfig},
-    publishing::{
-        module_simple::LoopType,
-        publish_util::{Package, PackageHandler},
-    },
-    EntryPoints,
+    publishing::publish_util::{Package, PackageHandler},
 };
+use aptos_transaction_workloads_lib::{EntryPoints, LoopType};
 use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
 use rand::{rngs::StdRng, SeedableRng};
 use serde_json::json;

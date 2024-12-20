@@ -71,6 +71,7 @@ use aptos_transaction_generator_lib::entry_point_trait::PreBuiltPackages;",
     writeln!(
         string_buffer,
         "
+#[derive(Debug)]
 pub struct PreBuiltPackagesImpl;
 
 impl PreBuiltPackages for PreBuiltPackagesImpl {{

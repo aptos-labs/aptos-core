@@ -10,7 +10,7 @@ use aptos_sdk::{
 };
 use rand::rngs::StdRng;
 
-pub trait PreBuiltPackages: Sync + Send {
+pub trait PreBuiltPackages: std::fmt::Debug + Sync + Send {
     fn package_metadata(&self, package_name: &str) -> &[u8];
     fn package_modules(&self, package_name: &str) -> &[Vec<u8>];
     fn package_script(&self, package_name: &str) -> Option<&Vec<u8>>;

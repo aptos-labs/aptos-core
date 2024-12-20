@@ -837,7 +837,10 @@ pub fn run_single_with_default_params(
     let benchmark_block_size = match mode {
         SingleRunMode::TEST => 10,
         SingleRunMode::BENCHMARK { approx_tps } => {
-            debug_assert!(false, "Benchmark shouldn't be run in debug mode, use --release instead.");
+            debug_assert!(
+                false,
+                "Benchmark shouldn't be run in debug mode, use --release instead."
+            );
             std::cmp::max(10, std::cmp::min(10000, approx_tps / 4))
         },
     };
@@ -923,7 +926,8 @@ mod tests {
     use aptos_executor_types::BlockExecutorTrait;
     use aptos_sdk::{transaction_builder::aptos_stdlib, types::LocalAccount};
     use aptos_temppath::TempPath;
-    use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
+    use aptos_transaction_generator_lib::WorkflowProgress;
+    use aptos_transaction_workloads_lib::args::TransactionTypeArg;
     use aptos_types::{
         access_path::Path,
         account_address::AccountAddress,

@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
-    publishing::{module_simple::PreBuiltPackagesImpl, publish_util::PackageHandler},
-    TransactionGenerator, TransactionGeneratorCreator,
+    publishing::publish_util::PackageHandler, TransactionGenerator, TransactionGeneratorCreator,
 };
 use aptos_infallible::RwLock;
 use aptos_sdk::{
@@ -71,13 +70,10 @@ pub struct PublishPackageCreator {
 }
 
 impl PublishPackageCreator {
-    pub fn new(txn_factory: TransactionFactory) -> Self {
+    pub fn new(txn_factory: TransactionFactory, package_handler: PackageHandler) -> Self {
         Self {
             txn_factory,
-            package_handler: Arc::new(RwLock::new(PackageHandler::new(
-                &PreBuiltPackagesImpl,
-                "simple",
-            ))),
+            package_handler: Arc::new(RwLock::new(package_handler)),
         }
     }
 }

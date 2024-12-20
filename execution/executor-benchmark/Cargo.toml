@@ -35,6 +35,7 @@ aptos-push-metrics =  { workspace = true }
 aptos-sdk = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-transaction-generator-lib = { workspace = true }
+aptos-transaction-workloads-lib = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-environment = { workspace = true }

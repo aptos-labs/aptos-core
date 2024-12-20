@@ -11,10 +11,12 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use args::TransactionTypeArg;
 use async_trait::async_trait;
 use clap::{Parser, ValueEnum};
-use publishing::entry_point_trait::EntryPointTrait;
+use publishing::{
+    entry_point_trait::{EntryPointTrait, PreBuiltPackages},
+    publish_util::PackageHandler,
+};
 use rand::{rngs::StdRng, seq::SliceRandom, Rng};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -27,17 +29,15 @@ use std::{
 };
 use workflow_delegator::WorkflowKind;
 
-mod account_generator;
-mod accounts_pool_wrapper;
-pub mod args;
+pub mod account_generator;
+pub mod accounts_pool_wrapper;
 mod batch_transfer;
 mod bounded_batch_wrapper;
 pub mod call_custom_modules;
-mod entry_points;
+pub mod entry_points;
 mod p2p_transaction_generator;
 pub mod publish_modules;
 pub mod publishing;
-mod token_workflow;
 mod transaction_mix_generator;
 pub mod workflow_delegator;
 use self::{
@@ -53,10 +53,7 @@ use crate::{
     entry_points::EntryPointTransactionGenerator, p2p_transaction_generator::SamplingMode,
     workflow_delegator::WorkflowTxnGeneratorCreator,
 };
-pub use publishing::{
-    entry_point_trait, module_simple::EntryPoints,
-    prebuild_packages::create_prebuilt_packages_rs_file,
-};
+pub use publishing::{entry_point_trait, prebuild_packages::create_prebuilt_packages_rs_file};
 
 pub const SEND_AMOUNT: u64 = 1;
 
@@ -75,6 +72,8 @@ pub enum TransactionType {
     },
     PublishPackage {
         use_account_pool: bool,
+        pre_built: &'static dyn PreBuiltPackages,
+        package_name: String,
     },
     CallCustomModules {
         entry_point: Box<dyn EntryPointTrait>,
@@ -120,7 +119,12 @@ impl WorkflowProgress {
 
 impl Default for TransactionType {
     fn default() -> Self {
-        TransactionTypeArg::CoinTransfer.materialize_default()
+        TransactionType::CoinTransfer {
+            invalid_transaction_ratio: 0,
+            sender_use_account_pool: false,
+            non_conflicting: false,
+            use_fa_transfer: false,
+        }
     }
 }
 
@@ -325,8 +329,15 @@ pub async fn create_txn_generator_creator(
                     max_account_working_set,
                     creation_balance,
                 )),
-                TransactionType::PublishPackage { use_account_pool } => wrap_accounts_pool(
-                    Box::new(PublishPackageCreator::new(txn_factory.clone())),
+                TransactionType::PublishPackage {
+                    use_account_pool,
+                    pre_built,
+                    package_name,
+                } => wrap_accounts_pool(
+                    Box::new(PublishPackageCreator::new(
+                        txn_factory.clone(),
+                        PackageHandler::new(pre_built, &package_name),
+                    )),
                     use_account_pool,
                     &accounts_pool,
                 ),

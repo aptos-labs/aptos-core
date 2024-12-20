@@ -21,6 +21,7 @@ aptos-network-checker = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-sdk = { workspace = true }
 aptos-transaction-emitter-lib = { workspace = true }
+aptos-transaction-workloads-lib = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
