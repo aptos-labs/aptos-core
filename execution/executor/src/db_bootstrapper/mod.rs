@@ -12,10 +12,8 @@ use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_storage_interface::{
-    state_store::state_view::{
-        async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView,
-    },
-    DbReaderWriter, DbWriter, LedgerSummary,
+    state_store::state_view::cached_state_view::CachedStateView, DbReaderWriter, DbWriter,
+    LedgerSummary,
 };
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
@@ -124,10 +122,10 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
     // In the very extreme and sad situation of losing quorum among validators, we refer to the
     // second use case said above.
     let genesis_version = ledger_summary.version().map_or(0, |v| v + 1);
-    let base_state_view = ledger_summary.verified_state_view(
+    let base_state_view = CachedStateView::new(
         StateViewId::Miscellaneous,
         Arc::clone(&db.reader),
-        Arc::new(AsyncProofFetcher::new(db.reader.clone())),
+        ledger_summary.state.latest().clone(),
     )?;
 
     let epoch = if genesis_version == 0 {
@@ -139,6 +137,7 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
     let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
         &V::new(),
         vec![genesis_txn.clone().into()].into(),
+        &ledger_summary.state,
         base_state_view,
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         TransactionSliceMetadata::unknown(),
@@ -152,7 +151,7 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
         "Genesis txn didn't output reconfig event."
     );
 
-    let output = ApplyExecutionOutput::run(execution_output, &ledger_summary)?;
+    let output = ApplyExecutionOutput::run(execution_output, ledger_summary)?;
     let timestamp_usecs = if genesis_version == 0 {
         // TODO(aldenhu): fix existing tests before using real timestamp and check on-chain epoch.
         GENESIS_TIMESTAMP_USECS
@@ -160,9 +159,7 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
         let state_view = CachedStateView::new(
             StateViewId::Miscellaneous,
             Arc::clone(&db.reader),
-            output.execution_output.next_version(),
-            output.expect_result_state().current.clone(),
-            Arc::new(AsyncProofFetcher::new(db.reader.clone())),
+            output.result_state().latest().clone(),
         )?;
         let next_epoch = epoch
             .checked_add(1)

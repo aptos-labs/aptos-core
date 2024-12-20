@@ -679,6 +679,11 @@ pub static ACCUMULATOR_PLACEHOLDER_HASH: Lazy<HashValue> =
 pub static SPARSE_MERKLE_PLACEHOLDER_HASH: Lazy<HashValue> =
     Lazy::new(|| create_literal_hash("SPARSE_MERKLE_PLACEHOLDER_HASH"));
 
+/// Useful at places where we have to set a hash value for placeholder before
+/// knowing the actual hash.
+pub static CORRUPTION_SENTINEL: Lazy<HashValue> =
+    Lazy::new(|| create_literal_hash("CORRUPTION_SENTINEL"));
+
 /// Placeholder hash of hot state tier Merkle Tree.
 pub static HOT_STATE_PLACE_HOLDER_HASH: Lazy<HashValue> =
     Lazy::new(|| create_literal_hash("HOT_STATE_PLACEHOLDER_HASH"));

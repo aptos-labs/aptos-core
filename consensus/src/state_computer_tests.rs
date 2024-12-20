@@ -112,7 +112,7 @@ impl BlockExecutorTrait for DummyBlockExecutor {
         Ok(())
     }
 
-    fn execute_and_state_checkpoint(
+    fn execute_and_update_state(
         &self,
         block: ExecutableBlock,
         _parent_block_id: HashValue,

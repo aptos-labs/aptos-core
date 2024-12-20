@@ -16,7 +16,6 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-drop-helper = { workspace = true }
-aptos-infallible = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-scratchpad = { workspace = true }
 aptos-secure-net = { workspace = true }
@@ -28,7 +27,6 @@ derive_more = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
 ouroboros = { workspace = true }
-rayon = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 

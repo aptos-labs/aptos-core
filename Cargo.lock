@@ -1173,7 +1173,6 @@ dependencies = [
  "aptos-crypto",
  "aptos-db-indexer",
  "aptos-db-indexer-schemas",
- "aptos-executor",
  "aptos-executor-types",
  "aptos-experimental-runtimes",
  "aptos-infallible",
@@ -1196,14 +1195,12 @@ dependencies = [
  "clap 4.5.21",
  "crossbeam-channel",
  "dashmap",
- "derive_more",
  "either",
  "hex",
  "indicatif 0.15.0",
  "itertools 0.13.0",
  "lru 0.7.8",
  "move-core-types",
- "num-derive",
  "once_cell",
  "owo-colors",
  "proptest",
@@ -1463,18 +1460,15 @@ dependencies = [
  "aptos-crypto",
  "aptos-db",
  "aptos-db-indexer",
- "aptos-db-indexer-schemas",
  "aptos-drop-helper",
  "aptos-executor-service",
  "aptos-executor-test-helpers",
  "aptos-executor-types",
  "aptos-experimental-runtimes",
- "aptos-genesis",
  "aptos-indexer-grpc-table-info",
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
- "aptos-scratchpad",
  "aptos-sdk",
  "aptos-storage-interface",
  "aptos-temppath",
@@ -1485,7 +1479,6 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "criterion",
- "dashmap",
  "fail",
  "itertools 0.13.0",
  "move-core-types",
@@ -1609,7 +1602,6 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-drop-helper",
- "aptos-infallible",
  "aptos-metrics-core",
  "aptos-scratchpad",
  "aptos-secure-net",
@@ -1621,7 +1613,6 @@ dependencies = [
  "itertools 0.13.0",
  "once_cell",
  "ouroboros",
- "rayon",
  "serde",
  "thiserror",
 ]
@@ -3960,27 +3951,27 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
- "aptos-drop-helper",
- "aptos-experimental-runtimes",
- "aptos-logger",
+ "aptos-experimental-layered-map",
+ "aptos-infallible",
  "aptos-metrics-core",
  "aptos-scratchpad",
  "aptos-secure-net",
  "aptos-types",
  "aptos-vm",
  "arr_macro",
- "assert_unordered",
  "bcs 0.1.4",
- "crossbeam-channel",
  "dashmap",
+ "derive_more",
+ "itertools 0.13.0",
  "once_cell",
+ "once_map",
  "parking_lot 0.12.1",
  "proptest",
  "proptest-derive",
+ "rand 0.7.3",
  "rayon",
  "serde",
  "thiserror",
- "threadpool",
 ]
 
 [[package]]
@@ -4401,7 +4392,6 @@ dependencies = [
  "aptos-proptest-helpers",
  "arbitrary",
  "ark-bn254",
- "ark-crypto-primitives",
  "ark-ec",
  "ark-ff",
  "ark-groth16",
@@ -4443,7 +4433,6 @@ dependencies = [
  "quick_cache",
  "rand 0.7.3",
  "rayon",
- "regex",
  "reqwest 0.11.23",
  "ring 0.16.20",
  "rsa 0.9.6",
@@ -5042,15 +5031,6 @@ name = "assert_approx_eq"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c07dab4369547dbe5114677b33fbbf724971019f3818172d59a97a61c774ffd"
-
-[[package]]
-name = "assert_unordered"
-version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c74323b7881323eb351134e08ee5331594826789557afef8e309baf481b2264"
-dependencies = [
- "ansi_term",
-]
 
 [[package]]
 name = "async-channel"
@@ -12485,6 +12465,18 @@ name = "once_cell"
 version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3fdb12b2476b595f9358c5161aa467c2438859caa136dec86c26fdd2efe17b92"
+
+[[package]]
+name = "once_map"
+version = "0.4.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7bd2cae3bec3936bbed1ccc5a3343b3738858182419f9c0522c7260c80c430b0"
+dependencies = [
+ "ahash 0.8.11",
+ "hashbrown 0.15.1",
+ "parking_lot 0.12.1",
+ "stable_deref_trait",
+]
 
 [[package]]
 name = "oorandom"

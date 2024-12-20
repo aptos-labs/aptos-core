@@ -20,17 +20,14 @@ pub struct ApplyExecutionOutput;
 impl ApplyExecutionOutput {
     pub fn run(
         execution_output: ExecutionOutput,
-        base_view: &LedgerSummary,
+        base_view: LedgerSummary,
     ) -> Result<PartialStateComputeResult> {
-        let state_checkpoint_output = DoStateCheckpoint::run(
-            &execution_output,
-            base_view.state(),
-            Option::<Vec<_>>::None, // known_state_checkpoint_hashes
-        )?;
+        let state_checkpoint_output =
+            DoStateCheckpoint::run(&execution_output, &base_view.state_summary, None)?;
         let ledger_update_output = DoLedgerUpdate::run(
             &execution_output,
             &state_checkpoint_output,
-            base_view.txn_accumulator().clone(),
+            base_view.transaction_accumulator,
         )?;
         let output = PartialStateComputeResult::new(execution_output);
         output.set_state_checkpoint_output(state_checkpoint_output);

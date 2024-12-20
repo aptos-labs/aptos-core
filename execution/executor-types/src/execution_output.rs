@@ -4,13 +4,14 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{
-    planned::Planned,
-    transactions_with_output::{TransactionsToKeep, TransactionsWithOutput},
-};
+use crate::transactions_with_output::{TransactionsToKeep, TransactionsWithOutput};
 use aptos_drop_helper::DropHelper;
-use aptos_storage_interface::state_store::{
-    state_delta::StateDelta, state_view::cached_state_view::StateCache,
+use aptos_storage_interface::{
+    state_store::{
+        state::LedgerState, state_proof_fetcher::StateProofFetcher,
+        state_view::cached_state_view::ShardedStateCache,
+    },
+    utils::planned::Planned,
 };
 use aptos_types::{
     contract_event::ContractEvent,
@@ -36,14 +37,19 @@ impl ExecutionOutput {
         to_commit: TransactionsToKeep,
         to_discard: TransactionsWithOutput,
         to_retry: TransactionsWithOutput,
-        state_cache: StateCache,
+        result_state: LedgerState,
+        state_reads: ShardedStateCache,
+        state_proofs: StateProofFetcher,
         block_end_info: Option<BlockEndInfo>,
         next_epoch_state: Option<EpochState>,
         subscribable_events: Planned<Vec<ContractEvent>>,
     ) -> Self {
+        let next_version = first_version + to_commit.len() as Version;
+        assert_eq!(next_version, result_state.latest().next_version());
         if is_block {
             // If it's a block, ensure it ends with state checkpoint.
             assert!(to_commit.is_empty() || to_commit.ends_with_sole_checkpoint());
+            assert!(result_state.is_checkpoint());
         } else {
             // If it's not, there shouldn't be any transaction to be discarded or retried.
             assert!(to_discard.is_empty() && to_retry.is_empty());
@@ -56,14 +62,16 @@ impl ExecutionOutput {
             to_commit,
             to_discard,
             to_retry,
-            state_cache,
+            result_state,
+            state_reads,
+            state_proofs,
             block_end_info,
             next_epoch_state,
             subscribable_events,
         })
     }
 
-    pub fn new_empty(state: Arc<StateDelta>) -> Self {
+    pub fn new_empty(state: LedgerState) -> Self {
         Self::new_impl(Inner {
             is_block: false,
             first_version: state.next_version(),
@@ -71,7 +79,9 @@ impl ExecutionOutput {
             to_commit: TransactionsToKeep::new_empty(),
             to_discard: TransactionsWithOutput::new_empty(),
             to_retry: TransactionsWithOutput::new_empty(),
-            state_cache: StateCache::new_empty(state.current.clone()),
+            state_reads: ShardedStateCache::new_empty(state.version()),
+            state_proofs: StateProofFetcher::new_dummy(),
+            result_state: state,
             block_end_info: None,
             next_epoch_state: None,
             subscribable_events: Planned::ready(vec![]),
@@ -88,7 +98,9 @@ impl ExecutionOutput {
             to_commit: TransactionsToKeep::new_dummy_success(txns),
             to_discard: TransactionsWithOutput::new_empty(),
             to_retry: TransactionsWithOutput::new_empty(),
-            state_cache: StateCache::new_dummy(),
+            result_state: LedgerState::new_empty(),
+            state_reads: ShardedStateCache::new_empty(None),
+            state_proofs: StateProofFetcher::new_dummy(),
             block_end_info: None,
             next_epoch_state: None,
             subscribable_events: Planned::ready(vec![]),
@@ -107,7 +119,9 @@ impl ExecutionOutput {
             to_commit: TransactionsToKeep::new_empty(),
             to_discard: TransactionsWithOutput::new_empty(),
             to_retry: TransactionsWithOutput::new_empty(),
-            state_cache: StateCache::new_dummy(),
+            result_state: self.result_state.clone(),
+            state_reads: ShardedStateCache::new_empty(self.next_version().checked_sub(1)),
+            state_proofs: StateProofFetcher::new_dummy(),
             block_end_info: None,
             next_epoch_state: self.next_epoch_state.clone(),
             subscribable_events: Planned::ready(vec![]),
@@ -146,10 +160,13 @@ pub struct Inner {
     pub to_discard: TransactionsWithOutput,
     pub to_retry: TransactionsWithOutput,
 
-    /// Carries the frozen base state view, so all in-mem nodes involved won't drop before the
-    /// execution result is processed; as well as all the accounts touched during execution, together
-    /// with their proofs.
-    pub state_cache: StateCache,
+    pub result_state: LedgerState,
+    /// State items read during execution, useful for calculating the state storge usage and
+    /// indices used by the db pruner.
+    pub state_reads: ShardedStateCache,
+    /// State proofs pre-fetched during execution, for calculating the state summary.
+    pub state_proofs: StateProofFetcher,
+
     /// Optional StateCheckpoint payload
     pub block_end_info: Option<BlockEndInfo>,
     /// Optional EpochState payload.

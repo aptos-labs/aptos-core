@@ -42,19 +42,31 @@ impl<T> Planned<T> {
         }
     }
 
-    pub fn get(&self, name_for_timer: Option<&str>) -> &T {
+    /// Returns None if it's a placeholder, otherwise wait for the result.
+    fn wait_impl(&self, name_for_timer: Option<&str>) -> Option<&T> {
         if let Some(t) = self.value.get() {
-            t
+            Some(t)
         } else {
             let _timer = name_for_timer.map(|name| TIMER.timer_with(&[name]));
 
-            let rx = self.rx.get().expect("Not planned").lock();
+            let rx_locked = self.rx.get()?.lock();
+
             if self.value.get().is_none() {
-                let t = rx.recv().expect("Plan failed.");
+                let t = rx_locked.recv().expect("Plan failed.");
                 self.value.set(t).map_err(|_| "").expect("Already set.");
             }
-            self.value.get().expect("Must have been set.")
+            Some(self.value.get().expect("Must have been set."))
         }
+    }
+
+    pub fn wait(&self, name_for_timer: Option<&str>) -> &T {
+        self.wait_impl(name_for_timer).expect("Not planned.")
+    }
+}
+
+impl<T> Drop for Planned<T> {
+    fn drop(&mut self) {
+        let _ = self.wait_impl(None);
     }
 }
 
@@ -62,7 +74,7 @@ impl<T> Deref for Planned<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        self.get(None)
+        self.wait(None)
     }
 }
 

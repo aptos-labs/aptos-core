@@ -148,7 +148,7 @@ impl StateComputeResult {
             subscribable_events: self
                 .execution_output
                 .subscribable_events
-                .get(Some("wait_for_subscribable_events"))
+                .wait(Some("wait_for_subscribable_events"))
                 .clone(),
             committed_transactions: self.execution_output.to_commit.transactions.clone(),
             reconfiguration_occurred: self.execution_output.next_epoch_state.is_some(),
@@ -161,14 +161,10 @@ impl StateComputeResult {
             transactions: &self.execution_output.to_commit.transactions,
             transaction_outputs: &self.execution_output.to_commit.transaction_outputs,
             transaction_infos: &self.ledger_update_output.transaction_infos,
-            base_state_version: self.state_checkpoint_output.parent_state.base_version,
-            latest_in_memory_state: &self.state_checkpoint_output.result_state,
+            state: &self.execution_output.result_state,
+            state_summary: &self.state_checkpoint_output.state_summary,
             state_update_refs: self.execution_output.to_commit.state_update_refs(),
-            state_updates_until_last_checkpoint: self
-                .state_checkpoint_output
-                .state_updates_before_last_checkpoint
-                .as_ref(),
-            sharded_state_cache: Some(&self.execution_output.state_cache.sharded_state_cache),
+            state_reads: &self.execution_output.state_reads,
             is_reconfig: self.execution_output.next_epoch_state.is_some(),
         }
     }
