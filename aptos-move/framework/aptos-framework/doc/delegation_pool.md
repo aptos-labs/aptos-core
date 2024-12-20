@@ -2955,6 +2955,7 @@ Vote on a proposal with a voter's voting power. To successfully vote, the follow
     <b>if</b> (voting_power &gt; remaining_voting_power) {
         voting_power = remaining_voting_power;
     };
+    <a href="aptos_governance.md#0x1_aptos_governance_assert_proposal_expiration">aptos_governance::assert_proposal_expiration</a>(pool_address, proposal_id);
     <b>assert</b>!(voting_power &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="delegation_pool.md#0x1_delegation_pool_ENO_VOTING_POWER">ENO_VOTING_POWER</a>));
 
     <b>let</b> governance_records = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
