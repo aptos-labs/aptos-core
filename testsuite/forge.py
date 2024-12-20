@@ -1362,7 +1362,7 @@ def seeded_random_choice(namespace: str, cluster_names: Sequence[str]) -> str:
 # forge test runner customization
 @envoption("FORGE_RUNNER_MODE", "k8s")
 # TEMPORARY: override the cluster name to validate the unused cluster before use
-@envoption("FORGE_CLUSTER_NAME", "aptos-forge-1")
+@envoption("FORGE_CLUSTER_NAME", "aptos-forge-2")
 # these override the args in forge-cli
 @envoption("FORGE_NUM_VALIDATORS")
 @envoption("FORGE_NUM_VALIDATOR_FULLNODES")
