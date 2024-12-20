@@ -19,36 +19,67 @@ pub struct Config {
 
 #[derive(Debug)]
 pub struct ShuffledTransactionIterator<Txn> {
-    orig_txns: VecDeque<Txn>,
+    input_num_transactions: usize,
+    input_queue: VecDeque<Txn>,
     sliding_window_state: SlidingWindowState<Txn>,
     pending_txns: PendingTransactions<Txn>,
 }
 
-// TODO revisit the trait derives on Txn, used to be UseCaseAwareTransaction, may
-// have to make a SenderAwareTransaction trait...
 impl<Txn> ShuffledTransactionIterator<Txn>
 where
     Txn: SenderAwareTransaction + Debug + Clone + PartialEq,
 {
-    pub fn new(config: Config, orig_txns: Vec<Txn>) -> Self {
-        let mut pending_txns = PendingTransactions::new();
-        let num_transactions = orig_txns.len();
+    pub fn new(config: Config, input_txns: Vec<Txn>) -> Self {
+        let pending_txns = PendingTransactions::new();
+        let input_num_transactions = input_txns.len();
+        let orig_txns = VecDeque::from(input_txns);
         Self {
-            orig_txns: VecDeque::from(orig_txns),
+            input_num_transactions,
+            input_queue: orig_txns,
             sliding_window_state: SlidingWindowState::new(
                 config.conflict_window_size,
-                num_transactions,
+                input_num_transactions,
             ),
             pending_txns,
         }
     }
 
     pub(super) fn select_next_txn_inner(&mut self) -> Txn {
-        todo!()
+        // First check if we have a sender dropped off of conflict window in previous step, if so,
+        // we try to find pending transaction from the corresponding sender and add it to the block.
+        if let Some(sender) = self.sliding_window_state.last_dropped_sender() {
+            if let Some(txn) = self.pending_txns.remove_pending_from_sender(sender) {
+                self.sliding_window_state.add_transaction(txn.clone());
+                return txn;
+            }
+        }
+        // If we can't find any transaction from a sender dropped off of conflict window, then
+        // iterate through the original transactions and try to find the next candidate
+        while let Some(txn) = self.input_queue.pop_front() {
+            if !self.sliding_window_state.has_conflict(&txn.parse_sender()) {
+                self.sliding_window_state.add_transaction(txn.clone());
+                return txn;
+            }
+            self.pending_txns.add_transaction(txn);
+        }
+
+        // If we can't find any candidate in above steps, then lastly
+        // add pending transactions in the order if we can't find any other candidate
+        let txn = self
+            .pending_txns
+            .remove_first_pending()
+            .expect("Pending should return a transaction");
+        self.sliding_window_state.add_transaction(txn.clone());
+        txn
     }
 
     pub(super) fn select_next_txn(&mut self) -> Option<Txn> {
-        todo!()
+        if self.sliding_window_state.num_txns() < self.input_num_transactions {
+            let txn = self.select_next_txn_inner();
+            Some(txn)
+        } else {
+            None
+        }
     }
 }
 
@@ -128,41 +159,34 @@ impl SenderAwareShuffler {
 impl TransactionShuffler for SenderAwareShuffler {
     fn shuffle(&self, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
         // Early return for performance reason if there are no transactions to shuffle
+        // TODO make sure this is handled in iterator
         if txns.is_empty() {
             return txns;
         }
 
         // handle the corner case of conflict window being 0, in which case we don't do any shuffling
+        // TODO make sure this is handled in iterator
         if self.config.conflict_window_size == 0 {
             return txns;
         }
 
-        // maintains the intermediate state of the shuffled transactions
-        let mut sliding_window =
-            SlidingWindowState::new(self.config.conflict_window_size, txns.len());
-        let mut pending_txns = PendingTransactions::new();
-        let num_transactions = txns.len();
-        let mut orig_txns = VecDeque::from(txns);
-        while sliding_window.num_txns() < num_transactions {
-            let _ = self.next_to_add(&mut sliding_window, &mut pending_txns, &mut orig_txns);
-        }
-        sliding_window.finalize()
+        ShuffledTransactionIterator::new(self.config.clone(), txns).collect()
     }
 
     fn signed_transaction_iterator(
         &self,
         txns: Vec<SignedTransaction>,
     ) -> Box<dyn Iterator<Item = SignedTransaction> + 'static> {
-        // TODO? Is there more complex logic here? Should this be `unimplemented!()`
-        Box::new(txns.into_iter())
+        let iterator = ShuffledTransactionIterator::new(self.config.clone(), txns);
+        Box::new(iterator)
     }
 
     fn signature_verified_transaction_iterator(
         &self,
         txns: Vec<SignatureVerifiedTransaction>,
     ) -> Box<dyn Iterator<Item = SignatureVerifiedTransaction> + 'static> {
-        // TODO? Is there more complex logic here? Should this be `unimplemented!()`
-        Box::new(txns.into_iter())
+        let iterator = ShuffledTransactionIterator::new(self.config.clone(), txns);
+        Box::new(iterator)
     }
 }
 
