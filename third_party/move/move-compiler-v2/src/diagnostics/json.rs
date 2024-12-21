@@ -3,6 +3,8 @@ use codespan::{FileId, Files};
 use codespan_reporting::diagnostic::{Diagnostic, Label};
 use std::io::Write;
 
+/// Shows compiler errors as a structured JSON output.
+/// Exists to support various tools external to the aptos-cli, i.e. IDEs.
 pub struct JsonEmitter<'w, W: Write> {
     writer: &'w mut W,
 }
