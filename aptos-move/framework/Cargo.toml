@@ -60,6 +60,7 @@ move-package = { workspace = true }
 move-prover = { workspace = true }
 move-prover-boogie-backend = { workspace = true }
 move-prover-bytecode-pipeline = { workspace = true }
+move-prover-lab = { workspace = true }
 move-stackless-bytecode = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
@@ -78,6 +79,7 @@ smallvec = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 tiny-keccak = { workspace = true }
+toml = { workspace = true }
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }

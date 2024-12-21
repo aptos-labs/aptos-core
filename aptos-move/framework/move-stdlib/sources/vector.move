@@ -9,7 +9,7 @@
 /// Move functions here because many have loops, requiring loop invariants to prove, and
 /// the return on investment didn't seem worth it for these simple functions.
 module std::vector {
-    // use std::mem;
+    use std::mem;
 
     /// The index into the vector is out of bounds
     const EINDEX_OUT_OF_BOUNDS: u64 = 0x20000;
@@ -357,14 +357,13 @@ module std::vector {
     public fun replace<Element>(self: &mut vector<Element>, i: u64, val: Element): Element {
         let last_idx = length(self);
         assert!(i < last_idx, EINDEX_OUT_OF_BOUNDS);
-        // TODO: Enable after tests are fixed.
-        // if (USE_MOVE_RANGE) {
-        //     mem::replace(borrow_mut(self, i), val)
-        // } else {
-        push_back(self, val);
-        swap(self, i, last_idx);
-        pop_back(self)
-        // }
+        if (USE_MOVE_RANGE) {
+            mem::replace(borrow_mut(self, i), val)
+        } else {
+            push_back(self, val);
+            swap(self, i, last_idx);
+            pop_back(self)
+        }
     }
 
     /// Apply the function to each element in the vector, consuming it.

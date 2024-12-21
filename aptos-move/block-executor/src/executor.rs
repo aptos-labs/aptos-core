@@ -59,7 +59,7 @@ use fail::fail_point;
 use move_binary_format::CompiledModule;
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
-use move_vm_types::code::ModuleCache;
+use move_vm_types::{code::ModuleCache, delayed_values::delayed_field_id::DelayedFieldID};
 use num_cpus;
 use rayon::ThreadPool;
 use std::{
@@ -115,7 +115,7 @@ where
         incarnation: Incarnation,
         signature_verified_block: &TP,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, DelayedFieldID>,
         executor: &E,
         base_view: &S,
         global_module_cache: &GlobalModuleCache<
@@ -406,7 +406,7 @@ where
             Module,
             AptosModuleExtension,
         >,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, DelayedFieldID>,
         scheduler: &Scheduler,
     ) -> bool {
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
@@ -436,7 +436,7 @@ where
     fn update_transaction_on_abort(
         txn_idx: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, DelayedFieldID>,
         runtime_environment: &RuntimeEnvironment,
     ) {
         counters::SPECULATIVE_ABORT_COUNT.inc();
@@ -490,7 +490,7 @@ where
         valid: bool,
         validation_wave: Wave,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, DelayedFieldID>,
         scheduler: &Scheduler,
         runtime_environment: &RuntimeEnvironment,
     ) -> Result<SchedulerTask, PanicError> {
@@ -520,7 +520,7 @@ where
     /// returns false (indicating that transaction needs to be re-executed).
     fn validate_and_commit_delayed_fields(
         txn_idx: TxnIndex,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, DelayedFieldID>,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
     ) -> Result<bool, PanicError> {
         let read_set = last_input_output
@@ -563,7 +563,7 @@ where
         &self,
         block_gas_limit_type: &BlockGasLimitType,
         scheduler: &Scheduler,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, DelayedFieldID>,
         scheduler_task: &mut SchedulerTask,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
@@ -766,7 +766,7 @@ where
             Module,
             AptosModuleExtension,
         >,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, DelayedFieldID>,
         scheduler: &Scheduler,
         runtime_environment: &RuntimeEnvironment,
     ) -> Result<(), PanicError> {
@@ -788,7 +788,7 @@ where
     fn materialize_aggregator_v1_delta_writes(
         txn_idx: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, DelayedFieldID>,
         base_view: &S,
     ) -> Vec<(T::Key, WriteOp)> {
         // Materialize all the aggregator v1 deltas.
@@ -840,7 +840,7 @@ where
     fn materialize_txn_commit(
         &self,
         txn_idx: TxnIndex,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, DelayedFieldID>,
         scheduler: &Scheduler,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
@@ -953,7 +953,7 @@ where
         environment: &AptosEnvironment,
         block: &TP,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, DelayedFieldID>,
         scheduler: &Scheduler,
         // TODO: should not need to pass base view.
         base_view: &S,
@@ -1274,7 +1274,7 @@ where
             Module,
             AptosModuleExtension,
         >,
-        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, T::Identifier>,
+        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         output: &E::Output,
         resource_write_set: Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>,
     ) -> Result<(), SequentialBlockExecutionError<E::Error>> {

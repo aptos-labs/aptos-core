@@ -440,7 +440,6 @@ impl<
     > Transaction for MockTransaction<K, E>
 {
     type Event = E;
-    type Identifier = DelayedFieldID;
     type Key = K;
     type Tag = u32;
     type Value = ValueType;
@@ -848,7 +847,7 @@ where
 
     fn execute_transaction(
         &self,
-        view: &(impl TExecutorView<K, u32, MoveTypeLayout, DelayedFieldID, ValueType>
+        view: &(impl TExecutorView<K, u32, MoveTypeLayout, ValueType>
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>
               + AptosCodeStorage),
         txn: &Self::Txn,
@@ -1112,12 +1111,7 @@ where
         self.deltas.clone()
     }
 
-    fn delayed_field_change_set(
-        &self,
-    ) -> BTreeMap<
-        <Self::Txn as Transaction>::Identifier,
-        DelayedChange<<Self::Txn as Transaction>::Identifier>,
-    > {
+    fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
         // TODO[agg_v2](tests): add aggregators V2 to the proptest?
         BTreeMap::new()
     }
@@ -1263,7 +1257,6 @@ where
         crate::types::InputOutputKey<
             <Self::Txn as Transaction>::Key,
             <Self::Txn as Transaction>::Tag,
-            <Self::Txn as Transaction>::Identifier,
         >,
     > {
         HashSet::new()
