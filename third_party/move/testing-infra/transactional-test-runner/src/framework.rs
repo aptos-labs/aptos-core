@@ -825,7 +825,7 @@ fn compile_source_unit_v2(
     }
     let mut error_writer = termcolor::Buffer::no_color();
     let result = {
-        let mut emitter = options.message_emitter(&mut error_writer);
+        let mut emitter = options.error_emitter(&mut error_writer);
         move_compiler_v2::run_move_compiler(emitter.as_mut(), options)
     };
     let error_str = String::from_utf8_lossy(&error_writer.into_inner()).to_string();

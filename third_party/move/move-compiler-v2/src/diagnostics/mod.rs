@@ -14,7 +14,7 @@ pub mod human;
 pub mod json;
 
 impl options::Options {
-    pub fn message_emitter<'w, W>(&self, dest: &'w mut W) -> Box<dyn Emitter + 'w>
+    pub fn error_emitter<'w, W>(&self, dest: &'w mut W) -> Box<dyn Emitter + 'w>
     where
         W: WriteColor,
     {

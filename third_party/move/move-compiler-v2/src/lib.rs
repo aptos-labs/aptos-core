@@ -80,7 +80,7 @@ pub fn run_move_compiler_to_stderr(
     options: Options,
 ) -> anyhow::Result<(GlobalEnv, Vec<AnnotatedCompiledUnit>)> {
     let mut stderr = StandardStream::stderr(ColorChoice::Auto);
-    let mut emitter = options.message_emitter(&mut stderr);
+    let mut emitter = options.error_emitter(&mut stderr);
     run_move_compiler(emitter.as_mut(), options)
 }
 
@@ -167,7 +167,7 @@ pub fn run_move_compiler_for_analysis(
     options.whole_program = true; // will set `treat_everything_as_target`
     options = options.set_experiment(Experiment::SPEC_REWRITE, true);
     options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
-    let mut emitter = options.message_emitter(error_writer);
+    let mut emitter = options.error_emitter(error_writer);
     let (env, _units) = run_move_compiler(emitter.as_mut(), options)?;
     // Reset for subsequent analysis
     env.treat_everything_as_target(false);
