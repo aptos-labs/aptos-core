@@ -737,6 +737,20 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::EndStage,
             dump_bytecode_filter: None,
         },
+        TestConfig {
+            name: "compiler-message-format-json",
+            runner: |p| run_test(p, get_config_by_name("compiler-message-format-json")),
+            include: vec!["/compiler-message-format-json/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts
+                .clone()
+                .set_experiment(Experiment::MESSAGE_FORMAT_JSON, true),
+            stop_after: StopAfter::AstPipeline,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::None,
+            dump_bytecode_filter: None,
+        },
     ];
     configs.into_iter().map(|c| (c.name, c)).collect()
 });
@@ -780,7 +794,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
 
     // Run context checker
     let mut env = move_compiler_v2::run_checker(options.clone())?;
-    let mut ok = check_diags(&mut test_output.borrow_mut(), &env);
+    let mut ok = check_diags(&mut test_output.borrow_mut(), &env, &options);
 
     if ok {
         // Run env processor pipeline.
@@ -796,10 +810,10 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
             test_output
                 .borrow_mut()
                 .push_str(&String::from_utf8_lossy(&out.into_inner()));
-            ok = check_diags(&mut test_output.borrow_mut(), &env);
+            ok = check_diags(&mut test_output.borrow_mut(), &env, &options);
         } else {
             env_pipeline.run(&mut env);
-            ok = check_diags(&mut test_output.borrow_mut(), &env);
+            ok = check_diags(&mut test_output.borrow_mut(), &env, &options);
             if ok && config.dump_ast == DumpLevel::EndStage {
                 test_output.borrow_mut().push_str(&format!(
                     "// -- Model dump before bytecode pipeline\n{}\n",
@@ -824,13 +838,13 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         // In real use, this is run outside of the compilation process, but the needed info is
         // available in `env` once we finish the AST.
         plan_builder::construct_test_plan(&env, None);
-        ok = check_diags(&mut test_output.borrow_mut(), &env);
+        ok = check_diags(&mut test_output.borrow_mut(), &env, &options);
     }
 
     if ok && config.stop_after > StopAfter::AstPipeline {
         // Run stackless bytecode generator
         let mut targets = move_compiler_v2::run_bytecode_gen(&env);
-        ok = check_diags(&mut test_output.borrow_mut(), &env);
+        ok = check_diags(&mut test_output.borrow_mut(), &env, &options);
         if ok {
             // Run the target pipeline.
             let bytecode_pipeline = if config.stop_after == StopAfter::BytecodeGen {
@@ -852,7 +866,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
                 // bytecode from the generator, if requested.
                 |targets_before| {
                     let out = &mut test_output.borrow_mut();
-                    update_diags(ok.borrow_mut(), out, &env);
+                    update_diags(ok.borrow_mut(), out, &env, &options);
                     if bytecode_dump_enabled(&config, true, INITIAL_BYTECODE_STAGE) {
                         let dump =
                             &move_stackless_bytecode::print_targets_with_annotations_for_test(
@@ -870,7 +884,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
                 // bytecode after the processor, if requested.
                 |i, processor, targets_after| {
                     let out = &mut test_output.borrow_mut();
-                    update_diags(ok.borrow_mut(), out, &env);
+                    update_diags(ok.borrow_mut(), out, &env, &options);
                     if bytecode_dump_enabled(&config, i + 1 == count, processor.name().as_str()) {
                         let title = format!("after {}:", processor.name());
                         let dump =
@@ -890,7 +904,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
             if *ok.borrow() && config.stop_after == StopAfter::FileFormat {
                 let units = run_file_format_gen(&mut env, &targets);
                 let out = &mut test_output.borrow_mut();
-                update_diags(ok.borrow_mut(), out, &env);
+                update_diags(ok.borrow_mut(), out, &env, &options);
                 if *ok.borrow() {
                     if bytecode_dump_enabled(&config, true, FILE_FORMAT_STAGE) {
                         out.push_str(
@@ -904,7 +918,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
                     } else {
                         out.push_str("\n============ bytecode verification failed ========\n");
                     }
-                    check_diags(out, &env);
+                    check_diags(out, &env, &options);
                 }
             }
         }
@@ -929,9 +943,12 @@ fn bytecode_dump_enabled(config: &TestConfig, is_last: bool, name: &str) -> bool
 }
 
 /// Checks for diagnostics and adds them to the baseline.
-fn check_diags(baseline: &mut String, env: &GlobalEnv) -> bool {
+fn check_diags(baseline: &mut String, env: &GlobalEnv, options: &Options) -> bool {
     let mut error_writer = Buffer::no_color();
-    env.report_diag(&mut error_writer, Severity::Note);
+    {
+        let mut emitter = options.error_emitter(&mut error_writer);
+        emitter.report_diag(env, Severity::Note);
+    }
     let diag = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
     if !diag.is_empty() {
         *baseline += &format!("\nDiagnostics:\n{}", diag);
@@ -941,8 +958,8 @@ fn check_diags(baseline: &mut String, env: &GlobalEnv) -> bool {
     ok
 }
 
-fn update_diags(mut ok: RefMut<bool>, baseline: &mut String, env: &GlobalEnv) {
-    if !check_diags(baseline, env) {
+fn update_diags(mut ok: RefMut<bool>, baseline: &mut String, env: &GlobalEnv, options: &Options) {
+    if !check_diags(baseline, env, options) {
         *ok = false;
     }
 }

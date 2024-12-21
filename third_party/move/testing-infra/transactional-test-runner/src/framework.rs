@@ -825,7 +825,10 @@ fn compile_source_unit_v2(
         options = options.set_experiment(exp, value)
     }
     let mut error_writer = termcolor::Buffer::no_color();
-    let result = move_compiler_v2::run_move_compiler(&mut error_writer, options);
+    let result = {
+        let mut emitter = options.error_emitter(&mut error_writer);
+        move_compiler_v2::run_move_compiler(emitter.as_mut(), options)
+    };
     let error_str = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
     let (model, mut units) =
         result.map_err(|_| anyhow::anyhow!("compilation errors:\n {}", error_str))?;

@@ -271,6 +271,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
                 .to_string(),
             default: Given(false),
         },
+        Experiment {
+            name: Experiment::MESSAGE_FORMAT_JSON.to_string(),
+            description: "Enable json format for compiler messages".to_string(),
+            default: Given(false),
+        },
     ];
     experiments
         .into_iter()
@@ -302,6 +307,7 @@ impl Experiment {
     pub const LAMBDA_LIFTING: &'static str = "lambda-lifting";
     pub const LAMBDA_VALUES: &'static str = "lambda-values";
     pub const LINT_CHECKS: &'static str = "lint-checks";
+    pub const MESSAGE_FORMAT_JSON: &'static str = "compiler-message-format-json";
     pub const OPTIMIZE: &'static str = "optimize";
     pub const OPTIMIZE_EXTRA: &'static str = "optimize-extra";
     pub const OPTIMIZE_WAITING_FOR_COMPARE_TESTS: &'static str =
