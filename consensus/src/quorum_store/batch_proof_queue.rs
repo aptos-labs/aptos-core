@@ -55,13 +55,13 @@ impl QueueItem {
     }
 }
 
-struct TxnDuplicatesCache {
+struct OrderedTxnsCache {
     pub cache: HashMap<TxnSummaryWithExpiration, u64>,
     pub expiration_rounds: TimeExpirations<TxnSummaryWithExpiration>,
     pub latest_block_round: Round,
 }
 
-impl TxnDuplicatesCache {
+impl OrderedTxnsCache {
     fn new() -> Self {
         Self {
             cache: HashMap::new(),
@@ -79,12 +79,12 @@ pub struct BatchProofQueue {
     items: HashMap<BatchKey, QueueItem>,
     // Number of unexpired and uncommitted proofs in which the txn_summary = (sender, sequence number, hash, expiration)
     // has been included. We only count those batches that are in both author_to_batches and items along with proofs.
-    txn_summary_num_occurrences: HashMap<TxnSummaryWithExpiration, u64>,
+    unordered_txns_in_proofs: HashMap<TxnSummaryWithExpiration, u64>,
     // Expiration index
-    expirations: TimeExpirations<BatchSortKey>,
+    batch_expirations: TimeExpirations<BatchSortKey>,
     batch_store: Arc<BatchStore>,
-    // For duplicate accounting
-    txn_duplicates_cache: TxnDuplicatesCache,
+    // For counting unique txns when creating proposals
+    ordered_txns_cache: OrderedTxnsCache,
     txn_duplicates_window: u64,
 
     latest_block_timestamp: u64,
@@ -106,10 +106,10 @@ impl BatchProofQueue {
             my_peer_id,
             author_to_batches: HashMap::new(),
             items: HashMap::new(),
-            txn_summary_num_occurrences: HashMap::new(),
-            expirations: TimeExpirations::new(),
+            unordered_txns_in_proofs: HashMap::new(),
+            batch_expirations: TimeExpirations::new(),
             batch_store,
-            txn_duplicates_cache: TxnDuplicatesCache::new(),
+            ordered_txns_cache: OrderedTxnsCache::new(),
             // TODO: take the block window
             txn_duplicates_window: 20,
             latest_block_timestamp: 0,
@@ -160,14 +160,14 @@ impl BatchProofQueue {
     pub(crate) fn is_empty(&self) -> bool {
         self.items.is_empty()
             && self.author_to_batches.is_empty()
-            && self.expirations.is_empty()
-            && self.txn_summary_num_occurrences.is_empty()
+            && self.batch_expirations.is_empty()
+            && self.unordered_txns_in_proofs.is_empty()
     }
 
     fn remaining_txns_without_duplicates(&self) -> u64 {
         // txn_summary_num_occurrences counts all the unexpired and uncommitted proofs that have txn summaries
         // in batch_summaries.
-        let mut remaining_txns = self.txn_summary_num_occurrences.len() as u64;
+        let mut remaining_txns = self.unordered_txns_in_proofs.len() as u64;
 
         // For the unexpired and uncommitted proofs that don't have transaction summaries in batch_summaries,
         // we need to add the proof.num_txns() to the remaining_txns.
@@ -232,7 +232,7 @@ impl BatchProofQueue {
             }
         }
 
-        self.expirations.add_item(batch_sort_key, expiration);
+        self.batch_expirations.add_item(batch_sort_key, expiration);
 
         // If we are here, then proof is added for the first time. Otherwise, we will
         // return early. We only count when proof is added for the first time and txn
@@ -244,7 +244,7 @@ impl BatchProofQueue {
         {
             for txn_summary in txn_summaries {
                 *self
-                    .txn_summary_num_occurrences
+                    .unordered_txns_in_proofs
                     .entry(*txn_summary)
                     .or_insert(0) += 1;
             }
@@ -303,7 +303,7 @@ impl BatchProofQueue {
                 .entry(batch_info.author())
                 .or_default()
                 .insert(batch_sort_key.clone(), batch_info.clone());
-            self.expirations
+            self.batch_expirations
                 .add_item(batch_sort_key, batch_info.expiration());
 
             // We only count txn summaries first time it is added to the queue
@@ -315,7 +315,7 @@ impl BatchProofQueue {
             {
                 for txn_summary in &txn_summaries {
                     *self
-                        .txn_summary_num_occurrences
+                        .unordered_txns_in_proofs
                         .entry(*txn_summary)
                         .or_insert(0) += 1;
                 }
@@ -605,7 +605,7 @@ impl BatchProofQueue {
         let mut recent_filtered_txns: HashSet<_> = HashSet::new();
         excluded_batches
             .iter()
-            .filter(|(round, _)| *round > self.txn_duplicates_cache.latest_block_round)
+            .filter(|(round, _)| *round > self.ordered_txns_cache.latest_block_round)
             .for_each(|(_, batch_info)| {
                 let batch_key = BatchKey::from_info(batch_info);
                 if let Some(txn_summaries) = self
@@ -679,7 +679,7 @@ impl BatchProofQueue {
                                     .filter(|txn_summary| {
                                         !(recent_filtered_txns.contains(txn_summary)
                                             || self
-                                                .txn_duplicates_cache
+                                                .ordered_txns_cache
                                                 .cache
                                                 .contains_key(txn_summary))
                                             && block_timestamp.as_secs()
@@ -768,7 +768,7 @@ impl BatchProofQueue {
             counters::TIME_LAG_IN_BATCH_PROOF_QUEUE.observe_duration(time_lag);
         }
 
-        let expired = self.expirations.expire(block_timestamp);
+        let expired = self.batch_expirations.expire(block_timestamp);
         let mut num_expired_but_not_committed = 0;
         for key in &expired {
             if let Some(mut queue) = self.author_to_batches.remove(&key.author()) {
@@ -785,11 +785,11 @@ impl BatchProofQueue {
                         if let Some(ref txn_summaries) = item.txn_summaries {
                             for txn_summary in txn_summaries {
                                 if let Some(count) =
-                                    self.txn_summary_num_occurrences.get_mut(txn_summary)
+                                    self.unordered_txns_in_proofs.get_mut(txn_summary)
                                 {
                                     *count -= 1;
                                     if *count == 0 {
-                                        self.txn_summary_num_occurrences.remove(txn_summary);
+                                        self.unordered_txns_in_proofs.remove(txn_summary);
                                     }
                                 };
                             }
@@ -859,7 +859,7 @@ impl BatchProofQueue {
         sample!(
             SampleRate::Duration(Duration::from_secs(3)),
             counters::TXNS_WITH_DUPLICATE_BATCHES.observe(
-                self.txn_summary_num_occurrences
+                self.unordered_txns_in_proofs
                     .iter()
                     .filter(|(_, count)| **count > 1)
                     .count() as f64,
@@ -867,13 +867,12 @@ impl BatchProofQueue {
         );
 
         // Number of txns in unexpired and uncommitted proofs with summaries in batch_summaries
-        counters::TXNS_IN_PROOFS_WITH_SUMMARIES
-            .observe(self.txn_summary_num_occurrences.len() as f64);
+        counters::TXNS_IN_PROOFS_WITH_SUMMARIES.observe(self.unordered_txns_in_proofs.len() as f64);
 
         // Number of txns in unexpired and uncommitted proofs without summaries in batch_summaries
         counters::TXNS_IN_PROOFS_WITHOUT_SUMMARIES.observe(
             remaining_txns_without_duplicates
-                .saturating_sub(self.txn_summary_num_occurrences.len() as u64) as f64,
+                .saturating_sub(self.unordered_txns_in_proofs.len() as u64) as f64,
         );
 
         counters::PROOFS_WITHOUT_BATCH_SUMMARY
@@ -884,16 +883,28 @@ impl BatchProofQueue {
         (remaining_txns_without_duplicates, self.remaining_proofs)
     }
 
+    // TODO: use payload_manager.batches_in_block() instead
+    fn get_batches_from_block(block: &PipelinedBlock) -> Vec<BatchInfo> {
+        if let Some(payload) = block.payload() {
+            let payload_vec = &vec![(block.round(), payload)];
+            let payload_filter: PayloadFilter = payload_vec.into();
+            if let PayloadFilter::InQuorumStore(batches_set) = payload_filter {
+                return batches_set.into_iter().map(|(_, batch)| batch).collect();
+            }
+        }
+        vec![]
+    }
+
     pub(crate) fn handle_ordered(&mut self, block: PipelinedBlock) {
         let start_time = Instant::now();
 
         // gc the transactions outside the window
         for expired_txn in self
-            .txn_duplicates_cache
+            .ordered_txns_cache
             .expiration_rounds
             .expire(block.round().saturating_sub(self.txn_duplicates_window))
         {
-            if let Entry::Occupied(mut entry) = self.txn_duplicates_cache.cache.entry(expired_txn) {
+            if let Entry::Occupied(mut entry) = self.ordered_txns_cache.cache.entry(expired_txn) {
                 let count = entry.get_mut();
                 *count -= 1;
                 if *count == 0 {
@@ -902,31 +913,37 @@ impl BatchProofQueue {
             }
         }
 
-        if let Some(payload) = block.block().payload() {
-            let payload_vec = &vec![(block.round(), payload)];
-            let payload_filter: PayloadFilter = payload_vec.into();
-            if let PayloadFilter::InQuorumStore(batches) = payload_filter {
-                // Look up the txns in the block and update the duplicates cache
-                for (_, batch) in batches {
-                    if let Some(item) = self.items.get(&BatchKey::from_info(&batch)) {
-                        if let Some(txn_summaries) = item.txn_summaries.as_ref() {
-                            for txn_summary in txn_summaries {
-                                let entry = self
-                                    .txn_duplicates_cache
-                                    .cache
-                                    .entry(*txn_summary)
-                                    .or_insert(0);
-                                *entry += 1;
-                                self.txn_duplicates_cache
-                                    .expiration_rounds
-                                    .add_item(*txn_summary, block.round());
+        for batch in Self::get_batches_from_block(&block) {
+            if let Some(item) = self.items.get(&BatchKey::from_info(&batch)) {
+                if let Some(txn_summaries) = item.txn_summaries.as_ref() {
+                    for txn_summary in txn_summaries {
+                        // Insert into ordered_txns_cache
+                        let entry = self
+                            .ordered_txns_cache
+                            .cache
+                            .entry(*txn_summary)
+                            .or_insert(0);
+                        *entry += 1;
+                        self.ordered_txns_cache
+                            .expiration_rounds
+                            .add_item(*txn_summary, block.round());
+
+                        // Remove from unordered_txns_in_proofs
+                        if let Entry::Occupied(mut entry) =
+                            self.unordered_txns_in_proofs.entry(*txn_summary)
+                        {
+                            let count = entry.get_mut();
+                            *count -= 1;
+                            if *count == 0 {
+                                entry.remove();
                             }
                         }
                     }
                 }
             }
         }
-        self.txn_duplicates_cache.latest_block_round = block.round();
+
+        self.ordered_txns_cache.latest_block_round = block.round();
         info!(
             "handle_ordered from QuorumStore: updating txn_duplicates_cache took {} ms",
             start_time.elapsed().as_millis()
@@ -940,10 +957,6 @@ impl BatchProofQueue {
         txns: Vec<TxnSummaryWithExpiration>,
     ) {
         let start = Instant::now();
-        // TODO: does this later need some kind of GC for dangling references?
-        for txn in txns.into_iter() {
-            self.txn_summary_num_occurrences.remove(&txn);
-        }
 
         for batch in batches.into_iter() {
             let batch_key = BatchKey::from_info(&batch);
@@ -966,20 +979,7 @@ impl BatchProofQueue {
                     .get_mut(&batch_key)
                     .expect("must exist due to check");
 
-                if item.proof.is_some() {
-                    if let Some(ref txn_summaries) = item.txn_summaries {
-                        for txn_summary in txn_summaries {
-                            if let Some(count) =
-                                self.txn_summary_num_occurrences.get_mut(txn_summary)
-                            {
-                                *count -= 1;
-                                if *count == 0 {
-                                    self.txn_summary_num_occurrences.remove(txn_summary);
-                                }
-                            };
-                        }
-                    }
-                } else if !item.is_committed() {
+                if !item.is_committed() {
                     counters::GARBAGE_COLLECTED_IN_PROOF_QUEUE_COUNTER
                         .with_label_values(&["committed_batch_without_proof"])
                         .inc();
@@ -989,7 +989,7 @@ impl BatchProofQueue {
                 item.mark_committed();
             } else {
                 let batch_sort_key = BatchSortKey::from_info(batch.info());
-                self.expirations
+                self.batch_expirations
                     .add_item(batch_sort_key.clone(), batch.expiration());
                 self.author_to_batches
                     .entry(batch.author())
