@@ -428,16 +428,16 @@ pub fn background_traffic_for_sweep(num_cases: usize) -> Option<BackgroundTraffi
 }
 
 pub fn background_traffic_for_sweep_with_latency(
-    criteria: &[(f32, f32)],
+    criteria_expired_p50_and_p90: &[(f64, f32, f32)],
     high_gas_price: bool,
 ) -> Option<BackgroundTraffic> {
     Some(BackgroundTraffic {
         traffic: background_emit_request(high_gas_price),
-        criteria: criteria
+        criteria: criteria_expired_p50_and_p90
             .iter()
-            .map(|(p50, p90)| {
+            .map(|(expired, p50, p90)| {
                 SuccessCriteria::new_float(9.5)
-                    .add_max_expired_tps(0.1)
+                    .add_max_expired_tps(*expired)
                     .add_max_failed_submission_tps(0.0)
                     .add_latency_threshold(*p50, LatencyType::P50)
                     .add_latency_threshold(*p90, LatencyType::P90)

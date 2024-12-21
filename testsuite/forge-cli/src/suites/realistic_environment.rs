@@ -179,7 +179,7 @@ pub(crate) fn realistic_env_fairness_workload_sweep() -> ForgeConfig {
         ]),
         criteria: Vec::new(),
         background_traffic: background_traffic_for_sweep_with_latency(
-            &[(3.0, 8.0), (3.0, 8.0), (3.0, 4.0)],
+            &[(2.0, 3.0, 8.0), (0.1, 25.0, 30.0), (0.1, 30.0, 40.0)],
             false,
         ),
     })
@@ -213,14 +213,14 @@ pub(crate) fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
         criteria: Vec::new(),
         background_traffic: background_traffic_for_sweep_with_latency(
             &[
-                (4.0, 5.0),
-                (2.2, 3.0),
-                (3.5, 5.0),
-                (4.0, 6.0),
-                (2.5, 4.0),
-                (3.5, 5.0),
+                (0.1, 4.0, 5.0),
+                (0.1, 2.2, 3.0),
+                (0.1, 3.5, 5.0),
+                (0.1, 4.0, 6.0),
+                (0.1, 2.5, 4.0),
+                (0.1, 3.5, 5.0),
                 // TODO - p50 and p90 is set to high, until it is calibrated/understood.
-                (3.0, 10.0),
+                (0.1, 3.0, 10.0),
             ],
             true,
         ),
