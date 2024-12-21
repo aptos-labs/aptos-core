@@ -20,7 +20,7 @@ impl<'w, W: Write> Emitter for JsonEmitter<'w, W> {
             .iter()
             .map(|label| {
                 let fpath = codespan_reporting::files::Files::name(source_files, label.file_id)
-                    .expect("emit must not fail")
+                    .expect("always Ok() in the impl")
                     .to_string();
                 Label::new(label.style, fpath, label.range.clone())
             })
@@ -32,7 +32,8 @@ impl<'w, W: Write> Emitter for JsonEmitter<'w, W> {
         if let Some(code) = &diag.code {
             json_diag = json_diag.with_code(code)
         }
-        serde_json::to_writer(&mut self.writer, &json_diag).expect("emit must not fail");
-        writeln!(&mut self.writer).unwrap();
+        serde_json::to_writer(&mut self.writer, &json_diag).expect("it should be serializable");
+        writeln!(&mut self.writer)
+            .expect("dest is stderr / in-memory buffer, it should always be available");
     }
 }
