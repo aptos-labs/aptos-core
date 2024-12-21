@@ -15,7 +15,7 @@ pub mod pipeline;
 pub mod plan_builder;
 
 use crate::{
-    diagnostics::{human::HumanEmitter, Emitter},
+    diagnostics::Emitter,
     env_pipeline::{
         acquires_checker, ast_simplifier, cyclic_instantiation_checker, flow_insensitive_checkers,
         function_checker, inliner, lambda_lifter, lambda_lifter::LambdaLiftingOptions,
@@ -80,8 +80,8 @@ pub fn run_move_compiler_to_stderr(
     options: Options,
 ) -> anyhow::Result<(GlobalEnv, Vec<AnnotatedCompiledUnit>)> {
     let mut stderr = StandardStream::stderr(ColorChoice::Auto);
-    let mut emitter = HumanEmitter::new(&mut stderr);
-    run_move_compiler(&mut emitter, options)
+    let mut emitter = options.message_emitter(&mut stderr);
+    run_move_compiler(emitter.as_mut(), options)
 }
 
 /// Run move compiler and print errors to given writer. Returns the set of compiled units.
@@ -167,8 +167,8 @@ pub fn run_move_compiler_for_analysis(
     options.whole_program = true; // will set `treat_everything_as_target`
     options = options.set_experiment(Experiment::SPEC_REWRITE, true);
     options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
-    let mut emitter = HumanEmitter::new(error_writer);
-    let (env, _units) = run_move_compiler(&mut emitter, options)?;
+    let mut emitter = options.message_emitter(error_writer);
+    let (env, _units) = run_move_compiler(emitter.as_mut(), options)?;
     // Reset for subsequent analysis
     env.treat_everything_as_target(false);
     Ok(env)
