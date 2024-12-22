@@ -349,7 +349,7 @@ dependencies = [
  "move-vm-runtime",
  "pathsearch",
  "poem",
- "processor",
+ "processor 1.0.1",
  "rand 0.7.3",
  "regex",
  "reqwest 0.11.23",
@@ -357,7 +357,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
- "server-framework",
+ "server-framework 1.0.0",
  "set_env",
  "shadow-rs",
  "tempfile",
@@ -2378,10 +2378,11 @@ dependencies = [
 [[package]]
 name = "aptos-indexer-processor-sdk"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=9ecd252ccff53023664562001dd04c2886488c0d#9ecd252ccff53023664562001dd04c2886488c0d"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=95d76e07dd66a20a0e50a9e6c559885bff7ab52b#95d76e07dd66a20a0e50a9e6c559885bff7ab52b"
 dependencies = [
+ "ahash 0.8.11",
  "anyhow",
- "aptos-indexer-transaction-stream",
+ "aptos-indexer-transaction-stream 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=95d76e07dd66a20a0e50a9e6c559885bff7ab52b)",
  "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb)",
  "async-trait",
  "bcs 0.1.4",
@@ -2390,7 +2391,39 @@ dependencies = [
  "derive_builder",
  "futures",
  "hex",
- "instrumented-channel",
+ "instrumented-channel 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=95d76e07dd66a20a0e50a9e6c559885bff7ab52b)",
+ "kanal",
+ "mockall 0.12.1",
+ "num_cpus",
+ "once_cell",
+ "petgraph 0.6.5",
+ "prometheus",
+ "prometheus-client",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tiny-keccak",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "aptos-indexer-processor-sdk"
+version = "0.1.0"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=9ecd252ccff53023664562001dd04c2886488c0d#9ecd252ccff53023664562001dd04c2886488c0d"
+dependencies = [
+ "anyhow",
+ "aptos-indexer-transaction-stream 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=9ecd252ccff53023664562001dd04c2886488c0d)",
+ "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb)",
+ "async-trait",
+ "bcs 0.1.4",
+ "bigdecimal",
+ "chrono",
+ "derive_builder",
+ "futures",
+ "hex",
+ "instrumented-channel 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=9ecd252ccff53023664562001dd04c2886488c0d)",
  "kanal",
  "mockall 0.12.1",
  "num_cpus",
@@ -2443,6 +2476,27 @@ dependencies = [
 [[package]]
 name = "aptos-indexer-transaction-stream"
 version = "0.1.0"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=95d76e07dd66a20a0e50a9e6c559885bff7ab52b#95d76e07dd66a20a0e50a9e6c559885bff7ab52b"
+dependencies = [
+ "anyhow",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=95d76e07dd66a20a0e50a9e6c559885bff7ab52b)",
+ "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb)",
+ "chrono",
+ "futures-util",
+ "once_cell",
+ "prometheus",
+ "prost 0.12.3",
+ "sample 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=95d76e07dd66a20a0e50a9e6c559885bff7ab52b)",
+ "serde",
+ "tokio",
+ "tonic 0.11.0",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "aptos-indexer-transaction-stream"
+version = "0.1.0"
 source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=9ecd252ccff53023664562001dd04c2886488c0d#9ecd252ccff53023664562001dd04c2886488c0d"
 dependencies = [
  "anyhow",
@@ -2453,7 +2507,7 @@ dependencies = [
  "once_cell",
  "prometheus",
  "prost 0.12.3",
- "sample",
+ "sample 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=9ecd252ccff53023664562001dd04c2886488c0d)",
  "serde",
  "tokio",
  "tonic 0.11.0",
@@ -2922,6 +2976,13 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
+dependencies = [
+ "chrono",
+]
+
+[[package]]
+name = "aptos-moving-average"
+version = "0.1.0"
 source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf#4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf"
 dependencies = [
  "chrono",
@@ -2931,6 +2992,14 @@ dependencies = [
 name = "aptos-moving-average"
 version = "0.1.0"
 source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=51a34901b40d7f75767ac907b4d2478104d6a515#51a34901b40d7f75767ac907b4d2478104d6a515"
+dependencies = [
+ "chrono",
+]
+
+[[package]]
+name = "aptos-moving-average"
+version = "0.1.0"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=95d76e07dd66a20a0e50a9e6c559885bff7ab52b#95d76e07dd66a20a0e50a9e6c559885bff7ab52b"
 dependencies = [
  "chrono",
 ]
@@ -4702,9 +4771,9 @@ dependencies = [
  "diesel-async",
  "futures",
  "maplit",
- "processor",
+ "processor 1.0.0",
  "rand 0.7.3",
- "server-framework",
+ "server-framework 1.0.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=51a34901b40d7f75767ac907b4d2478104d6a515)",
  "tempfile",
  "tokio",
  "tokio-util 0.7.10",
@@ -9907,6 +9976,19 @@ dependencies = [
 [[package]]
 name = "instrumented-channel"
 version = "0.1.0"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=95d76e07dd66a20a0e50a9e6c559885bff7ab52b#95d76e07dd66a20a0e50a9e6c559885bff7ab52b"
+dependencies = [
+ "delegate",
+ "derive_builder",
+ "kanal",
+ "once_cell",
+ "prometheus",
+ "prometheus-client",
+]
+
+[[package]]
+name = "instrumented-channel"
+version = "0.1.0"
 source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=9ecd252ccff53023664562001dd04c2886488c0d#9ecd252ccff53023664562001dd04c2886488c0d"
 dependencies = [
  "delegate",
@@ -13612,7 +13694,7 @@ dependencies = [
  "allocative",
  "allocative_derive",
  "anyhow",
- "aptos-indexer-processor-sdk",
+ "aptos-indexer-processor-sdk 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=9ecd252ccff53023664562001dd04c2886488c0d)",
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=51a34901b40d7f75767ac907b4d2478104d6a515)",
  "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb)",
  "async-trait",
@@ -13651,7 +13733,67 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "server-framework",
+ "server-framework 1.0.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=51a34901b40d7f75767ac907b4d2478104d6a515)",
+ "sha2 0.10.8",
+ "sha3 0.10.8",
+ "strum 0.24.1",
+ "tiny-keccak",
+ "tokio",
+ "tokio-postgres",
+ "tonic 0.11.0",
+ "tracing",
+ "unescape",
+ "url",
+]
+
+[[package]]
+name = "processor"
+version = "1.0.1"
+dependencies = [
+ "ahash 0.8.11",
+ "allocative",
+ "allocative_derive",
+ "anyhow",
+ "aptos-indexer-processor-sdk 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=95d76e07dd66a20a0e50a9e6c559885bff7ab52b)",
+ "aptos-moving-average 0.1.0",
+ "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=5c48aee129b5a141be2792ffa3d9bd0a1a61c9cb)",
+ "async-trait",
+ "bcs 0.1.4",
+ "bigdecimal",
+ "bitflags 2.6.0",
+ "canonical_json",
+ "chrono",
+ "clap 4.5.21",
+ "diesel",
+ "diesel-async",
+ "diesel_migrations",
+ "enum_dispatch",
+ "field_count",
+ "futures",
+ "futures-util",
+ "google-cloud-googleapis",
+ "google-cloud-pubsub",
+ "google-cloud-storage",
+ "hex",
+ "hyper 0.14.28",
+ "itertools 0.12.1",
+ "jemallocator",
+ "kanal",
+ "lazy_static",
+ "native-tls",
+ "num 0.4.1",
+ "num_cpus",
+ "once_cell",
+ "parquet",
+ "parquet_derive",
+ "postgres-native-tls",
+ "prometheus",
+ "prost 0.12.3",
+ "rayon",
+ "regex",
+ "serde",
+ "serde_json",
+ "server-framework 1.0.0",
  "sha2 0.10.8",
  "sha3 0.10.8",
  "strum 0.24.1",
@@ -15005,6 +15147,14 @@ dependencies = [
 [[package]]
 name = "sample"
 version = "0.1.0"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=95d76e07dd66a20a0e50a9e6c559885bff7ab52b#95d76e07dd66a20a0e50a9e6c559885bff7ab52b"
+dependencies = [
+ "tracing",
+]
+
+[[package]]
+name = "sample"
+version = "0.1.0"
 source = "git+https://github.com/aptos-labs/aptos-indexer-processor-sdk.git?rev=9ecd252ccff53023664562001dd04c2886488c0d#9ecd252ccff53023664562001dd04c2886488c0d"
 
 [[package]]
@@ -15428,6 +15578,26 @@ dependencies = [
  "move-core-types",
  "proptest",
  "proptest-derive",
+]
+
+[[package]]
+name = "server-framework"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-system-utils 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=202bdccff2b2d333a385ae86a4fcf23e89da9f62)",
+ "async-trait",
+ "backtrace",
+ "clap 4.5.21",
+ "prometheus",
+ "serde",
+ "serde_yaml 0.8.26",
+ "tempfile",
+ "tokio",
+ "toml 0.7.8",
+ "tracing",
+ "tracing-subscriber 0.3.18",
+ "warp",
 ]
 
 [[package]]

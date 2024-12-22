@@ -98,6 +98,12 @@ pub fn get_processor_config(processor_name: &ProcessorName) -> Result<ProcessorC
         ProcessorName::ParquetTokenV2Processor => {
             bail!("ParquetTokenV2Processor is not supported in the localnet")
         },
+        &ProcessorName::ParquetFungibleAssetActivitiesProcessor => {
+            bail!("Not implemented yet")
+        },
+        &ProcessorName::ParquetUserTransactionsProcessor => {
+            bail!("Not implemented yet")
+        },
         ProcessorName::StakeProcessor => ProcessorConfig::StakeProcessor(StakeProcessorConfig {
             query_retries: Default::default(),
             query_retry_delay_ms: Default::default(),
