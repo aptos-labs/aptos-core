@@ -224,7 +224,7 @@ Particularly, certain operations such as `get_with_default` and
 Move option类型在内部表示为一个单例向量，可能包含`资源`或`可复制`类型的值。如果你熟悉其他语言中的option类型，Move `Option`的行为与那些类似，但有几个显著的例外，因为option可以包含一个类型为`资源`的值。
 特别地，某些操作如`get_with_default`和`destroy_with_default`要求元素类型`T`为`可复制`类型。
 
-The API for the `option` module is as as follows
+The API for the `option` module is as follows
 
 `option`模块的API如下所示:
 
@@ -465,7 +465,7 @@ An account did not have the expected  role for this operation. Useful for Role B
 ```
 
 ---------------------------------------------------------------------------
-An account did not not have a required capability. Useful for RBAC error conditions.
+An account did not have a required capability. Useful for RBAC error conditions.
 
 帐户没有所需的能力。用于RBAC错误。
 

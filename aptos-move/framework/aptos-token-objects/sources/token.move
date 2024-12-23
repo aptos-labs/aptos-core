@@ -1284,7 +1284,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    /// This test verifies that once the collection name can be changed, tokens can still be be minted from the collection.
+    /// This test verifies that once the collection name can be changed, tokens can still be minted from the collection.
     fun test_change_collection_name(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
