@@ -1,76 +1,62 @@
 processed 4 tasks
 
 task 1 'print-bytecode'. lines 4-35:
-Error: extended checks failed:
+// Move bytecode v7
+module f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6.game {
+use 0000000000000000000000000000000000000000000000000000000000000001::signer;
+use 0000000000000000000000000000000000000000000000000000000000000001::debug;
 
-bug: BYTECODE VERIFICATION FAILED
-   ┌─ TEMPFILE:25:13
-   │
-25 │             debug::print(field); // INTERNAL TEST ERROR: INTERNAL VM INVARIANT VIOLATION
-   │             ^^^^^^^^^^^^^^^^^^^ ICE failed bytecode verifier: VMError {
-    major_status: CALL_TYPE_MISMATCH_ERROR,
-    sub_status: None,
-    message: None,
-    exec_state: None,
-    location: Module(
-        ModuleId {
-            address: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6,
-            name: Identifier(
-                "game",
-            ),
-        },
-    ),
-    indices: [
-        (
-            FunctionDefinition,
-            0,
-        ),
-    ],
-    offsets: [
-        (
-            FunctionDefinitionIndex(0),
-            25,
-        ),
-    ],
+
+struct InnerStruct has copy, store, key {
+	amount: u64
+}
+struct OuterStruct has key {
+	any_field: vector<InnerStruct>
 }
 
-
-
-task 2 'publish'. lines 37-68:
-Error: extended checks failed:
-
-bug: BYTECODE VERIFICATION FAILED
-   ┌─ TEMPFILE1:58:13
-   │
-58 │             debug::print(field); // INTERNAL TEST ERROR: INTERNAL VM INVARIANT VIOLATION
-   │             ^^^^^^^^^^^^^^^^^^^ ICE failed bytecode verifier: VMError {
-    major_status: CALL_TYPE_MISMATCH_ERROR,
-    sub_status: None,
-    message: None,
-    exec_state: None,
-    location: Module(
-        ModuleId {
-            address: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6,
-            name: Identifier(
-                "game",
-            ),
-        },
-    ),
-    indices: [
-        (
-            FunctionDefinition,
-            0,
-        ),
-    ],
-    offsets: [
-        (
-            FunctionDefinitionIndex(0),
-            25,
-        ),
-    ],
+entry public test_upgrade(Arg0: &signer) /* def_idx: 0 */ {
+L1:	loc0: &mut vector<InnerStruct>
+L2:	loc1: u64
+L3:	loc2: u64
+B0:
+	0: CopyLoc[0](Arg0: &signer)
+	1: Call signer::address_of(&signer): address
+	2: MoveLoc[0](Arg0: &signer)
+	3: VecPack(3, 0)
+	4: Pack[1](OuterStruct)
+	5: MoveTo[1](OuterStruct)
+	6: MutBorrowGlobal[1](OuterStruct)
+	7: MutBorrowField[0](OuterStruct.any_field: vector<InnerStruct>)
+	8: StLoc[1](loc0: &mut vector<InnerStruct>)
+	9: LdU64(0)
+	10: StLoc[2](loc1: u64)
+	11: CopyLoc[1](loc0: &mut vector<InnerStruct>)
+	12: FreezeRef
+	13: VecLen(3)
+	14: StLoc[3](loc2: u64)
+B1:
+	15: CopyLoc[2](loc1: u64)
+	16: CopyLoc[3](loc2: u64)
+	17: Lt
+	18: BrFalse(29)
+B2:
+	19: CopyLoc[1](loc0: &mut vector<InnerStruct>)
+	20: CopyLoc[2](loc1: u64)
+	21: VecMutBorrow(3)
+	22: FreezeRef
+	23: Call debug::print<InnerStruct>(&InnerStruct)
+	24: MoveLoc[2](loc1: u64)
+	25: LdU64(1)
+	26: Add
+	27: StLoc[2](loc1: u64)
+	28: Branch(15)
+B3:
+	29: MoveLoc[1](loc0: &mut vector<InnerStruct>)
+	30: Pop
+	31: Ret
 }
-
-
+}
 
 task 3 'run'. lines 70-70:
-Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(Some(LINKER_ERROR))
+mutable inputs after call: local#0: 0
+return values: 0

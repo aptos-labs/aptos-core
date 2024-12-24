@@ -7,10 +7,12 @@ DKG on-chain states and helper functions.
 
 
 -  [Struct `DKGSessionMetadata`](#0x1_dkg_DKGSessionMetadata)
+-  [Enum `TestEnum`](#0x1_dkg_TestEnum)
 -  [Struct `DKGStartEvent`](#0x1_dkg_DKGStartEvent)
 -  [Struct `DKGSessionState`](#0x1_dkg_DKGSessionState)
 -  [Resource `DKGState`](#0x1_dkg_DKGState)
 -  [Constants](#@Constants_0)
+-  [Function `test_a`](#0x1_dkg_test_a)
 -  [Function `initialize`](#0x1_dkg_initialize)
 -  [Function `start`](#0x1_dkg_start)
 -  [Function `finish`](#0x1_dkg_finish)
@@ -79,6 +81,55 @@ This can be considered as the public input of DKG.
 </dd>
 </dl>
 
+
+</details>
+
+<a id="0x1_dkg_TestEnum"></a>
+
+## Enum `TestEnum`
+
+
+
+<pre><code>enum <a href="dkg.md#0x1_dkg_TestEnum">TestEnum</a> <b>has</b> drop
+</code></pre>
+
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>A</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+</dl>
+
+
+</details>
+
+</details>
+
+<details>
+<summary>B</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+</dl>
+
+
+</details>
+
+</details>
 
 </details>
 
@@ -213,6 +264,30 @@ The completed and in-progress DKG sessions.
 </code></pre>
 
 
+
+<a id="0x1_dkg_test_a"></a>
+
+## Function `test_a`
+
+
+
+<pre><code><b>fun</b> <a href="dkg.md#0x1_dkg_test_a">test_a</a>(): <a href="dkg.md#0x1_dkg_TestEnum">dkg::TestEnum</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="dkg.md#0x1_dkg_test_a">test_a</a>(): <a href="dkg.md#0x1_dkg_TestEnum">TestEnum</a> {
+   TestEnum::A
+}
+</code></pre>
+
+
+
+</details>
 
 <a id="0x1_dkg_initialize"></a>
 

@@ -48,6 +48,8 @@ pub(crate) fn build_package(
     let mut options = options;
     if get_move_compiler_v2_from_env() {
         options.compiler_version = Some(CompilerVersion::latest_stable());
+        options.language_version =
+            Some(CompilerVersion::latest_stable().infer_stable_language_version());
     }
     BuiltPackage::build(package_path.to_owned(), options)
 }
