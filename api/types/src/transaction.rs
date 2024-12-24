@@ -1191,6 +1191,7 @@ pub enum TransactionSignature {
     MultiAgentSignature(MultiAgentSignature),
     FeePayerSignature(FeePayerSignature),
     SingleSender(AccountSignature),
+    NoAccountSignature(NoAccountSignature),
 }
 
 impl VerifyInput for TransactionSignature {
@@ -1201,6 +1202,7 @@ impl VerifyInput for TransactionSignature {
             TransactionSignature::MultiAgentSignature(inner) => inner.verify(),
             TransactionSignature::FeePayerSignature(inner) => inner.verify(),
             TransactionSignature::SingleSender(inner) => inner.verify(),
+            TransactionSignature::NoAccountSignature(inner) => inner.verify(),
         }
     }
 }
@@ -1217,6 +1219,7 @@ impl TryFrom<TransactionSignature> for TransactionAuthenticator {
             TransactionSignature::SingleSender(sig) => {
                 TransactionAuthenticator::single_sender(sig.try_into()?)
             },
+            TransactionSignature::NoAccountSignature(sig) => sig.try_into()?
         })
     }
 }
