@@ -395,7 +395,7 @@ Cannot delete a module that was published in the same package
 
 <a id="0x1_code_EMODULE_NAME_CLASH"></a>
 
-Package contains duplicate module names with existing modules publised in other packages on this address
+Package contains duplicate module names with existing modules published in other packages on this address
 
 
 <pre><code><b>const</b> <a href="code.md#0x1_code_EMODULE_NAME_CLASH">EMODULE_NAME_CLASH</a>: u64 = 1;
