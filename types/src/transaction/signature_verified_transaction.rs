@@ -72,6 +72,15 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
             _ => 0,
         }
     }
+
+    fn is_block_metadata_txn(&self) -> bool {
+        matches!(
+            self.expect_valid(),
+            Transaction::BlockMetadata(_)
+                | Transaction::BlockMetadataExt(_)
+                | Transaction::GenesisTransaction(_)
+        )
+    }
 }
 
 impl From<Transaction> for SignatureVerifiedTransaction {
