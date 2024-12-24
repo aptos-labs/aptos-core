@@ -9,6 +9,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe438c63458706e03479442743baae6c88256498e6431708f6dfc520a26515d3"
 
 [[package]]
+name = "Replay"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap 4.4.14",
+ "cloud-storage",
+ "futures",
+ "futures-util",
+ "move-binary-format",
+ "move-core-types",
+ "rayon",
+ "reqwest 0.11.23",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "abstract-domain-derive"
 version = "0.1.0"
 dependencies = [
@@ -6407,6 +6426,7 @@ dependencies = [
  "hex",
  "jsonwebtoken 7.2.0",
  "lazy_static",
+ "openssl",
  "pem 0.8.3",
  "percent-encoding",
  "reqwest 0.11.23",
