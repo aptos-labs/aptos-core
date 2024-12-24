@@ -2,13 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    randomness::{decrypt_key_map, get_current_version, verify_dkg_transcript, verify_randomness},
+    randomness::{
+        decrypt_key_map, get_current_version, verify_dkg_transcript, verify_randomness,
+        wait_for_dkg_finish,
+    },
     smoke_test_environment::SwarmBuilder,
-    utils::get_on_chain_resource,
 };
 use aptos_forge::{NodeExt, SwarmExt};
 use aptos_logger::info;
-use aptos_types::{dkg::DKGState, on_chain_config::OnChainRandomnessConfig};
+use aptos_types::on_chain_config::OnChainRandomnessConfig;
 use std::{sync::Arc, time::Duration};
 
 /// Verify the correctness of DKG transcript and block-level randomness seed.
@@ -39,8 +41,8 @@ async fn randomness_correctness() {
         .expect("Epoch 2 taking too long to arrive!");
 
     info!("Verify DKG correctness for epoch 2.");
-    let dkg_session = get_on_chain_resource::<DKGState>(&rest_client).await;
-    assert!(verify_dkg_transcript(dkg_session.last_complete(), &decrypt_key_map).is_ok());
+    let (dkg_session, rounding_result) = wait_for_dkg_finish(&rest_client, Some(2), 30).await;
+    assert!(verify_dkg_transcript(&dkg_session, rounding_result, &decrypt_key_map).is_ok());
 
     // Verify the randomness in 10 versions.
     for _ in 0..10 {
@@ -59,8 +61,8 @@ async fn randomness_correctness() {
         .expect("Epoch 3 taking too long to arrive!");
 
     info!("Verify DKG correctness for epoch 3.");
-    let dkg_session = get_on_chain_resource::<DKGState>(&rest_client).await;
-    assert!(verify_dkg_transcript(dkg_session.last_complete(), &decrypt_key_map).is_ok());
+    let (dkg_session, rounding) = wait_for_dkg_finish(&rest_client, Some(3), 60).await;
+    assert!(verify_dkg_transcript(&dkg_session, rounding, &decrypt_key_map).is_ok());
 
     // Again, verify the randomness in 10 versions.
     for _ in 0..10 {

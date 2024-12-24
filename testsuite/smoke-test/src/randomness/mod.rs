@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils;
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{compat::Sha3_256, Uniform};
 use aptos_dkg::weighted_vuf::traits::WeightedVUF;
@@ -13,6 +12,7 @@ use aptos_types::{
     on_chain_config::{OnChainConfig, OnChainConsensusConfig},
     randomness::{PerBlockRandomness, RandMetadata, WVUF},
     validator_verifier::ValidatorConsensusInfo,
+    CurEpochRounding, RoundingResult,
 };
 use digest::Digest;
 use move_core_types::{account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS};
@@ -47,7 +47,7 @@ async fn get_current_version(rest_client: &Client) -> u64 {
 async fn get_on_chain_resource_at_version<T: OnChainConfig>(
     rest_client: &Client,
     version: u64,
-) -> T {
+) -> Result<T> {
     let maybe_response = rest_client
         .get_account_resource_at_version_bcs::<T>(
             CORE_CODE_ADDRESS,
@@ -55,48 +55,58 @@ async fn get_on_chain_resource_at_version<T: OnChainConfig>(
             version,
         )
         .await;
-    let response = maybe_response.unwrap();
-    response.into_inner()
+    let response = maybe_response
+        .map_err(|e| anyhow!("get_on_chain_resource_at_version failed with rest error: {e}"))?;
+    Ok(response.into_inner())
 }
 
 /// Poll the on-chain state until we see a DKG session finishes.
 /// Return a `DKGSessionState` of the DKG session seen.
-#[allow(dead_code)]
 async fn wait_for_dkg_finish(
-    client: &Client,
+    rest_cli: &Client,
     target_epoch: Option<u64>,
     time_limit_secs: u64,
-) -> DKGSessionState {
-    let mut dkg_state = utils::get_on_chain_resource::<DKGState>(client).await;
+) -> (DKGSessionState, Option<RoundingResult>) {
     let timer = Instant::now();
-    while timer.elapsed().as_secs() < time_limit_secs
-        && !(dkg_state.in_progress.is_none()
-            && dkg_state.last_completed.is_some()
-            && (target_epoch.is_none()
-                || dkg_state
-                    .last_completed
-                    .as_ref()
-                    .map(|session| session.metadata.dealer_epoch + 1)
-                    == target_epoch))
-    {
+    loop {
+        let cur_txn_version = get_current_version(rest_cli).await;
+        let (dkg_state, cur_epoch_rounding) = tokio::join!(
+            get_on_chain_resource_at_version::<DKGState>(rest_cli, cur_txn_version),
+            get_on_chain_resource_at_version::<CurEpochRounding>(rest_cli, cur_txn_version),
+        );
+        if let Ok(dkg_state) = dkg_state {
+            if dkg_state.in_progress.is_none()
+                && dkg_state.last_completed.is_some()
+                && (target_epoch.is_none()
+                    || dkg_state
+                        .last_completed
+                        .as_ref()
+                        .map(|session| session.metadata.dealer_epoch + 1)
+                        == target_epoch)
+            {
+                let rounding_result = cur_epoch_rounding
+                    .ok()
+                    .map(|CurEpochRounding { rounding }| rounding);
+                return (dkg_state.last_complete().clone(), rounding_result);
+            }
+        }
+        assert!(timer.elapsed().as_secs() < time_limit_secs);
         tokio::time::sleep(Duration::from_secs(1)).await;
-        dkg_state = utils::get_on_chain_resource::<DKGState>(client).await;
     }
-    assert!(timer.elapsed().as_secs() < time_limit_secs);
-    dkg_state.last_complete().clone()
 }
 
 /// Verify that DKG transcript of epoch i (stored in `new_dkg_state`) is correctly generated
 /// by the validator set in epoch i-1 (stored in `new_dkg_state`).
 fn verify_dkg_transcript(
     dkg_session: &DKGSessionState,
+    rounding_result: Option<RoundingResult>,
     decrypt_key_map: &HashMap<AccountAddress, <DefaultDKG as DKGTrait>::NewValidatorDecryptKey>,
 ) -> Result<()> {
     info!(
         "Verifying the transcript generated in epoch {}.",
         dkg_session.metadata.dealer_epoch,
     );
-    let pub_params = DefaultDKG::new_public_params(&dkg_session.metadata);
+    let pub_params = DefaultDKG::new_public_params(&dkg_session.metadata, rounding_result);
     let transcript = bcs::from_bytes(dkg_session.transcript.as_slice()).map_err(|e| {
         anyhow!("DKG transcript verification failed with transcript deserialization error: {e}")
     })?;
@@ -207,21 +217,26 @@ async fn verify_randomness(
     version: u64,
 ) -> Result<()> {
     // Fetch resources.
-    let (dkg_state, on_chain_block_randomness) = tokio::join!(
+    let (dkg_state, on_chain_block_randomness, cur_epoch_rounding) = tokio::join!(
         get_on_chain_resource_at_version::<DKGState>(rest_client, version),
-        get_on_chain_resource_at_version::<PerBlockRandomness>(rest_client, version)
+        get_on_chain_resource_at_version::<PerBlockRandomness>(rest_client, version),
+        get_on_chain_resource_at_version::<CurEpochRounding>(rest_client, version),
     );
+    let on_chain_block_randomness = on_chain_block_randomness.unwrap();
+    let dkg_state = dkg_state.unwrap();
 
     ensure!(
         on_chain_block_randomness.seed.is_some(),
         "randomness verification failed with seed missing"
     );
-
+    let rounding_result = cur_epoch_rounding
+        .ok()
+        .map(|CurEpochRounding { rounding }| rounding);
     // Derive the shared secret.
     let dkg_session = dkg_state
         .last_completed
         .ok_or_else(|| anyhow!("randomness verification failed with missing dkg result"))?;
-    let dkg_pub_params = DefaultDKG::new_public_params(&dkg_session.metadata);
+    let dkg_pub_params = DefaultDKG::new_public_params(&dkg_session.metadata, rounding_result);
     let transcript =
         bcs::from_bytes::<<DefaultDKG as DKGTrait>::Transcript>(dkg_session.transcript.as_slice())
             .map_err(|_| {
