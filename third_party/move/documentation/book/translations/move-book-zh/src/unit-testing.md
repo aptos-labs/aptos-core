@@ -326,7 +326,7 @@ module 0x1::my_module {
 }
 ```
 
-we would get get the following output when running the tests:
+we would get the following output when running the tests:
 
 当运行测试时我们将得到下面的输出：
 
