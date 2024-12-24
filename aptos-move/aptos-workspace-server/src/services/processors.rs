@@ -4,7 +4,7 @@
 use super::{node::get_data_service_url, postgres::get_postgres_connection_string};
 use crate::common::make_shared;
 use anyhow::{anyhow, Context, Result};
-use aptos_localnet::{health_checker::HealthChecker, processors::get_processor_config};
+use aptos::node::local_testnet::{processors::get_processor_config, HealthChecker};
 use diesel::Connection;
 use diesel_async::{async_connection_wrapper::AsyncConnectionWrapper, pg::AsyncPgConnection};
 use futures::{future::try_join_all, stream::FuturesUnordered, StreamExt};
