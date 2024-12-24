@@ -8,7 +8,7 @@ use crate::VerifierConfig;
 use move_binary_format::{
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
-    file_format::{CompiledModule, CompiledScript, StructFieldInformation},
+    file_format::{CompiledModule, CompiledScript, SignatureToken, StructFieldInformation},
     IndexKind,
 };
 use move_core_types::vm_status::StatusCode;
@@ -33,6 +33,7 @@ impl<'a> FeatureVerifier<'a> {
             code: BinaryIndexedView::Module(module),
         };
         verifier.verify_function_handles()?;
+        verifier.verify_function_value_types()?;
         verifier.verify_struct_defs()
     }
 
@@ -76,6 +77,21 @@ impl<'a> FeatureVerifier<'a> {
                     return Err(PartialVMError::new(StatusCode::FEATURE_NOT_ENABLED)
                         .at_index(IndexKind::FunctionHandle, idx as u16)
                         .with_message("resource access control feature not enabled".to_string()));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn verify_function_value_types(&self) -> PartialVMResult<()> {
+        if !self.config.enable_function_values {
+            for (idx, signature) in self.code.signatures().iter().enumerate() {
+                for signature_token in signature.0.iter() {
+                    if matches!(signature_token, SignatureToken::Function(..)) {
+                        return Err(PartialVMError::new(StatusCode::FEATURE_NOT_ENABLED)
+                            .at_index(IndexKind::Signature, idx as u16)
+                            .with_message("function values feature not enabled".to_string()));
+                    }
                 }
             }
         }

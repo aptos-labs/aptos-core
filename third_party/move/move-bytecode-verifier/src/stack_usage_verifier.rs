@@ -14,7 +14,7 @@ use move_binary_format::{
     binary_views::{BinaryIndexedView, FunctionView},
     control_flow_graph::{BlockId, ControlFlowGraph},
     errors::{PartialVMError, PartialVMResult},
-    file_format::{Bytecode, CodeUnit, FunctionDefinitionIndex, Signature},
+    file_format::{Bytecode, CodeUnit, FunctionDefinitionIndex, Signature, SignatureToken},
 };
 use move_core_types::vm_status::StatusCode;
 
@@ -226,6 +226,50 @@ impl<'a> StackUsageVerifier<'a> {
                 let arg_count = self.resolver.signature_at(function_handle.parameters).len() as u64;
                 let return_count = self.resolver.signature_at(function_handle.return_).len() as u64;
                 (arg_count, return_count)
+            },
+
+            // LdFunction pushes the function handle
+            Bytecode::LdFunction(idx) => {
+                let _function_handle = self.resolver.function_handle_at(*idx);
+                (0, 1)
+            },
+            Bytecode::LdFunctionGeneric(idx) => {
+                let func_inst = self.resolver.function_instantiation_at(*idx);
+                let _function_handle = self.resolver.function_handle_at(func_inst.handle);
+                (0, 1)
+            },
+
+            // InvokeFunction pops a function and the number of arguments and pushes the results of the
+            // given function type
+            Bytecode::InvokeFunction(idx) => {
+                if let Some(SignatureToken::Function(args, results, ..)) =
+                    self.resolver.signature_at(*idx).0.first()
+                {
+                    ((1 + args.len()) as u64, results.len() as u64)
+                } else {
+                    // We don't know what it will pop/push, but the signature checker
+                    // ensures we never reach this
+                    (0, 0)
+                }
+            },
+
+            // EarlyBindFunction pops a function value and the captured arguments and returns 1 value
+            Bytecode::EarlyBindFunction(idx, arg_count) => {
+                if let Some(SignatureToken::Function(args, ..)) =
+                    self.resolver.signature_at(*idx).0.first()
+                {
+                    if args.len() <= *arg_count as usize {
+                        (1 + *arg_count as u64, 1)
+                    } else {
+                        // We don't know what it will pop/push, but the signature checker
+                        // ensures we never reach this
+                        (0, 0)
+                    }
+                } else {
+                    // We don't know what it will pop/push, but the signature checker
+                    // ensures we never reach this
+                    (0, 0)
+                }
             },
 
             // Pack performs `num_fields` pops and one push
