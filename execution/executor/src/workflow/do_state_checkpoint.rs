@@ -1,28 +1,84 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::in_memory_state_calculator_v2::InMemoryStateCalculatorV2;
-use anyhow::Result;
+use crate::metrics::OTHER_TIMERS;
+use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
     execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
 };
-use aptos_storage_interface::state_store::state_delta::StateDelta;
-use std::sync::Arc;
+use aptos_metrics_core::TimerHelper;
+use aptos_storage_interface::state_store::state_summary::LedgerStateSummary;
 
 pub struct DoStateCheckpoint;
 
 impl DoStateCheckpoint {
     pub fn run(
         execution_output: &ExecutionOutput,
-        parent_state: &Arc<StateDelta>,
-        known_state_checkpoints: Option<impl IntoIterator<Item = Option<HashValue>>>,
+        parent_state_summary: &LedgerStateSummary,
+        known_state_checkpoints: Option<Vec<Option<HashValue>>>,
     ) -> Result<StateCheckpointOutput> {
-        // Apply the write set, get the latest state.
-        InMemoryStateCalculatorV2::calculate_for_transactions(
+        let _timer = OTHER_TIMERS.timer_with(&["do_state_checkpoint"]);
+
+        let state_summary = parent_state_summary.update(
+            &execution_output.state_proofs,
+            execution_output.to_commit.state_update_refs(),
+        )?;
+
+        let state_checkpoint_hashes = Self::get_state_checkpoint_hashes(
             execution_output,
-            parent_state,
             known_state_checkpoints,
-        )
+            &state_summary,
+        )?;
+
+        Ok(StateCheckpointOutput::new(
+            state_summary,
+            state_checkpoint_hashes,
+        ))
+    }
+
+    fn get_state_checkpoint_hashes(
+        execution_output: &ExecutionOutput,
+        known_state_checkpoints: Option<Vec<Option<HashValue>>>,
+        state_summary: &LedgerStateSummary,
+    ) -> Result<Vec<Option<HashValue>>> {
+        let _timer = OTHER_TIMERS.timer_with(&["get_state_checkpoint_hashes"]);
+
+        let num_txns = execution_output.to_commit.len();
+        let last_checkpoint_index = execution_output
+            .to_commit
+            .last_inner_state_checkpoint_index();
+
+        if let Some(known) = known_state_checkpoints {
+            ensure!(
+                known.len() == num_txns,
+                "Bad number of known hashes. {} vs {}",
+                known.len(),
+                num_txns
+            );
+            if let Some(idx) = last_checkpoint_index {
+                ensure!(
+                    known[idx] == Some(state_summary.last_checkpoint().root_hash()),
+                    "Root hash mismatch with known hashes passed in. {:?} vs {:?}",
+                    known[idx],
+                    Some(&state_summary.last_checkpoint().root_hash()),
+                );
+            }
+
+            Ok(known)
+        } else {
+            if !execution_output.is_block {
+                // We should enter this branch only in test.
+                execution_output.to_commit.ensure_at_most_one_checkpoint()?;
+            }
+
+            let mut out = vec![None; num_txns];
+
+            if let Some(index) = last_checkpoint_index {
+                out[index] = Some(state_summary.last_checkpoint().root_hash());
+            }
+
+            Ok(out)
+        }
     }
 }

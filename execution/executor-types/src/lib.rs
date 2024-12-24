@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_scratchpad::{ProofRead, SparseMerkleTree};
+use aptos_scratchpad::SparseMerkleTree;
 use aptos_types::{
     account_config::{NEW_EPOCH_EVENT_MOVE_TYPE_TAG, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG},
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
@@ -13,7 +13,6 @@ use aptos_types::{
     dkg::DKG_START_EVENT_MOVE_TYPE_TAG,
     jwks::OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG,
     ledger_info::LedgerInfoWithSignatures,
-    proof::SparseMerkleProofExt,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         Transaction, TransactionInfo, TransactionListWithProof, TransactionOutputListWithProof,
@@ -25,7 +24,7 @@ pub use error::{ExecutorError, ExecutorResult};
 pub use ledger_update_output::LedgerUpdateOutput;
 use state_compute_result::StateComputeResult;
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::BTreeSet,
     ops::Deref,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -37,7 +36,6 @@ mod error;
 pub mod execution_output;
 mod ledger_update_output;
 mod metrics;
-pub mod planned;
 pub mod state_checkpoint_output;
 pub mod state_compute_result;
 pub mod transactions_with_output;
@@ -135,12 +133,12 @@ pub trait BlockExecutorTrait: Send + Sync {
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<StateComputeResult> {
         let block_id = block.block_id;
-        self.execute_and_state_checkpoint(block, parent_block_id, onchain_config)?;
+        self.execute_and_update_state(block, parent_block_id, onchain_config)?;
         self.ledger_update(block_id, parent_block_id)
     }
 
     /// Executes a block and returns the state checkpoint output.
-    fn execute_and_state_checkpoint(
+    fn execute_and_update_state(
         &self,
         block: ExecutableBlock,
         parent_block_id: HashValue,
@@ -264,28 +262,6 @@ pub struct ChunkCommitNotification {
     pub subscribable_events: Vec<ContractEvent>,
     pub committed_transactions: Vec<Transaction>,
     pub reconfiguration_occurred: bool,
-}
-
-pub struct ProofReader<'a> {
-    proofs: Option<&'a HashMap<HashValue, SparseMerkleProofExt>>,
-}
-
-impl<'a> ProofReader<'a> {
-    pub fn new(proofs: &'a HashMap<HashValue, SparseMerkleProofExt>) -> Self {
-        Self {
-            proofs: Some(proofs),
-        }
-    }
-
-    pub fn new_empty() -> Self {
-        Self { proofs: None }
-    }
-}
-
-impl<'a> ProofRead for ProofReader<'a> {
-    fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt> {
-        self.proofs.and_then(|proofs| proofs.get(&key))
-    }
 }
 
 /// Used in both state sync and consensus to filter the txn events that should be subscribable by node components.

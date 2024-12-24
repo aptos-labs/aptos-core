@@ -15,9 +15,8 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-drop-helper = { workspace = true }
-aptos-experimental-runtimes = { workspace = true }
-aptos-logger = { workspace = true }
+aptos-experimental-layered-map = { workspace = true }
+aptos-infallible = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-scratchpad = { workspace = true }
 aptos-secure-net = { workspace = true }
@@ -25,20 +24,21 @@ aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 arr_macro = { workspace = true }
 bcs = { workspace = true }
-crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }
+derive_more = { workspace = true }
+itertools = { workspace = true }
 once_cell = { workspace = true }
+once_map = { workspace = true }
 parking_lot = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
+rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
-threadpool = { workspace = true }
 
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["fuzzing"] }
-assert_unordered = { workspace = true }
 
 [features]
 default = []

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::DbReader;
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::HashValue;
 use aptos_types::{
     ledger_info::LedgerInfo,
     state_store::{
@@ -26,13 +26,14 @@ impl DbStateView {
     fn get(&self, key: &StateKey) -> StateViewResult<Option<StateValue>> {
         if let Some(version) = self.version {
             if let Some(root_hash) = self.maybe_verify_against_state_root_hash {
+                // TODO(aldenhu): sample-verify proof inside DB
                 // DB doesn't support returning proofs for buffered state, so only optionally
                 // verify proof.
                 // TODO: support returning state proof for buffered state.
                 if let Ok((value, proof)) =
                     self.db.get_state_value_with_proof_by_version(key, version)
                 {
-                    proof.verify(root_hash, CryptoHash::hash(key), value.as_ref())?;
+                    proof.verify(root_hash, *key.crypto_hash_ref(), value.as_ref())?;
                     return Ok(value);
                 }
             }

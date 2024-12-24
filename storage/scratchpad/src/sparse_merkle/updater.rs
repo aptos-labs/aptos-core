@@ -15,14 +15,23 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_drop_helper::ArcAsyncDrop;
-use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_types::proof::{definition::NodeInProof, SparseMerkleLeafNode, SparseMerkleProofExt};
+use once_cell::sync::Lazy;
 use std::cmp::Ordering;
 
 type Result<T> = std::result::Result<T, UpdateError>;
 
 type InMemSubTree<V> = super::node::SubTree<V>;
 type InMemInternal<V> = InternalNode<V>;
+
+static POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
+    rayon::ThreadPoolBuilder::new()
+        // High concurrency for proof reads.
+        .num_threads(256)
+        .thread_name(|index| format!("smt_update_{}", index))
+        .build()
+        .unwrap()
+});
 
 #[derive(Clone)]
 enum InMemSubTreeInfo<V: ArcAsyncDrop> {
@@ -150,7 +159,7 @@ impl<'a, V: Clone + CryptoHash + Send + Sync + 'static> SubTreeInfo<'a, V> {
         proof_reader: &'a impl ProofRead,
     ) -> Result<Self> {
         let proof = proof_reader
-            .get_proof(a_descendant_key)
+            .get_proof(a_descendant_key, depth)
             .ok_or(UpdateError::MissingProof)?;
         if depth > proof.bottom_depth() {
             return Err(UpdateError::ShortProof {
@@ -312,9 +321,7 @@ impl<'a, V: ArcAsyncDrop + Clone + CryptoHash> SubTreeUpdater<'a, V> {
                     && left.updates.len() >= MIN_PARALLELIZABLE_SIZE
                     && right.updates.len() >= MIN_PARALLELIZABLE_SIZE
                 {
-                    THREAD_MANAGER
-                        .get_exe_cpu_pool()
-                        .join(|| left.run(proof_reader), || right.run(proof_reader))
+                    POOL.join(|| left.run(proof_reader), || right.run(proof_reader))
                 } else {
                     (left.run(proof_reader), right.run(proof_reader))
                 };
