@@ -60,6 +60,7 @@ impl RestoreHandler {
     }
 
     pub fn save_ledger_infos(&self, ledger_infos: &[LedgerInfoWithSignatures]) -> Result<()> {
+        println!("saving ledger infos {}", ledger_infos.len());
         restore_utils::save_ledger_infos(self.aptosdb.ledger_db.metadata_db(), ledger_infos, None)
     }
 
