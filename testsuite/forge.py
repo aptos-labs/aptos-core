@@ -1445,7 +1445,7 @@ def test(
         log.setLevel(logging.DEBUG)
 
     ### XXX: hack these arguments to force Forge to run with overrides
-    # forge_cluster_name = "aptos-forge-0"
+    forge_cluster_name = "aptos-forge-1"
     # forge_enable_performance = "true"
 
     log.debug("Initializing backends...")
