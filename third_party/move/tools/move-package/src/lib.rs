@@ -204,12 +204,11 @@ impl BuildConfig {
     /// External checks on Move code can be provided, these are only run if compiler v2 is used.
     pub fn compile_package_no_exit<W: Write>(
         self,
-        path: &Path,
+        resolved_graph: ResolvedGraph,
         external_checks: Vec<Arc<dyn ExternalChecks>>,
         writer: &mut W,
     ) -> Result<(CompiledPackage, Option<model::GlobalEnv>)> {
         let config = self.compiler_config.clone(); // Need clone because of mut self
-        let resolved_graph = self.resolution_graph_for_package(path, writer)?;
         let mutx = PackageLock::lock();
         let ret =
             BuildPlan::create(resolved_graph)?.compile_no_exit(&config, external_checks, writer);
