@@ -272,7 +272,12 @@ fn fetch_config_and_update_hash<T: OnChainConfig>(
 #[cfg(test)]
 pub mod test {
     use super::*;
-    use aptos_types::state_store::MockStateView;
+    use aptos_types::{
+        on_chain_config::{FeatureFlag, GasScheduleV2},
+        state_store::{state_key::StateKey, state_value::StateValue, MockStateView},
+    };
+    use serde::Serialize;
+    use std::collections::HashMap;
 
     #[test]
     fn test_new_environment() {
@@ -297,5 +302,86 @@ pub mod test {
         );
     }
 
-    // TODO(loader_v2): Add equality tests.
+    fn state_view_with_non_default_config<T: OnChainConfig + Serialize>(
+        config: T,
+    ) -> MockStateView<StateKey> {
+        MockStateView::new(HashMap::from([(
+            StateKey::resource(T::address(), &T::struct_tag()).unwrap(),
+            StateValue::new_legacy(bcs::to_bytes(&config).unwrap().into()),
+        )]))
+    }
+
+    #[test]
+    fn test_environment_eq() {
+        let state_view = MockStateView::empty();
+        let environment_1 = AptosEnvironment::new(&state_view);
+        let environment_2 = AptosEnvironment::new(&state_view);
+        assert!(environment_1 == environment_2);
+    }
+
+    #[test]
+    fn test_environment_ne_configuration() {
+        let mut configuration = ConfigurationResource::default();
+        assert_eq!(configuration.last_reconfiguration_time_micros(), 0);
+        configuration.set_last_reconfiguration_time_for_test(1);
+
+        let environment_1 = AptosEnvironment::new(&MockStateView::empty());
+        let environment_2 =
+            AptosEnvironment::new(&state_view_with_non_default_config(configuration));
+        assert!(environment_1 != environment_2);
+    }
+
+    #[test]
+    fn test_environment_ne_chain_id() {
+        let environment_1 = AptosEnvironment::new(&MockStateView::empty());
+        let environment_2 =
+            AptosEnvironment::new(&state_view_with_non_default_config(ChainId::mainnet()));
+        assert!(environment_1 != environment_2);
+    }
+
+    #[test]
+    fn test_environment_ne_features() {
+        let mut features = Features::default();
+        assert!(features.is_enabled(FeatureFlag::LIMIT_VM_TYPE_SIZE));
+        features.disable(FeatureFlag::LIMIT_VM_TYPE_SIZE);
+
+        let environment_1 = AptosEnvironment::new(&MockStateView::empty());
+        let environment_2 = AptosEnvironment::new(&state_view_with_non_default_config(features));
+        assert!(environment_1 != environment_2);
+    }
+
+    #[test]
+    fn test_environment_ne_gas_schedule() {
+        let state_views = [
+            MockStateView::empty(),
+            state_view_with_non_default_config(GasScheduleV2 {
+                feature_version: 12,
+                entries: vec![],
+            }),
+            // Different feature version.
+            state_view_with_non_default_config(GasScheduleV2 {
+                feature_version: 13,
+                entries: vec![],
+            }),
+            // Same feature version, but an extra param.
+            state_view_with_non_default_config(GasScheduleV2 {
+                feature_version: 12,
+                entries: vec![(String::from("gas.param.base"), 12)],
+            }),
+            // Completely different gas schedule.
+            state_view_with_non_default_config(GasScheduleV2 {
+                feature_version: 0,
+                entries: vec![],
+            }),
+        ];
+        for i in 0..state_views.len() {
+            for j in 0..state_views.len() {
+                if i != j {
+                    let environment_1 = AptosEnvironment::new(&state_views[i]);
+                    let environment_2 = AptosEnvironment::new(&state_views[j]);
+                    assert!(environment_1 != environment_2);
+                }
+            }
+        }
+    }
 }
