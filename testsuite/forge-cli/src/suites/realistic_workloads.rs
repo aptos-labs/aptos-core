@@ -7,7 +7,7 @@ use super::ungrouped::{
 };
 use aptos_forge::{
     args::TransactionTypeArg, success_criteria::SuccessCriteria, EmitJobMode, EmitJobRequest,
-    EntryPoints, ForgeConfig, TransactionType, WorkflowProgress,
+    EntryPoints, ForgeConfig, ReplayProtectionType, TransactionType, WorkflowProgress,
 };
 use aptos_testcases::{
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactionWorkload, Workloads},
@@ -38,6 +38,7 @@ pub(crate) fn individual_workload_tests(test_name: String) -> ForgeConfig {
                     add_created_accounts_to_pool: true,
                     max_account_working_set: 20_000_000,
                     creation_balance: 200_000_000,
+                    replay_protection: ReplayProtectionType::SequenceNumber,
                 };
                 let write_type = TransactionType::CallCustomModules {
                     entry_point: EntryPoints::BytesMakeOrChange {
@@ -45,6 +46,7 @@ pub(crate) fn individual_workload_tests(test_name: String) -> ForgeConfig {
                     },
                     num_modules: 1,
                     use_account_pool: true,
+                    replay_protection: ReplayProtectionType::SequenceNumber,
                 };
                 job.transaction_mix_per_phase(vec![
                     // warmup

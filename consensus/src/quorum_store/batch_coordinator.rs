@@ -157,6 +157,12 @@ impl BatchCoordinator {
             return;
         };
 
+        for batch in &batches {
+            for txn in batch.txns() {
+                info!("handle_batches_msg author: {:?}, batch_id: {:?} (address: {:?}, replay_protector: {:?}, expiration_timestamp_secs: {:?})", batch.batch_info().author(), batch.batch_info().batch_id(), txn.sender(), txn.replay_protector(), txn.expiration_timestamp_secs());
+            }
+        }
+
         let approx_created_ts_usecs = batch
             .info()
             .expiration()

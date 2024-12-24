@@ -579,6 +579,11 @@ pub struct TransactionPayload {
     pub r#type: i32,
     #[prost(oneof="transaction_payload::Payload", tags="2, 3, 5, 6")]
     pub payload: ::core::option::Option<transaction_payload::Payload>,
+    // Question: Is this new protobuf structure okay?
+    // Question: What tags should we assign here.
+    // Should we skip tag numbers in between so that we might be able to add new fields in between?
+    #[prost(oneof="transaction_payload::ExtraConfig", tags="7")]
+    pub extra_config: ::core::option::Option<transaction_payload::ExtraConfig>
 }
 /// Nested message and enum types in `TransactionPayload`.
 pub mod transaction_payload {
@@ -617,8 +622,10 @@ pub mod transaction_payload {
             }
         }
     }
+
+    // Question: Why have `#[allow(clippy::derive_partial_eq_without_eq)]` instead of just having #[derive(Eq)]?
     #[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Oneof)]
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Payload {
         #[prost(message, tag="2")]
         EntryFunctionPayload(super::EntryFunctionPayload),
@@ -629,7 +636,25 @@ pub mod transaction_payload {
         #[prost(message, tag="6")]
         MultisigPayload(super::MultisigPayload),
     }
+
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum ExtraConfig {
+        // Question: Is this okay to be enum?
+        #[prost(message, tag="1")]
+        ExtraConfigV1(super::ExtraConfigV1),
+    }
 }
+
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ExtraConfigV1 {
+    #[prost(string, optional, tag="1")]
+    pub multisig_address: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(uint64, optional, tag="2")]
+    pub replay_protection_nonce: ::core::option::Option<u64>,
+}
+
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct EntryFunctionPayload {

@@ -170,7 +170,7 @@ async fn warn_detailed_error(
             let inner = account.into_inner();
             (
                 rest_client
-                    .get_account_transactions_bcs(
+                    .get_account_ordered_transactions_bcs(
                         sender,
                         Some(inner.sequence_number().saturating_sub(1)),
                         Some(5),
