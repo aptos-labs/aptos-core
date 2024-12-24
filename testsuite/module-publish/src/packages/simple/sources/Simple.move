@@ -474,7 +474,7 @@ module 0xABCD::simple {
         simple_events: EventHandle<SimpleEvent>,
     }
 
-    fun emit_events(owner: &signer, count: u64) acquires EventStore
+    public entry fun emit_events(owner: &signer, count: u64) acquires EventStore
     {
         let owner_address = signer::address_of(owner);
         if (!exists<EventStore>(owner_address)) {

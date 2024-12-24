@@ -45,6 +45,7 @@ impl StateCheckpointOutput {
         Self::new_empty(Arc::new(StateDelta::new_empty()))
     }
 
+
     fn new_impl(inner: Inner) -> Self {
         Self {
             inner: Arc::new(DropHelper::new(inner)),

@@ -7,8 +7,10 @@ use aptos_framework::natives::code::{MoveOption, PackageMetadata};
 use aptos_sdk::{
     bcs,
     move_types::{
-        account_address::AccountAddress, ident_str, identifier::Identifier,
-        language_storage::ModuleId,
+        account_address::AccountAddress,
+        ident_str,
+        identifier::Identifier,
+        language_storage::{ModuleId, StructTag, TypeTag},
     },
     types::{
         serde_helper::bcs_utils::bcs_size_of_byte_array,
@@ -288,6 +290,12 @@ pub enum EntryPoints {
         length: u64,
         num_points_per_txn: usize,
     },
+    EconiaRegisterMarket,
+    EconiaRegisterMarketUser,
+    EconiaDepositCoins,
+    EconiaPlaceBidLimitOrder,
+    EconiaPlaceAskLimitOrder,
+    EconiaPlaceRandomLimitOrder,
     DeserializeU256,
     /// No-op script with dependencies in *::simple.move. The script has unreachable code that is
     /// there to slow down deserialization & verification, effectively making it more expensive to
@@ -351,6 +359,12 @@ impl EntryPoints {
             | EntryPoints::VectorPictureRead { .. }
             | EntryPoints::InitializeSmartTablePicture
             | EntryPoints::SmartTablePicture { .. } => "complex",
+            EntryPoints::EconiaRegisterMarket
+            | EntryPoints::EconiaRegisterMarketUser
+            | EntryPoints::EconiaDepositCoins
+            | EntryPoints::EconiaPlaceBidLimitOrder
+            | EntryPoints::EconiaPlaceAskLimitOrder
+            | EntryPoints::EconiaPlaceRandomLimitOrder => "econia",
             EntryPoints::IncGlobalMilestoneAggV2 { .. }
             | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "aggregator_examples",
             EntryPoints::DeserializeU256 => "bcs_stream",
@@ -415,6 +429,12 @@ impl EntryPoints {
             EntryPoints::InitializeSmartTablePicture | EntryPoints::SmartTablePicture { .. } => {
                 "smart_table_picture"
             },
+            EntryPoints::EconiaRegisterMarket
+            | EntryPoints::EconiaRegisterMarketUser
+            | EntryPoints::EconiaDepositCoins
+            | EntryPoints::EconiaPlaceBidLimitOrder
+            | EntryPoints::EconiaPlaceAskLimitOrder
+            | EntryPoints::EconiaPlaceRandomLimitOrder => "txn_generator_utils",
             EntryPoints::IncGlobalMilestoneAggV2 { .. }
             | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "counter_with_milestone",
             EntryPoints::DeserializeU256 => "bcs_stream",
@@ -802,6 +822,192 @@ impl EntryPoints {
                     bcs::to_bytes(&colors).unwrap(),  // colors
                 ])
             },
+            EntryPoints::EconiaRegisterMarket => {
+                TransactionPayload::EntryFunction(EntryFunction::new(
+                    module_id,
+                    ident_str!("register_market").to_owned(),
+                    vec![
+                        TypeTag::Struct(Box::new(StructTag {
+                            address: *other.expect("Must provide other"),
+                            module: ident_str!("assets").to_owned(),
+                            name: ident_str!("AAC").to_owned(),
+                            type_args: vec![],
+                        })),
+                        TypeTag::Struct(Box::new(StructTag {
+                            address: *other.expect("Must provide other"),
+                            module: ident_str!("assets").to_owned(),
+                            name: ident_str!("QC").to_owned(),
+                            type_args: vec![],
+                        })),
+                    ],
+                    vec![],
+                ))
+            },
+            EntryPoints::EconiaRegisterMarketUser => {
+                TransactionPayload::EntryFunction(EntryFunction::new(
+                    module_id,
+                    ident_str!("register_market_accounts").to_owned(),
+                    vec![
+                        TypeTag::Struct(Box::new(StructTag {
+                            address: *other.expect("Must provide other"),
+                            module: ident_str!("assets").to_owned(),
+                            name: ident_str!("AAC").to_owned(),
+                            type_args: vec![],
+                        })),
+                        TypeTag::Struct(Box::new(StructTag {
+                            address: *other.expect("Must provide other"),
+                            module: ident_str!("assets").to_owned(),
+                            name: ident_str!("QC").to_owned(),
+                            type_args: vec![],
+                        })),
+                    ],
+                    vec![
+                        bcs::to_bytes(&1u64).unwrap(), //market id
+                    ],
+                ))
+            },
+            EntryPoints::EconiaDepositCoins => {
+                TransactionPayload::EntryFunction(EntryFunction::new(
+                    module_id,
+                    ident_str!("deposit_coins").to_owned(),
+                    vec![
+                        TypeTag::Struct(Box::new(StructTag {
+                            address: *other.expect("Must provide other"),
+                            module: ident_str!("assets").to_owned(),
+                            name: ident_str!("AAC").to_owned(),
+                            type_args: vec![],
+                        })),
+                        TypeTag::Struct(Box::new(StructTag {
+                            address: *other.expect("Must provide other"),
+                            module: ident_str!("assets").to_owned(),
+                            name: ident_str!("QC").to_owned(),
+                            type_args: vec![],
+                        })),
+                    ],
+                    vec![
+                        bcs::to_bytes(&1u64).unwrap(), // market id
+                    ],
+                ))
+            },
+            EntryPoints::EconiaPlaceBidLimitOrder => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let size: u64 = rng.gen_range(4u64, 14u64);
+                let price: u64 = rng.gen_range(1u64, 30u64);
+                TransactionPayload::EntryFunction(EntryFunction::new(
+                    module_id,
+                    ident_str!("place_bid_limit_order").to_owned(),
+                    vec![
+                        TypeTag::Struct(Box::new(StructTag {
+                            address: *other.expect("Must provide other"),
+                            module: ident_str!("assets").to_owned(),
+                            name: ident_str!("AAC").to_owned(),
+                            type_args: vec![],
+                        })),
+                        TypeTag::Struct(Box::new(StructTag {
+                            address: *other.expect("Must provide other"),
+                            module: ident_str!("assets").to_owned(),
+                            name: ident_str!("QC").to_owned(),
+                            type_args: vec![],
+                        })),
+                    ],
+                    vec![
+                        bcs::to_bytes(&size).unwrap(),  // size
+                        bcs::to_bytes(&price).unwrap(), // amount
+                        bcs::to_bytes(&1u64).unwrap(),  // market id
+                    ],
+                ))
+            },
+            EntryPoints::EconiaPlaceAskLimitOrder => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let size: u64 = rng.gen_range(4u64, 14u64);
+                let price: u64 = rng.gen_range(1u64, 30u64);
+                TransactionPayload::EntryFunction(EntryFunction::new(
+                    module_id,
+                    ident_str!("place_ask_limit_order").to_owned(),
+                    vec![
+                        TypeTag::Struct(Box::new(StructTag {
+                            address: *other.expect("Must provide other"),
+                            module: ident_str!("assets").to_owned(),
+                            name: ident_str!("AAC").to_owned(),
+                            type_args: vec![],
+                        })),
+                        TypeTag::Struct(Box::new(StructTag {
+                            address: *other.expect("Must provide other"),
+                            module: ident_str!("assets").to_owned(),
+                            name: ident_str!("QC").to_owned(),
+                            type_args: vec![],
+                        })),
+                    ],
+                    vec![
+                        bcs::to_bytes(&size).unwrap(),  // size
+                        bcs::to_bytes(&price).unwrap(), // amount
+                        bcs::to_bytes(&1u64).unwrap(),  //market id
+                    ],
+                ))
+            },
+            EntryPoints::EconiaPlaceRandomLimitOrder => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let size: u64 = rng.gen_range(4u64, 14u64);
+                let price: u64 = rng.gen_range(1u64, 30u64);
+                let is_bid: bool = rng.gen();
+                if is_bid {
+                    TransactionPayload::EntryFunction(EntryFunction::new(
+                        module_id,
+                        ident_str!("place_bid_limit_order").to_owned(),
+                        vec![
+                            TypeTag::Struct(Box::new(StructTag {
+                                address: *other.expect("Must provide other"),
+                                module: Identifier::new(<&str as Into<Box<str>>>::into("assets"))
+                                    .unwrap(),
+                                name: Identifier::new(<&str as Into<Box<str>>>::into("AAC"))
+                                    .unwrap(),
+                                type_args: vec![],
+                            })),
+                            TypeTag::Struct(Box::new(StructTag {
+                                address: *other.expect("Must provide other"),
+                                module: Identifier::new(<&str as Into<Box<str>>>::into("assets"))
+                                    .unwrap(),
+                                name: Identifier::new(<&str as Into<Box<str>>>::into("QC"))
+                                    .unwrap(),
+                                type_args: vec![],
+                            })),
+                        ],
+                        vec![
+                            bcs::to_bytes(&size).unwrap(),  // size
+                            bcs::to_bytes(&price).unwrap(), // amount
+                            bcs::to_bytes(&1u64).unwrap(),  // market id
+                        ],
+                    ))
+                } else {
+                    TransactionPayload::EntryFunction(EntryFunction::new(
+                        module_id,
+                        ident_str!("place_ask_limit_order").to_owned(),
+                        vec![
+                            TypeTag::Struct(Box::new(StructTag {
+                                address: *other.expect("Must provide other"),
+                                module: Identifier::new(<&str as Into<Box<str>>>::into("assets"))
+                                    .unwrap(),
+                                name: Identifier::new(<&str as Into<Box<str>>>::into("AAC"))
+                                    .unwrap(),
+                                type_args: vec![],
+                            })),
+                            TypeTag::Struct(Box::new(StructTag {
+                                address: *other.expect("Must provide other"),
+                                module: Identifier::new(<&str as Into<Box<str>>>::into("assets"))
+                                    .unwrap(),
+                                name: Identifier::new(<&str as Into<Box<str>>>::into("QC"))
+                                    .unwrap(),
+                                type_args: vec![],
+                            })),
+                        ],
+                        vec![
+                            bcs::to_bytes(&size).unwrap(),  // size
+                            bcs::to_bytes(&price).unwrap(), // amount
+                            bcs::to_bytes(&1u64).unwrap(),  // market id
+                        ],
+                    ))
+                }
+            },
             EntryPoints::DeserializeU256 => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 let mut u256_bytes = [0u8; 32];
@@ -854,9 +1060,11 @@ impl EntryPoints {
             EntryPoints::Nop5Signers => MultiSigConfig::Random(4),
             EntryPoints::ResourceGroupsGlobalWriteTag { .. }
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. } => MultiSigConfig::Publisher,
-            EntryPoints::CoinInitAndMint | EntryPoints::FungibleAssetMint => {
-                MultiSigConfig::Publisher
-            },
+            EntryPoints::TokenV2AmbassadorMint { .. }
+            | EntryPoints::TokenV2AmbassadorBurn
+            | EntryPoints::EconiaDepositCoins
+            | EntryPoints::CoinInitAndMint
+            | EntryPoints::FungibleAssetMint => MultiSigConfig::Publisher,
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 MultiSigConfig::Publisher
             },
@@ -925,6 +1133,12 @@ impl EntryPoints {
             },
             EntryPoints::InitializeSmartTablePicture => AutomaticArgs::Signer,
             EntryPoints::SmartTablePicture { .. } => AutomaticArgs::None,
+            EntryPoints::EconiaRegisterMarket
+            | EntryPoints::EconiaRegisterMarketUser
+            | EntryPoints::EconiaPlaceBidLimitOrder
+            | EntryPoints::EconiaPlaceAskLimitOrder
+            | EntryPoints::EconiaPlaceRandomLimitOrder => AutomaticArgs::Signer,
+            EntryPoints::EconiaDepositCoins => AutomaticArgs::SignerAndMultiSig,
             EntryPoints::DeserializeU256 => AutomaticArgs::None,
             EntryPoints::IncGlobalMilestoneAggV2 { .. } => AutomaticArgs::None,
             EntryPoints::CreateGlobalMilestoneAggV2 { .. } => AutomaticArgs::Signer,
