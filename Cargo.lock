@@ -4748,6 +4748,7 @@ dependencies = [
  "aptos-node",
  "aptos-types",
  "bollard",
+ "clap 4.5.21",
  "diesel",
  "diesel-async",
  "futures",
