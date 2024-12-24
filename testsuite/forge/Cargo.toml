@@ -34,6 +34,7 @@ aptos-short-hex-str = { workspace = true }
 aptos-state-sync-driver = { workspace = true }
 aptos-transaction-emitter-lib = { workspace = true }
 aptos-transaction-generator-lib = { workspace = true }
+aptos-transaction-workloads-lib = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["env", "unstable-styles"] }
