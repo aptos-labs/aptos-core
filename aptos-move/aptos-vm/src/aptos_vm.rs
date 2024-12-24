@@ -75,7 +75,6 @@ use aptos_types::{
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
-use aptos_utils::aptos_try;
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
 use aptos_vm_types::{
@@ -1045,69 +1044,6 @@ impl AptosVM {
         ))
     }
 
-    fn simulate_multisig_transaction<'a, 'r, 'l>(
-        &'l self,
-        resolver: &'r impl AptosMoveResolver,
-        module_storage: &impl AptosModuleStorage,
-        session: UserSession<'r, 'l>,
-        gas_meter: &mut impl AptosGasMeter,
-        traversal_context: &mut TraversalContext<'a>,
-        txn_data: &TransactionMetadata,
-        payload: &'a Multisig,
-        log_context: &AdapterLogSchema,
-        new_published_modules_loaded: &mut bool,
-        change_set_configs: &ChangeSetConfigs,
-    ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        match &payload.transaction_payload {
-            None => Err(VMStatus::error(StatusCode::MISSING_DATA, None)),
-            Some(multisig_payload) => {
-                match multisig_payload {
-                    MultisigTransactionPayload::EntryFunction(entry_function) => {
-                        aptos_try!({
-                            let user_session_change_set = self.execute_multisig_entry_function(
-                                resolver,
-                                module_storage,
-                                session,
-                                gas_meter,
-                                traversal_context,
-                                payload.multisig_address,
-                                entry_function,
-                                new_published_modules_loaded,
-                                txn_data,
-                                change_set_configs,
-                            )?;
-                            let has_modules_published_to_special_address =
-                                user_session_change_set.has_modules_published_to_special_address();
-
-                            // TODO: Deduplicate this against execute_multisig_transaction
-                            // A bit tricky since we need to skip success/failure cleanups,
-                            // which is in the middle. Introducing a boolean would make the code
-                            // messier.
-                            let epilogue_session = self.charge_change_set_and_respawn_session(
-                                user_session_change_set,
-                                resolver,
-                                module_storage,
-                                gas_meter,
-                                txn_data,
-                            )?;
-
-                            self.success_transaction_cleanup(
-                                epilogue_session,
-                                module_storage,
-                                gas_meter,
-                                txn_data,
-                                log_context,
-                                change_set_configs,
-                                traversal_context,
-                                has_modules_published_to_special_address,
-                            )
-                        })
-                    },
-                }
-            },
-        }
-    }
-
     // Execute a multisig transaction:
     // 1. Obtain the payload of the transaction to execute. This could have been stored on chain
     // when the multisig transaction was created.
@@ -1295,56 +1231,6 @@ impl AptosVM {
             traversal_context,
             has_modules_published_to_special_address,
         )
-    }
-
-    fn execute_or_simulate_multisig_transaction<'a, 'r, 'l>(
-        &'l self,
-        resolver: &'r impl AptosMoveResolver,
-        module_storage: &impl AptosModuleStorage,
-        session: UserSession<'r, 'l>,
-        prologue_session_change_set: &SystemSessionChangeSet,
-        gas_meter: &mut impl AptosGasMeter,
-        traversal_context: &mut TraversalContext<'a>,
-        txn_data: &TransactionMetadata,
-        payload: &'a Multisig,
-        log_context: &AdapterLogSchema,
-        new_published_modules_loaded: &mut bool,
-        change_set_configs: &ChangeSetConfigs,
-    ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        // Once `simulation_enhancement` is enabled, we use `execute_multisig_transaction` for simulation,
-        // deprecating `simulate_multisig_transaction`.
-        if self.is_simulation
-            && !self
-                .features()
-                .is_transaction_simulation_enhancement_enabled()
-        {
-            self.simulate_multisig_transaction(
-                resolver,
-                module_storage,
-                session,
-                gas_meter,
-                traversal_context,
-                txn_data,
-                payload,
-                log_context,
-                new_published_modules_loaded,
-                change_set_configs,
-            )
-        } else {
-            self.execute_multisig_transaction(
-                resolver,
-                module_storage,
-                session,
-                prologue_session_change_set,
-                gas_meter,
-                traversal_context,
-                txn_data,
-                payload,
-                log_context,
-                new_published_modules_loaded,
-                change_set_configs,
-            )
-        }
     }
 
     fn execute_multisig_entry_function(
@@ -1987,7 +1873,7 @@ impl AptosVM {
                     &mut new_published_modules_loaded,
                     change_set_configs,
                 ),
-            TransactionPayload::Multisig(payload) => self.execute_or_simulate_multisig_transaction(
+            TransactionPayload::Multisig(payload) => self.execute_multisig_transaction(
                 resolver,
                 code_storage,
                 user_session,
@@ -2572,7 +2458,6 @@ impl AptosVM {
                     session,
                     module_storage,
                     txn_data,
-                    self.features(),
                     log_context,
                     traversal_context,
                     self.is_simulation,
@@ -2586,30 +2471,19 @@ impl AptosVM {
                     session,
                     module_storage,
                     txn_data,
-                    self.features(),
                     log_context,
                     traversal_context,
                     self.is_simulation,
                 )?;
-                // Once "simulation_enhancement" is enabled, the simulation path also validates the
-                // multisig transaction by running the multisig prologue.
-                if !self.is_simulation
-                    || self
-                        .features()
-                        .is_transaction_simulation_enhancement_enabled()
-                {
-                    transaction_validation::run_multisig_prologue(
-                        session,
-                        module_storage,
-                        txn_data,
-                        multisig_payload,
-                        self.features(),
-                        log_context,
-                        traversal_context,
-                    )
-                } else {
-                    Ok(())
-                }
+                transaction_validation::run_multisig_prologue(
+                    session,
+                    module_storage,
+                    txn_data,
+                    multisig_payload,
+                    self.features(),
+                    log_context,
+                    traversal_context,
+                )
             },
 
             // Deprecated.
