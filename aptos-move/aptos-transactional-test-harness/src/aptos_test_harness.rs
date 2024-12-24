@@ -12,9 +12,13 @@ use aptos_crypto::{
 };
 use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
 use aptos_language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD};
-use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
+use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_types::{
-    account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
+    account_address::get_apt_primary_store_address,
+    account_config::{
+        aptos_test_root_address, AccountResource, CoinStoreResource, FungibleStoreResource,
+        ObjectGroupResource,
+    },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
@@ -433,42 +437,44 @@ impl<'a> AptosTestAdapter<'a> {
 
     /// Obtain the AptosCoin amount under address `signer_addr`
     fn fetch_account_balance(&self, signer_addr: &AccountAddress) -> Result<u64> {
-        let aptos_coin_tag = CoinStoreResource::<AptosCoinType>::struct_tag();
+        let data_blob = TStateView::get_state_value_bytes(
+            &self.storage,
+            &StateKey::resource_typed::<CoinStoreResource<AptosCoinType>>(signer_addr)
+                .expect("failed to create StateKey"),
+        )
+        .expect("account must exist in data store");
+        let coin = if let Some(data) = data_blob {
+            bcs::from_bytes::<CoinStoreResource<AptosCoinType>>(&data)
+                .ok()
+                .map(|x| x.coin())
+                .unwrap_or(0)
+        } else {
+            0
+        };
 
-        let balance_blob = self
-            .storage
-            .get_state_value_bytes(&StateKey::resource(signer_addr, &aptos_coin_tag)?)
+        let bytes_opt = TStateView::get_state_value_bytes(
+            &self.storage,
+            &StateKey::resource_group(
+                &get_apt_primary_store_address(*signer_addr),
+                &ObjectGroupResource::struct_tag(),
+            ),
+        )
+        .expect("account must exist in data store");
+
+        let group: Option<BTreeMap<StructTag, Vec<u8>>> = bytes_opt
+            .map(|bytes| bcs::from_bytes(&bytes))
+            .transpose()
+            .unwrap();
+        let fa = group
+            .and_then(|g| {
+                g.get(&FungibleStoreResource::struct_tag())
+                    .map(|b| bcs::from_bytes(b))
+            })
+            .transpose()
             .unwrap()
-            .ok_or_else(|| {
-                format_err!(
-                    "Failed to fetch balance resource under address {}.",
-                    signer_addr
-                )
-            })?;
-
-        let annotated = AptosValueAnnotator::new(&self.storage)
-            .view_resource(&aptos_coin_tag, &balance_blob)?;
-
-        // Filter the Coin resource and return the resouce value
-        for (key, val) in annotated.value {
-            if key != Identifier::new("coin").unwrap() {
-                continue;
-            }
-
-            if let AnnotatedMoveValue::Struct(s) = val {
-                for (key, val) in s.value {
-                    if key != Identifier::new("value").unwrap() {
-                        continue;
-                    }
-
-                    if let AnnotatedMoveValue::U64(v) = val {
-                        return Ok(v);
-                    }
-                }
-            }
-        }
-
-        bail!("Failed to fetch balance under address {}.", signer_addr)
+            .map(|x: FungibleStoreResource| x.balance())
+            .unwrap_or(0);
+        Ok(coin + fa)
     }
 
     /// Derive the default transaction parameters from the account and balance resources fetched

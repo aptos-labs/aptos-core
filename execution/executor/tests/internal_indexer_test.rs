@@ -185,7 +185,7 @@ fn test_db_indexer_data() {
         )
         .unwrap();
     let core_kv_res: Vec<_> = core_kv_iter.collect();
-    assert_eq!(core_kv_res.len(), 5);
+    assert_eq!(core_kv_res.len(), 4);
     let address_one_kv_iter = db_indexer
         .get_prefixed_state_value_iterator(
             &StateKeyPrefix::from(AccountAddress::from_hex_literal("0x1").unwrap()),
@@ -352,7 +352,7 @@ fn test_db_indexer_data() {
         (false, "0x1::randomness_config::RandomnessConfig"),
         (false, "0x1::staking_config::StakingRewardsConfig"),
         (false, "0x1::aggregator_factory::AggregatorFactory"),
-        (false, "0x1::transaction_fee::AptosCoinCapabilities"),
+        (false, "0x1::transaction_fee::AptosFABurnCapabilities"),
         (false, "0x1::transaction_fee::AptosCoinMintCapability"),
         (false, "0x1::jwk_consensus_config::JWKConsensusConfig"),
         (false, "0x1::aptos_governance::ApprovedExecutionHashes"),
@@ -389,7 +389,6 @@ fn test_db_indexer_data() {
         }
     })
     .collect::<Vec<_>>();
-
     assert_vec_eq(&resources, &expected_resources);
 }
 
