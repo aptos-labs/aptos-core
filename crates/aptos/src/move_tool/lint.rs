@@ -75,6 +75,10 @@ pub struct LintPackage {
     /// See <https://github.com/aptos-labs/aptos-core/issues/10335>
     #[clap(long, env = "APTOS_CHECK_TEST_CODE")]
     pub check_test_code: bool,
+
+    /// Experiments
+    #[clap(long, hide(true))]
+    pub experiments: Vec<String>,
 }
 
 impl LintPackage {
@@ -89,6 +93,7 @@ impl LintPackage {
             language_version,
             skip_attribute_checks,
             check_test_code,
+            experiments,
         } = self.clone();
         MovePackageDir {
             dev,
@@ -100,6 +105,7 @@ impl LintPackage {
             language_version,
             skip_attribute_checks,
             check_test_code,
+            experiments,
             ..MovePackageDir::new()
         }
     }

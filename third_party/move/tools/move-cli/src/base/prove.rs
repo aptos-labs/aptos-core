@@ -230,7 +230,7 @@ pub fn run_move_prover(
             } else {
                 "FAILURE".bold().red()
             },
-            model.get_target_modules().len(),
+            model.get_primary_target_modules().len(),
             basedir,
             now.elapsed().as_secs_f64()
         )?;

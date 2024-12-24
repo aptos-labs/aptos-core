@@ -11,16 +11,15 @@ edition = "2021"
 
 [dependencies]
 abstract-domain-derive = { path = "./abstract_domain_derive" }
-move-binary-format = { path = "../../move-binary-format" }
-move-core-types = { path = "../../move-core/types" }
-move-model = { path = ".." }
-
 anyhow = { workspace = true }
 codespan-reporting = { workspace = true, features = ["serde", "serialization"] }
 ethnum = { workspace = true }
-im = "15.0.0"
+im = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+move-model = { workspace = true }
 num = { workspace = true }
 paste = { workspace = true }
 petgraph = { workspace = true }
@@ -30,7 +29,7 @@ try_match = { workspace = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 datatest-stable = { workspace = true }
-move-stackless-bytecode-test-utils = { path = "../bytecode-test-utils" }
+move-stackless-bytecode-test-utils = { workspace = true }
 
 [features]
 default = []

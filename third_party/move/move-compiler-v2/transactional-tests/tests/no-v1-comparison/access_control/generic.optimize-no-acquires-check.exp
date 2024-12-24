@@ -1,0 +1,18 @@
+processed 5 tasks
+
+task 2 'run'. lines 25-25:
+return values: true
+
+task 3 'run'. lines 27-27:
+return values: true
+
+task 4 'run'. lines 29-29:
+Error: Function execution failed with VMError: {
+    message: not allowed to perform `reads 0x42::test::R<bool>(@0x1)`,
+    major_status: ACCESS_DENIED,
+    sub_status: None,
+    location: 0x42::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

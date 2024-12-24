@@ -9,17 +9,15 @@ edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
-colored = { workspace = true }
-move-binary-format = { path = "../../move-binary-format" }
-move-bytecode-source-map = { path = "../../move-ir-compiler/move-bytecode-source-map" }
-
-move-command-line-common = { path = "../../move-command-line-common" }
-move-compiler = { path = "../../move-compiler" }
-move-core-types = { path = "../../move-core/types" }
-move-coverage = { path = "../move-coverage" }
-move-ir-types = { path = "../../move-ir/types" }
-
 clap = { workspace = true, features = ["derive"] }
+colored = { workspace = true }
+move-binary-format = { workspace = true }
+move-bytecode-source-map = { workspace = true }
+move-command-line-common = { workspace = true }
+move-compiler = { workspace = true }
+move-core-types = { workspace = true }
+move-coverage = { workspace = true }
+move-ir-types = { workspace = true }
 
 [features]
 default = []

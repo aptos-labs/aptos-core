@@ -2,16 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::VMConfig,
-    loader::{Function, LoadedFunctionOwner, Module},
-    logging::expect_no_verification_errors,
-    module_traversal::TraversalContext,
-    storage::module_storage::ModuleStorage,
-    CodeStorage, LoadedFunction,
+    config::VMConfig, loader::LoadedFunctionOwner, module_traversal::TraversalContext,
+    storage::module_storage::ModuleStorage, CodeStorage, LoadedFunction,
 };
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
-    errors::{Location, PartialVMError, PartialVMResult, VMResult},
+    errors::{Location, PartialVMResult, VMResult},
     CompiledModule,
 };
 use move_core_types::{
@@ -19,11 +15,10 @@ use move_core_types::{
     gas_algebra::NumBytes,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
-    vm_status::StatusCode,
 };
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::runtime_types::{StructType, Type, TypeBuilder},
+    loaded_data::runtime_types::{Type, TypeBuilder},
     module_linker_error,
 };
 use std::{collections::BTreeMap, sync::Arc};
@@ -137,7 +132,7 @@ impl LoaderV2 {
         // arguments for scripts are verified on the client side.
         let ty_args = ty_tag_args
             .iter()
-            .map(|ty_tag| self.load_ty(code_storage, ty_tag))
+            .map(|ty_tag| code_storage.fetch_ty(ty_tag))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Script))?;
 
@@ -150,95 +145,6 @@ impl LoaderV2 {
             ty_args,
             function: main,
         })
-    }
-
-    /// Returns a loaded & verified module corresponding to the specified name.
-    pub(crate) fn load_module(
-        &self,
-        module_storage: &dyn ModuleStorage,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Arc<Module>> {
-        module_storage
-            .fetch_verified_module(address, module_name)
-            .map_err(expect_no_verification_errors)?
-            .ok_or_else(|| module_linker_error!(address, module_name))
-    }
-
-    /// Returns the function definition corresponding to the specified name, as well as the module
-    /// where this function is defined.
-    pub(crate) fn load_function_without_ty_args(
-        &self,
-        module_storage: &dyn ModuleStorage,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-        function_name: &IdentStr,
-    ) -> VMResult<(Arc<Module>, Arc<Function>)> {
-        let module = self.load_module(module_storage, address, module_name)?;
-        let function = module
-            .function_map
-            .get(function_name)
-            .and_then(|idx| module.function_defs.get(*idx))
-            .ok_or_else(|| {
-                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                    .with_message(format!(
-                        "Function {}::{}::{} does not exist",
-                        address, module_name, function_name
-                    ))
-                    .finish(Location::Undefined)
-            })?
-            .clone();
-        Ok((module, function))
-    }
-
-    /// Returns a struct type corresponding to the specified name. The module
-    /// containing the struct is loaded.
-    pub(crate) fn load_struct_ty(
-        &self,
-        module_storage: &dyn ModuleStorage,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-        struct_name: &IdentStr,
-    ) -> PartialVMResult<Arc<StructType>> {
-        let module = self
-            .load_module(module_storage, address, module_name)
-            .map_err(|err| err.to_partial())?;
-        Ok(module
-            .struct_map
-            .get(struct_name)
-            .and_then(|idx| module.structs.get(*idx))
-            .ok_or_else(|| {
-                PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE).with_message(format!(
-                    "Struct {}::{}::{} does not exist",
-                    address, module_name, struct_name
-                ))
-            })?
-            .definition_struct_type
-            .clone())
-    }
-
-    /// Returns a runtime type corresponding to the specified type tag (file format type
-    /// representation). In case struct types are transitively loaded, the module containing
-    /// the struct definition is also loaded.
-    pub(crate) fn load_ty(
-        &self,
-        module_storage: &impl ModuleStorage,
-        ty_tag: &TypeTag,
-    ) -> PartialVMResult<Type> {
-        // TODO(loader_v2): Loader V1 uses VMResults everywhere, but partial VM errors
-        //                  seem better fit. Here we map error to VMError to reuse existing
-        //                  type builder implementation, and then strip the location info.
-        self.ty_builder()
-            .create_ty(ty_tag, |st| {
-                self.load_struct_ty(
-                    module_storage,
-                    &st.address,
-                    st.module.as_ident_str(),
-                    st.name.as_ident_str(),
-                )
-                .map_err(|err| err.finish(Location::Undefined))
-            })
-            .map_err(|err| err.to_partial())
     }
 }
 

@@ -3,11 +3,7 @@
 
 use crate::transactions;
 use aptos_bitvec::BitVec;
-use aptos_block_executor::{
-    code_cache_global_manager::AptosModuleCacheManager,
-    txn_commit_hook::NoOpTransactionCommitHook,
-    txn_provider::{default::DefaultTxnProvider, TxnProvider},
-};
+use aptos_block_executor::txn_provider::{default::DefaultTxnProvider, TxnProvider};
 use aptos_block_partitioner::{
     v2::config::PartitionerV2Config, BlockPartitioner, PartitionerConfig,
 };
@@ -32,15 +28,15 @@ use aptos_types::{
         },
         ExecutionStatus, Transaction, TransactionOutput, TransactionStatus,
     },
-    vm_status::VMStatus,
 };
 use aptos_vm::{
-    block_executor::{AptosTransactionOutput, AptosVMBlockExecutorWrapper},
+    aptos_vm::AptosVMBlockExecutor,
     data_cache::AsMoveResolver,
     sharded_block_executor::{
         local_executor_shard::{LocalExecutorClient, LocalExecutorService},
         ShardedBlockExecutor,
     },
+    VMBlockExecutor,
 };
 use proptest::{collection::vec, prelude::Strategy, strategy::ValueTree, test_runner::TestRunner};
 use std::{net::SocketAddr, sync::Arc, time::Instant};
@@ -217,20 +213,18 @@ where
     ) -> (Vec<TransactionOutput>, usize) {
         let block_size = txn_provider.num_txns();
         let timer = Instant::now();
-        let output = AptosVMBlockExecutorWrapper::execute_block::<
-            _,
-            NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
-            DefaultTxnProvider<SignatureVerifiedTransaction>,
-        >(
-            txn_provider,
-            self.state_view.as_ref(),
-            &AptosModuleCacheManager::new(),
-            BlockExecutorConfig::new_maybe_block_limit(1, maybe_block_gas_limit),
-            TransactionSliceMetadata::unknown(),
-            None,
-        )
-        .expect("VM should not fail to start")
-        .into_transaction_outputs_forced();
+
+        let executor = AptosVMBlockExecutor::new();
+        let output = executor
+            .execute_block_with_config(
+                txn_provider,
+                self.state_view.as_ref(),
+                BlockExecutorConfig::new_maybe_block_limit(1, maybe_block_gas_limit),
+                TransactionSliceMetadata::unknown(),
+            )
+            .expect("Sequential block execution should succeed")
+            .into_transaction_outputs_forced();
+
         let exec_time = timer.elapsed().as_millis();
 
         (output, block_size * 1000 / exec_time as usize)
@@ -263,28 +257,25 @@ where
     fn execute_benchmark_parallel(
         &self,
         txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
-        concurrency_level_per_shard: usize,
+        concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> (Vec<TransactionOutput>, usize) {
         let block_size = txn_provider.num_txns();
         let timer = Instant::now();
-        let output = AptosVMBlockExecutorWrapper::execute_block::<
-            _,
-            NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
-            DefaultTxnProvider<SignatureVerifiedTransaction>,
-        >(
-            txn_provider,
-            self.state_view.as_ref(),
-            &AptosModuleCacheManager::new(),
-            BlockExecutorConfig::new_maybe_block_limit(
-                concurrency_level_per_shard,
-                maybe_block_gas_limit,
-            ),
-            TransactionSliceMetadata::unknown(),
-            None,
-        )
-        .expect("VM should not fail to start")
-        .into_transaction_outputs_forced();
+
+        let executor = AptosVMBlockExecutor::new();
+        let output = executor
+            .execute_block_with_config(
+                txn_provider,
+                self.state_view.as_ref(),
+                BlockExecutorConfig::new_maybe_block_limit(
+                    concurrency_level,
+                    maybe_block_gas_limit,
+                ),
+                TransactionSliceMetadata::unknown(),
+            )
+            .expect("Parallel block execution should succeed")
+            .into_transaction_outputs_forced();
         let exec_time = timer.elapsed().as_millis();
 
         (output, block_size * 1000 / exec_time as usize)

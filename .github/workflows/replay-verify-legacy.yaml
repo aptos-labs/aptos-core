@@ -1,0 +1,115 @@
+# This defines a workflow to replay transactions on the given chain with the latest aptos node software.
+# In order to trigger it go to the Actions Tab of the Repo, click "replay-verify" and then "Run Workflow".
+#
+# On PR, a single test case will run. On workflow_dispatch, you may specify the CHAIN_NAME to verify.
+
+name: "replay-verify"
+on:
+  # Allow triggering manually
+  workflow_dispatch:
+    inputs:
+      GIT_SHA:
+        required: false
+        type: string
+        description: The git SHA1 to test. If not specified, it will use the latest commit on main.
+      CHAIN_NAME:
+        required: false
+        type: choice
+        options: [testnet, mainnet, all]
+        default: all
+        description: The chain name to test. If not specified, it will test both testnet and mainnet.
+      TESTNET_BUCKET:
+        required: false
+        type: string
+        description: The bucket to use for testnet replay. If not specified, it will use aptos-testnet-backup.
+        default: aptos-testnet-backup
+      MAINNET_BUCKET:
+        required: false
+        type: string
+        description: The bucket to use for mainnet replay. If not specified, it will use aptos-mainnet-backup.
+        default: aptos-mainnet-backup
+
+# cancel redundant builds
+concurrency:
+  # cancel redundant builds on PRs (only on PR, not on branches)
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  determine-test-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      # checkout the repo first, so check-aptos-core can use it and cancel the workflow if necessary
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/check-aptos-core
+        with:
+          cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
+
+  replay-testnet:
+    if: |
+      github.event_name == 'schedule' ||
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' && (inputs.CHAIN_NAME == 'testnet' || inputs.CHAIN_NAME == 'all')
+    needs: determine-test-metadata
+    uses: ./.github/workflows/workflow-run-replay-verify.yaml
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ inputs.GIT_SHA }}
+      # replay-verify config
+      BUCKET: ${{ inputs.TESTNET_BUCKET || 'aptos-testnet-backup' }}
+      SUB_DIR: e1
+      HISTORY_START: 862000000
+      # to see historical TXNS_TO_SKIP, check out ce6158ac2764ee9d4c8738a85f3bcdc6bd0cadc1
+      TXNS_TO_SKIP: "0"
+      # 1195000000-122000000: https://github.com/aptos-labs/aptos-core/pull/13832
+      RANGES_TO_SKIP: "1195000000-1220000000"
+      BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
+      # workflow config
+      RUNS_ON: "high-perf-docker-with-local-ssd"
+      TIMEOUT_MINUTES: 180
+      MAX_VERSIONS_PER_RANGE: 2000000
+
+  replay-mainnet:
+    if: |
+      github.event_name == 'schedule' ||
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' && (inputs.CHAIN_NAME == 'mainnet' || inputs.CHAIN_NAME == 'all' )
+    needs: determine-test-metadata
+    uses: ./.github/workflows/workflow-run-replay-verify.yaml
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ inputs.GIT_SHA }}
+      # replay-verify config
+      BUCKET: ${{ inputs.MAINNET_BUCKET || 'aptos-mainnet-backup' }}
+      SUB_DIR: e1
+      HISTORY_START: 518000000
+      #TXNS_TO_SKIP: 12253479 12277499 148358668
+      TXNS_TO_SKIP: "0"
+      # 1197378568-1198492648: https://github.com/aptos-labs/aptos-core/pull/13832
+      RANGES_TO_SKIP: "1197378568-1198492648"
+      BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
+      # workflow config
+      RUNS_ON: "high-perf-docker-with-local-ssd"
+      TIMEOUT_MINUTES: 180
+      MAX_VERSIONS_PER_RANGE: 800000
+
+  test-replay:
+    if: ${{ (github.event_name == 'pull_request') && contains(github.event.pull_request.labels.*.name, 'CICD:test-replay')}}
+    needs: determine-test-metadata
+    uses: ./.github/workflows/workflow-run-replay-verify.yaml
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ github.event.pull_request.head.sha }}
+      # replay-verify config
+      BUCKET: ${{ inputs.TESTNET_BUCKET || 'aptos-testnet-backup' }}
+      SUB_DIR: e1
+      HISTORY_START: 862000000
+      # to see historical TXNS_TO_SKIP, check out ce6158ac2764ee9d4c8738a85f3bcdc6bd0cadc1
+      TXNS_TO_SKIP: "0"
+      # 1195000000-1220000000: https://github.com/aptos-labs/aptos-core/pull/13832
+      RANGES_TO_SKIP: "1195000000-1220000000"
+      BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
+      # workflow config
+      RUNS_ON: "high-perf-docker-with-local-ssd"
+      TIMEOUT_MINUTES: 120 # increase test replay timeout to capture more flaky errors
+      MAX_VERSIONS_PER_RANGE: 2000000

@@ -25,6 +25,4 @@ error: abort not covered by any of the `aborts_if` clauses
    =         result = <redacted>
    =     at ../move-stdlib/sources/signer.move:14: address_of
    =     at tests/sources/functional/script_provider.move:10: register
-   =         <redacted> = <redacted>
-   =     at tests/sources/functional/script_provider.move:10: register
    =         ABORTED

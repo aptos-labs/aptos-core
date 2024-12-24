@@ -13,14 +13,12 @@ edition = "2021"
 anyhow = { workspace = true }
 codespan-reporting = { workspace = true }
 log = { workspace = true }
-move-binary-format = { path = "../../move-binary-format" }
-move-bytecode-source-map = { path = "../move-bytecode-source-map" }
-move-command-line-common = { path = "../../move-command-line-common" }
-move-core-types = { path = "../../move-core/types" }
+move-binary-format = { workspace = true }
+move-bytecode-source-map = { workspace = true }
+move-command-line-common = { workspace = true }
+move-core-types = { workspace = true }
 move-ir-to-bytecode-syntax = { path = "syntax" }
-move-ir-types = { path = "../../move-ir/types" }
-move-symbol-pool = { path = "../../move-symbol-pool" }
+move-ir-types = { workspace = true }
+move-symbol-pool = { workspace = true }
 ouroboros = { workspace = true }
 
-[features]
-default = []

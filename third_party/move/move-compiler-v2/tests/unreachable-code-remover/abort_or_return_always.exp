@@ -55,4 +55,21 @@ fun m::test($t0: bool): u64 {
 }
 
 
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+test(Arg0: bool): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: bool)
+	1: BrFalse(4)
+B1:
+	2: LdU64(0)
+	3: Abort
+B2:
+	4: LdU64(1)
+	5: Ret
+}
+}
 ============ bytecode verification succeeded ========

@@ -6,19 +6,19 @@ error: local `s2` of type `S` does not have the `drop` ability
 17 │         s != s2;
    │         ^^^^^^^ operator drops value here (consider borrowing the argument)
 
-error: local `s` of type `S` does not have the `drop` ability
+error: value of type `S` does not have the `drop` ability
    ┌─ tests/ability-check/typing/neq_invalid2.move:17:9
    │
 17 │         s != s2;
    │         ^^^^^^^ operator drops value here (consider borrowing the argument)
 
-error: local `r1` of type `R` does not have the `drop` ability
+error: local `r2` of type `R` does not have the `drop` ability
    ┌─ tests/ability-check/typing/neq_invalid2.move:22:9
    │
 22 │         r1 != r2;
    │         ^^^^^^^^ operator drops value here (consider borrowing the argument)
 
-error: local `r2` of type `R` does not have the `drop` ability
+error: value of type `R` does not have the `drop` ability
    ┌─ tests/ability-check/typing/neq_invalid2.move:22:9
    │
 22 │         r1 != r2;

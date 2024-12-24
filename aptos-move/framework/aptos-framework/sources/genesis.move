@@ -109,6 +109,7 @@ module aptos_framework::genesis {
         execution_config::set(&aptos_framework_account, execution_config);
         version::initialize(&aptos_framework_account, initial_version);
         stake::initialize(&aptos_framework_account);
+        timestamp::set_time_has_started(&aptos_framework_account);
         staking_config::initialize(
             &aptos_framework_account,
             minimum_stake,
@@ -129,7 +130,6 @@ module aptos_framework::genesis {
         reconfiguration::initialize(&aptos_framework_account);
         block::initialize(&aptos_framework_account, epoch_interval_microsecs);
         state_storage::initialize(&aptos_framework_account);
-        timestamp::set_time_has_started(&aptos_framework_account);
     }
 
     /// Genesis step 2: Initialize Aptos coin.

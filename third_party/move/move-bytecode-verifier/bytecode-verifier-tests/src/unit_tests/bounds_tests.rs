@@ -2,13 +2,13 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use invalid_mutations::bounds::{
-    ApplyCodeUnitBoundsContext, ApplyOutOfBoundsContext, CodeUnitBoundsMutation,
-    OutOfBoundsMutation,
-};
 use move_binary_format::{
     check_bounds::BoundsChecker, file_format::*, file_format_common,
     proptest_types::CompiledModuleStrategyGen,
+};
+use move_bytecode_verifier_invalid_mutations::bounds::{
+    ApplyCodeUnitBoundsContext, ApplyOutOfBoundsContext, CodeUnitBoundsMutation,
+    OutOfBoundsMutation,
 };
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode,

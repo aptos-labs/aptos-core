@@ -49,10 +49,8 @@ on:
         description: The number of test jobs to run in parallel. If not specified, defaults to 1
         default: 1
 
-  # NOTE: to support testing different branches on different schedules, you need to specify the cron schedule in the 'determine-test-branch' step as well below
-  # Reference: https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule
   schedule:
-    - cron: "0 22 * * 0,2,4" # The main branch cadence. This runs every Sun,Tues,Thurs
+    - cron: "0 22 * * 1-5" # The main branch cadence. This runs every Mon-Fri
   pull_request:
     paths:
       - ".github/workflows/forge-stable.yaml"
@@ -147,17 +145,11 @@ jobs:
         id: determine-test-branch
         # NOTE: the schedule cron MUST match the one in the 'on.schedule.cron' section above
         run: |
+          BRANCH=""
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            if [[ "${{ github.event.schedule }}" == "0 22 * * 0,2,4" ]]; then
-              echo "Branch: main"
-              echo "BRANCH=main" >> $GITHUB_OUTPUT
-            else
-              echo "Unknown schedule: ${{ github.event.schedule }}"
-              exit 1
-            fi
+            echo "BRANCH=main" >> $GITHUB_OUTPUT
           elif [[ "${{ github.event_name }}" == "push" ]]; then
-              echo "Branch: ${{ github.ref_name }}"
-              echo "BRANCH=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "BRANCH=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           # on workflow_dispatch, this will simply use the inputs.GIT_SHA given (or the default)
           elif [[ -n "${{ inputs.GIT_SHA }}" ]]; then
             echo "BRANCH=${{ inputs.GIT_SHA }}" >> $GITHUB_OUTPUT
@@ -165,6 +157,7 @@ jobs:
           else
             echo "BRANCH=${{ github.head_ref }}" >> $GITHUB_OUTPUT
           fi
+          echo "Branch: $(grep BRANCH= $GITHUB_OUTPUT)"
       # Use the branch hash instead of the full branch name to stay under kubernetes namespace length limit
       - name: Hash the branch
         id: hash-branch

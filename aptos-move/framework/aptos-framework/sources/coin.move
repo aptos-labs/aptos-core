@@ -581,13 +581,21 @@ module aptos_framework::coin {
                     deleted_withdraw_event_handle_creation_number: guid::creation_num(event::guid(&withdraw_events))
                 }
             );
-            event::destroy_handle(deposit_events);
-            event::destroy_handle(withdraw_events);
             if (coin.value == 0) {
                 destroy_zero(coin);
             } else {
-                fungible_asset::deposit(store, coin_to_fungible_asset(coin));
+                if (std::features::module_event_migration_enabled()) {
+                    event::emit(CoinWithdraw { coin_type: type_name<CoinType>(), account, amount: coin.value });
+                } else {
+                    event::emit_event<WithdrawEvent>(
+                        &mut withdraw_events,
+                        WithdrawEvent { amount: coin.value },
+                    );
+                };
+                fungible_asset::deposit_internal(object_address(&store), coin_to_fungible_asset(coin));
             };
+            event::destroy_handle(deposit_events);
+            event::destroy_handle(withdraw_events);
             // Note:
             // It is possible the primary fungible store may already exist before this function call.
             // In this case, if the account owns a frozen CoinStore and an unfrozen primary fungible store, this

@@ -115,33 +115,33 @@ module 0x1::simple_map {
         _t2
     }
     public fun to_vec_pair<Key: store, Value: store>(self: SimpleMap<Key, Value>): (vector<Key>, vector<Value>) {
-        let _t25;
-        let _t24;
+        let _t22;
+        let _t21;
         let _t5;
         let _t4;
         let _t3;
-        let _t14;
+        let _t11;
         let _t2;
         let _t1;
         _t1 = vector::empty<Key>();
         _t2 = vector::empty<Value>();
-        SimpleMap<Key,Value>{data: _t14} = self;
-        _t3 = _t14;
+        SimpleMap<Key,Value>{data: _t11} = self;
+        _t3 = _t11;
         vector::reverse<Element<Key, Value>>(&mut _t3);
         _t4 = _t3;
         _t5 = vector::length<Element<Key, Value>>(&_t4);
         while (_t5 > 0) {
-            Element<Key,Value>{key: _t24,value: _t25} = vector::pop_back<Element<Key, Value>>(&mut _t4);
-            vector::push_back<Key>(&mut _t1, _t24);
-            vector::push_back<Value>(&mut _t2, _t25);
+            Element<Key,Value>{key: _t21,value: _t22} = vector::pop_back<Element<Key, Value>>(&mut _t4);
+            vector::push_back<Key>(&mut _t1, _t21);
+            vector::push_back<Value>(&mut _t2, _t22);
             _t5 = _t5 - 1
         };
         vector::destroy_empty<Element<Key, Value>>(_t4);
         (_t1, _t2)
     }
     public fun upsert<Key: store, Value: store>(self: &mut SimpleMap<Key, Value>, key: Key, value: Value): (option::Option<Key>, option::Option<Value>) {
-        let _t38;
-        let _t37;
+        let _t35;
+        let _t34;
         let _t5;
         let _t4;
         let _t3;
@@ -152,8 +152,8 @@ module 0x1::simple_map {
             while (!(!(_t5 < _t4) || &vector::borrow<Element<Key, Value>>(/*freeze*/_t3, _t5).key == &key)) _t5 = _t5 + 1;
             vector::push_back<Element<Key, Value>>(_t3, Element<Key,Value>{key: key,value: value});
             vector::swap<Element<Key, Value>>(_t3, _t5, _t4);
-            Element<Key,Value>{key: _t37,value: _t38} = vector::pop_back<Element<Key, Value>>(_t3);
-            return (option::some<Key>(_t37), option::some<Value>(_t38))
+            Element<Key,Value>{key: _t34,value: _t35} = vector::pop_back<Element<Key, Value>>(_t3);
+            return (option::some<Key>(_t34), option::some<Value>(_t35))
         };
         vector::push_back<Element<Key, Value>>(&mut self.data, Element<Key,Value>{key: key,value: value});
         (option::none<Key>(), option::none<Value>())

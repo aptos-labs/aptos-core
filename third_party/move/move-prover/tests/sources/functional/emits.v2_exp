@@ -8,7 +8,6 @@ error: function does not emit the expected event
    =     at tests/sources/functional/emits.move:19: simple_wrong_msg_incorrect
    =         handle = <redacted>
    =     at tests/sources/functional/emits.move:20: simple_wrong_msg_incorrect
-   =         <redacted> = <redacted>
    =     at tests/sources/functional/emits.move:19: simple_wrong_msg_incorrect
    =         handle = <redacted>
    =     at tests/sources/functional/emits.move:21: simple_wrong_msg_incorrect
@@ -24,7 +23,6 @@ error: function does not emit the expected event
    =         handle = <redacted>
    =         _handle2 = <redacted>
    =     at tests/sources/functional/emits.move:27: simple_wrong_handle_incorrect
-   =         <redacted> = <redacted>
    =     at tests/sources/functional/emits.move:26: simple_wrong_handle_incorrect
    =         handle = <redacted>
    =         _handle2 = <redacted>
@@ -40,9 +38,7 @@ error: function does not emit the expected event
    =     at tests/sources/functional/emits.move:47: multiple_incorrect
    =         handle = <redacted>
    =     at tests/sources/functional/emits.move:48: multiple_incorrect
-   =         <redacted> = <redacted>
    =     at tests/sources/functional/emits.move:49: multiple_incorrect
-   =         <redacted> = <redacted>
    =     at tests/sources/functional/emits.move:47: multiple_incorrect
    =         handle = <redacted>
    =     at tests/sources/functional/emits.move:50: multiple_incorrect
@@ -59,7 +55,6 @@ error: function does not emit the expected event
    =     at tests/sources/functional/emits.move:66: multiple_same_incorrect
    =         handle = <redacted>
    =     at tests/sources/functional/emits.move:67: multiple_same_incorrect
-   =         <redacted> = <redacted>
    =     at tests/sources/functional/emits.move:66: multiple_same_incorrect
    =         handle = <redacted>
    =     at tests/sources/functional/emits.move:68: multiple_same_incorrect
@@ -102,9 +97,7 @@ error: function does not emit the expected event
     =         b = <redacted>
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:150: conditional_multiple_incorrect
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/emits.move:151: conditional_multiple_incorrect
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/emits.move:152: conditional_multiple_incorrect
     =     at tests/sources/functional/emits.move:149: conditional_multiple_incorrect
     =         handle = <redacted>
@@ -122,9 +115,7 @@ error: function does not emit the expected event
     =         b = <redacted>
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:180: conditional_multiple_same_incorrect
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/emits.move:181: conditional_multiple_same_incorrect
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/emits.move:182: conditional_multiple_same_incorrect
     =     at tests/sources/functional/emits.move:179: conditional_multiple_same_incorrect
     =         handle = <redacted>
@@ -143,9 +134,7 @@ error: emitted event not covered by any of the `emits` clauses
     =     at tests/sources/functional/emits.move:231: partial_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:232: partial_incorrect
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/emits.move:233: partial_incorrect
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/emits.move:231: partial_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:234: partial_incorrect
@@ -163,9 +152,7 @@ error: emitted event not covered by any of the `emits` clauses
     =     at tests/sources/functional/emits.move:251: strict_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:252: strict_incorrect
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/emits.move:253: strict_incorrect
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/emits.move:251: strict_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:254: strict_incorrect
@@ -180,10 +167,8 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:286: opaque_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:287: opaque_incorrect
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/emits.move:288: opaque_incorrect
     =     at tests/sources/functional/emits.move:289: opaque_incorrect
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/emits.move:286: opaque_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:290: opaque_incorrect
@@ -206,10 +191,8 @@ error: emitted event not covered by any of the `emits` clauses
     =     at tests/sources/functional/emits.move:309: opaque_completeness_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:310: opaque_completeness_incorrect
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/emits.move:311: opaque_completeness_incorrect
     =     at tests/sources/functional/emits.move:312: opaque_completeness_incorrect
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/emits.move:309: opaque_completeness_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:313: opaque_completeness_incorrect
@@ -233,10 +216,8 @@ error: emitted event not covered by any of the `emits` clauses
     =     at tests/sources/functional/emits.move:350: opaque_partial_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:351: opaque_partial_incorrect
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/emits.move:352: opaque_partial_incorrect
     =     at tests/sources/functional/emits.move:353: opaque_partial_incorrect
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/emits.move:350: opaque_partial_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:354: opaque_partial_incorrect

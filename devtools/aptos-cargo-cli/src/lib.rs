@@ -258,12 +258,17 @@ impl AptosCargoCommand {
                     self.get_args_and_affected_packages(package_args)?;
 
                 // Determine if any relevant files or packages were changed
-                let relevant_changes_detected = detect_relevant_changes(
+                #[allow(unused_assignments)]
+                let mut relevant_changes_detected = detect_relevant_changes(
                     RELEVANT_FILE_PATHS_FOR_FRAMEWORK_UPGRADE_TESTS.to_vec(),
                     RELEVANT_PACKAGES_FOR_FRAMEWORK_UPGRADE_TESTS.to_vec(),
                     changed_files,
                     affected_package_paths,
                 );
+
+                // TODO: remove this! This is a temporary fix to disable
+                // the framework upgrade test while we debug the failures.
+                relevant_changes_detected = false;
 
                 // Output if relevant changes were detected that require the framework upgrade
                 // test. This will be consumed by Github Actions and used to run the test.

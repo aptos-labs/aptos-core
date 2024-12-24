@@ -354,7 +354,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .materialized_size()
     }
 
-    fn get_write_summary(&self) -> HashSet<InputOutputKey<StateKey, StructTag, DelayedFieldID>> {
+    fn get_write_summary(&self) -> HashSet<InputOutputKey<StateKey, StructTag>> {
         let vm_output = self.vm_output.lock();
         let output = vm_output
             .as_ref()
@@ -481,7 +481,7 @@ impl<
     }
 
     /// Uses shared thread pool to execute blocks.
-    pub fn execute_block<
+    pub(crate) fn execute_block<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
         TP: TxnProvider<SignatureVerifiedTransaction> + Sync,

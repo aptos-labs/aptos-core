@@ -25,6 +25,7 @@ use dashmap::DashSet;
 use move_binary_format::CompiledModule;
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout};
 use move_vm_runtime::{Module, RuntimeEnvironment};
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
@@ -356,7 +357,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn delayed_field_keys(
         &self,
         txn_idx: TxnIndex,
-    ) -> Option<impl Iterator<Item = T::Identifier>> {
+    ) -> Option<impl Iterator<Item = DelayedFieldID>> {
         self.outputs[txn_idx as usize]
             .load()
             .as_ref()
@@ -462,7 +463,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn get_write_summary(
         &self,
         txn_idx: TxnIndex,
-    ) -> HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>> {
+    ) -> HashSet<InputOutputKey<T::Key, T::Tag>> {
         match self.outputs[txn_idx as usize]
             .load_full()
             .expect("Output must exist")

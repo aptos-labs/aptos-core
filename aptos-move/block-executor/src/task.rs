@@ -21,6 +21,7 @@ use aptos_vm_types::{
     resolver::{ResourceGroupSize, TExecutorView, TResourceGroupView},
 };
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
@@ -77,7 +78,6 @@ pub trait ExecutorTask: Sync {
             <Self::Txn as Transaction>::Key,
             <Self::Txn as Transaction>::Tag,
             MoveTypeLayout,
-            <Self::Txn as Transaction>::Identifier,
             <Self::Txn as Transaction>::Value,
         > + TResourceGroupView<
             GroupKey = <Self::Txn as Transaction>::Key,
@@ -118,12 +118,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
     fn aggregator_v1_delta_set(&self) -> Vec<(<Self::Txn as Transaction>::Key, DeltaOp)>;
 
     /// Get the delayed field changes of a transaction from its output.
-    fn delayed_field_change_set(
-        &self,
-    ) -> BTreeMap<
-        <Self::Txn as Transaction>::Identifier,
-        DelayedChange<<Self::Txn as Transaction>::Identifier>,
-    >;
+    fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>;
 
     fn reads_needing_delayed_field_exchange(
         &self,
@@ -204,11 +199,5 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     fn get_write_summary(
         &self,
-    ) -> HashSet<
-        InputOutputKey<
-            <Self::Txn as Transaction>::Key,
-            <Self::Txn as Transaction>::Tag,
-            <Self::Txn as Transaction>::Identifier,
-        >,
-    >;
+    ) -> HashSet<InputOutputKey<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Tag>>;
 }
