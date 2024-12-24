@@ -2,6 +2,7 @@
 address 0x123 {
 
   module M {
+    use std::fixed_point32;
 
     public fun foo(): u64 {
       let a = A {
@@ -77,6 +78,28 @@ address 0x123 {
       if (e == (0 as u64)) { int2bv((1 as u64)) } else { n & spec_bv_and(n, e - int2bv((1 as u64))) }
     }
 
+    fun test_2(x1: u64, x2: u64): u64 {
+       x1 + x2
+    }
+
+    spec test_2(x1: u64, x2: u64): u64 {
+       pragma opaque;
+       ensures result == spec_test_2(x1, x2);
+    }
+
+    spec fun spec_test_2(x1: u64, x2: u64): u64 {
+       x1 + x2
+    }
+
+    fun test_1(x: u64): u64 {
+       let y = x ^ (x - 2);
+       let fix = fixed_point32::create_from_rational(2, 3);
+       let z = fixed_point32::divide_u64(2, fix) ^ y;
+       test_2(x, x) + z
+    }
+
   }
+
+
 
 }

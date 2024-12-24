@@ -141,6 +141,9 @@ module TestFeatures {
             };
             i = i + 1;
         };
+        spec {
+            assert forall j in 0..len(disable): disable[j] / 8 < len(features) && !spec_contains(features, disable[j]);
+        };
     }
 
     spec disable_feature_flags {
@@ -167,6 +170,9 @@ module TestFeatures {
                 assert (enable[i] / 8 < len(features) && spec_contains(features, enable[i]));
             };
             i = i + 1;
+        };
+        spec {
+            assert forall j in 0..len(enable): enable[j] / 8 < len(features) && spec_contains(features, enable[j]);
         };
     }
 
