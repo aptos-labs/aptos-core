@@ -29,11 +29,9 @@ use aptos_network::{
     protocols::{
         network::{
             NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender, ReceivedMessage,
+            SerializedRequest,
         },
-        wire::{
-            handshake::v1::ProtocolId::MempoolDirectSend,
-            messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest},
-        },
+        wire::{handshake::v1::ProtocolId::MempoolDirectSend, messaging::v1::NetworkMessage},
     },
     testutils::{
         builder::TestFrameworkBuilder,
@@ -271,33 +269,24 @@ impl MempoolNode {
         };
         let data = protocol_id.to_bytes(&msg).unwrap();
         let (notif, maybe_receiver) = match protocol_id {
-            ProtocolId::MempoolDirectSend => (
-                ReceivedMessage {
-                    message: NetworkMessage::DirectSendMsg(DirectSendMsg {
-                        protocol_id,
-                        priority: 0,
-                        raw_msg: data,
-                    }),
-                    sender: PeerNetworkId::new(network_id, remote_peer_id),
-                    receive_timestamp_micros: 0,
-                    rpc_replier: None,
-                },
-                None,
-            ),
+            ProtocolId::MempoolDirectSend => {
+                let network_message = NetworkMessage::new_direct_send(protocol_id, data);
+                let received_message = ReceivedMessage::new_for_testing(
+                    network_message,
+                    PeerNetworkId::new(network_id, remote_peer_id),
+                    None,
+                );
+                (received_message, None)
+            },
             ProtocolId::MempoolRpc => {
                 let (res_tx, res_rx) = oneshot::channel();
-                let rmsg = ReceivedMessage {
-                    message: NetworkMessage::RpcRequest(RpcRequest {
-                        protocol_id,
-                        request_id: 0,
-                        priority: 0,
-                        raw_request: data,
-                    }),
-                    sender: PeerNetworkId::new(network_id, remote_peer_id),
-                    receive_timestamp_micros: 0,
-                    rpc_replier: Some(Arc::new(res_tx)),
-                };
-                (rmsg, Some(res_rx))
+                let network_message = NetworkMessage::rpc_request_for_testing(protocol_id, data);
+                let received_message = ReceivedMessage::new_for_testing(
+                    network_message,
+                    PeerNetworkId::new(network_id, remote_peer_id),
+                    Some(Arc::new(res_tx)),
+                );
+                (received_message, Some(res_rx))
             },
 
             protocol_id => panic!("Invalid protocol id found: {:?}", protocol_id),
@@ -314,7 +303,7 @@ impl MempoolNode {
             match self.get_outbound_handle(network_id).next().await.unwrap() {
                 PeerManagerRequest::SendDirectSend(peer_id, msg) => {
                     assert_eq!(peer_id, remote_peer_id);
-                    msg.protocol_id.from_bytes(&msg.mdata).unwrap()
+                    msg.protocol_id().from_bytes(msg.data()).unwrap()
                 },
                 _ => panic!("Should not be getting an RPC response"),
             }
@@ -376,10 +365,11 @@ impl MempoolNode {
         let message = self.get_next_network_msg(network_id).await;
         let (peer_id, protocol_id, data, maybe_rpc_sender) = match message {
             PeerManagerRequest::SendRpc(peer_id, msg) => {
-                (peer_id, msg.protocol_id, msg.data, Some(msg.res_tx))
+                let (_, protocol_id, data, res_tx, _) = msg.into_parts();
+                (peer_id, protocol_id, data, Some(res_tx))
             },
             PeerManagerRequest::SendDirectSend(peer_id, msg) => {
-                (peer_id, msg.protocol_id, msg.mdata, None)
+                (peer_id, msg.protocol_id(), msg.data().clone(), None)
             },
         };
         assert_eq!(peer_id, expected_peer_id);
@@ -443,19 +433,15 @@ impl MempoolNode {
         if let Some(rpc_sender) = maybe_rpc_sender {
             rpc_sender.send(Ok(bytes.into())).unwrap();
         } else {
-            let notif = ReceivedMessage {
-                message: NetworkMessage::DirectSendMsg(DirectSendMsg {
-                    protocol_id,
-                    priority: 0,
-                    raw_msg: bytes,
-                }),
-                sender: PeerNetworkId::new(network_id, peer_id),
-                receive_timestamp_micros: 0,
-                rpc_replier: None,
-            };
+            let network_message = NetworkMessage::new_direct_send(protocol_id, bytes);
+            let received_message = ReceivedMessage::new_for_testing(
+                network_message,
+                PeerNetworkId::new(network_id, expected_peer_id),
+                None,
+            );
             inbound_handle
                 .inbound_message_sender
-                .push((peer_id, protocol_id), notif)
+                .push((peer_id, protocol_id), received_message)
                 .unwrap();
         }
     }

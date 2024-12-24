@@ -24,7 +24,7 @@ use aptos_network::{
         network::{NetworkEvents, NewNetworkEvents, ReceivedMessage},
         wire::{
             handshake::v1::{MessagingProtocolVersion, ProtocolId, ProtocolIdSet},
-            messaging::v1::{NetworkMessage, RpcRequest},
+            messaging::v1::NetworkMessage,
         },
     },
     transport::{ConnectionId, ConnectionMetadata},
@@ -555,23 +555,19 @@ impl MockClient {
             .to_bytes(&PeerMonitoringServiceMessage::Request(request))
             .unwrap();
         let (request_sender, request_receiver) = oneshot::channel();
-        let request_notification = ReceivedMessage {
-            message: NetworkMessage::RpcRequest(RpcRequest {
-                protocol_id,
-                request_id: 42,
-                priority: 0,
-                raw_request: request_data.clone(),
-            }),
-            sender: PeerNetworkId::new(network_id, peer_id),
-            receive_timestamp_micros: 0,
-            rpc_replier: Some(Arc::new(request_sender)),
-        };
+        let network_message =
+            NetworkMessage::rpc_request_for_testing(protocol_id, request_data.clone());
+        let received_message = ReceivedMessage::new_for_testing(
+            network_message,
+            PeerNetworkId::new(network_id, peer_id),
+            Some(Arc::new(request_sender)),
+        );
 
         // Send the request to the peer monitoring service
         self.peer_manager_notifiers
             .get(&network_id)
             .unwrap()
-            .push((peer_id, protocol_id), request_notification)
+            .push((peer_id, protocol_id), received_message)
             .unwrap();
 
         // Wait for the response from the peer monitoring service

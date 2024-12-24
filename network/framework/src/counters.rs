@@ -2,8 +2,13 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::protocols::wire::handshake::v1::ProtocolId;
-use aptos_config::network_id::NetworkContext;
+use crate::protocols::wire::{
+    handshake::v1::ProtocolId,
+    messaging::v1::metadata::{
+        MessageLatencyType, MessageReceiveType, MessageSendType, MessageStreamType,
+    },
+};
+use aptos_config::network_id::{NetworkContext, NetworkId};
 use aptos_metrics_core::{
     exponential_buckets, register_histogram_vec, register_int_counter_vec, register_int_gauge,
     register_int_gauge_vec, Histogram, HistogramTimer, HistogramVec, IntCounter, IntCounterVec,
@@ -196,6 +201,148 @@ pub static APTOS_NETWORK_DISCOVERY_NOTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Time it takes for messages to be received by the network layer
+pub static APTOS_NETWORK_MESSAGE_RECEIVE_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_network_message_receive_latency",
+        "Time it takes for messages to be received by the network layer",
+        &[
+            "network_id",
+            "protocol_id",
+            "message_type",
+            "message_stream_type",
+        ],
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
+/// Time it takes for messages to be sent by the network layer
+pub static APTOS_NETWORK_MESSAGE_SEND_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_network_message_send_latency",
+        "Time it takes for messages to be sent by the network layer",
+        &[
+            "network_id",
+            "protocol_id",
+            "message_type",
+            "message_stream_type",
+            "latency_label",
+        ],
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
+/// Time it takes for messages to be transported across the wire
+pub static APTOS_NETWORK_MESSAGE_TRANSPORT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_network_message_transport_latency",
+        "Time it takes for messages to be transported across the wire",
+        &[
+            "network_id",
+            "protocol_id",
+            "message_type",
+            "message_stream_type",
+            "latency_label",
+        ],
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
+/// Observes the message receive latency
+pub fn observe_message_receive_latency(
+    network_id: &NetworkId,
+    protocol_id: &Option<ProtocolId>,
+    message_receive_type: &MessageReceiveType,
+    message_stream_type: &MessageStreamType,
+    value: f64,
+) {
+    // Get the protocol ID
+    let protocol_id = protocol_id.unwrap_or(ProtocolId::Unknown);
+
+    // Update the histogram
+    APTOS_NETWORK_MESSAGE_RECEIVE_LATENCY
+        .with_label_values(&[
+            network_id.as_str(),
+            protocol_id.as_str(),
+            message_receive_type.get_label(),
+            message_stream_type.get_label(),
+        ])
+        .observe(value)
+}
+
+/// Observes the message send latency
+pub fn observe_message_send_latency(
+    network_id: &NetworkId,
+    protocol_id: &Option<ProtocolId>,
+    message_send_type: &MessageSendType,
+    message_stream_type: &MessageStreamType,
+    message_latency_type: &MessageLatencyType,
+    value: f64,
+) {
+    // Get the protocol ID
+    let protocol_id = protocol_id.unwrap_or(ProtocolId::Unknown);
+
+    // Update the histogram
+    APTOS_NETWORK_MESSAGE_SEND_LATENCY
+        .with_label_values(&[
+            network_id.as_str(),
+            protocol_id.as_str(),
+            message_send_type.get_label(),
+            message_stream_type.get_label(),
+            message_latency_type.get_label(),
+        ])
+        .observe(value)
+}
+
+/// Observes the message transport latency (i.e., latencies across the wire)
+pub fn observe_message_transport_latency(
+    network_id: &NetworkId,
+    protocol_id: &ProtocolId,
+    message_receive_type: &MessageReceiveType,
+    message_stream_type: &MessageStreamType,
+    message_latency_type: &MessageLatencyType,
+    value: f64,
+) {
+    APTOS_NETWORK_MESSAGE_TRANSPORT_LATENCY
+        .with_label_values(&[
+            network_id.as_str(),
+            protocol_id.as_str(),
+            message_receive_type.get_label(),
+            message_stream_type.get_label(),
+            message_latency_type.get_label(),
+        ])
+        .observe(value)
+}
+
+/// The number of fragments in streamed messages
+pub static APTOS_NETWORK_MESSAGE_STREAM_FRAGMENT_COUNT: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_network_message_stream_fragment_count",
+        "The number of fragments in streamed messages",
+        &["network_id", "protocol_id",],
+        exponential_buckets(/*start=*/ 1.0, /*factor=*/ 2.0, /*count=*/ 10).unwrap(),
+    )
+    .unwrap()
+});
+
+/// Observes the number of fragments in streamed messages
+pub fn observe_message_stream_fragment_count(
+    network_id: &NetworkId,
+    protocol_id: &Option<ProtocolId>,
+    fragment_count: usize,
+) {
+    // Get the protocol ID
+    let protocol_id = protocol_id.unwrap_or(ProtocolId::Unknown);
+
+    // Update the histogram
+    APTOS_NETWORK_MESSAGE_STREAM_FRAGMENT_COUNT
+        .with_label_values(&[network_id.as_str(), protocol_id.as_str()])
+        .observe(fragment_count as f64)
+}
 
 pub static APTOS_NETWORK_RPC_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!("aptos_network_rpc_messages", "Number of RPC messages", &[
@@ -665,19 +812,3 @@ pub static OP_MEASURE: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .unwrap()
 });
-
-pub static INBOUND_QUEUE_DELAY: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        "aptos_network_inbound_queue_time",
-        "Time a message sits in queue between peer socket and app code",
-        &["protocol_id"],
-        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
-    )
-    .unwrap()
-});
-
-pub fn inbound_queue_delay_observe(protocol_id: ProtocolId, seconds: f64) {
-    INBOUND_QUEUE_DELAY
-        .with_label_values(&[protocol_id.as_str()])
-        .observe(seconds)
-}
