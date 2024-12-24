@@ -88,7 +88,8 @@ the return on investment didn't seem worth it for these simple functions.
     -  [Function `rotate_slice`](#@Specification_1_rotate_slice)
 
 
-<pre><code></code></pre>
+<pre><code><b>use</b> <a href="mem.md#0x1_mem">0x1::mem</a>;
+</code></pre>
 
 
 
@@ -930,14 +931,13 @@ Aborts if <code>i</code> is out of bounds.
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_replace">replace</a>&lt;Element&gt;(self: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64, val: Element): Element {
     <b>let</b> last_idx = <a href="vector.md#0x1_vector_length">length</a>(self);
     <b>assert</b>!(i &lt; last_idx, <a href="vector.md#0x1_vector_EINDEX_OUT_OF_BOUNDS">EINDEX_OUT_OF_BOUNDS</a>);
-    // TODO: Enable after tests are fixed.
-    // <b>if</b> (<a href="vector.md#0x1_vector_USE_MOVE_RANGE">USE_MOVE_RANGE</a>) {
-    //     <a href="mem.md#0x1_mem_replace">mem::replace</a>(<a href="vector.md#0x1_vector_borrow_mut">borrow_mut</a>(self, i), val)
-    // } <b>else</b> {
-    <a href="vector.md#0x1_vector_push_back">push_back</a>(self, val);
-    <a href="vector.md#0x1_vector_swap">swap</a>(self, i, last_idx);
-    <a href="vector.md#0x1_vector_pop_back">pop_back</a>(self)
-    // }
+    <b>if</b> (<a href="vector.md#0x1_vector_USE_MOVE_RANGE">USE_MOVE_RANGE</a>) {
+        <a href="mem.md#0x1_mem_replace">mem::replace</a>(<a href="vector.md#0x1_vector_borrow_mut">borrow_mut</a>(self, i), val)
+    } <b>else</b> {
+        <a href="vector.md#0x1_vector_push_back">push_back</a>(self, val);
+        <a href="vector.md#0x1_vector_swap">swap</a>(self, i, last_idx);
+        <a href="vector.md#0x1_vector_pop_back">pop_back</a>(self)
+    }
 }
 </code></pre>
 
