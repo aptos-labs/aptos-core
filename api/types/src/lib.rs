@@ -23,7 +23,7 @@ pub mod transaction;
 mod view;
 mod wrappers;
 
-pub use account::AccountData;
+pub use account::{AccountData, AssetType};
 pub use address::Address;
 pub use block::{BcsBlock, Block};
 pub use bytecode::Bytecode;

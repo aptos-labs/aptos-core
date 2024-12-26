@@ -3770,6 +3770,7 @@ dependencies = [
  "bcs 0.1.4",
  "ed25519-dalek-bip32",
  "hex",
+ "lazy_static",
  "move-core-types",
  "once_cell",
  "rand 0.7.3",
