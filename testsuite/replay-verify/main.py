@@ -105,7 +105,7 @@ class ReplayConfig:
 class WorkerPod:
     def __init__(
         self,
-        id: int,
+        worker_id: int,
         start_version: int,
         end_version: int,
         label: str,
@@ -115,7 +115,7 @@ class WorkerPod:
         network: Network = Network.TESTNET,
         namespace: str = "default",
     ) -> None:
-        self.id = id
+        self.worker_id = worker_id
         self.client = client.CoreV1Api()
         self.name = f"{label}-replay-verify-{start_version}-{end_version}"
         self.start_version = start_version
@@ -167,6 +167,12 @@ class WorkerPod:
             return self.status.status.phase
         return None
 
+    def get_container_status(self) -> list[client.V1ContainerStatus] | None:
+        self.update_status()
+        if self.status:
+            return self.status.status.container_statuses
+        return None
+
     def has_txn_mismatch(self) -> bool:
         if self.status:
             container_statuses = self.status.status.container_statuses
@@ -182,7 +188,7 @@ class WorkerPod:
         return "/mnt/archive/db"
 
     def get_claim_name(self) -> str:
-        idx = self.id % len(self.pvcs)
+        idx = self.worker_id % len(self.pvcs)
         return self.pvcs[idx]
 
     def start(self) -> None:
@@ -392,17 +398,40 @@ class ReplayScheduler:
         assert len(pvcs) == self.config.pvc_number, "failed to create all pvcs"
         self.pvcs = pvcs
 
+    @retry(
+        stop=stop_after_attempt(MAX_RETRIES),
+        wait=wait_fixed(RETRY_DELAY),
+        retry=retry_if_exception_type(ApiException),
+        before_sleep=lambda retry_state: logger.warning(
+            f"Retry {retry_state.attempt_number}/{MAX_RETRIES} failed: {retry_state.outcome.exception()}"
+        ),
+    )
+    def get_pvc_bound_status(self) -> list[bool]:
+        statuses = []
+        for pvc in self.pvcs:
+            pvc_status = self.client.read_namespaced_persistent_volume_claim_status(
+                name=pvc, namespace=self.namespace
+            )
+            if pvc_status.status.phase == "Bound":
+                statuses.append(True)
+            else:
+                statuses.append(False)
+        return statuses
+
     def schedule(self, from_scratch: bool = False) -> None:
         if from_scratch:
             self.kill_all_pods()
         self.create_tasks()
 
         while len(self.tasks) > 0:
+            pvc_bound_status = self.get_pvc_bound_status()
             for i in range(len(self.current_workers)):
                 if (
                     self.current_workers[i] is None
                     or self.current_workers[i].is_completed()
-                ):
+                ) and (
+                    pvc_bound_status[i % len(self.pvcs)] or i < len(self.pvcs)
+                ):  # we only create a new pod to intialize the pvc before the PVC is bound
                     if (
                         self.current_workers[i] is not None
                         and self.current_workers[i].is_completed()
@@ -428,11 +457,20 @@ class ReplayScheduler:
                     self.task_stats[worker_pod.name] = TaskStats(worker_pod.name)
 
                 if self.current_workers[i] is not None:
+                    phase = self.current_workers[i].get_phase()
                     logger.info(
-                        f"Checking worker {i}: {self.current_workers[i].name}: {self.current_workers[i].get_phase()}"
+                        f"Checking worker {i}: {self.current_workers[i].name}: {phase}"
                     )
             time.sleep(QUERY_DELAY)
         logger.info("All tasks have been scheduled")
+
+    def reschedule_pod(self, worker_pod: WorkerPod, worker_idx: int):
+        # clean up the existing pod
+        worker_pod.delete_pod()
+        # re-enter the task to the queue
+        self.tasks.append((worker_pod.start_version, worker_pod.end_version))
+        self.task_stats[worker_pod.name].increment_retry_count()
+        self.current_workers[worker_idx] = None
 
     def process_completed_pod(self, worker_pod, worker_idx):
         if worker_pod.has_txn_mismatch():
@@ -444,16 +482,11 @@ class ReplayScheduler:
                 logger.info(
                     f"Worker {worker_pod.name} failed with {worker_pod.get_failure_reason()}. Rescheduling"
                 )
-                # clean up the existing pod
-                worker_pod.delete_pod()
-                # re-enter the task to the queue
-                self.tasks.append((worker_pod.start_version, worker_pod.end_version))
-                self.task_stats[worker_pod.name].increment_retry_count()
+                self.reschedule_pod(worker_pod, worker_idx)
             else:
                 self.failed_workpod_logs.append(worker_pod.get_humio_log_link())
-
+                self.current_workers[worker_idx] = None
         self.task_stats[worker_pod.name].set_end_time()
-        self.current_workers[worker_idx] = None
 
     def cleanup(self):
         self.kill_all_pods()
