@@ -1013,7 +1013,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             warnings.append(text)
 
 if HIDE_OUTPUT:
-    print_table(results, by_levels=False, single_field=None)
+    print_table(results, by_levels=False, only_fields=None)
 
 if warnings:
     print("Warnings: ")
