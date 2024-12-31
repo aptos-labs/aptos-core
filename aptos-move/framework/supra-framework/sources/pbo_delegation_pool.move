@@ -249,7 +249,7 @@ module supra_framework::pbo_delegation_pool {
 
     const ENEW_IS_SAME_AS_OLD_DELEGATOR: u64 = 37;
     
-    const EUNLOCKING_ALREADY_STARTED: u64 = 38;
+    const EUNLOCKING_ALREADY_STARTED: u64 = 41;
 
     const MAX_U64: u64 = 18446744073709551615;
 
@@ -437,6 +437,7 @@ module supra_framework::pbo_delegation_pool {
         unlock_start_time: u64,
         unlock_duration: u64
     }
+
     #[event]
     struct DistributeCommission has drop, store {
         pool_address: address,
@@ -760,6 +761,7 @@ module supra_framework::pbo_delegation_pool {
         (uschedule.schedule,uschedule.start_timestamp_secs, uschedule.period_duration, uschedule.last_unlock_period, uschedule.cumulative_unlocked_fraction)
         
     }
+
     /// Pre-condition: `cumulative_unlocked_fraction` should be zero, which would indicate that even
     /// though there are principle stake holders, none of those have yet called `unlock` on the pool
     /// thus it is ``safe'' to change the schedule
@@ -773,29 +775,9 @@ module supra_framework::pbo_delegation_pool {
         assert!(is_admin(signer::address_of(multisig_admin),pool_address), error::permission_denied(ENOT_AUTHORIZED));
         let pool = borrow_global_mut<DelegationPool>(pool_address);
         assert!(fixed_point64::is_zero(pool.principle_unlock_schedule.cumulative_unlocked_fraction), error::invalid_state(EUNLOCKING_ALREADY_STARTED));
-
-        //Unlock duration can not be zero
-        assert!(unlock_duration > 0, error::invalid_argument(EPERIOD_DURATION_IS_ZERO));
-        //Fraction denominator can not be zero
-        assert!(unlock_denominator != 0, error::invalid_argument(EDENOMINATOR_IS_ZERO));
-        let numerator_length = vector::length(&unlock_numerators);
-        //Fraction numerators can not be empty
-        assert!(
-            numerator_length > 0,
-            error::invalid_argument(EEMPTY_UNLOCK_SCHEDULE)
-        );
         
-        //First and last numerator can not be zero
-        assert!(*vector::borrow(&unlock_numerators,0)!=0,error::invalid_argument(ESCHEDULE_WITH_ZERO_FRACTION));
-        assert!(*vector::borrow(&unlock_numerators,numerator_length-1)!=0,error::invalid_argument(ESCHEDULE_WITH_ZERO_FRACTION));
+        validate_unlock_schedule_params(&unlock_numerators,unlock_denominator,unlock_start_time,unlock_duration);
         
-        let sum = vector::foldr(unlock_numerators, 0, |e, a| { e + a });
-        //Sum of numerators can not be greater than denominators
-        assert!(
-            sum <= unlock_denominator,
-            error::invalid_argument(ENUMERATORS_GRATER_THAN_DENOMINATOR)
-        );
-
         //Create unlock schedule
         let schedule = vector::empty();
         vector::for_each_ref(
@@ -823,6 +805,32 @@ module supra_framework::pbo_delegation_pool {
 
         }
     
+    // All sanity checks for unlock schedule parameters in one common function
+    fun validate_unlock_schedule_params(unlock_numerators: &vector<u64>, unlock_denominator: u64,
+    unlock_start_time: u64, unlock_duration: u64) {
+        //Unlock duration can not be zero
+        assert!(unlock_duration > 0, error::invalid_argument(EPERIOD_DURATION_IS_ZERO));
+        //Fraction denominator can not be zero
+        assert!(unlock_denominator != 0, error::invalid_argument(EDENOMINATOR_IS_ZERO));
+        let numerator_length = vector::length(unlock_numerators);
+        //Fraction numerators can not be empty
+        assert!(
+            numerator_length > 0,
+            error::invalid_argument(EEMPTY_UNLOCK_SCHEDULE)
+        );
+        //First and last numerator can not be zero
+        assert!(*vector::borrow(unlock_numerators,0)!=0,error::invalid_argument(ESCHEDULE_WITH_ZERO_FRACTION));
+        assert!(*vector::borrow(unlock_numerators,numerator_length-1)!=0,error::invalid_argument(ESCHEDULE_WITH_ZERO_FRACTION));
+        
+        let sum = vector::foldr(*unlock_numerators, 0, |e, a| { e + a });
+        //Sum of numerators can not be greater than denominators
+        assert!(
+            sum <= unlock_denominator,
+            error::invalid_argument(ENUMERATORS_GRATER_THAN_DENOMINATOR)
+        );
+
+    }
+
     /// Initialize a delegation pool of custom fixed `operator_commission_percentage`.
     /// A resource account is created from `owner` signer and its supplied `delegation_pool_creation_seed`
     /// to host the delegation pool resource and own the underlying stake pool.
@@ -869,26 +877,8 @@ module supra_framework::pbo_delegation_pool {
             unlock_start_time >= timestamp::now_seconds(),
             error::invalid_argument(ESTARTUP_TIME_IN_PAST)
         );
-        //Unlock duration can not be zero
-        assert!(unlock_duration > 0, error::invalid_argument(EPERIOD_DURATION_IS_ZERO));
-        //Fraction denominator can not be zero
-        assert!(unlock_denominator != 0, error::invalid_argument(EDENOMINATOR_IS_ZERO));
-        let numerator_length = vector::length(&unlock_numerators);
-        //Fraction numerators can not be empty
-        assert!(
-            numerator_length > 0,
-            error::invalid_argument(EEMPTY_UNLOCK_SCHEDULE)
-        );
-        //First and last numerator can not be zero
-        assert!(*vector::borrow(&unlock_numerators,0)!=0,error::invalid_argument(ESCHEDULE_WITH_ZERO_FRACTION));
-        assert!(*vector::borrow(&unlock_numerators,numerator_length-1)!=0,error::invalid_argument(ESCHEDULE_WITH_ZERO_FRACTION));
         
-        let sum = vector::foldr(unlock_numerators, 0, |e, a| { e + a });
-        //Sum of numerators can not be greater than denominators
-        assert!(
-            sum <= unlock_denominator,
-            error::invalid_argument(ENUMERATORS_GRATER_THAN_DENOMINATOR)
-        );
+        validate_unlock_schedule_params(&unlock_numerators,unlock_denominator,unlock_start_time,unlock_duration);
 
         let owner_address = signer::address_of(owner);
         assert!(
