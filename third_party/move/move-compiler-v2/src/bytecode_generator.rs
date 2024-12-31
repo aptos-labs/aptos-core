@@ -6,7 +6,7 @@ use crate::{experiments::Experiment, Options};
 use codespan_reporting::diagnostic::Severity;
 use ethnum::U256;
 use itertools::Itertools;
-use move_binary_format::file_format::Ability;
+use move_core_types::ability::Ability;
 use move_model::{
     ast::{Exp, ExpData, MatchArm, Operation, Pattern, SpecBlockTarget, TempIndex, Value},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},

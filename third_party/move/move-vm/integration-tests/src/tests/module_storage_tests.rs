@@ -3,8 +3,8 @@
 
 use crate::compiler::{as_module, compile_units};
 use bytes::Bytes;
-use move_binary_format::file_format::{Ability, AbilitySet};
 use move_core_types::{
+    ability::{Ability, AbilitySet},
     account_address::AccountAddress,
     ident_str,
     identifier::Identifier,

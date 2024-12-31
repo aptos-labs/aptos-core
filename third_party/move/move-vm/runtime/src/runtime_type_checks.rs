@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{frame_type_cache::FrameTypeCache, interpreter::Stack, loader::Resolver};
-use move_binary_format::{
-    errors::*,
-    file_format::{Ability, AbilitySet, Bytecode},
+use move_binary_format::{errors::*, file_format::Bytecode};
+use move_core_types::{
+    ability::{Ability, AbilitySet},
+    vm_status::StatusCode,
 };
-use move_core_types::vm_status::StatusCode;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Locals};
 
 pub(crate) trait RuntimeTypeCheck {

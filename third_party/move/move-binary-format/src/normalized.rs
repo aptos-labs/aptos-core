@@ -8,12 +8,12 @@ use crate::{
     access::ModuleAccess,
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        AbilitySet, CompiledModule, FieldDefinition, FunctionDefinition, SignatureToken,
-        StructDefinition, StructFieldInformation, StructTypeParameter, TypeParameterIndex,
-        Visibility,
+        CompiledModule, FieldDefinition, FunctionDefinition, SignatureToken, StructDefinition,
+        StructFieldInformation, StructTypeParameter, TypeParameterIndex, Visibility,
     },
 };
 use move_core_types::{
+    ability::AbilitySet,
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},

@@ -5,7 +5,7 @@
 use crate::compiler::compile_modules_in_file;
 use move_binary_format::{
     file_format::{
-        empty_module, AbilitySet, AddressIdentifierIndex, Bytecode, CodeUnit, FunctionDefinition,
+        empty_module, AddressIdentifierIndex, Bytecode, CodeUnit, FunctionDefinition,
         FunctionHandle, FunctionHandleIndex, IdentifierIndex, ModuleHandle, ModuleHandleIndex,
         SignatureIndex, StructHandle, StructTypeParameter, TableIndex, Visibility,
     },
@@ -13,6 +13,7 @@ use move_binary_format::{
 };
 use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
+    ability::AbilitySet,
     account_address::AccountAddress,
     ident_str,
     identifier::{IdentStr, Identifier},

@@ -6,7 +6,7 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        Ability, AbilitySet, Bytecode, CodeUnit, CompiledModule, CompiledScript, FieldDefinition,
+        Bytecode, CodeUnit, CompiledModule, CompiledScript, FieldDefinition,
         FieldInstantiationIndex, FunctionDefinition, FunctionHandle, FunctionHandleIndex,
         FunctionInstantiationIndex, SignatureIndex, SignatureToken, StructDefInstantiationIndex,
         StructDefinition, StructDefinitionIndex, StructFieldInformation, StructHandle,
@@ -15,7 +15,10 @@ use move_binary_format::{
     },
     IndexKind,
 };
-use move_core_types::vm_status::StatusCode;
+use move_core_types::{
+    ability::{Ability, AbilitySet},
+    vm_status::StatusCode,
+};
 use std::{
     cell::RefCell,
     collections::{btree_map, BTreeMap},

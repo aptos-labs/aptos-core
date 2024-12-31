@@ -22,14 +22,13 @@ use move_binary_format::{
     binary_views::{BinaryIndexedView, FunctionView},
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        Bytecode, ClosureMask, CodeOffset, FunctionDefinitionIndex, FunctionHandle,
-        IdentifierIndex, SignatureIndex, SignatureToken, StructDefinition, StructVariantHandle,
-        VariantIndex,
+        Bytecode, CodeOffset, FunctionDefinitionIndex, FunctionHandle, IdentifierIndex,
+        SignatureIndex, SignatureToken, StructDefinition, StructVariantHandle, VariantIndex,
     },
     safe_assert, safe_unwrap,
     views::FieldOrVariantIndex,
 };
-use move_core_types::vm_status::StatusCode;
+use move_core_types::{function::ClosureMask, vm_status::StatusCode};
 use std::collections::{BTreeSet, HashMap};
 
 struct ReferenceSafetyAnalysis<'a> {

@@ -10,14 +10,15 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError},
     file_format::{
-        Ability, AbilitySet, CompiledScript, FieldDefinition, SignatureToken,
-        StructDefinitionIndex, StructFieldInformation, StructHandleIndex,
+        CompiledScript, FieldDefinition, SignatureToken, StructDefinitionIndex,
+        StructFieldInformation, StructHandleIndex,
     },
     views::FunctionHandleView,
     CompiledModule,
 };
 use move_bytecode_utils::{compiled_module_viewer::CompiledModuleView, layout::TypeLayoutBuilder};
 use move_core_types::{
+    ability::{Ability, AbilitySet},
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},

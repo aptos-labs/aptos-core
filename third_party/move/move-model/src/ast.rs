@@ -19,9 +19,9 @@ use internment::LocalIntern;
 use itertools::{EitherOrBoth, Itertools};
 use move_binary_format::{
     file_format,
-    file_format::{AbilitySet, CodeOffset, Visibility},
+    file_format::{CodeOffset, Visibility},
 };
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{ability::AbilitySet, account_address::AccountAddress};
 use num::BigInt;
 use std::{
     borrow::Borrow,

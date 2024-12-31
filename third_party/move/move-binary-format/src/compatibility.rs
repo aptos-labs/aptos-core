@@ -6,8 +6,7 @@ use crate::{
     access::ModuleAccess,
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        AbilitySet, Signature, SignatureToken, StructHandleIndex, StructTypeParameter,
-        VariantIndex, Visibility,
+        Signature, SignatureToken, StructHandleIndex, StructTypeParameter, VariantIndex, Visibility,
     },
     file_format_common::VERSION_5,
     views::{
@@ -15,7 +14,7 @@ use crate::{
     },
     CompiledModule,
 };
-use move_core_types::vm_status::StatusCode;
+use move_core_types::{ability::AbilitySet, vm_status::StatusCode};
 use std::collections::BTreeSet;
 
 /// The result of a linking and layout compatibility check. Here is what the different combinations. NOTE that if `check_struct_layout` is false, type safety over a series of upgrades cannot be guaranteed.

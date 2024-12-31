@@ -18,11 +18,12 @@ use itertools::Itertools;
 use move_binary_format::normalized::Type as MType;
 use move_binary_format::{
     access::ModuleAccess,
-    file_format::{Ability, AbilitySet, SignatureToken, TypeParameterIndex},
+    file_format::{SignatureToken, TypeParameterIndex},
     views::StructHandleView,
     CompiledModule,
 };
 use move_core_types::{
+    ability::{Ability, AbilitySet},
     language_storage::{StructTag, TypeTag},
     u256::U256,
 };

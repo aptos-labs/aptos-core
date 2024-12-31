@@ -9,11 +9,12 @@ use aptos_types::{
     transaction::{ExecutionStatus, Script, TransactionStatus},
 };
 use move_binary_format::file_format::{
-    empty_script, Ability, AbilitySet, AddressIdentifierIndex, Bytecode, FunctionHandle,
-    FunctionHandleIndex, FunctionInstantiation, FunctionInstantiationIndex, IdentifierIndex,
-    ModuleHandle, ModuleHandleIndex, Signature, SignatureIndex, SignatureToken,
+    empty_script, AddressIdentifierIndex, Bytecode, FunctionHandle, FunctionHandleIndex,
+    FunctionInstantiation, FunctionInstantiationIndex, IdentifierIndex, ModuleHandle,
+    ModuleHandleIndex, Signature, SignatureIndex, SignatureToken,
 };
 use move_core_types::{
+    ability::{Ability, AbilitySet},
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
     vm_status::{StatusCode, StatusCode::LINKER_ERROR},

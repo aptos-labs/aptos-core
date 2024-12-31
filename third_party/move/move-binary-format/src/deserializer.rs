@@ -4,7 +4,12 @@
 
 use crate::{check_bounds::BoundsChecker, errors::*, file_format::*, file_format_common::*};
 use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, metadata::Metadata, state::VMState,
+    ability::{Ability, AbilitySet},
+    account_address::AccountAddress,
+    function::ClosureMask,
+    identifier::Identifier,
+    metadata::Metadata,
+    state::VMState,
     vm_status::StatusCode,
 };
 use serde::Serialize;
