@@ -56,6 +56,16 @@ module std::fixed_point32 {
         (val * multiplier.value) >> 32
     }
 
+    public fun multiply_u64_return_fixpoint32(val: u64, multiplier: FixedPoint32): FixedPoint32 {
+        // The product of two 64 bit values has 128 bits, so perform the
+        // multiplication with u128 types and keep the full 128 bit product
+        // to avoid losing accuracy.
+        let unscaled_product = (val as u128) * (multiplier.value as u128);
+        // Check whether the value is too large.
+        assert!(unscaled_product <= MAX_U64, EMULTIPLICATION);
+        create_from_raw_value((unscaled_product as u64))
+    }
+
     /// Divide a u64 integer by a fixed-point number, truncating any
     /// fractional part of the quotient. This will abort if the divisor
     /// is zero or if the quotient overflows.

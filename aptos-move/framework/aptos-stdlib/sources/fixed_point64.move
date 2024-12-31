@@ -85,6 +85,17 @@ module aptos_std::fixed_point64 {
         (val * multiplier.value) >> 64
     }
 
+    public fun multiply_u128_return_fixpoint64(val: u128, multiplier: FixedPoint64): FixedPoint64 {
+        // The product of two 128 bit values has 256 bits, so perform the
+        // multiplication with u256 types and keep the full 256 bit product
+        // to avoid losing accuracy.
+        let unscaled_product = (val as u256) * (multiplier.value as u256);
+        // Check whether the value is too large.
+        assert!(unscaled_product <= MAX_U128, EMULTIPLICATION);
+        create_from_raw_value((unscaled_product as u128))
+    }
+
+
     /// Divide a u128 integer by a fixed-point number, truncating any
     /// fractional part of the quotient. This will abort if the divisor
     /// is zero or if the quotient overflows.
