@@ -4,15 +4,15 @@
 
 use crate::{
     file_format::{
-        AbilitySet, AccessSpecifier, Bytecode, CodeOffset, CodeUnit, ConstantPoolIndex,
-        FieldHandle, FieldHandleIndex, FieldInstantiation, FieldInstantiationIndex,
-        FunctionDefinition, FunctionHandle, FunctionHandleIndex, FunctionInstantiation,
-        FunctionInstantiationIndex, IdentifierIndex, LocalIndex, ModuleHandleIndex, Signature,
-        SignatureIndex, SignatureToken, StructDefInstantiation, StructDefInstantiationIndex,
-        StructDefinition, StructDefinitionIndex, StructFieldInformation, StructHandle,
-        StructVariantHandle, StructVariantHandleIndex, StructVariantInstantiation,
-        StructVariantInstantiationIndex, TableIndex, VariantFieldHandle, VariantFieldHandleIndex,
-        VariantFieldInstantiation, VariantFieldInstantiationIndex, VariantIndex, Visibility,
+        AccessSpecifier, Bytecode, CodeOffset, CodeUnit, ConstantPoolIndex, FieldHandle,
+        FieldHandleIndex, FieldInstantiation, FieldInstantiationIndex, FunctionDefinition,
+        FunctionHandle, FunctionHandleIndex, FunctionInstantiation, FunctionInstantiationIndex,
+        IdentifierIndex, LocalIndex, ModuleHandleIndex, Signature, SignatureIndex, SignatureToken,
+        StructDefInstantiation, StructDefInstantiationIndex, StructDefinition,
+        StructDefinitionIndex, StructFieldInformation, StructHandle, StructVariantHandle,
+        StructVariantHandleIndex, StructVariantInstantiation, StructVariantInstantiationIndex,
+        TableIndex, VariantFieldHandle, VariantFieldHandleIndex, VariantFieldInstantiation,
+        VariantFieldInstantiationIndex, VariantIndex, Visibility,
     },
     internals::ModuleIndex,
     proptest_types::{
@@ -21,7 +21,7 @@ use crate::{
         TableSize,
     },
 };
-use move_core_types::u256::U256;
+use move_core_types::{ability::AbilitySet, u256::U256};
 use proptest::{
     collection::{vec, SizeRange},
     option::of,

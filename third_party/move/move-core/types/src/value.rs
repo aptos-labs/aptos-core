@@ -2,6 +2,11 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+// The below is to deal with a strange problem with derive(Dearbitrary), which creates warnings
+// of unused variables in derived code which cannot be turned off by applying the attribute
+// just at the type in question. (Here, MoveStructLayout.)
+#![allow(unused_variables)]
+
 use crate::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -133,7 +138,10 @@ pub enum MoveValue {
 
 /// A layout associated with a named field
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
 pub struct MoveFieldLayout {
     pub name: Identifier,
     pub layout: MoveTypeLayout,
@@ -146,14 +154,20 @@ impl MoveFieldLayout {
 }
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
 pub struct MoveVariantLayout {
     pub name: Identifier,
     pub fields: Vec<MoveFieldLayout>,
 }
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
 pub enum MoveStructLayout {
     /// The representation used by the MoveVM for plain structs
     Runtime(Vec<MoveTypeLayout>),
@@ -173,7 +187,10 @@ pub enum MoveStructLayout {
 
 /// Used to distinguish between aggregators ans snapshots.
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
 pub enum IdentifierMappingKind {
     Aggregator,
     Snapshot,
@@ -181,7 +198,11 @@ pub enum IdentifierMappingKind {
 }
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary),
+    derive(dearbitrary::Dearbitrary)
+)]
 pub enum MoveTypeLayout {
     #[serde(rename(serialize = "bool", deserialize = "bool"))]
     Bool,

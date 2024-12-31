@@ -7,12 +7,15 @@ use anyhow::{anyhow, Result};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
-        Ability, AbilitySet, CompiledModule, FunctionDefinition, ModuleHandle, SignatureToken,
-        StructDefinition, StructFieldInformation, StructHandleIndex, StructTypeParameter,
-        TypeParameterIndex, Visibility,
+        CompiledModule, FunctionDefinition, ModuleHandle, SignatureToken, StructDefinition,
+        StructFieldInformation, StructHandleIndex, StructTypeParameter, TypeParameterIndex,
+        Visibility,
     },
 };
-use move_core_types::language_storage::ModuleId;
+use move_core_types::{
+    ability::{Ability, AbilitySet},
+    language_storage::ModuleId,
+};
 use std::{collections::BTreeMap, fs};
 
 pub const NATIVE_INTERFACE: &str = "native_interface";

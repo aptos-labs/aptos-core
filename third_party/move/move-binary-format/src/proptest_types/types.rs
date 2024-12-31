@@ -4,9 +4,9 @@
 
 use crate::{
     file_format::{
-        AbilitySet, FieldDefinition, IdentifierIndex, ModuleHandleIndex, SignatureToken,
-        StructDefinition, StructFieldInformation, StructHandle, StructHandleIndex,
-        StructTypeParameter, TableIndex, TypeSignature, VariantDefinition,
+        FieldDefinition, IdentifierIndex, ModuleHandleIndex, SignatureToken, StructDefinition,
+        StructFieldInformation, StructHandle, StructHandleIndex, StructTypeParameter, TableIndex,
+        TypeSignature, VariantDefinition,
     },
     internals::ModuleIndex,
     proptest_types::{
@@ -14,6 +14,7 @@ use crate::{
         signature::{AbilitySetGen, SignatureTokenGen},
     },
 };
+use move_core_types::ability::AbilitySet;
 use proptest::{
     collection::{vec, SizeRange},
     option,

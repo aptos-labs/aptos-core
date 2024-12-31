@@ -9,13 +9,13 @@ use itertools::Itertools;
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        Ability, AbilitySet, SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex,
-        VariantIndex,
+        SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex, VariantIndex,
     },
 };
 #[cfg(test)]
 use move_core_types::account_address::AccountAddress;
 use move_core_types::{
+    ability::{Ability, AbilitySet},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
@@ -622,6 +622,10 @@ impl Type {
                 AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
                     ty.abilities()?
                 ])
+                .map_err(|e| {
+                    PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION)
+                        .with_message(e.to_string())
+                })
             },
             Type::Struct { ability, .. } => Ok(ability.base_ability_set),
             Type::StructInstantiation {
@@ -642,6 +646,10 @@ impl Type {
                     phantom_ty_args_mask.iter(),
                     type_argument_abilities,
                 )
+                .map_err(|e| {
+                    PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION)
+                        .with_message(e.to_string())
+                })
             },
         }
     }

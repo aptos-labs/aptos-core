@@ -45,7 +45,7 @@ use codespan_reporting::{
 use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
-pub use move_binary_format::file_format::{AbilitySet, Visibility};
+pub use move_binary_format::file_format::Visibility;
 #[allow(deprecated)]
 use move_binary_format::normalized::Type as MType;
 use move_binary_format::{
@@ -64,6 +64,7 @@ use move_command_line_common::{
     address::NumericalAddress, env::read_bool_env_var, files::FileHash,
 };
 use move_compiler::command_line as cli;
+pub use move_core_types::ability::AbilitySet;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
