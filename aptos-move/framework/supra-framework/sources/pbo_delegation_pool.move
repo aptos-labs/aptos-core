@@ -762,7 +762,7 @@ module supra_framework::pbo_delegation_pool {
     }
     /// Pre-condition: `cumulative_unlocked_fraction` should be zero, which would indicate that even
     /// though there are principle stake holders, none of those have yet called `unlock` on the pool
-    /// thus it may be ``safe'' to change the schedule
+    /// thus it is ``safe'' to change the schedule
     /// This is a temporary measure to allow Supra Foundation to change the schedule for those pools
     /// there were initialized with ``dummy/default'' schedule. This method should be disabled
     /// before external validator might be allowed to join  the validator set
