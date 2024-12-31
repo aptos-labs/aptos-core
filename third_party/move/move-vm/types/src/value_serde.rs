@@ -4,7 +4,10 @@
 use crate::{
     delayed_values::delayed_field_id::DelayedFieldID,
     loaded_data::runtime_types::Type,
-    values::{DeserializationSeed, SerializationReadyValue, Value},
+    values::{
+        AbstractFunction, DeserializationSeed, SerializationReadyValue, SerializedFunctionData,
+        Value,
+    },
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
@@ -15,7 +18,7 @@ use move_core_types::{
 };
 use std::cell::RefCell;
 
-/// An extension to (de)serializer to lookup information about function values.
+/// An extension to (de)serialize information about function values.
 pub trait FunctionValueExtension {
     /// Given the module's id and the function name, returns the parameter types of the
     /// corresponding function, instantiated with the provided set of type tags.
@@ -25,6 +28,18 @@ pub trait FunctionValueExtension {
         function_name: &IdentStr,
         ty_arg_tags: Vec<TypeTag>,
     ) -> PartialVMResult<Vec<Type>>;
+
+    /// Create an implementation of an `AbstractFunction` from the serialization data.
+    fn create_from_serialization_data(
+        &self,
+        data: SerializedFunctionData,
+    ) -> PartialVMResult<Box<dyn AbstractFunction>>;
+
+    /// Get serialization data from an `AbstractFunction`.
+    fn get_serialization_data(
+        &self,
+        fun: &dyn AbstractFunction,
+    ) -> PartialVMResult<SerializedFunctionData>;
 }
 
 /// An extension to (de)serializer to lookup information about delayed fields.
@@ -90,6 +105,14 @@ impl<'a> ValueSerDeContext<'a> {
     ) -> Self {
         self.function_extension = Some(function_extension);
         self
+    }
+
+    pub fn required_function_extension(&self) -> PartialVMResult<&dyn FunctionValueExtension> {
+        self.function_extension.ok_or_else(|| {
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                "require function extension context for serialization of closures".to_string(),
+            )
+        })
     }
 
     /// Returns the same extension but without allowing the delayed fields.

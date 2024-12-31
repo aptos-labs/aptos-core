@@ -9,6 +9,7 @@ use crate::{
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
+    function::MoveFunctionLayout,
     language_storage::StructTag,
     value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
@@ -156,6 +157,32 @@ pub(crate) trait LayoutConverterBase {
             Type::StructInstantiation { idx, ty_args, .. } => {
                 *count += 1;
                 self.struct_name_to_type_layout(*idx, ty_args, count, depth + 1)?
+            },
+            Type::Function {
+                args,
+                results,
+                abilities,
+            } => {
+                let mut identifier_mapping = false;
+                let mut to_list = |rcs: &[triomphe::Arc<Type>]| {
+                    rcs.iter()
+                        .map(|rc| {
+                            self.type_to_type_layout_impl(rc.as_ref(), count, depth + 1)
+                                .map(|(l, has)| {
+                                    identifier_mapping |= has;
+                                    l
+                                })
+                        })
+                        .collect::<PartialVMResult<Vec<_>>>()
+                };
+                (
+                    MoveTypeLayout::Function(MoveFunctionLayout(
+                        to_list(args)?,
+                        to_list(results)?,
+                        *abilities,
+                    )),
+                    identifier_mapping,
+                )
             },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
@@ -306,6 +333,24 @@ pub(crate) trait LayoutConverterBase {
             },
             Type::StructInstantiation { idx, ty_args, .. } => {
                 self.struct_name_to_fully_annotated_layout(*idx, ty_args, count, depth + 1)?
+            },
+            Type::Function {
+                args,
+                results,
+                abilities,
+            } => {
+                let mut to_list = |rcs: &[triomphe::Arc<Type>]| {
+                    rcs.iter()
+                        .map(|rc| {
+                            self.type_to_fully_annotated_layout_impl(rc.as_ref(), count, depth + 1)
+                        })
+                        .collect::<PartialVMResult<Vec<_>>>()
+                };
+                MoveTypeLayout::Function(MoveFunctionLayout(
+                    to_list(args)?,
+                    to_list(results)?,
+                    *abilities,
+                ))
             },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
