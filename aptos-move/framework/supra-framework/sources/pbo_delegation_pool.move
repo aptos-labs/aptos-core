@@ -765,7 +765,7 @@ module supra_framework::pbo_delegation_pool {
     /// thus it is ``safe'' to change the schedule
     /// This is a temporary measure to allow Supra Foundation to change the schedule for those pools
     /// there were initialized with ``dummy/default'' schedule. This method must be disabled
-    /// before external validator might be allowed to join  the validator set
+    /// before external validators are allowed to join the validator set.
     public entry fun update_unlocking_schedule (multisig_admin: &signer, 
             pool_address: address, unlock_numerators : vector<u64>, unlock_denominator : u64, unlock_start_time: u64,
             unlock_duration: u64) acquires DelegationPool {
