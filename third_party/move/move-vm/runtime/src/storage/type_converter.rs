@@ -12,7 +12,8 @@ use crate::{
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
-    language_storage::{StructTag, TypeTag},
+    function::MoveFunctionLayout,
+    language_storage::{FunctionTag, StructTag, TypeTag},
     value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
@@ -23,7 +24,7 @@ use std::sync::Arc;
 #[allow(private_bounds)]
 pub trait TypeConverter: TypeConverterBase {
     /// Converts a runtime type to a type layout.
-    fn type_to_type_layout(&mut self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
+    fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
         let mut count = 0;
         self.type_to_type_layout_impl(ty, &mut count, 1)
             .map(|(l, _)| l)
@@ -141,6 +142,32 @@ pub(crate) trait TypeConverterBase {
             Type::StructInstantiation { idx, ty_args, .. } => {
                 *count += 1;
                 self.struct_name_to_type_layout(*idx, ty_args, count, depth + 1)?
+            },
+            Type::Function {
+                args,
+                results,
+                abilities,
+            } => {
+                let mut identifier_mapping = false;
+                let mut to_list = |rcs: &[triomphe::Arc<Type>]| {
+                    rcs.iter()
+                        .map(|rc| {
+                            self.type_to_type_layout_impl(rc.as_ref(), count, depth + 1)
+                                .map(|(l, has)| {
+                                    identifier_mapping |= has;
+                                    l
+                                })
+                        })
+                        .collect::<PartialVMResult<Vec<_>>>()
+                };
+                (
+                    MoveTypeLayout::Function(MoveFunctionLayout(
+                        to_list(args)?,
+                        to_list(results)?,
+                        *abilities,
+                    )),
+                    identifier_mapping,
+                )
             },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
@@ -309,6 +336,24 @@ pub(crate) trait TypeConverterBase {
             Type::StructInstantiation { idx, ty_args, .. } => {
                 self.struct_name_to_fully_annotated_layout(*idx, ty_args, count, depth + 1)?
             },
+            Type::Function {
+                args,
+                results,
+                abilities,
+            } => {
+                let mut to_list = |rcs: &[triomphe::Arc<Type>]| {
+                    rcs.iter()
+                        .map(|rc| {
+                            self.type_to_fully_annotated_layout_impl(rc.as_ref(), count, depth + 1)
+                        })
+                        .collect::<PartialVMResult<Vec<_>>>()
+                };
+                MoveTypeLayout::Function(MoveFunctionLayout(
+                    to_list(args)?,
+                    to_list(results)?,
+                    *abilities,
+                ))
+            },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -409,6 +454,22 @@ pub(crate) trait TypeConverterBase {
             Type::StructInstantiation { idx, ty_args, .. } => TypeTag::Struct(Box::new(
                 self.struct_name_to_type_tag(*idx, ty_args, gas_context)?,
             )),
+            Type::Function {
+                args,
+                results,
+                abilities,
+            } => {
+                let mut to_list = |rcs: &[triomphe::Arc<Type>]| {
+                    rcs.iter()
+                        .map(|rc| self.type_to_type_tag_impl(rc.as_ref(), gas_context))
+                        .collect::<PartialVMResult<Vec<_>>>()
+                };
+                TypeTag::Function(Box::new(FunctionTag {
+                    args: to_list(args)?,
+                    results: to_list(results)?,
+                    abilities: *abilities,
+                }))
+            },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)

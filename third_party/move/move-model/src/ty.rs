@@ -24,7 +24,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     ability::{Ability, AbilitySet},
-    language_storage::{StructTag, TypeTag},
+    language_storage::{FunctionTag, StructTag, TypeTag},
     u256::U256,
 };
 use num::BigInt;
@@ -1333,6 +1333,21 @@ impl Type {
                 Struct(qid.module_id, qid.id, type_args)
             },
             TypeTag::Vector(type_param) => Vector(Box::new(Self::from_type_tag(type_param, env))),
+            TypeTag::Function(fun) => {
+                let FunctionTag {
+                    args,
+                    results,
+                    abilities,
+                } = fun.as_ref();
+                let from_vec = |ts: &[TypeTag]| {
+                    Type::tuple(ts.iter().map(|t| Type::from_type_tag(t, env)).collect_vec())
+                };
+                Fun(
+                    Box::new(from_vec(args)),
+                    Box::new(from_vec(results)),
+                    *abilities,
+                )
+            },
         }
     }
 

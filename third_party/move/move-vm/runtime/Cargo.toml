@@ -12,6 +12,7 @@ edition = "2021"
 
 [dependencies]
 ambassador = { workspace = true }
+anyhow = { workspace = true }
 better_any = { workspace = true }
 bytes = { workspace = true }
 claims = { workspace = true }
@@ -37,7 +38,7 @@ hex = { workspace = true }
 move-binary-format = { workspace = true, features = ["fuzzing"] }
 move-compiler = { workspace = true }
 move-ir-compiler = { workspace = true }
-move-vm-test-utils ={ workspace = true }
+move-vm-test-utils = { workspace = true }
 proptest = { workspace = true }
 
 [features]

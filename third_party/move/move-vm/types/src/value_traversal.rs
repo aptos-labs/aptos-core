@@ -3,7 +3,7 @@
 
 use crate::{
     delayed_values::error::code_invariant_error,
-    values::{Container, Value, ValueImpl},
+    values::{Closure, Container, Value, ValueImpl},
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::StatusCode;
@@ -54,6 +54,12 @@ fn find_identifiers_in_value_impl(
                     find_identifiers_in_value_impl(val, identifiers)?;
                 }
             },
+        },
+
+        ValueImpl::ClosureValue(Closure(_, captured)) => {
+            for val in captured.iter() {
+                find_identifiers_in_value_impl(val, identifiers)?;
+            }
         },
 
         ValueImpl::Invalid | ValueImpl::ContainerRef(_) | ValueImpl::IndexedRef(_) => {
