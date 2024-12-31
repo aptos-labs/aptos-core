@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    ability::AbilitySet,
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     parser::{parse_module_id, parse_struct_tag, parse_type_tag},
@@ -67,6 +68,15 @@ pub enum TypeTag {
     U32,
     #[serde(rename = "u256", alias = "U256")]
     U256,
+
+    // NOTE: added in bytecode version v8
+    Function(
+        #[serde(
+            serialize_with = "safe_serialize::type_tag_recursive_serialize",
+            deserialize_with = "safe_serialize::type_tag_recursive_deserialize"
+        )]
+        Box<FunctionTag>,
+    ),
 }
 
 impl TypeTag {
@@ -82,6 +92,7 @@ impl TypeTag {
     /// to change and should not be used inside stable code.
     pub fn to_canonical_string(&self) -> String {
         use TypeTag::*;
+
         match self {
             Bool => "bool".to_owned(),
             U8 => "u8".to_owned(),
@@ -94,6 +105,25 @@ impl TypeTag {
             Signer => "signer".to_owned(),
             Vector(t) => format!("vector<{}>", t.to_canonical_string()),
             Struct(s) => s.to_canonical_string(),
+            Function(f) => {
+                let fmt_list = |l: &[TypeTag]| -> String {
+                    l.iter()
+                        .map(|t| t.to_canonical_string())
+                        .collect::<Vec<_>>()
+                        .join(",")
+                };
+                let FunctionTag {
+                    args,
+                    results,
+                    abilities,
+                } = f.as_ref();
+                format!(
+                    "|{}|{}{}",
+                    fmt_list(args),
+                    fmt_list(results),
+                    abilities.display_postfix()
+                )
+            },
         }
     }
 
@@ -101,7 +131,8 @@ impl TypeTag {
         use TypeTag::*;
         match self {
             Struct(struct_tag) => Some(struct_tag.as_ref()),
-            Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | Vector(_) => None,
+            Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | Vector(_)
+            | Function(_) => None,
         }
     }
 
@@ -126,6 +157,11 @@ impl<'a> Iterator for TypeTagPreorderTraversalIter<'a> {
                     Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 => (),
                     Vector(ty) => self.stack.push(ty),
                     Struct(struct_tag) => self.stack.extend(struct_tag.type_args.iter().rev()),
+                    Function(fun_tag) => {
+                        let FunctionTag { args, results, .. } = fun_tag.as_ref();
+                        self.stack
+                            .extend(results.iter().rev().chain(args.iter().rev()))
+                    },
                 }
                 Some(ty)
             },
@@ -227,6 +263,19 @@ impl FromStr for StructTag {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         parse_struct_tag(s)
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+#[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
+pub struct FunctionTag {
+    pub args: Vec<TypeTag>,
+    pub results: Vec<TypeTag>,
+    pub abilities: AbilitySet,
 }
 
 /// Represents the initial key into global storage where we first index by the address, and then
@@ -356,6 +405,7 @@ impl Display for TypeTag {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
             TypeTag::Struct(s) => write!(f, "{}", s),
+            TypeTag::Function(_) => write!(f, "{}", self.to_canonical_string()),
             TypeTag::Vector(ty) => write!(f, "vector<{}>", ty),
             TypeTag::U8 => write!(f, "u8"),
             TypeTag::U16 => write!(f, "u16"),
@@ -367,6 +417,12 @@ impl Display for TypeTag {
             TypeTag::Signer => write!(f, "signer"),
             TypeTag::Bool => write!(f, "bool"),
         }
+    }
+}
+
+impl Display for FunctionTag {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        TypeTag::Function(Box::new(self.clone())).fmt(f)
     }
 }
 

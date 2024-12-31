@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    loader::{Function, Module},
+    loader::{Function, LazyLoadedFunction, LazyLoadedFunctionState, Module},
     logging::expect_no_verification_errors,
-    WithRuntimeEnvironment,
+    LayoutConverter, StorageLayoutConverter, WithRuntimeEnvironment,
 };
 use ambassador::delegatable_trait;
 use bytes::Bytes;
@@ -26,6 +26,7 @@ use move_vm_types::{
     loaded_data::runtime_types::{StructType, Type},
     module_cyclic_dependency_error, module_linker_error,
     value_serde::FunctionValueExtension,
+    values::{AbstractFunction, SerializedFunctionData},
 };
 use std::sync::Arc;
 
@@ -447,5 +448,59 @@ impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
                 ty_builder.create_ty_with_subst(ty_to_substitute, &substitution_ty_args)
             })
             .collect::<PartialVMResult<Vec<_>>>()
+    }
+
+    fn create_from_serialization_data(
+        &self,
+        data: SerializedFunctionData,
+    ) -> PartialVMResult<Box<dyn AbstractFunction>> {
+        Ok(Box::new(LazyLoadedFunction::new_unresolved(data)))
+    }
+
+    fn get_serialization_data(
+        &self,
+        fun: &dyn AbstractFunction,
+    ) -> PartialVMResult<SerializedFunctionData> {
+        match &*LazyLoadedFunction::expect_this_impl(fun)?.0.borrow() {
+            LazyLoadedFunctionState::Unresolved { data, .. } => Ok(data.clone()),
+            LazyLoadedFunctionState::Resolved {
+                fun,
+                mask,
+                fun_inst,
+            } => {
+                let ty_converter = StorageLayoutConverter::new(self.module_storage);
+                let ty_builder = &self
+                    .module_storage
+                    .runtime_environment()
+                    .vm_config()
+                    .ty_builder;
+                let instantiate = |ty: &Type| -> PartialVMResult<Type> {
+                    if fun.ty_args.is_empty() {
+                        Ok(ty.clone())
+                    } else {
+                        ty_builder.create_ty_with_subst(ty, &fun.ty_args)
+                    }
+                };
+                let captured_layouts = mask
+                    .extract(fun.param_tys(), true)
+                    .into_iter()
+                    .map(|t| ty_converter.type_to_type_layout(&instantiate(t)?))
+                    .collect::<PartialVMResult<Vec<_>>>()?;
+                Ok(SerializedFunctionData {
+                    module_id: fun
+                        .module_id()
+                        .ok_or_else(|| {
+                            PartialVMError::new_invariant_violation(
+                                "attempt to serialize a script function",
+                            )
+                        })?
+                        .clone(),
+                    fun_id: fun.function.name.clone(),
+                    fun_inst: fun_inst.clone(),
+                    mask: *mask,
+                    captured_layouts,
+                })
+            },
+        }
     }
 }
