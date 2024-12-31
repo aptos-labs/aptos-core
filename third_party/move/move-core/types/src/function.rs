@@ -1,7 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use serde::{Deserialize, Serialize};
+use crate::{
+    ability::AbilitySet,
+    identifier::Identifier,
+    language_storage::{FunctionTag, ModuleId, TypeTag},
+    value::{MoveTypeLayout, MoveValue},
+};
+use serde::{de::Error, ser::SerializeSeq, Deserialize, Serialize};
 use std::fmt;
 
 /// A `ClosureMask` is a value which determines how to distinguish those function arguments
@@ -103,6 +109,19 @@ impl ClosureMask {
         i
     }
 
+    /// Return the # of captured arguments in the mask
+    pub fn captured_count(&self) -> u16 {
+        let mut i = 0;
+        let mut mask = self.0;
+        while mask != 0 {
+            if mask & 0x1 != 0 {
+                i += 1
+            }
+            mask >>= 1;
+        }
+        i
+    }
+
     pub fn merge_placeholder_strings(
         &self,
         arity: usize,
@@ -112,5 +131,180 @@ impl ClosureMask {
             .map(|_| "_".to_string())
             .collect::<Vec<_>>();
         self.compose(captured, provided)
+    }
+}
+
+/// Function type layout, with arguments and result types.
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
+pub struct MoveFunctionLayout(
+    pub Vec<MoveTypeLayout>,
+    pub Vec<MoveTypeLayout>,
+    pub AbilitySet,
+);
+
+/// A closure (function value). The closure stores the name of the function and it's
+/// type instantiation, as well as the closure mask and the captured values together
+/// with their layout. The latter allows to deserialize closures context free (without
+/// needing to lookup information about the function and its dependencies).
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
+pub struct MoveClosure {
+    pub module_id: ModuleId,
+    pub fun_id: Identifier,
+    pub ty_args: Vec<TypeTag>,
+    pub mask: ClosureMask,
+    pub captured: Vec<(MoveTypeLayout, MoveValue)>,
+}
+
+#[allow(unused)] // Currently, we do not use the expected function layout
+pub(crate) struct ClosureVisitor<'a>(pub(crate) &'a MoveFunctionLayout);
+
+impl<'d, 'a> serde::de::Visitor<'d> for ClosureVisitor<'a> {
+    type Value = MoveClosure;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("Closure")
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::SeqAccess<'d>,
+    {
+        let module_id = read_required_value::<_, ModuleId>(&mut seq)?;
+        let fun_id = read_required_value::<_, Identifier>(&mut seq)?;
+        let ty_args = read_required_value::<_, Vec<TypeTag>>(&mut seq)?;
+        let mask = read_required_value::<_, ClosureMask>(&mut seq)?;
+        let mut captured = vec![];
+        for _ in 0..mask.captured_count() {
+            let layout = read_required_value::<_, MoveTypeLayout>(&mut seq)?;
+            match seq.next_element_seed(&layout)? {
+                Some(v) => captured.push((layout, v)),
+                None => return Err(A::Error::invalid_length(captured.len(), &self)),
+            }
+        }
+        // If the sequence length is known, check whether there are no extra values
+        if matches!(seq.size_hint(), Some(remaining) if remaining != 0) {
+            return Err(A::Error::invalid_length(captured.len(), &self));
+        }
+        Ok(MoveClosure {
+            module_id,
+            fun_id,
+            ty_args,
+            mask,
+            captured,
+        })
+    }
+}
+
+fn read_required_value<'a, A, T>(seq: &mut A) -> Result<T, A::Error>
+where
+    A: serde::de::SeqAccess<'a>,
+    T: serde::de::Deserialize<'a>,
+{
+    match seq.next_element::<T>()? {
+        Some(x) => Ok(x),
+        None => Err(A::Error::custom("expected more elements")),
+    }
+}
+
+impl serde::Serialize for MoveClosure {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let MoveClosure {
+            module_id,
+            fun_id,
+            ty_args,
+            mask,
+            captured,
+        } = self;
+        let mut s = serializer.serialize_seq(Some(4 + captured.len()))?;
+        s.serialize_element(module_id)?;
+        s.serialize_element(fun_id)?;
+        s.serialize_element(ty_args)?;
+        s.serialize_element(mask)?;
+        for (l, v) in captured {
+            s.serialize_element(l)?;
+            s.serialize_element(v)?;
+        }
+        s.end()
+    }
+}
+
+impl fmt::Display for MoveFunctionLayout {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
+        let fmt_list = |l: &[MoveTypeLayout]| {
+            l.iter()
+                .map(|t| t.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        let MoveFunctionLayout(args, results, abilities) = self;
+        write!(
+            f,
+            "|{}|{}{}",
+            fmt_list(args),
+            fmt_list(results),
+            abilities.display_postfix()
+        )
+    }
+}
+
+impl TryInto<FunctionTag> for &MoveFunctionLayout {
+    type Error = anyhow::Error;
+
+    fn try_into(self) -> Result<FunctionTag, Self::Error> {
+        let into_list = |ts: &[MoveTypeLayout]| {
+            ts.iter()
+                .map(|t| t.try_into())
+                .collect::<Result<Vec<TypeTag>, _>>()
+        };
+        Ok(FunctionTag {
+            args: into_list(&self.0)?,
+            results: into_list(&self.1)?,
+            abilities: self.2,
+        })
+    }
+}
+
+impl fmt::Display for MoveClosure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let MoveClosure {
+            module_id,
+            fun_id,
+            ty_args,
+            mask,
+            captured,
+        } = self;
+        let captured_str = mask
+            .merge_placeholder_strings(
+                mask.max_captured() + 1,
+                captured.iter().map(|v| v.1.to_string()).collect(),
+            )
+            .unwrap_or_else(|| vec!["*invalid*".to_string()])
+            .join(",");
+        let inst_str = if ty_args.is_empty() {
+            "".to_string()
+        } else {
+            format!(
+                "<{}>",
+                ty_args
+                    .iter()
+                    .map(|t| t.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            )
+        };
+        write!(
+            f,
+            // this will print `a::m::f<T>(a1,_,a2,_)`
+            "{}::{}{}({})",
+            module_id, fun_id, inst_str, captured_str
+        )
     }
 }

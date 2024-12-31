@@ -12005,6 +12005,7 @@ version = "0.1.0"
 dependencies = [
  "ambassador",
  "bcs 0.1.4",
+ "better_any",
  "bytes",
  "claims",
  "crossbeam",

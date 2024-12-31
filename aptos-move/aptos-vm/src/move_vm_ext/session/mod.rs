@@ -127,6 +127,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         module_storage: &impl ModuleStorage,
     ) -> VMResult<(VMChangeSet, ModuleWriteSet)> {
         let move_vm = self.inner.get_move_vm();
+
         let function_extension = module_storage.as_function_value_extension();
 
         let resource_converter = |value: Value,

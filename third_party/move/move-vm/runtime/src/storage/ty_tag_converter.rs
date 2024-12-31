@@ -5,7 +5,7 @@ use crate::{loader::PseudoGasContext, RuntimeEnvironment};
 use hashbrown::{hash_map::Entry, HashMap};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
-    language_storage::{StructTag, TypeTag},
+    language_storage::{FunctionTag, StructTag, TypeTag},
     vm_status::StatusCode,
 };
 use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndex};
@@ -238,6 +238,26 @@ impl<'a> TypeTagConverter<'a> {
                 let struct_tag =
                     self.struct_name_idx_to_struct_tag_impl(idx, ty_args, gas_context)?;
                 TypeTag::Struct(Box::new(struct_tag))
+            },
+
+            // Functions: recurse
+            Type::Function {
+                args,
+                results,
+                abilities,
+            } => {
+                let to_vec = |ts: &[triomphe::Arc<Type>],
+                              gas_ctx: &mut PseudoGasContext|
+                 -> PartialVMResult<Vec<TypeTag>> {
+                    ts.iter()
+                        .map(|t| self.ty_to_ty_tag_impl(t, gas_ctx))
+                        .collect()
+                };
+                TypeTag::Function(Box::new(FunctionTag {
+                    args: to_vec(args, gas_context)?,
+                    results: to_vec(results, gas_context)?,
+                    abilities: *abilities,
+                }))
             },
 
             // References and type parameters cannot be converted to tags.

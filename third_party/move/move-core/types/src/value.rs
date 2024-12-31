@@ -9,6 +9,7 @@
 
 use crate::{
     account_address::AccountAddress,
+    function::{ClosureVisitor, MoveClosure, MoveFunctionLayout},
     ident_str,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
@@ -135,6 +136,8 @@ pub enum MoveValue {
     U16(u16),
     U32(u32),
     U256(u256::U256),
+    // Added in bytecode version v8
+    Closure(Box<MoveClosure>),
 }
 
 /// A layout associated with a named field
@@ -263,6 +266,10 @@ pub enum MoveTypeLayout {
     // TODO[agg_v2](?): Do we need a layout here if we have custom serde
     //                  implementations available?
     Native(IdentifierMappingKind, Box<MoveTypeLayout>),
+
+    // Added in bytecode version v8
+    #[serde(rename(serialize = "fun", deserialize = "fun"))]
+    Function(MoveFunctionLayout),
 }
 
 impl MoveValue {
@@ -272,6 +279,10 @@ impl MoveValue {
 
     pub fn simple_serialize(&self) -> Option<Vec<u8>> {
         bcs::to_bytes(self).ok()
+    }
+
+    pub fn closure(c: MoveClosure) -> MoveValue {
+        Self::Closure(Box::new(c))
     }
 
     pub fn vector_u8(v: Vec<u8>) -> Self {
@@ -556,6 +567,9 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
             },
             MoveTypeLayout::Signer => Err(D::Error::custom("cannot deserialize signer")),
             MoveTypeLayout::Struct(ty) => Ok(MoveValue::Struct(ty.deserialize(deserializer)?)),
+            MoveTypeLayout::Function(fun) => Ok(MoveValue::Closure(Box::new(
+                deserializer.deserialize_seq(ClosureVisitor(fun))?,
+            ))),
             MoveTypeLayout::Vector(layout) => Ok(MoveValue::Vector(
                 deserializer.deserialize_seq(VectorElementVisitor(layout))?,
             )),
@@ -750,6 +764,7 @@ impl serde::Serialize for MoveValue {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             MoveValue::Struct(s) => s.serialize(serializer),
+            MoveValue::Closure(c) => c.serialize(serializer),
             MoveValue::Bool(b) => serializer.serialize_bool(*b),
             MoveValue::U8(i) => serializer.serialize_u8(*i),
             MoveValue::U16(i) => serializer.serialize_u16(*i),
@@ -877,6 +892,7 @@ impl fmt::Display for MoveTypeLayout {
             Address => write!(f, "address"),
             Vector(typ) => write!(f, "vector<{}>", typ),
             Struct(s) => fmt::Display::fmt(s, f),
+            Function(fun) => fmt::Display::fmt(fun, f),
             Signer => write!(f, "signer"),
             // TODO[agg_v2](cleanup): consider printing the tag as well.
             Native(_, typ) => write!(f, "native<{}>", typ),
@@ -944,6 +960,7 @@ impl TryInto<TypeTag> for &MoveTypeLayout {
             MoveTypeLayout::Signer => TypeTag::Signer,
             MoveTypeLayout::Vector(v) => TypeTag::Vector(Box::new(v.as_ref().try_into()?)),
             MoveTypeLayout::Struct(v) => TypeTag::Struct(Box::new(v.try_into()?)),
+            MoveTypeLayout::Function(f) => TypeTag::Function(Box::new(f.try_into()?)),
 
             // Native layout variant is only used by MoveVM, and is irrelevant
             // for type tags which are used to key resources in the global state.
@@ -981,6 +998,7 @@ impl fmt::Display for MoveValue {
             MoveValue::Signer(a) => write!(f, "signer({})", a.to_hex_literal()),
             MoveValue::Vector(v) => fmt_list(f, "vector[", v, "]"),
             MoveValue::Struct(s) => fmt::Display::fmt(s, f),
+            MoveValue::Closure(c) => fmt::Display::fmt(c, f),
         }
     }
 }
