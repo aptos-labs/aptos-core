@@ -9260,7 +9260,7 @@ module supra_framework::pbo_delegation_pool {
             );
         assert!(unlock_coin, 20);
     }
-    // Test that after unlock schedule change can not happen after a princile stakeholder calls
+    // Test that after unlock schedule change can not happen after a principle stakeholder calls
     // `can_principle_unlock` and the unlock fraction becomes non zero
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     #[expected_failure(abort_code = 196646, location = Self)]
