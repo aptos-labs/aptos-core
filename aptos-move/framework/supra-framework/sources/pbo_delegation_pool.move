@@ -818,6 +818,28 @@ module supra_framework::pbo_delegation_pool {
         )
 
     }
+    
+    // Create `vector<FixedPoint64>` for schedule fractions from numerators and a denominator
+    // Pre-condition: It is assumed that `validate_unlock_schedule_params` is called before this
+    // If the denominator is zero, this function would fail in `create_from_rational`
+    fun create_schedule_fractions(unlock_numerators: &vector<u64>, unlock_denominator: u64) : vector<FixedPoint64> {
+        
+    //Create unlock schedule
+        let schedule = vector::empty();
+        vector::for_each_ref(
+            unlock_numerators,
+            |e| {
+                let fraction =
+                    fixed_point64::create_from_rational(
+                        (*e as u128), (unlock_denominator as u128)
+                    );
+                vector::push_back(&mut schedule, fraction);
+            }
+        );
+        
+        schedule
+
+    }
 
     /// Pre-condition: `cumulative_unlocked_fraction` should be zero, which would indicate that even
     /// though there are principle stake holders, none of those have yet called `unlock` on the pool
@@ -852,19 +874,9 @@ module supra_framework::pbo_delegation_pool {
             unlock_duration
         );
 
-        //Create unlock schedule
-        let schedule = vector::empty();
-        vector::for_each_ref(
-            &unlock_numerators,
-            |e| {
-                let fraction =
-                    fixed_point64::create_from_rational(
-                        (*e as u128), (unlock_denominator as u128)
-                    );
-                vector::push_back(&mut schedule, fraction);
-            }
-        );
-
+        //Create unlock schedule fractions
+        let schedule = create_schedule_fractions(&unlock_numerators,unlock_denominator);
+       
         pool.principle_unlock_schedule = UnlockSchedule {
             schedule: schedule,
             start_timestamp_secs: unlock_start_time,
@@ -888,7 +900,7 @@ module supra_framework::pbo_delegation_pool {
     fun validate_unlock_schedule_params(
         unlock_numerators: &vector<u64>,
         unlock_denominator: u64,
-        unlock_start_time: u64,
+        _unlock_start_time: u64,
         unlock_duration: u64
     ) {
         //Unlock duration can not be zero
@@ -1022,18 +1034,8 @@ module supra_framework::pbo_delegation_pool {
         };
 
         //Create unlock schedule
-        let schedule = vector::empty();
-        vector::for_each_ref(
-            &unlock_numerators,
-            |e| {
-                let fraction =
-                    fixed_point64::create_from_rational(
-                        (*e as u128), (unlock_denominator as u128)
-                    );
-                vector::push_back(&mut schedule, fraction);
-            }
-        );
-
+        let schedule = create_schedule_fractions(&unlock_numerators,unlock_denominator);
+        
         move_to(
             &stake_pool_signer,
             DelegationPool {
@@ -9579,7 +9581,7 @@ module supra_framework::pbo_delegation_pool {
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
         end_aptos_epoch();
 
-        let (_, old_stime, old_duration, old_last_unlock, old_cfraction) =
+        let (_, old_stime, _old_duration, old_last_unlock, old_cfraction) =
             get_unlock_schedule(pool_address);
         // Assert that `get_unlock_schedule` is returning expected values
         assert!(old_stime == principle_lockup_time, old_stime);
@@ -9647,7 +9649,7 @@ module supra_framework::pbo_delegation_pool {
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
         end_aptos_epoch();
 
-        let (_, old_stime, old_duration, old_last_unlock, old_cfraction) =
+        let (_, old_stime, _old_duration, old_last_unlock, old_cfraction) =
             get_unlock_schedule(pool_address);
         // Assert that `get_unlock_schedule` is returning expected values
         assert!(old_stime == principle_lockup_time, old_stime);
@@ -9663,7 +9665,7 @@ module supra_framework::pbo_delegation_pool {
             LOCKUP_CYCLE_SECONDS
         );
         // It's acceptable to round off 9 because this coin will remain locked and won't be transferred anywhere.
-        let (_, new_stime, new_duration, new_last_unlock, new_cfraction) =
+        let (_, new_stime, _new_duration, new_last_unlock, new_cfraction) =
             get_unlock_schedule(pool_address);
         // Assert that `get_unlock_schedule` is returning expected values
         assert!(
