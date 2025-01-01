@@ -256,6 +256,8 @@ module supra_framework::pbo_delegation_pool {
     /// amount of stake available in the specified stake pool.
     const EINSUFFICIENT_STAKE_TO_LOCK: u64 = 40;
 
+    const EUNLOCKING_ALREADY_STARTED: u64 = 41;
+
     const MAX_U64: u64 = 18446744073709551615;
 
     /// Maximum operator percentage fee(of double digit precision): 22.85% is represented as 2285
@@ -432,6 +434,15 @@ module supra_framework::pbo_delegation_pool {
         operator: address,
         commission_active: u64,
         commission_pending_inactive: u64
+    }
+
+    #[event]
+    struct UnlockScheduleUpdated has drop, store {
+        pool_address: address,
+        unlock_numerators: vector<u64>,
+        unlock_denominator: u64,
+        unlock_start_time: u64,
+        unlock_duration: u64
     }
 
     #[event]
@@ -825,6 +836,136 @@ module supra_framework::pbo_delegation_pool {
         )
     }
 
+    #[view]
+    /// Return the unlock schedule of the pool as (schedule, start_time, period_duration, last_unlock_period, cumulative_unlocked_fraction)
+    public fun get_unlock_schedule(
+        pool_address: address
+    ): (vector<FixedPoint64>, u64, u64, u64, FixedPoint64) acquires DelegationPool {
+        let uschedule =
+            borrow_global<DelegationPool>(pool_address).principle_unlock_schedule;
+        (
+            uschedule.schedule,
+            uschedule.start_timestamp_secs,
+            uschedule.period_duration,
+            uschedule.last_unlock_period,
+            uschedule.cumulative_unlocked_fraction
+        )
+
+    }
+    
+    // Create `vector<FixedPoint64>` for schedule fractions from numerators and a denominator
+    // Pre-condition: It is assumed that `validate_unlock_schedule_params` is called before this
+    // If the denominator is zero, this function would fail in `create_from_rational`
+    fun create_schedule_fractions(unlock_numerators: &vector<u64>, unlock_denominator: u64) : vector<FixedPoint64> {
+        
+    //Create unlock schedule
+        let schedule = vector::empty();
+        vector::for_each_ref(
+            unlock_numerators,
+            |e| {
+                let fraction =
+                    fixed_point64::create_from_rational(
+                        (*e as u128), (unlock_denominator as u128)
+                    );
+                vector::push_back(&mut schedule, fraction);
+            }
+        );
+        
+        schedule
+
+    }
+
+    /// Pre-condition: `cumulative_unlocked_fraction` should be zero, which would indicate that even
+    /// though there are principle stake holders, none of those have yet called `unlock` on the pool
+    /// thus it is ``safe'' to change the schedule
+    /// This is a temporary measure to allow Supra Foundation to change the schedule for those pools
+    /// there were initialized with ``dummy/default'' schedule. This method must be disabled
+    /// before external validators are allowed to join the validator set.
+    public entry fun update_unlocking_schedule(
+        multisig_admin: &signer,
+        pool_address: address,
+        unlock_numerators: vector<u64>,
+        unlock_denominator: u64,
+        unlock_start_time: u64,
+        unlock_duration: u64
+    ) acquires DelegationPool {
+        assert!(
+            is_admin(signer::address_of(multisig_admin), pool_address),
+            error::permission_denied(ENOT_AUTHORIZED)
+        );
+        let pool = borrow_global_mut<DelegationPool>(pool_address);
+        assert!(
+            fixed_point64::is_zero(
+                pool.principle_unlock_schedule.cumulative_unlocked_fraction
+            ),
+            error::invalid_state(EUNLOCKING_ALREADY_STARTED)
+        );
+
+        validate_unlock_schedule_params(
+            &unlock_numerators,
+            unlock_denominator,
+            unlock_start_time,
+            unlock_duration
+        );
+
+        //Create unlock schedule fractions
+        let schedule = create_schedule_fractions(&unlock_numerators,unlock_denominator);
+       
+        pool.principle_unlock_schedule = UnlockSchedule {
+            schedule: schedule,
+            start_timestamp_secs: unlock_start_time,
+            period_duration: unlock_duration,
+            last_unlock_period: 0,
+            cumulative_unlocked_fraction: fixed_point64::create_from_rational(0, 1)
+        };
+        event::emit(
+            UnlockScheduleUpdated {
+                pool_address,
+                unlock_numerators,
+                unlock_denominator,
+                unlock_start_time,
+                unlock_duration
+            }
+        );
+
+    }
+
+    // All sanity checks for unlock schedule parameters in one common function
+    fun validate_unlock_schedule_params(
+        unlock_numerators: &vector<u64>,
+        unlock_denominator: u64,
+        _unlock_start_time: u64,
+        unlock_duration: u64
+    ) {
+        //Unlock duration can not be zero
+        assert!(unlock_duration > 0, error::invalid_argument(EPERIOD_DURATION_IS_ZERO));
+        //Fraction denominator can not be zero
+        assert!(unlock_denominator != 0, error::invalid_argument(EDENOMINATOR_IS_ZERO));
+        let numerator_length = vector::length(unlock_numerators);
+        //Fraction numerators can not be empty
+        assert!(
+            numerator_length > 0,
+            error::invalid_argument(EEMPTY_UNLOCK_SCHEDULE)
+        );
+        //First and last numerator can not be zero
+        assert!(
+            *vector::borrow(unlock_numerators, 0) != 0,
+            error::invalid_argument(ESCHEDULE_WITH_ZERO_FRACTION)
+        );
+        assert!(
+            *vector::borrow(unlock_numerators, numerator_length - 1) != 0,
+            error::invalid_argument(ESCHEDULE_WITH_ZERO_FRACTION)
+        );
+
+        let sum = vector::foldr(*unlock_numerators, 0, |e, a| { e + a });
+        //Sum of numerators can not be greater than denominators
+        assert!(
+            sum <= unlock_denominator,
+            error::invalid_argument(ENUMERATORS_GRATER_THAN_DENOMINATOR)
+        );
+
+    }
+
     /// Initialize a delegation pool of custom fixed `operator_commission_percentage`.
     /// A resource account is created from `owner` signer and its supplied `delegation_pool_creation_seed`
     /// to host the delegation pool resource and own the underlying stake pool.
@@ -866,26 +1007,13 @@ module supra_framework::pbo_delegation_pool {
             features::delegation_pools_enabled(),
             error::invalid_state(EDELEGATION_POOLS_DISABLED)
         );
-        //Unlock duration can not be zero
-        assert!(unlock_duration > 0, error::invalid_argument(EPERIOD_DURATION_IS_ZERO));
-        //Fraction denominator can not be zero
-        assert!(unlock_denominator != 0, error::invalid_argument(EDENOMINATOR_IS_ZERO));
-        //Fraction numerators can not be empty
-        assert!(
-            vector::length(&unlock_numerators) > 0,
-            error::invalid_argument(EEMPTY_UNLOCK_SCHEDULE)
-        );
-        //Fraction numerators can not be zero
-        assert!(
-            !vector::any(&unlock_numerators, |e| { *e == 0 }),
-            error::invalid_argument(ESCHEDULE_WITH_ZERO_FRACTION)
-        );
 
-        let sum = vector::foldr(unlock_numerators, 0, |e, a| { e + a });
-        //Sum of numerators can not be greater than denominators
-        assert!(
-            sum <= unlock_denominator,
-            error::invalid_argument(ENUMERATORS_GRATER_THAN_DENOMINATOR)
+        
+        validate_unlock_schedule_params(
+            &unlock_numerators,
+            unlock_denominator,
+            unlock_start_time,
+            unlock_duration
         );
 
         let owner_address = signer::address_of(owner);
@@ -940,18 +1068,8 @@ module supra_framework::pbo_delegation_pool {
         };
 
         //Create unlock schedule
-        let schedule = vector::empty();
-        vector::for_each_ref(
-            &unlock_numerators,
-            |e| {
-                let fraction =
-                    fixed_point64::create_from_rational(
-                        (*e as u128), (unlock_denominator as u128)
-                    );
-                vector::push_back(&mut schedule, fraction);
-            }
-        );
-
+        let schedule = create_schedule_fractions(&unlock_numerators,unlock_denominator);
+        
         move_to(
             &stake_pool_signer,
             DelegationPool {
@@ -9447,6 +9565,173 @@ module supra_framework::pbo_delegation_pool {
                 (100 * ONE_SUPRA) + 1
             );
         assert!(unlock_coin, 20);
+    }
+
+    // Test that after unlock schedule change can not happen after a principle stakeholder calls
+    // `can_principle_unlock` and the unlock fraction becomes non zero
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
+    #[expected_failure(abort_code = 196649, location = Self)]
+    public entry fun test_change_unlock_schedule_fail(
+        supra_framework: &signer, validator: &signer, delegator: &signer
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        account::create_account_for_test(signer::address_of(validator));
+        let delegator_address = signer::address_of(delegator);
+        let delegator_address_vec = vector[delegator_address];
+        let principle_stake = vector[100 * ONE_SUPRA];
+        let coin = stake::mint_coins(100 * ONE_SUPRA);
+        let principle_lockup_time = 7776000; // 3 month cliff
+        let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
+
+        initialize_test_validator(
+            validator,
+            0,
+            true,
+            true,
+            0,
+            delegator_address_vec,
+            principle_stake,
+            coin,
+            option::some(multisig),
+            vector[2, 3, 1],
+            10,
+            principle_lockup_time,
+            LOCKUP_CYCLE_SECONDS // monthly unlocking
+        );
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        // after 2 month unlock reward
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // 3 month
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // after 4 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        let (_, old_stime, _old_duration, old_last_unlock, old_cfraction) =
+            get_unlock_schedule(pool_address);
+        // Assert that `get_unlock_schedule` is returning expected values
+        assert!(old_stime == principle_lockup_time, old_stime);
+        assert!(old_last_unlock == 0, old_last_unlock);
+        assert!(fixed_point64::is_zero(old_cfraction), 99);
+        // Change schedule to 1 month cliff and monthly 10% vest
+
+        can_principle_unlock(delegator_address, pool_address, 1 * ONE_SUPRA);
+        update_unlocking_schedule(
+            &account::create_signer_for_test(multisig),
+            pool_address,
+            vector[1],
+            10,
+            principle_lockup_time / 3,
+            LOCKUP_CYCLE_SECONDS
+        );
+
+    }
+
+    // Test that after unlock schedule change, one is able to unlock as per
+    // new schedule but NOT as per old schedule
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
+    #[expected_failure(abort_code = 13, location = Self)]
+    public entry fun test_change_unlock_schedule(
+        supra_framework: &signer, validator: &signer, delegator: &signer
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        account::create_account_for_test(signer::address_of(validator));
+        let delegator_address = signer::address_of(delegator);
+        let delegator_address_vec = vector[delegator_address];
+        let principle_stake = vector[100 * ONE_SUPRA];
+        let coin = stake::mint_coins(100 * ONE_SUPRA);
+        let principle_lockup_time = 7776000; // 3 month cliff
+        let multisig = generate_multisig_account(validator, vector[@0x12134], 2);
+
+        initialize_test_validator(
+            validator,
+            0,
+            true,
+            true,
+            0,
+            delegator_address_vec,
+            principle_stake,
+            coin,
+            option::some(multisig),
+            vector[2, 3, 1],
+            10,
+            principle_lockup_time,
+            LOCKUP_CYCLE_SECONDS // monthly unlocking
+        );
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        // after 2 month unlock reward
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // 3 month
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // after 4 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        let (_, old_stime, _old_duration, old_last_unlock, old_cfraction) =
+            get_unlock_schedule(pool_address);
+        // Assert that `get_unlock_schedule` is returning expected values
+        assert!(old_stime == principle_lockup_time, old_stime);
+        assert!(old_last_unlock == 0, old_last_unlock);
+        assert!(fixed_point64::is_zero(old_cfraction), 99);
+        // Change schedule to 1 month cliff and monthly 10% vest
+        update_unlocking_schedule(
+            &account::create_signer_for_test(multisig),
+            pool_address,
+            vector[1],
+            10,
+            principle_lockup_time / 3,
+            LOCKUP_CYCLE_SECONDS
+        );
+        // It's acceptable to round off 9 because this coin will remain locked and won't be transferred anywhere.
+        let (_, new_stime, _new_duration, new_last_unlock, new_cfraction) =
+            get_unlock_schedule(pool_address);
+        // Assert that `get_unlock_schedule` is returning expected values
+        assert!(
+            new_stime == principle_lockup_time / 3,
+            new_stime
+        );
+        assert!(new_last_unlock == 0, new_last_unlock);
+        assert!(fixed_point64::is_zero(new_cfraction), 99);
+        let unlock_coin =
+            can_principle_unlock(
+                delegator_address,
+                pool_address,
+                (30 * ONE_SUPRA) - 9
+            );
+        assert!(unlock_coin, 11);
+
+        // after 5 months
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        unlock_coin = can_principle_unlock(
+            delegator_address,
+            pool_address,
+            (40 * ONE_SUPRA) - 9
+        );
+        assert!(unlock_coin, 12);
+        unlock_coin = can_principle_unlock(
+            delegator_address,
+            pool_address,
+            (50 * ONE_SUPRA) - 9
+        );
+        assert!(unlock_coin, 13);
+
     }
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
