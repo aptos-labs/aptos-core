@@ -183,6 +183,11 @@ module supra_framework::vesting_without_staking {
     }
 
     #[view]
+    public fun get_contract_admin(vesting_contract_addr: address): address acquires VestingContract {
+        borrow_global<VestingContract>(vesting_contract_addr).admin
+    } 
+
+    #[view]
     //Return the vesting record of the shareholder as a tuple `(init_amount, left_amount, last_vested_period)`
     public fun get_vesting_record(
         vesting_contract_address: address, shareholder_address: address
