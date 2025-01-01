@@ -183,6 +183,7 @@ module supra_framework::vesting_without_staking {
     }
 
     #[view]
+    // Return the `admin` address of the contract
     public fun get_contract_admin(vesting_contract_addr: address): address acquires VestingContract {
         borrow_global<VestingContract>(vesting_contract_addr).admin
     } 
@@ -2336,6 +2337,7 @@ module supra_framework::vesting_without_staking {
         let vested_amount = 0;
         // Because the time is behind the start time, vest will do nothing.
         vest(contract_address);
+        assert!(get_contract_admin(contract_address)==admin_address,99);
         assert!(coin::balance<SupraCoin>(contract_address) == 1000, 0);
         assert!(coin::balance<SupraCoin>(shareholder_address) == vested_amount, 0);
         // Time is now at the start time, vest will unlock the first period, which is 2/10.
