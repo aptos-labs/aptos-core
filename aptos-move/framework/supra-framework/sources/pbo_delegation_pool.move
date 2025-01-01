@@ -768,9 +768,9 @@ module supra_framework::pbo_delegation_pool {
     }
 
     /// Initialize a delegation pool without actual coin but withdraw from the owner's account.
-    public fun initialize_delegation_pool_with_amount(
+    public entry fun initialize_delegation_pool_with_amount(
         owner: &signer,
-        multisig_admin: option::Option<address>,
+        multisig_admin: address,
         amount: u64,
         operator_commission_percentage: u64,
         delegation_pool_creation_seed: vector<u8>,
@@ -789,7 +789,41 @@ module supra_framework::pbo_delegation_pool {
 
         initialize_delegation_pool(
             owner,
-            multisig_admin,
+            option::some(multisig_admin),
+            operator_commission_percentage,
+            delegation_pool_creation_seed,
+            delegator_address,
+            principle_stake,
+            coin,
+            unlock_numerators,
+            unlock_denominator,
+            unlock_start_time,
+            unlock_duration
+        )
+    }
+
+    /// Initialize a delegation pool without actual coin but withdraw from the owner's account.
+    public entry fun initialize_delegation_pool_with_amount_without_multisig_admin(
+        owner: &signer,
+        amount: u64,
+        operator_commission_percentage: u64,
+        delegation_pool_creation_seed: vector<u8>,
+        delegator_address: vector<address>,
+        principle_stake: vector<u64>,
+        unlock_numerators: vector<u64>,
+        unlock_denominator: u64,
+        unlock_start_time: u64,
+        unlock_duration: u64
+    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        assert!(
+            coin::balance<SupraCoin>(signer::address_of(owner)) >= amount,
+            error::invalid_argument(EBALANCE_NOT_SUFFICIENT)
+        );
+        let coin = coin::withdraw<SupraCoin>(owner, amount);
+
+        initialize_delegation_pool(
+            owner,
+            option::none<address>(),
             operator_commission_percentage,
             delegation_pool_creation_seed,
             delegator_address,
