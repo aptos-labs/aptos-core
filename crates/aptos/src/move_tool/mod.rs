@@ -525,6 +525,10 @@ pub struct TestPackage {
     /// Dump storage state on failure.
     #[clap(long = "dump")]
     pub dump_state: bool,
+
+    /// Report test failures on-the-fly.
+    #[clap(long = "format-json")]
+    pub format_json: bool,
 }
 
 pub(crate) fn fix_bytecode_version(
@@ -580,6 +584,7 @@ impl CliCommand<&'static str> for TestPackage {
                 report_stacktrace_on_abort: true,
                 report_storage_on_error: self.dump_state,
                 ignore_compile_warnings: self.ignore_compile_warnings,
+                format_json: self.format_json,
                 named_address_values: self
                     .move_options
                     .named_addresses

@@ -88,6 +88,9 @@ pub struct Test {
     #[clap(long = "coverage")]
     pub compute_coverage: bool,
 
+    #[clap(long = "format_json", hide = true)]
+    pub format_json: bool,
+
     /// Use the EVM-based execution backend.
     /// Does not work with --stackless.
     #[cfg(feature = "evm-backend")]
@@ -116,6 +119,7 @@ impl Test {
             check_stackless_vm,
             verbose_mode,
             compute_coverage,
+            format_json,
             #[cfg(feature = "evm-backend")]
             evm,
         } = self;
@@ -128,6 +132,7 @@ impl Test {
             check_stackless_vm,
             verbose: verbose_mode,
             ignore_compile_warnings,
+            format_json,
             #[cfg(feature = "evm-backend")]
             evm,
 
