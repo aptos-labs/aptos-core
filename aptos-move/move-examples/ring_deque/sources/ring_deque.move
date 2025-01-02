@@ -14,6 +14,11 @@ module 0x1::ring_deque {
     /// Ring deque is empty;
     const E_EMPTY: u64 = 2;
 
+    /// Ring buffer implementation of a double-ended queue. Mechanics:
+    ///
+    /// 1. Uses a single vector of options to store elements, instantiated to full capacity.
+    /// 2. Options are used to extract elements, but not resize the vector.
+    /// 3. Bounds are maintained by front and back indices, which wrap around.
     struct RingDeque<T> has copy, drop, store {
         data: vector<Option<T>>,
         capacity: u64,
