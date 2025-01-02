@@ -8,6 +8,10 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V22
+///   - Increased governance transaction execution limit from 4B to 5B to enable framework upgrades without changing
+///     the gas schedule.
+///   - Updated the `pbo_delegation_pool.move` and `vesting_without_staking.move` smart contracts (not gas-related).
 /// - V21
 ///   - Fix type to type tag conversion in MoveVM
 /// - V20
@@ -66,7 +70,7 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_16;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_16_SUPRA_V1_5_1;
 
 pub mod gas_feature_versions {
     pub const RELEASE_V1_8: u64 = 11;
@@ -79,4 +83,5 @@ pub mod gas_feature_versions {
     pub const RELEASE_V1_14: u64 = 19;
     pub const RELEASE_V1_15: u64 = 20;
     pub const RELEASE_V1_16: u64 = 21;
+    pub const RELEASE_V1_16_SUPRA_V1_5_1: u64 = 22;
 }
