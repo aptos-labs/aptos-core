@@ -56,6 +56,8 @@ module aptos_framework::governed_gas_pool {
         aptos_framework: &signer,
         delegation_pool_creation_seed: vector<u8>,
     ) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+
         // generate a seed to be used to create the resource account hosting the delegation pool
         let seed = create_resource_account_seed(delegation_pool_creation_seed);
 

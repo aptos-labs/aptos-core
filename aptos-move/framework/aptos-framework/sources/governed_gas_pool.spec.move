@@ -43,10 +43,9 @@ spec aptos_framework::governed_gas_pool {
     }
 
     spec initialize(aptos_framework: &signer, delegation_pool_creation_seed: vector<u8>) {
+        requires system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
         /// [high-level-req-1]
         ensures exists<GovernedGasPool>(@aptos_framework);
-        /// [high-level-req-2]
-        aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
     }
 
     spec fund<CoinType>(aptos_framework: &signer, account: address, amount: u64) {
