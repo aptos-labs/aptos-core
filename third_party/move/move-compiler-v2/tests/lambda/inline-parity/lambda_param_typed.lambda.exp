@@ -1,0 +1,398 @@
+// -- Model dump before env processor pipeline:
+module 0x42::LambdaParam {
+    public inline fun inline_apply(f: |u64|u64,b: u64): u64 {
+        (f)(b)
+    }
+    public inline fun inline_apply2(f: |u64|u64,b: u64): u64 {
+        LambdaParam::inline_apply(f, b)
+    }
+    public inline fun inline_apply3(f: |u64|u64,b: u64): u64 {
+        LambdaParam::inline_apply4(f, b)
+    }
+    public inline fun inline_apply4(_f: |u64|u64,b: u64): u64 {
+        b
+    }
+    private fun test_lambda_symbol_param1() {
+        {
+          let a: u64 = LambdaParam::inline_apply2(|x: u64| x, 3);
+          if Eq<u64>(a, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Tuple()
+        }
+    }
+    private fun test_lambda_symbol_param2() {
+        {
+          let a: u64 = LambdaParam::inline_apply2(|x: u64| x, 3);
+          if Eq<u64>(a, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          {
+            let b: u64 = LambdaParam::inline_apply(|x: u64| x, 3);
+            if Eq<u64>(b, 3) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            {
+              let b: u64 = LambdaParam::inline_apply3(|x: u64| x, 3);
+              if Eq<u64>(b, 3) {
+                Tuple()
+              } else {
+                Abort(0)
+              };
+              Tuple()
+            }
+          }
+        }
+    }
+} // end 0x42::LambdaParam
+
+
+// -- Model dump after env processor unused checks:
+module 0x42::LambdaParam {
+    public inline fun inline_apply(f: |u64|u64,b: u64): u64 {
+        (f)(b)
+    }
+    public inline fun inline_apply2(f: |u64|u64,b: u64): u64 {
+        LambdaParam::inline_apply(f, b)
+    }
+    public inline fun inline_apply3(f: |u64|u64,b: u64): u64 {
+        LambdaParam::inline_apply4(f, b)
+    }
+    public inline fun inline_apply4(_f: |u64|u64,b: u64): u64 {
+        b
+    }
+    private fun test_lambda_symbol_param1() {
+        {
+          let a: u64 = LambdaParam::inline_apply2(|x: u64| x, 3);
+          if Eq<u64>(a, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Tuple()
+        }
+    }
+    private fun test_lambda_symbol_param2() {
+        {
+          let a: u64 = LambdaParam::inline_apply2(|x: u64| x, 3);
+          if Eq<u64>(a, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          {
+            let b: u64 = LambdaParam::inline_apply(|x: u64| x, 3);
+            if Eq<u64>(b, 3) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            {
+              let b: u64 = LambdaParam::inline_apply3(|x: u64| x, 3);
+              if Eq<u64>(b, 3) {
+                Tuple()
+              } else {
+                Abort(0)
+              };
+              Tuple()
+            }
+          }
+        }
+    }
+} // end 0x42::LambdaParam
+
+
+// -- Model dump after env processor type parameter check:
+module 0x42::LambdaParam {
+    public inline fun inline_apply(f: |u64|u64,b: u64): u64 {
+        (f)(b)
+    }
+    public inline fun inline_apply2(f: |u64|u64,b: u64): u64 {
+        LambdaParam::inline_apply(f, b)
+    }
+    public inline fun inline_apply3(f: |u64|u64,b: u64): u64 {
+        LambdaParam::inline_apply4(f, b)
+    }
+    public inline fun inline_apply4(_f: |u64|u64,b: u64): u64 {
+        b
+    }
+    private fun test_lambda_symbol_param1() {
+        {
+          let a: u64 = LambdaParam::inline_apply2(|x: u64| x, 3);
+          if Eq<u64>(a, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Tuple()
+        }
+    }
+    private fun test_lambda_symbol_param2() {
+        {
+          let a: u64 = LambdaParam::inline_apply2(|x: u64| x, 3);
+          if Eq<u64>(a, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          {
+            let b: u64 = LambdaParam::inline_apply(|x: u64| x, 3);
+            if Eq<u64>(b, 3) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            {
+              let b: u64 = LambdaParam::inline_apply3(|x: u64| x, 3);
+              if Eq<u64>(b, 3) {
+                Tuple()
+              } else {
+                Abort(0)
+              };
+              Tuple()
+            }
+          }
+        }
+    }
+} // end 0x42::LambdaParam
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0x42::LambdaParam {
+    public inline fun inline_apply(f: |u64|u64,b: u64): u64 {
+        (f)(b)
+    }
+    public inline fun inline_apply2(f: |u64|u64,b: u64): u64 {
+        LambdaParam::inline_apply(f, b)
+    }
+    public inline fun inline_apply3(f: |u64|u64,b: u64): u64 {
+        LambdaParam::inline_apply4(f, b)
+    }
+    public inline fun inline_apply4(_f: |u64|u64,b: u64): u64 {
+        b
+    }
+    private fun test_lambda_symbol_param1() {
+        {
+          let a: u64 = LambdaParam::inline_apply2(|x: u64| x, 3);
+          if Eq<u64>(a, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Tuple()
+        }
+    }
+    private fun test_lambda_symbol_param2() {
+        {
+          let a: u64 = LambdaParam::inline_apply2(|x: u64| x, 3);
+          if Eq<u64>(a, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          {
+            let b: u64 = LambdaParam::inline_apply(|x: u64| x, 3);
+            if Eq<u64>(b, 3) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            {
+              let b: u64 = LambdaParam::inline_apply3(|x: u64| x, 3);
+              if Eq<u64>(b, 3) {
+                Tuple()
+              } else {
+                Abort(0)
+              };
+              Tuple()
+            }
+          }
+        }
+    }
+} // end 0x42::LambdaParam
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0x42::LambdaParam {
+    public inline fun inline_apply(f: |u64|u64,b: u64): u64 {
+        (f)(b)
+    }
+    public inline fun inline_apply2(f: |u64|u64,b: u64): u64 {
+        LambdaParam::inline_apply(f, b)
+    }
+    public inline fun inline_apply3(f: |u64|u64,b: u64): u64 {
+        LambdaParam::inline_apply4(f, b)
+    }
+    public inline fun inline_apply4(_f: |u64|u64,b: u64): u64 {
+        b
+    }
+    private fun test_lambda_symbol_param1() {
+        {
+          let a: u64 = LambdaParam::inline_apply2(|x: u64| x, 3);
+          if Eq<u64>(a, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Tuple()
+        }
+    }
+    private fun test_lambda_symbol_param2() {
+        {
+          let a: u64 = LambdaParam::inline_apply2(|x: u64| x, 3);
+          if Eq<u64>(a, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          {
+            let b: u64 = LambdaParam::inline_apply(|x: u64| x, 3);
+            if Eq<u64>(b, 3) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            {
+              let b: u64 = LambdaParam::inline_apply3(|x: u64| x, 3);
+              if Eq<u64>(b, 3) {
+                Tuple()
+              } else {
+                Abort(0)
+              };
+              Tuple()
+            }
+          }
+        }
+    }
+} // end 0x42::LambdaParam
+
+
+// -- Model dump after env processor unused struct params check:
+module 0x42::LambdaParam {
+    public inline fun inline_apply(f: |u64|u64,b: u64): u64 {
+        (f)(b)
+    }
+    public inline fun inline_apply2(f: |u64|u64,b: u64): u64 {
+        LambdaParam::inline_apply(f, b)
+    }
+    public inline fun inline_apply3(f: |u64|u64,b: u64): u64 {
+        LambdaParam::inline_apply4(f, b)
+    }
+    public inline fun inline_apply4(_f: |u64|u64,b: u64): u64 {
+        b
+    }
+    private fun test_lambda_symbol_param1() {
+        {
+          let a: u64 = LambdaParam::inline_apply2(|x: u64| x, 3);
+          if Eq<u64>(a, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Tuple()
+        }
+    }
+    private fun test_lambda_symbol_param2() {
+        {
+          let a: u64 = LambdaParam::inline_apply2(|x: u64| x, 3);
+          if Eq<u64>(a, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          {
+            let b: u64 = LambdaParam::inline_apply(|x: u64| x, 3);
+            if Eq<u64>(b, 3) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            {
+              let b: u64 = LambdaParam::inline_apply3(|x: u64| x, 3);
+              if Eq<u64>(b, 3) {
+                Tuple()
+              } else {
+                Abort(0)
+              };
+              Tuple()
+            }
+          }
+        }
+    }
+} // end 0x42::LambdaParam
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0x42::LambdaParam {
+    public inline fun inline_apply(f: |u64|u64,b: u64): u64 {
+        (f)(b)
+    }
+    public inline fun inline_apply2(f: |u64|u64,b: u64): u64 {
+        LambdaParam::inline_apply(f, b)
+    }
+    public inline fun inline_apply3(f: |u64|u64,b: u64): u64 {
+        LambdaParam::inline_apply4(f, b)
+    }
+    public inline fun inline_apply4(_f: |u64|u64,b: u64): u64 {
+        b
+    }
+    private fun test_lambda_symbol_param1() {
+        {
+          let a: u64 = LambdaParam::inline_apply2(|x: u64| x, 3);
+          if Eq<u64>(a, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Tuple()
+        }
+    }
+    private fun test_lambda_symbol_param2() {
+        {
+          let a: u64 = LambdaParam::inline_apply2(|x: u64| x, 3);
+          if Eq<u64>(a, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          {
+            let b: u64 = LambdaParam::inline_apply(|x: u64| x, 3);
+            if Eq<u64>(b, 3) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            {
+              let b: u64 = LambdaParam::inline_apply3(|x: u64| x, 3);
+              if Eq<u64>(b, 3) {
+                Tuple()
+              } else {
+                Abort(0)
+              };
+              Tuple()
+            }
+          }
+        }
+    }
+} // end 0x42::LambdaParam
+
+
+
+Diagnostics:
+error: Currently, a function-typed parameter to an inline function must be a literal lambda expression
+  ┌─ tests/lambda/inline-parity/lambda_param_typed.move:7:15
+  │
+7 │     inline_apply(f, b)
+  │                  ^
+
+error: Currently, a function-typed parameter to an inline function must be a literal lambda expression
+   ┌─ tests/lambda/inline-parity/lambda_param_typed.move:11:16
+   │
+11 │     inline_apply4(f, b)
+   │                   ^

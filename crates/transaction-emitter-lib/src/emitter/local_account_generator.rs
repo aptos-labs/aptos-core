@@ -2,16 +2,23 @@ use anyhow::bail;
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_sdk::types::{AccountKey, EphemeralKeyPair, KeylessAccount, LocalAccount};
+use aptos_sdk::types::{
+    AccountKey, EphemeralKeyPair, EphemeralPrivateKey, KeylessAccount, LocalAccount,
+};
 use aptos_transaction_generator_lib::ReliableTransactionSubmitter;
-use aptos_types::keyless::{Claims, OpenIdSig, Pepper, ZeroKnowledgeSig};
+use aptos_types::{
+    keyless,
+    keyless::{Claims, OpenIdSig, Pepper, ZeroKnowledgeSig},
+};
 use async_trait::async_trait;
-use futures::future::try_join_all;
+use futures::StreamExt;
 use rand::rngs::StdRng;
 use std::{
     fs::File,
     io::{self, BufRead},
 };
+
+const QUERY_PARALLELISM: usize = 300;
 
 #[async_trait]
 pub trait LocalAccountGenerator: Send + Sync {
@@ -32,6 +39,7 @@ pub fn create_keyless_account_generator(
     epk_expiry_date_secs: u64,
     jwt: &str,
     proof_file_path: Option<&str>,
+    keyless_config: keyless::Configuration,
 ) -> anyhow::Result<Box<dyn LocalAccountGenerator>> {
     let parts: Vec<&str> = jwt.split('.').collect();
     let header_bytes = base64::decode(parts[0]).unwrap();
@@ -47,6 +55,7 @@ pub fn create_keyless_account_generator(
         uid_key: "sub".to_owned(),
         uid_val: claims.oidc_claims.sub,
         jwt_header_json,
+        keyless_config,
     }))
 }
 
@@ -73,7 +82,13 @@ impl LocalAccountGenerator for PrivateKeyAccountGenerator {
             .iter()
             .map(|address| txn_executor.query_sequence_number(*address))
             .collect::<Vec<_>>();
-        let seq_nums: Vec<_> = try_join_all(result_futures).await?.into_iter().collect();
+
+        let seq_nums = futures::stream::iter(result_futures)
+            .buffered(QUERY_PARALLELISM)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
 
         let accounts = account_keys
             .into_iter()
@@ -99,6 +114,9 @@ pub struct KeylessAccountGenerator {
     uid_key: String,
     uid_val: String,
     jwt_header_json: String,
+    /// We assume the on-chain keyless config won't change and cache it here.
+    /// Needed by nonce generation.
+    keyless_config: keyless::Configuration,
 }
 
 #[async_trait]
@@ -133,7 +151,9 @@ impl LocalAccountGenerator for KeylessAccountGenerator {
 
             // Cloning is disabled outside #[cfg(test)]
             let serialized: &[u8] = &(self.ephemeral_secret_key.to_bytes());
-            let esk = Ed25519PrivateKey::try_from(serialized)?;
+            let esk = EphemeralPrivateKey::Ed25519 {
+                inner_private_key: Ed25519PrivateKey::try_from(serialized)?,
+            };
 
             let keyless_account = KeylessAccount::new(
                 &self.iss,
@@ -141,7 +161,8 @@ impl LocalAccountGenerator for KeylessAccountGenerator {
                 &self.uid_key,
                 &self.uid_val,
                 &self.jwt_header_json,
-                EphemeralKeyPair::new(
+                EphemeralKeyPair::new_with_keyless_config(
+                    &self.keyless_config,
                     esk,
                     self.epk_expiry_date_secs,
                     vec![0; OpenIdSig::EPK_BLINDER_NUM_BYTES],
@@ -166,7 +187,13 @@ impl LocalAccountGenerator for KeylessAccountGenerator {
             .iter()
             .map(|address| txn_executor.query_sequence_number(*address))
             .collect::<Vec<_>>();
-        let seq_nums: Vec<_> = try_join_all(result_futures).await?.into_iter().collect();
+
+        let seq_nums = futures::stream::iter(result_futures)
+            .buffered(QUERY_PARALLELISM)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
 
         let accounts = keyless_accounts
             .into_iter()

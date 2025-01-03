@@ -44,6 +44,463 @@ module 0xcafe::m {
 } // end 0xcafe::m
 
 
+// -- Model dump after env processor unused checks:
+module 0xcafe::m {
+    struct S {
+        x: u64,
+    }
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun assigns_local(x: u64,c: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| z: u64 = 2;
+          Add<u64>(y, c))
+        }
+    }
+    private fun assigns_param(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| x: u64 = 2;
+        Add<u64>(y, c))
+    }
+    private fun borrows_local(x: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| {
+            let r: &mut u64 = Borrow(Mutable)(z);
+            Add<u64>(y, Deref(r))
+          })
+        }
+    }
+    private fun borrows_param(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| {
+          let r: &mut u64 = Borrow(Mutable)(c);
+          Add<u64>(y, Deref(r))
+        })
+    }
+    private fun immutable_borrow_ok(x: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| {
+            let r: &u64 = Borrow(Immutable)(z);
+            Add<u64>(y, Deref(r))
+          })
+        }
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor type parameter check:
+module 0xcafe::m {
+    struct S {
+        x: u64,
+    }
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun assigns_local(x: u64,c: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| z: u64 = 2;
+          Add<u64>(y, c))
+        }
+    }
+    private fun assigns_param(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| x: u64 = 2;
+        Add<u64>(y, c))
+    }
+    private fun borrows_local(x: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| {
+            let r: &mut u64 = Borrow(Mutable)(z);
+            Add<u64>(y, Deref(r))
+          })
+        }
+    }
+    private fun borrows_param(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| {
+          let r: &mut u64 = Borrow(Mutable)(c);
+          Add<u64>(y, Deref(r))
+        })
+    }
+    private fun immutable_borrow_ok(x: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| {
+            let r: &u64 = Borrow(Immutable)(z);
+            Add<u64>(y, Deref(r))
+          })
+        }
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0xcafe::m {
+    struct S {
+        x: u64,
+    }
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun assigns_local(x: u64,c: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| z: u64 = 2;
+          Add<u64>(y, c))
+        }
+    }
+    private fun assigns_param(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| x: u64 = 2;
+        Add<u64>(y, c))
+    }
+    private fun borrows_local(x: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| {
+            let r: &mut u64 = Borrow(Mutable)(z);
+            Add<u64>(y, Deref(r))
+          })
+        }
+    }
+    private fun borrows_param(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| {
+          let r: &mut u64 = Borrow(Mutable)(c);
+          Add<u64>(y, Deref(r))
+        })
+    }
+    private fun immutable_borrow_ok(x: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| {
+            let r: &u64 = Borrow(Immutable)(z);
+            Add<u64>(y, Deref(r))
+          })
+        }
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0xcafe::m {
+    struct S {
+        x: u64,
+    }
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun assigns_local(x: u64,c: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| z: u64 = 2;
+          Add<u64>(y, c))
+        }
+    }
+    private fun assigns_param(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| x: u64 = 2;
+        Add<u64>(y, c))
+    }
+    private fun borrows_local(x: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| {
+            let r: &mut u64 = Borrow(Mutable)(z);
+            Add<u64>(y, Deref(r))
+          })
+        }
+    }
+    private fun borrows_param(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| {
+          let r: &mut u64 = Borrow(Mutable)(c);
+          Add<u64>(y, Deref(r))
+        })
+    }
+    private fun immutable_borrow_ok(x: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| {
+            let r: &u64 = Borrow(Immutable)(z);
+            Add<u64>(y, Deref(r))
+          })
+        }
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor unused struct params check:
+module 0xcafe::m {
+    struct S {
+        x: u64,
+    }
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun assigns_local(x: u64,c: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| z: u64 = 2;
+          Add<u64>(y, c))
+        }
+    }
+    private fun assigns_param(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| x: u64 = 2;
+        Add<u64>(y, c))
+    }
+    private fun borrows_local(x: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| {
+            let r: &mut u64 = Borrow(Mutable)(z);
+            Add<u64>(y, Deref(r))
+          })
+        }
+    }
+    private fun borrows_param(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| {
+          let r: &mut u64 = Borrow(Mutable)(c);
+          Add<u64>(y, Deref(r))
+        })
+    }
+    private fun immutable_borrow_ok(x: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| {
+            let r: &u64 = Borrow(Immutable)(z);
+            Add<u64>(y, Deref(r))
+          })
+        }
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0xcafe::m {
+    struct S {
+        x: u64,
+    }
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun assigns_local(x: u64,c: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| z: u64 = 2;
+          Add<u64>(y, c))
+        }
+    }
+    private fun assigns_param(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| x: u64 = 2;
+        Add<u64>(y, c))
+    }
+    private fun borrows_local(x: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| {
+            let r: &mut u64 = Borrow(Mutable)(z);
+            Add<u64>(y, Deref(r))
+          })
+        }
+    }
+    private fun borrows_param(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| {
+          let r: &mut u64 = Borrow(Mutable)(c);
+          Add<u64>(y, Deref(r))
+        })
+    }
+    private fun immutable_borrow_ok(x: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| {
+            let r: &u64 = Borrow(Immutable)(z);
+            Add<u64>(y, Deref(r))
+          })
+        }
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor inlining:
+module 0xcafe::m {
+    struct S {
+        x: u64,
+    }
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun assigns_local(x: u64,c: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| z: u64 = 2;
+          Add<u64>(y, c))
+        }
+    }
+    private fun assigns_param(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| x: u64 = 2;
+        Add<u64>(y, c))
+    }
+    private fun borrows_local(x: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| {
+            let r: &mut u64 = Borrow(Mutable)(z);
+            Add<u64>(y, Deref(r))
+          })
+        }
+    }
+    private fun borrows_param(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| {
+          let r: &mut u64 = Borrow(Mutable)(c);
+          Add<u64>(y, Deref(r))
+        })
+    }
+    private fun immutable_borrow_ok(x: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| {
+            let r: &u64 = Borrow(Immutable)(z);
+            Add<u64>(y, Deref(r))
+          })
+        }
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0xcafe::m {
+    struct S {
+        x: u64,
+    }
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun assigns_local(x: u64,c: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| z: u64 = 2;
+          Add<u64>(y, c))
+        }
+    }
+    private fun assigns_param(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| x: u64 = 2;
+        Add<u64>(y, c))
+    }
+    private fun borrows_local(x: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| {
+            let r: &mut u64 = Borrow(Mutable)(z);
+            Add<u64>(y, Deref(r))
+          })
+        }
+    }
+    private fun borrows_param(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| {
+          let r: &mut u64 = Borrow(Mutable)(c);
+          Add<u64>(y, Deref(r))
+        })
+    }
+    private fun immutable_borrow_ok(x: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| {
+            let r: &u64 = Borrow(Immutable)(z);
+            Add<u64>(y, Deref(r))
+          })
+        }
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor acquires check:
+module 0xcafe::m {
+    struct S {
+        x: u64,
+    }
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun assigns_local(x: u64,c: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| z: u64 = 2;
+          Add<u64>(y, c))
+        }
+    }
+    private fun assigns_param(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| x: u64 = 2;
+        Add<u64>(y, c))
+    }
+    private fun borrows_local(x: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| {
+            let r: &mut u64 = Borrow(Mutable)(z);
+            Add<u64>(y, Deref(r))
+          })
+        }
+    }
+    private fun borrows_param(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| {
+          let r: &mut u64 = Borrow(Mutable)(c);
+          Add<u64>(y, Deref(r))
+        })
+    }
+    private fun immutable_borrow_ok(x: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| {
+            let r: &u64 = Borrow(Immutable)(z);
+            Add<u64>(y, Deref(r))
+          })
+        }
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor simplifier:
+module 0xcafe::m {
+    struct S {
+        x: u64,
+    }
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun assigns_local(x: u64,c: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| z: u64 = 2;
+          Add<u64>(y, c))
+        }
+    }
+    private fun assigns_param(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| x: u64 = 2;
+        Add<u64>(y, c))
+    }
+    private fun borrows_local(x: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| {
+            let r: &mut u64 = Borrow(Mutable)(z);
+            Add<u64>(y, Deref(r))
+          })
+        }
+    }
+    private fun borrows_param(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| {
+          let r: &mut u64 = Borrow(Mutable)(c);
+          Add<u64>(y, Deref(r))
+        })
+    }
+    private fun immutable_borrow_ok(x: u64): u64 {
+        m::map(x, |y: u64| {
+          let r: &u64 = Borrow(Immutable)(1);
+          Add<u64>(y, Deref(r))
+        })
+    }
+} // end 0xcafe::m
+
+
 
 Diagnostics:
 error: captured variable `x` cannot be modified inside of a lambda

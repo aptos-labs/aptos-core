@@ -3,30 +3,29 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Scratchpad for on chain values during the execution.
 
-use crate::{
-    gas::get_gas_config_from_storage,
-    move_vm_ext::{
-        resource_state_key, AptosMoveResolver, AsExecutorView, AsResourceGroupView,
-        ResourceGroupResolver,
-    },
+use crate::move_vm_ext::{
+    resource_state_key, AptosMoveResolver, AsExecutorView, AsResourceGroupView,
+    ResourceGroupResolver,
 };
 use aptos_aggregator::{
     bounded_math::SignedU128,
     resolver::{TAggregatorV1View, TDelayedFieldView},
-    types::{DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
+    types::{DelayedFieldValue, DelayedFieldsSpeculativeError},
 };
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
-    delayed_fields::PanicError,
+    error::{PanicError, PanicOr},
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{
-        errors::StateviewError,
+        errors::StateViewError,
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
         StateView, StateViewId,
     },
-    vm::configs::aptos_prod_deserializer_config,
+};
+use aptos_vm_environment::{
+    gas::get_gas_feature_version, prod_configs::aptos_prod_deserializer_config,
 };
 use aptos_vm_types::{
     resolver::{
@@ -301,7 +300,7 @@ impl<S: StateView> AsMoveResolver<S> for S {
         let features = Features::fetch_config(self).unwrap_or_default();
         let deserializer_config = aptos_prod_deserializer_config(&features);
 
-        let (_, gas_feature_version) = get_gas_config_from_storage(self);
+        let gas_feature_version = get_gas_feature_version(self);
         let resource_group_adapter = ResourceGroupAdapter::new(
             None,
             self,
@@ -313,11 +312,17 @@ impl<S: StateView> AsMoveResolver<S> for S {
 }
 
 impl<'e, E: ExecutorView> StateStorageView for StorageAdapter<'e, E> {
+    type Key = StateKey;
+
     fn id(&self) -> StateViewId {
         self.executor_view.id()
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
+    fn read_state_value(&self, state_key: &Self::Key) -> Result<(), StateViewError> {
+        self.executor_view.read_state_value(state_key)
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
         self.executor_view.get_usage()
     }
 }

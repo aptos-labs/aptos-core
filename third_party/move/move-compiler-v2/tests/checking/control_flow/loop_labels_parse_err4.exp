@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid character
+  ┌─ tests/checking/control_flow/loop_labels_parse_err4.move:3:10
+  │
+3 │         '0x: if (true) false else true
+  │          ^ Label quote must be followed by 'A-Z', `a-z', or '_'

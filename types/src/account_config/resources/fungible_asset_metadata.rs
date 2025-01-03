@@ -10,13 +10,13 @@ use move_core_types::{
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ConcurrentSupply {
+pub struct ConcurrentSupplyResource {
     pub current: AggregatorResource<u128>,
 }
 
-impl MoveStructType for ConcurrentSupply {
+impl MoveStructType for ConcurrentSupplyResource {
     const MODULE_NAME: &'static IdentStr = ident_str!("fungible_asset");
     const STRUCT_NAME: &'static IdentStr = ident_str!("ConcurrentSupply");
 }
 
-impl MoveResource for ConcurrentSupply {}
+impl MoveResource for ConcurrentSupplyResource {}

@@ -1,12 +1,12 @@
 ============ initial translation from Move ================
 
 [variant baseline]
-fun TestLiveVars::test1($t0|r_ref: &TestLiveVars::R): u64 {
-     var $t1: &TestLiveVars::R
+fun TestLiveVars::test1($t0|r_ref: &0x42::TestLiveVars::R): u64 {
+     var $t1: &0x42::TestLiveVars::R
      var $t2: &u64
      var $t3: u64
   0: $t1 := move($t0)
-  1: $t2 := borrow_field<TestLiveVars::R>.x($t1)
+  1: $t2 := borrow_field<0x42::TestLiveVars::R>.x($t1)
   2: $t3 := read_ref($t2)
   3: return $t3
 }
@@ -14,24 +14,24 @@ fun TestLiveVars::test1($t0|r_ref: &TestLiveVars::R): u64 {
 
 [variant baseline]
 fun TestLiveVars::test2($t0|b: bool): u64 {
-     var $t1|r1: TestLiveVars::R
-     var $t2|r2: TestLiveVars::R
-     var $t3|r_ref: &TestLiveVars::R
+     var $t1|r1: 0x42::TestLiveVars::R
+     var $t2|r2: 0x42::TestLiveVars::R
+     var $t3|r_ref: &0x42::TestLiveVars::R
      var $t4: u64
-     var $t5: TestLiveVars::R
+     var $t5: 0x42::TestLiveVars::R
      var $t6: u64
-     var $t7: TestLiveVars::R
-     var $t8: &TestLiveVars::R
+     var $t7: 0x42::TestLiveVars::R
+     var $t8: &0x42::TestLiveVars::R
      var $t9: bool
-     var $t10: &TestLiveVars::R
-     var $t11: &TestLiveVars::R
-     var $t12: &TestLiveVars::R
+     var $t10: &0x42::TestLiveVars::R
+     var $t11: &0x42::TestLiveVars::R
+     var $t12: &0x42::TestLiveVars::R
      var $t13: u64
   0: $t4 := 3
-  1: $t5 := pack TestLiveVars::R($t4)
+  1: $t5 := pack 0x42::TestLiveVars::R($t4)
   2: $t1 := $t5
   3: $t6 := 4
-  4: $t7 := pack TestLiveVars::R($t6)
+  4: $t7 := pack 0x42::TestLiveVars::R($t6)
   5: $t2 := $t7
   6: $t8 := borrow_local($t1)
   7: $t3 := $t8
@@ -51,34 +51,34 @@ fun TestLiveVars::test2($t0|b: bool): u64 {
 
 
 [variant baseline]
-fun TestLiveVars::test3($t0|n: u64, $t1|r_ref: &TestLiveVars::R): u64 {
-     var $t2|r1: TestLiveVars::R
-     var $t3|r2: TestLiveVars::R
+fun TestLiveVars::test3($t0|n: u64, $t1|r_ref: &0x42::TestLiveVars::R): u64 {
+     var $t2|r1: 0x42::TestLiveVars::R
+     var $t3|r2: 0x42::TestLiveVars::R
      var $t4: u64
-     var $t5: TestLiveVars::R
+     var $t5: 0x42::TestLiveVars::R
      var $t6: u64
-     var $t7: TestLiveVars::R
+     var $t7: 0x42::TestLiveVars::R
      var $t8: u64
      var $t9: u64
      var $t10: bool
-     var $t11: &TestLiveVars::R
+     var $t11: &0x42::TestLiveVars::R
      var $t12: u64
      var $t13: u64
      var $t14: u64
      var $t15: u64
      var $t16: bool
-     var $t17: &TestLiveVars::R
-     var $t18: &TestLiveVars::R
+     var $t17: &0x42::TestLiveVars::R
+     var $t18: &0x42::TestLiveVars::R
      var $t19: u64
      var $t20: u64
      var $t21: u64
-     var $t22: &TestLiveVars::R
+     var $t22: &0x42::TestLiveVars::R
      var $t23: u64
   0: $t4 := 3
-  1: $t5 := pack TestLiveVars::R($t4)
+  1: $t5 := pack 0x42::TestLiveVars::R($t4)
   2: $t2 := $t5
   3: $t6 := 4
-  4: $t7 := pack TestLiveVars::R($t6)
+  4: $t7 := pack 0x42::TestLiveVars::R($t6)
   5: $t3 := $t7
   6: goto 7
   7: label L6
@@ -120,11 +120,11 @@ fun TestLiveVars::test3($t0|n: u64, $t1|r_ref: &TestLiveVars::R): u64 {
 ============ after pipeline `livevar` ================
 
 [variant baseline]
-fun TestLiveVars::test1($t0|r_ref: &TestLiveVars::R): u64 {
+fun TestLiveVars::test1($t0|r_ref: &0x42::TestLiveVars::R): u64 {
      var $t1: &u64
      var $t2: u64
      # live vars: r_ref
-  0: $t1 := borrow_field<TestLiveVars::R>.x($t0)
+  0: $t1 := borrow_field<0x42::TestLiveVars::R>.x($t0)
      # live vars: $t1
   1: $t2 := read_ref($t1)
      # live vars: $t2
@@ -134,22 +134,22 @@ fun TestLiveVars::test1($t0|r_ref: &TestLiveVars::R): u64 {
 
 [variant baseline]
 fun TestLiveVars::test2($t0|b: bool): u64 {
-     var $t1|r1: TestLiveVars::R
-     var $t2|r2: TestLiveVars::R
-     var $t3|r_ref: &TestLiveVars::R
+     var $t1|r1: 0x42::TestLiveVars::R
+     var $t2|r2: 0x42::TestLiveVars::R
+     var $t3|r_ref: &0x42::TestLiveVars::R
      var $t4: u64
      var $t5: u64
-     var $t6: &TestLiveVars::R
-     var $t7: &TestLiveVars::R
+     var $t6: &0x42::TestLiveVars::R
+     var $t7: &0x42::TestLiveVars::R
      var $t8: u64
      # live vars: b
   0: $t4 := 3
      # live vars: b, $t4
-  1: $t1 := pack TestLiveVars::R($t4)
+  1: $t1 := pack 0x42::TestLiveVars::R($t4)
      # live vars: b, r1
   2: $t5 := 4
      # live vars: b, r1, $t5
-  3: $t2 := pack TestLiveVars::R($t5)
+  3: $t2 := pack 0x42::TestLiveVars::R($t5)
      # live vars: b, r1, r2
   4: $t6 := borrow_local($t1)
      # live vars: b, r2, $t6
@@ -188,9 +188,9 @@ fun TestLiveVars::test2($t0|b: bool): u64 {
 
 
 [variant baseline]
-fun TestLiveVars::test3($t0|n: u64, $t1|r_ref: &TestLiveVars::R): u64 {
-     var $t2|r1: TestLiveVars::R
-     var $t3|r2: TestLiveVars::R
+fun TestLiveVars::test3($t0|n: u64, $t1|r_ref: &0x42::TestLiveVars::R): u64 {
+     var $t2|r1: 0x42::TestLiveVars::R
+     var $t3|r2: 0x42::TestLiveVars::R
      var $t4: u64
      var $t5: u64
      var $t6: u64
@@ -199,18 +199,18 @@ fun TestLiveVars::test3($t0|n: u64, $t1|r_ref: &TestLiveVars::R): u64 {
      var $t9: u64
      var $t10: u64
      var $t11: bool
-     var $t12: &TestLiveVars::R
-     var $t13: &TestLiveVars::R
+     var $t12: &0x42::TestLiveVars::R
+     var $t13: &0x42::TestLiveVars::R
      var $t14: u64
      var $t15: u64
      # live vars: n, r_ref
   0: $t4 := 3
      # live vars: n, r_ref, $t4
-  1: $t2 := pack TestLiveVars::R($t4)
+  1: $t2 := pack 0x42::TestLiveVars::R($t4)
      # live vars: n, r_ref, r1
   2: $t5 := 4
      # live vars: n, r_ref, r1, $t5
-  3: $t3 := pack TestLiveVars::R($t5)
+  3: $t3 := pack 0x42::TestLiveVars::R($t5)
      # live vars: n, r_ref, r1, r2
   4: goto 5
      # live vars: n, r_ref, r1, r2

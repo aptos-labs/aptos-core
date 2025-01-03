@@ -61,13 +61,13 @@ object "A2_M" {
                 $t5 := $MakePtr(false, add($locals, 32))
                 // $t6 := move($t1)
                 $t6 := mload($locals)
-                // $t7 := pack M::T<u8>($t6)
+                // $t7 := pack 0x2::M::T<u8>($t6)
                 {
                     let $mem := $Malloc(32)
                     $MemoryStoreU256(add($mem, 0), $t6)
                     $t7 := $mem
                 }
-                // move_to<M::T<u8>>($t7, $t5)
+                // move_to<0x2::M::T<u8>>($t7, $t5)
                 {
                     let $base_offset := $MakeTypeStorageBase(0, 0x2e75402e, $LoadU256($t5))
                     if $AlignedStorageLoad($base_offset) {
@@ -96,7 +96,7 @@ object "A2_M" {
                 }
                 // $t8 := 0x42
                 $t8 := 0x42
-                // $t9 := borrow_global<M::T<u8>>($t8)
+                // $t9 := borrow_global<0x2::M::T<u8>>($t8)
                 {
                     let $base_offset := $MakeTypeStorageBase(0, 0x2e75402e, $t8)
                     if iszero($AlignedStorageLoad($base_offset)) {
@@ -104,7 +104,7 @@ object "A2_M" {
                     }
                     $t9 := $MakePtr(true, add($base_offset, 32))
                 }
-                // $t10 := borrow_field<M::T<u8>>.v($t9)
+                // $t10 := borrow_field<0x2::M::T<u8>>.v($t9)
                 $t10 := $t9
                 // $t11 := read_ref($t10)
                 $t11 := $LoadU256($t10)
@@ -139,19 +139,19 @@ object "A2_M" {
                 $t4 := 65
                 // vector::push_back<u8>($t3, $t4)
                 A1_vector_push_back$u8$($t3, $t4)
-                // $t2 := vector::empty<U256::U256>()
+                // $t2 := vector::empty<0x2::U256::U256>()
                 mstore(add($locals, 32), A1_vector_empty$A2_U256_U256$())
                 // $t5 := borrow_local($t2)
                 $t5 := $MakePtr(false, add($locals, 32))
                 // $t6 := 64
                 $t6 := 64
-                // vector::push_back<U256::U256>($t5, $t6)
+                // vector::push_back<0x2::U256::U256>($t5, $t6)
                 A1_vector_push_back$A2_U256_U256$($t5, $t6)
                 // $t7 := borrow_local($t2)
                 $t7 := $MakePtr(false, add($locals, 32))
                 // $t8 := 65
                 $t8 := 65
-                // vector::push_back<U256::U256>($t7, $t8)
+                // vector::push_back<0x2::U256::U256>($t7, $t8)
                 A1_vector_push_back$A2_U256_U256$($t7, $t8)
                 // $t9 := 0x42
                 $t9 := 0x42
@@ -163,14 +163,14 @@ object "A2_M" {
                 $t11 := mload($locals)
                 // $t12 := move($t2)
                 $t12 := mload(add($locals, 32))
-                // $t13 := pack M::State($t11, $t12)
+                // $t13 := pack 0x2::M::State($t11, $t12)
                 {
                     let $mem := $Malloc(64)
                     $MemoryStoreU256(add($mem, 0), $t11)
                     $MemoryStoreU256(add($mem, 32), $t12)
                     $t13 := $mem
                 }
-                // move_to<M::State>($t13, $t10)
+                // move_to<0x2::M::State>($t13, $t10)
                 {
                     let $base_offset := $MakeTypeStorageBase(0, 0x7d9cc237, $LoadU256($t10))
                     if $AlignedStorageLoad($base_offset) {
@@ -213,7 +213,7 @@ object "A2_M" {
                 }
                 // $t14 := 0x42
                 $t14 := 0x42
-                // $t15 := borrow_global<M::State>($t14)
+                // $t15 := borrow_global<0x2::M::State>($t14)
                 {
                     let $base_offset := $MakeTypeStorageBase(0, 0x7d9cc237, $t14)
                     if iszero($AlignedStorageLoad($base_offset)) {
@@ -221,7 +221,7 @@ object "A2_M" {
                     }
                     $t15 := $MakePtr(true, add($base_offset, 32))
                 }
-                // $t16 := borrow_field<M::State>.s1($t15)
+                // $t16 := borrow_field<0x2::M::State>.s1($t15)
                 $t16 := $t15
                 // $t17 := read_ref($t16)
                 $t17 := $LoadU256($t16)
@@ -242,7 +242,7 @@ object "A2_M" {
                 }
                 // $t18 := 0x42
                 $t18 := 0x42
-                // $t19 := borrow_global<M::State>($t18)
+                // $t19 := borrow_global<0x2::M::State>($t18)
                 {
                     let $base_offset := $MakeTypeStorageBase(0, 0x7d9cc237, $t18)
                     if iszero($AlignedStorageLoad($base_offset)) {
@@ -250,7 +250,7 @@ object "A2_M" {
                     }
                     $t19 := $MakePtr(true, add($base_offset, 32))
                 }
-                // $t20 := borrow_field<M::State>.s2($t19)
+                // $t20 := borrow_field<0x2::M::State>.s2($t19)
                 $t20 := $IndexPtr($t19, 32)
                 // $t21 := read_ref($t20)
                 $t21 := $LoadU256($t20)

@@ -454,11 +454,26 @@ where
                         );
                     }
                 } else {
+                    // Update the connection dial metrics
+                    counters::update_network_connection_operation_metrics(
+                        &self.network_context,
+                        counters::DIAL_LABEL.into(),
+                        counters::DIAL_PEER_LABEL.into(),
+                    );
+
+                    // Send a transport request to dial the peer
                     let request = TransportRequest::DialPeer(requested_peer_id, addr, response_tx);
                     self.transport_reqs_tx.send(request).await.unwrap();
                 };
             },
-            ConnectionRequest::DisconnectPeer(peer_id, resp_tx) => {
+            ConnectionRequest::DisconnectPeer(peer_id, disconnect_reason, resp_tx) => {
+                // Update the connection disconnect metrics
+                counters::update_network_connection_operation_metrics(
+                    &self.network_context,
+                    counters::DISCONNECT_LABEL.into(),
+                    disconnect_reason.get_label(),
+                );
+
                 // Send a CloseConnection request to Peer and drop the send end of the
                 // PeerRequest channel.
                 if let Some((conn_metadata, sender)) = self.active_peers.remove(&peer_id) {

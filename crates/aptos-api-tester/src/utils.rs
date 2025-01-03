@@ -181,8 +181,8 @@ pub async fn check_balance(
     expected: U64,
 ) -> Result<(), TestFailure> {
     // actual
-    let actual = match client.get_account_balance(address).await {
-        Ok(response) => response.into_inner().coin.value,
+    let actual = match client.view_apt_account_balance(address).await {
+        Ok(response) => response.into_inner(),
         Err(e) => {
             error!(
                 "test: {} part: check_account_data ERROR: {}, with error {:?}",
@@ -195,7 +195,7 @@ pub async fn check_balance(
     };
 
     // compare
-    if expected != actual {
+    if expected.0 != actual {
         error!(
             "test: {} part: check_account_data FAIL: {}, expected {:?}, got {:?}",
             &test_name.to_string(),

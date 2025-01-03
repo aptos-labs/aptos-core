@@ -122,7 +122,9 @@ impl ModuleGenerator {
     ) -> (FF::CompiledModule, SourceMap, Option<FF::FunctionHandle>) {
         let options = module_env.env.get_extension::<Options>().expect("options");
         let language_version = options.language_version.unwrap_or_default();
-        let compiler_version = options.compiler_version.unwrap_or(CompilerVersion::V2_0);
+        let compiler_version = options
+            .compiler_version
+            .unwrap_or(CompilerVersion::latest_stable());
         let gen_access_specifiers = language_version.is_at_least(LanguageVersion::V2_0)
             && options.experiment_on(Experiment::GEN_ACCESS_SPECIFIERS);
         let compilation_metadata = CompilationMetadata::new(compiler_version, language_version);
@@ -365,7 +367,18 @@ impl ModuleGenerator {
                     ReferenceKind::Mutable => FF::SignatureToken::MutableReference(target_ty),
                 }
             },
-            Fun(_, _) | TypeDomain(_) | ResourceDomain(_, _, _) | Error | Var(_) => {
+            Fun(_param_ty, _result_ty, _abilities) => {
+                // TODO(LAMBDA)
+                ctx.error(
+                    loc,
+                    format!(
+                        "Unimplemented type: {}",
+                        ty.display(&ctx.env.get_type_display_ctx())
+                    ),
+                );
+                FF::SignatureToken::Bool
+            },
+            TypeDomain(_) | ResourceDomain(_, _, _) | Error | Var(_) => {
                 ctx.internal_error(
                     loc,
                     format!(
@@ -1064,7 +1077,7 @@ impl<'env> ModuleContext<'env> {
                 if fun.is_inline() {
                     continue;
                 }
-                if let Some(callees) = fun.get_called_functions() {
+                if let Some(callees) = fun.get_used_functions() {
                     let mut usage = usage_map[&fun.get_id()].clone();
                     let count = usage.len();
                     // Extend usage by that of callees from the same module. Acquires is only

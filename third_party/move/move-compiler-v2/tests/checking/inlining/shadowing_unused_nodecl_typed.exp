@@ -47,5 +47,34 @@ module 0x42::Test {
     }
 } // end 0x42::Test
 
+// -- Sourcified model before bytecode pipeline
+module 0x42::Test {
+    public inline fun foo(f: |(u64, u64)|, z: u64) {
+        {
+            let (z) = (z);
+            f(3, 5);
+        };
+    }
+    public inline fun quux(f: |(u64, u64)|, z: u64) {
+        f(3, 5);
+    }
+    public fun test_shadowing() {
+        let _x = 1;
+        {
+            {
+                _x = 3;
+            };
+        };
+        if (_x == 3) () else abort 0
+    }
+    public fun test_shadowing2() {
+        let _x = 1;
+        {
+            _x = 3;
+        };
+        if (_x == 3) () else abort 0
+    }
+}
+
 
 ============ bytecode verification succeeded ========

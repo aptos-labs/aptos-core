@@ -6,8 +6,8 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 7 │     fun f<T>() {
   │         ^
   │
-  = `f<T>` calls `g<M::S<T>>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_type_con.move:8
-  = `g<M::S<T>>` calls `f<M::S<T>>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_type_con.move:12
+  = `f<T>` calls `g<S<T>>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_type_con.move:8
+  = `g<S<T>>` calls `f<S<T>>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_type_con.move:12
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_type_con.move:11:9
@@ -16,4 +16,4 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
    │         ^
    │
    = `g<T>` calls `f<T>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_type_con.move:12
-   = `f<T>` calls `g<M::S<T>>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_type_con.move:8
+   = `f<T>` calls `g<S<T>>` at tests/cyclic-instantiation-checker/v1-tests/mutually_recursive_type_con.move:8

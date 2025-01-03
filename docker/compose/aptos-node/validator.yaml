@@ -21,6 +21,10 @@ consensus:
 execution:
   genesis_file_location: "/opt/aptos/genesis/genesis.blob"
 
+storage:
+  rocksdb_configs:
+    enable_storage_sharding: true
+
 validator_network:
   discovery_method: "onchain"
   mutual_authentication: true

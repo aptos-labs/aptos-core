@@ -55,6 +55,7 @@ module "validator" {
   gke_node_autoprovisioning_max_memory = var.gke_node_autoprovisioning_max_memory
   gke_autoscaling_profile              = var.gke_autoscaling_profile
   gke_autoscaling_max_node_count       = var.gke_autoscaling_max_node_count
+  enable_vertical_pod_autoscaling      = var.enable_vertical_pod_autoscaling
 
   # Testnet config
   workspace_name_override = var.workspace_name_override

@@ -2,12 +2,14 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::vm_validator::{get_account_sequence_number, TransactionValidation, VMValidator};
+use crate::vm_validator::{get_account_sequence_number, PooledVMValidator, TransactionValidation};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_db::AptosDB;
 use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
-use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
+use aptos_storage_interface::{
+    state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReaderWriter,
+};
 use aptos_types::{
     account_address, account_config,
     chain_id::ChainId,
@@ -15,14 +17,14 @@ use aptos_types::{
     transaction::{Script, TransactionPayload},
     vm_status::StatusCode,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use move_core_types::{account_address::AccountAddress, gas_algebra::GasQuantity};
 use rand::SeedableRng;
 
 const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 6 * 1024 * 1024;
 
 struct TestValidator {
-    vm_validator: VMValidator,
+    vm_validator: PooledVMValidator,
     _db_path: aptos_temppath::TempPath,
 }
 
@@ -31,7 +33,7 @@ impl TestValidator {
         let _db_path = aptos_temppath::TempPath::new();
         _db_path.create_as_dir().unwrap();
         let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(_db_path.path()));
-        aptos_executor_test_helpers::bootstrap_genesis::<AptosVM>(
+        aptos_executor_test_helpers::bootstrap_genesis::<AptosVMBlockExecutor>(
             &db_rw,
             &aptos_vm_genesis::test_genesis_transaction(),
         )
@@ -39,7 +41,7 @@ impl TestValidator {
 
         // Create another client for the vm_validator since the one used for the executor will be
         // run on another runtime which will be dropped before this function returns.
-        let vm_validator = VMValidator::new(db);
+        let vm_validator = PooledVMValidator::new(db, 1);
         TestValidator {
             vm_validator,
             _db_path,
@@ -48,7 +50,7 @@ impl TestValidator {
 }
 
 impl std::ops::Deref for TestValidator {
-    type Target = VMValidator;
+    type Target = PooledVMValidator;
 
     fn deref(&self) -> &Self::Target {
         &self.vm_validator
@@ -206,6 +208,9 @@ fn test_get_account_sequence_number() {
     let root_address = account_config::aptos_test_root_address();
     let state_view = vm_validator
         .vm_validator
+        .get_next_vm()
+        .lock()
+        .unwrap()
         .db_reader
         .latest_state_checkpoint_view()
         .unwrap();

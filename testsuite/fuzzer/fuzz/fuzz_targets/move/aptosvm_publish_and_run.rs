@@ -31,9 +31,9 @@ use std::{
     time::Instant,
 };
 mod utils;
-use utils::{
-    check_for_invariant_violation, publish_group, sort_by_deps, Authenticator, ExecVariant,
-    RunnableState,
+use utils::vm::{
+    check_for_invariant_violation, publish_group, sort_by_deps, ExecVariant,
+    FuzzerRunnableAuthenticator, RunnableState,
 };
 
 // genesis write set generated once for each fuzzing session
@@ -51,7 +51,7 @@ static TP: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
 
 const MAX_TYPE_PARAMETER_VALUE: u16 = 64 / 4 * 16; // third_party/move/move-bytecode-verifier/src/signature_v2.rs#L1306-L1312
 
-const EXECUTION_TIME_GAS_RATIO: u8 = 35;
+const EXECUTION_TIME_GAS_RATIO: u8 = 50;
 
 fn check_for_invariant_violation_vmerror(e: VMError) {
     if e.status_type() == StatusType::InvariantViolation
@@ -94,7 +94,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     filter_modules(&input)?;
 
     let verifier_config = VerifierConfig::production();
-    let deserializer_config = DeserializerConfig::default();
+    let deserializer_config = DeserializerConfig::new(8, 255);
 
     for m in input.dep_modules.iter_mut() {
         // m.metadata = vec![]; // we could optimize metadata to only contain aptos metadata
@@ -258,11 +258,11 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     };
     let raw_tx = tx.raw();
     let tx = match input.tx_auth_type {
-        Authenticator::Ed25519 { sender: _ } => raw_tx
+        FuzzerRunnableAuthenticator::Ed25519 { sender: _ } => raw_tx
             .sign(&sender_acc.privkey, sender_acc.pubkey.as_ed25519().unwrap())
             .map_err(|_| Corpus::Keep)?
             .into_inner(),
-        Authenticator::MultiAgent {
+        FuzzerRunnableAuthenticator::MultiAgent {
             sender: _,
             secondary_signers,
         } => {
@@ -285,7 +285,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
                 .map_err(|_| Corpus::Keep)?
                 .into_inner()
         },
-        Authenticator::FeePayer {
+        FuzzerRunnableAuthenticator::FeePayer {
             sender: _,
             secondary_signers,
             fee_payer,

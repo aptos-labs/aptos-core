@@ -368,7 +368,7 @@ impl SolidityType {
             },
             TypeParameter(_)
             | Reference(_, _)
-            | Fun(_, _)
+            | Fun(..)
             | TypeDomain(_)
             | ResourceDomain(_, _, _)
             | Error

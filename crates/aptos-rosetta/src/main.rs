@@ -8,12 +8,16 @@
 use aptos_config::config::{ApiConfig, DEFAULT_MAX_PAGE_SIZE};
 use aptos_logger::prelude::*;
 use aptos_node::AptosNodeArgs;
-use aptos_rosetta::bootstrap;
+use aptos_rosetta::{bootstrap, common::native_coin, types::Currency};
+use aptos_sdk::move_types::language_storage::StructTag;
 use aptos_types::chain_id::ChainId;
 use clap::Parser;
 use std::{
+    collections::HashSet,
+    fs::File,
     net::SocketAddr,
     path::PathBuf,
+    str::FromStr,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -85,8 +89,13 @@ async fn main() {
 
     println!("aptos-rosetta: Starting rosetta");
     // Ensure runtime for Rosetta is up and running
-    let _rosetta = bootstrap(args.chain_id(), args.api_config(), args.rest_client())
-        .expect("aptos-rosetta: Should bootstrap rosetta server");
+    let _rosetta = bootstrap(
+        args.chain_id(),
+        args.api_config(),
+        args.rest_client(),
+        args.supported_currencies(),
+    )
+    .expect("aptos-rosetta: Should bootstrap rosetta server");
 
     println!("aptos-rosetta: Rosetta started");
     // Run until there is an interrupt
@@ -106,6 +115,9 @@ trait ServerArgs {
 
     /// Retrieve the chain id
     fn chain_id(&self) -> ChainId;
+
+    /// Supported currencies for the service
+    fn supported_currencies(&self) -> HashSet<Currency>;
 }
 
 /// Aptos Rosetta API Server
@@ -146,6 +158,14 @@ impl ServerArgs for CommandArgs {
             CommandArgs::Online(args) => args.chain_id(),
         }
     }
+
+    fn supported_currencies(&self) -> HashSet<Currency> {
+        match self {
+            CommandArgs::OnlineRemote(args) => args.supported_currencies(),
+            CommandArgs::Offline(args) => args.supported_currencies(),
+            CommandArgs::Online(args) => args.supported_currencies(),
+        }
+    }
 }
 
 #[derive(Debug, Parser)]
@@ -170,6 +190,31 @@ pub struct OfflineArgs {
     /// This can be configured to change performance characteristics
     #[clap(long, default_value_t = DEFAULT_MAX_PAGE_SIZE)]
     transactions_page_size: u16,
+
+    /// A file of currencies to support other than APT
+    ///
+    /// Example file for testnet:
+    /// ```json
+    /// [
+    ///   {
+    ///     "symbol": "TC",
+    ///     "decimals": 4,
+    ///     "metadata": {
+    ///       "fa_address": "0xb528ad40e472f8fcf0f21aa78aecd09fe68f6208036a5845e6d16b7d561c83b8",
+    ///       "move_type": "0xf5a9b6ccc95f8ad3c671ddf1e227416e71f7bcd3c971efe83c0ae8e5e028350f::test_faucet::TestFaucetCoin"
+    ///     }
+    ///   },
+    ///   {
+    ///     "symbol": "TFA",
+    ///     "decimals": 4,
+    ///     "metadata": {
+    ///       "fa_address": "0x7e51ad6e79cd113f5abe08f53ed6a3c2bfbf88561a24ae10b9e1e822e0623dfd"
+    ///     }
+    ///   }
+    /// ]
+    /// ```
+    #[clap(long)]
+    currency_config_file: Option<PathBuf>,
 }
 
 impl ServerArgs for OfflineArgs {
@@ -191,6 +236,40 @@ impl ServerArgs for OfflineArgs {
 
     fn chain_id(&self) -> ChainId {
         self.chain_id
+    }
+
+    fn supported_currencies(&self) -> HashSet<Currency> {
+        let mut supported_currencies = HashSet::new();
+        supported_currencies.insert(native_coin());
+
+        if let Some(ref filepath) = self.currency_config_file {
+            let file = File::open(filepath).unwrap();
+            let currencies: Vec<Currency> = serde_json::from_reader(file).unwrap();
+            for item in currencies.into_iter() {
+                // Do a safety check on possible currencies on startup
+                if item.symbol.as_str() == "" {
+                    warn!(
+                        "Currency {:?} has an empty symbol, and is being skipped",
+                        item
+                    );
+                } else if let Some(metadata) = item.metadata.as_ref() {
+                    if let Some(move_type) = metadata.move_type.as_ref() {
+                        if StructTag::from_str(move_type).is_ok() {
+                            supported_currencies.insert(item);
+                            continue;
+                        }
+                    }
+                    warn!(
+                        "Currency {:?} has an invalid metadata coin type, and is being skipped",
+                        item
+                    );
+                } else {
+                    supported_currencies.insert(item);
+                }
+            }
+        }
+
+        supported_currencies
     }
 }
 
@@ -218,6 +297,10 @@ impl ServerArgs for OnlineRemoteArgs {
     fn chain_id(&self) -> ChainId {
         self.offline_args.chain_id
     }
+
+    fn supported_currencies(&self) -> HashSet<Currency> {
+        self.offline_args.supported_currencies()
+    }
 }
 
 #[derive(Debug, Parser)]
@@ -241,6 +324,10 @@ impl ServerArgs for OnlineLocalArgs {
 
     fn chain_id(&self) -> ChainId {
         self.online_args.offline_args.chain_id
+    }
+
+    fn supported_currencies(&self) -> HashSet<Currency> {
+        self.online_args.offline_args.supported_currencies()
     }
 }
 

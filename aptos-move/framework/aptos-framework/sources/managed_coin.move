@@ -6,7 +6,9 @@ module aptos_framework::managed_coin {
     use std::error;
     use std::signer;
 
-    use aptos_framework::coin::{Self, BurnCapability, FreezeCapability, MintCapability};
+    use aptos_framework::coin::{Self, BurnCapability, FreezeCapability, MintCapability, destroy_burn_cap,
+        destroy_freeze_cap, destroy_mint_cap
+    };
 
     //
     // Errors
@@ -97,6 +99,32 @@ module aptos_framework::managed_coin {
         coin::register<CoinType>(account);
     }
 
+    /// Destroys capabilities from the account, so that the user no longer has access to mint or burn.
+    public entry fun destroy_caps<CoinType>(account: &signer) acquires Capabilities {
+        let (burn_cap, freeze_cap, mint_cap) = remove_caps<CoinType>(account);
+        destroy_burn_cap(burn_cap);
+        destroy_freeze_cap(freeze_cap);
+        destroy_mint_cap(mint_cap);
+    }
+
+    /// Removes capabilities from the account to be stored or destroyed elsewhere
+    public fun remove_caps<CoinType>(
+        account: &signer
+    ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) acquires Capabilities {
+        let account_addr = signer::address_of(account);
+        assert!(
+            exists<Capabilities<CoinType>>(account_addr),
+            error::not_found(ENO_CAPABILITIES),
+        );
+
+        let Capabilities<CoinType> {
+            burn_cap,
+            freeze_cap,
+            mint_cap,
+        } = move_from<Capabilities<CoinType>>(account_addr);
+        (burn_cap, freeze_cap, mint_cap)
+    }
+
     //
     // Tests
     //
@@ -156,6 +184,40 @@ module aptos_framework::managed_coin {
 
         let new_supply = coin::supply<FakeMoney>();
         assert!(option::extract(&mut new_supply) == 20, 2);
+
+        // Destroy mint capabilities
+        destroy_caps<FakeMoney>(&mod_account);
+        assert!(!exists<Capabilities<FakeMoney>>(signer::address_of(&mod_account)), 3);
+    }
+
+    #[test(source = @0xa11ce, destination = @0xb0b, mod_account = @0x1)]
+    public entry fun test_end_to_end_caps_removal(
+        source: signer,
+        destination: signer,
+        mod_account: signer
+    ) acquires Capabilities {
+        let source_addr = signer::address_of(&source);
+        let destination_addr = signer::address_of(&destination);
+        aptos_framework::account::create_account_for_test(source_addr);
+        aptos_framework::account::create_account_for_test(destination_addr);
+        aptos_framework::account::create_account_for_test(signer::address_of(&mod_account));
+        aggregator_factory::initialize_aggregator_factory_for_test(&mod_account);
+
+        initialize<FakeMoney>(
+            &mod_account,
+            b"Fake Money",
+            b"FMD",
+            10,
+            true
+        );
+        assert!(coin::is_coin_initialized<FakeMoney>(), 0);
+
+        // Remove capabilities
+        let (burn_cap, freeze_cap, mint_cap) = remove_caps<FakeMoney>(&mod_account);
+        assert!(!exists<Capabilities<FakeMoney>>(signer::address_of(&mod_account)), 3);
+        coin::destroy_mint_cap(mint_cap);
+        coin::destroy_freeze_cap(freeze_cap);
+        coin::destroy_burn_cap(burn_cap);
     }
 
     #[test(source = @0xa11ce, destination = @0xb0b, mod_account = @0x1)]

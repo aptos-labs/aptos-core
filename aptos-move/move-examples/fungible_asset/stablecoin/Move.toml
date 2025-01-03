@@ -6,7 +6,7 @@ version = "0.0.0"
 [addresses]
 stablecoin = "_"
 master_minter = "_"
-minter = "_" 
+minter = "_"
 pauser = "_"
 denylister = "_"
 
@@ -18,4 +18,4 @@ pauser = "0xdafe"
 denylister = "0xcade"
 
 [dependencies]
-AptosFramework = { local = "../../../framework/aptos-framework" }
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-framework", rev = "mainnet" }

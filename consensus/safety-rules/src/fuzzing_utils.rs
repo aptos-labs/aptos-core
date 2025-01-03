@@ -204,10 +204,10 @@ prop_compose! {
             validator_infos,
         );
         if include_epoch_state {
-            Some(EpochState {
+            Some(EpochState::new(
                 epoch,
                 verifier
-            })
+            ))
         } else {
             None
         }

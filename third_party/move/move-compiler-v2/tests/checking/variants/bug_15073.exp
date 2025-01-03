@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unbound module
+  ┌─ tests/checking/variants/bug_15073.move:8:13
+  │
+8 │             ToolType::Http { uri } => {
+  │             ^^^^^^^^ Unbound module or type alias 'ToolType'

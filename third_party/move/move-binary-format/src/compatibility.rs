@@ -33,6 +33,8 @@ pub struct Compatibility {
     pub(crate) check_struct_layout: bool,
     /// if false, treat `friend` as `private` when `check_struct_and_function_linking`.
     pub(crate) check_friend_linking: bool,
+    /// if false, entry function will be treated as regular function.
+    pub(crate) treat_entry_as_public: bool,
 }
 
 impl Default for Compatibility {
@@ -41,6 +43,7 @@ impl Default for Compatibility {
             check_struct_and_pub_function_linking: true,
             check_struct_layout: true,
             check_friend_linking: true,
+            treat_entry_as_public: true,
         }
     }
 }
@@ -55,14 +58,20 @@ impl Compatibility {
             check_struct_and_pub_function_linking: false,
             check_struct_layout: false,
             check_friend_linking: false,
+            treat_entry_as_public: false,
         }
     }
 
-    pub fn new(check_struct_layout: bool, check_friend_linking: bool) -> Self {
+    pub fn new(
+        check_struct_layout: bool,
+        check_friend_linking: bool,
+        treat_entry_as_public: bool,
+    ) -> Self {
         Self {
             check_struct_and_pub_function_linking: true,
             check_struct_layout,
             check_friend_linking,
+            treat_entry_as_public,
         }
     }
 
@@ -139,11 +148,8 @@ impl Compatibility {
         //   - if the function visibility is upgraded to public, it is OK
         //   - otherwise, it is considered as incompatible.
         //
-        // NOTE: it is possible to relax the compatibility checking for a friend function, i.e.,
-        // we can remove/change a friend function if the function is not used by any module in the
-        // friend list. But for simplicity, we decided to go to the more restrictive form now and
-        // we may revisit this in the future.
         for old_func in old_view.functions() {
+            // private, non entry function doesn't need to follow any checks here, skip
             if old_func.visibility() == Visibility::Private && !old_func.is_entry() {
                 // Function not exposed, continue with next one
                 continue;
@@ -152,15 +158,28 @@ impl Compatibility {
                 Some(new_func) => new_func,
                 None => {
                     // Function has been removed
+                    // Function is NOT a private, non entry function.
                     if !matches!(old_func.visibility(), Visibility::Friend)
+                        // Above: Either Private Entry, or Public
                         || self.check_friend_linking
+                        // Here we know that the old_function has to be Friend.
+                        // And if friends are not considered private (self.check_friend_linking is true), we can't update.
+                        || (old_func.is_entry() && self.treat_entry_as_public)
+                    // Here we know that the old_func has to be Friend, and the check_friend_linking is set to false.
+                    // We make sure that we don't allow any Entry functions to be deleted, when self.treat_entry_as_public is set (treats entry as public)
                     {
                         errors.push(format!("removed function `{}`", old_func.name()));
                     }
                     continue;
                 },
             };
-            if matches!(old_func.visibility(), Visibility::Friend) && !self.check_friend_linking {
+
+            if matches!(old_func.visibility(), Visibility::Friend)
+                && !self.check_friend_linking
+                // Above: We want to skip linking checks for public(friend) if self.check_friend_linking is set to false.
+                && !(old_func.is_entry() && self.treat_entry_as_public)
+            // However, public(friend) entry function still needs to be checked.
+            {
                 continue;
             }
             let is_vis_compatible = match (old_func.visibility(), new_func.visibility()) {

@@ -27,6 +27,7 @@ use move_vm_runtime::{
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunctionTable,
+    AsFunctionValueExtension, AsUnsyncModuleStorage, RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use rayon::prelude::*;
@@ -71,10 +72,9 @@ fn setup_test_storage<'a>(
         .compute_dependency_graph()
         .compute_topological_order()?
     {
-        let module_id = module.self_id();
         let mut module_bytes = Vec::new();
         module.serialize_for_version(Some(module.version), &mut module_bytes)?;
-        storage.publish_or_overwrite_module(module_id, module_bytes);
+        storage.add_module_bytes(module.self_addr(), module.self_name(), module_bytes.into());
     }
 
     Ok(storage)
@@ -86,6 +86,7 @@ fn print_resources_and_extensions(
     cs: &ChangeSet,
     extensions: &mut NativeContextExtensions,
     storage: &InMemoryStorage,
+    natives: &NativeFunctionTable,
 ) -> Result<String> {
     use std::fmt::Write;
     let mut buf = String::new();
@@ -104,7 +105,10 @@ fn print_resources_and_extensions(
         }
     }
 
-    extensions::print_change_sets(&mut buf, extensions);
+    let runtime_environment = RuntimeEnvironment::new(natives.clone());
+    let module_storage = storage.as_unsync_module_storage(runtime_environment);
+    let function_value_extension = module_storage.as_function_value_extension();
+    extensions::print_change_sets(&mut buf, extensions, &function_value_extension);
 
     Ok(buf)
 }
@@ -252,7 +256,14 @@ impl SharedTestingConfig {
         VMResult<Vec<Vec<u8>>>,
         TestRunInfo,
     ) {
-        let move_vm = MoveVM::new(self.native_function_table.clone());
+        // Note: While Move unit tests run concurrently, there is no publishing involved. To keep
+        // things simple, we create a new VM instance for each test.
+        let runtime_environment = RuntimeEnvironment::new(self.native_function_table.clone());
+        let move_vm = MoveVM::new_with_runtime_environment(&runtime_environment);
+        let module_storage = self
+            .starting_storage_state
+            .as_unsync_module_storage(runtime_environment.clone());
+
         let extensions = extensions::new_extensions();
         let mut session =
             move_vm.new_session_with_extensions(&self.starting_storage_state, extensions);
@@ -261,14 +272,15 @@ impl SharedTestingConfig {
         // TODO: collect VM logs if the verbose flag (i.e, `self.verbose`) is set
 
         let now = Instant::now();
-        let storage = TraversalStorage::new();
+        let traversal_storage = TraversalStorage::new();
         let serialized_return_values_result = session.execute_function_bypass_visibility(
             &test_plan.module_id,
             IdentStr::new(function_name).unwrap(),
             vec![], // no ty args, at least for now
             serialize_values(test_info.arguments.iter()),
             &mut gas_meter,
-            &mut TraversalContext::new(&storage),
+            &mut TraversalContext::new(&traversal_storage),
+            &module_storage,
         );
         let mut return_result = serialized_return_values_result.map(|res| {
             res.return_values
@@ -283,7 +295,7 @@ impl SharedTestingConfig {
         }
 
         let test_run_info = TestRunInfo::new(function_name.to_string(), now.elapsed());
-        match session.finish_with_extensions() {
+        match session.finish_with_extensions(&module_storage) {
             Ok((cs, mut extensions)) => {
                 let finalized_test_run_info = factory.lock().unwrap().finalize_test_run_info(
                     &cs,
@@ -331,6 +343,7 @@ impl SharedTestingConfig {
                                 &changeset,
                                 &mut extensions,
                                 &self.starting_storage_state,
+                                &self.native_function_table,
                             )
                             .ok()
                         })

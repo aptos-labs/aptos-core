@@ -895,6 +895,13 @@ impl TransactionInfoListWithProof {
         Self::new(AccumulatorRangeProof::new_empty(), vec![])
     }
 
+    pub fn state_checkpoint_hashes(&self) -> Vec<Option<HashValue>> {
+        self.transaction_infos
+            .iter()
+            .map(|t| t.state_checkpoint_hash())
+            .collect()
+    }
+
     /// Verifies the list of transaction infos are correct using the proof. The verifier
     /// needs to have the ledger info and the version of the first transaction in possession.
     pub fn verify(

@@ -8,10 +8,14 @@
 
 pub mod event_by_key;
 pub mod event_by_version;
+pub mod event_sequence_number;
 pub mod indexer_metadata;
 pub mod state_keys;
 pub mod table_info;
 pub mod transaction_by_account;
+pub mod translated_v1_event;
+
+use anyhow::ensure;
 use aptos_schemadb::ColumnFamilyName;
 
 pub const DEFAULT_COLUMN_FAMILY_NAME: ColumnFamilyName = "default";
@@ -22,6 +26,8 @@ pub const EVENT_BY_KEY_CF_NAME: ColumnFamilyName = "event_by_key";
 pub const EVENT_BY_VERSION_CF_NAME: ColumnFamilyName = "event_by_version";
 pub const TRANSACTION_BY_ACCOUNT_CF_NAME: ColumnFamilyName = "transaction_by_account";
 pub const STATE_KEYS_CF_NAME: ColumnFamilyName = "state_keys";
+pub const TRANSLATED_V1_EVENT_CF_NAME: ColumnFamilyName = "translated_v1_event";
+pub const EVENT_SEQUENCE_NUMBER_CF_NAME: ColumnFamilyName = "event_sequence_number";
 
 pub fn column_families() -> Vec<ColumnFamilyName> {
     vec![
@@ -39,5 +45,17 @@ pub fn internal_indexer_column_families() -> Vec<ColumnFamilyName> {
         EVENT_BY_VERSION_CF_NAME,
         TRANSACTION_BY_ACCOUNT_CF_NAME,
         STATE_KEYS_CF_NAME,
+        TRANSLATED_V1_EVENT_CF_NAME,
+        EVENT_SEQUENCE_NUMBER_CF_NAME,
     ]
+}
+
+fn ensure_slice_len_eq(data: &[u8], len: usize) -> anyhow::Result<()> {
+    ensure!(
+        data.len() == len,
+        "Unexpected data len {}, expected {}.",
+        data.len(),
+        len,
+    );
+    Ok(())
 }

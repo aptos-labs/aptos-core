@@ -17,11 +17,9 @@ use aptos_db::backup::restore_handler::RestoreHandler;
 use aptos_executor_types::VerifyExecutionMode;
 use aptos_logger::prelude::*;
 use aptos_storage_interface::AptosDbError;
-use aptos_types::{
-    on_chain_config::TimedFeatureOverride, transaction::Version,
-    vm::configs::set_timed_feature_override,
-};
+use aptos_types::{on_chain_config::TimedFeatureOverride, transaction::Version};
 use aptos_vm::AptosVM;
+use aptos_vm_environment::prod_configs::set_timed_feature_override;
 use std::sync::Arc;
 use thiserror::Error;
 

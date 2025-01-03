@@ -1,0 +1,37 @@
+
+Diagnostics:
+error: Only inline functions may have function-typed parameters, but non-inline function `LambdaTest1::inline_apply1` has a function parameter:
+  ┌─ tests/lambda/inline-parity/lambda.move:6:16
+  │
+6 │     public fun inline_apply1(f: |u64|u64, b: u64) : u64 {
+  │                ^^^^^^^^^^^^^ - Parameter `f` has function-valued type `|u64|u64`.
+
+error: Only inline functions may have function-typed parameters, but non-inline function `LambdaTest1::inline_apply` has a function parameter:
+   ┌─ tests/lambda/inline-parity/lambda.move:10:16
+   │
+10 │     public fun inline_apply(f: |u64|u64, b: u64) : u64 {
+   │                ^^^^^^^^^^^^ - Parameter `f` has function-valued type `|u64|u64`.
+
+error: Only inline functions may have function-typed parameters, but non-inline function `LambdaTest2::foreach` has a function parameter:
+   ┌─ tests/lambda/inline-parity/lambda.move:19:16
+   │
+19 │     public fun foreach<T>(v: &vector<T>, action: |&T|) { // expected to be not implemented
+   │                ^^^^^^^                   ------ Parameter `action` has function-valued type `|&T|`.
+
+error: Only inline functions may have function-typed parameters, but non-inline function `LambdaTest2::inline_apply2` has a function parameter:
+   ┌─ tests/lambda/inline-parity/lambda.move:33:16
+   │
+33 │     public fun inline_apply2(g: |u64|u64, c: u64) : u64 {
+   │                ^^^^^^^^^^^^^ - Parameter `g` has function-valued type `|u64|u64`.
+
+error: Only inline functions may have function-typed parameters, but non-inline function `LambdaTest2::inline_apply3` has a function parameter:
+   ┌─ tests/lambda/inline-parity/lambda.move:37:16
+   │
+37 │     public fun inline_apply3(g: |u64|u64, c: u64) : u64 {
+   │                ^^^^^^^^^^^^^ - Parameter `g` has function-valued type `|u64|u64`.
+
+error: Only inline functions may have function-typed parameters, but non-inline function `LambdaTest::inline_apply` has a function parameter:
+   ┌─ tests/lambda/inline-parity/lambda.move:49:16
+   │
+49 │     public fun inline_apply(f: |u64|u64, b: u64) : u64 {
+   │                ^^^^^^^^^^^^ - Parameter `f` has function-valued type `|u64|u64`.

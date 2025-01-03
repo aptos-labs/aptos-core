@@ -9,17 +9,9 @@ mainnet:
     # example:
     # 123: "example_transaction"
   }
+
 # testnet:
 #   transaction_stream_endpoint: https://grpc.testnet.aptoslabs.com:443
 #   api_key: YOUR_KEY_HERE
-#   versions_to_import: {
-#   }
-# devnet:
-#   transaction_stream_endpoint: https://grpc.devnet.aptoslabs.com:443
-#   api_key: YOUR_KEY_HERE
-#   versions_to_import: {
-#   }
-# custom:
-#   transaction_stream_endpoint: https://CUSTOM_ENDPOINT:443
 #   versions_to_import: {
 #   }

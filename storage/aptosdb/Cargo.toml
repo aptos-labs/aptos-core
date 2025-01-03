@@ -42,6 +42,7 @@ claims = { workspace = true }
 clap = { workspace = true, optional = true }
 crossbeam-channel = { workspace = true, optional = true }
 dashmap = { workspace = true }
+derive_more = { workspace = true }
 either = { workspace = true }
 hex = { workspace = true }
 indicatif = { workspace = true, optional = true }

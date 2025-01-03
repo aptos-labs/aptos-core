@@ -16,6 +16,10 @@ module 0x8675309::M {
         abort 0
     }
 
+    fun both_1<R: copy, C: key>(_r: R, _c: C) {
+        abort 0
+    }
+
     fun cpy<C: copy>(_c: C) {
         abort 0
     }
@@ -57,5 +61,9 @@ module 0x8675309::M {
         cpy(new_box3<U, U, C>());
 
         cpy(new_box3<U, U, U>());
+    }
+
+    fun t4<R: key, C: drop>() {
+        both_1(Coin{}, 0)
     }
 }

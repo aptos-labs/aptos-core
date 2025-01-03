@@ -11,3 +11,10 @@ pub(crate) static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
         .build()
         .unwrap()
 });
+
+pub(crate) static VALIDATION_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
+    rayon::ThreadPoolBuilder::new()
+        .thread_name(|index| format!("mempool_vali_{}", index))
+        .build()
+        .unwrap()
+});

@@ -440,7 +440,7 @@ mod tests {
             let rand_config = RandConfig::new(
                 authors[my_index],
                 target_epoch,
-                verifier,
+                verifier.into(),
                 vuf_pub_params,
                 rand_keys,
                 weighted_config,

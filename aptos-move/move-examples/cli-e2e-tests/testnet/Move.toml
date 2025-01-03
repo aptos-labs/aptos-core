@@ -9,11 +9,11 @@ addr = "_"
 addr = "0x12345"
 
 [dependencies.AptosFramework]
-git = "https://github.com/aptos-labs/aptos-core.git"
+git = "https://github.com/aptos-labs/aptos-framework.git"
 rev = "testnet"
-subdir = "aptos-move/framework/aptos-framework"
+subdir = "aptos-framework"
 
 [dependencies.AptosTokenObjects]
-git = "https://github.com/aptos-labs/aptos-core.git"
+git = "https://github.com/aptos-labs/aptos-framework.git"
 rev = "testnet"
-subdir = "aptos-move/framework/aptos-token-objects"
+subdir = "aptos-token-objects"

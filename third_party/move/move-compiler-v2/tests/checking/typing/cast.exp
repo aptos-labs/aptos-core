@@ -37,3 +37,20 @@ module 0x8675309::M {
         }
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    fun t0(x8: u8, x64: u64, x128: u128) {
+        let _ = x8;
+        let _ = x64;
+        let _ = x128;
+        let _ = x64 as u8;
+        let _ = x128 as u64;
+        let _ = x8 as u128;
+        let _ = x128 as u8;
+        let _ = x8 as u64;
+        let _ = x64 as u128;
+        let _ = 340282366920938463463374607431768211455u128 as u8;
+        let _ = 340282366920938463463374607431768211455u128 as u64;
+    }
+}

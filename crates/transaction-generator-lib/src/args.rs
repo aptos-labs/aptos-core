@@ -21,6 +21,7 @@ pub enum TransactionTypeArg {
     AccountGenerationLargePool,
     Batch100Transfer,
     PublishPackage,
+    RepublishAndCall,
     // Simple EntryPoints
     NoOp,
     NoOpFeePayer,
@@ -44,6 +45,8 @@ pub enum TransactionTypeArg {
     CreateObjects100,
     CreateObjects100WithPayload10k,
     CreateObjectsConflict100WithPayload10k,
+    VectorTrimAppendLen3000Size1,
+    VectorRemoveInsertLen3000Size1,
     ResourceGroupsGlobalWriteTag1KB,
     ResourceGroupsGlobalWriteAndReadTag1KB,
     ResourceGroupsSenderWriteTag1KB,
@@ -72,6 +75,7 @@ pub enum TransactionTypeArg {
     SmartTablePicture1BWith256Change,
     SmartTablePicture1MWith1KChangeExceedsLimit,
     DeserializeU256,
+    SimpleScript,
 }
 
 impl TransactionTypeArg {
@@ -165,6 +169,11 @@ impl TransactionTypeArg {
                     milestone_every: 1000,
                 })
             },
+            TransactionTypeArg::RepublishAndCall => TransactionType::CallCustomModulesMix {
+                entry_points: vec![(EntryPoints::Nop, 1), (EntryPoints::Republish, 1)],
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
             TransactionTypeArg::NoOp => call_custom_module(EntryPoints::Nop),
             TransactionTypeArg::NoOpFeePayer => call_custom_module(EntryPoints::NopFeePayer),
             TransactionTypeArg::NoOp2Signers => call_custom_module(EntryPoints::Nop),
@@ -213,6 +222,22 @@ impl TransactionTypeArg {
                 call_custom_module(EntryPoints::CreateObjectsConflict {
                     num_objects: 100,
                     object_payload_size: 10 * 1024,
+                })
+            },
+            TransactionTypeArg::VectorTrimAppendLen3000Size1 => {
+                call_custom_module(EntryPoints::VectorTrimAppend {
+                    vec_len: 3000,
+                    element_len: 1,
+                    index: 100,
+                    repeats: 1000,
+                })
+            },
+            TransactionTypeArg::VectorRemoveInsertLen3000Size1 => {
+                call_custom_module(EntryPoints::VectorRemoveInsert {
+                    vec_len: 3000,
+                    element_len: 1,
+                    index: 100,
+                    repeats: 1000,
                 })
             },
             TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB => {
@@ -318,6 +343,7 @@ impl TransactionTypeArg {
                 })
             },
             TransactionTypeArg::DeserializeU256 => call_custom_module(EntryPoints::DeserializeU256),
+            TransactionTypeArg::SimpleScript => call_custom_module(EntryPoints::SimpleScript),
         }
     }
 

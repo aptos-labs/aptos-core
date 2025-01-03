@@ -1,7 +1,7 @@
 processed 6 tasks
 
 task 0 'print-bytecode'. lines 1-6:
-// Move bytecode v6
+// Move bytecode v7
 script {
 
 
@@ -12,7 +12,7 @@ B0:
 }
 
 task 1 'print-bytecode'. lines 8-14:
-// Move bytecode v6
+// Move bytecode v7
 script {
 
 
@@ -23,7 +23,7 @@ B0:
 }
 
 task 2 'print-bytecode'. lines 16-20:
-// Move bytecode v6
+// Move bytecode v7
 script {
 
 
@@ -34,7 +34,7 @@ B0:
 }
 
 task 3 'print-bytecode'. lines 22-27:
-// Move bytecode v6
+// Move bytecode v7
 script {
 
 
@@ -48,7 +48,7 @@ task 4 'print-bytecode'. lines 29-36:
 Error: ParserError: Invalid Token: invalid token kind for statement Slash
 
 task 5 'print-bytecode'. lines 38-46:
-// Move bytecode v6
+// Move bytecode v7
 script {
 
 

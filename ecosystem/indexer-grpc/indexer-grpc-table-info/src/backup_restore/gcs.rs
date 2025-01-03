@@ -141,6 +141,10 @@ impl GcsBackupRestoreOperator {
                 .await
             {
                 Ok(_) => {
+                    aptos_logger::info!(
+                        "[Table Info] Successfully updated metadata to GCS bucket: {}",
+                        METADATA_FILE_NAME
+                    );
                     return Ok(());
                 },
                 // https://cloud.google.com/storage/quotas
@@ -168,12 +172,41 @@ impl GcsBackupRestoreOperator {
         // chain id + epoch is the unique identifier for the snapshot.
         let snapshot_tar_file_name = format!("chain_id_{}_epoch_{}", chain_id, epoch);
         let snapshot_path_closure = snapshot_path.clone();
+        aptos_logger::info!(
+            snapshot_tar_file_name = snapshot_tar_file_name.as_str(),
+            "[Table Info] Starting to compress the folder.",
+        );
+        // If target path does not exist, wait and log.
+        if !snapshot_path.exists() {
+            aptos_logger::warn!(
+                snapshot_path = snapshot_path.to_str(),
+                snapshot_tar_file_name = snapshot_tar_file_name.as_str(),
+                epoch = epoch,
+                "[Table Info] Directory does not exist. Waiting for the directory to be created."
+            );
+            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+            return Ok(());
+        }
         let tar_file = task::spawn_blocking(move || {
-            create_tar_gz(snapshot_path_closure.clone(), &snapshot_tar_file_name)
+            aptos_logger::info!(
+                snapshot_tar_file_name = snapshot_tar_file_name.as_str(),
+                "[Table Info] Compressing the folder."
+            );
+            let result = create_tar_gz(snapshot_path_closure.clone(), &snapshot_tar_file_name);
+            aptos_logger::info!(
+                snapshot_tar_file_name = snapshot_tar_file_name.as_str(),
+                result = result.is_ok(),
+                "[Table Info] Compressed the folder."
+            );
+            result
         })
         .await
         .context("Failed to spawn task to create snapshot backup file.")?
         .context("Failed to create tar.gz file in blocking task")?;
+        aptos_logger::info!(
+            "[Table Info] Created snapshot tar file: {:?}",
+            tar_file.file_name().unwrap()
+        );
 
         // Open the file in async mode to stream it
         let file = File::open(&tar_file)
@@ -183,6 +216,10 @@ impl GcsBackupRestoreOperator {
 
         let filename = generate_blob_name(chain_id, epoch);
 
+        aptos_logger::info!(
+            "[Table Info] Uploading snapshot to GCS bucket: {}",
+            filename
+        );
         match self
             .gcs_client
             .upload_streamed_object(
@@ -206,6 +243,10 @@ impl GcsBackupRestoreOperator {
                     .and_then(|_| fs::remove_dir_all(snapshot_path_clone))
                     .await
                     .expect("Failed to clean up after db snapshot upload");
+                aptos_logger::info!(
+                    "[Table Info] Successfully uploaded snapshot to GCS bucket: {}",
+                    filename
+                );
             },
             Err(err) => {
                 error!("Failed to upload snapshot: {}", err);

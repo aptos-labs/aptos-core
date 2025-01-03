@@ -55,8 +55,8 @@ use tokio::{runtime::Handle, task::JoinHandle, time};
 const MAX_TXNS: u64 = 1_000_000_000;
 
 // TODO Transfer cost increases during Coin => FA migration, we can reduce back later.
-pub const EXPECTED_GAS_PER_TRANSFER: u64 = 10;
-pub const EXPECTED_GAS_PER_ACCOUNT_CREATE: u64 = 2000 + 8;
+pub const EXPECTED_GAS_PER_TRANSFER: u64 = 22;
+pub const EXPECTED_GAS_PER_ACCOUNT_CREATE: u64 = 1100 + 20;
 
 const MAX_RETRIES: usize = 12;
 
@@ -717,13 +717,15 @@ impl EmitJob {
 pub struct TxnEmitter {
     txn_factory: TransactionFactory,
     rng: StdRng,
+    rest_cli: RestClient,
 }
 
 impl TxnEmitter {
-    pub fn new(transaction_factory: TransactionFactory, rng: StdRng) -> Self {
+    pub fn new(transaction_factory: TransactionFactory, rng: StdRng, rest_cli: RestClient) -> Self {
         Self {
             txn_factory: transaction_factory,
             rng,
+            rest_cli,
         }
     }
 
@@ -775,6 +777,11 @@ impl TxnEmitter {
                         .expect("keyless_ephem_secret_key to not be None")
                         .as_ref(),
                 )?;
+                let keyless_config = self
+                    .rest_cli
+                    .get_resource(AccountAddress::ONE, "0x1::keyless_account::Configuration")
+                    .await?
+                    .into_inner();
                 create_keyless_account_generator(
                     ephem_sk,
                     req.epk_expiry_date_secs
@@ -783,6 +790,7 @@ impl TxnEmitter {
                         .as_deref()
                         .expect("keyless_jwt to not be None"),
                     req.proof_file_path.as_deref(),
+                    keyless_config,
                 )?
             },
         };

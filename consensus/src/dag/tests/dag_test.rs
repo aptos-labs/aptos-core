@@ -138,7 +138,7 @@ fn setup() -> (
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
     let epoch_state = Arc::new(EpochState {
         epoch: 1,
-        verifier: validator_verifier,
+        verifier: validator_verifier.into(),
     });
     let storage = Arc::new(MockStorage::new());
     let payload_manager = Arc::new(MockPayloadManager {});

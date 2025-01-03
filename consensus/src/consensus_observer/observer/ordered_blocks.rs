@@ -9,10 +9,10 @@ use crate::consensus_observer::{
     network::observer_message::{CommitDecision, OrderedBlock},
 };
 use aptos_config::config::ConsensusObserverConfig;
-use aptos_consensus_types::common::Round;
+use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
 use aptos_logger::{debug, warn};
-use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfoWithSignatures};
-use std::collections::BTreeMap;
+use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use std::{collections::BTreeMap, sync::Arc};
 
 /// A simple struct to store ordered blocks
 pub struct OrderedBlockStore {
@@ -54,10 +54,10 @@ impl OrderedBlockStore {
     }
 
     /// Returns the last ordered block (if any)
-    pub fn get_last_ordered_block(&self) -> Option<BlockInfo> {
+    pub fn get_last_ordered_block(&self) -> Option<Arc<PipelinedBlock>> {
         self.ordered_blocks
             .last_key_value()
-            .map(|(_, (ordered_block, _))| ordered_block.last_block().block_info())
+            .map(|(_, (ordered_block, _))| ordered_block.last_block())
     }
 
     /// Returns the ordered block for the given epoch and round (if any)
@@ -217,7 +217,8 @@ mod test {
     };
     use aptos_crypto::HashValue;
     use aptos_types::{
-        aggregate_signature::AggregateSignature, ledger_info::LedgerInfo, transaction::Version,
+        aggregate_signature::AggregateSignature, block_info::BlockInfo, ledger_info::LedgerInfo,
+        transaction::Version,
     };
     use std::sync::Arc;
 
@@ -339,8 +340,15 @@ mod test {
 
     #[test]
     fn test_get_last_ordered_block() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            ..ConsensusObserverConfig::default()
+        };
+
         // Create a new ordered block store
-        let mut ordered_block_store = OrderedBlockStore::new(ConsensusObserverConfig::default());
+        let mut ordered_block_store = OrderedBlockStore::new(consensus_observer_config);
 
         // Verify that we have no last ordered block
         assert!(ordered_block_store.get_last_ordered_block().is_none());
@@ -359,7 +367,10 @@ mod test {
         let last_ordered_block_info = last_ordered_block.last_block().block_info();
         assert_eq!(
             last_ordered_block_info,
-            ordered_block_store.get_last_ordered_block().unwrap()
+            ordered_block_store
+                .get_last_ordered_block()
+                .unwrap()
+                .block_info()
         );
 
         // Insert several ordered blocks for the next epoch
@@ -373,14 +384,24 @@ mod test {
         let last_ordered_block_info = last_ordered_block.last_block().block_info();
         assert_eq!(
             last_ordered_block_info,
-            ordered_block_store.get_last_ordered_block().unwrap()
+            ordered_block_store
+                .get_last_ordered_block()
+                .unwrap()
+                .block_info()
         );
     }
 
     #[test]
     fn test_get_ordered_block() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            ..ConsensusObserverConfig::default()
+        };
+
         // Create a new ordered block store
-        let mut ordered_block_store = OrderedBlockStore::new(ConsensusObserverConfig::default());
+        let mut ordered_block_store = OrderedBlockStore::new(consensus_observer_config);
 
         // Insert several ordered blocks for the current epoch
         let current_epoch = 0;
@@ -456,8 +477,15 @@ mod test {
 
     #[test]
     fn test_remove_blocks_for_commit() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            ..ConsensusObserverConfig::default()
+        };
+
         // Create a new ordered block store
-        let mut ordered_block_store = OrderedBlockStore::new(ConsensusObserverConfig::default());
+        let mut ordered_block_store = OrderedBlockStore::new(consensus_observer_config);
 
         // Insert several ordered blocks for the current epoch
         let current_epoch = 10;
@@ -553,8 +581,15 @@ mod test {
 
     #[test]
     fn test_update_commit_decision() {
+        // Create a new consensus observer config
+        let max_num_pending_blocks = 100;
+        let consensus_observer_config = ConsensusObserverConfig {
+            max_num_pending_blocks,
+            ..ConsensusObserverConfig::default()
+        };
+
         // Create a new ordered block store
-        let mut ordered_block_store = OrderedBlockStore::new(ConsensusObserverConfig::default());
+        let mut ordered_block_store = OrderedBlockStore::new(consensus_observer_config);
 
         // Insert several ordered blocks for the current epoch
         let current_epoch = 0;

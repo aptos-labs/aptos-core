@@ -14,10 +14,9 @@ anyhow = { workspace = true }
 difference = { workspace = true }
 dirs-next = { workspace = true }
 hex = { workspace = true }
+move-core-types = { workspace = true }
 num-bigint = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 sha2 = { workspace = true }
 walkdir = { workspace = true }
-
-move-core-types = { path = "../move-core/types" }

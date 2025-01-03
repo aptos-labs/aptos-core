@@ -51,7 +51,8 @@ impl InternalIndexerDBService {
                 .expect("Failed to open internal indexer db"),
         );
 
-        let internal_indexer_db_config = InternalIndexerDBConfig::new(false, false, true, 10_000);
+        let internal_indexer_db_config =
+            InternalIndexerDBConfig::new(true, true, true, 0, true, 10_000);
         Some(InternalIndexerDB::new(arc_db, internal_indexer_db_config))
     }
 
@@ -137,6 +138,29 @@ impl InternalIndexerDBService {
             }
         }
 
+        if node_config.indexer_db_config.enable_event_v2_translation() {
+            let event_v2_translation_start_version = self
+                .db_indexer
+                .indexer_db
+                .get_event_v2_translation_version()?
+                .map_or(0, |v| v + 1);
+            if node_config
+                .indexer_db_config
+                .event_v2_translation_ignores_below_version()
+                < start_version
+                && start_version != event_v2_translation_start_version
+            {
+                panic!(
+                    "Cannot start event v2 translation indexer because the progress doesn't match. \
+                    start_version: {}, event_v2_translation_start_version: {}",
+                    start_version, event_v2_translation_start_version
+                );
+            }
+            if !node_config.indexer_db_config.enable_event() {
+                panic!("Cannot start event v2 translation indexer because event indexer is not enabled.");
+            }
+        }
+
         Ok(start_version)
     }
 
@@ -174,6 +198,27 @@ impl InternalIndexerDBService {
             start_version = next_version;
         }
     }
+
+    // For internal testing
+    pub async fn run_with_end_version(
+        &mut self,
+        node_config: &NodeConfig,
+        end_version: Option<Version>,
+    ) -> Result<()> {
+        let mut start_version = self.get_start_version(node_config).await?;
+        while start_version <= end_version.unwrap_or(std::u64::MAX) {
+            let next_version = self.db_indexer.process_a_batch(start_version)?;
+            if next_version == start_version {
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                continue;
+            }
+            start_version = next_version;
+        }
+        // We should never stop the internal indexer
+        tokio::time::sleep(std::time::Duration::from_secs(100)).await;
+
+        Ok(())
+    }
 }
 
 pub struct MockInternalIndexerDBService {
@@ -186,6 +231,7 @@ impl MockInternalIndexerDBService {
         db_reader: Arc<dyn DbReader>,
         node_config: &NodeConfig,
         update_receiver: WatchReceiver<Version>,
+        end_version: Option<Version>,
     ) -> Self {
         if !node_config
             .indexer_db_config
@@ -205,7 +251,7 @@ impl MockInternalIndexerDBService {
         let config_clone = node_config.to_owned();
         handle.spawn(async move {
             internal_indexer_db_service
-                .run(&config_clone)
+                .run_with_end_version(&config_clone, end_version)
                 .await
                 .unwrap();
         });

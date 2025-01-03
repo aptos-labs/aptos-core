@@ -13,7 +13,7 @@ use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, transaction::Version, waypoint::Waypoint,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use either::Either;
 use std::{fs, path::Path, sync::Arc, time::Instant};
 use tokio::{
@@ -33,8 +33,9 @@ pub(crate) fn maybe_apply_genesis(
         .unwrap_or(&node_config.base.waypoint)
         .genesis_waypoint();
     if let Some(genesis) = get_genesis_txn(node_config) {
-        let ledger_info_opt = maybe_bootstrap::<AptosVM>(db_rw, genesis, genesis_waypoint)
-            .map_err(|err| anyhow!("DB failed to bootstrap {}", err))?;
+        let ledger_info_opt =
+            maybe_bootstrap::<AptosVMBlockExecutor>(db_rw, genesis, genesis_waypoint)
+                .map_err(|err| anyhow!("DB failed to bootstrap {}", err))?;
         Ok(ledger_info_opt)
     } else {
         info ! ("Genesis txn not provided! This is fine only if you don't expect to apply it. Otherwise, the config is incorrect!");

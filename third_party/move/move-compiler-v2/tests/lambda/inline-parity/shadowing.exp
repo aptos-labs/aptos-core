@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: Only inline functions may have function-typed parameters, but non-inline function `Test::foo` has a function parameter:
+  ┌─ tests/lambda/inline-parity/shadowing.move:4:16
+  │
+4 │     public fun foo(f:|u64|) {
+  │                ^^^ - Parameter `f` has function-valued type `|u64|`.

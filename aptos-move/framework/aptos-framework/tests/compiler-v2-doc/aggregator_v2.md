@@ -50,10 +50,14 @@ read, read_snapshot, read_derived_string
 -  [Function `copy_snapshot`](#0x1_aggregator_v2_copy_snapshot)
 -  [Function `string_concat`](#0x1_aggregator_v2_string_concat)
 -  [Specification](#@Specification_1)
+    -  [Struct `Aggregator`](#@Specification_1_Aggregator)
+    -  [Function `max_value`](#@Specification_1_max_value)
     -  [Function `create_aggregator`](#@Specification_1_create_aggregator)
     -  [Function `create_unbounded_aggregator`](#@Specification_1_create_unbounded_aggregator)
     -  [Function `try_add`](#@Specification_1_try_add)
+    -  [Function `add`](#@Specification_1_add)
     -  [Function `try_sub`](#@Specification_1_try_sub)
+    -  [Function `sub`](#@Specification_1_sub)
     -  [Function `is_at_least_impl`](#@Specification_1_is_at_least_impl)
     -  [Function `read`](#@Specification_1_read)
     -  [Function `snapshot`](#@Specification_1_snapshot)
@@ -221,7 +225,7 @@ and any calls will raise this error.
 
 <a id="0x1_aggregator_v2_ECONCAT_STRING_LENGTH_TOO_LARGE"></a>
 
-Arguments passed to concat exceed max limit of 256 bytes (for prefix and suffix together).
+Arguments passed to concat exceed max limit of 1024 bytes (for prefix and suffix together).
 
 
 <pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_ECONCAT_STRING_LENGTH_TOO_LARGE">ECONCAT_STRING_LENGTH_TOO_LARGE</a>: u64 = 8;
@@ -709,7 +713,7 @@ Useful for when object is sometimes created via string_concat(), and sometimes d
 Concatenates <code>before</code>, <code>snapshot</code> and <code>after</code> into a single string.
 snapshot passed needs to have integer type - currently supported types are u64 and u128.
 Raises EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE if called with another type.
-If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_TOO_LARGE is raised.
+If length of prefix and suffix together exceeds 1024 bytes, ECONCAT_STRING_LENGTH_TOO_LARGE is raised.
 
 Parallelism info: This operation enables parallelism.
 
@@ -783,6 +787,94 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 ## Specification
 
 
+
+<a id="0x1_aggregator_v2_spec_get_max_value"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_max_value">spec_get_max_value</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;): IntElement;
+</code></pre>
+
+
+
+
+<a id="0x1_aggregator_v2_spec_get_string_value"></a>
+
+
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_string_value">spec_get_string_value</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;IntElement&gt;): String;
+</code></pre>
+
+
+
+
+<a id="0x1_aggregator_v2_spec_read_snapshot"></a>
+
+
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_read_snapshot">spec_read_snapshot</a>&lt;IntElement&gt;(snapshot: <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;IntElement&gt;): IntElement {
+   snapshot.value
+}
+</code></pre>
+
+
+
+
+<a id="0x1_aggregator_v2_spec_read_derived_string"></a>
+
+
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_read_derived_string">spec_read_derived_string</a>(snapshot: <a href="aggregator_v2.md#0x1_aggregator_v2_DerivedStringSnapshot">DerivedStringSnapshot</a>): String {
+   snapshot.value
+}
+</code></pre>
+
+
+
+<a id="@Specification_1_Aggregator"></a>
+
+### Struct `Aggregator`
+
+
+<pre><code><b>struct</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt; <b>has</b> drop, store
+</code></pre>
+
+
+
+<dl>
+<dt>
+<code>value: IntElement</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>max_value: IntElement</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_max_value"></a>
+
+### Function `max_value`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_max_value">max_value</a>&lt;IntElement: <b>copy</b>, drop&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;): IntElement
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
 <a id="@Specification_1_create_aggregator"></a>
 
 ### Function `create_aggregator`
@@ -794,7 +886,7 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 
-<pre><code><b>pragma</b> opaque;
+<pre><code><b>pragma</b> intrinsic;
 </code></pre>
 
 
@@ -810,7 +902,7 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 
-<pre><code><b>pragma</b> opaque;
+<pre><code><b>pragma</b> intrinsic;
 </code></pre>
 
 
@@ -826,7 +918,23 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 
-<pre><code><b>pragma</b> opaque;
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_add"></a>
+
+### Function `add`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_add">add</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, value: IntElement)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
 </code></pre>
 
 
@@ -842,7 +950,23 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 
-<pre><code><b>pragma</b> opaque;
+<pre><code><b>pragma</b> intrinsic;
+</code></pre>
+
+
+
+<a id="@Specification_1_sub"></a>
+
+### Function `sub`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_sub">sub</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, value: IntElement)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic;
 </code></pre>
 
 
@@ -858,7 +982,7 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 
-<pre><code><b>pragma</b> opaque;
+<pre><code><b>pragma</b> intrinsic;
 </code></pre>
 
 
@@ -874,7 +998,7 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 
-<pre><code><b>pragma</b> opaque;
+<pre><code><b>pragma</b> intrinsic;
 </code></pre>
 
 
@@ -891,6 +1015,8 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 <pre><code><b>pragma</b> opaque;
+<b>include</b> <a href="aggregator_v2.md#0x1_aggregator_v2_AbortsIfIntElement">AbortsIfIntElement</a>&lt;IntElement&gt;;
+<b>ensures</b> [abstract] result.value == <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_value">spec_get_value</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
 </code></pre>
 
 
@@ -907,6 +1033,8 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 <pre><code><b>pragma</b> opaque;
+<b>include</b> <a href="aggregator_v2.md#0x1_aggregator_v2_AbortsIfIntElement">AbortsIfIntElement</a>&lt;IntElement&gt;;
+<b>ensures</b> [abstract] result.value == value;
 </code></pre>
 
 
@@ -923,6 +1051,8 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 <pre><code><b>pragma</b> opaque;
+<b>include</b> <a href="aggregator_v2.md#0x1_aggregator_v2_AbortsIfIntElement">AbortsIfIntElement</a>&lt;IntElement&gt;;
+<b>ensures</b> [abstract] result == snapshot.value;
 </code></pre>
 
 
@@ -939,6 +1069,8 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == snapshot.value;
 </code></pre>
 
 
@@ -955,6 +1087,8 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] len(value.bytes) &gt; 1024;
+<b>ensures</b> [abstract] result.value == value;
 </code></pre>
 
 
@@ -971,6 +1105,20 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 <pre><code><b>pragma</b> opaque;
+<b>include</b> <a href="aggregator_v2.md#0x1_aggregator_v2_AbortsIfIntElement">AbortsIfIntElement</a>&lt;IntElement&gt;;
+<b>ensures</b> [abstract] result.value.bytes == concat(before.bytes, concat(<a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_string_value">spec_get_string_value</a>(snapshot).bytes, after.bytes));
+<b>aborts_if</b> [abstract] len(before.bytes) + len(after.bytes) &gt; 1024;
+</code></pre>
+
+
+
+
+<a id="0x1_aggregator_v2_AbortsIfIntElement"></a>
+
+
+<pre><code><b>schema</b> <a href="aggregator_v2.md#0x1_aggregator_v2_AbortsIfIntElement">AbortsIfIntElement</a>&lt;IntElement&gt; {
+    <b>aborts_if</b> [abstract] <a href="../../../aptos-stdlib/tests/compiler-v2-doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;IntElement&gt;().bytes != b"u64" && <a href="../../../aptos-stdlib/tests/compiler-v2-doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;IntElement&gt;().bytes != b"u128";
+}
 </code></pre>
 
 
@@ -988,6 +1136,7 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>true</b>;
 </code></pre>
 
 
@@ -1005,6 +1154,16 @@ DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTI
 
 
 <pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>true</b>;
+</code></pre>
+
+
+
+
+<a id="0x1_aggregator_v2_spec_get_value"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_spec_get_value">spec_get_value</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;): IntElement;
 </code></pre>
 
 

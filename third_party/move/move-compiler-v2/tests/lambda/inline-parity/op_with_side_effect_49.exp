@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: Only inline functions may have function-typed parameters, but non-inline function `m::call` has a function parameter:
+  ┌─ tests/lambda/inline-parity/op_with_side_effect_49.move:3:9
+  │
+3 │     fun call(f: ||u64): u64 {
+  │         ^^^^ - Parameter `f` has function-valued type `|()|u64`.

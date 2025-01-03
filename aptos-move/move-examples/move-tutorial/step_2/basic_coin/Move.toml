@@ -3,6 +3,6 @@ name = "basic_coin"
 version = "0.0.0"
 
 [dependencies.AptosStdlib]
-git = 'https://github.com/aptos-labs/aptos-core.git'
+git = 'https://github.com/aptos-labs/aptos-framework.git'
 rev = 'main'
-subdir = 'aptos-move/framework/aptos-stdlib'
+subdir = 'aptos-stdlib'

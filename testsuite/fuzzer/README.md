@@ -12,7 +12,10 @@ The script includes several functions to manage and execute fuzz tests:
     ```bash
     ./fuzz.sh add <fuzz_target_name>
     ```
-
+- `block-builder`: Run rust utility to build fuzzers.
+    ```bash
+    ./fuzz.sh block-builder <utility> [args]
+    ```
 - `build`: Build specified fuzz targets or all targets.
     ```bash
     ./fuzz.sh build <fuzz_target|all> [target_dir]
@@ -22,7 +25,22 @@ The script includes several functions to manage and execute fuzz tests:
     ```bash
     ./fuzz.sh build-oss-fuzz <target_dir>
     ```
-
+- `coverage`: Generates coverage report in HTML format
+    ```bash
+    ./fuzz.sh coverage <fuzz_target>
+    ```
+- `coverage-cleanup`:
+    ```bash
+    ./fuzz.sh clean-coverage <fuzz_target|all>
+    ```
+- `degub`: Run fuzzer with GDB and pass test_case as input
+    ```bash
+    ./fuzz.sh debug <fuzz_target> <test_case>
+    ```
+- `flamegraph`: Generates flamegraph report (might requires addition setups on the os)
+    ```
+    ./fuzz.sh flamegraph <fuzz_target> <test_case>
+    ```
 - `list`: List all existing fuzz targets.
     ```bash
     ./fuzz.sh list
@@ -96,6 +114,15 @@ When building in the OSS-Fuzz environment, `fuzz.sh` will place the corpus archi
 - **Handle Diverse Inputs:** Ensure that the harness can handle a wide range of input formats and sizes.
 - **Error Handling:** Implement robust error handling to intercept crashes or unwanted/unexpected behavior.
 - **Performance Optimization:** Optimize for performance to enable more iterations and deeper fuzzing.
+
+## Generate Corpora
+Some fuzzers operate better if a good initial corpus is provided. In order to generate the corpus, utilities are available via `./fuzz.sh block-builder`. Once a corpus is obtained, to feed it to fuzzers running on OSS-Fuzz, building a ZIP archive with a specific name is required: `$FUZZERNAME_seed_corpus.zip`. Upload it to a publicly accessible cloud, e.g., GCP Bucket or S3; avoid GDrive. Obtain a public link and add it to the `CORPUS_ZIPS` array in `fuzz.sh`. It will automatically be downloaded and used inside Google's infrastructure.
+### Aptos-VM Publish & Run
+`./fuzz.sh block-builder generate_runnable_state /tmp/modules.csv /tmp/Modules`
+The CSV file is structured as follows:  
+- Column 1: Module name  
+- Column 2: Module address  
+- Column 3: Base64-encoded bytecode of the module
 
 ## References
 - [Rust Fuzz Book](https://rust-fuzz.github.io/book/)

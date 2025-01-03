@@ -18,6 +18,7 @@ use aptos_storage_service_notifications::StorageServiceNotificationListener;
 use aptos_storage_service_types::responses::CompleteDataRange;
 use aptos_types::{
     account_address::AccountAddress,
+    account_config::NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     chain_id::ChainId,
@@ -80,6 +81,13 @@ pub fn create_epoch_ending_ledger_info_for_epoch(
 pub fn create_event(event_key: Option<EventKey>) -> ContractEvent {
     let event_key = event_key.unwrap_or_else(EventKey::random);
     ContractEvent::new_v1(event_key, 0, TypeTag::Bool, bcs::to_bytes(&0).unwrap())
+}
+
+pub fn create_reconfig_event() -> ContractEvent {
+    ContractEvent::new_v2(
+        NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(),
+        bcs::to_bytes(&0).unwrap(),
+    )
 }
 
 /// Creates a test driver configuration for full nodes

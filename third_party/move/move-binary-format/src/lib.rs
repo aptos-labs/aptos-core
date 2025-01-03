@@ -14,6 +14,7 @@ pub mod compatibility;
 pub mod compatibility_legacy;
 #[macro_use]
 pub mod errors;
+pub mod builders;
 pub mod check_complexity;
 pub mod constant;
 pub mod control_flow_graph;
@@ -125,32 +126,6 @@ impl fmt::Display for IndexKind {
             VariantFieldInstantiation => "variant field instantiation",
             StructVariantHandle => "struct variant handle",
             StructVariantInstantiation => "struct variant instantiation",
-        };
-
-        f.write_str(desc)
-    }
-}
-
-// TODO: is this outdated?
-/// Represents the kind of a signature token.
-#[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum SignatureTokenKind {
-    /// Any sort of owned value that isn't an array (Integer, Bool, Struct etc).
-    Value,
-    /// A reference.
-    Reference,
-    /// A mutable reference.
-    MutableReference,
-}
-
-impl fmt::Display for SignatureTokenKind {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use SignatureTokenKind::*;
-
-        let desc = match self {
-            Value => "value",
-            Reference => "reference",
-            MutableReference => "mutable reference",
         };
 
         f.write_str(desc)

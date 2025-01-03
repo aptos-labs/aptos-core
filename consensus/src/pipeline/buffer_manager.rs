@@ -38,10 +38,11 @@ use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::Protoc
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_address::AccountAddress, aggregate_signature::PartialSignatures,
-    epoch_change::EpochChangeProof, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
+    account_address::AccountAddress, epoch_change::EpochChangeProof, epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
 };
 use bytes::Bytes;
+use fail::fail_point;
 use futures::{
     channel::{
         mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
@@ -126,8 +127,12 @@ pub struct BufferManager {
     commit_proof_rb_handle: Option<DropGuard>,
 
     // message received from the network
-    commit_msg_rx:
-        Option<aptos_channels::aptos_channel::Receiver<AccountAddress, IncomingCommitRequest>>,
+    commit_msg_rx: Option<
+        aptos_channels::aptos_channel::Receiver<
+            AccountAddress,
+            (AccountAddress, IncomingCommitRequest),
+        >,
+    >,
 
     persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
     persisting_phase_rx: Receiver<ExecutorResult<Round>>,
@@ -185,7 +190,7 @@ impl BufferManager {
         commit_msg_tx: Arc<NetworkSender>,
         commit_msg_rx: aptos_channels::aptos_channel::Receiver<
             AccountAddress,
-            IncomingCommitRequest,
+            (AccountAddress, IncomingCommitRequest),
         >,
         persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
         persisting_phase_rx: Receiver<ExecutorResult<Round>>,
@@ -209,7 +214,6 @@ impl BufferManager {
             .max_delay(Duration::from_secs(5));
 
         let (tx, rx) = unbounded();
-
         Self {
             author,
 
@@ -259,7 +263,6 @@ impl BufferManager {
             back_pressure_enabled,
             highest_committed_round,
             latest_round: highest_committed_round,
-
             consensus_observer_config,
             consensus_publisher,
 
@@ -415,23 +418,18 @@ impl BufferManager {
             .await
             .expect("Failed to send execution schedule request");
 
-        let mut unverified_signatures = PartialSignatures::empty();
+        let mut unverified_votes = HashMap::new();
         if let Some(block) = ordered_blocks.last() {
             if let Some(votes) = self.pending_commit_votes.remove(&block.round()) {
-                votes
-                    .values()
-                    .filter(|vote| vote.commit_info().id() == block.id())
-                    .for_each(|vote| {
-                        unverified_signatures.add_signature(vote.author(), vote.signature().clone())
-                    });
+                for (_, vote) in votes {
+                    if vote.commit_info().id() == block.id() {
+                        unverified_votes.insert(vote.author(), vote);
+                    }
+                }
             }
         }
-        let item = BufferItem::new_ordered(
-            ordered_blocks,
-            ordered_proof,
-            callback,
-            unverified_signatures,
-        );
+        let item =
+            BufferItem::new_ordered(ordered_blocks, ordered_proof, callback, unverified_votes);
         self.buffer.push_back(item);
     }
 
@@ -478,7 +476,8 @@ impl BufferManager {
             let executed_item = item.unwrap_executed_ref();
             let request = self.create_new_request(SigningRequest {
                 ordered_ledger_info: executed_item.ordered_proof.clone(),
-                commit_ledger_info: executed_item.partial_commit_proof.ledger_info().clone(),
+                commit_ledger_info: executed_item.partial_commit_proof.data().clone(),
+                blocks: executed_item.executed_blocks.clone(),
             });
             if cursor == self.signing_root {
                 let sender = self.signing_phase_tx.clone();
@@ -563,6 +562,13 @@ impl BufferManager {
     /// Internal requests are managed with ongoing_tasks.
     /// Incoming ordered blocks are pulled, it should only have existing blocks but no new blocks until reset finishes.
     async fn reset(&mut self) {
+        while let Some(item) = self.buffer.pop_front() {
+            for b in item.get_blocks() {
+                if let Some(futs) = b.abort_pipeline() {
+                    futs.wait_until_executor_finishes().await;
+                }
+            }
+        }
         self.buffer = Buffer::new();
         self.execution_root = None;
         self.signing_root = None;
@@ -704,6 +710,17 @@ impl BufferManager {
         }
     }
 
+    fn generate_commit_message(commit_vote: CommitVote) -> CommitMessage {
+        fail_point!("consensus::create_invalid_commit_vote", |_| {
+            CommitMessage::Vote(CommitVote::new_with_signature(
+                commit_vote.author(),
+                commit_vote.ledger_info().clone(),
+                aptos_crypto::bls12381::Signature::dummy_signature(),
+            ))
+        });
+        CommitMessage::Vote(commit_vote)
+    }
+
     /// If the signing response is successful, advance the item to Signed and broadcast commit votes.
     async fn process_signing_response(&mut self, response: SigningResponse) {
         let SigningResponse {
@@ -733,7 +750,7 @@ impl BufferManager {
                 let mut signed_item = item.advance_to_signed(self.author, signature);
                 let signed_item_mut = signed_item.unwrap_signed_mut();
                 let commit_vote = signed_item_mut.commit_vote.clone();
-                let commit_vote = CommitMessage::Vote(commit_vote);
+                let commit_vote = Self::generate_commit_message(commit_vote);
                 signed_item_mut.rb_handle = self
                     .do_reliable_broadcast(commit_vote)
                     .map(|handle| (Instant::now(), handle));
@@ -758,7 +775,7 @@ impl BufferManager {
                 // find the corresponding item
                 let author = vote.author();
                 let commit_info = vote.commit_info().clone();
-                trace!("Receive commit vote {} from {}", commit_info, author);
+                debug!("Receive commit vote {} from {}", commit_info, author);
                 let target_block_id = vote.commit_info().id();
                 let current_cursor = self
                     .buffer
@@ -931,12 +948,12 @@ impl BufferManager {
         let epoch_state = self.epoch_state.clone();
         let bounded_executor = self.bounded_executor.clone();
         spawn_named!("buffer manager verification", async move {
-            while let Some(commit_msg) = commit_msg_rx.next().await {
+            while let Some((sender, commit_msg)) = commit_msg_rx.next().await {
                 let tx = verified_commit_msg_tx.clone();
                 let epoch_state_clone = epoch_state.clone();
                 bounded_executor
                     .spawn(async move {
-                        match commit_msg.req.verify(&epoch_state_clone.verifier) {
+                        match commit_msg.req.verify(sender, &epoch_state_clone.verifier) {
                             Ok(_) => {
                                 let _ = tx.unbounded_send(commit_msg);
                             },
@@ -986,7 +1003,7 @@ impl BufferManager {
                 },
                 _ = self.execution_schedule_retry_rx.next() => {
                     monitor!("buffer_manager_process_execution_schedule_retry",
-                    self.retry_schedule_phase().await);
+                        self.retry_schedule_phase().await);
                 },
                 Some(response) = self.signing_phase_rx.next() => {
                     monitor!("buffer_manager_process_signing_response", {

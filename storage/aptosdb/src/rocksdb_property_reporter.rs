@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::NUM_STATE_SHARDS,
     db_options::{
         event_db_column_families, ledger_db_column_families, ledger_metadata_db_column_families,
         skip_reporting_cf, state_kv_db_column_families, state_kv_db_new_key_column_families,
@@ -24,6 +23,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::IntGaugeVec;
 use aptos_schemadb::DB;
+use aptos_storage_interface::state_store::NUM_STATE_SHARDS;
 use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,

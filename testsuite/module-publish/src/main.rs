@@ -148,9 +148,10 @@ use std::collections::HashMap;"#,
 fn write_package(file: &mut File, package_path: PathBuf, package_name: &str) -> String {
     println!("Building package {}", package_name);
     // build package
-    let package = BuiltPackage::build(package_path, BuildOptions::default())
+    let package = BuiltPackage::build(package_path, BuildOptions::move_2())
         .expect("building package must succeed");
-    let code = package.extract_code();
+    let modules = package.extract_code();
+    let mut scripts = package.extract_script_code();
     let package_metadata = package.extract_metadata().expect("Metadata must exist");
     let metadata = bcs::to_bytes(&package_metadata).expect("Metadata must serialize");
 
@@ -164,7 +165,7 @@ fn write_package(file: &mut File, package_path: PathBuf, package_name: &str) -> 
     let mut module_names = Vec::new();
 
     // write out all modules
-    for module in &code {
+    for module in &modules {
         // this is an unfortunate way to find the module name but it is not
         // clear how to do it otherwise
         let compiled_module = CompiledModule::deserialize(module).expect("Module must deserialize");
@@ -178,6 +179,16 @@ fn write_package(file: &mut File, package_path: PathBuf, package_name: &str) -> 
         writeln!(file).expect("Empty line failed");
         write_lazy(file, name.as_str(), module);
         module_names.push(name);
+    }
+
+    assert!(
+        scripts.len() <= 1,
+        "Only single script can be added per package"
+    );
+    if let Some(script) = scripts.pop() {
+        let name: String = format!("SCRIPT_{}", package_name.to_uppercase());
+        writeln!(file).expect("Empty line failed");
+        write_lazy(file, name.as_str(), &script);
     }
 
     writeln!(file).expect("Empty line failed");

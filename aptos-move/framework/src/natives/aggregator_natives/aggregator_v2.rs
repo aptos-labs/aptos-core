@@ -6,7 +6,6 @@ use aptos_aggregator::{
     bounded_math::{BoundedMath, SignedU128},
     delayed_field_extension::DelayedFieldData,
     resolver::DelayedFieldResolver,
-    types::code_invariant_error,
 };
 use aptos_gas_algebra::NumBytes;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
@@ -14,9 +13,12 @@ use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
-use aptos_types::delayed_fields::{
-    calculate_width_for_constant_string, calculate_width_for_integer_embedded_string,
-    SnapshotToStringFormula,
+use aptos_types::{
+    delayed_fields::{
+        calculate_width_for_constant_string, calculate_width_for_integer_embedded_string,
+        SnapshotToStringFormula,
+    },
+    error::code_invariant_error,
 };
 use move_binary_format::errors::PartialVMError;
 use move_vm_runtime::native_functions::NativeFunction;

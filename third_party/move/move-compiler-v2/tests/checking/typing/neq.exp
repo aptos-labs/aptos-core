@@ -1,7 +1,7 @@
 // -- Model dump before bytecode pipeline
 module 0x8675309::M {
-    struct G {
-        f: #0,
+    struct G<T> {
+        f: T,
     }
     struct R {
         f: u64,
@@ -9,7 +9,7 @@ module 0x8675309::M {
     struct S {
         u: u64,
     }
-    private fun t0(r: &M::R,r_mut: &mut M::R,s: M::S,s_ref: &M::S,s_mut: &mut M::S) {
+    private fun t0(r: &R,r_mut: &mut R,s: S,s_ref: &S,s_mut: &mut S) {
         true;
         true;
         true;
@@ -18,19 +18,55 @@ module 0x8675309::M {
         Neq<u64>(Borrow(Immutable)(0), Borrow(Immutable)(1));
         true;
         true;
-        Neq<M::S>(Borrow(Immutable)(s), s_ref);
-        Neq<M::S>(Freeze(false)(Borrow(Mutable)(s)), s_ref);
-        Neq<M::S>(Freeze(false)(Borrow(Mutable)(s)), Freeze(false)(s_mut));
-        Neq<M::S>(Borrow(Immutable)(s), Freeze(false)(s_mut));
-        Neq<M::S>(s_ref, Freeze(false)(s_mut));
-        Neq<M::S>(Freeze(false)(s_mut), Freeze(false)(s_mut));
-        Neq<M::S>(pack M::S(0), s);
-        Neq<M::R>(r, r);
-        Neq<M::R>(Freeze(false)(r_mut), Freeze(false)(r_mut));
-        Neq<M::R>(r, Freeze(false)(r_mut));
-        Neq<M::R>(Freeze(false)(r_mut), r);
-        Neq<M::G<u64>>(pack M::G<u64>(1), pack M::G<u64>(2));
-        Neq<M::G<u64>>(pack M::G<u64>(1), pack M::G<u64>(2));
+        Neq<S>(Borrow(Immutable)(s), s_ref);
+        Neq<S>(Freeze(false)(Borrow(Mutable)(s)), s_ref);
+        Neq<S>(Freeze(false)(Borrow(Mutable)(s)), Freeze(false)(s_mut));
+        Neq<S>(Borrow(Immutable)(s), Freeze(false)(s_mut));
+        Neq<S>(s_ref, Freeze(false)(s_mut));
+        Neq<S>(Freeze(false)(s_mut), Freeze(false)(s_mut));
+        Neq<S>(pack M::S(0), s);
+        Neq<R>(r, r);
+        Neq<R>(Freeze(false)(r_mut), Freeze(false)(r_mut));
+        Neq<R>(r, Freeze(false)(r_mut));
+        Neq<R>(Freeze(false)(r_mut), r);
+        Neq<G<u64>>(pack M::G<u64>(1), pack M::G<u64>(2));
+        Neq<G<u64>>(pack M::G<u64>(1), pack M::G<u64>(2));
         Tuple()
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct G<T> has drop {
+        f: T,
+    }
+    struct R {
+        f: u64,
+    }
+    struct S has drop {
+        u: u64,
+    }
+    fun t0(r: &R, r_mut: &mut R, s: S, s_ref: &S, s_mut: &mut S) {
+        true;
+        true;
+        true;
+        true;
+        true;
+        &0 != &1;
+        true;
+        true;
+        &s != s_ref;
+        /*freeze*/&mut s != s_ref;
+        /*freeze*/&mut s != /*freeze*/s_mut;
+        &s != /*freeze*/s_mut;
+        s_ref != /*freeze*/s_mut;
+        /*freeze*/s_mut != /*freeze*/s_mut;
+        S{u: 0} != s;
+        r != r;
+        /*freeze*/r_mut != /*freeze*/r_mut;
+        r != /*freeze*/r_mut;
+        /*freeze*/r_mut != r;
+        G<u64>{f: 1} != G<u64>{f: 2};
+        G<u64>{f: 1} != G<u64>{f: 2};
+    }
+}

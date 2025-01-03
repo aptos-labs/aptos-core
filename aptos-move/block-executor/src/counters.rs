@@ -3,8 +3,8 @@
 
 use aptos_metrics_core::{
     exponential_buckets, register_avg_counter_vec, register_histogram, register_histogram_vec,
-    register_int_counter, register_int_counter_vec, Histogram, HistogramVec, IntCounter,
-    IntCounterVec,
+    register_int_counter, register_int_counter_vec, register_int_gauge, Histogram, HistogramVec,
+    IntCounter, IntCounterVec, IntGauge,
 };
 use aptos_mvhashmap::BlockStateStats;
 use aptos_types::fee_statement::FeeStatement;
@@ -48,6 +48,18 @@ fn output_buckets() -> std::vec::Vec<f64> {
     )
     .unwrap()
 }
+
+pub static BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_executor_block_executor_inner_execute_block_seconds",
+        // metric description
+        "The time spent in the most-inner part of executing a block of transactions, \
+        i.e. for BlockSTM that is how long parallel or sequential execution took.",
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
 
 /// Count of times the module publishing fallback was triggered in parallel execution.
 pub static MODULE_PUBLISHING_FALLBACK_COUNT: Lazy<IntCounter> = Lazy::new(|| {
@@ -186,7 +198,7 @@ pub static EFFECTIVE_BLOCK_GAS: Lazy<HistogramVec> = Lazy::new(|| {
 pub static APPROX_BLOCK_OUTPUT_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_execution_approx_block_output_size",
-        "Historgram for different approx block output sizes - used for evaluting block ouptut limit.",
+        "Histogram for different approx block output sizes - used for evaluating block output limit.",
         &["mode"],
         output_buckets(),
     )
@@ -321,3 +333,38 @@ pub(crate) fn update_state_counters(block_state_stats: BlockStateStats, is_paral
         .with_label_values(&[mode_str, "delayed_field"])
         .observe(block_state_stats.base_delayed_fields_size as f64);
 }
+
+pub static GLOBAL_MODULE_CACHE_SIZE_IN_BYTES: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "global_module_cache_size_in_bytes",
+        "Sum of sizes of all serialized modules stored in global module cache"
+    )
+    .unwrap()
+});
+
+pub static GLOBAL_MODULE_CACHE_NUM_MODULES: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "global_module_cache_num_modules",
+        "Number of modules cached in global module cache"
+    )
+    .unwrap()
+});
+
+pub static GLOBAL_MODULE_CACHE_MISS_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "global_module_cache_miss_seconds",
+        // metric description
+        "The time spent in seconds after global module cache miss to access per-block module cache",
+        time_buckets(),
+    )
+    .unwrap()
+});
+
+pub static STRUCT_NAME_INDEX_MAP_NUM_ENTRIES: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "struct_name_index_map_num_entries",
+        "Number of struct names interned and cached in execution environment"
+    )
+    .unwrap()
+});

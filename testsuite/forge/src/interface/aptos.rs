@@ -113,6 +113,7 @@ impl<'t> AptosContext<'t> {
     }
 }
 
+#[derive(Clone)]
 pub struct AptosPublicInfo {
     chain_id: ChainId,
     inspection_service_url: Url,
@@ -331,20 +332,12 @@ pub async fn reconfig(
     transaction_factory: &TransactionFactory,
     root_account: Arc<LocalAccount>,
 ) -> State {
-    let aptos_version = client.get_aptos_version().await.unwrap();
-    let current = aptos_version.into_inner();
-    let current_version = *current.major.inner();
     let txns = {
-        vec![
-            root_account.sign_with_transaction_builder(transaction_factory.clone().payload(
-                aptos_stdlib::version_set_for_next_epoch(current_version + 1),
-            )),
-            root_account.sign_with_transaction_builder(
-                transaction_factory
-                    .clone()
-                    .payload(aptos_stdlib::aptos_governance_force_end_epoch_test_only()),
-            ),
-        ]
+        vec![root_account.sign_with_transaction_builder(
+            transaction_factory
+                .clone()
+                .payload(aptos_stdlib::aptos_governance_force_end_epoch_test_only()),
+        )]
     };
 
     submit_and_wait_reconfig(client, txns).await

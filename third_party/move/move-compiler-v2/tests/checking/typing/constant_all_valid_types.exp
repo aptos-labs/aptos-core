@@ -41,3 +41,46 @@ module <SELF>_0 {
         Tuple()
     }
 } // end <SELF>_0
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::M {
+    fun t1(): u8 {
+        0u8
+    }
+    fun t2(): u64 {
+        0
+    }
+    fun t3(): u128 {
+        0u128
+    }
+    fun t4(): bool {
+        false
+    }
+    fun t5(): address {
+        0x0
+    }
+    fun t6(): vector<u8> {
+        vector[1u8, 35u8]
+    }
+    fun t7(): vector<u8> {
+        vector[97u8, 98u8, 99u8, 100u8]
+    }
+    fun t8(): vector<address> {
+        vector[0x0, 0x1]
+    }
+    fun t9(): u8 {
+        0u8
+    }
+}
+script {
+    fun t() {
+        0u8;
+        0;
+        0u128;
+        false;
+        0x0;
+        vector[1u8, 35u8];
+        vector[97u8, 98u8, 99u8, 100u8];
+        vector[0x0, 0x1];
+    }
+}

@@ -34,13 +34,13 @@ pub enum CommitMessage {
 
 impl CommitMessage {
     /// Verify the signatures on the message
-    pub fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+    pub fn verify(&self, sender: Author, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         match self {
             CommitMessage::Vote(vote) => {
                 let _timer = counters::VERIFY_MSG
                     .with_label_values(&["commit_vote"])
                     .start_timer();
-                vote.verify(verifier)
+                vote.verify(sender, verifier)
             },
             CommitMessage::Decision(decision) => {
                 let _timer = counters::VERIFY_MSG

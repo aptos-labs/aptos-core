@@ -6,12 +6,12 @@ use super::GENESIS_HELM_RELEASE_NAME;
 use crate::{
     get_validator_fullnodes, get_validators, k8s_wait_nodes_strategy, nodes_healthcheck,
     wait_stateful_set, ForgeDeployerManager, ForgeRunnerMode, GenesisConfigFn, K8sApi, K8sNode,
-    NodeConfigFn, ReadWrite, Result, APTOS_NODE_HELM_RELEASE_NAME, DEFAULT_FORGE_DEPLOYER_PROFILE,
-    DEFAULT_ROOT_KEY, DEFAULT_TEST_SUITE_NAME, DEFAULT_USERNAME, FORGE_KEY_SEED,
+    NodeConfigFn, ReadWrite, Result, APTOS_NODE_HELM_RELEASE_NAME, DEFAULT_ROOT_KEY,
+    DEFAULT_TEST_SUITE_NAME, DEFAULT_USERNAME, FORGE_KEY_SEED,
     FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO, FULLNODE_HAPROXY_SERVICE_SUFFIX,
     FULLNODE_SERVICE_SUFFIX, HELM_BIN, KUBECTL_BIN, MANAGEMENT_CONFIGMAP_PREFIX,
-    NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS, VALIDATOR_HAPROXY_SERVICE_SUFFIX,
-    VALIDATOR_SERVICE_SUFFIX,
+    NAMESPACE_CLEANUP_THRESHOLD_SECS, ORPHAN_POD_CLEANUP_THRESHOLD_SECS,
+    VALIDATOR_HAPROXY_SERVICE_SUFFIX, VALIDATOR_SERVICE_SUFFIX,
 };
 use again::RetryPolicy;
 use anyhow::{anyhow, bail, format_err};
@@ -71,71 +71,118 @@ pub fn dump_string_to_file(
     Ok(file_path_str)
 }
 
+#[derive(Error, Debug)]
+#[error("{0}")]
+enum LogJobError {
+    RetryableError(String),
+    FinalError(String),
+}
+
+/**
+ * Tail the logs of a job. Returns OK if the job has a pod that succeeds.
+ * Assumes that the job only runs once and exits, and has no configured retry policy (i.e. backoffLimit = 0)
+ */
+async fn tail_job_logs(
+    jobs_api: Arc<dyn ReadWrite<Job>>,
+    job_name: String,
+    job_namespace: String,
+) -> Result<(), LogJobError> {
+    let genesis_job = jobs_api
+        .get_status(&job_name)
+        .await
+        .map_err(|e| LogJobError::FinalError(format!("Failed to get job status: {}", e)))?;
+
+    let status = genesis_job.status.expect("Job status not found");
+    info!("Job {} status: {:?}", &job_name, status);
+    match status.active {
+        Some(active) => {
+            if active < 1 {
+                return Err(LogJobError::RetryableError(format!(
+                    "Job {} has no active pods. Maybe it has not started yet",
+                    &job_name
+                )));
+            }
+            // try tailing the logs of the genesis job
+            // by the time this is done, we can re-evalulate its status
+            let mut command = tokio::process::Command::new(KUBECTL_BIN)
+                .args([
+                    "-n",
+                    &job_namespace,
+                    "logs",
+                    "--tail=10", // in case of connection reset we only want the last few lines to avoid spam
+                    "-f",
+                    format!("job/{}", &job_name).as_str(),
+                ])
+                .stdout(Stdio::piped())
+                .spawn()
+                .map_err(|e| {
+                    LogJobError::RetryableError(format!("Failed to spawn command: {}", e))
+                })?;
+            // Ensure the command has stdout
+            let stdout = command.stdout.take().ok_or_else(|| {
+                LogJobError::RetryableError("Failed to capture stdout".to_string())
+            })?;
+
+            // Create a BufReader to read the output asynchronously, line by line
+            let mut reader = BufReader::new(stdout).lines();
+
+            // Iterate over the lines as they come
+            while let Some(line) = reader.next_line().await.transpose() {
+                match line {
+                    Ok(line) => {
+                        info!("[{}]: {}", &job_name, line); // Add a prefix to each line
+                    },
+                    Err(e) => {
+                        return Err(LogJobError::RetryableError(format!(
+                            "Error reading line: {}",
+                            e
+                        )));
+                    },
+                }
+            }
+            command.wait().await.map_err(|e| {
+                LogJobError::RetryableError(format!("Error waiting for command: {}", e))
+            })?;
+        },
+        None => info!("Job {} has no active pods running", &job_name),
+    }
+    match status.succeeded {
+        Some(_) => {
+            info!("Job {} succeeded!", &job_name);
+            return Ok(());
+        },
+        None => info!("Job {} has no succeeded pods", &job_name),
+    }
+    if status.failed.is_some() {
+        info!("Job {} failed!", &job_name);
+        return Err(LogJobError::FinalError(format!("Job {} failed", &job_name)));
+    }
+    Err(LogJobError::RetryableError(format!(
+        "Job {} has no succeeded or failed pods. Maybe it has not started yet.",
+        &job_name
+    )))
+}
+
 /// Waits for a job to complete, while tailing the job's logs
 pub async fn wait_log_job(
     jobs_api: Arc<dyn ReadWrite<Job>>,
     job_namespace: &str,
     job_name: String,
-    retry_strategy: impl Iterator<Item = Duration>,
+    retry_policy: RetryPolicy,
 ) -> Result<()> {
-    aptos_retrier::retry_async(retry_strategy, || {
-        let jobs_api = jobs_api.clone();
-        let job_name = job_name.clone();
-        Box::pin(async move {
-            let genesis_job = jobs_api.get_status(&job_name).await.unwrap();
-
-            let status = genesis_job.status.unwrap();
-            info!("Job {} status: {:?}", &job_name, status);
-            match status.active {
-                Some(_) => {
-                    // try tailing the logs of the genesis job
-                    // by the time this is done, we can re-evalulate its status
-                    let mut command = tokio::process::Command::new(KUBECTL_BIN)
-                        .args([
-                            "-n",
-                            job_namespace,
-                            "logs",
-                            "--tail=10", // in case of connection reset we only want the last few lines to avoid spam
-                            "-f",
-                            format!("job/{}", &job_name).as_str(),
-                        ])
-                        .stdout(Stdio::piped())
-                        .spawn()?;
-                    // Ensure the command has stdout
-                    let stdout = command
-                        .stdout
-                        .take()
-                        .ok_or_else(|| anyhow::anyhow!("Failed to capture stdout"))?;
-
-                    // Create a BufReader to read the output asynchronously, line by line
-                    let mut reader = BufReader::new(stdout).lines();
-
-                    // Iterate over the lines as they come
-                    while let Some(line) = reader.next_line().await.transpose() {
-                        match line {
-                            Ok(line) => {
-                                info!("[{}]: {}", &job_name, line); // Add a prefix to each line
-                            },
-                            Err(e) => {
-                                bail!("Error reading line: {}", e);
-                            },
-                        }
-                    }
-                    command.wait().await?;
-                },
-                None => info!("Job {} completed running", &job_name),
-            }
-            info!("Job {} status: {:?}", &job_name, status);
-            match status.succeeded {
-                Some(_) => {
-                    info!("Job {} done", &job_name);
-                    Ok(())
-                },
-                None => bail!("Job {} did not succeed", &job_name),
-            }
-        })
-    })
-    .await
+    retry_policy
+        .retry_if(
+            move || {
+                tail_job_logs(
+                    jobs_api.clone(),
+                    job_name.clone(),
+                    job_namespace.to_string(),
+                )
+            },
+            |e: &LogJobError| matches!(e, LogJobError::RetryableError(_)),
+        )
+        .await?;
+    Ok(())
 }
 
 /// Waits for a given number of HAProxy K8s Deployments to be ready
@@ -522,6 +569,7 @@ pub async fn install_testnet_resources(
     use_port_forward: bool,
     enable_haproxy: bool,
     enable_indexer: bool,
+    deployer_profile: String,
     genesis_helm_config_fn: Option<GenesisConfigFn>,
     node_helm_config_fn: Option<NodeConfigFn>,
     // If true, skip collecting running nodes after installing the testnet. This is useful when we only care about creating resources
@@ -560,8 +608,19 @@ pub async fn install_testnet_resources(
         enable_haproxy,
     )?;
 
+    info!("aptos_node_helm_values: {:?}", aptos_node_helm_values);
+    info!(
+        "aptos_node_helm_values_override: {:?}",
+        aptos_node_helm_values_override
+    );
+
     merge_yaml(&mut aptos_node_helm_values, aptos_node_helm_values_override);
     merge_yaml(&mut genesis_helm_values, genesis_helm_values_override);
+
+    info!(
+        "aptos_node_helm_values after override: {:?}",
+        aptos_node_helm_values
+    );
 
     // disable uploading genesis to blob storage since indexer requires it in the cluster
     if enable_indexer {
@@ -577,7 +636,7 @@ pub async fn install_testnet_resources(
     }
 
     let config: serde_json::Value = serde_json::from_value(serde_json::json!({
-        "profile": DEFAULT_FORGE_DEPLOYER_PROFILE.to_string(),
+        "profile": deployer_profile,
         "era": new_era,
         "namespace": kube_namespace.clone(),
         "testnet-values": aptos_node_helm_values,
@@ -919,7 +978,11 @@ pub async fn create_management_configmap(
     Ok(())
 }
 
-pub async fn cleanup_cluster_with_management() -> Result<()> {
+pub async fn cleanup_cluster_with_management(dry_run: bool) -> Result<()> {
+    if dry_run {
+        info!("Dry run mode, skipping actual cleanup");
+    }
+
     let kube_client = create_k8s_client().await?;
     let start = SystemTime::now();
     let time_since_the_epoch = start
@@ -927,43 +990,11 @@ pub async fn cleanup_cluster_with_management() -> Result<()> {
         .expect("Time went backwards")
         .as_secs();
 
-    let pods_api: Api<Pod> = Api::namespaced(kube_client.clone(), "default");
-    let lp = ListParams::default().labels("app.kubernetes.io/name=forge");
-
-    // delete all forge test pods over a threshold age
-    let pods = pods_api
-        .list(&lp)
-        .await?
-        .items
-        .into_iter()
-        .filter(|pod| {
-            let pod_name = pod.name();
-            info!("Got pod {}", pod_name);
-            if let Some(time) = &pod.metadata.creation_timestamp {
-                let pod_creation_time = time.0.timestamp() as u64;
-                let pod_uptime = time_since_the_epoch - pod_creation_time;
-                info!(
-                    "Pod {} has lived for {}/{} seconds",
-                    pod_name, pod_uptime, POD_CLEANUP_THRESHOLD_SECS
-                );
-                if pod_uptime > POD_CLEANUP_THRESHOLD_SECS {
-                    return true;
-                }
-            }
-            false
-        })
-        .collect::<Vec<Pod>>();
-    for pod in pods {
-        let pod_name = pod.name();
-        info!("Deleting pod {}", pod_name);
-        pods_api.delete(&pod_name, &DeleteParams::default()).await?;
-    }
-
     // delete all forge testnets over a threshold age using their management configmaps
     // unless they are explicitly set with "keep = true"
     let configmaps_api: Api<ConfigMap> = Api::all(kube_client.clone());
     let lp = ListParams::default();
-    let configmaps = configmaps_api
+    let old_forge_management_configmaps_to_delete = configmaps_api
         .list(&lp)
         .await?
         .items
@@ -985,9 +1016,58 @@ pub async fn cleanup_cluster_with_management() -> Result<()> {
             false
         })
         .collect::<Vec<ConfigMap>>();
-    for configmap in configmaps {
+    for configmap in old_forge_management_configmaps_to_delete {
         let namespace = configmap.namespace().unwrap();
-        uninstall_testnet_resources(namespace).await?;
+        info!("Deleting old namespace {}", namespace);
+        if !dry_run {
+            uninstall_testnet_resources(namespace).await?;
+        }
+    }
+
+    // delete all orphan forge test pods older than a threshold
+    let namespace_api: Api<Namespace> = Api::all(kube_client.clone());
+    let lp = ListParams::default();
+    let forge_namespaces = namespace_api
+        .list(&lp)
+        .await?
+        .items
+        .into_iter()
+        .filter(|namespace| namespace.name().starts_with("forge-"))
+        .collect::<Vec<Namespace>>();
+    // print all namespace names
+    for namespace in &forge_namespaces {
+        info!("Found forge namespace: {}", namespace.name());
+    }
+    let pods_api: Api<Pod> = Api::namespaced(kube_client.clone(), "default");
+    let lp = ListParams::default().labels("app.kubernetes.io/name=forge");
+    let orphan_forge_test_runner_pods_to_delete =
+        pods_api.list(&lp).await?.items.into_iter().filter(|pod| {
+            let pod_name = pod.name();
+            // check if the pod is older than 5min
+            if let Some(time) = &pod.metadata.creation_timestamp {
+                let pod_creation_time = time.0.timestamp() as u64;
+                let pod_uptime = time_since_the_epoch - pod_creation_time;
+                // If it's not older than the threshold time, it's not elegible for deletion
+                if pod_uptime < ORPHAN_POD_CLEANUP_THRESHOLD_SECS {
+                    return false;
+                }
+            }
+            // If there is no namespace that matches the pod name, it's an orphan pod
+            !forge_namespaces
+                .iter()
+                .any(|namespace| pod_name.starts_with(namespace.metadata.name.as_ref().unwrap()))
+        });
+    for pod in orphan_forge_test_runner_pods_to_delete {
+        let pod_name = pod.name();
+        let pod_age =
+            time_since_the_epoch - pod.metadata.creation_timestamp.unwrap().0.timestamp() as u64;
+        info!(
+            "Deleting orphaned pod {} with age {} without any corresponding namespace",
+            pod_name, pod_age
+        );
+        if !dry_run {
+            pods_api.delete(&pod_name, &DeleteParams::default()).await?;
+        }
     }
 
     Ok(())

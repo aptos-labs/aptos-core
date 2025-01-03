@@ -9,27 +9,63 @@ module 0x815::m {
         Red,
         Blue,
     }
-    enum Generic {
+    enum Generic<T> {
         Foo {
-            0: #0,
+            0: T,
         }
         Bar {
             0: u64,
         }
     }
-    private fun test(c: m::Color): bool {
+    private fun test(c: Color): bool {
         test_variants m::Color::Red|RGB(c)
     }
-    private fun test_fully_qualified(c: m::Color): bool {
+    private fun test_fully_qualified(c: Color): bool {
         test_variants m::Color::Red(c)
     }
-    private fun test_generic<T>(x: &m::Generic<#0>): bool {
+    private fun test_generic<T>(x: &Generic<T>): bool {
         test_variants m::Generic::Foo<T>(x)
     }
-    private fun test_generic_qualified<T>(x: &m::Generic<#0>): bool {
+    private fun test_generic_qualified<T>(x: &Generic<T>): bool {
         test_variants m::Generic::Foo<T>(x)
     }
-    private fun test_qualified(c: m::Color): bool {
+    private fun test_qualified(c: Color): bool {
         test_variants m::Color::Red|RGB(c)
     }
 } // end 0x815::m
+
+// -- Sourcified model before bytecode pipeline
+module 0x815::m {
+    enum Color {
+        RGB {
+            red: u64,
+            green: u64,
+            blue: u64,
+        }
+        Red,
+        Blue,
+    }
+    enum Generic<T> {
+        Foo {
+            0: T,
+        }
+        Bar {
+            0: u64,
+        }
+    }
+    fun test(c: Color): bool {
+        c is Red | RGB
+    }
+    fun test_fully_qualified(c: Color): bool {
+        c is Red
+    }
+    fun test_generic<T>(x: &Generic<T>): bool {
+        x is Foo
+    }
+    fun test_generic_qualified<T>(x: &Generic<T>): bool {
+        x is Foo
+    }
+    fun test_qualified(c: Color): bool {
+        c is Red | RGB
+    }
+}

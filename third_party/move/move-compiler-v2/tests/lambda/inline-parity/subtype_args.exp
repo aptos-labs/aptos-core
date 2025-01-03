@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: Only inline functions may have function-typed parameters, but non-inline function `M::t2` has a function parameter:
+   ┌─ tests/lambda/inline-parity/subtype_args.move:23:9
+   │
+23 │     fun t2(f: |&u64, &mut u64|) {
+   │         ^^ - Parameter `f` has function-valued type `|(&u64, &mut u64)|`.

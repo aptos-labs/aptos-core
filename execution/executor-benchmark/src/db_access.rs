@@ -2,60 +2,81 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_storage_interface::state_view::DbStateView;
 use aptos_types::{
     account_address::AccountAddress,
+    account_config::{
+        AccountResource, CoinInfoResource, CoinStoreResource, ConcurrentSupplyResource,
+        FungibleStoreResource, ObjectCoreResource, ObjectGroupResource, TypeInfoResource,
+    },
+    event::{EventHandle, EventKey},
     state_store::{state_key::StateKey, StateView},
     write_set::TOTAL_SUPPLY_STATE_KEY,
+    AptosCoinType, CoinType,
 };
+use itertools::Itertools;
 use move_core_types::{
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
+    move_resource::MoveStructType,
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::str::FromStr;
+use serde::de::DeserializeOwned;
+use std::{collections::BTreeMap, str::FromStr};
 
-#[derive(Debug, Default, Deserialize, Serialize)]
-pub struct CoinStore {
-    pub coin: u64,
-    pub _frozen: bool,
-    pub _deposit_events: EventHandle,
-    pub _withdraw_events: EventHandle,
+pub struct CommonStructTags {
+    pub account: StructTag,
+    pub apt_coin_store: StructTag,
+    pub object_group: StructTag,
+    pub object_core: StructTag,
+    pub fungible_store: StructTag,
+    pub concurrent_supply: StructTag,
+
+    pub apt_coin_type_name: String,
+
+    pub apt_coin_info_resource: StateKey,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
-pub struct EventHandle {
-    _counter: u64,
-    _guid: GUID,
+impl CommonStructTags {
+    pub fn new() -> Self {
+        Self {
+            account: AccountResource::struct_tag(),
+            apt_coin_store: CoinStoreResource::<AptosCoinType>::struct_tag(),
+            object_group: ObjectGroupResource::struct_tag(),
+            object_core: ObjectCoreResource::struct_tag(),
+            fungible_store: FungibleStoreResource::struct_tag(),
+            concurrent_supply: ConcurrentSupplyResource::struct_tag(),
+
+            apt_coin_type_name: "0x1::aptos_coin::AptosCoin".to_string(),
+            apt_coin_info_resource: StateKey::resource_typed::<CoinInfoResource<AptosCoinType>>(
+                &AptosCoinType::coin_info_address(),
+            )
+            .unwrap(),
+        }
+    }
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
-pub struct GUID {
-    _creation_num: u64,
-    _address: Address,
+impl Default for CommonStructTags {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
-pub struct Account {
-    pub authentication_key: Vec<u8>,
-    pub sequence_number: u64,
-    pub _guid_creation_num: u64,
-    pub _coin_register_events: EventHandle,
-    pub _key_rotation_events: EventHandle,
-    pub _rotation_capability_offer: CapabilityOffer,
-    pub _signer_capability_offer: CapabilityOffer,
+pub struct DbAccessUtil {
+    pub common: CommonStructTags,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
-pub struct CapabilityOffer {
-    _for_address: Option<Address>,
+impl Default for DbAccessUtil {
+    fn default() -> Self {
+        Self::new()
+    }
 }
-
-pub type Address = [u8; 32];
-
-pub struct DbAccessUtil;
 
 impl DbAccessUtil {
+    pub fn new() -> Self {
+        Self {
+            common: CommonStructTags::new(),
+        }
+    }
+
     pub fn new_struct_tag(
         address: AccountAddress,
         module: &str,
@@ -70,46 +91,36 @@ impl DbAccessUtil {
         }
     }
 
-    pub fn new_state_key(
-        address: AccountAddress,
-        resource_address: AccountAddress,
-        module: &str,
-        name: &str,
-        type_args: Vec<TypeTag>,
-    ) -> StateKey {
-        StateKey::resource(
-            &address,
-            &Self::new_struct_tag(resource_address, module, name, type_args),
-        )
-        .unwrap()
+    pub fn new_state_key_account(&self, address: &AccountAddress) -> StateKey {
+        StateKey::resource(address, &self.common.account).unwrap()
     }
 
-    pub fn new_state_key_account(address: AccountAddress) -> StateKey {
-        Self::new_state_key(address, AccountAddress::ONE, "account", "Account", vec![])
+    pub fn new_state_key_aptos_coin(&self, address: &AccountAddress) -> StateKey {
+        StateKey::resource(address, &self.common.apt_coin_store).unwrap()
     }
 
-    pub fn new_state_key_aptos_coin(address: AccountAddress) -> StateKey {
-        Self::new_state_key(address, AccountAddress::ONE, "coin", "CoinStore", vec![
-            TypeTag::Struct(Box::new(Self::new_struct_tag(
-                AccountAddress::ONE,
-                "aptos_coin",
-                "AptosCoin",
-                vec![],
-            ))),
-        ])
+    pub fn new_state_key_object_resource_group(&self, address: &AccountAddress) -> StateKey {
+        StateKey::resource_group(address, &self.common.object_group)
     }
 
     pub fn get_account(
         account_key: &StateKey,
         state_view: &impl StateView,
-    ) -> Result<Option<Account>> {
+    ) -> Result<Option<AccountResource>> {
         Self::get_value(account_key, state_view)
     }
 
-    pub fn get_coin_store(
+    pub fn get_fa_store(
+        store_key: &StateKey,
+        state_view: &impl StateView,
+    ) -> Result<Option<FungibleStoreResource>> {
+        Self::get_value(store_key, state_view)
+    }
+
+    pub fn get_apt_coin_store(
         coin_store_key: &StateKey,
         state_view: &impl StateView,
-    ) -> Result<Option<CoinStore>> {
+    ) -> Result<Option<CoinStoreResource<AptosCoinType>>> {
         Self::get_value(coin_store_key, state_view)
     }
 
@@ -123,14 +134,63 @@ impl DbAccessUtil {
         value.transpose().map_err(anyhow::Error::msg)
     }
 
-    pub fn get_db_value<T: DeserializeOwned>(
+    pub fn get_resource_group(
         state_key: &StateKey,
-        state_view: &DbStateView,
-    ) -> Result<Option<T>> {
+        state_view: &impl StateView,
+    ) -> Result<Option<BTreeMap<StructTag, Vec<u8>>>> {
         Self::get_value(state_key, state_view)
     }
 
     pub fn get_total_supply(state_view: &impl StateView) -> Result<Option<u128>> {
         Self::get_value(&TOTAL_SUPPLY_STATE_KEY, state_view)
+    }
+
+    pub fn new_account_resource(address: AccountAddress) -> AccountResource {
+        AccountResource::new(
+            0,
+            address.to_vec(),
+            EventHandle::new(EventKey::new(1, address), 0),
+            EventHandle::new(EventKey::new(2, address), 0),
+        )
+    }
+
+    pub fn new_apt_coin_store(
+        balance: u64,
+        address: AccountAddress,
+    ) -> CoinStoreResource<AptosCoinType> {
+        CoinStoreResource::<AptosCoinType>::new(
+            balance,
+            false,
+            EventHandle::new(EventKey::new(1, address), 0),
+            EventHandle::new(EventKey::new(2, address), 0),
+        )
+    }
+
+    pub fn new_object_core(address: AccountAddress, owner: AccountAddress) -> ObjectCoreResource {
+        ObjectCoreResource::new(owner, false, EventHandle::new(EventKey::new(1, address), 0))
+    }
+
+    pub fn new_type_info_resource<T: MoveStructType>() -> anyhow::Result<TypeInfoResource> {
+        let struct_tag = T::struct_tag();
+        Ok(TypeInfoResource {
+            account_address: struct_tag.address,
+            module_name: bcs::to_bytes(&struct_tag.module.to_string())?,
+            struct_name: bcs::to_bytes(
+                &if struct_tag.type_args.is_empty() {
+                    struct_tag.name.to_string()
+                } else {
+                    format!(
+                        "{}<{}>",
+                        struct_tag.name,
+                        struct_tag
+                            .type_args
+                            .iter()
+                            .map(|v| v.to_string())
+                            .join(", ")
+                    )
+                    .to_string()
+                },
+            )?,
+        })
     }
 }

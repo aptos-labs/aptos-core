@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: Only inline functions may have function-typed parameters, but non-inline function `Test::foreach` has a function parameter:
+  ┌─ tests/lambda/inline-parity/generics.move:5:16
+  │
+5 │     public fun foreach<X>(v: &vector<X>, action: |&X|) {
+  │                ^^^^^^^                   ------ Parameter `action` has function-valued type `|&X|`.

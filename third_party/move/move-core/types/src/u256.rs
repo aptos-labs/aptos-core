@@ -705,6 +705,13 @@ impl<'a> arbitrary::Arbitrary<'a> for U256 {
     }
 }
 
+#[cfg(any(test, feature = "fuzzing"))]
+impl dearbitrary::Dearbitrary for U256 {
+    fn dearbitrary(&self, dearbitrator: &mut dearbitrary::Dearbitrator) {
+        dearbitrator.push_bytes(U256::to_le_bytes(self.to_owned()).as_ref());
+    }
+}
+
 #[test]
 fn wrapping_add() {
     // a + b overflows U256::MAX by 100

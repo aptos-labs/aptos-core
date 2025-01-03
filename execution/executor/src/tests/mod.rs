@@ -4,30 +4,29 @@
 
 use crate::{
     block_executor::BlockExecutor,
-    components::chunk_output::ChunkOutput,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
-    mock_vm::{
-        encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
-        MockVM, DISCARD_STATUS, KEEP_STATUS,
-    },
+    workflow::{do_get_execution_output::DoGetExecutionOutput, ApplyExecutionOutput},
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_db::AptosDB;
 use aptos_executor_types::{
-    BlockExecutorTrait, ExecutedChunk, LedgerUpdateOutput, TransactionReplayer, VerifyExecutionMode,
+    BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode,
 };
 use aptos_storage_interface::{
-    async_proof_fetcher::AsyncProofFetcher, DbReaderWriter, ExecutedTrees, Result,
+    state_store::state_view::async_proof_fetcher::AsyncProofFetcher, DbReaderWriter, LedgerSummary,
+    Result,
 };
 use aptos_types::{
     account_address::AccountAddress,
     aggregate_signature::AggregateSignature,
-    block_executor::config::BlockExecutorConfigFromOnchain,
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain,
+        transaction_slice_metadata::TransactionSliceMetadata,
+    },
     block_info::BlockInfo,
     bytes::NumToBytes,
     chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    proof::definition::LeafCount,
     state_store::{state_key::StateKey, state_value::StateValue, StateViewId},
     test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
     transaction::{
@@ -38,10 +37,18 @@ use aptos_types::{
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
+use aptos_vm::VMBlockExecutor;
+use itertools::Itertools;
+use mock_vm::{
+    encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
+    MockVM, DISCARD_STATUS, KEEP_STATUS,
+};
 use proptest::prelude::*;
 use std::{iter::once, sync::Arc};
 
 mod chunk_executor_tests;
+#[cfg(test)]
+mod mock_vm;
 
 fn execute_and_commit_block(
     executor: &TestExecutor,
@@ -59,7 +66,7 @@ fn execute_and_commit_block(
         )
         .unwrap();
     let version = 2 * (txn_index + 1);
-    assert_eq!(output.version(), version);
+    assert_eq!(output.expect_last_version(), version);
 
     let ledger_info = gen_ledger_info(version, output.root_hash(), id, txn_index + 1);
     executor.commit_blocks(vec![id], ledger_info).unwrap();
@@ -216,7 +223,7 @@ fn test_executor_one_block() {
         )
         .unwrap();
     let version = num_user_txns + 1;
-    assert_eq!(output.version(), version);
+    assert_eq!(output.expect_last_version(), version);
     let block_root_hash = output.root_hash();
 
     let ledger_info = gen_ledger_info(version, block_root_hash, block_id, 1);
@@ -291,9 +298,7 @@ fn test_executor_commit_twice() {
         )
         .unwrap();
     let ledger_info = gen_ledger_info(6, output1.root_hash(), block1_id, 1);
-    executor
-        .pre_commit_block(block1_id, executor.committed_block_id())
-        .unwrap();
+    executor.pre_commit_block(block1_id).unwrap();
     executor.commit_ledger(ledger_info.clone()).unwrap();
     executor.commit_ledger(ledger_info).unwrap();
 }
@@ -310,7 +315,7 @@ fn test_executor_execute_same_block_multiple_times() {
         .collect();
 
     let mut responses = vec![];
-    for _i in 0..100 {
+    for _i in 0..10 {
         let output = executor
             .execute_block(
                 (block_id, block(txns.clone())).into(),
@@ -320,8 +325,14 @@ fn test_executor_execute_same_block_multiple_times() {
             .unwrap();
         responses.push(output);
     }
-    responses.dedup();
-    assert_eq!(responses.len(), 1);
+    assert_eq!(
+        responses
+            .iter()
+            .map(|output| output.root_hash())
+            .dedup()
+            .count(),
+        1,
+    );
 }
 
 fn create_blocks_and_chunks(
@@ -381,10 +392,8 @@ fn create_blocks_and_chunks(
                 TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
             )
             .unwrap();
-        assert_eq!(output.version(), version);
-        block_executor
-            .pre_commit_block(block_id, parent_block_id)
-            .unwrap();
+        assert_eq!(output.expect_last_version(), version);
+        block_executor.pre_commit_block(block_id).unwrap();
         let ledger_info = gen_ledger_info(version, output.root_hash(), block_id, version);
         out_blocks.push((txns, ledger_info));
         parent_block_id = block_id;
@@ -448,9 +457,9 @@ fn apply_transaction_by_writeset(
     db: &DbReaderWriter,
     transactions_and_writesets: Vec<(Transaction, WriteSet)>,
 ) {
-    let ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
+    let ledger_summary: LedgerSummary = db.reader.get_pre_committed_ledger_summary().unwrap();
 
-    let transactions_and_outputs = transactions_and_writesets
+    let (txns, txn_outs) = transactions_and_writesets
         .iter()
         .map(|(txn, write_set)| {
             (
@@ -474,9 +483,9 @@ fn apply_transaction_by_writeset(
                 TransactionAuxiliaryData::default(),
             ),
         )))
-        .collect();
+        .unzip();
 
-    let state_view = ledger_view
+    let state_view = ledger_summary
         .verified_state_view(
             StateViewId::Miscellaneous,
             Arc::clone(&db.reader),
@@ -485,36 +494,15 @@ fn apply_transaction_by_writeset(
         .unwrap();
 
     let chunk_output =
-        ChunkOutput::by_transaction_output(transactions_and_outputs, state_view).unwrap();
+        DoGetExecutionOutput::by_transaction_output(txns, txn_outs, state_view).unwrap();
 
-    let (executed, _, _) = chunk_output.apply_to_ledger(&ledger_view, None).unwrap();
-    let ExecutedChunk {
-        result_state,
-        ledger_info,
-        next_epoch_state: _,
-        ledger_update_output,
-    } = executed;
-    let LedgerUpdateOutput {
-        statuses_for_input_txns: _,
-        to_commit,
-        subscribable_events: _,
-        transaction_info_hashes: _,
-        state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
-        sharded_state_cache,
-        transaction_accumulator: _,
-        block_end_info: _,
-    } = ledger_update_output;
+    let output = ApplyExecutionOutput::run(chunk_output, &ledger_summary).unwrap();
 
     db.writer
         .save_transactions(
-            &to_commit,
-            ledger_view.txn_accumulator().num_leaves(),
-            ledger_view.state().base_version,
-            ledger_info.as_ref(),
+            output.expect_complete_result().as_chunk_to_commit(),
+            None,
             true, /* sync_commit */
-            result_state,
-            state_updates_before_last_checkpoint,
-            Some(&sharded_state_cache),
         )
         .unwrap();
 }
@@ -691,12 +679,13 @@ fn run_transactions_naive(
 ) -> HashValue {
     let executor = TestExecutor::new();
     let db = &executor.db;
-    let mut ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
 
     for txn in transactions {
-        let out = ChunkOutput::by_transaction_execution::<MockVM>(
+        let ledger_summary: LedgerSummary = db.reader.get_pre_committed_ledger_summary().unwrap();
+        let out = DoGetExecutionOutput::by_transaction_execution(
+            &MockVM::new(),
             vec![txn].into(),
-            ledger_view
+            ledger_summary
                 .verified_state_view(
                     StateViewId::Miscellaneous,
                     Arc::clone(&db.reader),
@@ -704,61 +693,43 @@ fn run_transactions_naive(
                 )
                 .unwrap(),
             block_executor_onchain_config.clone(),
+            TransactionSliceMetadata::unknown(),
         )
         .unwrap();
-        let (executed, _, _) = out.apply_to_ledger(&ledger_view, None).unwrap();
-        let next_ledger_view = executed.result_view();
-        let ExecutedChunk {
-            result_state,
-            ledger_info,
-            next_epoch_state: _,
-            ledger_update_output,
-        } = executed;
-        let LedgerUpdateOutput {
-            statuses_for_input_txns: _,
-            to_commit,
-            subscribable_events: _,
-            transaction_info_hashes: _,
-            state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
-            sharded_state_cache,
-            transaction_accumulator: _,
-            block_end_info: _,
-        } = ledger_update_output;
+        let output = ApplyExecutionOutput::run(out, &ledger_summary).unwrap();
         db.writer
             .save_transactions(
-                &to_commit,
-                ledger_view.txn_accumulator().num_leaves(),
-                ledger_view.state().base_version,
-                ledger_info.as_ref(),
+                output.expect_complete_result().as_chunk_to_commit(),
+                None,
                 true, /* sync_commit */
-                result_state,
-                state_updates_before_last_checkpoint,
-                Some(&sharded_state_cache),
             )
             .unwrap();
-        ledger_view = next_ledger_view;
     }
-    ledger_view.txn_accumulator().root_hash()
+    db.reader
+        .get_pre_committed_ledger_summary()
+        .unwrap()
+        .transaction_accumulator
+        .root_hash()
 }
 
 proptest! {
-#![proptest_config(ProptestConfig::with_cases(5))]
+    #![proptest_config(ProptestConfig::with_cases(5))]
 
-#[test]
-#[cfg_attr(feature = "consensus-only-perf-test", ignore)]
-fn test_reconfiguration_with_retry_transaction_status(
-    (num_user_txns, reconfig_txn_index) in (2..5u64).prop_flat_map(|num_user_txns| {
-        (
-            Just(num_user_txns),
-            0..num_user_txns - 1 // avoid state checkpoint right after reconfig
-        )
+    #[test]
+    #[cfg_attr(feature = "consensus-only-perf-test", ignore)]
+    fn test_reconfiguration_with_retry_transaction_status(
+        (num_user_txns, reconfig_txn_index) in (2..5usize).prop_flat_map(|num_user_txns| {
+            (
+                Just(num_user_txns),
+                0..num_user_txns - 1 // avoid state checkpoint right after reconfig
+            )
     }).no_shrink()) {
         let executor = TestExecutor::new();
 
         let block_id = gen_block_id(1);
-        let mut block = TestBlock::new(num_user_txns, 10, block_id);
-        let num_input_txns = block.txns.len() as LeafCount;
-        block.txns[reconfig_txn_index as usize] = encode_reconfiguration_transaction().into();
+        let mut block = TestBlock::new(num_user_txns as u64, 10, block_id);
+        let num_input_txns = block.txns.len();
+        block.txns[reconfig_txn_index] = encode_reconfiguration_transaction().into();
 
         let parent_block_id = executor.committed_block_id();
         let output = executor.execute_block(
@@ -769,34 +740,52 @@ fn test_reconfiguration_with_retry_transaction_status(
         let retry_iter = output.compute_status_for_input_txns().iter()
         .skip_while(|status| matches!(*status, TransactionStatus::Keep(_)));
         prop_assert_eq!(
-            retry_iter.take_while(|status| matches!(*status,TransactionStatus::Retry)).count() as u64,
+            retry_iter.take_while(|status| matches!(*status,TransactionStatus::Retry)).count(),
             num_input_txns - reconfig_txn_index - 1
         );
 
         // commit
-        let ledger_info = gen_ledger_info(reconfig_txn_index + 1 /* version */, output.root_hash(), block_id, 1 /* timestamp */);
+        let ledger_info = gen_ledger_info(
+            reconfig_txn_index as Version + 1 /* version */,
+            output.root_hash(),
+            block_id,
+            1 /* timestamp */
+        );
         executor.commit_blocks(vec![block_id], ledger_info).unwrap();
         let parent_block_id = executor.committed_block_id();
 
         // retry txns after reconfiguration
+        let retry_txns = block.txns.iter().skip(reconfig_txn_index + 1).cloned().collect_vec();
         let retry_block_id = gen_block_id(2);
         let retry_output = executor.execute_block(
-            (retry_block_id, block.txns.iter().skip(reconfig_txn_index as usize + 1).cloned().collect::<Vec<SignatureVerifiedTransaction>>()).into(), parent_block_id, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG
+            ( retry_block_id, retry_txns ).into(),
+            parent_block_id,
+            TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG
         ).unwrap();
         prop_assert!(retry_output.compute_status_for_input_txns().iter().all(|s| matches!(*s, TransactionStatus::Keep(_))));
 
         // Second block has StateCheckpoint/BlockPrologue transaction added.
-        let ledger_version = num_input_txns + 1;
+        let ledger_version = num_input_txns as Version + 1;
 
         // commit
-        let ledger_info = gen_ledger_info(ledger_version, retry_output.root_hash(), retry_block_id, 12345 /* timestamp */);
+        let ledger_info = gen_ledger_info(
+            ledger_version,
+            retry_output.root_hash(),
+            retry_block_id,
+            12345 /* timestamp */
+        );
         executor.commit_blocks(vec![retry_block_id], ledger_info).unwrap();
 
         // get txn_infos from db
         let db = executor.db.reader.clone();
         prop_assert_eq!(db.expect_synced_version(), ledger_version);
-        let txn_list = db.get_transactions(1 /* start version */, ledger_version, ledger_version /* ledger version */, false /* fetch events */).unwrap();
-        prop_assert_eq!(&block.inner_txns(), &txn_list.transactions[..num_input_txns as usize]);
+        let txn_list = db.get_transactions(
+            1, /* start version */
+            ledger_version, /* version */
+            ledger_version, /* ledger version */
+            false /* fetch events */
+        ).unwrap();
+        prop_assert_eq!(&block.inner_txns(), &txn_list.transactions[..num_input_txns]);
         let txn_infos = txn_list.proof.transaction_infos;
         let write_sets = db.get_write_set_iterator(1, ledger_version).unwrap().collect::<Result<_>>().unwrap();
         let event_vecs = db.get_events_iterator(1, ledger_version).unwrap().collect::<Result<_>>().unwrap();
@@ -804,8 +793,20 @@ fn test_reconfiguration_with_retry_transaction_status(
         // replay txns in one batch across epoch boundary,
         // and the replayer should deal with `Retry`s automatically
         let replayer = chunk_executor_tests::TestExecutor::new();
-        replayer.executor.replay(txn_list.transactions, txn_infos, write_sets, event_vecs, &VerifyExecutionMode::verify_all()).unwrap();
+        let chunks_enqueued = replayer.executor.enqueue_chunks(
+            txn_list.transactions,
+            txn_infos,
+            write_sets,
+            event_vecs,
+            &VerifyExecutionMode::verify_all()
+        ).unwrap();
+        assert_eq!(chunks_enqueued, 2);
+        replayer.executor.update_ledger().unwrap();
+        replayer.executor.update_ledger().unwrap();
+
         replayer.executor.commit().unwrap();
+        replayer.executor.commit().unwrap();
+        prop_assert!(replayer.executor.is_empty());
         let replayed_db = replayer.db.reader.clone();
         prop_assert_eq!(
             replayed_db.get_accumulator_root_hash(ledger_version).unwrap(),

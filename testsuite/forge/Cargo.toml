@@ -50,17 +50,20 @@ kube = { version = "0.65.0", default-features = false, features = ["jsonpatch", 
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
 prometheus-http-query = { workspace = true }
+quick-junit = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
+sugars = { workspace = true }
 tempfile = { workspace = true }
 termcolor = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]
 serde_merge = { workspace = true }

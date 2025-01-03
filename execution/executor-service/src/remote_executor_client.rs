@@ -7,7 +7,7 @@ use crate::{
 };
 use aptos_logger::{info, trace};
 use aptos_secure_net::network_controller::{Message, NetworkController};
-use aptos_storage_interface::cached_state_view::CachedStateView;
+use aptos_storage_interface::state_store::state_view::cached_state_view::CachedStateView;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,

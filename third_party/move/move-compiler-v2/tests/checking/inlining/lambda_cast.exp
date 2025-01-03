@@ -59,5 +59,45 @@ module 0x12391283::M {
     }
 } // end 0x12391283::M
 
+// -- Sourcified model before bytecode pipeline
+module 0x12391283::M {
+    fun test_1(): u64 {
+        let accu = 0;
+        {
+            let (v) = (vector[115u8, 115u8, 95u8, 112u8, 97u8, 99u8, 107u8, 101u8, 100u8, 32u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8]);
+            0x1::vector::reverse<u8>(&mut v);
+            while (!0x1::vector::is_empty<u8>(&v)) {
+                let e = 0x1::vector::pop_back<u8>(&mut v);
+                {
+                    let (elem) = (e);
+                    accu = {
+                        let (sum,addend) = (accu, elem);
+                        sum + (addend as u64)
+                    }
+                };
+            };
+        };
+        accu
+    }
+    fun test_2(): u64 {
+        let accu = 0;
+        {
+            let (v) = (vector[115u8, 115u8, 95u8, 112u8, 97u8, 99u8, 107u8, 101u8, 100u8, 32u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8]);
+            0x1::vector::reverse<u8>(&mut v);
+            while (!0x1::vector::is_empty<u8>(&v)) {
+                let e = 0x1::vector::pop_back<u8>(&mut v);
+                {
+                    let (elem) = (e);
+                    accu = {
+                        let (sum,addend) = (accu, elem);
+                        sum + (addend as u64)
+                    }
+                };
+            };
+        };
+        accu
+    }
+}
+
 
 ============ bytecode verification succeeded ========

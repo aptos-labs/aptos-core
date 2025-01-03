@@ -29,11 +29,13 @@ aptos-proptest-helpers = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
+aptos-vm-environment = { workspace = true }
 aptos-vm-genesis = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
+claims = { workspace = true }
 goldenfile = { workspace = true }
 move-binary-format = { workspace = true }
 move-command-line-common = { workspace = true }
@@ -50,9 +52,6 @@ proptest-derive = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
-
-[dev-dependencies]
-claims = { workspace = true }
 
 [features]
 default = []

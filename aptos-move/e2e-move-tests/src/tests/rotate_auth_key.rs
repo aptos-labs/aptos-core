@@ -15,7 +15,7 @@ use aptos_crypto::{
 use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{AccountResource, RotationProofChallenge, CORE_CODE_ADDRESS},
+    account_config::{RotationProofChallenge, CORE_CODE_ADDRESS},
     state_store::{state_key::StateKey, table::TableHandle},
     transaction::{authenticator::AuthenticationKey, TransactionStatus},
 };
@@ -40,7 +40,7 @@ fn rotate_auth_key_ed25519_to_ed25519() {
     );
 
     // verify that we can still get to account1's originating address
-    verify_originating_address(&mut harness, account2.auth_key(), *account1.address(), 1);
+    verify_originating_address(&mut harness, account2.auth_key(), *account1.address());
 }
 
 #[test]
@@ -64,7 +64,7 @@ fn rotate_auth_key_ed25519_to_multi_ed25519() {
     );
 
     // verify that we can still get to account1's originating address
-    verify_originating_address(&mut harness, auth_key.to_vec(), *account1.address(), 1);
+    verify_originating_address(&mut harness, auth_key.to_vec(), *account1.address());
 }
 
 #[test]
@@ -87,7 +87,7 @@ fn rotate_auth_key_twice() {
     // rotate account1's keypair to account2
     account1.rotate_key(account2.privkey, account2.pubkey.as_ed25519().unwrap());
     // verify that we can still get to account1's originating address
-    verify_originating_address(&mut harness, account1.auth_key(), *account1.address(), 1);
+    verify_originating_address(&mut harness, account1.auth_key(), *account1.address());
 
     let account3 = harness.new_account_with_key_pair();
     assert_successful_key_rotation_transaction(
@@ -101,7 +101,7 @@ fn rotate_auth_key_twice() {
         account3.pubkey.to_bytes(),
     );
     account1.rotate_key(account3.privkey, account3.pubkey.as_ed25519().unwrap());
-    verify_originating_address(&mut harness, account1.auth_key(), *account1.address(), 2);
+    verify_originating_address(&mut harness, account1.auth_key(), *account1.address());
 }
 
 #[test]
@@ -125,7 +125,6 @@ fn rotate_auth_key_with_rotation_capability_e2e() {
         &mut harness,
         offerer_account.auth_key(),
         *offerer_account.address(),
-        1,
     );
 
     revoke_rotation_capability(&mut harness, &offerer_account, *delegate_account.address());
@@ -221,7 +220,6 @@ pub fn verify_originating_address(
     harness: &mut MoveHarness,
     auth_key: Vec<u8>,
     expected_address: AccountAddress,
-    expected_num_of_events: u64,
 ) {
     // Get the address redirection table
     let originating_address_handle = harness
@@ -234,13 +232,4 @@ pub fn verify_originating_address(
     // Verify that the value in the address redirection table is expected
     let result = harness.read_state_value_bytes(state_key).unwrap();
     assert_eq!(result, expected_address.to_vec());
-
-    let account_resource = parse_struct_tag("0x1::account::Account").unwrap();
-    let key_rotation_events = harness
-        .read_resource::<AccountResource>(&expected_address, account_resource)
-        .unwrap()
-        .key_rotation_events()
-        .clone();
-
-    assert_eq!(key_rotation_events.count(), expected_num_of_events);
 }

@@ -5,6 +5,9 @@ status-level = "skip"
 failure-output = "immediate-final"
 # Cancel test run on the first failure. Accounts for retries.
 fail-fast = true
+# To avoid CPU saturation and test timeouts (due to heavy/multithreaded
+# tests), we increase the number of threads required per test.
+threads-required = 3
 
 junit = { path = "junit.xml" }
 

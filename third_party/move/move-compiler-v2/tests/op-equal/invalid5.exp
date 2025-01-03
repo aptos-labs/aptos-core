@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: cannot use `()` with an operator which expects a value of type `integer`
+  ┌─ tests/op-equal/invalid5.move:4:17
+  │
+4 │         let y = (x += 2) * (x -= 1);
+  │                 ^^^^^^^^

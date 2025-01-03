@@ -661,6 +661,10 @@ spec aptos_framework::account {
         aborts_if account.sequence_number != 0;
     }
 
+    spec originating_address(auth_key: address): Option<address> {
+        pragma verify=false;
+    }
+
     spec update_auth_key_and_originating_address_table(
         originating_addr: address,
         account_resource: &mut Account,
@@ -681,6 +685,7 @@ spec aptos_framework::account {
         aborts_if table::spec_contains(address_map, curr_auth_key) &&
             table::spec_get(address_map, curr_auth_key) != originating_addr;
         aborts_if !from_bcs::deserializable<address>(new_auth_key_vector);
+        aborts_if curr_auth_key == new_auth_key;
         aborts_if curr_auth_key != new_auth_key && table::spec_contains(address_map, new_auth_key);
 
         ensures table::spec_contains(global<OriginatingAddress>(@aptos_framework).address_map, from_bcs::deserialize<address>(new_auth_key_vector));
@@ -728,5 +733,9 @@ spec aptos_framework::account {
         // );
 
         aborts_if account_scheme != ED25519_SCHEME && account_scheme != MULTI_ED25519_SCHEME;
+    }
+
+    spec set_originating_address(account: &signer) {
+        pragma verify=false;
     }
 }

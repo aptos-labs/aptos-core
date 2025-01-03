@@ -110,7 +110,6 @@ jobs:
           # which cleans up the target directory in its post action
           path: |
             aptos-debugger
-            testsuite/replay_verify.py
           key: aptos-debugger-${{ inputs.GIT_SHA || github.sha }}
 
       - name: Prepare for build if not cached
@@ -185,12 +184,11 @@ jobs:
       matrix:
         job_id: ${{ fromJson(needs.prepare.outputs.job_ids) }}
     steps:
-      - name: Load cached aptos-debugger binary and replay_verify.py script
+      - name: Load cached aptos-debugger binary
         uses: actions/cache/restore@v4
         with:
           path: |
             aptos-debugger
-            testsuite/replay_verify.py
           key: aptos-debugger-${{ inputs.GIT_SHA || github.sha }}
           fail-on-cache-miss: true
 

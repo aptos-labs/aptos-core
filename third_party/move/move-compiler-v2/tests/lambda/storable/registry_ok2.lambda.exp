@@ -1,0 +1,1909 @@
+// -- Model dump before env processor pipeline:
+module 0x42::test {
+    use std::signer;
+    use std::vector;
+    struct FunctionEntry {
+        f: |u64|u64 with copy+store,
+        key: u64,
+    }
+    struct FunctionValue {
+        0: |u64|u64 with copy+store,
+    }
+    enum Option<T> {
+        None,
+        Some {
+            0: T,
+        }
+    }
+    struct Registry {
+        functions: vector<FunctionEntry>,
+    }
+    private fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+    private fun get_function(v: &vector<FunctionEntry>,k: u64): Option<|u64|u64 with copy+store> {
+        {
+          let x: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          vector::for_each_ref<FunctionEntry>(v, |f: &FunctionEntry| if Eq<u64>(select test::FunctionEntry.key<&FunctionEntry>(f), k) {
+            x: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(select test::FunctionEntry.f<&FunctionEntry>(f))
+          } else {
+            Tuple()
+          });
+          x
+        }
+    }
+    private fun invoke(addr: address,k: u64,x: u64): Option<u64>
+        acquires Registry(*)
+     {
+        if Not(exists<Registry>(addr)) {
+          return pack test::Option::None<u64>()
+        } else {
+          Tuple()
+        };
+        {
+          let registry: &Registry = BorrowGlobal(Immutable)<Registry>(addr);
+          match (test::get_function(Borrow(Immutable)(select test::Registry.functions<&Registry>(registry)), k)) {
+            test::Option::Some<|u64|u64 with copy+store>{ 0: f } => {
+              pack test::Option::Some<u64>((f)(x))
+            }
+            _: Option<|u64|u64 with copy+store> => {
+              pack test::Option::None<u64>()
+            }
+          }
+
+        }
+    }
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+    private fun multiply_by_x(x: u64): |u64|u64 with copy+store {
+         move|y: u64| test::multiply(x, y)
+    }
+    private fun multiply_by_x2(x: u64): |u64|u64 with copy+store {
+         move|y: u64| test::multiply(x, y)
+    }
+    private fun register(owner: &signer,f: |u64|u64 with copy+store,k: u64)
+        acquires Registry(*)
+     {
+        {
+          let addr: address = signer::address_of(owner);
+          if Not(exists<Registry>(addr)) {
+            {
+              let new_registry: Registry = pack test::Registry(Vector<FunctionEntry>());
+              MoveTo<Registry>(owner, new_registry);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          };
+          {
+            let registry: &mut Registry = BorrowGlobal(Mutable)<Registry>(addr);
+            test::replace_or_add_function(Borrow(Mutable)(select test::Registry.functions<&mut Registry>(registry)), k, f);
+            Tuple()
+          }
+        }
+    }
+    private fun replace_or_add_function(v: &mut vector<FunctionEntry>,k: u64,f: |u64|u64 with copy+store): Option<|u64|u64 with copy+store> {
+        {
+          let result: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          vector::for_each_mut<FunctionEntry>(v, |record: &mut FunctionEntry| if Eq<u64>(select test::FunctionEntry.key<&mut FunctionEntry>(record), k) {
+            {
+              let old_f: |u64|u64 with copy+store = select test::FunctionEntry.f<&mut FunctionEntry>(record);
+              select test::FunctionEntry.f<&mut FunctionEntry>(record) = f;
+              result: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(old_f);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          });
+          match (result) {
+            test::Option::None<|u64|u64 with copy+store> => {
+              {
+                let new_record: FunctionEntry = pack test::FunctionEntry(f, k);
+                vector::push_back<FunctionEntry>(v, new_record);
+                pack test::Option::None<|u64|u64 with copy+store>()
+              }
+            }
+            test::Option::Some<|u64|u64 with copy+store>{ 0: _ } => {
+              result
+            }
+          }
+
+        }
+    }
+    private fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor unused checks:
+module 0x42::test {
+    use std::signer;
+    use std::vector;
+    struct FunctionEntry {
+        f: |u64|u64 with copy+store,
+        key: u64,
+    }
+    struct FunctionValue {
+        0: |u64|u64 with copy+store,
+    }
+    enum Option<T> {
+        None,
+        Some {
+            0: T,
+        }
+    }
+    struct Registry {
+        functions: vector<FunctionEntry>,
+    }
+    private fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+    private fun get_function(v: &vector<FunctionEntry>,k: u64): Option<|u64|u64 with copy+store> {
+        {
+          let x: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          vector::for_each_ref<FunctionEntry>(v, |f: &FunctionEntry| if Eq<u64>(select test::FunctionEntry.key<&FunctionEntry>(f), k) {
+            x: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(select test::FunctionEntry.f<&FunctionEntry>(f))
+          } else {
+            Tuple()
+          });
+          x
+        }
+    }
+    private fun invoke(addr: address,k: u64,x: u64): Option<u64>
+        acquires Registry(*)
+     {
+        if Not(exists<Registry>(addr)) {
+          return pack test::Option::None<u64>()
+        } else {
+          Tuple()
+        };
+        {
+          let registry: &Registry = BorrowGlobal(Immutable)<Registry>(addr);
+          match (test::get_function(Borrow(Immutable)(select test::Registry.functions<&Registry>(registry)), k)) {
+            test::Option::Some<|u64|u64 with copy+store>{ 0: f } => {
+              pack test::Option::Some<u64>((f)(x))
+            }
+            _: Option<|u64|u64 with copy+store> => {
+              pack test::Option::None<u64>()
+            }
+          }
+
+        }
+    }
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+    private fun multiply_by_x(x: u64): |u64|u64 with copy+store {
+         move|y: u64| test::multiply(x, y)
+    }
+    private fun multiply_by_x2(x: u64): |u64|u64 with copy+store {
+         move|y: u64| test::multiply(x, y)
+    }
+    private fun register(owner: &signer,f: |u64|u64 with copy+store,k: u64)
+        acquires Registry(*)
+     {
+        {
+          let addr: address = signer::address_of(owner);
+          if Not(exists<Registry>(addr)) {
+            {
+              let new_registry: Registry = pack test::Registry(Vector<FunctionEntry>());
+              MoveTo<Registry>(owner, new_registry);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          };
+          {
+            let registry: &mut Registry = BorrowGlobal(Mutable)<Registry>(addr);
+            test::replace_or_add_function(Borrow(Mutable)(select test::Registry.functions<&mut Registry>(registry)), k, f);
+            Tuple()
+          }
+        }
+    }
+    private fun replace_or_add_function(v: &mut vector<FunctionEntry>,k: u64,f: |u64|u64 with copy+store): Option<|u64|u64 with copy+store> {
+        {
+          let result: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          vector::for_each_mut<FunctionEntry>(v, |record: &mut FunctionEntry| if Eq<u64>(select test::FunctionEntry.key<&mut FunctionEntry>(record), k) {
+            {
+              let old_f: |u64|u64 with copy+store = select test::FunctionEntry.f<&mut FunctionEntry>(record);
+              select test::FunctionEntry.f<&mut FunctionEntry>(record) = f;
+              result: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(old_f);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          });
+          match (result) {
+            test::Option::None<|u64|u64 with copy+store> => {
+              {
+                let new_record: FunctionEntry = pack test::FunctionEntry(f, k);
+                vector::push_back<FunctionEntry>(v, new_record);
+                pack test::Option::None<|u64|u64 with copy+store>()
+              }
+            }
+            test::Option::Some<|u64|u64 with copy+store>{ 0: _ } => {
+              result
+            }
+          }
+
+        }
+    }
+    private fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor type parameter check:
+module 0x42::test {
+    use std::signer;
+    use std::vector;
+    struct FunctionEntry {
+        f: |u64|u64 with copy+store,
+        key: u64,
+    }
+    struct FunctionValue {
+        0: |u64|u64 with copy+store,
+    }
+    enum Option<T> {
+        None,
+        Some {
+            0: T,
+        }
+    }
+    struct Registry {
+        functions: vector<FunctionEntry>,
+    }
+    private fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+    private fun get_function(v: &vector<FunctionEntry>,k: u64): Option<|u64|u64 with copy+store> {
+        {
+          let x: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          vector::for_each_ref<FunctionEntry>(v, |f: &FunctionEntry| if Eq<u64>(select test::FunctionEntry.key<&FunctionEntry>(f), k) {
+            x: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(select test::FunctionEntry.f<&FunctionEntry>(f))
+          } else {
+            Tuple()
+          });
+          x
+        }
+    }
+    private fun invoke(addr: address,k: u64,x: u64): Option<u64>
+        acquires Registry(*)
+     {
+        if Not(exists<Registry>(addr)) {
+          return pack test::Option::None<u64>()
+        } else {
+          Tuple()
+        };
+        {
+          let registry: &Registry = BorrowGlobal(Immutable)<Registry>(addr);
+          match (test::get_function(Borrow(Immutable)(select test::Registry.functions<&Registry>(registry)), k)) {
+            test::Option::Some<|u64|u64 with copy+store>{ 0: f } => {
+              pack test::Option::Some<u64>((f)(x))
+            }
+            _: Option<|u64|u64 with copy+store> => {
+              pack test::Option::None<u64>()
+            }
+          }
+
+        }
+    }
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+    private fun multiply_by_x(x: u64): |u64|u64 with copy+store {
+         move|y: u64| test::multiply(x, y)
+    }
+    private fun multiply_by_x2(x: u64): |u64|u64 with copy+store {
+         move|y: u64| test::multiply(x, y)
+    }
+    private fun register(owner: &signer,f: |u64|u64 with copy+store,k: u64)
+        acquires Registry(*)
+     {
+        {
+          let addr: address = signer::address_of(owner);
+          if Not(exists<Registry>(addr)) {
+            {
+              let new_registry: Registry = pack test::Registry(Vector<FunctionEntry>());
+              MoveTo<Registry>(owner, new_registry);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          };
+          {
+            let registry: &mut Registry = BorrowGlobal(Mutable)<Registry>(addr);
+            test::replace_or_add_function(Borrow(Mutable)(select test::Registry.functions<&mut Registry>(registry)), k, f);
+            Tuple()
+          }
+        }
+    }
+    private fun replace_or_add_function(v: &mut vector<FunctionEntry>,k: u64,f: |u64|u64 with copy+store): Option<|u64|u64 with copy+store> {
+        {
+          let result: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          vector::for_each_mut<FunctionEntry>(v, |record: &mut FunctionEntry| if Eq<u64>(select test::FunctionEntry.key<&mut FunctionEntry>(record), k) {
+            {
+              let old_f: |u64|u64 with copy+store = select test::FunctionEntry.f<&mut FunctionEntry>(record);
+              select test::FunctionEntry.f<&mut FunctionEntry>(record) = f;
+              result: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(old_f);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          });
+          match (result) {
+            test::Option::None<|u64|u64 with copy+store> => {
+              {
+                let new_record: FunctionEntry = pack test::FunctionEntry(f, k);
+                vector::push_back<FunctionEntry>(v, new_record);
+                pack test::Option::None<|u64|u64 with copy+store>()
+              }
+            }
+            test::Option::Some<|u64|u64 with copy+store>{ 0: _ } => {
+              result
+            }
+          }
+
+        }
+    }
+    private fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor check recursive struct definition:
+module 0x42::test {
+    use std::signer;
+    use std::vector;
+    struct FunctionEntry {
+        f: |u64|u64 with copy+store,
+        key: u64,
+    }
+    struct FunctionValue {
+        0: |u64|u64 with copy+store,
+    }
+    enum Option<T> {
+        None,
+        Some {
+            0: T,
+        }
+    }
+    struct Registry {
+        functions: vector<FunctionEntry>,
+    }
+    private fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+    private fun get_function(v: &vector<FunctionEntry>,k: u64): Option<|u64|u64 with copy+store> {
+        {
+          let x: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          vector::for_each_ref<FunctionEntry>(v, |f: &FunctionEntry| if Eq<u64>(select test::FunctionEntry.key<&FunctionEntry>(f), k) {
+            x: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(select test::FunctionEntry.f<&FunctionEntry>(f))
+          } else {
+            Tuple()
+          });
+          x
+        }
+    }
+    private fun invoke(addr: address,k: u64,x: u64): Option<u64>
+        acquires Registry(*)
+     {
+        if Not(exists<Registry>(addr)) {
+          return pack test::Option::None<u64>()
+        } else {
+          Tuple()
+        };
+        {
+          let registry: &Registry = BorrowGlobal(Immutable)<Registry>(addr);
+          match (test::get_function(Borrow(Immutable)(select test::Registry.functions<&Registry>(registry)), k)) {
+            test::Option::Some<|u64|u64 with copy+store>{ 0: f } => {
+              pack test::Option::Some<u64>((f)(x))
+            }
+            _: Option<|u64|u64 with copy+store> => {
+              pack test::Option::None<u64>()
+            }
+          }
+
+        }
+    }
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+    private fun multiply_by_x(x: u64): |u64|u64 with copy+store {
+         move|y: u64| test::multiply(x, y)
+    }
+    private fun multiply_by_x2(x: u64): |u64|u64 with copy+store {
+         move|y: u64| test::multiply(x, y)
+    }
+    private fun register(owner: &signer,f: |u64|u64 with copy+store,k: u64)
+        acquires Registry(*)
+     {
+        {
+          let addr: address = signer::address_of(owner);
+          if Not(exists<Registry>(addr)) {
+            {
+              let new_registry: Registry = pack test::Registry(Vector<FunctionEntry>());
+              MoveTo<Registry>(owner, new_registry);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          };
+          {
+            let registry: &mut Registry = BorrowGlobal(Mutable)<Registry>(addr);
+            test::replace_or_add_function(Borrow(Mutable)(select test::Registry.functions<&mut Registry>(registry)), k, f);
+            Tuple()
+          }
+        }
+    }
+    private fun replace_or_add_function(v: &mut vector<FunctionEntry>,k: u64,f: |u64|u64 with copy+store): Option<|u64|u64 with copy+store> {
+        {
+          let result: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          vector::for_each_mut<FunctionEntry>(v, |record: &mut FunctionEntry| if Eq<u64>(select test::FunctionEntry.key<&mut FunctionEntry>(record), k) {
+            {
+              let old_f: |u64|u64 with copy+store = select test::FunctionEntry.f<&mut FunctionEntry>(record);
+              select test::FunctionEntry.f<&mut FunctionEntry>(record) = f;
+              result: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(old_f);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          });
+          match (result) {
+            test::Option::None<|u64|u64 with copy+store> => {
+              {
+                let new_record: FunctionEntry = pack test::FunctionEntry(f, k);
+                vector::push_back<FunctionEntry>(v, new_record);
+                pack test::Option::None<|u64|u64 with copy+store>()
+              }
+            }
+            test::Option::Some<|u64|u64 with copy+store>{ 0: _ } => {
+              result
+            }
+          }
+
+        }
+    }
+    private fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor check cyclic type instantiation:
+module 0x42::test {
+    use std::signer;
+    use std::vector;
+    struct FunctionEntry {
+        f: |u64|u64 with copy+store,
+        key: u64,
+    }
+    struct FunctionValue {
+        0: |u64|u64 with copy+store,
+    }
+    enum Option<T> {
+        None,
+        Some {
+            0: T,
+        }
+    }
+    struct Registry {
+        functions: vector<FunctionEntry>,
+    }
+    private fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+    private fun get_function(v: &vector<FunctionEntry>,k: u64): Option<|u64|u64 with copy+store> {
+        {
+          let x: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          vector::for_each_ref<FunctionEntry>(v, |f: &FunctionEntry| if Eq<u64>(select test::FunctionEntry.key<&FunctionEntry>(f), k) {
+            x: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(select test::FunctionEntry.f<&FunctionEntry>(f))
+          } else {
+            Tuple()
+          });
+          x
+        }
+    }
+    private fun invoke(addr: address,k: u64,x: u64): Option<u64>
+        acquires Registry(*)
+     {
+        if Not(exists<Registry>(addr)) {
+          return pack test::Option::None<u64>()
+        } else {
+          Tuple()
+        };
+        {
+          let registry: &Registry = BorrowGlobal(Immutable)<Registry>(addr);
+          match (test::get_function(Borrow(Immutable)(select test::Registry.functions<&Registry>(registry)), k)) {
+            test::Option::Some<|u64|u64 with copy+store>{ 0: f } => {
+              pack test::Option::Some<u64>((f)(x))
+            }
+            _: Option<|u64|u64 with copy+store> => {
+              pack test::Option::None<u64>()
+            }
+          }
+
+        }
+    }
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+    private fun multiply_by_x(x: u64): |u64|u64 with copy+store {
+         move|y: u64| test::multiply(x, y)
+    }
+    private fun multiply_by_x2(x: u64): |u64|u64 with copy+store {
+         move|y: u64| test::multiply(x, y)
+    }
+    private fun register(owner: &signer,f: |u64|u64 with copy+store,k: u64)
+        acquires Registry(*)
+     {
+        {
+          let addr: address = signer::address_of(owner);
+          if Not(exists<Registry>(addr)) {
+            {
+              let new_registry: Registry = pack test::Registry(Vector<FunctionEntry>());
+              MoveTo<Registry>(owner, new_registry);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          };
+          {
+            let registry: &mut Registry = BorrowGlobal(Mutable)<Registry>(addr);
+            test::replace_or_add_function(Borrow(Mutable)(select test::Registry.functions<&mut Registry>(registry)), k, f);
+            Tuple()
+          }
+        }
+    }
+    private fun replace_or_add_function(v: &mut vector<FunctionEntry>,k: u64,f: |u64|u64 with copy+store): Option<|u64|u64 with copy+store> {
+        {
+          let result: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          vector::for_each_mut<FunctionEntry>(v, |record: &mut FunctionEntry| if Eq<u64>(select test::FunctionEntry.key<&mut FunctionEntry>(record), k) {
+            {
+              let old_f: |u64|u64 with copy+store = select test::FunctionEntry.f<&mut FunctionEntry>(record);
+              select test::FunctionEntry.f<&mut FunctionEntry>(record) = f;
+              result: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(old_f);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          });
+          match (result) {
+            test::Option::None<|u64|u64 with copy+store> => {
+              {
+                let new_record: FunctionEntry = pack test::FunctionEntry(f, k);
+                vector::push_back<FunctionEntry>(v, new_record);
+                pack test::Option::None<|u64|u64 with copy+store>()
+              }
+            }
+            test::Option::Some<|u64|u64 with copy+store>{ 0: _ } => {
+              result
+            }
+          }
+
+        }
+    }
+    private fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor unused struct params check:
+module 0x42::test {
+    use std::signer;
+    use std::vector;
+    struct FunctionEntry {
+        f: |u64|u64 with copy+store,
+        key: u64,
+    }
+    struct FunctionValue {
+        0: |u64|u64 with copy+store,
+    }
+    enum Option<T> {
+        None,
+        Some {
+            0: T,
+        }
+    }
+    struct Registry {
+        functions: vector<FunctionEntry>,
+    }
+    private fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+    private fun get_function(v: &vector<FunctionEntry>,k: u64): Option<|u64|u64 with copy+store> {
+        {
+          let x: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          vector::for_each_ref<FunctionEntry>(v, |f: &FunctionEntry| if Eq<u64>(select test::FunctionEntry.key<&FunctionEntry>(f), k) {
+            x: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(select test::FunctionEntry.f<&FunctionEntry>(f))
+          } else {
+            Tuple()
+          });
+          x
+        }
+    }
+    private fun invoke(addr: address,k: u64,x: u64): Option<u64>
+        acquires Registry(*)
+     {
+        if Not(exists<Registry>(addr)) {
+          return pack test::Option::None<u64>()
+        } else {
+          Tuple()
+        };
+        {
+          let registry: &Registry = BorrowGlobal(Immutable)<Registry>(addr);
+          match (test::get_function(Borrow(Immutable)(select test::Registry.functions<&Registry>(registry)), k)) {
+            test::Option::Some<|u64|u64 with copy+store>{ 0: f } => {
+              pack test::Option::Some<u64>((f)(x))
+            }
+            _: Option<|u64|u64 with copy+store> => {
+              pack test::Option::None<u64>()
+            }
+          }
+
+        }
+    }
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+    private fun multiply_by_x(x: u64): |u64|u64 with copy+store {
+         move|y: u64| test::multiply(x, y)
+    }
+    private fun multiply_by_x2(x: u64): |u64|u64 with copy+store {
+         move|y: u64| test::multiply(x, y)
+    }
+    private fun register(owner: &signer,f: |u64|u64 with copy+store,k: u64)
+        acquires Registry(*)
+     {
+        {
+          let addr: address = signer::address_of(owner);
+          if Not(exists<Registry>(addr)) {
+            {
+              let new_registry: Registry = pack test::Registry(Vector<FunctionEntry>());
+              MoveTo<Registry>(owner, new_registry);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          };
+          {
+            let registry: &mut Registry = BorrowGlobal(Mutable)<Registry>(addr);
+            test::replace_or_add_function(Borrow(Mutable)(select test::Registry.functions<&mut Registry>(registry)), k, f);
+            Tuple()
+          }
+        }
+    }
+    private fun replace_or_add_function(v: &mut vector<FunctionEntry>,k: u64,f: |u64|u64 with copy+store): Option<|u64|u64 with copy+store> {
+        {
+          let result: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          vector::for_each_mut<FunctionEntry>(v, |record: &mut FunctionEntry| if Eq<u64>(select test::FunctionEntry.key<&mut FunctionEntry>(record), k) {
+            {
+              let old_f: |u64|u64 with copy+store = select test::FunctionEntry.f<&mut FunctionEntry>(record);
+              select test::FunctionEntry.f<&mut FunctionEntry>(record) = f;
+              result: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(old_f);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          });
+          match (result) {
+            test::Option::None<|u64|u64 with copy+store> => {
+              {
+                let new_record: FunctionEntry = pack test::FunctionEntry(f, k);
+                vector::push_back<FunctionEntry>(v, new_record);
+                pack test::Option::None<|u64|u64 with copy+store>()
+              }
+            }
+            test::Option::Some<|u64|u64 with copy+store>{ 0: _ } => {
+              result
+            }
+          }
+
+        }
+    }
+    private fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor access and use check before inlining:
+module 0x42::test {
+    use std::signer;
+    use std::vector;
+    struct FunctionEntry {
+        f: |u64|u64 with copy+store,
+        key: u64,
+    }
+    struct FunctionValue {
+        0: |u64|u64 with copy+store,
+    }
+    enum Option<T> {
+        None,
+        Some {
+            0: T,
+        }
+    }
+    struct Registry {
+        functions: vector<FunctionEntry>,
+    }
+    private fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+    private fun get_function(v: &vector<FunctionEntry>,k: u64): Option<|u64|u64 with copy+store> {
+        {
+          let x: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          vector::for_each_ref<FunctionEntry>(v, |f: &FunctionEntry| if Eq<u64>(select test::FunctionEntry.key<&FunctionEntry>(f), k) {
+            x: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(select test::FunctionEntry.f<&FunctionEntry>(f))
+          } else {
+            Tuple()
+          });
+          x
+        }
+    }
+    private fun invoke(addr: address,k: u64,x: u64): Option<u64>
+        acquires Registry(*)
+     {
+        if Not(exists<Registry>(addr)) {
+          return pack test::Option::None<u64>()
+        } else {
+          Tuple()
+        };
+        {
+          let registry: &Registry = BorrowGlobal(Immutable)<Registry>(addr);
+          match (test::get_function(Borrow(Immutable)(select test::Registry.functions<&Registry>(registry)), k)) {
+            test::Option::Some<|u64|u64 with copy+store>{ 0: f } => {
+              pack test::Option::Some<u64>((f)(x))
+            }
+            _: Option<|u64|u64 with copy+store> => {
+              pack test::Option::None<u64>()
+            }
+          }
+
+        }
+    }
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+    private fun multiply_by_x(x: u64): |u64|u64 with copy+store {
+         move|y: u64| test::multiply(x, y)
+    }
+    private fun multiply_by_x2(x: u64): |u64|u64 with copy+store {
+         move|y: u64| test::multiply(x, y)
+    }
+    private fun register(owner: &signer,f: |u64|u64 with copy+store,k: u64)
+        acquires Registry(*)
+     {
+        {
+          let addr: address = signer::address_of(owner);
+          if Not(exists<Registry>(addr)) {
+            {
+              let new_registry: Registry = pack test::Registry(Vector<FunctionEntry>());
+              MoveTo<Registry>(owner, new_registry);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          };
+          {
+            let registry: &mut Registry = BorrowGlobal(Mutable)<Registry>(addr);
+            test::replace_or_add_function(Borrow(Mutable)(select test::Registry.functions<&mut Registry>(registry)), k, f);
+            Tuple()
+          }
+        }
+    }
+    private fun replace_or_add_function(v: &mut vector<FunctionEntry>,k: u64,f: |u64|u64 with copy+store): Option<|u64|u64 with copy+store> {
+        {
+          let result: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          vector::for_each_mut<FunctionEntry>(v, |record: &mut FunctionEntry| if Eq<u64>(select test::FunctionEntry.key<&mut FunctionEntry>(record), k) {
+            {
+              let old_f: |u64|u64 with copy+store = select test::FunctionEntry.f<&mut FunctionEntry>(record);
+              select test::FunctionEntry.f<&mut FunctionEntry>(record) = f;
+              result: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(old_f);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          });
+          match (result) {
+            test::Option::None<|u64|u64 with copy+store> => {
+              {
+                let new_record: FunctionEntry = pack test::FunctionEntry(f, k);
+                vector::push_back<FunctionEntry>(v, new_record);
+                pack test::Option::None<|u64|u64 with copy+store>()
+              }
+            }
+            test::Option::Some<|u64|u64 with copy+store>{ 0: _ } => {
+              result
+            }
+          }
+
+        }
+    }
+    private fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor inlining:
+module 0x42::test {
+    use std::signer;
+    use std::vector;
+    struct FunctionEntry {
+        f: |u64|u64 with copy+store,
+        key: u64,
+    }
+    struct FunctionValue {
+        0: |u64|u64 with copy+store,
+    }
+    enum Option<T> {
+        None,
+        Some {
+            0: T,
+        }
+    }
+    struct Registry {
+        functions: vector<FunctionEntry>,
+    }
+    private fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+    private fun get_function(v: &vector<FunctionEntry>,k: u64): Option<|u64|u64 with copy+store> {
+        {
+          let x: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          {
+            let (v: &vector<FunctionEntry>): (&vector<FunctionEntry>) = Tuple(v);
+            {
+              let i: u64 = 0;
+              loop {
+                if Lt<u64>(i, vector::length<FunctionEntry>(v)) {
+                  {
+                    let (f: &FunctionEntry): (&FunctionEntry) = Tuple(vector::borrow<FunctionEntry>(v, i));
+                    if Eq<u64>(select test::FunctionEntry.key<&FunctionEntry>(f), k) {
+                      x: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(select test::FunctionEntry.f<&FunctionEntry>(f))
+                    } else {
+                      Tuple()
+                    }
+                  };
+                  i: u64 = Add<u64>(i, 1)
+                } else {
+                  break
+                }
+              }
+            }
+          };
+          x
+        }
+    }
+    private fun invoke(addr: address,k: u64,x: u64): Option<u64>
+        acquires Registry(*)
+     {
+        if Not(exists<Registry>(addr)) {
+          return pack test::Option::None<u64>()
+        } else {
+          Tuple()
+        };
+        {
+          let registry: &Registry = BorrowGlobal(Immutable)<Registry>(addr);
+          match (test::get_function(Borrow(Immutable)(select test::Registry.functions<&Registry>(registry)), k)) {
+            test::Option::Some<|u64|u64 with copy+store>{ 0: f } => {
+              pack test::Option::Some<u64>((f)(x))
+            }
+            _: Option<|u64|u64 with copy+store> => {
+              pack test::Option::None<u64>()
+            }
+          }
+
+        }
+    }
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+    private fun multiply_by_x(x: u64): |u64|u64 with copy+store {
+         move|y: u64| test::multiply(x, y)
+    }
+    private fun multiply_by_x2(x: u64): |u64|u64 with copy+store {
+         move|y: u64| test::multiply(x, y)
+    }
+    private fun register(owner: &signer,f: |u64|u64 with copy+store,k: u64)
+        acquires Registry(*)
+     {
+        {
+          let addr: address = signer::address_of(owner);
+          if Not(exists<Registry>(addr)) {
+            {
+              let new_registry: Registry = pack test::Registry(Vector<FunctionEntry>());
+              MoveTo<Registry>(owner, new_registry);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          };
+          {
+            let registry: &mut Registry = BorrowGlobal(Mutable)<Registry>(addr);
+            test::replace_or_add_function(Borrow(Mutable)(select test::Registry.functions<&mut Registry>(registry)), k, f);
+            Tuple()
+          }
+        }
+    }
+    private fun replace_or_add_function(v: &mut vector<FunctionEntry>,k: u64,f: |u64|u64 with copy+store): Option<|u64|u64 with copy+store> {
+        {
+          let result: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          {
+            let (v: &mut vector<FunctionEntry>): (&mut vector<FunctionEntry>) = Tuple(v);
+            {
+              let i: u64 = 0;
+              loop {
+                if Lt<u64>(i, vector::length<FunctionEntry>(Freeze(false)(v))) {
+                  {
+                    let (record: &mut FunctionEntry): (&mut FunctionEntry) = Tuple(vector::borrow_mut<FunctionEntry>(v, i));
+                    if Eq<u64>(select test::FunctionEntry.key<&mut FunctionEntry>(record), k) {
+                      {
+                        let old_f: |u64|u64 with copy+store = select test::FunctionEntry.f<&mut FunctionEntry>(record);
+                        select test::FunctionEntry.f<&mut FunctionEntry>(record) = f;
+                        result: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(old_f);
+                        Tuple()
+                      }
+                    } else {
+                      Tuple()
+                    }
+                  };
+                  i: u64 = Add<u64>(i, 1)
+                } else {
+                  break
+                }
+              }
+            }
+          };
+          match (result) {
+            test::Option::None<|u64|u64 with copy+store> => {
+              {
+                let new_record: FunctionEntry = pack test::FunctionEntry(f, k);
+                vector::push_back<FunctionEntry>(v, new_record);
+                pack test::Option::None<|u64|u64 with copy+store>()
+              }
+            }
+            test::Option::Some<|u64|u64 with copy+store>{ 0: _ } => {
+              result
+            }
+          }
+
+        }
+    }
+    private fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor access and use check after inlining:
+module 0x42::test {
+    use std::signer;
+    use std::vector;
+    struct FunctionEntry {
+        f: |u64|u64 with copy+store,
+        key: u64,
+    }
+    struct FunctionValue {
+        0: |u64|u64 with copy+store,
+    }
+    enum Option<T> {
+        None,
+        Some {
+            0: T,
+        }
+    }
+    struct Registry {
+        functions: vector<FunctionEntry>,
+    }
+    private fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+    private fun get_function(v: &vector<FunctionEntry>,k: u64): Option<|u64|u64 with copy+store> {
+        {
+          let x: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          {
+            let (v: &vector<FunctionEntry>): (&vector<FunctionEntry>) = Tuple(v);
+            {
+              let i: u64 = 0;
+              loop {
+                if Lt<u64>(i, vector::length<FunctionEntry>(v)) {
+                  {
+                    let (f: &FunctionEntry): (&FunctionEntry) = Tuple(vector::borrow<FunctionEntry>(v, i));
+                    if Eq<u64>(select test::FunctionEntry.key<&FunctionEntry>(f), k) {
+                      x: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(select test::FunctionEntry.f<&FunctionEntry>(f))
+                    } else {
+                      Tuple()
+                    }
+                  };
+                  i: u64 = Add<u64>(i, 1)
+                } else {
+                  break
+                }
+              }
+            }
+          };
+          x
+        }
+    }
+    private fun invoke(addr: address,k: u64,x: u64): Option<u64>
+        acquires Registry(*)
+     {
+        if Not(exists<Registry>(addr)) {
+          return pack test::Option::None<u64>()
+        } else {
+          Tuple()
+        };
+        {
+          let registry: &Registry = BorrowGlobal(Immutable)<Registry>(addr);
+          match (test::get_function(Borrow(Immutable)(select test::Registry.functions<&Registry>(registry)), k)) {
+            test::Option::Some<|u64|u64 with copy+store>{ 0: f } => {
+              pack test::Option::Some<u64>((f)(x))
+            }
+            _: Option<|u64|u64 with copy+store> => {
+              pack test::Option::None<u64>()
+            }
+          }
+
+        }
+    }
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+    private fun multiply_by_x(x: u64): |u64|u64 with copy+store {
+         move|y: u64| test::multiply(x, y)
+    }
+    private fun multiply_by_x2(x: u64): |u64|u64 with copy+store {
+         move|y: u64| test::multiply(x, y)
+    }
+    private fun register(owner: &signer,f: |u64|u64 with copy+store,k: u64)
+        acquires Registry(*)
+     {
+        {
+          let addr: address = signer::address_of(owner);
+          if Not(exists<Registry>(addr)) {
+            {
+              let new_registry: Registry = pack test::Registry(Vector<FunctionEntry>());
+              MoveTo<Registry>(owner, new_registry);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          };
+          {
+            let registry: &mut Registry = BorrowGlobal(Mutable)<Registry>(addr);
+            test::replace_or_add_function(Borrow(Mutable)(select test::Registry.functions<&mut Registry>(registry)), k, f);
+            Tuple()
+          }
+        }
+    }
+    private fun replace_or_add_function(v: &mut vector<FunctionEntry>,k: u64,f: |u64|u64 with copy+store): Option<|u64|u64 with copy+store> {
+        {
+          let result: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          {
+            let (v: &mut vector<FunctionEntry>): (&mut vector<FunctionEntry>) = Tuple(v);
+            {
+              let i: u64 = 0;
+              loop {
+                if Lt<u64>(i, vector::length<FunctionEntry>(Freeze(false)(v))) {
+                  {
+                    let (record: &mut FunctionEntry): (&mut FunctionEntry) = Tuple(vector::borrow_mut<FunctionEntry>(v, i));
+                    if Eq<u64>(select test::FunctionEntry.key<&mut FunctionEntry>(record), k) {
+                      {
+                        let old_f: |u64|u64 with copy+store = select test::FunctionEntry.f<&mut FunctionEntry>(record);
+                        select test::FunctionEntry.f<&mut FunctionEntry>(record) = f;
+                        result: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(old_f);
+                        Tuple()
+                      }
+                    } else {
+                      Tuple()
+                    }
+                  };
+                  i: u64 = Add<u64>(i, 1)
+                } else {
+                  break
+                }
+              }
+            }
+          };
+          match (result) {
+            test::Option::None<|u64|u64 with copy+store> => {
+              {
+                let new_record: FunctionEntry = pack test::FunctionEntry(f, k);
+                vector::push_back<FunctionEntry>(v, new_record);
+                pack test::Option::None<|u64|u64 with copy+store>()
+              }
+            }
+            test::Option::Some<|u64|u64 with copy+store>{ 0: _ } => {
+              result
+            }
+          }
+
+        }
+    }
+    private fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor acquires check:
+module 0x42::test {
+    use std::signer;
+    use std::vector;
+    struct FunctionEntry {
+        f: |u64|u64 with copy+store,
+        key: u64,
+    }
+    struct FunctionValue {
+        0: |u64|u64 with copy+store,
+    }
+    enum Option<T> {
+        None,
+        Some {
+            0: T,
+        }
+    }
+    struct Registry {
+        functions: vector<FunctionEntry>,
+    }
+    private fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+    private fun get_function(v: &vector<FunctionEntry>,k: u64): Option<|u64|u64 with copy+store> {
+        {
+          let x: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          {
+            let (v: &vector<FunctionEntry>): (&vector<FunctionEntry>) = Tuple(v);
+            {
+              let i: u64 = 0;
+              loop {
+                if Lt<u64>(i, vector::length<FunctionEntry>(v)) {
+                  {
+                    let (f: &FunctionEntry): (&FunctionEntry) = Tuple(vector::borrow<FunctionEntry>(v, i));
+                    if Eq<u64>(select test::FunctionEntry.key<&FunctionEntry>(f), k) {
+                      x: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(select test::FunctionEntry.f<&FunctionEntry>(f))
+                    } else {
+                      Tuple()
+                    }
+                  };
+                  i: u64 = Add<u64>(i, 1)
+                } else {
+                  break
+                }
+              }
+            }
+          };
+          x
+        }
+    }
+    private fun invoke(addr: address,k: u64,x: u64): Option<u64>
+        acquires Registry(*)
+     {
+        if Not(exists<Registry>(addr)) {
+          return pack test::Option::None<u64>()
+        } else {
+          Tuple()
+        };
+        {
+          let registry: &Registry = BorrowGlobal(Immutable)<Registry>(addr);
+          match (test::get_function(Borrow(Immutable)(select test::Registry.functions<&Registry>(registry)), k)) {
+            test::Option::Some<|u64|u64 with copy+store>{ 0: f } => {
+              pack test::Option::Some<u64>((f)(x))
+            }
+            _: Option<|u64|u64 with copy+store> => {
+              pack test::Option::None<u64>()
+            }
+          }
+
+        }
+    }
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+    private fun multiply_by_x(x: u64): |u64|u64 with copy+store {
+         move|y: u64| test::multiply(x, y)
+    }
+    private fun multiply_by_x2(x: u64): |u64|u64 with copy+store {
+         move|y: u64| test::multiply(x, y)
+    }
+    private fun register(owner: &signer,f: |u64|u64 with copy+store,k: u64)
+        acquires Registry(*)
+     {
+        {
+          let addr: address = signer::address_of(owner);
+          if Not(exists<Registry>(addr)) {
+            {
+              let new_registry: Registry = pack test::Registry(Vector<FunctionEntry>());
+              MoveTo<Registry>(owner, new_registry);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          };
+          {
+            let registry: &mut Registry = BorrowGlobal(Mutable)<Registry>(addr);
+            test::replace_or_add_function(Borrow(Mutable)(select test::Registry.functions<&mut Registry>(registry)), k, f);
+            Tuple()
+          }
+        }
+    }
+    private fun replace_or_add_function(v: &mut vector<FunctionEntry>,k: u64,f: |u64|u64 with copy+store): Option<|u64|u64 with copy+store> {
+        {
+          let result: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          {
+            let (v: &mut vector<FunctionEntry>): (&mut vector<FunctionEntry>) = Tuple(v);
+            {
+              let i: u64 = 0;
+              loop {
+                if Lt<u64>(i, vector::length<FunctionEntry>(Freeze(false)(v))) {
+                  {
+                    let (record: &mut FunctionEntry): (&mut FunctionEntry) = Tuple(vector::borrow_mut<FunctionEntry>(v, i));
+                    if Eq<u64>(select test::FunctionEntry.key<&mut FunctionEntry>(record), k) {
+                      {
+                        let old_f: |u64|u64 with copy+store = select test::FunctionEntry.f<&mut FunctionEntry>(record);
+                        select test::FunctionEntry.f<&mut FunctionEntry>(record) = f;
+                        result: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(old_f);
+                        Tuple()
+                      }
+                    } else {
+                      Tuple()
+                    }
+                  };
+                  i: u64 = Add<u64>(i, 1)
+                } else {
+                  break
+                }
+              }
+            }
+          };
+          match (result) {
+            test::Option::None<|u64|u64 with copy+store> => {
+              {
+                let new_record: FunctionEntry = pack test::FunctionEntry(f, k);
+                vector::push_back<FunctionEntry>(v, new_record);
+                pack test::Option::None<|u64|u64 with copy+store>()
+              }
+            }
+            test::Option::Some<|u64|u64 with copy+store>{ 0: _ } => {
+              result
+            }
+          }
+
+        }
+    }
+    private fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor simplifier:
+module 0x42::test {
+    use std::signer;
+    use std::vector;
+    struct FunctionEntry {
+        f: |u64|u64 with copy+store,
+        key: u64,
+    }
+    struct FunctionValue {
+        0: |u64|u64 with copy+store,
+    }
+    enum Option<T> {
+        None,
+        Some {
+            0: T,
+        }
+    }
+    struct Registry {
+        functions: vector<FunctionEntry>,
+    }
+    private fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+    private fun get_function(v: &vector<FunctionEntry>,k: u64): Option<|u64|u64 with copy+store> {
+        {
+          let x: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          {
+            let (v: &vector<FunctionEntry>): (&vector<FunctionEntry>) = Tuple(v);
+            {
+              let i: u64 = 0;
+              loop {
+                if Lt<u64>(i, vector::length<FunctionEntry>(v)) {
+                  {
+                    let (f: &FunctionEntry): (&FunctionEntry) = Tuple(vector::borrow<FunctionEntry>(v, i));
+                    if Eq<u64>(select test::FunctionEntry.key<&FunctionEntry>(f), k) {
+                      x: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(select test::FunctionEntry.f<&FunctionEntry>(f))
+                    } else {
+                      Tuple()
+                    }
+                  };
+                  i: u64 = Add<u64>(i, 1)
+                } else {
+                  break
+                }
+              }
+            }
+          };
+          x
+        }
+    }
+    private fun invoke(addr: address,k: u64,x: u64): Option<u64>
+        acquires Registry(*)
+     {
+        if Not(exists<Registry>(addr)) {
+          return pack test::Option::None<u64>()
+        } else {
+          Tuple()
+        };
+        {
+          let registry: &Registry = BorrowGlobal(Immutable)<Registry>(addr);
+          match (test::get_function(Borrow(Immutable)(select test::Registry.functions<&Registry>(registry)), k)) {
+            test::Option::Some<|u64|u64 with copy+store>{ 0: f } => {
+              pack test::Option::Some<u64>((f)(x))
+            }
+            _: Option<|u64|u64 with copy+store> => {
+              pack test::Option::None<u64>()
+            }
+          }
+
+        }
+    }
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+    private fun multiply_by_x(x: u64): |u64|u64 with copy+store {
+         move|y: u64| test::multiply(x, y)
+    }
+    private fun multiply_by_x2(x: u64): |u64|u64 with copy+store {
+         move|y: u64| test::multiply(x, y)
+    }
+    private fun register(owner: &signer,f: |u64|u64 with copy+store,k: u64)
+        acquires Registry(*)
+     {
+        {
+          let addr: address = signer::address_of(owner);
+          if Not(exists<Registry>(addr)) {
+            {
+              let new_registry: Registry = pack test::Registry(Vector<FunctionEntry>());
+              MoveTo<Registry>(owner, new_registry);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          };
+          {
+            let registry: &mut Registry = BorrowGlobal(Mutable)<Registry>(addr);
+            test::replace_or_add_function(Borrow(Mutable)(select test::Registry.functions<&mut Registry>(registry)), k, f);
+            Tuple()
+          }
+        }
+    }
+    private fun replace_or_add_function(v: &mut vector<FunctionEntry>,k: u64,f: |u64|u64 with copy+store): Option<|u64|u64 with copy+store> {
+        {
+          let result: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          {
+            let (v: &mut vector<FunctionEntry>): (&mut vector<FunctionEntry>) = Tuple(v);
+            {
+              let i: u64 = 0;
+              loop {
+                if Lt<u64>(i, vector::length<FunctionEntry>(Freeze(false)(v))) {
+                  {
+                    let (record: &mut FunctionEntry): (&mut FunctionEntry) = Tuple(vector::borrow_mut<FunctionEntry>(v, i));
+                    if Eq<u64>(select test::FunctionEntry.key<&mut FunctionEntry>(record), k) {
+                      {
+                        let old_f: |u64|u64 with copy+store = select test::FunctionEntry.f<&mut FunctionEntry>(record);
+                        select test::FunctionEntry.f<&mut FunctionEntry>(record) = f;
+                        result: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(old_f);
+                        Tuple()
+                      }
+                    } else {
+                      Tuple()
+                    }
+                  };
+                  i: u64 = Add<u64>(i, 1)
+                } else {
+                  break
+                }
+              }
+            }
+          };
+          match (result) {
+            test::Option::None<|u64|u64 with copy+store> => {
+              {
+                let new_record: FunctionEntry = pack test::FunctionEntry(f, k);
+                vector::push_back<FunctionEntry>(v, new_record);
+                pack test::Option::None<|u64|u64 with copy+store>()
+              }
+            }
+            test::Option::Some<|u64|u64 with copy+store>{ 0: _ } => {
+              result
+            }
+          }
+
+        }
+    }
+    private fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor lambda-lifting:
+module 0x42::test {
+    use std::signer;
+    use std::vector;
+    struct FunctionEntry {
+        f: |u64|u64 with copy+store,
+        key: u64,
+    }
+    struct FunctionValue {
+        0: |u64|u64 with copy+store,
+    }
+    enum Option<T> {
+        None,
+        Some {
+            0: T,
+        }
+    }
+    struct Registry {
+        functions: vector<FunctionEntry>,
+    }
+    private fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+    private fun get_function(v: &vector<FunctionEntry>,k: u64): Option<|u64|u64 with copy+store> {
+        {
+          let x: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          {
+            let (v: &vector<FunctionEntry>): (&vector<FunctionEntry>) = Tuple(v);
+            {
+              let i: u64 = 0;
+              loop {
+                if Lt<u64>(i, vector::length<FunctionEntry>(v)) {
+                  {
+                    let (f: &FunctionEntry): (&FunctionEntry) = Tuple(vector::borrow<FunctionEntry>(v, i));
+                    if Eq<u64>(select test::FunctionEntry.key<&FunctionEntry>(f), k) {
+                      x: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(select test::FunctionEntry.f<&FunctionEntry>(f))
+                    } else {
+                      Tuple()
+                    }
+                  };
+                  i: u64 = Add<u64>(i, 1)
+                } else {
+                  break
+                }
+              }
+            }
+          };
+          x
+        }
+    }
+    private fun invoke(addr: address,k: u64,x: u64): Option<u64>
+        acquires Registry(*)
+     {
+        if Not(exists<Registry>(addr)) {
+          return pack test::Option::None<u64>()
+        } else {
+          Tuple()
+        };
+        {
+          let registry: &Registry = BorrowGlobal(Immutable)<Registry>(addr);
+          match (test::get_function(Borrow(Immutable)(select test::Registry.functions<&Registry>(registry)), k)) {
+            test::Option::Some<|u64|u64 with copy+store>{ 0: f } => {
+              pack test::Option::Some<u64>((f)(x))
+            }
+            _: Option<|u64|u64 with copy+store> => {
+              pack test::Option::None<u64>()
+            }
+          }
+
+        }
+    }
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+    private fun multiply_by_x(x: u64): |u64|u64 with copy+store {
+        earlybind(test::multiply, x)
+    }
+    private fun multiply_by_x2(x: u64): |u64|u64 with copy+store {
+        earlybind(test::multiply, x)
+    }
+    private fun register(owner: &signer,f: |u64|u64 with copy+store,k: u64)
+        acquires Registry(*)
+     {
+        {
+          let addr: address = signer::address_of(owner);
+          if Not(exists<Registry>(addr)) {
+            {
+              let new_registry: Registry = pack test::Registry(Vector<FunctionEntry>());
+              MoveTo<Registry>(owner, new_registry);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          };
+          {
+            let registry: &mut Registry = BorrowGlobal(Mutable)<Registry>(addr);
+            test::replace_or_add_function(Borrow(Mutable)(select test::Registry.functions<&mut Registry>(registry)), k, f);
+            Tuple()
+          }
+        }
+    }
+    private fun replace_or_add_function(v: &mut vector<FunctionEntry>,k: u64,f: |u64|u64 with copy+store): Option<|u64|u64 with copy+store> {
+        {
+          let result: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          {
+            let (v: &mut vector<FunctionEntry>): (&mut vector<FunctionEntry>) = Tuple(v);
+            {
+              let i: u64 = 0;
+              loop {
+                if Lt<u64>(i, vector::length<FunctionEntry>(Freeze(false)(v))) {
+                  {
+                    let (record: &mut FunctionEntry): (&mut FunctionEntry) = Tuple(vector::borrow_mut<FunctionEntry>(v, i));
+                    if Eq<u64>(select test::FunctionEntry.key<&mut FunctionEntry>(record), k) {
+                      {
+                        let old_f: |u64|u64 with copy+store = select test::FunctionEntry.f<&mut FunctionEntry>(record);
+                        select test::FunctionEntry.f<&mut FunctionEntry>(record) = f;
+                        result: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(old_f);
+                        Tuple()
+                      }
+                    } else {
+                      Tuple()
+                    }
+                  };
+                  i: u64 = Add<u64>(i, 1)
+                } else {
+                  break
+                }
+              }
+            }
+          };
+          match (result) {
+            test::Option::None<|u64|u64 with copy+store> => {
+              {
+                let new_record: FunctionEntry = pack test::FunctionEntry(f, k);
+                vector::push_back<FunctionEntry>(v, new_record);
+                pack test::Option::None<|u64|u64 with copy+store>()
+              }
+            }
+            test::Option::Some<|u64|u64 with copy+store>{ 0: _ } => {
+              result
+            }
+          }
+
+        }
+    }
+    private fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor specification checker:
+module 0x42::test {
+    use std::signer;
+    use std::vector;
+    struct FunctionEntry {
+        f: |u64|u64 with copy+store,
+        key: u64,
+    }
+    struct FunctionValue {
+        0: |u64|u64 with copy+store,
+    }
+    enum Option<T> {
+        None,
+        Some {
+            0: T,
+        }
+    }
+    struct Registry {
+        functions: vector<FunctionEntry>,
+    }
+    private fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+    private fun get_function(v: &vector<FunctionEntry>,k: u64): Option<|u64|u64 with copy+store> {
+        {
+          let x: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          {
+            let (v: &vector<FunctionEntry>): (&vector<FunctionEntry>) = Tuple(v);
+            {
+              let i: u64 = 0;
+              loop {
+                if Lt<u64>(i, vector::length<FunctionEntry>(v)) {
+                  {
+                    let (f: &FunctionEntry): (&FunctionEntry) = Tuple(vector::borrow<FunctionEntry>(v, i));
+                    if Eq<u64>(select test::FunctionEntry.key<&FunctionEntry>(f), k) {
+                      x: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(select test::FunctionEntry.f<&FunctionEntry>(f))
+                    } else {
+                      Tuple()
+                    }
+                  };
+                  i: u64 = Add<u64>(i, 1)
+                } else {
+                  break
+                }
+              }
+            }
+          };
+          x
+        }
+    }
+    private fun invoke(addr: address,k: u64,x: u64): Option<u64>
+        acquires Registry(*)
+     {
+        if Not(exists<Registry>(addr)) {
+          return pack test::Option::None<u64>()
+        } else {
+          Tuple()
+        };
+        {
+          let registry: &Registry = BorrowGlobal(Immutable)<Registry>(addr);
+          match (test::get_function(Borrow(Immutable)(select test::Registry.functions<&Registry>(registry)), k)) {
+            test::Option::Some<|u64|u64 with copy+store>{ 0: f } => {
+              pack test::Option::Some<u64>((f)(x))
+            }
+            _: Option<|u64|u64 with copy+store> => {
+              pack test::Option::None<u64>()
+            }
+          }
+
+        }
+    }
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+    private fun multiply_by_x(x: u64): |u64|u64 with copy+store {
+        earlybind(test::multiply, x)
+    }
+    private fun multiply_by_x2(x: u64): |u64|u64 with copy+store {
+        earlybind(test::multiply, x)
+    }
+    private fun register(owner: &signer,f: |u64|u64 with copy+store,k: u64)
+        acquires Registry(*)
+     {
+        {
+          let addr: address = signer::address_of(owner);
+          if Not(exists<Registry>(addr)) {
+            {
+              let new_registry: Registry = pack test::Registry(Vector<FunctionEntry>());
+              MoveTo<Registry>(owner, new_registry);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          };
+          {
+            let registry: &mut Registry = BorrowGlobal(Mutable)<Registry>(addr);
+            test::replace_or_add_function(Borrow(Mutable)(select test::Registry.functions<&mut Registry>(registry)), k, f);
+            Tuple()
+          }
+        }
+    }
+    private fun replace_or_add_function(v: &mut vector<FunctionEntry>,k: u64,f: |u64|u64 with copy+store): Option<|u64|u64 with copy+store> {
+        {
+          let result: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          {
+            let (v: &mut vector<FunctionEntry>): (&mut vector<FunctionEntry>) = Tuple(v);
+            {
+              let i: u64 = 0;
+              loop {
+                if Lt<u64>(i, vector::length<FunctionEntry>(Freeze(false)(v))) {
+                  {
+                    let (record: &mut FunctionEntry): (&mut FunctionEntry) = Tuple(vector::borrow_mut<FunctionEntry>(v, i));
+                    if Eq<u64>(select test::FunctionEntry.key<&mut FunctionEntry>(record), k) {
+                      {
+                        let old_f: |u64|u64 with copy+store = select test::FunctionEntry.f<&mut FunctionEntry>(record);
+                        select test::FunctionEntry.f<&mut FunctionEntry>(record) = f;
+                        result: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(old_f);
+                        Tuple()
+                      }
+                    } else {
+                      Tuple()
+                    }
+                  };
+                  i: u64 = Add<u64>(i, 1)
+                } else {
+                  break
+                }
+              }
+            }
+          };
+          match (result) {
+            test::Option::None<|u64|u64 with copy+store> => {
+              {
+                let new_record: FunctionEntry = pack test::FunctionEntry(f, k);
+                vector::push_back<FunctionEntry>(v, new_record);
+                pack test::Option::None<|u64|u64 with copy+store>()
+              }
+            }
+            test::Option::Some<|u64|u64 with copy+store>{ 0: _ } => {
+              result
+            }
+          }
+
+        }
+    }
+    private fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::test
+
+
+// -- Model dump after env processor specification rewriter:
+module 0x42::test {
+    use std::signer;
+    use std::vector;
+    struct FunctionEntry {
+        f: |u64|u64 with copy+store,
+        key: u64,
+    }
+    struct FunctionValue {
+        0: |u64|u64 with copy+store,
+    }
+    enum Option<T> {
+        None,
+        Some {
+            0: T,
+        }
+    }
+    struct Registry {
+        functions: vector<FunctionEntry>,
+    }
+    private fun double(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+    private fun get_function(v: &vector<FunctionEntry>,k: u64): Option<|u64|u64 with copy+store> {
+        {
+          let x: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          {
+            let (v: &vector<FunctionEntry>): (&vector<FunctionEntry>) = Tuple(v);
+            {
+              let i: u64 = 0;
+              loop {
+                if Lt<u64>(i, vector::length<FunctionEntry>(v)) {
+                  {
+                    let (f: &FunctionEntry): (&FunctionEntry) = Tuple(vector::borrow<FunctionEntry>(v, i));
+                    if Eq<u64>(select test::FunctionEntry.key<&FunctionEntry>(f), k) {
+                      x: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(select test::FunctionEntry.f<&FunctionEntry>(f))
+                    } else {
+                      Tuple()
+                    }
+                  };
+                  i: u64 = Add<u64>(i, 1)
+                } else {
+                  break
+                }
+              }
+            }
+          };
+          x
+        }
+    }
+    private fun invoke(addr: address,k: u64,x: u64): Option<u64>
+        acquires Registry(*)
+     {
+        if Not(exists<Registry>(addr)) {
+          return pack test::Option::None<u64>()
+        } else {
+          Tuple()
+        };
+        {
+          let registry: &Registry = BorrowGlobal(Immutable)<Registry>(addr);
+          match (test::get_function(Borrow(Immutable)(select test::Registry.functions<&Registry>(registry)), k)) {
+            test::Option::Some<|u64|u64 with copy+store>{ 0: f } => {
+              pack test::Option::Some<u64>((f)(x))
+            }
+            _: Option<|u64|u64 with copy+store> => {
+              pack test::Option::None<u64>()
+            }
+          }
+
+        }
+    }
+    public fun multiply(x: u64,y: u64): u64 {
+        Mul<u64>(x, y)
+    }
+    private fun multiply_by_x(x: u64): |u64|u64 with copy+store {
+        earlybind(test::multiply, x)
+    }
+    private fun multiply_by_x2(x: u64): |u64|u64 with copy+store {
+        earlybind(test::multiply, x)
+    }
+    private fun register(owner: &signer,f: |u64|u64 with copy+store,k: u64)
+        acquires Registry(*)
+     {
+        {
+          let addr: address = signer::address_of(owner);
+          if Not(exists<Registry>(addr)) {
+            {
+              let new_registry: Registry = pack test::Registry(Vector<FunctionEntry>());
+              MoveTo<Registry>(owner, new_registry);
+              Tuple()
+            }
+          } else {
+            Tuple()
+          };
+          {
+            let registry: &mut Registry = BorrowGlobal(Mutable)<Registry>(addr);
+            test::replace_or_add_function(Borrow(Mutable)(select test::Registry.functions<&mut Registry>(registry)), k, f);
+            Tuple()
+          }
+        }
+    }
+    private fun replace_or_add_function(v: &mut vector<FunctionEntry>,k: u64,f: |u64|u64 with copy+store): Option<|u64|u64 with copy+store> {
+        {
+          let result: Option<|u64|u64 with copy+store> = pack test::Option::None<|u64|u64 with copy+store>();
+          {
+            let (v: &mut vector<FunctionEntry>): (&mut vector<FunctionEntry>) = Tuple(v);
+            {
+              let i: u64 = 0;
+              loop {
+                if Lt<u64>(i, vector::length<FunctionEntry>(Freeze(false)(v))) {
+                  {
+                    let (record: &mut FunctionEntry): (&mut FunctionEntry) = Tuple(vector::borrow_mut<FunctionEntry>(v, i));
+                    if Eq<u64>(select test::FunctionEntry.key<&mut FunctionEntry>(record), k) {
+                      {
+                        let old_f: |u64|u64 with copy+store = select test::FunctionEntry.f<&mut FunctionEntry>(record);
+                        select test::FunctionEntry.f<&mut FunctionEntry>(record) = f;
+                        result: Option<|u64|u64 with copy+store> = pack test::Option::Some<|u64|u64 with copy+store>(old_f);
+                        Tuple()
+                      }
+                    } else {
+                      Tuple()
+                    }
+                  };
+                  i: u64 = Add<u64>(i, 1)
+                } else {
+                  break
+                }
+              }
+            }
+          };
+          match (result) {
+            test::Option::None<|u64|u64 with copy+store> => {
+              {
+                let new_record: FunctionEntry = pack test::FunctionEntry(f, k);
+                vector::push_back<FunctionEntry>(v, new_record);
+                pack test::Option::None<|u64|u64 with copy+store>()
+              }
+            }
+            test::Option::Some<|u64|u64 with copy+store>{ 0: _ } => {
+              result
+            }
+          }
+
+        }
+    }
+    private fun triple(x: u64): u64 {
+        Mul<u64>(x, 3)
+    }
+} // end 0x42::test
+
+
+
+Diagnostics:
+error: Calls to function values other than inline function parameters not yet implemented
+   ┌─ tests/lambda/storable/registry_ok2.move:71:30
+   │
+71 │                 Option::Some(f(x))
+   │                              ^^^^
+
+error: Function-typed values not yet implemented except as parameters to calls to inline functions
+   ┌─ tests/lambda/storable/registry_ok2.move:92:9
+   │
+92 │         move |y| multiply(x, y)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: Function-typed values not yet implemented except as parameters to calls to inline functions
+   ┌─ tests/lambda/storable/registry_ok2.move:96:9
+   │
+96 │         move |y| multiply(x, y)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^

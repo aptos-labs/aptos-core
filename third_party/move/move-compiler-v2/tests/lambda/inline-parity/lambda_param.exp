@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: Only inline functions may have function-typed parameters, but non-inline function `LambdaParam::inline_apply` has a function parameter:
+  ┌─ tests/lambda/inline-parity/lambda_param.move:2:16
+  │
+2 │     public fun inline_apply(f: |u64|u64, b: u64) : u64 {
+  │                ^^^^^^^^^^^^ - Parameter `f` has function-valued type `|u64|u64`.
+
+error: Only inline functions may have function-typed parameters, but non-inline function `LambdaParam::inline_apply2` has a function parameter:
+  ┌─ tests/lambda/inline-parity/lambda_param.move:6:16
+  │
+6 │     public fun inline_apply2(f: |u64|u64, b: u64) : u64 {
+  │                ^^^^^^^^^^^^^ - Parameter `f` has function-valued type `|u64|u64`.
+
+error: Only inline functions may have function-typed parameters, but non-inline function `LambdaParam::inline_apply3` has a function parameter:
+   ┌─ tests/lambda/inline-parity/lambda_param.move:10:16
+   │
+10 │     public fun inline_apply3(f: |u64|u64, b: u64) : u64 {
+   │                ^^^^^^^^^^^^^ - Parameter `f` has function-valued type `|u64|u64`.
+
+error: Only inline functions may have function-typed parameters, but non-inline function `LambdaParam::inline_apply4` has a function parameter:
+   ┌─ tests/lambda/inline-parity/lambda_param.move:14:16
+   │
+14 │     public fun inline_apply4(_f: |u64|u64, b: u64) : u64 {
+   │                ^^^^^^^^^^^^^ -- Parameter `_f` has function-valued type `|u64|u64`.

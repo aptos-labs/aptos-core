@@ -7,6 +7,7 @@ use crate::{
         error::Error, interface::NetworkClientInterface, metadata::ConnectionState,
         storage::PeersAndMetadata,
     },
+    peer::DisconnectReason,
     protocols::{
         health_checker::{HealthCheckerMsg, HealthCheckerNetworkEvents},
         network::Event,
@@ -62,12 +63,16 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg>>
 
     /// Disconnect a peer, and keep track of the associated state
     /// Note: This removes the peer outright for now until we add GCing, and historical state management
-    pub async fn disconnect_peer(&mut self, peer_network_id: PeerNetworkId) -> Result<(), Error> {
+    pub async fn disconnect_peer(
+        &mut self,
+        peer_network_id: PeerNetworkId,
+        disconnect_reason: DisconnectReason,
+    ) -> Result<(), Error> {
         // Possibly already disconnected, but try anyways
         let _ = self.update_connection_state(peer_network_id, ConnectionState::Disconnecting);
         let result = self
             .network_client
-            .disconnect_from_peer(peer_network_id)
+            .disconnect_from_peer(peer_network_id, disconnect_reason)
             .await;
         let peer_id = peer_network_id.peer_id();
         if result.is_ok() {

@@ -21,17 +21,14 @@ use crate::{
     analyzer::PtxAnalyzer, finalizer::PtxFinalizer, metrics::TIMER, runner::PtxRunner,
     scheduler::PtxScheduler, sorter::PtxSorter, state_reader::PtxStateReader,
 };
-use aptos_executor::{
-    block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput,
-};
+use aptos_block_executor::txn_provider::{default::DefaultTxnProvider, TxnProvider};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::TimerHelper;
-use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorConfigFromOnchain,
-        partitioner::{ExecutableTransactions, PartitionedTransactions},
+        config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     state_store::StateView,
     transaction::{
@@ -41,18 +38,24 @@ use aptos_types::{
 };
 use aptos_vm::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
-    AptosVM, VMExecutor,
+    AptosVM, VMBlockExecutor,
 };
 use move_core_types::vm_status::VMStatus;
 use std::sync::{mpsc::channel, Arc};
 
 pub struct PtxBlockExecutor;
 
-impl VMExecutor for PtxBlockExecutor {
+impl VMBlockExecutor for PtxBlockExecutor {
+    fn new() -> Self {
+        Self
+    }
+
     fn execute_block(
-        transactions: &[SignatureVerifiedTransaction],
+        &self,
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
         state_view: &(impl StateView + Sync),
         _onchain_config: BlockExecutorConfigFromOnchain,
+        _transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let _timer = TIMER.timer_with(&["block_total"]);
 
@@ -73,7 +76,7 @@ impl VMExecutor for PtxBlockExecutor {
         let ret = Arc::new(Mutex::new(None));
         let ret_clone = ret.clone();
         THREAD_MANAGER.get_exe_cpu_pool().scope(move |scope| {
-            let num_txns = transactions.len();
+            let num_txns = txn_provider.num_txns();
             let (result_tx, result_rx) = channel();
 
             // Spawn all the components.
@@ -86,8 +89,10 @@ impl VMExecutor for PtxBlockExecutor {
             let analyzer = PtxAnalyzer::spawn(scope, sorter);
 
             // Feed the transactions down the pipeline.
-            for txn in transactions {
-                analyzer.analyze_transaction(txn.clone());
+            //for txn in transactions {
+            for idx in 0..num_txns {
+                let txn = txn_provider.get_txn(idx as u32);
+                analyzer.analyze_transaction((*txn).clone());
             }
             analyzer.finish_block();
 
@@ -111,19 +116,5 @@ impl VMExecutor for PtxBlockExecutor {
         _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         unimplemented!()
-    }
-}
-
-impl TransactionBlockExecutor for PtxBlockExecutor {
-    fn execute_transaction_block(
-        transactions: ExecutableTransactions,
-        state_view: CachedStateView,
-        onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> anyhow::Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<PtxBlockExecutor>(
-            transactions,
-            state_view,
-            onchain_config,
-        )
     }
 }

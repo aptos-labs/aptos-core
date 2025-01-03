@@ -31,6 +31,8 @@ mod network_tests;
 mod payload_client;
 mod pending_order_votes;
 mod pending_votes;
+#[cfg(test)]
+mod pending_votes_test;
 pub mod persistent_liveness_storage;
 mod pipeline;
 pub mod quorum_store;
@@ -61,6 +63,8 @@ mod payload_manager;
 mod transaction_deduper;
 mod transaction_filter;
 mod transaction_shuffler;
+#[cfg(feature = "fuzzing")]
+pub use transaction_shuffler::transaction_shuffler_fuzzing;
 mod txn_hash_and_authenticator_deduper;
 
 use aptos_metrics_core::IntGauge;
@@ -71,7 +75,7 @@ pub use quorum_store::quorum_store_db::QUORUM_STORE_DB_NAME;
 #[cfg(feature = "fuzzing")]
 pub use round_manager::round_manager_fuzzing;
 
-struct IntGaugeGuard {
+pub struct IntGaugeGuard {
     gauge: IntGauge,
 }
 

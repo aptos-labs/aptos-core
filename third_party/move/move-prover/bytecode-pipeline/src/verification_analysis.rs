@@ -96,7 +96,7 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
 
         // Rule 2: verify the function if it is within the target modules
         let env = fun_env.module_env.env;
-        let target_modules = env.get_target_modules();
+        let target_modules = env.get_primary_target_modules();
 
         let is_in_target_module = target_modules
             .iter()
@@ -162,7 +162,7 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
 
         writeln!(f, "invariant applicability: [")?;
         let target_invs: BTreeSet<_> = env
-            .get_target_modules()
+            .get_primary_target_modules()
             .iter()
             .flat_map(|menv| env.get_global_invariants_by_module(menv.get_id()))
             .collect();

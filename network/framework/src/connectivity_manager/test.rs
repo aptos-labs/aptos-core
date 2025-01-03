@@ -206,7 +206,7 @@ impl TestHarness {
         info!("Waiting to receive disconnect request");
         let success = result.is_ok();
         match self.connection_reqs_rx.next().await.unwrap() {
-            ConnectionRequest::DisconnectPeer(p, result_tx) => {
+            ConnectionRequest::DisconnectPeer(p, _, result_tx) => {
                 assert_eq!(peer_id, p);
                 result_tx.send(result).unwrap();
             },

@@ -73,6 +73,10 @@ impl<C: CoinType> CoinStoreResource<C> {
         self.coin
     }
 
+    pub fn set_coin(&mut self, coin: u64) {
+        self.coin = coin;
+    }
+
     pub fn frozen(&self) -> bool {
         self.frozen
     }
@@ -81,8 +85,16 @@ impl<C: CoinType> CoinStoreResource<C> {
         &self.deposit_events
     }
 
+    pub fn deposit_events_mut(&mut self) -> &mut EventHandle {
+        &mut self.deposit_events
+    }
+
     pub fn withdraw_events(&self) -> &EventHandle {
         &self.withdraw_events
+    }
+
+    pub fn withdraw_events_mut(&mut self) -> &mut EventHandle {
+        &mut self.withdraw_events
     }
 }
 

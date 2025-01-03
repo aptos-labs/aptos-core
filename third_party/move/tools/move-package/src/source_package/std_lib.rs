@@ -12,6 +12,8 @@ use std::{fmt::Display, path::PathBuf};
 
 /// Represents a standard library.
 pub enum StdLib {
+    AptosTokenObjects,
+    AptosToken,
     AptosFramework,
     AptosStdlib,
     MoveStdlib,
@@ -19,7 +21,7 @@ pub enum StdLib {
 
 impl StdLib {
     /// The well-known git URL for the standard library.
-    const STD_GIT_URL: &'static str = "https://github.com/aptos-labs/aptos-core.git";
+    const STD_GIT_URL: &'static str = "https://github.com/aptos-labs/aptos-framework.git";
 
     /// Returns the dependency for the standard library with the given version.
     pub fn dependency(&self, version: &StdVersion) -> Dependency {
@@ -42,6 +44,8 @@ impl StdLib {
     /// Returns the name of the standard library.
     pub fn as_str(&self) -> &'static str {
         match self {
+            StdLib::AptosToken => "AptosToken",
+            StdLib::AptosTokenObjects => "AptosTokenObjects",
             StdLib::AptosFramework => "AptosFramework",
             StdLib::AptosStdlib => "AptosStdlib",
             StdLib::MoveStdlib => "MoveStdlib",
@@ -51,6 +55,8 @@ impl StdLib {
     /// Returns the standard library from the given package name, or `None` if the package name is not a standard library.
     pub fn from_package_name(package_name: Symbol) -> Option<StdLib> {
         match package_name.as_str() {
+            "AptosToken" => Some(StdLib::AptosToken),
+            "AptosTokenObjects" => Some(StdLib::AptosTokenObjects),
             "AptosFramework" => Some(StdLib::AptosFramework),
             "AptosStdlib" => Some(StdLib::AptosStdlib),
             "MoveStdlib" => Some(StdLib::MoveStdlib),
@@ -61,9 +67,11 @@ impl StdLib {
     /// Returns the subdirectory of the standard library in the git repository.
     fn sub_dir(&self) -> &'static str {
         match self {
-            StdLib::AptosFramework => "aptos-move/framework/aptos-framework",
-            StdLib::AptosStdlib => "aptos-move/framework/aptos-stdlib",
-            StdLib::MoveStdlib => "aptos-move/framework/move-stdlib",
+            StdLib::AptosToken => "aptos-token",
+            StdLib::AptosTokenObjects => "aptos-token-objects",
+            StdLib::AptosFramework => "aptos-framework",
+            StdLib::AptosStdlib => "aptos-stdlib",
+            StdLib::MoveStdlib => "move-stdlib",
         }
     }
 }

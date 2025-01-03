@@ -245,17 +245,6 @@ jobs:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
 
-  indexer-grpc-e2e-tests:
-    needs: [permission-check, rust-images, determine-docker-build-metadata] # runs with the default release docker build variant "rust-images"
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-      contains(github.event.pull_request.body, '#e2e')
-    uses: aptos-labs/aptos-core/.github/workflows/docker-indexer-grpc-test.yaml@main
-    secrets: inherit
-    with:
-      GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
-
   # This is a PR required job.
   forge-e2e-test:
     needs:
@@ -288,6 +277,7 @@ jobs:
       # by this GHA. If there is a Forge namespace collision, Forge will pre-empt the existing test running in the namespace.
       FORGE_NAMESPACE: forge-e2e-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
+      SEND_RESULTS_TO_TRUNK: true
   
   # This job determines the last released docker image tag, which is used by forge compat test.
   fetch-last-released-docker-image-tag:
@@ -367,6 +357,7 @@ jobs:
       COMMENT_HEADER: forge-compat
       FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
+      SEND_RESULTS_TO_TRUNK: true
   
   # Run forge framework upgradability test. This is a PR required job.
   forge-framework-upgrade-test:
@@ -396,6 +387,7 @@ jobs:
       COMMENT_HEADER: forge-framework-upgrade
       FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       SKIP_JOB: ${{ !contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') && (needs.test-target-determinator.outputs.run_framework_upgrade_test == 'false') }}
+      SEND_RESULTS_TO_TRUNK: true
 
   forge-consensus-only-perf-test:
     needs:

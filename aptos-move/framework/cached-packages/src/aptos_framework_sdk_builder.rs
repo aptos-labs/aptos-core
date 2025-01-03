@@ -136,6 +136,9 @@ pub enum EntryFunctionCall {
     /// does not come with a proof-of-knowledge of the underlying SK. Nonetheless, we need this functionality due to
     /// the introduction of non-standard key algorithms, such as passkeys, which cannot produce proofs-of-knowledge in
     /// the format expected in `rotate_authentication_key`.
+    ///
+    /// If you'd like to followup with updating the `OriginatingAddress` table, you can call
+    /// `set_originating_address()`.
     AccountRotateAuthenticationKeyCall {
         new_auth_key: Vec<u8>,
     },
@@ -146,6 +149,21 @@ pub enum EntryFunctionCall {
         new_public_key_bytes: Vec<u8>,
         cap_update_table: Vec<u8>,
     },
+
+    /// For the given account, add an entry to `OriginatingAddress` table mapping the account's
+    /// authentication key to the account's address.
+    ///
+    /// Can be used as a followup to `rotate_authentication_key_call()` to reconcile the
+    /// `OriginatingAddress` table, or to establish a mapping for a new account that has not yet had
+    /// its authentication key rotated.
+    ///
+    /// Aborts if there is already an entry in the `OriginatingAddress` table for the account's
+    /// authentication key.
+    ///
+    /// Kept as a private entry function to ensure that after an unproven rotation via
+    /// `rotate_authentication_key_call()`, the `OriginatingAddress` table is only updated under the
+    /// authority of the new authentication key.
+    AccountSetOriginatingAddress {},
 
     /// Batch version of APT transfer.
     AptosAccountBatchTransfer {
@@ -303,6 +321,12 @@ pub enum EntryFunctionCall {
     /// Create APT pairing by passing `AptosCoin`.
     CoinCreatePairing {
         coin_type: TypeTag,
+    },
+
+    /// Migrate to fungible store for `CoinType` if not yet.
+    CoinMigrateCoinStoreToFungibleStore {
+        coin_type: TypeTag,
+        accounts: Vec<AccountAddress>,
     },
 
     /// Voluntarily migrate to fungible store for `CoinType` if not yet.
@@ -510,6 +534,11 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    /// Destroys capabilities from the account, so that the user no longer has access to mint or burn.
+    ManagedCoinDestroyCaps {
+        coin_type: TypeTag,
+    },
+
     /// Initialize new coin `CoinType` in Aptos Blockchain.
     /// Mint and Burn Capabilities will be stored under `account` in `Capabilities` resource.
     ManagedCoinInitialize {
@@ -613,6 +642,33 @@ pub enum EntryFunctionCall {
         account_scheme: u8,
         account_public_key: Vec<u8>,
         create_multisig_account_signed_message: Vec<u8>,
+        metadata_keys: Vec<Vec<u8>>,
+        metadata_values: Vec<Vec<u8>>,
+    },
+
+    /// Private entry function that creates a new multisig account on top of an existing account and immediately rotate
+    /// the origin auth key to 0x0.
+    ///
+    /// Note: If the original account is a resource account, this does not revoke all control over it as if any
+    /// SignerCapability of the resource account still exists, it can still be used to generate the signer for the
+    /// account.
+    MultisigAccountCreateWithExistingAccountAndRevokeAuthKeyCall {
+        owners: Vec<AccountAddress>,
+        num_signatures_required: u64,
+        metadata_keys: Vec<Vec<u8>>,
+        metadata_values: Vec<Vec<u8>>,
+    },
+
+    /// Private entry function that creates a new multisig account on top of an existing account.
+    ///
+    /// This offers a migration path for an existing account with any type of auth key.
+    ///
+    /// Note that this does not revoke auth key-based control over the account. Owners should separately rotate the auth
+    /// key after they are fully migrated to the new multisig account. Alternatively, they can call
+    /// create_with_existing_account_and_revoke_auth_key_call instead.
+    MultisigAccountCreateWithExistingAccountCall {
+        owners: Vec<AccountAddress>,
+        num_signatures_required: u64,
         metadata_keys: Vec<Vec<u8>>,
         metadata_values: Vec<Vec<u8>>,
     },
@@ -1159,6 +1215,7 @@ impl EntryFunctionCall {
                 new_public_key_bytes,
                 cap_update_table,
             ),
+            AccountSetOriginatingAddress {} => account_set_originating_address(),
             AptosAccountBatchTransfer {
                 recipients,
                 amounts,
@@ -1247,6 +1304,10 @@ impl EntryFunctionCall {
             } => code_publish_package_txn(metadata_serialized, code),
             CoinCreateCoinConversionMap {} => coin_create_coin_conversion_map(),
             CoinCreatePairing { coin_type } => coin_create_pairing(coin_type),
+            CoinMigrateCoinStoreToFungibleStore {
+                coin_type,
+                accounts,
+            } => coin_migrate_coin_store_to_fungible_store(coin_type, accounts),
             CoinMigrateToFungibleStore { coin_type } => coin_migrate_to_fungible_store(coin_type),
             CoinTransfer {
                 coin_type,
@@ -1341,6 +1402,7 @@ impl EntryFunctionCall {
                 n_vec,
             } => jwks_update_federated_jwk_set(iss, kid_vec, alg_vec, e_vec, n_vec),
             ManagedCoinBurn { coin_type, amount } => managed_coin_burn(coin_type, amount),
+            ManagedCoinDestroyCaps { coin_type } => managed_coin_destroy_caps(coin_type),
             ManagedCoinInitialize {
                 coin_type,
                 name,
@@ -1415,6 +1477,28 @@ impl EntryFunctionCall {
                 account_scheme,
                 account_public_key,
                 create_multisig_account_signed_message,
+                metadata_keys,
+                metadata_values,
+            ),
+            MultisigAccountCreateWithExistingAccountAndRevokeAuthKeyCall {
+                owners,
+                num_signatures_required,
+                metadata_keys,
+                metadata_values,
+            } => multisig_account_create_with_existing_account_and_revoke_auth_key_call(
+                owners,
+                num_signatures_required,
+                metadata_keys,
+                metadata_values,
+            ),
+            MultisigAccountCreateWithExistingAccountCall {
+                owners,
+                num_signatures_required,
+                metadata_keys,
+                metadata_values,
+            } => multisig_account_create_with_existing_account_call(
+                owners,
+                num_signatures_required,
                 metadata_keys,
                 metadata_values,
             ),
@@ -1938,6 +2022,9 @@ pub fn account_rotate_authentication_key(
 /// does not come with a proof-of-knowledge of the underlying SK. Nonetheless, we need this functionality due to
 /// the introduction of non-standard key algorithms, such as passkeys, which cannot produce proofs-of-knowledge in
 /// the format expected in `rotate_authentication_key`.
+///
+/// If you'd like to followup with updating the `OriginatingAddress` table, you can call
+/// `set_originating_address()`.
 pub fn account_rotate_authentication_key_call(new_auth_key: Vec<u8>) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -1975,6 +2062,34 @@ pub fn account_rotate_authentication_key_with_rotation_capability(
             bcs::to_bytes(&new_public_key_bytes).unwrap(),
             bcs::to_bytes(&cap_update_table).unwrap(),
         ],
+    ))
+}
+
+/// For the given account, add an entry to `OriginatingAddress` table mapping the account's
+/// authentication key to the account's address.
+///
+/// Can be used as a followup to `rotate_authentication_key_call()` to reconcile the
+/// `OriginatingAddress` table, or to establish a mapping for a new account that has not yet had
+/// its authentication key rotated.
+///
+/// Aborts if there is already an entry in the `OriginatingAddress` table for the account's
+/// authentication key.
+///
+/// Kept as a private entry function to ensure that after an unproven rotation via
+/// `rotate_authentication_key_call()`, the `OriginatingAddress` table is only updated under the
+/// authority of the new authentication key.
+pub fn account_set_originating_address() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("set_originating_address").to_owned(),
+        vec![],
+        vec![],
     ))
 }
 
@@ -2454,6 +2569,25 @@ pub fn coin_create_pairing(coin_type: TypeTag) -> TransactionPayload {
         ident_str!("create_pairing").to_owned(),
         vec![coin_type],
         vec![],
+    ))
+}
+
+/// Migrate to fungible store for `CoinType` if not yet.
+pub fn coin_migrate_coin_store_to_fungible_store(
+    coin_type: TypeTag,
+    accounts: Vec<AccountAddress>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("coin").to_owned(),
+        ),
+        ident_str!("migrate_coin_store_to_fungible_store").to_owned(),
+        vec![coin_type],
+        vec![bcs::to_bytes(&accounts).unwrap()],
     ))
 }
 
@@ -2983,6 +3117,22 @@ pub fn managed_coin_burn(coin_type: TypeTag, amount: u64) -> TransactionPayload 
     ))
 }
 
+/// Destroys capabilities from the account, so that the user no longer has access to mint or burn.
+pub fn managed_coin_destroy_caps(coin_type: TypeTag) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("managed_coin").to_owned(),
+        ),
+        ident_str!("destroy_caps").to_owned(),
+        vec![coin_type],
+        vec![],
+    ))
+}
+
 /// Initialize new coin `CoinType` in Aptos Blockchain.
 /// Mint and Burn Capabilities will be stored under `account` in `Capabilities` resource.
 pub fn managed_coin_initialize(
@@ -3276,6 +3426,69 @@ pub fn multisig_account_create_with_existing_account_and_revoke_auth_key(
             bcs::to_bytes(&account_scheme).unwrap(),
             bcs::to_bytes(&account_public_key).unwrap(),
             bcs::to_bytes(&create_multisig_account_signed_message).unwrap(),
+            bcs::to_bytes(&metadata_keys).unwrap(),
+            bcs::to_bytes(&metadata_values).unwrap(),
+        ],
+    ))
+}
+
+/// Private entry function that creates a new multisig account on top of an existing account and immediately rotate
+/// the origin auth key to 0x0.
+///
+/// Note: If the original account is a resource account, this does not revoke all control over it as if any
+/// SignerCapability of the resource account still exists, it can still be used to generate the signer for the
+/// account.
+pub fn multisig_account_create_with_existing_account_and_revoke_auth_key_call(
+    owners: Vec<AccountAddress>,
+    num_signatures_required: u64,
+    metadata_keys: Vec<Vec<u8>>,
+    metadata_values: Vec<Vec<u8>>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("create_with_existing_account_and_revoke_auth_key_call").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&owners).unwrap(),
+            bcs::to_bytes(&num_signatures_required).unwrap(),
+            bcs::to_bytes(&metadata_keys).unwrap(),
+            bcs::to_bytes(&metadata_values).unwrap(),
+        ],
+    ))
+}
+
+/// Private entry function that creates a new multisig account on top of an existing account.
+///
+/// This offers a migration path for an existing account with any type of auth key.
+///
+/// Note that this does not revoke auth key-based control over the account. Owners should separately rotate the auth
+/// key after they are fully migrated to the new multisig account. Alternatively, they can call
+/// create_with_existing_account_and_revoke_auth_key_call instead.
+pub fn multisig_account_create_with_existing_account_call(
+    owners: Vec<AccountAddress>,
+    num_signatures_required: u64,
+    metadata_keys: Vec<Vec<u8>>,
+    metadata_values: Vec<Vec<u8>>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("create_with_existing_account_call").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&owners).unwrap(),
+            bcs::to_bytes(&num_signatures_required).unwrap(),
             bcs::to_bytes(&metadata_keys).unwrap(),
             bcs::to_bytes(&metadata_values).unwrap(),
         ],
@@ -4930,6 +5143,16 @@ mod decoder {
         }
     }
 
+    pub fn account_set_originating_address(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::AccountSetOriginatingAddress {})
+        } else {
+            None
+        }
+    }
+
     pub fn aptos_account_batch_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosAccountBatchTransfer {
@@ -5198,6 +5421,19 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CoinCreatePairing {
                 coin_type: script.ty_args().get(0)?.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn coin_migrate_coin_store_to_fungible_store(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CoinMigrateCoinStoreToFungibleStore {
+                coin_type: script.ty_args().get(0)?.clone(),
+                accounts: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -5498,6 +5734,16 @@ mod decoder {
         }
     }
 
+    pub fn managed_coin_destroy_caps(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ManagedCoinDestroyCaps {
+                coin_type: script.ty_args().get(0)?.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn managed_coin_initialize(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ManagedCoinInitialize {
@@ -5659,6 +5905,40 @@ mod decoder {
                         .ok()?,
                     metadata_keys: bcs::from_bytes(script.args().get(6)?).ok()?,
                     metadata_values: bcs::from_bytes(script.args().get(7)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn multisig_account_create_with_existing_account_and_revoke_auth_key_call(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::MultisigAccountCreateWithExistingAccountAndRevokeAuthKeyCall {
+                    owners: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    num_signatures_required: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    metadata_keys: bcs::from_bytes(script.args().get(2)?).ok()?,
+                    metadata_values: bcs::from_bytes(script.args().get(3)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn multisig_account_create_with_existing_account_call(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::MultisigAccountCreateWithExistingAccountCall {
+                    owners: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    num_signatures_required: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    metadata_keys: bcs::from_bytes(script.args().get(2)?).ok()?,
+                    metadata_values: bcs::from_bytes(script.args().get(3)?).ok()?,
                 },
             )
         } else {
@@ -6614,6 +6894,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::account_rotate_authentication_key_with_rotation_capability),
         );
         map.insert(
+            "account_set_originating_address".to_string(),
+            Box::new(decoder::account_set_originating_address),
+        );
+        map.insert(
             "aptos_account_batch_transfer".to_string(),
             Box::new(decoder::aptos_account_batch_transfer),
         );
@@ -6704,6 +6988,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "coin_create_pairing".to_string(),
             Box::new(decoder::coin_create_pairing),
+        );
+        map.insert(
+            "coin_migrate_coin_store_to_fungible_store".to_string(),
+            Box::new(decoder::coin_migrate_coin_store_to_fungible_store),
         );
         map.insert(
             "coin_migrate_to_fungible_store".to_string(),
@@ -6802,6 +7090,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::managed_coin_burn),
         );
         map.insert(
+            "managed_coin_destroy_caps".to_string(),
+            Box::new(decoder::managed_coin_destroy_caps),
+        );
+        map.insert(
             "managed_coin_initialize".to_string(),
             Box::new(decoder::managed_coin_initialize),
         );
@@ -6848,6 +7140,16 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "multisig_account_create_with_existing_account_and_revoke_auth_key".to_string(),
             Box::new(decoder::multisig_account_create_with_existing_account_and_revoke_auth_key),
+        );
+        map.insert(
+            "multisig_account_create_with_existing_account_and_revoke_auth_key_call".to_string(),
+            Box::new(
+                decoder::multisig_account_create_with_existing_account_and_revoke_auth_key_call,
+            ),
+        );
+        map.insert(
+            "multisig_account_create_with_existing_account_call".to_string(),
+            Box::new(decoder::multisig_account_create_with_existing_account_call),
         );
         map.insert(
             "multisig_account_create_with_owners".to_string(),

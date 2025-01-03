@@ -26,10 +26,12 @@ B0:
 	4: TestVariant[0](Data/V1)
 	5: StLoc[1](loc1: bool)
 	6: CopyLoc[1](loc1: bool)
-	7: BrTrue(8)
+	7: BrFalse(9)
 B1:
-	8: MoveLoc[1](loc1: bool)
-	9: Ret
+	8: Branch(9)
+B2:
+	9: MoveLoc[1](loc1: bool)
+	10: Ret
 }
 test_v1v3(): bool /* def_idx: 1 */ {
 L0:	loc0: Data
@@ -48,40 +50,52 @@ B0:
 	6: TestVariant[0](Data/V1)
 	7: StLoc[2](loc2: bool)
 	8: CopyLoc[2](loc2: bool)
-	9: BrTrue(15)
+	9: BrFalse(13)
 B1:
 	10: MoveLoc[1](loc1: &Data)
-	11: TestVariant[1](Data/V3)
-	12: StLoc[2](loc2: bool)
-	13: CopyLoc[2](loc2: bool)
-	14: BrTrue(15)
+	11: Pop
+	12: Branch(19)
 B2:
-	15: PackVariant[1](Data/V3)
-	16: StLoc[3](loc3: Data)
-	17: MoveLoc[2](loc2: bool)
-	18: BrFalse(32)
+	13: MoveLoc[1](loc1: &Data)
+	14: TestVariant[1](Data/V3)
+	15: StLoc[2](loc2: bool)
+	16: CopyLoc[2](loc2: bool)
+	17: BrFalse(19)
 B3:
-	19: ImmBorrowLoc[3](loc3: Data)
-	20: StLoc[4](loc4: &Data)
-	21: CopyLoc[4](loc4: &Data)
-	22: TestVariant[0](Data/V1)
-	23: StLoc[5](loc5: bool)
-	24: CopyLoc[5](loc5: bool)
-	25: BrTrue(31)
+	18: Branch(19)
 B4:
-	26: MoveLoc[4](loc4: &Data)
-	27: TestVariant[1](Data/V3)
-	28: StLoc[5](loc5: bool)
-	29: CopyLoc[5](loc5: bool)
-	30: BrTrue(31)
+	19: PackVariant[1](Data/V3)
+	20: StLoc[3](loc3: Data)
+	21: MoveLoc[2](loc2: bool)
+	22: BrFalse(40)
 B5:
-	31: Branch(34)
+	23: ImmBorrowLoc[3](loc3: Data)
+	24: StLoc[4](loc4: &Data)
+	25: CopyLoc[4](loc4: &Data)
+	26: TestVariant[0](Data/V1)
+	27: StLoc[5](loc5: bool)
+	28: CopyLoc[5](loc5: bool)
+	29: BrFalse(33)
 B6:
-	32: LdFalse
-	33: StLoc[5](loc5: bool)
+	30: MoveLoc[4](loc4: &Data)
+	31: Pop
+	32: Branch(39)
 B7:
-	34: MoveLoc[5](loc5: bool)
-	35: Ret
+	33: MoveLoc[4](loc4: &Data)
+	34: TestVariant[1](Data/V3)
+	35: StLoc[5](loc5: bool)
+	36: CopyLoc[5](loc5: bool)
+	37: BrFalse(39)
+B8:
+	38: Branch(39)
+B9:
+	39: Branch(42)
+B10:
+	40: LdFalse
+	41: StLoc[5](loc5: bool)
+B11:
+	42: MoveLoc[5](loc5: bool)
+	43: Ret
 }
 }
 ============ bytecode verification succeeded ========

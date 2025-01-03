@@ -39,6 +39,7 @@ use async_trait::async_trait;
 use futures::future::join_all;
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
+    borrow::Cow,
     fmt::Write,
     ops::DerefMut,
     sync::Arc,
@@ -142,7 +143,14 @@ pub async fn create_emitter_and_request(
 
     let chain_info = swarm.read().await.chain_info();
     let transaction_factory = TransactionFactory::new(chain_info.chain_id);
-    let emitter = TxnEmitter::new(transaction_factory, rng);
+    let rest_cli = swarm
+        .read()
+        .await
+        .validators()
+        .next()
+        .unwrap()
+        .rest_client();
+    let emitter = TxnEmitter::new(transaction_factory, rng, rest_cli);
 
     emit_job_request = emit_job_request.rest_clients(
         swarm
@@ -283,7 +291,10 @@ impl NetworkTest for dyn NetworkLoadTest {
                     .keys()
                     .into_iter()
                     .map(|slice| {
-                        let slice_samples = phase_stats.latency_breakdown.get_samples(&slice);
+                        let slice_samples = phase_stats
+                            .latency_breakdown
+                            .get_samples(&slice)
+                            .expect("Could not get samples");
                         format!(
                             "{:?}: max: {:.3}, avg: {:.3}",
                             slice,
@@ -640,6 +651,15 @@ impl NetworkTest for CompositeNetworkTest {
 impl Test for CompositeNetworkTest {
     fn name(&self) -> &'static str {
         "CompositeNetworkTest"
+    }
+
+    fn reporting_name(&self) -> Cow<'static, str> {
+        let mut name_builder = self.test.name().to_owned();
+        for wrapper in self.wrappers.iter() {
+            name_builder = format!("{}({})", wrapper.name(), name_builder);
+        }
+        name_builder = format!("CompositeNetworkTest({}) with ", name_builder);
+        Cow::Owned(name_builder)
     }
 }
 

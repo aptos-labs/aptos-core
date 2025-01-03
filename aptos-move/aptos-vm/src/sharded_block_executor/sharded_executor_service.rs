@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_executor::BlockAptosVM,
+    block_executor::AptosVMBlockExecutorWrapper,
     sharded_block_executor::{
         aggr_overridden_state_view::{AggregatorOverriddenStateView, TOTAL_SUPPLY_AGGR_BASE_VAL},
         coordinator_client::CoordinatorClient,
@@ -16,11 +16,15 @@ use crate::{
         ExecutorShardCommand,
     },
 };
+use aptos_block_executor::{
+    code_cache_global_manager::AptosModuleCacheManager, txn_provider::default::DefaultTxnProvider,
+};
 use aptos_logger::{info, trace};
 use aptos_types::{
     block_executor::{
         config::{BlockExecutorConfig, BlockExecutorLocalConfig},
         partitioner::{ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies},
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     state_store::StateView,
     transaction::{
@@ -135,11 +139,16 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 );
             });
             s.spawn(move |_| {
-                let ret = BlockAptosVM::execute_block_on_thread_pool(
+                let txn_provider = DefaultTxnProvider::new(signature_verified_transactions);
+                let ret = AptosVMBlockExecutorWrapper::execute_block_on_thread_pool(
                     executor_thread_pool,
-                    &signature_verified_transactions,
+                    &txn_provider,
                     aggr_overridden_state_view.as_ref(),
+                    // Since we execute blocks in parallel, we cannot share module caches, so each
+                    // thread has its own caches.
+                    &AptosModuleCacheManager::new(),
                     config,
+                    TransactionSliceMetadata::unknown(),
                     cross_shard_commit_sender,
                 )
                 .map(BlockOutput::into_transaction_outputs_forced);
@@ -163,7 +172,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 callback.send(ret).unwrap();
                 executor_thread_pool_clone.spawn(move || {
                     // Explicit async drop
-                    drop(signature_verified_transactions);
+                    drop(txn_provider);
                 });
             });
         });
@@ -230,11 +239,9 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                         transactions,
                         state_view.as_ref(),
                         BlockExecutorConfig {
-                            local: BlockExecutorLocalConfig {
-                                concurrency_level: concurrency_level_per_shard,
-                                allow_fallback: true,
-                                discard_failed_blocks: false,
-                            },
+                            local: BlockExecutorLocalConfig::default_with_concurrency_level(
+                                concurrency_level_per_shard,
+                            ),
                             onchain: onchain_config,
                         },
                     );

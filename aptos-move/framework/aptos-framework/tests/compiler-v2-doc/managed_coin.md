@@ -14,6 +14,8 @@ By utilizing this current module, a developer can create his own coin and care l
 -  [Function `initialize`](#0x1_managed_coin_initialize)
 -  [Function `mint`](#0x1_managed_coin_mint)
 -  [Function `register`](#0x1_managed_coin_register)
+-  [Function `destroy_caps`](#0x1_managed_coin_destroy_caps)
+-  [Function `remove_caps`](#0x1_managed_coin_remove_caps)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
@@ -21,6 +23,8 @@ By utilizing this current module, a developer can create his own coin and care l
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `mint`](#@Specification_1_mint)
     -  [Function `register`](#@Specification_1_register)
+    -  [Function `destroy_caps`](#@Specification_1_destroy_caps)
+    -  [Function `remove_caps`](#@Specification_1_remove_caps)
 
 
 <pre><code><b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
@@ -233,6 +237,72 @@ Required if user wants to start accepting deposits of <code>CoinType</code> in h
 
 </details>
 
+<a id="0x1_managed_coin_destroy_caps"></a>
+
+## Function `destroy_caps`
+
+Destroys capabilities from the account, so that the user no longer has access to mint or burn.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="managed_coin.md#0x1_managed_coin_destroy_caps">destroy_caps</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="managed_coin.md#0x1_managed_coin_destroy_caps">destroy_caps</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a> {
+    <b>let</b> (burn_cap, freeze_cap, mint_cap) = <a href="managed_coin.md#0x1_managed_coin_remove_caps">remove_caps</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>);
+    destroy_burn_cap(burn_cap);
+    destroy_freeze_cap(freeze_cap);
+    destroy_mint_cap(mint_cap);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_managed_coin_remove_caps"></a>
+
+## Function `remove_caps`
+
+Removes capabilities from the account to be stored or destroyed elsewhere
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="managed_coin.md#0x1_managed_coin_remove_caps">remove_caps</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>): (<a href="coin.md#0x1_coin_BurnCapability">coin::BurnCapability</a>&lt;CoinType&gt;, <a href="coin.md#0x1_coin_FreezeCapability">coin::FreezeCapability</a>&lt;CoinType&gt;, <a href="coin.md#0x1_coin_MintCapability">coin::MintCapability</a>&lt;CoinType&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="managed_coin.md#0x1_managed_coin_remove_caps">remove_caps</a>&lt;CoinType&gt;(
+    <a href="account.md#0x1_account">account</a>: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>
+): (BurnCapability&lt;CoinType&gt;, FreezeCapability&lt;CoinType&gt;, MintCapability&lt;CoinType&gt;) <b>acquires</b> <a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a> {
+    <b>let</b> account_addr = <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>assert</b>!(
+        <b>exists</b>&lt;<a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt;&gt;(account_addr),
+        <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="managed_coin.md#0x1_managed_coin_ENO_CAPABILITIES">ENO_CAPABILITIES</a>),
+    );
+
+    <b>let</b> <a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt; {
+        burn_cap,
+        freeze_cap,
+        mint_cap,
+    } = <b>move_from</b>&lt;<a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt;&gt;(account_addr);
+    (burn_cap, freeze_cap, mint_cap)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="@Specification_1"></a>
 
 ## Specification
@@ -420,6 +490,42 @@ Updating <code>Account.guid_creation_num</code> will not overflow.
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr) && !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(account_addr);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr) && !<a href="../../../aptos-stdlib/tests/compiler-v2-doc/type_info.md#0x1_type_info_spec_is_struct">type_info::spec_is_struct</a>&lt;CoinType&gt;();
 <b>ensures</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
+</code></pre>
+
+
+
+<a id="@Specification_1_destroy_caps"></a>
+
+### Function `destroy_caps`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="managed_coin.md#0x1_managed_coin_destroy_caps">destroy_caps</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> account_addr = <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt;&gt;(account_addr);
+<b>ensures</b> !<b>exists</b>&lt;<a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt;&gt;(account_addr);
+</code></pre>
+
+
+
+<a id="@Specification_1_remove_caps"></a>
+
+### Function `remove_caps`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="managed_coin.md#0x1_managed_coin_remove_caps">remove_caps</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer">signer</a>): (<a href="coin.md#0x1_coin_BurnCapability">coin::BurnCapability</a>&lt;CoinType&gt;, <a href="coin.md#0x1_coin_FreezeCapability">coin::FreezeCapability</a>&lt;CoinType&gt;, <a href="coin.md#0x1_coin_MintCapability">coin::MintCapability</a>&lt;CoinType&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> account_addr = <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt;&gt;(account_addr);
+<b>ensures</b> !<b>exists</b>&lt;<a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt;&gt;(account_addr);
 </code></pre>
 
 

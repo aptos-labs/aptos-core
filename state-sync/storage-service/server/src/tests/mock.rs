@@ -22,7 +22,7 @@ use aptos_network::{
         },
     },
 };
-use aptos_storage_interface::{DbReader, ExecutedTrees, Order};
+use aptos_storage_interface::{DbReader, LedgerSummary, Order};
 use aptos_storage_service_notifications::StorageServiceNotifier;
 use aptos_storage_service_types::{
     requests::StorageServiceRequest, responses::StorageServiceResponse, StorageServiceError,
@@ -325,7 +325,7 @@ mock! {
             version: Version,
         ) -> aptos_storage_interface::Result<(Option<StateValue>, SparseMerkleProof)>;
 
-        fn get_latest_executed_trees(&self) -> aptos_storage_interface::Result<ExecutedTrees>;
+        fn get_pre_committed_ledger_summary(&self) -> aptos_storage_interface::Result<LedgerSummary>;
 
         fn get_epoch_ending_ledger_info(&self, known_version: u64) ->aptos_storage_interface::Result<LedgerInfoWithSignatures>;
 

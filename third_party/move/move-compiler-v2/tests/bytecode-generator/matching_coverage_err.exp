@@ -15,25 +15,25 @@ module 0xc0ffee::m {
     enum Outer {
         None,
         One {
-            i: m::Inner,
+            i: Inner,
         }
         Two {
-            i: m::Inner,
-            b: m::Box,
+            i: Inner,
+            b: Box,
         }
     }
-    public fun exhaustive_tuple(i: &m::Inner) {
+    public fun exhaustive_tuple(i: &Inner) {
         match (Tuple(i, i)) {
-          (m::Inner::Inner1{ x: _ }, _: &m::Inner): (&m::Inner, &m::Inner) => {
+          (m::Inner::Inner1{ x: _ }, _: &Inner): (&Inner, &Inner) => {
             Tuple()
           }
-          (m::Inner::Inner2{ x: _, y: _ }, _: &m::Inner): (&m::Inner, &m::Inner) => {
+          (m::Inner::Inner2{ x: _, y: _ }, _: &Inner): (&Inner, &Inner) => {
             Tuple()
           }
         }
 
     }
-    public fun exhaustive_via_merge(o: &m::Outer) {
+    public fun exhaustive_via_merge(o: &Outer) {
         match (o) {
           m::Outer::None => {
             Tuple()
@@ -50,7 +50,7 @@ module 0xc0ffee::m {
         }
 
     }
-    public fun non_exhaustive(o: &m::Outer) {
+    public fun non_exhaustive(o: &Outer) {
         match (o) {
           m::Outer::None => {
             Tuple()
@@ -61,7 +61,7 @@ module 0xc0ffee::m {
         }
 
     }
-    public fun non_exhaustive_because_of_cond(o: &m::Outer) {
+    public fun non_exhaustive_because_of_cond(o: &Outer) {
         match (o) {
           m::Outer::None => {
             Tuple()
@@ -69,13 +69,13 @@ module 0xc0ffee::m {
           m::Outer::One{ i: _ } => {
             Tuple()
           }
-          m::Outer::Two{ i: _, b } if Gt<u64>(select m::Box.x<&m::Box>(b), 0) => {
+          m::Outer::Two{ i: _, b } if Gt<u64>(select m::Box.x<&Box>(b), 0) => {
             Tuple()
           }
         }
 
     }
-    public fun non_exhaustive_because_of_nested(o: &m::Outer) {
+    public fun non_exhaustive_because_of_nested(o: &Outer) {
         match (o) {
           m::Outer::None => {
             Tuple()
@@ -89,26 +89,26 @@ module 0xc0ffee::m {
         }
 
     }
-    public fun non_exhaustive_tuple(i: &m::Inner) {
+    public fun non_exhaustive_tuple(i: &Inner) {
         match (Tuple(i, i)) {
-          (m::Inner::Inner1{ x: _ }, _: &m::Inner): (&m::Inner, &m::Inner) => {
+          (m::Inner::Inner1{ x: _ }, _: &Inner): (&Inner, &Inner) => {
             Tuple()
           }
         }
 
     }
-    public fun non_exhaustive_tuple2(i: &m::Inner) {
+    public fun non_exhaustive_tuple2(i: &Inner) {
         match (Tuple(i, i)) {
-          (m::Inner::Inner1{ x: _ }, _: &m::Inner): (&m::Inner, &m::Inner) => {
+          (m::Inner::Inner1{ x: _ }, _: &Inner): (&Inner, &Inner) => {
             Tuple()
           }
-          (_: &m::Inner, m::Inner::Inner2{ x: _, y: _ }): (&m::Inner, &m::Inner) => {
+          (_: &Inner, m::Inner::Inner2{ x: _, y: _ }): (&Inner, &Inner) => {
             Tuple()
           }
         }
 
     }
-    public fun unreachable(o: &m::Outer) {
+    public fun unreachable(o: &Outer) {
         match (o) {
           m::Outer::None => {
             Tuple()
@@ -119,13 +119,13 @@ module 0xc0ffee::m {
           m::Outer::Two{ i: _, b: _ } => {
             Tuple()
           }
-          _: &m::Outer => {
+          _: &Outer => {
             Tuple()
           }
         }
 
     }
-    public fun unreachable_via_overlaying_pattern(o: &m::Outer) {
+    public fun unreachable_via_overlaying_pattern(o: &Outer) {
         match (o) {
           m::Outer::None => {
             Tuple()
@@ -139,13 +139,13 @@ module 0xc0ffee::m {
           m::Outer::One{ i: m::Inner::Inner1{ x: _ } } => {
             Tuple()
           }
-          _: &m::Outer => {
+          _: &Outer => {
             Tuple()
           }
         }
 
     }
-    public fun unreachable_via_repeated_pattern(o: &m::Outer) {
+    public fun unreachable_via_repeated_pattern(o: &Outer) {
         match (o) {
           m::Outer::None => {
             Tuple()
@@ -156,13 +156,109 @@ module 0xc0ffee::m {
           m::Outer::One{ i: _ } => {
             Tuple()
           }
-          _: &m::Outer => {
+          _: &Outer => {
             Tuple()
           }
         }
 
     }
 } // end 0xc0ffee::m
+
+// -- Sourcified model before bytecode pipeline
+module 0xc0ffee::m {
+    struct Box has drop {
+        x: u64,
+    }
+    enum Inner {
+        Inner1 {
+            x: u64,
+        }
+        Inner2 {
+            x: u64,
+            y: u64,
+        }
+    }
+    enum Outer {
+        None,
+        One {
+            i: Inner,
+        }
+        Two {
+            i: Inner,
+            b: Box,
+        }
+    }
+    public fun exhaustive_tuple(i: &Inner) {
+        match ((i, i)) {
+            (Inner::Inner1{x: _},_) => (),
+            (Inner::Inner2{x: _,y: _},_) => (),
+        }
+    }
+    public fun exhaustive_via_merge(o: &Outer) {
+        match (o) {
+            Outer::None{} => (),
+            Outer::One{i: Inner::Inner1{x: _}} => (),
+            Outer::One{i: Inner::Inner2{x: _,y: _}} => (),
+            Outer::Two{i: _,b: _} => (),
+        }
+    }
+    public fun non_exhaustive(o: &Outer) {
+        match (o) {
+            Outer::None{} => (),
+            Outer::One{i: _} => (),
+        }
+    }
+    public fun non_exhaustive_because_of_cond(o: &Outer) {
+        match (o) {
+            Outer::None{} => (),
+            Outer::One{i: _} => (),
+            Outer::Two{i: _,b: b} if b.x > 0 => (),
+        }
+    }
+    public fun non_exhaustive_because_of_nested(o: &Outer) {
+        match (o) {
+            Outer::None{} => (),
+            Outer::One{i: Inner::Inner1{x: _}} => (),
+            Outer::Two{i: _,b: _} => (),
+        }
+    }
+    public fun non_exhaustive_tuple(i: &Inner) {
+        match ((i, i)) {
+            (Inner::Inner1{x: _},_) => (),
+        }
+    }
+    public fun non_exhaustive_tuple2(i: &Inner) {
+        match ((i, i)) {
+            (Inner::Inner1{x: _},_) => (),
+            (_,Inner::Inner2{x: _,y: _}) => (),
+        }
+    }
+    public fun unreachable(o: &Outer) {
+        match (o) {
+            Outer::None{} => (),
+            Outer::One{i: _} => (),
+            Outer::Two{i: _,b: _} => (),
+            _ => (),
+        }
+    }
+    public fun unreachable_via_overlaying_pattern(o: &Outer) {
+        match (o) {
+            Outer::None{} => (),
+            Outer::One{i: Inner::Inner1{x: _}} => (),
+            Outer::One{i: _} => (),
+            Outer::One{i: Inner::Inner1{x: _}} => (),
+            _ => (),
+        }
+    }
+    public fun unreachable_via_repeated_pattern(o: &Outer) {
+        match (o) {
+            Outer::None{} => (),
+            Outer::One{i: _} => (),
+            Outer::One{i: _} => (),
+            _ => (),
+        }
+    }
+}
 
 
 Diagnostics:

@@ -163,7 +163,7 @@ impl TestHarness {
     async fn expect_disconnect(&mut self, expected_peer_id: PeerId) {
         let req = self.connection_reqs_rx.next().await.unwrap();
         let (peer_id, res_tx) = match req {
-            ConnectionRequest::DisconnectPeer(peer_id, res_tx) => (peer_id, res_tx),
+            ConnectionRequest::DisconnectPeer(peer_id, _, res_tx) => (peer_id, res_tx),
             _ => panic!("Unexpected ConnectionRequest: {:?}", req),
         };
         assert_eq!(peer_id, expected_peer_id);

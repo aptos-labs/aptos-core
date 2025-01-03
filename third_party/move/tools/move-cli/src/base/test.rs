@@ -244,6 +244,7 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
     let (_compiled_package, model_opt) = build_plan.compile_with_driver(
         writer,
         &build_config.compiler_config,
+        vec![],
         |compiler| {
             let (files, comments_and_compiler_res) = compiler.run::<PASS_CFGIR>().unwrap();
             let (_, compiler) =
@@ -342,9 +343,10 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
             let buf_writer = &mut *LOGGING_FILE_WRITER.lock().unwrap();
             buf_writer.flush().unwrap();
         }
-        let coverage_map = CoverageMap::from_trace_file(trace_path);
+        let coverage_map = CoverageMap::from_trace_file(trace_path.clone());
         output_map_to_file(coverage_map_path, &coverage_map).unwrap();
     }
+    cleanup_trace();
     Ok(UnitTestResult::Success)
 }
 

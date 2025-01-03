@@ -37,7 +37,7 @@ fn test_observation_aggregation_state() {
         .map(|i| ValidatorConsensusInfo::new(addrs[i], public_keys[i].clone(), voting_powers[i]))
         .collect();
     let verifier = ValidatorVerifier::new(validator_infos);
-    let epoch_state = Arc::new(EpochState { epoch, verifier });
+    let epoch_state = Arc::new(EpochState::new(epoch, verifier));
     let view_0 = ProviderJWKs {
         issuer: b"https::/alice.com".to_vec(),
         version: 123,

@@ -5,6 +5,7 @@ use super::quorum_store_db::QuorumStoreStorage;
 use crate::{
     consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
     error::error_kind,
+    monitor,
     network::{IncomingBatchRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
     payload_manager::{DirectMempoolPayloadManager, QuorumStorePayloadManager, TPayloadManager},
@@ -28,10 +29,9 @@ use aptos_config::config::{QuorumStoreConfig, SecureBackend};
 use aptos_consensus_types::{
     common::Author, proof_of_store::ProofCache, request_response::GetPayloadCommand,
 };
-use aptos_global_constants::CONSENSUS_KEY;
+use aptos_crypto::bls12381::PrivateKey;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_secure_storage::{KVStorage, Storage};
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     account_address::AccountAddress, validator_signer::ValidatorSigner,
@@ -52,7 +52,7 @@ impl QuorumStoreBuilder {
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> (
         Arc<dyn TPayloadManager>,
-        Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+        Option<aptos_channel::Sender<AccountAddress, (Author, VerifiedEvent)>>,
     ) {
         match self {
             QuorumStoreBuilder::DirectMempool(inner) => inner.init_payload_manager(),
@@ -101,7 +101,7 @@ impl DirectMempoolInnerBuilder {
         &mut self,
     ) -> (
         Arc<dyn TPayloadManager>,
-        Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+        Option<aptos_channel::Sender<AccountAddress, (Author, VerifiedEvent)>>,
     ) {
         (Arc::from(DirectMempoolPayloadManager::new()), None)
     }
@@ -127,9 +127,9 @@ pub struct InnerBuilder {
     mempool_txn_pull_timeout_ms: u64,
     aptos_db: Arc<dyn DbReader>,
     network_sender: NetworkSender,
-    verifier: ValidatorVerifier,
+    verifier: Arc<ValidatorVerifier>,
     proof_cache: ProofCache,
-    backend: SecureBackend,
+    _backend: SecureBackend,
     coordinator_tx: Sender<CoordinatorCommand>,
     coordinator_rx: Option<Receiver<CoordinatorCommand>>,
     batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
@@ -141,16 +141,18 @@ pub struct InnerBuilder {
     back_pressure_tx: tokio::sync::mpsc::Sender<BackPressure>,
     back_pressure_rx: Option<tokio::sync::mpsc::Receiver<BackPressure>>,
     quorum_store_storage: Arc<dyn QuorumStoreStorage>,
-    quorum_store_msg_tx: aptos_channel::Sender<AccountAddress, VerifiedEvent>,
-    quorum_store_msg_rx: Option<aptos_channel::Receiver<AccountAddress, VerifiedEvent>>,
+    quorum_store_msg_tx: aptos_channel::Sender<AccountAddress, (Author, VerifiedEvent)>,
+    quorum_store_msg_rx: Option<aptos_channel::Receiver<AccountAddress, (Author, VerifiedEvent)>>,
     remote_batch_coordinator_cmd_tx: Vec<tokio::sync::mpsc::Sender<BatchCoordinatorCommand>>,
     remote_batch_coordinator_cmd_rx: Vec<tokio::sync::mpsc::Receiver<BatchCoordinatorCommand>>,
     batch_store: Option<Arc<BatchStore>>,
     batch_reader: Option<Arc<dyn BatchReader>>,
     broadcast_proofs: bool,
+    consensus_key: Arc<PrivateKey>,
 }
 
 impl InnerBuilder {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         epoch: u64,
         author: Author,
@@ -161,11 +163,12 @@ impl InnerBuilder {
         mempool_txn_pull_timeout_ms: u64,
         aptos_db: Arc<dyn DbReader>,
         network_sender: NetworkSender,
-        verifier: ValidatorVerifier,
+        verifier: Arc<ValidatorVerifier>,
         proof_cache: ProofCache,
         backend: SecureBackend,
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
         broadcast_proofs: bool,
+        consensus_key: Arc<PrivateKey>,
     ) -> Self {
         let (coordinator_tx, coordinator_rx) = futures_channel::mpsc::channel(config.channel_size);
         let (batch_generator_cmd_tx, batch_generator_cmd_rx) =
@@ -176,7 +179,7 @@ impl InnerBuilder {
             tokio::sync::mpsc::channel(config.channel_size);
         let (back_pressure_tx, back_pressure_rx) = tokio::sync::mpsc::channel(config.channel_size);
         let (quorum_store_msg_tx, quorum_store_msg_rx) =
-            aptos_channel::new::<AccountAddress, VerifiedEvent>(
+            aptos_channel::new::<AccountAddress, (Author, VerifiedEvent)>(
                 QueueStyle::FIFO,
                 config.channel_size,
                 None,
@@ -202,7 +205,7 @@ impl InnerBuilder {
             network_sender,
             verifier,
             proof_cache,
-            backend,
+            _backend: backend,
             coordinator_tx,
             coordinator_rx: Some(coordinator_rx),
             batch_generator_cmd_tx,
@@ -221,26 +224,19 @@ impl InnerBuilder {
             batch_store: None,
             batch_reader: None,
             broadcast_proofs,
+            consensus_key,
         }
     }
 
     fn create_batch_store(&mut self) -> Arc<BatchReaderImpl<NetworkSender>> {
-        let backend = &self.backend;
-        let storage: Storage = backend.into();
-        if let Err(error) = storage.available() {
-            panic!("Storage is not available: {:?}", error);
-        }
-        let private_key = storage
-            .get(CONSENSUS_KEY)
-            .map(|v| v.value)
-            .expect("Unable to get private key");
-        let signer = ValidatorSigner::new(self.author, private_key);
+        let signer = ValidatorSigner::new(self.author, self.consensus_key.clone());
 
         let latest_ledger_info_with_sigs = self
             .aptos_db
             .get_latest_ledger_info()
             .expect("could not get latest ledger info");
         let last_committed_timestamp = latest_ledger_info_with_sigs.commit_info().timestamp_usecs();
+        let is_new_epoch = latest_ledger_info_with_sigs.ledger_info().ends_epoch();
 
         let batch_requester = BatchRequester::new(
             self.epoch,
@@ -254,12 +250,14 @@ impl InnerBuilder {
         );
         let batch_store = Arc::new(BatchStore::new(
             self.epoch,
+            is_new_epoch,
             last_committed_timestamp,
             self.quorum_store_storage.clone(),
             self.config.memory_quota,
             self.config.db_quota,
             self.config.batch_quota,
             signer,
+            Duration::from_secs(60).as_micros() as u64,
         ));
         self.batch_store = Some(batch_store.clone());
         let batch_reader = Arc::new(BatchReaderImpl::new(batch_store.clone(), batch_requester));
@@ -328,6 +326,7 @@ impl InnerBuilder {
                 self.config.receiver_max_batch_bytes as u64,
                 self.config.receiver_max_total_txns as u64,
                 self.config.receiver_max_total_bytes as u64,
+                self.config.batch_expiry_gap_when_init_usecs,
             );
             #[allow(unused_variables)]
             let name = format!("batch_coordinator-{}", i);
@@ -345,6 +344,7 @@ impl InnerBuilder {
             self.batch_generator_cmd_tx.clone(),
             self.proof_cache,
             self.broadcast_proofs,
+            self.config.batch_expiry_gap_when_init_usecs,
         );
         spawn_named!(
             "proof_coordinator",
@@ -365,7 +365,7 @@ impl InnerBuilder {
                 * self.num_validators,
             self.batch_store.clone().unwrap(),
             self.config.allow_batches_without_pos_in_proposal,
-            self.config.enable_opt_quorum_store,
+            self.config.batch_expiry_gap_when_init_usecs,
         );
         spawn_named!(
             "proof_manager",
@@ -435,9 +435,9 @@ impl InnerBuilder {
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> (
         Arc<dyn TPayloadManager>,
-        Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+        Option<aptos_channel::Sender<AccountAddress, (Author, VerifiedEvent)>>,
     ) {
-        let batch_reader = self.create_batch_store();
+        let batch_reader = monitor!("qs_create_batch_store", self.create_batch_store());
 
         (
             Arc::from(QuorumStorePayloadManager::new(
@@ -446,6 +446,7 @@ impl InnerBuilder {
                 self.coordinator_tx.clone(),
                 consensus_publisher,
                 self.verifier.get_ordered_account_addresses(),
+                self.verifier.address_to_validator_index().clone(),
             )),
             Some(self.quorum_store_msg_tx.clone()),
         )

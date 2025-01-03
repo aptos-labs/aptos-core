@@ -16,3 +16,12 @@ module 0x42::m {
         Tuple()
     }
 } // end 0x42::m
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::m {
+    inline fun foo(f: |&u64|) {
+    }
+    fun g() {
+        ();
+    }
+}

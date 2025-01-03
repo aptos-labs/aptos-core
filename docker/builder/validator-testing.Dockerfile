@@ -5,29 +5,23 @@ FROM debian-base as validator-testing-base
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
-    libssl1.1 \
-    ca-certificates \
-    # Needed to run debugging tools like perf
-    linux-perf \
-    sudo \
-    procps \
-    gdb \
-    curl \
-    # postgres client lib required for indexer
-    libpq-dev \
-    # Extra goodies for debugging
-    less \
-    git \
-    vim \
-    nano \
-    libjemalloc-dev \
-    binutils \
-    graphviz \
-    ghostscript \
-    strace \
-    htop \
-    sysstat \
-    valgrind
+        # Needed to run debugging tools like perf
+        gdb \
+        linux-perf \
+        procps \
+        sudo \
+        # Extra goodies for debugging
+        binutils \
+        ghostscript \
+        git \
+        graphviz \
+        htop \
+        less \
+        libjemalloc-dev \
+        strace \
+        sysstat \
+        valgrind \
+        vim
 
 FROM node-builder
 

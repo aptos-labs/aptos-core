@@ -18,6 +18,5 @@ error: global memory invariant does not hold
     =     at tests/sources/regression/type_param_bug_121721.move:86: create_ballot
     =     at tests/sources/regression/type_param_bug_121721.move:88: create_ballot
     =     at tests/sources/regression/type_param_bug_121721.move:87: create_ballot
-    =         <redacted> = <redacted>
     =     at tests/sources/regression/type_param_bug_121721.move:167
     =     at tests/sources/regression/type_param_bug_121721.move:173

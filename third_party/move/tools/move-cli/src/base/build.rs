@@ -25,7 +25,7 @@ impl Build {
         let architecture = config.architecture.unwrap_or(Architecture::Move);
 
         match architecture {
-            Architecture::Move | Architecture::AsyncMove => {
+            Architecture::Move => {
                 config.compile_package(&rerooted_path, &mut std::io::stdout())?;
             },
 

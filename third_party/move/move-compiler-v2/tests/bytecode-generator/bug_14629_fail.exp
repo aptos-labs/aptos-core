@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: constraint `integer` does not have required ability `key`
+  ┌─ tests/bytecode-generator/bug_14629_fail.move:6:32
+  │
+6 │         let R { r: _ } = R {r: 0};
+  │                                ^

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: Only inline functions may have function-typed parameters, but non-inline function `c::foo` has a function parameter:
+   ┌─ tests/lambda/inline-parity/same_names.move:23:9
+   │
+23 │     fun foo(f: |a::MyList, b::MyOtherList|, x: a::MyList, y: b::MyOtherList) {
+   │         ^^^ - Parameter `f` has function-valued type `|(a::MyList, b::MyOtherList)|`.

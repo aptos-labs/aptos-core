@@ -38,6 +38,7 @@ pub enum MetadataKey {
     EventVersion,
     StateVersion,
     TransactionVersion,
+    EventV2TranslationVersion,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]

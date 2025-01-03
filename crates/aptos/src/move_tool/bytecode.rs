@@ -12,11 +12,16 @@ use crate::{
     update::get_revela_path,
 };
 use anyhow::Context;
+use aptos_framework::{
+    get_compilation_metadata_from_compiled_module, get_compilation_metadata_from_compiled_script,
+    get_metadata_from_compiled_module, get_metadata_from_compiled_script, RuntimeModuleMetadataV1,
+};
 use async_trait::async_trait;
 use clap::{Args, Parser};
 use itertools::Itertools;
 use move_binary_format::{
-    binary_views::BinaryIndexedView, file_format::CompiledScript, CompiledModule,
+    binary_views::BinaryIndexedView, file_format::CompiledScript, file_format_common,
+    CompiledModule,
 };
 use move_bytecode_source_map::{mapping::SourceMapping, utils::source_map_from_file};
 use move_command_line_common::files::{
@@ -25,11 +30,15 @@ use move_command_line_common::files::{
 use move_coverage::coverage_map::CoverageMap;
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
+use move_model::metadata::{CompilationMetadata, CompilerVersion, LanguageVersion};
+use serde::{Deserialize, Serialize};
 use std::{
     fs,
     path::{Path, PathBuf},
     process::Command,
+    str,
 };
+use tempfile::NamedTempFile;
 
 const DISASSEMBLER_EXTENSION: &str = "mv.asm";
 const DECOMPILER_EXTENSION: &str = "mv.move";
@@ -80,6 +89,11 @@ pub struct BytecodeCommand {
 
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
+
+    /// When `--bytecode-path` is set with this option,
+    /// only print out the metadata and bytecode version of the target bytecode
+    #[clap(long)]
+    pub print_metadata_only: bool,
 }
 
 /// Allows to ensure that either one of both is selected (via  the `group` attribute).
@@ -127,6 +141,13 @@ impl CliCommand<String> for Decompile {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct BytecodeMetadata {
+    aptos_metadata: Option<RuntimeModuleMetadataV1>,
+    bytecode_version: u32,
+    compilation_metadata: CompilationMetadata,
+}
+
 impl BytecodeCommand {
     async fn execute(self, command_type: BytecodeCommandType) -> CliTypedResult<String> {
         let inputs = if let Some(path) = self.input.bytecode_path.clone() {
@@ -140,6 +161,10 @@ impl BytecodeCommand {
         } else {
             unreachable!("arguments required by clap")
         };
+
+        if self.print_metadata_only && self.input.bytecode_path.is_some() {
+            return self.print_metadata(&inputs[0]);
+        }
 
         let mut report = vec![];
         let mut last_out_dir = String::new();
@@ -199,6 +224,45 @@ impl BytecodeCommand {
             1 => format!("{}/{}", last_out_dir, report[0]),
             _ => format!("{}/{{{}}}", last_out_dir, report.into_iter().join(",")),
         })
+    }
+
+    fn print_metadata(&self, bytecode_path: &Path) -> Result<String, CliError> {
+        let bytecode_bytes = read_from_file(bytecode_path)?;
+
+        let v1_metadata = CompilationMetadata {
+            unstable: false,
+            compiler_version: CompilerVersion::V1.to_string(),
+            language_version: LanguageVersion::V1.to_string(),
+        };
+        let metadata = if self.is_script {
+            let script = CompiledScript::deserialize(&bytecode_bytes)
+                .context("Script blob can't be deserialized")?;
+            if let Some(data) = get_compilation_metadata_from_compiled_script(&script) {
+                serde_json::to_string_pretty(&data).expect("expect compilation metadata")
+            } else {
+                serde_json::to_string_pretty(&v1_metadata).expect("expect compilation metadata")
+            };
+            BytecodeMetadata {
+                aptos_metadata: get_metadata_from_compiled_script(&script),
+                bytecode_version: script.version,
+                compilation_metadata: get_compilation_metadata_from_compiled_script(&script)
+                    .unwrap_or(v1_metadata),
+            }
+        } else {
+            let module = CompiledModule::deserialize(&bytecode_bytes)
+                .context("Module blob can't be deserialized")?;
+            BytecodeMetadata {
+                aptos_metadata: get_metadata_from_compiled_module(&module),
+                bytecode_version: module.version,
+                compilation_metadata: get_compilation_metadata_from_compiled_module(&module)
+                    .unwrap_or(v1_metadata),
+            }
+        };
+        println!(
+            "Metadata: {}",
+            serde_json::to_string_pretty(&metadata).expect("expect metadata")
+        );
+        Ok("ok".to_string())
     }
 
     fn disassemble(&self, bytecode_path: &Path) -> Result<String, CliError> {
@@ -261,7 +325,14 @@ impl BytecodeCommand {
         let exe = get_revela_path()?;
         let to_cli_error = |e| CliError::IO(exe.display().to_string(), e);
         let mut cmd = Command::new(exe.as_path());
-        cmd.arg(format!("--bytecode={}", bytecode_path.display()));
+        // WORKAROUND: if the bytecode is v7, try to downgrade to v6 since Revela
+        // does not support v7
+        let v6_temp_file = self.downgrade_to_v6(bytecode_path)?;
+        if let Some(file) = &v6_temp_file {
+            cmd.arg(format!("--bytecode={}", file.path().display()));
+        } else {
+            cmd.arg(format!("--bytecode={}", bytecode_path.display()));
+        }
         if self.is_script {
             cmd.arg("--script");
         }
@@ -279,6 +350,51 @@ impl BytecodeCommand {
                 out.status,
                 String::from_utf8(out.stderr).unwrap_or_default()
             )))
+        }
+    }
+
+    fn downgrade_to_v6(&self, file_path: &Path) -> Result<Option<NamedTempFile>, CliError> {
+        let error_explanation = || {
+            format!(
+                "{} in `{}` contains Move 2 features (e.g. enum types) \
+                types which are not yet supported by the decompiler",
+                if self.is_script { "script " } else { "module" },
+                file_path.display()
+            )
+        };
+        let create_new_bytecode = |bytes: &[u8]| -> Result<NamedTempFile, CliError> {
+            let temp_file = NamedTempFile::new()
+                .map_err(|e| CliError::IO("creating v6 temp file".to_string(), e))?;
+            fs::write(temp_file.path(), bytes)
+                .map_err(|e| CliError::IO("writing v6 temp file".to_string(), e))?;
+            Ok(temp_file)
+        };
+        let bytes = read_from_file(file_path)?;
+        if self.is_script {
+            let script = CompiledScript::deserialize(&bytes).map_err(|e| {
+                CliError::UnableToParse("script", format!("cannot deserialize: {}", e))
+            })?;
+            if script.version < file_format_common::VERSION_7 {
+                return Ok(None);
+            }
+            let mut new_bytes = vec![];
+            script
+                .serialize_for_version(Some(file_format_common::VERSION_6), &mut new_bytes)
+                // The only reason why this can fail is because of Move 2 features
+                .map_err(|_| CliError::UnexpectedError(error_explanation()))?;
+            Ok(Some(create_new_bytecode(&new_bytes)?))
+        } else {
+            let module = CompiledModule::deserialize(&bytes).map_err(|e| {
+                CliError::UnableToParse("script", format!("cannot deserialize: {}", e))
+            })?;
+            if module.version < file_format_common::VERSION_7 {
+                return Ok(None);
+            }
+            let mut new_bytes = vec![];
+            module
+                .serialize_for_version(Some(file_format_common::VERSION_6), &mut new_bytes)
+                .map_err(|_| CliError::UnexpectedError(error_explanation()))?;
+            Ok(Some(create_new_bytecode(&new_bytes)?))
         }
     }
 }

@@ -13,16 +13,23 @@ use crate::{
 };
 use anyhow::{bail, Result};
 use aptos_backup_cli::metadata::view::BackupStorageState;
-use aptos_forge::{reconfig, NodeExt, Swarm, SwarmExt};
+use aptos_forge::{reconfig, AptosPublicInfo, Node, NodeExt, Swarm, SwarmExt};
 use aptos_logger::info;
 use aptos_temppath::TempPath;
 use aptos_types::{transaction::Version, waypoint::Waypoint};
+use itertools::Itertools;
 use std::{
     fs,
     path::Path,
     process::Command,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::{Duration, Instant},
 };
+
+const LINE: &str = "----------";
 
 #[tokio::test]
 async fn test_db_restore() {
@@ -453,4 +460,124 @@ pub(crate) fn db_restore(
         .unwrap();
     assert!(status.success(), "{}", status);
     info!("Backup restored in {} seconds.", now.elapsed().as_secs());
+}
+
+async fn do_transfer_or_reconfig(info: &mut AptosPublicInfo) -> Result<()> {
+    const LOTS_MONEY: u64 = 100_000_000;
+    let r = rand::random::<u64>() % 10;
+    if r < 3 {
+        info!(
+            "{LINE} background task: triggering reconfig. Root account seq_num: {}. Ledger info: {:?}",
+            info.root_account().sequence_number(),
+            info.client().get_ledger_information().await.unwrap(),
+        );
+        info.reconfig().await;
+        info!(
+            "{LINE} background task: Reconfig done. Root account seq_num: {}",
+            info.root_account().sequence_number(),
+        );
+    } else {
+        let mut sender = info.create_and_fund_user_account(LOTS_MONEY).await?;
+        let receiver = info.create_and_fund_user_account(LOTS_MONEY).await?;
+        let num_txns = rand::random::<usize>() % 100;
+        for _ in 0..num_txns {
+            info.transfer_non_blocking(&mut sender, &receiver, 1)
+                .await?;
+        }
+    }
+
+    Ok(())
+}
+
+async fn do_transfers_and_reconfigs(mut info: AptosPublicInfo, quit_flag: Arc<AtomicBool>) {
+    // loop until aborted
+    while !quit_flag.load(Ordering::Acquire) {
+        do_transfer_or_reconfig(&mut info).await.unwrap();
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 10)]
+async fn test_db_restart() {
+    ::aptos_logger::Logger::new().init();
+
+    info!("{LINE} Test started.");
+    let mut swarm = SwarmBuilder::new_local(4).with_aptos().build().await;
+    swarm.wait_all_alive(Duration::from_secs(60)).await.unwrap();
+    swarm
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_CATCH_UP_WAIT_SECS))
+        .await
+        .unwrap();
+    info!("{LINE} Created receiver account and caught up.");
+
+    let mut restarting_validator_ids = swarm.validators().map(|v| v.peer_id()).collect_vec();
+    let non_restarting_validator_id = restarting_validator_ids.pop().unwrap();
+    let non_restarting_validator = swarm.validator(non_restarting_validator_id).unwrap();
+    let chain_info = swarm.chain_info();
+    let mut pub_chain_info = AptosPublicInfo::new(
+        chain_info.chain_id(),
+        non_restarting_validator
+            .inspection_service_endpoint()
+            .to_string(),
+        non_restarting_validator.rest_api_endpoint().to_string(),
+        chain_info.root_account(),
+    );
+    let client = non_restarting_validator.rest_client();
+
+    info!("{LINE} Gonna start continuous coin transfer and reconfigs in the background.");
+    let quit_flag = Arc::new(AtomicBool::new(false));
+    let background_traffic = tokio::task::spawn(do_transfers_and_reconfigs(
+        pub_chain_info.clone(),
+        quit_flag.clone(),
+    ));
+
+    for round in 0..3 {
+        info!("{LINE} Restart round {round}");
+        for (v, vid) in restarting_validator_ids.iter().enumerate() {
+            let validator = swarm.validator_mut(*vid).unwrap();
+            // sometimes trigger reconfig right before the restart, to expose edge cases around
+            // epoch change
+            if rand::random::<usize>() % 3 == 0 {
+                info!(
+                    "{LINE} Triggering reconfig right before restarting. Root account seq_num: {}. Ledger info: {:?}",
+                    pub_chain_info.root_account().sequence_number(),
+                    client.get_ledger_information().await.unwrap(),
+                );
+                reconfig(
+                    &client,
+                    &pub_chain_info.transaction_factory(),
+                    pub_chain_info.root_account(),
+                )
+                .await;
+                info!(
+                    "{LINE} Reconfig done. Root account seq_num: {}",
+                    pub_chain_info.root_account().sequence_number(),
+                )
+            }
+            info!(
+                "{LINE} Round {round}: Restarting validator {v}. ledger info: {:?}",
+                client.get_ledger_information().await.unwrap(),
+            );
+            validator.restart().await.unwrap();
+            swarm
+                .wait_for_all_nodes_to_catchup(Duration::from_secs(60))
+                .await
+                .unwrap();
+            info!("{LINE} Round {round}: Validator {v} restarted and caught up.");
+            tokio::time::sleep(Duration::from_secs(10)).await;
+        }
+    }
+
+    info!("{LINE} Stopping background traffic, and make sure background task didn't panic.");
+    quit_flag.store(true, Ordering::Release);
+    // Make sure background thread didn't panic.
+    background_traffic.await.unwrap();
+
+    info!("{LINE} Check again that all validators are alive.");
+    swarm
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(60))
+        .await
+        .unwrap();
+
+    info!("{LINE} All validators survived.");
+    info!("{LINE} Test succeeded.");
 }

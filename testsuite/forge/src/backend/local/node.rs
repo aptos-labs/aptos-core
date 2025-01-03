@@ -197,7 +197,7 @@ impl LocalNode {
         &self.config
     }
 
-    pub(crate) fn config_mut(&mut self) -> &mut NodeConfig {
+    pub fn config_mut(&mut self) -> &mut NodeConfig {
         &mut self.config
     }
 

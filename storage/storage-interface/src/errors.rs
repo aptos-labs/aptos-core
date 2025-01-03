@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module defines error types used by `AptosDB`.
-use aptos_types::state_store::errors::StateviewError;
+use aptos_types::state_store::errors::StateViewError;
 use std::sync::mpsc::RecvError;
 use thiserror::Error;
 
@@ -65,22 +65,22 @@ impl From<std::num::ParseIntError> for AptosDbError {
     }
 }
 
-impl From<AptosDbError> for StateviewError {
+impl From<AptosDbError> for StateViewError {
     fn from(error: AptosDbError) -> Self {
         match error {
-            AptosDbError::NotFound(msg) => StateviewError::NotFound(msg),
-            AptosDbError::Other(msg) => StateviewError::Other(msg),
-            _ => StateviewError::Other(format!("{}", error)),
+            AptosDbError::NotFound(msg) => StateViewError::NotFound(msg),
+            AptosDbError::Other(msg) => StateViewError::Other(msg),
+            _ => StateViewError::Other(format!("{}", error)),
         }
     }
 }
 
-impl From<StateviewError> for AptosDbError {
-    fn from(error: StateviewError) -> Self {
+impl From<StateViewError> for AptosDbError {
+    fn from(error: StateViewError) -> Self {
         match error {
-            StateviewError::NotFound(msg) => AptosDbError::NotFound(msg),
-            StateviewError::Other(msg) => AptosDbError::Other(msg),
-            StateviewError::BcsError(err) => AptosDbError::BcsError(err.to_string()),
+            StateViewError::NotFound(msg) => AptosDbError::NotFound(msg),
+            StateViewError::Other(msg) => AptosDbError::Other(msg),
+            StateViewError::BcsError(err) => AptosDbError::BcsError(err.to_string()),
         }
     }
 }

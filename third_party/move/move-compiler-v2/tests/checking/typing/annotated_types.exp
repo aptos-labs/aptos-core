@@ -11,7 +11,22 @@ module 0x8675309::M {
         0;
         pack M::S(false);
         M::R{ dummy_field: _ } = pack M::R(false);
-        (_: u64, _: M::S, M::R{ dummy_field: _ }): (u64, M::S, M::R) = Tuple(0, pack M::S(false), pack M::R(false));
+        (_: u64, _: S, M::R{ dummy_field: _ }): (u64, S, R) = Tuple(0, pack M::S(false), pack M::R(false));
         Tuple()
     }
 } // end 0x8675309::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x8675309::M {
+    struct R {
+    }
+    struct S has drop {
+    }
+    fun t() {
+        ();
+        0;
+        S{};
+        R{} = R{};
+        (_,_,R{}) = (0, S{}, R{});
+    }
+}

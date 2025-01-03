@@ -58,11 +58,11 @@ fn proof_of_store_with_size(
     )
 }
 
-#[test]
-fn test_proof_queue_sorting() {
+#[tokio::test]
+async fn test_proof_queue_sorting() {
     let my_peer_id = PeerId::random();
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1);
 
     let author_0 = PeerId::random();
     let author_1 = PeerId::random();
@@ -145,11 +145,11 @@ fn test_proof_queue_sorting() {
     assert_eq!(count_author_1, 2);
 }
 
-#[test]
-fn test_proof_calculate_remaining_txns_and_proofs() {
+#[tokio::test]
+async fn test_proof_calculate_remaining_txns_and_proofs() {
     let my_peer_id = PeerId::random();
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1);
     let now_in_secs = aptos_infallible::duration_since_epoch().as_secs() as u64;
     let now_in_usecs = aptos_infallible::duration_since_epoch().as_micros() as u64;
     let author_0 = PeerId::random();
@@ -405,11 +405,11 @@ fn test_proof_calculate_remaining_txns_and_proofs() {
     assert_eq!(proof_queue.batch_summaries_len(), 0);
 }
 
-#[test]
-fn test_proof_pull_proofs_with_duplicates() {
+#[tokio::test]
+async fn test_proof_pull_proofs_with_duplicates() {
     let my_peer_id = PeerId::random();
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1);
     let now_in_secs = aptos_infallible::duration_since_epoch().as_secs() as u64;
     let now_in_usecs = now_in_secs * 1_000_000;
     let txns = vec![
@@ -656,11 +656,11 @@ fn test_proof_pull_proofs_with_duplicates() {
     assert!(proof_queue.is_empty());
 }
 
-#[test]
-fn test_proof_queue_soft_limit() {
+#[tokio::test]
+async fn test_proof_queue_soft_limit() {
     let my_peer_id = PeerId::random();
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1);
 
     let author = PeerId::random();
 
@@ -698,11 +698,11 @@ fn test_proof_queue_soft_limit() {
     assert_eq!(num_unique_txns, 20);
 }
 
-#[test]
-fn test_proof_queue_insert_after_commit() {
+#[tokio::test]
+async fn test_proof_queue_insert_after_commit() {
     let my_peer_id = PeerId::random();
     let batch_store = batch_store_for_test(5 * 1024);
-    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1);
 
     let author = PeerId::random();
     let author_batches = vec![
@@ -730,11 +730,11 @@ fn test_proof_queue_insert_after_commit() {
     assert!(proof_queue.is_empty());
 }
 
-#[test]
-fn test_proof_queue_pull_full_utilization() {
+#[tokio::test]
+async fn test_proof_queue_pull_full_utilization() {
     let my_peer_id = PeerId::random();
     let batch_store = batch_store_for_test(5 * 1024);
-    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1);
 
     let author = PeerId::random();
     let author_batches = vec![

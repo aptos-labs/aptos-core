@@ -23,7 +23,7 @@ This file keeps track of the changes for indexer grpc.
 
 * Changed the internal data format to raw bytes, this can save at 40% traffic cost. 
 
-* Server supports request and respone compression. [PR](https://github.com/aptos-labs/aptos-core/pull/7907)
+* Server supports request and response compression. [PR](https://github.com/aptos-labs/aptos-core/pull/7907)
 
 
 ## [0.1.0] - 2023.03.28

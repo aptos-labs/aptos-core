@@ -21,6 +21,7 @@
  *  │ Computer ├─────────────┘
  *  └──────────┘
  */
+#![allow(dead_code)]
 
 pub mod buffer;
 pub mod buffer_item;
@@ -36,5 +37,6 @@ pub mod pipeline_phase;
 pub mod signing_phase;
 
 pub mod execution_client;
+pub mod pipeline_builder;
 #[cfg(test)]
 mod tests;

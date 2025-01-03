@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/checking/control_flow/loop_labels_parse_err1.move:3:13
+  │
+3 │         'a: if (true) false else true
+  │             ^^
+  │             │
+  │             Unexpected 'if'
+  │             Expected one of: `while` or `loop`

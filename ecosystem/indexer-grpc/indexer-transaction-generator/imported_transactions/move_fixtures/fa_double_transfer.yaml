@@ -1,0 +1,5 @@
+transactions:
+  - output_name: fa_double_transfer
+    script_path: fa_double_transfer
+    sender_address: __ACCOUNT_A__
+    

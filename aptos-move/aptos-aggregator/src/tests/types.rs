@@ -6,12 +6,10 @@ use crate::{
     bounded_math::{BoundedMath, SignedU128},
     delta_change_set::serialize,
     resolver::{TAggregatorV1View, TDelayedFieldView},
-    types::{
-        code_invariant_error, expect_ok, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
-    },
+    types::{DelayedFieldValue, DelayedFieldsSpeculativeError},
 };
 use aptos_types::{
-    delayed_fields::PanicError,
+    error::{code_invariant_error, expect_ok, PanicError, PanicOr},
     state_store::{
         state_key::StateKey,
         state_value::{StateValue, StateValueMetadata},

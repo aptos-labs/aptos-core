@@ -30,12 +30,14 @@ pub fn batch_store_for_test(memory_quota: usize) -> Arc<BatchStore> {
 
     Arc::new(BatchStore::new(
         10, // epoch
+        false,
         10, // last committed round
         db,
         memory_quota, // memory_quota
         2001,         // db quota
         2001,         // batch quota
         signers[0].clone(),
+        0,
     ))
 }
 
@@ -60,8 +62,8 @@ fn request_for_test(
     )
 }
 
-#[test]
-fn test_insert_expire() {
+#[tokio::test]
+async fn test_insert_expire() {
     let batch_store = batch_store_for_test(30);
 
     let digest = HashValue::random();
@@ -225,8 +227,8 @@ fn test_quota_manager() {
     assert_ok_eq!(qm.update_quota(2), StorageMode::MemoryAndPersisted);
 }
 
-#[test]
-fn test_get_local_batch() {
+#[tokio::test]
+async fn test_get_local_batch() {
     let store = batch_store_for_test(30);
 
     let digest_1 = HashValue::random();

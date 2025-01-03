@@ -39,6 +39,8 @@ spec:
   securityPolicy:
     name: {{ .Values.ingress.gce_security_policy }}
   {{- end }}
+  logging:
+    enable: {{ .Values.ingress.logging.enabled }}
   connectionDraining:
     drainingTimeoutSec: 30
   healthCheck:

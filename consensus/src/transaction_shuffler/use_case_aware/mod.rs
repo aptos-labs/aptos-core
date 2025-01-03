@@ -4,6 +4,7 @@
 use crate::transaction_shuffler::TransactionShuffler;
 use aptos_types::transaction::{use_case::UseCaseKey, SignedTransaction};
 use iterator::ShuffledTransactionIterator;
+use std::fmt::Debug;
 
 pub(crate) mod iterator;
 pub(crate) mod types;
@@ -14,7 +15,7 @@ pub(crate) mod delayed_queue;
 mod tests;
 
 #[derive(Clone, Debug, Default)]
-pub(crate) struct Config {
+pub struct Config {
     pub sender_spread_factor: usize,
     pub platform_use_case_spread_factor: usize,
     pub user_use_case_spread_factor: usize,
@@ -37,6 +38,20 @@ impl Config {
 
 pub struct UseCaseAwareShuffler {
     pub config: Config,
+}
+
+#[cfg(feature = "fuzzing")]
+impl UseCaseAwareShuffler {
+    pub fn shuffle_generic<
+        Txn: aptos_types::transaction::use_case::UseCaseAwareTransaction + Debug,
+    >(
+        &self,
+        txns: Vec<Txn>,
+    ) -> Vec<Txn> {
+        ShuffledTransactionIterator::new(self.config.clone())
+            .extended_with(txns)
+            .collect()
+    }
 }
 
 impl TransactionShuffler for UseCaseAwareShuffler {

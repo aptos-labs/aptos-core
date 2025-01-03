@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct AccountResource {
     authentication_key: Vec<u8>,
-    sequence_number: u64,
+    pub sequence_number: u64,
     guid_creation_num: u64,
     coin_register_events: EventHandle,
     key_rotation_events: EventHandle,

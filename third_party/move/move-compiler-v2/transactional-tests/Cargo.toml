@@ -7,15 +7,15 @@ edition = "2021"
 license = "Apache-2.0"
 
 [dependencies]
-move-command-line-common = { path = "../../move-command-line-common" }
+move-command-line-common = { workspace = true }
 once_cell = { workspace = true }
 
 [dev-dependencies]
 datatest-stable = { workspace = true }
 itertools = { workspace = true }
-move-compiler-v2 = { path = ".." }
-move-model = { path = "../../move-model" }
-move-transactional-test-runner = { path = "../../testing-infra/transactional-test-runner" }
+move-compiler-v2 = { workspace = true }
+move-model = { workspace = true }
+move-transactional-test-runner = { workspace = true }
 walkdir = { workspace = true }
 
 [[test]]

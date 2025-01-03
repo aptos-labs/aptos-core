@@ -19,7 +19,7 @@ use anyhow::{bail, Context, Result};
 use aptos_logger::{error, info};
 use aptos_sdk::transaction_builder::TransactionFactory;
 use aptos_transaction_generator_lib::{args::TransactionTypeArg, AccountType, WorkflowProgress};
-use aptos_types::keyless::test_utils::get_sample_esk;
+use aptos_types::{account_address::AccountAddress, keyless::test_utils::get_sample_esk};
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
     sync::Arc,
@@ -87,6 +87,7 @@ pub async fn emit_transactions_with_cluster(
             .with_transaction_expiration_time(args.txn_expiration_time_secs)
             .with_gas_unit_price(aptos_global_constants::GAS_UNIT_PRICE),
         StdRng::from_entropy(),
+        client,
     );
 
     let transaction_mix_per_phase = TransactionTypeArg::args_to_transaction_mix_per_phase(
@@ -230,12 +231,17 @@ pub async fn create_accounts_command(
 
     let account_generator = if let Some(jwt) = &create_accounts_args.keyless_jwt {
         emit_job_request = emit_job_request.keyless_jwt(jwt);
+        let keyless_config = client
+            .get_resource(AccountAddress::ONE, "0x1::keyless_account::Configuration")
+            .await?
+            .into_inner();
 
         create_keyless_account_generator(
             get_sample_esk(),
             0,
             jwt,
             create_accounts_args.proof_file_path.as_deref(),
+            keyless_config,
         )?
     } else {
         Box::new(PrivateKeyAccountGenerator)

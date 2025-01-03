@@ -52,8 +52,8 @@ note: unused schema M::SchemaExp
 
 // -- Model dump before bytecode pipeline
 module 0x42::M {
-    struct S {
-        x: #0,
+    struct S<X> {
+        x: X,
     }
     private fun add(x: u64): u64 {
         Add<u64>(x, 1)
@@ -75,3 +75,18 @@ module 0x42::M {
     }
 
 } // end 0x42::M
+
+// -- Sourcified model before bytecode pipeline
+module 0x42::M {
+    struct S<X> {
+        x: X,
+    }
+    fun add(x: u64): u64 {
+        x + 1
+    }
+    fun id(x: u64): u64 {
+        x
+    }
+    fun multiple(_x: u64, _y: u64) {
+    }
+}

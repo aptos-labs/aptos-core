@@ -6,7 +6,7 @@ use aptos_logger::trace;
 use aptos_types::{
     block_executor::partitioner::TransactionWithDependencies,
     state_store::{
-        errors::StateviewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
+        errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
         state_value::StateValue, StateView, TStateView,
     },
     transaction::analyzed_transaction::AnalyzedTransaction,
@@ -74,14 +74,14 @@ impl<'a, S: StateView + Sync + Send> CrossShardStateView<'a, S> {
 impl<'a, S: StateView + Sync + Send> TStateView for CrossShardStateView<'a, S> {
     type Key = StateKey;
 
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>, StateviewError> {
+    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>, StateViewError> {
         if let Some(value) = self.cross_shard_data.get(state_key) {
             return Ok(value.get_value());
         }
         self.base_view.get_state_value(state_key)
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
+    fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
         Ok(StateStorageUsage::new_untracked())
     }
 }
@@ -90,19 +90,27 @@ impl<'a, S: StateView + Sync + Send> TStateView for CrossShardStateView<'a, S> {
 mod tests {
     use crate::sharded_block_executor::cross_shard_state_view::CrossShardStateView;
     use aptos_types::state_store::{
-        in_memory_state_view::InMemoryStateView, state_key::StateKey, state_value::StateValue,
-        TStateView,
+        errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
+        state_value::StateValue, TStateView,
     };
-    use once_cell::sync::Lazy;
-    use std::{
-        collections::{HashMap, HashSet},
-        sync::Arc,
-        thread,
-        time::Duration,
-    };
+    use std::{collections::HashSet, sync::Arc, thread, time::Duration};
 
-    pub static EMPTY_VIEW: Lazy<Arc<InMemoryStateView>> =
-        Lazy::new(|| Arc::new(InMemoryStateView::new(HashMap::new())));
+    struct EmptyView;
+
+    impl TStateView for EmptyView {
+        type Key = StateKey;
+
+        fn get_state_value(
+            &self,
+            _state_key: &StateKey,
+        ) -> Result<Option<StateValue>, StateViewError> {
+            Ok(None)
+        }
+
+        fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
+            unreachable!()
+        }
+    }
 
     #[test]
     fn test_cross_shard_state_view_get_state_value() {
@@ -114,7 +122,7 @@ mod tests {
         let mut state_keys = HashSet::new();
         state_keys.insert(state_key.clone());
 
-        let cross_shard_state_view = Arc::new(CrossShardStateView::new(state_keys, &EMPTY_VIEW));
+        let cross_shard_state_view = Arc::new(CrossShardStateView::new(state_keys, &EmptyView));
         let cross_shard_state_view_clone = cross_shard_state_view.clone();
 
         let wait_thread = thread::spawn(move || {

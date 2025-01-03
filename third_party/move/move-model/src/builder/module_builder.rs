@@ -20,9 +20,9 @@ use crate::{
     intrinsics::process_intrinsic_declaration,
     model,
     model::{
-        EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, Loc, ModuleId,
-        MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId, SpecFunId,
-        SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind,
+        EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, FunctionLoc, Loc,
+        ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId,
+        SpecFunId, SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind,
     },
     options::ModelBuilderOptions,
     pragmas::{
@@ -48,7 +48,10 @@ use move_compiler::{
     parser::ast as PA,
     shared::{unique_map::UniqueMap, Identifier, Name},
 };
-use move_ir_types::{ast::ConstantName, location::Spanned};
+use move_ir_types::{
+    ast::ConstantName,
+    location::{sp, Spanned},
+};
 use regex::Regex;
 use std::{
     cell::RefCell,
@@ -250,8 +253,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     /// Converts a ModuleAccess into a qualified symbol which can be used for lookup of
     /// types or functions. If the access has a struct variant, an error is produced.
     pub fn module_access_to_qualified(&self, access: &EA::ModuleAccess) -> QualifiedSymbol {
-        self.check_no_variant(access);
-        let (qsym, _) = self.module_access_to_qualified_with_variant(access);
+        let (_, access) = self.check_no_variant_and_convert_maccess(access);
+        let (qsym, _) = self.module_access_to_qualified_with_variant(&access);
         qsym
     }
 
@@ -262,15 +265,46 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         )
     }
 
-    pub fn check_no_variant(&self, maccess: &EA::ModuleAccess) -> bool {
-        if Self::is_variant(maccess) {
-            self.parent.env.error(
-                &self.parent.to_loc(&maccess.loc),
-                "variants not allowed in this context",
-            );
-            false
+    /// If `maccess` takes the form `ModuleAccess(M, _, Some(V))`,
+    /// check `M::V` is a struct/enum, constant or schema,
+    /// if so, return the form `ModuleAccess(M, V, None)`,
+    /// see how `maccess` is created by
+    /// function `name_access_chain` in `expansion/translate.rs`
+    pub fn check_no_variant_and_convert_maccess(
+        &self,
+        maccess: &EA::ModuleAccess,
+    ) -> (bool, EA::ModuleAccess) {
+        if let EA::ModuleAccess_::ModuleAccess(mident, _, Some(var_name)) = &maccess.value {
+            let addr = self
+                .parent
+                .resolve_address(&self.parent.to_loc(&mident.loc), &mident.value.address);
+            let name = self
+                .symbol_pool()
+                .make(mident.value.module.0.value.as_str());
+            let module_name = ModuleName::from_address_bytes_and_name(addr, name);
+            let var_name_sym = self.symbol_pool().make(var_name.value.as_str());
+            let qualitifed_name = QualifiedSymbol {
+                module_name,
+                symbol: var_name_sym,
+            };
+            if self.parent.struct_table.contains_key(&qualitifed_name)
+                || self.parent.spec_schema_table.contains_key(&qualitifed_name)
+                || self.parent.const_table.contains_key(&qualitifed_name)
+            {
+                let new_maccess = sp(
+                    maccess.loc,
+                    EA::ModuleAccess_::ModuleAccess(*mident, *var_name, None),
+                );
+                (true, new_maccess)
+            } else {
+                self.parent.env.error(
+                    &self.parent.to_loc(&maccess.loc),
+                    "variants not allowed in this context",
+                );
+                (false, maccess.clone())
+            }
         } else {
-            true
+            (true, maccess.clone())
         }
     }
 
@@ -410,7 +444,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             self.symbol_pool().make(n.value.as_str()),
                         ),
                         EA::ModuleAccess_::ModuleAccess(mident, n, _) => {
-                            self.check_no_variant(macc);
+                            let (_, macc) = self.check_no_variant_and_convert_maccess(macc);
                             let addr_bytes = self.parent.resolve_address(
                                 &self.parent.to_loc(&macc.loc),
                                 &mident.value.address,
@@ -568,9 +602,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let is_native = matches!(def.body.value, EA::FunctionBody_::Native);
         let def_loc = et.to_loc(&def.loc);
         let name_loc = et.to_loc(&name.loc());
+        let result_type_loc = et.to_loc(&def.signature.return_type.loc);
         et.parent.parent.define_fun(qsym.clone(), FunEntry {
             loc: def_loc.clone(),
             name_loc,
+            result_type_loc,
             module_id: et.parent.module_id,
             fun_id,
             visibility,
@@ -731,6 +767,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     ) {
         let name = self.symbol_pool().make(&name.0.value);
         let (type_params, params, result_type) = self.decl_ana_signature(signature, false);
+        // Eliminate references in parameters and result type for spec functions
+        // `derive_spec_fun` does the same when generating spec functions from general move functions
+        let params = params
+            .into_iter()
+            .map(|Parameter(sym, ty, loc)| Parameter(sym, ty.skip_reference().clone(), loc))
+            .collect_vec();
+        let result_type = result_type.skip_reference().clone();
 
         // Add the function to the symbol table.
         let fun_id = SpecFunId::new(self.spec_funs.len());
@@ -875,7 +918,14 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 /// # Definition Analysis
 
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
-    pub fn check_language_version(&self, loc: &Loc, feature: &str, version_min: LanguageVersion) {
+    /// Returns `true` if language version is ok. Otherwise,
+    /// issues an error message and returns `false`.
+    pub fn test_language_version(
+        &self,
+        loc: &Loc,
+        feature: &str,
+        version_min: LanguageVersion,
+    ) -> bool {
         if !self.parent.env.language_version().is_at_least(version_min) {
             self.parent.env.error(
                 loc,
@@ -883,7 +933,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     "not supported before language version `{}`: {}",
                     version_min, feature
                 ),
-            )
+            );
+            false
+        } else {
+            true
         }
     }
 
@@ -969,11 +1022,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 if !self.parent.const_table.contains_key(&qsym) {
                     continue;
                 }
-                self.check_language_version(
+                if !self.test_language_version(
                     &loc,
                     "constant definitions referring to other constants",
                     LanguageVersion::V2_0,
-                );
+                ) {
+                    continue;
+                }
                 if visited.contains(&const_name) {
                     continue;
                 }
@@ -1496,8 +1551,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 et.define_type_param(loc, *name, Type::new_param(pos), kind.clone(), false);
             }
             et.enter_scope();
+            let is_lang_version_2_1 = et.env().language_version.is_at_least(LanguageVersion::V2_1);
             for (idx, Parameter(n, ty, loc)) in params.iter().enumerate() {
-                et.define_local(loc, *n, ty.clone(), None, Some(idx));
+                let symbol_pool = et.parent.parent.env.symbol_pool();
+                if !is_lang_version_2_1 || symbol_pool.string(*n).as_ref() != "_" {
+                    et.define_local(loc, *n, ty.clone(), None, Some(idx));
+                }
             }
             let access_specifiers = et.translate_access_specifiers(&def.access_specifiers);
             let result = et.translate_seq(&loc, seq, &result_type, &ErrorMessageContext::Return);
@@ -2587,10 +2646,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     ) {
         // Type check and translate lhs and rhs. They must have the same type.
         let mut et = self.exp_translator_for_context(loc, context, &ConditionKind::Requires);
-        let (expected_ty, lhs) = et.translate_exp_free(lhs);
-        let rhs = et.translate_exp(rhs, &expected_ty);
+        let (expected_ty, translated_lhs) = et.translate_exp_free(lhs);
+        let translated_rhs = et.translate_exp(rhs, &expected_ty);
         et.finalize_types();
-        if lhs.extract_ghost_mem_access(self.parent.env).is_some() {
+        if translated_lhs
+            .extract_ghost_mem_access(self.parent.env)
+            .is_some()
+        {
             // Add as a condition to the context.
             self.add_conditions_to_context(
                 context,
@@ -2599,15 +2661,15 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     loc: loc.clone(),
                     kind: ConditionKind::Update,
                     properties: Default::default(),
-                    exp: rhs.into_exp(),
-                    additional_exps: vec![lhs.into_exp()],
+                    exp: translated_rhs.into_exp(),
+                    additional_exps: vec![translated_lhs.into_exp()],
                 }],
                 PropertyBag::default(),
                 "",
             );
         } else {
             self.parent.error(
-                &self.parent.env.get_node_loc(lhs.node_id()),
+                &self.parent.env.get_node_loc(translated_lhs.node_id()),
                 "target of `update` restricted to specification variables",
             )
         }
@@ -3679,12 +3741,16 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let spec = self.fun_specs.remove(&name.symbol).unwrap_or_default();
             let def = self.fun_defs.remove(&name.symbol);
             let called_funs = Some(def.as_ref().map(|e| e.called_funs()).unwrap_or_default());
+            let used_funs = Some(def.as_ref().map(|e| e.used_funs()).unwrap_or_default());
             let access_specifiers = self.fun_access_specifiers.remove(&name.symbol);
             let fun_id = FunId::new(name.symbol);
             let data = FunctionData {
                 name: name.symbol,
-                loc: entry.loc.clone(),
-                id_loc: entry.name_loc.clone(),
+                loc: FunctionLoc {
+                    full: entry.loc.clone(),
+                    id_loc: entry.name_loc.clone(),
+                    result_type_loc: entry.result_type_loc.clone(),
+                },
                 def_idx: None,
                 handle_idx: None,
                 visibility: entry.visibility,
@@ -3701,6 +3767,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 called_funs,
                 calling_funs: RefCell::default(),
                 transitive_closure_of_called_funs: RefCell::default(),
+                used_funs,
+                using_funs: RefCell::default(),
+                transitive_closure_of_used_funs: RefCell::default(),
             };
             function_data.insert(fun_id, data);
         }

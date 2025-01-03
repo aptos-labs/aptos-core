@@ -5,9 +5,9 @@
 use crate::{
     expansion::translate::is_valid_struct_constant_or_schema_name,
     parser::ast::{
-        self as P, Ability, Ability_, BinOp, CallKind, ConstantName, Field, FunctionName,
-        ModuleName, QuantKind, SpecApplyPattern, StructName, UnaryOp, UseDecl, Var, VariantName,
-        ENTRY_MODIFIER,
+        self as P, Ability, Ability_, BinOp, CallKind, ConstantName, Field, FunctionName, Label,
+        LambdaCaptureKind, ModuleName, QuantKind, SpecApplyPattern, StructName, UnaryOp, UseDecl,
+        Var, VariantName, ENTRY_MODIFIER,
     },
     shared::{
         ast_debug::*,
@@ -25,7 +25,6 @@ use std::{
     fmt,
     hash::Hash,
 };
-
 //**************************************************************************************************
 // Program
 //**************************************************************************************************
@@ -402,7 +401,7 @@ pub enum Type_ {
     Multiple(Vec<Type>),
     Apply(ModuleAccess, Vec<Type>),
     Ref(bool, Box<Type>),
-    Fun(Vec<Type>, Box<Type>),
+    Fun(Vec<Type>, Box<Type>, AbilitySet),
     UnresolvedError,
 }
 pub type Type = Spanned<Type_>;
@@ -499,15 +498,16 @@ pub enum Exp_ {
 
     Name(ModuleAccess, Option<Vec<Type>>),
     Call(ModuleAccess, CallKind, Option<Vec<Type>>, Spanned<Vec<Exp>>),
+    ExpCall(Box<Exp>, Spanned<Vec<Exp>>),
     Pack(ModuleAccess, Option<Vec<Type>>, Fields<Exp>),
     Vector(Loc, Option<Vec<Type>>, Spanned<Vec<Exp>>),
 
     IfElse(Box<Exp>, Box<Exp>, Box<Exp>),
     Match(Box<Exp>, Vec<Spanned<(LValueList, Option<Exp>, Exp)>>),
-    While(Box<Exp>, Box<Exp>),
-    Loop(Box<Exp>),
+    While(Option<Label>, Box<Exp>, Box<Exp>),
+    Loop(Option<Label>, Box<Exp>),
     Block(Sequence),
-    Lambda(TypedLValueList, Box<Exp>),
+    Lambda(TypedLValueList, Box<Exp>, LambdaCaptureKind, AbilitySet),
     Quant(
         QuantKind,
         LValueWithRangeList,
@@ -522,8 +522,8 @@ pub enum Exp_ {
 
     Return(Box<Exp>),
     Abort(Box<Exp>),
-    Break,
-    Continue,
+    Break(Option<Label>),
+    Continue(Option<Label>),
 
     Dereference(Box<Exp>),
     UnaryExp(UnaryOp, Box<Exp>),
@@ -909,6 +909,17 @@ impl fmt::Display for Visibility {
     }
 }
 
+impl fmt::Display for AbilitySet {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
+        if !self.is_empty() {
+            write!(f, ": ")?;
+            write!(f, "{}", format_delim(self, "+"))
+        } else {
+            Ok(())
+        }
+    }
+}
+
 impl fmt::Display for Type_ {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
         use Type_::*;
@@ -917,19 +928,18 @@ impl fmt::Display for Type_ {
             Apply(n, tys) => {
                 write!(f, "{}", n)?;
                 if !tys.is_empty() {
-                    write!(f, "<")?;
-                    write!(f, "{}", format_comma(tys))?;
-                    write!(f, ">")?;
+                    write!(f, "<{}>", format_comma(tys))
+                } else {
+                    Ok(())
                 }
-                Ok(())
             },
             Ref(mut_, ty) => write!(f, "&{}{}", if *mut_ { "mut " } else { "" }, ty),
-            Fun(args, result) => write!(f, "({}):{}", format_comma(args), result),
+            Fun(args, result, abilities) => {
+                write!(f, "({}):{}{}", format_comma(args), result, abilities)
+            },
             Unit => write!(f, "()"),
             Multiple(tys) => {
-                write!(f, "(")?;
-                write!(f, "{}", format_comma(tys))?;
-                write!(f, ")")
+                write!(f, "({})", format_comma(tys))
             },
         }
     }
@@ -1445,11 +1455,12 @@ impl AstDebug for Type_ {
                 }
                 s.ast_debug(w)
             },
-            Type_::Fun(args, result) => {
+            Type_::Fun(args, result, abilities) => {
                 w.write("|");
                 w.comma(args, |w, ty| ty.ast_debug(w));
                 w.write("|");
                 result.ast_debug(w);
+                ability_constraints_ast_debug(w, abilities);
             },
             Type_::UnresolvedError => w.write("_|_"),
         }
@@ -1610,6 +1621,12 @@ impl AstDebug for Exp_ {
                 w.comma(rhs, |w, e| e.ast_debug(w));
                 w.write(")");
             },
+            E::ExpCall(fexp, sp!(_, rhs)) => {
+                fexp.ast_debug(w);
+                w.write("(");
+                w.comma(rhs, |w, e| e.ast_debug(w));
+                w.write(")");
+            },
             E::Pack(ma, tys_opt, fields) => {
                 ma.ast_debug(w);
                 if let Some(ss) = tys_opt {
@@ -1644,13 +1661,19 @@ impl AstDebug for Exp_ {
                 w.write(" else ");
                 f.ast_debug(w);
             },
-            E::While(b, e) => {
+            E::While(l, b, e) => {
+                if let Some(l) = l {
+                    w.write(&format!("{}: ", l.value().as_str()))
+                }
                 w.write("while (");
                 b.ast_debug(w);
                 w.write(")");
                 e.ast_debug(w);
             },
-            E::Loop(e) => {
+            E::Loop(l, e) => {
+                if let Some(l) = l {
+                    w.write(&format!("{}: ", l.value().as_str()))
+                }
                 w.write("loop ");
                 e.ast_debug(w);
             },
@@ -1669,11 +1692,15 @@ impl AstDebug for Exp_ {
                 }
             },
             E::Block(seq) => w.block(|w| seq.ast_debug(w)),
-            E::Lambda(sp!(_, bs), e) => {
+            E::Lambda(sp!(_, bs), e, capture_kind, abilities) => {
+                if *capture_kind != LambdaCaptureKind::Default {
+                    w.write(format!(" {}", capture_kind));
+                }
                 w.write("|");
                 bs.ast_debug(w);
                 w.write("|");
                 e.ast_debug(w);
+                ability_constraints_ast_debug(w, abilities)
             },
             E::Quant(kind, sp!(_, rs), trs, c_opt, e) => {
                 kind.ast_debug(w);
@@ -1720,8 +1747,18 @@ impl AstDebug for Exp_ {
                 w.write("abort ");
                 e.ast_debug(w);
             },
-            E::Break => w.write("break"),
-            E::Continue => w.write("continue"),
+            E::Break(l) => {
+                w.write("break");
+                if let Some(l) = l {
+                    w.write(format!(" {}", l.value().as_str()));
+                }
+            },
+            E::Continue(l) => {
+                w.write("continue");
+                if let Some(l) = l {
+                    w.write(format!(" {}", l.value().as_str()));
+                }
+            },
             E::Dereference(e) => {
                 w.write("*");
                 e.ast_debug(w)

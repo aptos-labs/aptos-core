@@ -6,10 +6,9 @@ use crate::{metrics::NUM_TXNS, pipeline::CommitBlockMessage};
 use aptos_crypto::hash::HashValue;
 use aptos_db::metrics::API_LATENCY_SECONDS;
 use aptos_executor::{
-    block_executor::{BlockExecutor, TransactionBlockExecutor},
+    block_executor::BlockExecutor,
     metrics::{
-        APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
-        APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
+        BLOCK_EXECUTION_WORKFLOW_WHOLE, COMMIT_BLOCKS, GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING,
     },
 };
 use aptos_executor_types::BlockExecutorTrait;
@@ -20,6 +19,7 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::Version,
 };
+use aptos_vm::VMBlockExecutor;
 use std::{
     sync::{mpsc, Arc},
     time::{Duration, Instant},
@@ -49,62 +49,62 @@ pub(crate) fn gen_li_with_sigs(
 
 pub struct TransactionCommitter<V> {
     executor: Arc<BlockExecutor<V>>,
-    version: Version,
+    start_version: Version,
     block_receiver: mpsc::Receiver<CommitBlockMessage>,
 }
 
 impl<V> TransactionCommitter<V>
 where
-    V: TransactionBlockExecutor,
+    V: VMBlockExecutor,
 {
     pub fn new(
         executor: Arc<BlockExecutor<V>>,
-        version: Version,
+        start_version: Version,
         block_receiver: mpsc::Receiver<CommitBlockMessage>,
     ) -> Self {
         Self {
-            version,
             executor,
+            start_version,
             block_receiver,
         }
     }
 
     pub fn run(&mut self) {
-        let start_version = self.version;
-        info!("Start with version: {}", start_version);
+        info!("Start with version: {}", self.start_version);
 
         while let Ok(msg) = self.block_receiver.recv() {
             let CommitBlockMessage {
                 block_id,
-                root_hash,
                 first_block_start_time,
                 current_block_start_time,
                 partition_time,
                 execution_time,
-                num_txns,
+                output,
             } = msg;
+            let root_hash = output
+                .ledger_update_output
+                .transaction_accumulator
+                .root_hash();
+            let num_input_txns = output.num_input_transactions();
             NUM_TXNS
                 .with_label_values(&["commit"])
-                .inc_by(num_txns as u64);
+                .inc_by(num_input_txns as u64);
 
-            self.version += num_txns as u64;
-            let commit_start = std::time::Instant::now();
-            let ledger_info_with_sigs = gen_li_with_sigs(block_id, root_hash, self.version);
-            let parent_block_id = self.executor.committed_block_id();
-            self.executor
-                .pre_commit_block(block_id, parent_block_id)
-                .unwrap();
+            let version = output.expect_last_version();
+            let commit_start = Instant::now();
+            let ledger_info_with_sigs = gen_li_with_sigs(block_id, root_hash, version);
+            self.executor.pre_commit_block(block_id).unwrap();
             self.executor.commit_ledger(ledger_info_with_sigs).unwrap();
 
             report_block(
-                start_version,
-                self.version,
+                self.start_version,
+                version,
                 first_block_start_time,
                 current_block_start_time,
                 partition_time,
                 execution_time,
                 Instant::now().duration_since(commit_start),
-                num_txns,
+                num_input_txns,
             );
         }
     }
@@ -135,20 +135,20 @@ fn report_block(
         total_versions / first_block_start_time.elapsed().as_secs_f64(),
     );
     info!(
-            "Accumulative total: VM time: {:.0} secs, executor time: {:.0} secs, commit time: {:.0} secs, DB commit time: {:.0} secs",
-            APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum(),
-            APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum() - APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum(),
-            APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum(),
+            "Accumulative total: BlockSTM+VM time: {:.0} secs, executor time: {:.0} secs, commit time: {:.0} secs, DB commit time: {:.0} secs",
+            GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum(),
+            BLOCK_EXECUTION_WORKFLOW_WHOLE.get_sample_sum() - GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum(),
+            COMMIT_BLOCKS.get_sample_sum(),
             API_LATENCY_SECONDS.get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum(),
         );
     const NANOS_PER_SEC: f64 = 1_000_000_000.0;
     info!(
-            "Accumulative per transaction: VM time: {:.0} ns, executor time: {:.0} ns, commit time: {:.0} ns, DB commit time: {:.0} ns",
-            APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum() * NANOS_PER_SEC
+            "Accumulative per transaction: BlockSTM+VM time: {:.0} ns, executor time: {:.0} ns, commit time: {:.0} ns, DB commit time: {:.0} ns",
+            GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum() * NANOS_PER_SEC
                 / total_versions,
-            (APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum() - APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum()) * NANOS_PER_SEC
+            (BLOCK_EXECUTION_WORKFLOW_WHOLE.get_sample_sum() - GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.get_sample_sum()) * NANOS_PER_SEC
                 / total_versions,
-            APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum() * NANOS_PER_SEC
+            COMMIT_BLOCKS.get_sample_sum() * NANOS_PER_SEC
                 / total_versions,
             API_LATENCY_SECONDS.get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum() * NANOS_PER_SEC
                 / total_versions,

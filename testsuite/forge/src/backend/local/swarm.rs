@@ -650,6 +650,10 @@ impl Swarm for LocalSwarm {
     fn get_default_pfn_node_config(&self) -> NodeConfig {
         todo!()
     }
+
+    fn has_indexer(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug)]

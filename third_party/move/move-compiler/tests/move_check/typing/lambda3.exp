@@ -1,0 +1,6 @@
+error[E04024]: invalid usage of function type
+   ┌─ tests/move_check/typing/lambda3.move:77:18
+   │
+77 │         let _x = |i| i + 1; // expected lambda not allowed
+   │                  ^^^^^^^^^ function-typed values only allowed for inline function arguments
+

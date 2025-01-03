@@ -330,10 +330,9 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 
-<pre><code><b>pragma</b> opaque;
+<pre><code><b>pragma</b> intrinsic;
 // This enforces <a id="high-level-req-1.2" href="#high-level-req">high-level requirement 1</a>:
-<b>aborts_if</b> <b>false</b>;
-<b>ensures</b> [abstract] result == <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
+<b>aborts_if</b> [abstract] <b>false</b>;
 </code></pre>
 
 

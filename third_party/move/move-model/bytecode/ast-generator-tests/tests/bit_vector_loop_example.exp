@@ -1,0 +1,733 @@
+
+=== Processing m::is_index_set =====================================================
+--- Source
+public fun is_index_set(self: &BitVector, bit_index: u64): bool {
+        assert!(bit_index < vector::length(&self.bit_field), EINDEX);
+        *vector::borrow(&self.bit_field, bit_index)
+    }
+
+--- Stackless Bytecode
+public fun m::is_index_set($t0|self: &0x1::m::BitVector, $t1|bit_index: u64): bool {
+     var $t2: u64
+     var $t3: &0x1::m::BitVector
+     var $t4: &vector<bool>
+     var $t5: u64
+     var $t6: bool
+     var $t7: &0x1::m::BitVector
+     var $t8: &vector<bool>
+     var $t9: u64
+     var $t10: &bool
+     var $t11: bool
+     var $t12: &0x1::m::BitVector
+     var $t13: u64
+  0: $t2 := copy($t1)
+  1: $t3 := copy($t0)
+  2: $t4 := borrow_field<0x1::m::BitVector>.bit_field($t3)
+  3: $t5 := vector::length<bool>($t4)
+  4: $t6 := <($t2, $t5)
+  5: if ($t6) goto 6 else goto 13
+  6: label L1
+  7: $t7 := move($t0)
+  8: $t8 := borrow_field<0x1::m::BitVector>.bit_field($t7)
+  9: $t9 := move($t1)
+ 10: $t10 := vector::borrow<bool>($t8, $t9)
+ 11: $t11 := read_ref($t10)
+ 12: return $t11
+ 13: label L0
+ 14: $t12 := move($t0)
+ 15: drop($t12)
+ 16: $t13 := 131072
+ 17: abort($t13)
+}
+
+--- Raw Generated AST
+_t2: u64 = bit_index;
+_t3: &BitVector = self;
+_t4: &vector<bool> = select m::BitVector.bit_field(_t3);
+_t5: u64 = vector::length<bool>(_t4);
+_t6: bool = Lt(_t2, _t5);
+loop {
+  if (_t6) break;
+  _t12: &BitVector = self;
+  _t13: u64 = 131072;
+  Abort(_t13)
+};
+_t7: &BitVector = self;
+_t8: &vector<bool> = select m::BitVector.bit_field(_t7);
+_t9: u64 = bit_index;
+_t10: &bool = vector::borrow<bool>(_t8, _t9);
+_t11: bool = Deref(_t10);
+return _t11
+
+--- Assign-Transformed Generated AST
+loop {
+  if (Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self)))) break;
+  Abort(131072)
+};
+return Deref(vector::borrow<bool>(select m::BitVector.bit_field(self), bit_index))
+
+--- If-Transformed Generated AST
+if (Not(Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self))))) Abort(131072);
+return Deref(vector::borrow<bool>(select m::BitVector.bit_field(self), bit_index))
+
+--- Var-Bound Generated AST
+if (Not(Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self))))) Abort(131072);
+return Deref(vector::borrow<bool>(select m::BitVector.bit_field(self), bit_index))
+
+
+=== Processing m::set =====================================================
+--- Source
+public fun set(self: &mut BitVector, bit_index: u64) {
+        assert!(bit_index < vector::length(&self.bit_field), EINDEX);
+        let x = vector::borrow_mut(&mut self.bit_field, bit_index);
+        *x = true;
+    }
+
+--- Stackless Bytecode
+public fun m::set($t0|self: &mut 0x1::m::BitVector, $t1|bit_index: u64) {
+     var $t2|x: &mut bool
+     var $t3: u64
+     var $t4: &mut 0x1::m::BitVector
+     var $t5: &vector<bool>
+     var $t6: u64
+     var $t7: bool
+     var $t8: &mut 0x1::m::BitVector
+     var $t9: &mut vector<bool>
+     var $t10: u64
+     var $t11: &mut bool
+     var $t12: bool
+     var $t13: &mut bool
+     var $t14: &mut 0x1::m::BitVector
+     var $t15: u64
+  0: $t3 := copy($t1)
+  1: $t4 := copy($t0)
+  2: $t5 := borrow_field<0x1::m::BitVector>.bit_field($t4)
+  3: $t6 := vector::length<bool>($t5)
+  4: $t7 := <($t3, $t6)
+  5: if ($t7) goto 6 else goto 16
+  6: label L1
+  7: $t8 := move($t0)
+  8: $t9 := borrow_field<0x1::m::BitVector>.bit_field($t8)
+  9: $t10 := move($t1)
+ 10: $t11 := vector::borrow_mut<bool>($t9, $t10)
+ 11: $t2 := $t11
+ 12: $t12 := true
+ 13: $t13 := move($t2)
+ 14: write_ref($t13, $t12)
+ 15: return ()
+ 16: label L0
+ 17: $t14 := move($t0)
+ 18: drop($t14)
+ 19: $t15 := 131072
+ 20: abort($t15)
+}
+
+--- Raw Generated AST
+_t3: u64 = bit_index;
+_t4: &mut BitVector = self;
+_t5: &vector<bool> = select m::BitVector.bit_field(_t4);
+_t6: u64 = vector::length<bool>(_t5);
+_t7: bool = Lt(_t3, _t6);
+loop {
+  if (_t7) break;
+  _t14: &mut BitVector = self;
+  _t15: u64 = 131072;
+  Abort(_t15)
+};
+_t8: &mut BitVector = self;
+_t9: &mut vector<bool> = select m::BitVector.bit_field(_t8);
+_t10: u64 = bit_index;
+_t11: &mut bool = vector::borrow_mut<bool>(_t9, _t10);
+_t2: &mut bool = _t11;
+_t12: bool = true;
+_t13: &mut bool = _t2;
+_t13 = _t12;
+return Tuple()
+
+--- Assign-Transformed Generated AST
+loop {
+  if (Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self)))) break;
+  Abort(131072)
+};
+vector::borrow_mut<bool>(select m::BitVector.bit_field(self), bit_index) = true;
+return Tuple()
+
+--- If-Transformed Generated AST
+if (Not(Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self))))) Abort(131072);
+vector::borrow_mut<bool>(select m::BitVector.bit_field(self), bit_index) = true;
+return Tuple()
+
+--- Var-Bound Generated AST
+if (Not(Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self))))) Abort(131072);
+vector::borrow_mut<bool>(select m::BitVector.bit_field(self), bit_index) = true;
+return Tuple()
+
+
+=== Processing m::shift_left =====================================================
+--- Source
+public fun shift_left(self: &mut BitVector, amount: u64) {
+        if (amount >= self.length) {
+            vector::for_each_mut(&mut self.bit_field, |elem| {
+                *elem = false;
+            });
+        } else {
+            let i = amount;
+
+            while (i < self.length) {
+                if (is_index_set(self, i)) set(self, i - amount)
+                else unset(self, i - amount);
+                i = i + 1;
+            };
+
+            i = self.length - amount;
+
+            while (i < self.length) {
+                unset(self, i);
+                i = i + 1;
+            };
+        }
+    }
+
+--- Stackless Bytecode
+public fun m::shift_left($t0|self: &mut 0x1::m::BitVector, $t1|amount: u64) {
+     var $t2|$t7: &mut vector<bool>
+     var $t3|$t3: u64
+     var $t4|$t14: &mut bool
+     var $t5: u64
+     var $t6: &mut 0x1::m::BitVector
+     var $t7: &u64
+     var $t8: u64
+     var $t9: bool
+     var $t10: &mut 0x1::m::BitVector
+     var $t11: &mut vector<bool>
+     var $t12: u64
+     var $t13: u64
+     var $t14: &mut vector<bool>
+     var $t15: &vector<bool>
+     var $t16: u64
+     var $t17: bool
+     var $t18: &mut vector<bool>
+     var $t19: u64
+     var $t20: &mut bool
+     var $t21: bool
+     var $t22: &mut bool
+     var $t23: u64
+     var $t24: u64
+     var $t25: u64
+     var $t26: &mut vector<bool>
+     var $t27: u64
+     var $t28: u64
+     var $t29: &mut 0x1::m::BitVector
+     var $t30: &u64
+     var $t31: u64
+     var $t32: bool
+     var $t33: &mut 0x1::m::BitVector
+     var $t34: &0x1::m::BitVector
+     var $t35: u64
+     var $t36: bool
+     var $t37: &mut 0x1::m::BitVector
+     var $t38: u64
+     var $t39: u64
+     var $t40: u64
+     var $t41: u64
+     var $t42: u64
+     var $t43: u64
+     var $t44: &mut 0x1::m::BitVector
+     var $t45: u64
+     var $t46: u64
+     var $t47: u64
+     var $t48: &mut 0x1::m::BitVector
+     var $t49: &u64
+     var $t50: u64
+     var $t51: u64
+     var $t52: u64
+     var $t53: u64
+     var $t54: &mut 0x1::m::BitVector
+     var $t55: &u64
+     var $t56: u64
+     var $t57: bool
+     var $t58: &mut 0x1::m::BitVector
+     var $t59: u64
+     var $t60: u64
+     var $t61: u64
+     var $t62: u64
+     var $t63: &mut 0x1::m::BitVector
+  0: $t5 := copy($t1)
+  1: $t6 := copy($t0)
+  2: $t7 := borrow_field<0x1::m::BitVector>.length($t6)
+  3: $t8 := read_ref($t7)
+  4: $t9 := >=($t5, $t8)
+  5: if ($t9) goto 6 else goto 39
+  6: label L1
+  7: $t10 := move($t0)
+  8: $t11 := borrow_field<0x1::m::BitVector>.bit_field($t10)
+  9: $t2 := $t11
+ 10: $t12 := 0
+ 11: $t3 := $t12
+ 12: goto 13
+ 13: label L4
+ 14: $t13 := copy($t3)
+ 15: $t14 := copy($t2)
+ 16: $t15 := freeze_ref($t14)
+ 17: $t16 := vector::length<bool>($t15)
+ 18: $t17 := <($t13, $t16)
+ 19: if ($t17) goto 20 else goto 33
+ 20: label L3
+ 21: $t18 := copy($t2)
+ 22: $t19 := copy($t3)
+ 23: $t20 := vector::borrow_mut<bool>($t18, $t19)
+ 24: $t4 := $t20
+ 25: $t21 := false
+ 26: $t22 := move($t4)
+ 27: write_ref($t22, $t21)
+ 28: $t23 := move($t3)
+ 29: $t24 := 1
+ 30: $t25 := +($t23, $t24)
+ 31: $t3 := $t25
+ 32: goto 13
+ 33: label L2
+ 34: $t26 := move($t2)
+ 35: drop($t26)
+ 36: goto 37
+ 37: label L14
+ 38: return ()
+ 39: label L0
+ 40: $t27 := copy($t1)
+ 41: $t3 := $t27
+ 42: goto 43
+ 43: label L9
+ 44: $t28 := copy($t3)
+ 45: $t29 := copy($t0)
+ 46: $t30 := borrow_field<0x1::m::BitVector>.length($t29)
+ 47: $t31 := read_ref($t30)
+ 48: $t32 := <($t28, $t31)
+ 49: if ($t32) goto 50 else goto 76
+ 50: label L6
+ 51: $t33 := copy($t0)
+ 52: $t34 := freeze_ref($t33)
+ 53: $t35 := copy($t3)
+ 54: $t36 := m::is_index_set($t34, $t35)
+ 55: if ($t36) goto 56 else goto 69
+ 56: label L8
+ 57: $t37 := copy($t0)
+ 58: $t38 := copy($t3)
+ 59: $t39 := copy($t1)
+ 60: $t40 := -($t38, $t39)
+ 61: m::set($t37, $t40)
+ 62: goto 63
+ 63: label L10
+ 64: $t41 := move($t3)
+ 65: $t42 := 1
+ 66: $t43 := +($t41, $t42)
+ 67: $t3 := $t43
+ 68: goto 43
+ 69: label L7
+ 70: $t44 := copy($t0)
+ 71: $t45 := copy($t3)
+ 72: $t46 := copy($t1)
+ 73: $t47 := -($t45, $t46)
+ 74: m::unset($t44, $t47)
+ 75: goto 63
+ 76: label L5
+ 77: $t48 := copy($t0)
+ 78: $t49 := borrow_field<0x1::m::BitVector>.length($t48)
+ 79: $t50 := read_ref($t49)
+ 80: $t51 := move($t1)
+ 81: $t52 := -($t50, $t51)
+ 82: $t3 := $t52
+ 83: goto 84
+ 84: label L13
+ 85: $t53 := copy($t3)
+ 86: $t54 := copy($t0)
+ 87: $t55 := borrow_field<0x1::m::BitVector>.length($t54)
+ 88: $t56 := read_ref($t55)
+ 89: $t57 := <($t53, $t56)
+ 90: if ($t57) goto 91 else goto 100
+ 91: label L12
+ 92: $t58 := copy($t0)
+ 93: $t59 := copy($t3)
+ 94: m::unset($t58, $t59)
+ 95: $t60 := move($t3)
+ 96: $t61 := 1
+ 97: $t62 := +($t60, $t61)
+ 98: $t3 := $t62
+ 99: goto 84
+100: label L11
+101: $t63 := move($t0)
+102: drop($t63)
+103: goto 37
+}
+
+--- Raw Generated AST
+_t5: u64 = amount;
+_t6: &mut BitVector = self;
+_t7: &u64 = select m::BitVector.length(_t6);
+_t8: u64 = Deref(_t7);
+_t9: bool = Ge(_t5, _t8);
+loop {
+  loop {
+    loop {
+      loop {
+        if (Not(_t9)) break;
+        _t10: &mut BitVector = self;
+        _t11: &mut vector<bool> = select m::BitVector.bit_field(_t10);
+        _t2: &mut vector<bool> = _t11;
+        _t12: u64 = 0;
+        _t3: u64 = _t12;
+        break[1]
+      };
+      _t27: u64 = amount;
+      _t3: u64 = _t27;
+      break[1]
+    };
+    loop {
+      _t13: u64 = _t3;
+      _t14: &mut vector<bool> = _t2;
+      _t15: &vector<bool> = Freeze(true)(_t14);
+      _t16: u64 = vector::length<bool>(_t15);
+      _t17: bool = Lt(_t13, _t16);
+      if (Not(_t17)) break;
+      _t18: &mut vector<bool> = _t2;
+      _t19: u64 = _t3;
+      _t20: &mut bool = vector::borrow_mut<bool>(_t18, _t19);
+      _t4: &mut bool = _t20;
+      _t21: bool = false;
+      _t22: &mut bool = _t4;
+      _t22 = _t21;
+      _t23: u64 = _t3;
+      _t24: u64 = 1;
+      _t25: u64 = Add(_t23, _t24);
+      _t3: u64 = _t25;
+      continue
+    };
+    _t26: &mut vector<bool> = _t2;
+    break[1]
+  };
+  loop {
+    _t28: u64 = _t3;
+    _t29: &mut BitVector = self;
+    _t30: &u64 = select m::BitVector.length(_t29);
+    _t31: u64 = Deref(_t30);
+    _t32: bool = Lt(_t28, _t31);
+    if (Not(_t32)) break;
+    _t33: &mut BitVector = self;
+    _t34: &BitVector = Freeze(true)(_t33);
+    _t35: u64 = _t3;
+    _t36: bool = m::is_index_set(_t34, _t35);
+    loop {
+      loop {
+        if (Not(_t36)) break;
+        _t37: &mut BitVector = self;
+        _t38: u64 = _t3;
+        _t39: u64 = amount;
+        _t40: u64 = Sub(_t38, _t39);
+        m::set(_t37, _t40);
+        break[1]
+      };
+      _t44: &mut BitVector = self;
+      _t45: u64 = _t3;
+      _t46: u64 = amount;
+      _t47: u64 = Sub(_t45, _t46);
+      m::unset(_t44, _t47);
+      break
+    };
+    _t41: u64 = _t3;
+    _t42: u64 = 1;
+    _t43: u64 = Add(_t41, _t42);
+    _t3: u64 = _t43;
+    continue
+  };
+  _t48: &mut BitVector = self;
+  _t49: &u64 = select m::BitVector.length(_t48);
+  _t50: u64 = Deref(_t49);
+  _t51: u64 = amount;
+  _t52: u64 = Sub(_t50, _t51);
+  _t3: u64 = _t52;
+  loop {
+    _t53: u64 = _t3;
+    _t54: &mut BitVector = self;
+    _t55: &u64 = select m::BitVector.length(_t54);
+    _t56: u64 = Deref(_t55);
+    _t57: bool = Lt(_t53, _t56);
+    if (Not(_t57)) break;
+    _t58: &mut BitVector = self;
+    _t59: u64 = _t3;
+    m::unset(_t58, _t59);
+    _t60: u64 = _t3;
+    _t61: u64 = 1;
+    _t62: u64 = Add(_t60, _t61);
+    _t3: u64 = _t62;
+    continue
+  };
+  _t63: &mut BitVector = self;
+  break
+};
+return Tuple()
+
+--- Assign-Transformed Generated AST
+loop {
+  loop {
+    loop {
+      loop {
+        if (Not(Ge(amount, Deref(select m::BitVector.length(self))))) break;
+        _t2: &mut vector<bool> = select m::BitVector.bit_field(self);
+        _t3: u64 = 0;
+        break[1]
+      };
+      _t3: u64 = amount;
+      break[1]
+    };
+    loop {
+      if (Not(Lt(_t3, vector::length<bool>(Freeze(true)(_t2))))) break;
+      vector::borrow_mut<bool>(_t2, _t3) = false;
+      _t3: u64 = Add(_t3, 1);
+      continue
+    };
+    break[1]
+  };
+  loop {
+    if (Not(Lt(_t3, Deref(select m::BitVector.length(self))))) break;
+    loop {
+      loop {
+        if (Not(m::is_index_set(Freeze(true)(self), _t3))) break;
+        m::set(self, Sub(_t3, amount));
+        break[1]
+      };
+      m::unset(self, Sub(_t3, amount));
+      break
+    };
+    _t3: u64 = Add(_t3, 1);
+    continue
+  };
+  _t3: u64 = Sub(Deref(select m::BitVector.length(self)), amount);
+  loop {
+    if (Not(Lt(_t3, Deref(select m::BitVector.length(self))))) break;
+    m::unset(self, _t3);
+    _t3: u64 = Add(_t3, 1);
+    continue
+  };
+  break
+};
+return Tuple()
+
+--- If-Transformed Generated AST
+loop {
+  loop {
+    if Ge(amount, Deref(select m::BitVector.length(self))) {
+      _t2: &mut vector<bool> = select m::BitVector.bit_field(self);
+      _t3: u64 = 0
+    } else {
+      _t3: u64 = amount;
+      break
+    };
+    loop {
+      if (Not(Lt(_t3, vector::length<bool>(Freeze(true)(_t2))))) break;
+      vector::borrow_mut<bool>(_t2, _t3) = false;
+      _t3: u64 = Add(_t3, 1);
+      continue
+    };
+    break[1]
+  };
+  loop {
+    if (Not(Lt(_t3, Deref(select m::BitVector.length(self))))) break;
+    if m::is_index_set(Freeze(true)(self), _t3) {
+      m::set(self, Sub(_t3, amount))
+    } else {
+      m::unset(self, Sub(_t3, amount))
+    };
+    _t3: u64 = Add(_t3, 1);
+    continue
+  };
+  _t3: u64 = Sub(Deref(select m::BitVector.length(self)), amount);
+  loop {
+    if (Not(Lt(_t3, Deref(select m::BitVector.length(self))))) break;
+    m::unset(self, _t3);
+    _t3: u64 = Add(_t3, 1);
+    continue
+  };
+  break
+};
+return Tuple()
+
+--- Var-Bound Generated AST
+{
+  let _t3: u64;
+  {
+    let _t2: &mut vector<bool>;
+    loop {
+      loop {
+        if Ge(amount, Deref(select m::BitVector.length(self))) {
+          _t2: &mut vector<bool> = select m::BitVector.bit_field(self);
+          _t3: u64 = 0
+        } else {
+          _t3: u64 = amount;
+          break
+        };
+        loop {
+          if (Not(Lt(_t3, vector::length<bool>(Freeze(true)(_t2))))) break;
+          vector::borrow_mut<bool>(_t2, _t3) = false;
+          _t3: u64 = Add(_t3, 1);
+          continue
+        };
+        break[1]
+      };
+      loop {
+        if (Not(Lt(_t3, Deref(select m::BitVector.length(self))))) break;
+        if m::is_index_set(Freeze(true)(self), _t3) {
+          m::set(self, Sub(_t3, amount))
+        } else {
+          m::unset(self, Sub(_t3, amount))
+        };
+        _t3: u64 = Add(_t3, 1);
+        continue
+      };
+      _t3: u64 = Sub(Deref(select m::BitVector.length(self)), amount);
+      loop {
+        if (Not(Lt(_t3, Deref(select m::BitVector.length(self))))) break;
+        m::unset(self, _t3);
+        _t3: u64 = Add(_t3, 1);
+        continue
+      };
+      break
+    };
+    return Tuple()
+  }
+}
+
+
+=== Processing m::unset =====================================================
+--- Source
+public fun unset(self: &mut BitVector, bit_index: u64) {
+        assert!(bit_index < vector::length(&self.bit_field), EINDEX);
+        let x = vector::borrow_mut(&mut self.bit_field, bit_index);
+        *x = false;
+    }
+
+--- Stackless Bytecode
+public fun m::unset($t0|self: &mut 0x1::m::BitVector, $t1|bit_index: u64) {
+     var $t2|x: &mut bool
+     var $t3: u64
+     var $t4: &mut 0x1::m::BitVector
+     var $t5: &vector<bool>
+     var $t6: u64
+     var $t7: bool
+     var $t8: &mut 0x1::m::BitVector
+     var $t9: &mut vector<bool>
+     var $t10: u64
+     var $t11: &mut bool
+     var $t12: bool
+     var $t13: &mut bool
+     var $t14: &mut 0x1::m::BitVector
+     var $t15: u64
+  0: $t3 := copy($t1)
+  1: $t4 := copy($t0)
+  2: $t5 := borrow_field<0x1::m::BitVector>.bit_field($t4)
+  3: $t6 := vector::length<bool>($t5)
+  4: $t7 := <($t3, $t6)
+  5: if ($t7) goto 6 else goto 16
+  6: label L1
+  7: $t8 := move($t0)
+  8: $t9 := borrow_field<0x1::m::BitVector>.bit_field($t8)
+  9: $t10 := move($t1)
+ 10: $t11 := vector::borrow_mut<bool>($t9, $t10)
+ 11: $t2 := $t11
+ 12: $t12 := false
+ 13: $t13 := move($t2)
+ 14: write_ref($t13, $t12)
+ 15: return ()
+ 16: label L0
+ 17: $t14 := move($t0)
+ 18: drop($t14)
+ 19: $t15 := 131072
+ 20: abort($t15)
+}
+
+--- Raw Generated AST
+_t3: u64 = bit_index;
+_t4: &mut BitVector = self;
+_t5: &vector<bool> = select m::BitVector.bit_field(_t4);
+_t6: u64 = vector::length<bool>(_t5);
+_t7: bool = Lt(_t3, _t6);
+loop {
+  if (_t7) break;
+  _t14: &mut BitVector = self;
+  _t15: u64 = 131072;
+  Abort(_t15)
+};
+_t8: &mut BitVector = self;
+_t9: &mut vector<bool> = select m::BitVector.bit_field(_t8);
+_t10: u64 = bit_index;
+_t11: &mut bool = vector::borrow_mut<bool>(_t9, _t10);
+_t2: &mut bool = _t11;
+_t12: bool = false;
+_t13: &mut bool = _t2;
+_t13 = _t12;
+return Tuple()
+
+--- Assign-Transformed Generated AST
+loop {
+  if (Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self)))) break;
+  Abort(131072)
+};
+vector::borrow_mut<bool>(select m::BitVector.bit_field(self), bit_index) = false;
+return Tuple()
+
+--- If-Transformed Generated AST
+if (Not(Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self))))) Abort(131072);
+vector::borrow_mut<bool>(select m::BitVector.bit_field(self), bit_index) = false;
+return Tuple()
+
+--- Var-Bound Generated AST
+if (Not(Lt(bit_index, vector::length<bool>(select m::BitVector.bit_field(self))))) Abort(131072);
+vector::borrow_mut<bool>(select m::BitVector.bit_field(self), bit_index) = false;
+return Tuple()
+
+=== Sourcified Output ============================================
+module 0x1::m {
+    struct BitVector has copy, drop, store {
+        length: u64,
+        bit_field: vector<bool>,
+    }
+    public fun is_index_set(self: &BitVector, bit_index: u64): bool {
+        if (!(bit_index < 0x1::vector::length<bool>(&self.bit_field))) abort 131072;
+        *0x1::vector::borrow<bool>(&self.bit_field, bit_index)
+    }
+    public fun set(self: &mut BitVector, bit_index: u64) {
+        if (!(bit_index < 0x1::vector::length<bool>(&self.bit_field))) abort 131072;
+        *0x1::vector::borrow_mut<bool>(&mut self.bit_field, bit_index) = true;
+    }
+    public fun shift_left(self: &mut BitVector, amount: u64) {
+        let _t3;
+        let _t2;
+        'l0: loop {
+            loop {
+                if (amount >= *&self.length) {
+                    _t2 = &mut self.bit_field;
+                    _t3 = 0
+                } else {
+                    _t3 = amount;
+                    break
+                };
+                while (_t3 < 0x1::vector::length<bool>(/*freeze*/_t2)) {
+                    *0x1::vector::borrow_mut<bool>(_t2, _t3) = false;
+                    _t3 = _t3 + 1
+                };
+                break 'l0
+            };
+            while (_t3 < *&self.length) {
+                if (is_index_set(/*freeze*/self, _t3)) set(self, _t3 - amount) else unset(self, _t3 - amount);
+                _t3 = _t3 + 1
+            };
+            _t3 = *&self.length - amount;
+            while (_t3 < *&self.length) {
+                unset(self, _t3);
+                _t3 = _t3 + 1
+            };
+            break
+        };
+    }
+    public fun unset(self: &mut BitVector, bit_index: u64) {
+        if (!(bit_index < 0x1::vector::length<bool>(&self.bit_field))) abort 131072;
+        *0x1::vector::borrow_mut<bool>(&mut self.bit_field, bit_index) = false;
+    }
+}

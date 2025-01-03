@@ -117,7 +117,6 @@ impl EventHandle {
         }
     }
 
-    #[cfg(any(test, feature = "fuzzing"))]
     pub fn count_mut(&mut self) -> &mut u64 {
         &mut self.count
     }

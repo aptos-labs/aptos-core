@@ -1,0 +1,16 @@
+
+Diagnostics:
+error: Only inline functions may have function-typed parameters, but non-inline function `simple_map::map_ref` has a function parameter:
+   ┌─ tests/lambda/inline-parity/simple_map_keys.move:23:15
+   │
+23 │    public fun map_ref<Element, NewElement>(
+   │               ^^^^^^^
+24 │         v: &vector<Element>,
+25 │         f: |&Element|NewElement
+   │         - Parameter `f` has function-valued type `|&Element|NewElement`.
+
+error: Only inline functions may have function-typed parameters, but non-inline function `simple_map::for_each_ref` has a function parameter:
+   ┌─ tests/lambda/inline-parity/simple_map_keys.move:32:16
+   │
+32 │     public fun for_each_ref<Element>(v: &vector<Element>, f: |&Element|) {
+   │                ^^^^^^^^^^^^                               - Parameter `f` has function-valued type `|&Element|`.

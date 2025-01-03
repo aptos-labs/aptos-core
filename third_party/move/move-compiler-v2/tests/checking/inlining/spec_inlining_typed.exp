@@ -56,5 +56,56 @@ module 0x42::Test {
     }
 } // end 0x42::Test
 
+// -- Sourcified model before bytecode pipeline
+module 0x42::Test {
+    inline fun apply(v: u64, predicate: |u64|bool): bool {
+
+        /* spec {
+          assert Ge($t0, 0);
+        }
+         */
+        ;
+        predicate(v)
+    }
+    public fun test_apply(x: u64) {
+        let r1 = {
+            let (v) = (x);
+
+            /* spec {
+              assert Ge(v, 0);
+            }
+             */
+            ;
+            let (v) = (v);
+            v >= 0
+        };
+
+        /* spec {
+          assert r1;
+        }
+         */
+        ;
+        if (r1) () else abort 1;
+        let r2 = {
+            let (v) = (x);
+
+            /* spec {
+              assert Ge(v, 0);
+            }
+             */
+            ;
+            let (v) = (v);
+            v != 0
+        };
+
+        /* spec {
+          assert r2;
+        }
+         */
+        ;
+        if (r2) () else abort 2;
+    }
+}
+
 
 ============ bytecode verification succeeded ========

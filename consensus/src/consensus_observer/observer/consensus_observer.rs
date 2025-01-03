@@ -16,8 +16,12 @@ use crate::{
             },
         },
         observer::{
-            active_state::ActiveObserverState, ordered_blocks::OrderedBlockStore,
-            payload_store::BlockPayloadStore, pending_blocks::PendingBlockStore,
+            active_state::ActiveObserverState,
+            fallback_manager::ObserverFallbackManager,
+            ordered_blocks::OrderedBlockStore,
+            payload_store::BlockPayloadStore,
+            pending_blocks::{PendingBlockStore, PendingBlockWithMetadata},
+            state_sync_manager::{StateSyncManager, StateSyncNotification},
             subscription_manager::SubscriptionManager,
         },
         publisher::consensus_publisher::ConsensusPublisher,
@@ -25,36 +29,40 @@ use crate::{
     dag::DagCommitSigner,
     network::{IncomingCommitRequest, IncomingRandGenRequest},
     network_interface::CommitMessage,
-    pipeline::execution_client::TExecutionClient,
+    pipeline::{execution_client::TExecutionClient, pipeline_builder::PipelineBuilder},
 };
 use aptos_channels::{aptos_channel, aptos_channel::Receiver, message_queues::QueueStyle};
 use aptos_config::{
     config::{ConsensusObserverConfig, NodeConfig},
     network_id::PeerNetworkId,
 };
-use aptos_consensus_types::{pipeline, pipelined_block::PipelinedBlock};
+use aptos_consensus_types::{
+    pipeline,
+    pipelined_block::{PipelineFutures, PipelinedBlock},
+};
 use aptos_crypto::{bls12381, Genesis};
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
+use aptos_executor_types::state_compute_result::StateComputeResult;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, error, info, warn};
 use aptos_network::{
     application::interface::NetworkClient, protocols::wire::handshake::v1::ProtocolId,
 };
-use aptos_reliable_broadcast::DropGuard;
 use aptos_storage_interface::DbReader;
 use aptos_time_service::TimeService;
 use aptos_types::{
     block_info::{BlockInfo, Round},
     epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
     validator_signer::ValidatorSigner,
 };
-use futures::{
-    future::{AbortHandle, Abortable},
-    StreamExt,
-};
+use futures::StreamExt;
 use futures_channel::oneshot;
 use move_core_types::account_address::AccountAddress;
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::{sync::mpsc::UnboundedSender, time::interval};
 use tokio_stream::wrappers::IntervalStream;
 
@@ -78,15 +86,17 @@ pub struct ConsensusObserver {
     // The execution client to the buffer manager
     execution_client: Arc<dyn TExecutionClient>,
 
-    // The sender to notify the observer that state syncing to the (epoch, round) has completed
-    sync_notification_sender: UnboundedSender<(u64, Round)>,
+    // The observer fallback manager
+    observer_fallback_manager: ObserverFallbackManager,
 
-    // If the sync handle is set it indicates that we're in state sync mode.
-    // The flag indicates if we're waiting to transition to a new epoch.
-    sync_handle: Option<(DropGuard, bool)>,
+    // The state sync manager
+    state_sync_manager: StateSyncManager,
 
     // The consensus observer subscription manager
     subscription_manager: SubscriptionManager,
+
+    // Pipeline builder
+    pipeline_builder: Option<PipelineBuilder>,
 }
 
 impl ConsensusObserver {
@@ -97,13 +107,27 @@ impl ConsensusObserver {
         >,
         db_reader: Arc<dyn DbReader>,
         execution_client: Arc<dyn TExecutionClient>,
-        sync_notification_sender: UnboundedSender<(u64, Round)>,
+        state_sync_notification_sender: UnboundedSender<StateSyncNotification>,
         reconfig_events: Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
         time_service: TimeService,
     ) -> Self {
         // Get the consensus observer config
         let consensus_observer_config = node_config.consensus_observer;
+
+        // Create the observer fallback manager
+        let observer_fallback_manager = ObserverFallbackManager::new(
+            consensus_observer_config,
+            db_reader.clone(),
+            time_service.clone(),
+        );
+
+        // Create the state sync manager
+        let state_sync_manager = StateSyncManager::new(
+            consensus_observer_config,
+            execution_client.clone(),
+            state_sync_notification_sender,
+        );
 
         // Create the subscription manager
         let subscription_manager = SubscriptionManager::new(
@@ -132,9 +156,10 @@ impl ConsensusObserver {
             block_payload_store: Arc::new(Mutex::new(block_payload_store)),
             pending_block_store: Arc::new(Mutex::new(pending_block_store)),
             execution_client,
-            sync_notification_sender,
-            sync_handle: None,
+            observer_fallback_manager,
+            state_sync_manager,
             subscription_manager,
+            pipeline_builder: None,
         }
     }
 
@@ -154,14 +179,34 @@ impl ConsensusObserver {
         debug!(LogSchema::new(LogEntry::ConsensusObserver)
             .message("Checking consensus observer progress!"));
 
-        // If we're in state sync mode, we should wait for state sync to complete
-        if self.in_state_sync_mode() {
+        // If we've fallen back to state sync, we should wait for it to complete
+        if self.state_sync_manager.in_fallback_mode() {
+            info!(LogSchema::new(LogEntry::ConsensusObserver)
+                .message("Waiting for state sync to complete fallback syncing!",));
+            return;
+        }
+
+        // If state sync is syncing to a commit decision, we should wait for it to complete
+        if self.state_sync_manager.is_syncing_to_commit() {
             info!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Waiting for state sync to reach target: {:?}!",
+                    "Waiting for state sync to reach commit decision: {:?}!",
                     self.active_observer_state.root().commit_info()
                 ))
             );
+            return;
+        }
+
+        // Check if we need to fallback to state sync
+        if let Err(error) = self.observer_fallback_manager.check_syncing_progress() {
+            // Log the error and enter fallback mode
+            warn!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Failed to make syncing progress! Entering fallback mode! Error: {:?}",
+                    error
+                ))
+            );
+            self.enter_fallback_mode().await;
             return;
         }
 
@@ -205,6 +250,18 @@ impl ConsensusObserver {
         metrics::increment_counter_without_labels(&metrics::OBSERVER_CLEARED_BLOCK_STATE);
     }
 
+    /// Enters fallback mode for consensus observer by invoking state sync
+    async fn enter_fallback_mode(&mut self) {
+        // Terminate all active subscriptions (to ensure we don't process any more messages)
+        self.subscription_manager.terminate_all_subscriptions();
+
+        // Clear all the pending block state
+        self.clear_pending_block_state().await;
+
+        // Start syncing for the fallback
+        self.state_sync_manager.sync_for_fallback();
+    }
+
     /// Finalizes the ordered block by sending it to the execution pipeline
     async fn finalize_ordered_block(&mut self, ordered_block: OrderedBlock) {
         info!(
@@ -215,10 +272,12 @@ impl ConsensusObserver {
         );
 
         // Create the commit callback (to be called after the execution pipeline)
-        let commit_callback = self.active_observer_state.create_commit_callback(
-            self.ordered_block_store.clone(),
-            self.block_payload_store.clone(),
-        );
+        let commit_callback = self
+            .active_observer_state
+            .create_commit_callback_deprecated(
+                self.ordered_block_store.clone(),
+                self.block_payload_store.clone(),
+            );
 
         // Send the ordered block to the execution pipeline
         if let Err(error) = self
@@ -288,35 +347,40 @@ impl ConsensusObserver {
     /// Returns the last ordered block
     fn get_last_ordered_block(&self) -> BlockInfo {
         if let Some(last_ordered_block) = self.ordered_block_store.lock().get_last_ordered_block() {
-            last_ordered_block
+            last_ordered_block.block_info()
         } else {
             // Return the root ledger info
             self.active_observer_state.root().commit_info().clone()
         }
     }
 
-    /// Returns true iff we are waiting for state sync to complete an epoch change
-    fn in_state_sync_epoch_change(&self) -> bool {
-        matches!(self.sync_handle, Some((_, true)))
-    }
-
-    /// Returns true iff we are waiting for state sync to complete
-    fn in_state_sync_mode(&self) -> bool {
-        self.sync_handle.is_some()
+    /// Returns the last block's pipeline futures, should only be called when pipeline is enabled
+    fn get_last_pipeline_futs(&self) -> PipelineFutures {
+        if let Some(last_ordered_block) = self.ordered_block_store.lock().get_last_ordered_block() {
+            last_ordered_block
+                .pipeline_futs()
+                .expect("Pipeline futures should exist when enabled")
+        } else {
+            self.pipeline_builder().build_root(
+                StateComputeResult::new_dummy(),
+                self.active_observer_state.root().clone(),
+            )
+        }
     }
 
     /// Orders any ready pending blocks for the given epoch and round
     async fn order_ready_pending_block(&mut self, block_epoch: u64, block_round: Round) {
         // Get any ready ordered block
-        let ready_ordered_block = self.pending_block_store.lock().remove_ready_block(
+        let pending_block_with_metadata = self.pending_block_store.lock().remove_ready_block(
             block_epoch,
             block_round,
             self.block_payload_store.clone(),
         );
 
         // Process the ready ordered block (if it exists)
-        if let Some(ready_ordered_block) = ready_ordered_block {
-            self.process_ordered_block(ready_ordered_block).await;
+        if let Some(pending_block_with_metadata) = pending_block_with_metadata {
+            self.process_ordered_block(pending_block_with_metadata)
+                .await;
         }
     }
 
@@ -324,6 +388,7 @@ impl ConsensusObserver {
     async fn process_block_payload_message(
         &mut self,
         peer_network_id: PeerNetworkId,
+        message_received_time: Instant,
         block_payload: BlockPayload,
     ) {
         // Get the epoch and round for the block
@@ -380,6 +445,13 @@ impl ConsensusObserver {
             false // We can't verify the signatures yet
         };
 
+        // Update the latency metrics for block payload processing
+        update_message_processing_latency_metrics(
+            message_received_time,
+            &peer_network_id,
+            metrics::BLOCK_PAYLOAD_LABEL,
+        );
+
         // Update the payload store with the payload
         self.block_payload_store
             .lock()
@@ -398,6 +470,7 @@ impl ConsensusObserver {
     fn process_commit_decision_message(
         &mut self,
         peer_network_id: PeerNetworkId,
+        message_received_time: Instant,
         commit_decision: CommitDecision,
     ) {
         // Get the commit decision epoch and round
@@ -429,6 +502,13 @@ impl ConsensusObserver {
                 return;
             }
 
+            // Update the latency metrics for commit processing
+            update_message_processing_latency_metrics(
+                message_received_time,
+                &peer_network_id,
+                metrics::COMMIT_DECISION_LABEL,
+            );
+
             // Update the pending blocks with the commit decision
             if self.process_commit_decision_for_pending_block(&commit_decision) {
                 return; // The commit decision was successfully processed
@@ -445,7 +525,7 @@ impl ConsensusObserver {
         if epoch_changed || commit_round > last_block.round() {
             // If we're waiting for state sync to transition into a new epoch,
             // we should just wait and not issue a new state sync request.
-            if self.in_state_sync_epoch_change() {
+            if self.state_sync_manager.is_syncing_through_epoch() {
                 info!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                         "Already waiting for state sync to reach new epoch: {:?}. Dropping commit decision: {:?}!",
@@ -456,15 +536,8 @@ impl ConsensusObserver {
                 return;
             }
 
-            // Otherwise, we should start the state sync process
-            info!(
-                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Started syncing to {}!",
-                    commit_decision.proof_block_info()
-                ))
-            );
-
-            // Update the root and clear the pending blocks (up to the commit)
+            // Otherwise, we should start the state sync process for the commit.
+            // Update the root and clear the pending blocks (up to the commit).
             self.active_observer_state
                 .update_root(commit_decision.commit_proof().clone());
             self.block_payload_store
@@ -474,15 +547,9 @@ impl ConsensusObserver {
                 .lock()
                 .remove_blocks_for_commit(commit_decision.commit_proof());
 
-            // Start the state sync process
-            let abort_handle = sync_to_commit_decision(
-                commit_decision,
-                commit_epoch,
-                commit_round,
-                self.execution_client.clone(),
-                self.sync_notification_sender.clone(),
-            );
-            self.sync_handle = Some((DropGuard::new(abort_handle), epoch_changed));
+            // Start state syncing to the commit decision
+            self.state_sync_manager
+                .sync_to_commit(commit_decision, epoch_changed);
         }
     }
 
@@ -510,8 +577,8 @@ impl ConsensusObserver {
                     .lock()
                     .update_commit_decision(commit_decision);
 
-                // If we are not in sync mode, forward the commit decision to the execution pipeline
-                if !self.in_state_sync_mode() {
+                // If state sync is not syncing to a commit, forward the commit decision to the execution pipeline
+                if !self.state_sync_manager.is_syncing_to_commit() {
                     info!(
                         LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                             "Forwarding commit decision to the execution pipeline: {}",
@@ -530,7 +597,8 @@ impl ConsensusObserver {
 
     /// Processes a network message received by the consensus observer
     async fn process_network_message(&mut self, network_message: ConsensusObserverNetworkMessage) {
-        // Unpack the network message
+        // Unpack the network message and note the received time
+        let message_received_time = Instant::now();
         let (peer_network_id, message) = network_message.into_parts();
 
         // Verify the message is from the peers we've subscribed to
@@ -565,15 +633,27 @@ impl ConsensusObserver {
         // Process the message based on the type
         match message {
             ConsensusObserverDirectSend::OrderedBlock(ordered_block) => {
-                self.process_ordered_block_message(peer_network_id, ordered_block)
-                    .await;
+                self.process_ordered_block_message(
+                    peer_network_id,
+                    message_received_time,
+                    ordered_block,
+                )
+                .await;
             },
             ConsensusObserverDirectSend::CommitDecision(commit_decision) => {
-                self.process_commit_decision_message(peer_network_id, commit_decision);
+                self.process_commit_decision_message(
+                    peer_network_id,
+                    message_received_time,
+                    commit_decision,
+                );
             },
             ConsensusObserverDirectSend::BlockPayload(block_payload) => {
-                self.process_block_payload_message(peer_network_id, block_payload)
-                    .await;
+                self.process_block_payload_message(
+                    peer_network_id,
+                    message_received_time,
+                    block_payload,
+                )
+                .await;
             },
         }
 
@@ -585,6 +665,7 @@ impl ConsensusObserver {
     async fn process_ordered_block_message(
         &mut self,
         peer_network_id: PeerNetworkId,
+        message_received_time: Instant,
         ordered_block: OrderedBlock,
     ) {
         // Verify the ordered blocks before processing
@@ -622,20 +703,32 @@ impl ConsensusObserver {
         // Update the metrics for the received ordered block
         update_metrics_for_ordered_block_message(peer_network_id, &ordered_block);
 
+        // Create a new pending block with metadata
+        let pending_block_with_metadata =
+            PendingBlockWithMetadata::new(peer_network_id, message_received_time, ordered_block);
+
         // If all payloads exist, process the block. Otherwise, store it
         // in the pending block store and wait for the payloads to arrive.
-        if self.all_payloads_exist(ordered_block.blocks()) {
-            self.process_ordered_block(ordered_block).await;
+        if self.all_payloads_exist(pending_block_with_metadata.ordered_block().blocks()) {
+            self.process_ordered_block(pending_block_with_metadata)
+                .await;
         } else {
             self.pending_block_store
                 .lock()
-                .insert_pending_block(ordered_block);
+                .insert_pending_block(pending_block_with_metadata);
         }
     }
 
     /// Processes the ordered block. This assumes the ordered block
     /// has been sanity checked and that all payloads exist.
-    async fn process_ordered_block(&mut self, ordered_block: OrderedBlock) {
+    async fn process_ordered_block(
+        &mut self,
+        pending_block_with_metadata: PendingBlockWithMetadata,
+    ) {
+        // Unpack the pending block
+        let (peer_network_id, message_received_time, ordered_block) =
+            pending_block_with_metadata.into_parts();
+
         // Verify the ordered block proof
         let epoch_state = self.get_epoch_state();
         if ordered_block.proof_block_info().epoch() == epoch_state.epoch {
@@ -679,13 +772,33 @@ impl ConsensusObserver {
         // The block was verified correctly. If the block is a child of our
         // last block, we can insert it into the ordered block store.
         if self.get_last_ordered_block().id() == ordered_block.first_block().parent_id() {
+            // Update the latency metrics for ordered block processing
+            update_message_processing_latency_metrics(
+                message_received_time,
+                &peer_network_id,
+                metrics::ORDERED_BLOCK_LABEL,
+            );
+
+            if self.pipeline_enabled() {
+                for block in ordered_block.blocks() {
+                    let commit_callback = self.active_observer_state.create_commit_callback(
+                        self.ordered_block_store.clone(),
+                        self.block_payload_store.clone(),
+                    );
+                    self.pipeline_builder().build(
+                        block,
+                        self.get_last_pipeline_futs(),
+                        commit_callback,
+                    );
+                }
+            }
             // Insert the ordered block into the pending blocks
             self.ordered_block_store
                 .lock()
                 .insert_ordered_block(ordered_block.clone());
 
-            // If we're not in sync mode, finalize the ordered blocks
-            if !self.in_state_sync_mode() {
+            // If state sync is not syncing to a commit, finalize the ordered blocks
+            if !self.state_sync_manager.is_syncing_to_commit() {
                 self.finalize_ordered_block(ordered_block).await;
             }
         } else {
@@ -698,34 +811,121 @@ impl ConsensusObserver {
         }
     }
 
-    /// Processes the sync complete notification for the given epoch and round
-    async fn process_sync_notification(&mut self, epoch: u64, round: Round) {
-        // Log the sync notification
+    /// Processes the given state sync notification
+    async fn process_state_sync_notification(
+        &mut self,
+        state_sync_notification: StateSyncNotification,
+    ) {
+        // Process the state sync notification based on the type
+        match state_sync_notification {
+            StateSyncNotification::FallbackSyncCompleted(latest_synced_ledger_info) => {
+                self.process_fallback_sync_notification(latest_synced_ledger_info)
+                    .await
+            },
+            StateSyncNotification::CommitSyncCompleted(latest_synced_ledger_info) => {
+                self.process_commit_sync_notification(latest_synced_ledger_info)
+                    .await
+            },
+        }
+    }
+
+    /// Processes the state sync notification for the fallback sync
+    async fn process_fallback_sync_notification(
+        &mut self,
+        latest_synced_ledger_info: LedgerInfoWithSignatures,
+    ) {
+        // Get the epoch and round for the latest synced ledger info
+        let ledger_info = latest_synced_ledger_info.ledger_info();
+        let epoch = ledger_info.epoch();
+        let round = ledger_info.round();
+
+        // Log the state sync notification
         info!(
             LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                "Received sync complete notification for epoch {}, round: {}",
+                "Received state sync notification for fallback completion! Epoch {}, round: {}!",
                 epoch, round
             ))
         );
 
-        // Verify that the sync notification is for the current epoch and round
+        // Verify that there is an active fallback sync
+        if !self.state_sync_manager.in_fallback_mode() {
+            // Log the error and return early
+            error!(LogSchema::new(LogEntry::ConsensusObserver).message(
+                "Failed to process fallback sync notification! No active fallback sync found!"
+            ));
+            return;
+        }
+
+        // Reset the fallback manager state
+        self.observer_fallback_manager
+            .reset_syncing_progress(&latest_synced_ledger_info);
+
+        // Update the root with the latest synced ledger info
+        self.active_observer_state
+            .update_root(latest_synced_ledger_info);
+
+        // If the epoch has changed, end the current epoch and start the latest one
+        let current_epoch_state = self.get_epoch_state();
+        if epoch > current_epoch_state.epoch {
+            // Wait for the latest epoch to start
+            self.execution_client.end_epoch().await;
+            self.wait_for_epoch_start().await;
+        };
+
+        // Reset the pending block state
+        self.clear_pending_block_state().await;
+
+        // Reset the state sync manager for the synced fallback
+        self.state_sync_manager.clear_active_fallback_sync();
+    }
+
+    /// Processes the state sync notification for the commit decision
+    async fn process_commit_sync_notification(
+        &mut self,
+        latest_synced_ledger_info: LedgerInfoWithSignatures,
+    ) {
+        // Get the epoch and round for the synced commit decision
+        let ledger_info = latest_synced_ledger_info.ledger_info();
+        let epoch = ledger_info.epoch();
+        let round = ledger_info.round();
+
+        // Log the state sync notification
+        info!(
+            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                "Received state sync notification for commit completion! Epoch {}, round: {}!",
+                epoch, round
+            ))
+        );
+
+        // Verify that there is an active commit sync
+        if !self.state_sync_manager.is_syncing_to_commit() {
+            // Log the error and return early
+            error!(LogSchema::new(LogEntry::ConsensusObserver).message(
+                "Failed to process commit sync notification! No active commit sync found!"
+            ));
+            return;
+        }
+
+        // Verify that the state sync notification is for the current epoch and round
         if !self
             .active_observer_state
             .check_root_epoch_and_round(epoch, round)
         {
-            info!(
+            // Log the error, reset the state sync manager and return early
+            error!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Received invalid sync notification for epoch: {}, round: {}! Current root: {:?}",
+                    "Received invalid commit sync notification for epoch: {}, round: {}! Current root: {:?}",
                     epoch, round, self.active_observer_state.root()
                 ))
             );
+            self.state_sync_manager.clear_active_commit_sync();
             return;
         }
 
-        // If the epoch has changed, end the current epoch and start the new one
+        // If the epoch has changed, end the current epoch and start the latest one
         let current_epoch_state = self.get_epoch_state();
         if epoch > current_epoch_state.epoch {
-            // Wait for the next epoch to start
+            // Wait for the latest epoch to start
             self.execution_client.end_epoch().await;
             self.wait_for_epoch_start().await;
 
@@ -743,8 +943,8 @@ impl ConsensusObserver {
             }
         };
 
-        // Reset and drop the sync handle
-        self.sync_handle = None;
+        // Reset the state sync manager for the synced commit decision
+        self.state_sync_manager.clear_active_commit_sync();
 
         // Process all the newly ordered blocks
         let all_ordered_blocks = self.ordered_block_store.lock().get_all_ordered_blocks();
@@ -797,9 +997,9 @@ impl ConsensusObserver {
             aptos_channel::new::<AccountAddress, IncomingRandGenRequest>(QueueStyle::FIFO, 1, None);
         self.execution_client
             .start_epoch(
-                Some(sk),
+                sk,
                 epoch_state.clone(),
-                dummy_signer,
+                dummy_signer.clone(),
                 payload_manager,
                 &consensus_config,
                 &execution_config,
@@ -810,6 +1010,9 @@ impl ConsensusObserver {
                 0,
             )
             .await;
+        if self.pipeline_enabled() {
+            self.pipeline_builder = Some(self.execution_client.pipeline_builder(signer))
+        }
     }
 
     /// Starts the consensus observer loop that processes incoming
@@ -818,7 +1021,9 @@ impl ConsensusObserver {
         mut self,
         consensus_observer_config: ConsensusObserverConfig,
         mut consensus_observer_message_receiver: Receiver<(), ConsensusObserverNetworkMessage>,
-        mut sync_notification_listener: tokio::sync::mpsc::UnboundedReceiver<(u64, Round)>,
+        mut state_sync_notification_listener: tokio::sync::mpsc::UnboundedReceiver<
+            StateSyncNotification,
+        >,
     ) {
         // Create a progress check ticker
         let mut progress_check_interval = IntervalStream::new(interval(Duration::from_millis(
@@ -826,7 +1031,7 @@ impl ConsensusObserver {
         )))
         .fuse();
 
-        // Wait for the epoch to start
+        // Wait for the latest epoch to start
         self.wait_for_epoch_start().await;
 
         // Start the consensus observer loop
@@ -837,8 +1042,8 @@ impl ConsensusObserver {
                 Some(network_message) = consensus_observer_message_receiver.next() => {
                     self.process_network_message(network_message).await;
                 }
-                Some((epoch, round)) = sync_notification_listener.recv() => {
-                    self.process_sync_notification(epoch, round).await;
+                Some(state_sync_notification) = state_sync_notification_listener.recv() => {
+                    self.process_state_sync_notification(state_sync_notification).await;
                 },
                 _ = progress_check_interval.select_next_some() => {
                     self.check_progress().await;
@@ -853,6 +1058,18 @@ impl ConsensusObserver {
         error!(LogSchema::new(LogEntry::ConsensusObserver)
             .message("The consensus observer loop exited unexpectedly!"));
     }
+
+    /// Returns whether the pipeline is enabled
+    pub fn pipeline_enabled(&self) -> bool {
+        self.active_observer_state.pipeline_enabled()
+    }
+
+    /// Returns the builder, should only be called if pipeline is enabled
+    pub fn pipeline_builder(&self) -> &PipelineBuilder {
+        self.pipeline_builder
+            .as_ref()
+            .expect("Pipeline builder should exist")
+    }
 }
 
 /// Logs the received message using an appropriate log level
@@ -866,45 +1083,22 @@ fn log_received_message(message: String) {
     }
 }
 
-/// Spawns a task to sync to the given commit decision and notifies
-/// the consensus observer. Also, returns an abort handle to cancel the task.
-fn sync_to_commit_decision(
-    commit_decision: CommitDecision,
-    decision_epoch: u64,
-    decision_round: Round,
-    execution_client: Arc<dyn TExecutionClient>,
-    sync_notification_sender: UnboundedSender<(u64, Round)>,
-) -> AbortHandle {
-    let (abort_handle, abort_registration) = AbortHandle::new_pair();
-    tokio::spawn(Abortable::new(
-        async move {
-            // Sync to the commit decision
-            if let Err(error) = execution_client
-                .clone()
-                .sync_to(commit_decision.commit_proof().clone())
-                .await
-            {
-                warn!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Failed to sync to commit decision: {:?}! Error: {:?}",
-                        commit_decision, error
-                    ))
-                );
-            }
+/// Updates the message processing latency metrics
+fn update_message_processing_latency_metrics(
+    message_received_time: Instant,
+    peer_network_id: &PeerNetworkId,
+    message_label: &str,
+) {
+    // Calculate the message processing duration
+    let processing_duration_secs = message_received_time.elapsed().as_secs_f64();
 
-            // Notify the consensus observer that the sync is complete
-            if let Err(error) = sync_notification_sender.send((decision_epoch, decision_round)) {
-                error!(
-                    LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Failed to send sync notification for decision epoch: {:?}, round: {:?}! Error: {:?}",
-                        decision_epoch, decision_round, error
-                    ))
-                );
-            }
-        },
-        abort_registration,
-    ));
-    abort_handle
+    // Update the processing latency metrics
+    metrics::observe_value_with_label(
+        &metrics::OBSERVER_MESSAGE_PROCESSING_LATENCIES,
+        message_label,
+        peer_network_id,
+        processing_duration_secs,
+    );
 }
 
 /// Updates the metrics for the received block payload message

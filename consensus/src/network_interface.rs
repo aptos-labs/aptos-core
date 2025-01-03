@@ -18,6 +18,7 @@ use aptos_consensus_types::{
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
+    round_timeout::RoundTimeoutMsg,
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
 };
@@ -80,6 +81,8 @@ pub enum ConsensusMsg {
     /// OrderVoteMsg is the struct that is broadcasted by a validator on receiving quorum certificate
     /// on a block.
     OrderVoteMsg(Box<OrderVoteMsg>),
+    /// RoundTimeoutMsg is broadcasted by a validator once it decides to timeout the current round.
+    RoundTimeoutMsg(Box<RoundTimeoutMsg>),
 }
 
 /// Network type for consensus
@@ -107,6 +110,7 @@ impl ConsensusMsg {
             ConsensusMsg::CommitMessage(_) => "CommitMessage",
             ConsensusMsg::RandGenMessage(_) => "RandGenMessage",
             ConsensusMsg::BatchResponseV2(_) => "BatchResponseV2",
+            ConsensusMsg::RoundTimeoutMsg(_) => "RoundTimeoutV2",
         }
     }
 }

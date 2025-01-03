@@ -1,0 +1,9 @@
+[package]
+name = "fa_double_transfer"
+version = "1.0.0"
+authors = []
+
+[addresses]
+
+[dependencies]
+AptosFramework = { local = "../../../../../../aptos-move/framework/aptos-framework" }

@@ -82,7 +82,7 @@ fn run_test_impl(
                 .into())
             },
             (true, _) => match BuildPlan::create(resolved_package)
-                .and_then(|bp| bp.compile_no_exit(&compiler_config.clone(), &mut Vec::new()))
+                .and_then(|bp| bp.compile_no_exit(&compiler_config.clone(), vec![], &mut vec![]))
             {
                 Ok((mut pkg, _)) => {
                     pkg.compiled_package_info.source_digest =
@@ -124,7 +124,7 @@ fn check_or_update(
     update_baseline: bool,
     compiler_version: CompilerVersion,
 ) -> datatest_stable::Result<()> {
-    let exp_ext = if compiler_version == CompilerVersion::V2_0 {
+    let exp_ext = if compiler_version != CompilerVersion::V1 {
         EXP_EXT_V2
     } else {
         EXP_EXT

@@ -3,7 +3,7 @@
 
 use crate::{
     account_address::AccountAddress,
-    contract_event::EventWithVersion,
+    contract_event::{ContractEventV1, ContractEventV2, EventWithVersion},
     event::EventKey,
     state_store::{
         state_key::{prefix::StateKeyPrefix, StateKey},
@@ -60,6 +60,7 @@ pub trait IndexerReader: Send + Sync {
     ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>>;
 
     fn get_latest_internal_indexer_ledger_version(&self) -> Result<Option<Version>>;
+    fn get_latest_table_info_ledger_version(&self) -> Result<Option<Version>>;
 
     #[cfg(any(test, feature = "fuzzing"))]
     fn wait_for_internal_indexer(&self, version: Version) -> Result<()> {
@@ -72,4 +73,11 @@ pub trait IndexerReader: Send + Sync {
 
         Ok(())
     }
+    fn get_translated_v1_event_by_version_and_index(
+        &self,
+        version: Version,
+        index: u64,
+    ) -> Result<ContractEventV1>;
+
+    fn translate_event_v2_to_v1(&self, v2: &ContractEventV2) -> Result<Option<ContractEventV1>>;
 }

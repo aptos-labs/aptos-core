@@ -64,7 +64,7 @@ impl AptosTapError {
     pub fn status_and_retry_after(&self) -> (StatusCode, Option<u64>) {
         let (mut status_code, mut retry_after) = (self.error_code.status(), None);
         for rejection_reason in &self.rejection_reasons {
-            if rejection_reason.code == RejectionReasonCode::IpUsageLimitExhausted {
+            if rejection_reason.code == RejectionReasonCode::UsageLimitExhausted {
                 status_code = StatusCode::TOO_MANY_REQUESTS;
                 retry_after = rejection_reason.retry_after;
                 break;
@@ -134,6 +134,9 @@ pub enum AptosTapErrorCode {
     /// The user tried to call an endpoint that is not enabled.
     EndpointNotEnabled = 45,
 
+    /// The user provided an invalid auth token.
+    AuthTokenInvalid = 46,
+
     /// Failed when making requests to the Aptos API.
     AptosApiError = 50,
 
@@ -170,7 +173,8 @@ impl AptosTapErrorCode {
             | AptosTapErrorCode::EndpointNotEnabled => StatusCode::BAD_REQUEST,
             AptosTapErrorCode::Rejected
             | AptosTapErrorCode::SourceIpMissing
-            | AptosTapErrorCode::TransactionFailed => StatusCode::FORBIDDEN,
+            | AptosTapErrorCode::TransactionFailed
+            | AptosTapErrorCode::AuthTokenInvalid => StatusCode::FORBIDDEN,
             AptosTapErrorCode::AptosApiError
             | AptosTapErrorCode::TransactionTimedOut
             | AptosTapErrorCode::SerializationError
@@ -233,8 +237,8 @@ pub enum RejectionReasonCode {
     /// Account already has funds.
     AccountAlreadyExists = 100,
 
-    /// IP has exhausted its usage limit.
-    IpUsageLimitExhausted = 101,
+    /// Key (IP / Firebase UID) has exhausted its usage limit.
+    UsageLimitExhausted = 101,
 
     /// IP is in the blocklist.
     IpInBlocklist = 102,

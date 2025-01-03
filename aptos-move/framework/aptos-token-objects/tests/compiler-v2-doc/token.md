@@ -1824,15 +1824,16 @@ as that would prohibit transactions to be executed in parallel.
             old_value: <a href="token.md#0x4_token">token</a>.description,
             new_value: description
         })
+    } <b>else</b> {
+        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>(
+            &<b>mut</b> <a href="token.md#0x4_token">token</a>.mutation_events,
+            <a href="token.md#0x4_token_MutationEvent">MutationEvent</a> {
+                mutated_field_name: <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_utf8">string::utf8</a>(b"description"),
+                old_value: <a href="token.md#0x4_token">token</a>.description,
+                new_value: description
+            },
+        );
     };
-    <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>(
-        &<b>mut</b> <a href="token.md#0x4_token">token</a>.mutation_events,
-        <a href="token.md#0x4_token_MutationEvent">MutationEvent</a> {
-            mutated_field_name: <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_utf8">string::utf8</a>(b"description"),
-            old_value: <a href="token.md#0x4_token">token</a>.description,
-            new_value: description
-        },
-    );
     <a href="token.md#0x4_token">token</a>.description = description;
 }
 </code></pre>
@@ -1879,15 +1880,16 @@ as that would prohibit transactions to be executed in parallel.
             old_value: old_name,
             new_value: name
         })
+    } <b>else</b> {
+        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>(
+            &<b>mut</b> <a href="token.md#0x4_token">token</a>.mutation_events,
+            <a href="token.md#0x4_token_MutationEvent">MutationEvent</a> {
+                mutated_field_name: <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_utf8">string::utf8</a>(b"name"),
+                old_value: old_name,
+                new_value: name
+            },
+        );
     };
-    <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>(
-        &<b>mut</b> <a href="token.md#0x4_token">token</a>.mutation_events,
-        <a href="token.md#0x4_token_MutationEvent">MutationEvent</a> {
-            mutated_field_name: <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_utf8">string::utf8</a>(b"name"),
-            old_value: old_name,
-            new_value: name
-        },
-    );
 }
 </code></pre>
 
@@ -1920,15 +1922,16 @@ as that would prohibit transactions to be executed in parallel.
             old_value: <a href="token.md#0x4_token">token</a>.uri,
             new_value: uri,
         })
+    } <b>else</b> {
+        <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>(
+            &<b>mut</b> <a href="token.md#0x4_token">token</a>.mutation_events,
+            <a href="token.md#0x4_token_MutationEvent">MutationEvent</a> {
+                mutated_field_name: <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_utf8">string::utf8</a>(b"uri"),
+                old_value: <a href="token.md#0x4_token">token</a>.uri,
+                new_value: uri,
+            },
+        );
     };
-    <a href="../../../aptos-framework/tests/compiler-v2-doc/event.md#0x1_event_emit_event">event::emit_event</a>(
-        &<b>mut</b> <a href="token.md#0x4_token">token</a>.mutation_events,
-        <a href="token.md#0x4_token_MutationEvent">MutationEvent</a> {
-            mutated_field_name: <a href="../../../aptos-framework/../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/string.md#0x1_string_utf8">string::utf8</a>(b"uri"),
-            old_value: <a href="token.md#0x4_token">token</a>.uri,
-            new_value: uri,
-        },
-    );
     <a href="token.md#0x4_token">token</a>.uri = uri;
 }
 </code></pre>
