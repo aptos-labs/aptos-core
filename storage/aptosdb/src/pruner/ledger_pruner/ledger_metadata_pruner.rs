@@ -44,7 +44,7 @@ impl LedgerMetadataPruner {
         current_progress: Version,
         target_version: Version,
     ) -> Result<()> {
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         for version in current_progress..target_version {
             batch.delete::<VersionDataSchema>(&version)?;
         }

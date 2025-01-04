@@ -330,7 +330,7 @@ impl EventStore {
         &self,
         begin: Version,
         end: Version,
-        db_batch: &SchemaBatch,
+        db_batch: &mut SchemaBatch,
     ) -> anyhow::Result<()> {
         let mut iter = self.event_db.iter::<EventAccumulatorSchema>()?;
         iter.seek(&(begin, Position::from_inorder_index(0)))?;

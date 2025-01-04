@@ -144,7 +144,7 @@ impl PersistentMetadataStorage {
         metadata_value: MetadataValue,
     ) -> Result<(), Error> {
         // Create the schema batch
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         batch
             .put::<MetadataSchema>(&metadata_key, &metadata_value)
             .map_err(|error| {

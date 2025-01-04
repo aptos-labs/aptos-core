@@ -121,7 +121,7 @@ pub(crate) fn save_transactions(
     existing_batch: Option<(
         &mut LedgerDbSchemaBatches,
         &mut ShardedStateKvSchemaBatch,
-        &SchemaBatch,
+        &mut SchemaBatch,
     )>,
     kv_replay: bool,
 ) -> Result<()> {
@@ -199,7 +199,7 @@ pub(crate) fn save_transactions_impl(
             first_version + idx as Version,
             txn,
             /*skip_index=*/ false,
-            &ledger_db_batch.transaction_db_batches,
+            &mut ledger_db_batch.transaction_db_batches,
         )?;
     }
 
@@ -207,7 +207,7 @@ pub(crate) fn save_transactions_impl(
         TransactionInfoDb::put_transaction_info(
             first_version + idx as Version,
             txn_info,
-            &ledger_db_batch.transaction_info_db_batches,
+            &mut ledger_db_batch.transaction_info_db_batches,
         )?;
     }
 
@@ -216,13 +216,13 @@ pub(crate) fn save_transactions_impl(
         .put_transaction_accumulator(
             first_version,
             txn_infos,
-            &ledger_db_batch.transaction_accumulator_db_batches,
+            &mut ledger_db_batch.transaction_accumulator_db_batches,
         )?;
 
     ledger_db.event_db().put_events_multiple_versions(
         first_version,
         events,
-        &ledger_db_batch.event_db_batches,
+        &mut ledger_db_batch.event_db_batches,
     )?;
 
     if ledger_db.enable_storage_sharding() {
@@ -233,7 +233,7 @@ pub(crate) fn save_transactions_impl(
                         LedgerMetadataDb::put_block_info(
                             first_version + idx as Version,
                             event,
-                            &ledger_db_batch.ledger_metadata_db_batches,
+                            &mut ledger_db_batch.ledger_metadata_db_batches,
                         )?;
                     }
                 }
@@ -245,14 +245,14 @@ pub(crate) fn save_transactions_impl(
         WriteSetDb::put_write_set(
             first_version + idx as Version,
             ws,
-            &ledger_db_batch.write_set_db_batches,
+            &mut ledger_db_batch.write_set_db_batches,
         )?;
     }
 
     if kv_replay && first_version > 0 && state_store.get_usage(Some(first_version - 1)).is_ok() {
         let ledger_state = state_store.calculate_state_and_put_updates(
             &StateUpdateRefs::index_write_sets(first_version, write_sets, write_sets.len(), None),
-            &ledger_db_batch.ledger_metadata_db_batches, // used for storing the storage usage
+            &mut ledger_db_batch.ledger_metadata_db_batches, // used for storing the storage usage
             state_kv_batches,
         )?;
         // n.b. ideally this is set after the batches are committed

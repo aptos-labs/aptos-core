@@ -5,9 +5,11 @@ use crate::{ledger_db::WriteSetDb, AptosDB};
 use aptos_schemadb::SchemaBatch;
 use aptos_storage_interface::Result;
 use aptos_temppath::TempPath;
-use aptos_types::{transaction::Version, write_set::WriteSet};
+use aptos_types::{
+    transaction::{ExecutionStatus, TransactionAuxiliaryData, TransactionOutput, Version},
+    write_set::WriteSet,
+};
 use proptest::{collection::vec, prelude::*};
-use rayon::prelude::*;
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
@@ -99,8 +101,8 @@ proptest! {
 
         {
             prop_assert!(write_set_db.get_write_set(0).is_ok());
-            let batch = SchemaBatch::new();
-            WriteSetDb::prune(0, 1, &batch).unwrap();
+            let mut batch = SchemaBatch::new();
+            WriteSetDb::prune(0, 1, &mut batch).unwrap();
             write_set_db.write_schemas(batch).unwrap();
             prop_assert!(write_set_db.get_write_set(0).is_err());
         }
@@ -110,7 +112,18 @@ proptest! {
 fn init_db(write_sets: &[WriteSet], write_set_db: &WriteSetDb) {
     assert!(write_set_db.get_write_set(0).is_err());
 
-    write_set_db
-        .commit_write_sets(0, write_sets.par_iter())
-        .unwrap();
+    let dummy_txn_outs = write_sets
+        .iter()
+        .map(|write_set| {
+            TransactionOutput::new(
+                write_set.clone(),
+                vec![],
+                0,
+                ExecutionStatus::Success.into(),
+                TransactionAuxiliaryData::default(),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    write_set_db.commit_write_sets(0, &dummy_txn_outs).unwrap();
 }

@@ -56,7 +56,7 @@ where
             target_version_for_this_round,
         )?;
 
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         indices.into_iter().try_for_each(|index| {
             batch.delete::<JellyfishMerkleNodeSchema>(&index.node_key)?;
             batch.delete::<S>(&index)

@@ -16,7 +16,7 @@ use crate::{
 };
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_crypto::HashValue;
-use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_jellyfish_merkle::{
     node_type::NodeKey, JellyfishMerkleTree, TreeReader, TreeUpdateBatch, TreeWriter,
 };
@@ -215,7 +215,7 @@ impl StateMerkleDb {
         Arc::clone(&self.state_merkle_db_shards[shard_id as usize])
     }
 
-    pub(crate) fn commit_top_levels(&self, version: Version, batch: SchemaBatch) -> Result<()> {
+    pub(crate) fn commit_top_levels(&self, version: Version, mut batch: SchemaBatch) -> Result<()> {
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::StateMerkleCommitProgress,
             &DbMetadataValue::Version(version),
@@ -229,7 +229,7 @@ impl StateMerkleDb {
         &self,
         version: Version,
         shard_id: u8,
-        batch: SchemaBatch,
+        mut batch: SchemaBatch,
     ) -> Result<()> {
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::StateMerkleShardCommitProgress(shard_id as usize),
@@ -330,42 +330,34 @@ impl StateMerkleDb {
             .with_label_values(&["create_jmt_commit_batch_for_shard"])
             .start_timer();
 
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
 
         let node_batch = tree_update_batch
             .node_batch
             .iter()
             .flatten()
             .collect::<Vec<_>>();
-        let num_nodes = node_batch.len();
-        node_batch
-            .par_iter()
-            .with_min_len(optimal_min_len(num_nodes, 128))
-            .try_for_each(|(node_key, node)| {
-                ensure!(node_key.get_shard_id() == shard_id, "shard_id mismatch");
-                batch.put::<JellyfishMerkleNodeSchema>(node_key, node)
-            })?;
+        node_batch.iter().try_for_each(|(node_key, node)| {
+            ensure!(node_key.get_shard_id() == shard_id, "shard_id mismatch");
+            batch.put::<JellyfishMerkleNodeSchema>(node_key, node)
+        })?;
 
         let stale_node_index_batch = tree_update_batch
             .stale_node_index_batch
             .iter()
             .flatten()
             .collect::<Vec<_>>();
-        let num_stale_nodes = stale_node_index_batch.len();
-        stale_node_index_batch
-            .par_iter()
-            .with_min_len(optimal_min_len(num_stale_nodes, 128))
-            .try_for_each(|row| {
-                ensure!(row.node_key.get_shard_id() == shard_id, "shard_id mismatch");
-                if previous_epoch_ending_version.is_some()
-                    && row.node_key.version() <= previous_epoch_ending_version.unwrap()
-                {
-                    batch.put::<StaleNodeIndexCrossEpochSchema>(row, &())
-                } else {
-                    // These are processed by the state merkle pruner.
-                    batch.put::<StaleNodeIndexSchema>(row, &())
-                }
-            })?;
+        stale_node_index_batch.iter().try_for_each(|row| {
+            ensure!(row.node_key.get_shard_id() == shard_id, "shard_id mismatch");
+            if previous_epoch_ending_version.is_some()
+                && row.node_key.version() <= previous_epoch_ending_version.unwrap()
+            {
+                batch.put::<StaleNodeIndexCrossEpochSchema>(row, &())
+            } else {
+                // These are processed by the state merkle pruner.
+                batch.put::<StaleNodeIndexSchema>(row, &())
+            }
+        })?;
 
         Ok(batch)
     }
@@ -843,7 +835,7 @@ impl TreeWriter<StateKey> for StateMerkleDb {
             .with_label_values(&["tree_writer_write_batch"])
             .start_timer();
         // Get the top level batch and sharded batch from raw NodeBatch
-        let top_level_batch = SchemaBatch::new();
+        let mut top_level_batch = SchemaBatch::new();
         let mut jmt_shard_batches: Vec<SchemaBatch> = Vec::with_capacity(NUM_STATE_SHARDS);
         jmt_shard_batches.resize_with(NUM_STATE_SHARDS, SchemaBatch::new);
         node_batch.iter().try_for_each(|(node_key, node)| {

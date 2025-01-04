@@ -3768,7 +3768,6 @@ name = "aptos-schemadb"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-storage-interface",

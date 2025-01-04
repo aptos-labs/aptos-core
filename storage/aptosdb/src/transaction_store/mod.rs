@@ -82,7 +82,7 @@ impl TransactionStore {
     pub fn prune_transaction_by_account(
         &self,
         transactions: &[Transaction],
-        db_batch: &SchemaBatch,
+        db_batch: &mut SchemaBatch,
     ) -> Result<()> {
         for transaction in transactions {
             if let Some(txn) = transaction.try_as_signed_user_txn() {

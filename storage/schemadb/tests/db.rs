@@ -194,7 +194,7 @@ fn gen_expected_values(values: &[(u32, u32)]) -> Vec<(TestField, TestField)> {
 fn test_single_schema_batch() {
     let db = TestDB::new();
 
-    let db_batch = SchemaBatch::new();
+    let mut db_batch = SchemaBatch::new();
     db_batch
         .put::<TestSchema1>(&TestField(0), &TestField(0))
         .unwrap();
@@ -232,7 +232,7 @@ fn test_single_schema_batch() {
 fn test_two_schema_batches() {
     let db = TestDB::new();
 
-    let db_batch1 = SchemaBatch::new();
+    let mut db_batch1 = SchemaBatch::new();
     db_batch1
         .put::<TestSchema1>(&TestField(0), &TestField(0))
         .unwrap();
@@ -250,7 +250,7 @@ fn test_two_schema_batches() {
         gen_expected_values(&[(0, 0), (1, 1)]),
     );
 
-    let db_batch2 = SchemaBatch::new();
+    let mut db_batch2 = SchemaBatch::new();
     db_batch2.delete::<TestSchema2>(&TestField(3)).unwrap();
     db_batch2
         .put::<TestSchema2>(&TestField(3), &TestField(3))
@@ -330,7 +330,7 @@ fn test_report_size() {
     let db = TestDB::new();
 
     for i in 0..1000 {
-        let db_batch = SchemaBatch::new();
+        let mut db_batch = SchemaBatch::new();
         db_batch
             .put::<TestSchema1>(&TestField(i), &TestField(i))
             .unwrap();

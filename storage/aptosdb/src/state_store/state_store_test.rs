@@ -251,7 +251,7 @@ pub fn test_get_state_snapshot_before() {
     // Here we are adding another non-root node, and removing the root node, to verify if there is
     // a node at version X but the root node at version X doesn't exist, we shouldn't return
     // version X.
-    let batch = SchemaBatch::new();
+    let mut batch = SchemaBatch::new();
     batch
         .put::<JellyfishMerkleNodeSchema>(
             &NodeKey::new(2, NibblePath::new_odd(vec![0])),
@@ -270,7 +270,7 @@ pub fn test_get_state_snapshot_before() {
         Some(2)
     );
 
-    let batch = SchemaBatch::new();
+    let mut batch = SchemaBatch::new();
     batch
         .delete::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(2))
         .unwrap();

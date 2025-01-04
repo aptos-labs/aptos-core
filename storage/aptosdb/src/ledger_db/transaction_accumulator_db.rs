@@ -109,7 +109,7 @@ impl TransactionAccumulatorDb {
         &self,
         first_version: Version,
         txn_infos: &[impl Borrow<TransactionInfo>],
-        transaction_accumulator_batch: &SchemaBatch,
+        transaction_accumulator_batch: &mut SchemaBatch,
     ) -> Result<HashValue> {
         let txn_hashes: Vec<HashValue> = txn_infos.iter().map(|t| t.borrow().hash()).collect();
 
@@ -146,7 +146,7 @@ impl TransactionAccumulatorDb {
     /// 2. From the node found from the previous step, delete both its children non-useful, and go
     /// to the right child to repeat the process until we reach a leaf node.
     /// More details are in this issue https://github.com/aptos-labs/aptos-core/issues/1288.
-    pub(crate) fn prune(begin: Version, end: Version, db_batch: &SchemaBatch) -> Result<()> {
+    pub(crate) fn prune(begin: Version, end: Version, db_batch: &mut SchemaBatch) -> Result<()> {
         for version_to_delete in begin..end {
             db_batch.delete::<TransactionAccumulatorRootHashSchema>(&version_to_delete)?;
             // The even version will be pruned in the iteration of version + 1.
