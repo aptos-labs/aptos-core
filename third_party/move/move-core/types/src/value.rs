@@ -9,8 +9,9 @@
 
 use crate::{
     account_address::AccountAddress,
+    ident_str,
     identifier::Identifier,
-    language_storage::{StructTag, TypeTag},
+    language_storage::{ModuleId, StructTag, TypeTag},
     u256,
 };
 use anyhow::{anyhow, bail, Result as AResult};
@@ -195,6 +196,31 @@ pub enum IdentifierMappingKind {
     Aggregator,
     Snapshot,
     DerivedString,
+}
+
+impl IdentifierMappingKind {
+    /// If the struct identifier has a special mapping, return it.
+    pub fn from_ident(
+        module_id: &ModuleId,
+        struct_id: &Identifier,
+    ) -> Option<IdentifierMappingKind> {
+        if module_id.address().eq(&AccountAddress::ONE)
+            && module_id.name().eq(ident_str!("aggregator_v2"))
+        {
+            let ident_str = struct_id.as_ident_str();
+            if ident_str.eq(ident_str!("Aggregator")) {
+                Some(IdentifierMappingKind::Aggregator)
+            } else if ident_str.eq(ident_str!("AggregatorSnapshot")) {
+                Some(IdentifierMappingKind::Snapshot)
+            } else if ident_str.eq(ident_str!("DerivedStringSnapshot")) {
+                Some(IdentifierMappingKind::DerivedString)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
@@ -850,7 +876,7 @@ impl fmt::Display for MoveTypeLayout {
             U256 => write!(f, "u256"),
             Address => write!(f, "address"),
             Vector(typ) => write!(f, "vector<{}>", typ),
-            Struct(s) => write!(f, "{}", s),
+            Struct(s) => fmt::Display::fmt(s, f),
             Signer => write!(f, "signer"),
             // TODO[agg_v2](cleanup): consider printing the tag as well.
             Native(_, typ) => write!(f, "native<{}>", typ),

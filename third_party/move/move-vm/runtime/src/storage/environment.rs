@@ -7,7 +7,7 @@ use crate::{
     native_functions::{NativeFunction, NativeFunctions},
     storage::{
         struct_name_index_map::StructNameIndexMap, ty_cache::StructInfoCache,
-        ty_tag_cache::TypeTagCache, verified_module_cache::VERIFIED_MODULES_V2,
+        ty_tag_converter::TypeTagCache, verified_module_cache::VERIFIED_MODULES_V2,
     },
     Module, Script,
 };
