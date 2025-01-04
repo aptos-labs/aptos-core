@@ -48,4 +48,5 @@ pub use storage::{
     },
     module_storage::{ambassador_impl_ModuleStorage, AsFunctionValueExtension, ModuleStorage},
     publishing::{StagingModuleStorage, VerifiedModuleBundle},
+    type_converter::{ModuleStorageTypeConverter, TypeConverter},
 };
