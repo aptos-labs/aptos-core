@@ -230,7 +230,7 @@ impl StateKvDb {
         &self,
         version: Version,
         shard_id: u8,
-        batch: SchemaBatch,
+        mut batch: SchemaBatch,
     ) -> Result<()> {
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::StateKvShardCommitProgress(shard_id as usize),

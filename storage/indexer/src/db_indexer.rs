@@ -93,7 +93,7 @@ impl InternalIndexerDB {
         progress: StateSnapshotProgress,
     ) -> Result<()> {
         // add state value to internal indexer
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         for state_key in keys {
             batch.put::<StateKeysSchema>(state_key, &())?;
         }
@@ -398,7 +398,7 @@ impl DBIndexer {
         let num_transactions = self.get_num_of_transactions(version)?;
         // This promises num_transactions should be readable from main db
         let mut db_iter = self.get_main_db_iter(version, num_transactions)?;
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         let mut event_keys: HashSet<EventKey> = HashSet::new();
         db_iter.try_for_each(|res| {
             let (txn, events, writeset) = res?;

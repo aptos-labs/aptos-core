@@ -30,7 +30,7 @@ impl StateKvMetadataPruner {
         current_progress: Version,
         target_version: Version,
     ) -> Result<()> {
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
 
         if self.state_kv_db.enabled_sharding() {
             let num_shards = self.state_kv_db.num_shards();

@@ -41,29 +41,34 @@ impl DBSubPruner for EventStorePruner {
     }
 
     fn prune(&self, current_progress: Version, target_version: Version) -> Result<()> {
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         let mut indexer_batch = None;
 
         let indices_batch = if let Some(indexer_db) = self.indexer_db() {
             if indexer_db.event_enabled() {
                 indexer_batch = Some(SchemaBatch::new());
             }
-            indexer_batch.as_ref()
+            indexer_batch.as_mut()
         } else {
-            Some(&batch)
+            Some(&mut batch)
         };
-        self.ledger_db.event_db().prune_events(
+        let num_events_per_version = self.ledger_db.event_db().prune_event_indices(
             current_progress,
             target_version,
-            &batch,
             indices_batch,
+        )?;
+        self.ledger_db.event_db().prune_events(
+            num_events_per_version,
+            current_progress,
+            target_version,
+            &mut batch,
         )?;
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::EventPrunerProgress,
             &DbMetadataValue::Version(target_version),
         )?;
 
-        if let Some(indexer_batch) = indexer_batch {
+        if let Some(mut indexer_batch) = indexer_batch {
             indexer_batch.put::<InternalIndexerMetadataSchema>(
                 &IndexerMetadataKey::EventPrunerProgress,
                 &IndexerMetadataValue::Version(target_version),

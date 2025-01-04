@@ -23,8 +23,8 @@ impl DBSubPruner for TransactionInfoPruner {
     }
 
     fn prune(&self, current_progress: Version, target_version: Version) -> Result<()> {
-        let batch = SchemaBatch::new();
-        TransactionInfoDb::prune(current_progress, target_version, &batch)?;
+        let mut batch = SchemaBatch::new();
+        TransactionInfoDb::prune(current_progress, target_version, &mut batch)?;
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::TransactionInfoPrunerProgress,
             &DbMetadataValue::Version(target_version),

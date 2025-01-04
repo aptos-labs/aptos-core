@@ -33,7 +33,7 @@ use aptos_config::config::{
 };
 use aptos_crypto::HashValue;
 use aptos_db_indexer::{db_indexer::InternalIndexerDB, Indexer};
-use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
 use aptos_resource_viewer::AptosValueAnnotator;
@@ -231,8 +231,8 @@ impl AptosDB {
             genesis_li.ledger_info().epoch() == current_epoch && current_epoch == 0,
             "Genesis ledger info epoch is not 0"
         );
-        let ledger_batch = SchemaBatch::new();
-        ledger_metadata_db.put_ledger_info(genesis_li, &ledger_batch)?;
+        let mut ledger_batch = SchemaBatch::new();
+        ledger_metadata_db.put_ledger_info(genesis_li, &mut ledger_batch)?;
         ledger_metadata_db.write_schemas(ledger_batch)
     }
 }

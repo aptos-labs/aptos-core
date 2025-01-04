@@ -85,12 +85,12 @@ impl TransactionDb {
         skip_index: bool,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_transactions"]);
-        let chunk_size = 512;
+        let chunk_size = transactions.len() / 8 + 1;
         let batches = transactions
             .par_chunks(chunk_size)
             .enumerate()
             .map(|(chunk_index, txns_in_chunk)| -> Result<SchemaBatch> {
-                let batch = SchemaBatch::new();
+                let mut batch = SchemaBatch::new();
                 let chunk_first_version = first_version + (chunk_size * chunk_index) as u64;
                 txns_in_chunk
                     .iter()
@@ -100,7 +100,7 @@ impl TransactionDb {
                             chunk_first_version + i as u64,
                             txn,
                             skip_index,
-                            &batch,
+                            &mut batch,
                         )?;
 
                         Ok(())
@@ -128,7 +128,7 @@ impl TransactionDb {
         version: Version,
         transaction: &Transaction,
         skip_index: bool,
-        batch: &SchemaBatch,
+        batch: &mut SchemaBatch,
     ) -> Result<()> {
         if !skip_index {
             if let Some(txn) = transaction.try_as_signed_user_txn() {
@@ -149,7 +149,7 @@ impl TransactionDb {
         &self,
         begin: Version,
         end: Version,
-        db_batch: &SchemaBatch,
+        db_batch: &mut SchemaBatch,
     ) -> Result<()> {
         for version in begin..end {
             db_batch.delete::<TransactionSchema>(&version)?;
@@ -161,7 +161,7 @@ impl TransactionDb {
     pub(crate) fn prune_transaction_by_hash_indices(
         &self,
         transactions: &[Transaction],
-        db_batch: &SchemaBatch,
+        db_batch: &mut SchemaBatch,
     ) -> Result<()> {
         for transaction in transactions {
             db_batch.delete::<TransactionByHashSchema>(&transaction.hash())?;

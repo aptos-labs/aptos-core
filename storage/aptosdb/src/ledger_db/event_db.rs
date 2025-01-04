@@ -128,7 +128,7 @@ impl EventDb {
         &self,
         first_version: u64,
         event_vecs: &[Vec<ContractEvent>],
-        batch: &SchemaBatch,
+        batch: &mut SchemaBatch,
     ) -> Result<()> {
         event_vecs.iter().enumerate().try_for_each(|(idx, events)| {
             let version = first_version
@@ -144,7 +144,7 @@ impl EventDb {
         version: u64,
         events: &[ContractEvent],
         skip_index: bool,
-        batch: &SchemaBatch,
+        batch: &mut SchemaBatch,
     ) -> Result<()> {
         // Event table and indices updates
         events
@@ -184,20 +184,25 @@ impl EventDb {
         Ok(())
     }
 
-    /// Deletes a set of events in the range of version in [begin, end), and all related indices.
-    pub(crate) fn prune_events(
+    /// Deletes event indices, returns number of events per version, so `prune_events` doesn't need
+    /// to iterate through evnets from DB again.
+    pub(crate) fn prune_event_indices(
         &self,
         start: Version,
         end: Version,
-        db_batch: &SchemaBatch,
-        indices_batch: Option<&SchemaBatch>,
-    ) -> anyhow::Result<()> {
+        mut indices_batch: Option<&mut SchemaBatch>,
+    ) -> Result<Vec<usize>> {
+        let mut ret = Vec::new();
+
         let mut current_version = start;
 
         for events in self.get_events_by_version_iter(start, (end - start) as usize)? {
-            for (idx, event) in (events?).into_iter().enumerate() {
-                if let ContractEvent::V1(v1) = event {
-                    if let Some(batch) = indices_batch {
+            let events = events?;
+            ret.push(events.len());
+
+            if let Some(ref mut batch) = indices_batch {
+                for event in events {
+                    if let ContractEvent::V1(v1) = event {
                         batch.delete::<EventByKeySchema>(&(*v1.key(), v1.sequence_number()))?;
                         batch.delete::<EventByVersionSchema>(&(
                             *v1.key(),
@@ -206,6 +211,25 @@ impl EventDb {
                         ))?;
                     }
                 }
+            }
+            current_version += 1;
+        }
+
+        Ok(ret)
+    }
+
+    /// Deletes a set of events in the range of version in [begin, end), and all related indices.
+    pub(crate) fn prune_events(
+        &self,
+        num_events_per_version: Vec<usize>,
+        start: Version,
+        end: Version,
+        db_batch: &mut SchemaBatch,
+    ) -> Result<()> {
+        let mut current_version = start;
+
+        for num_events in num_events_per_version {
+            for idx in 0..num_events {
                 db_batch.delete::<EventSchema>(&(current_version, idx as u64))?;
             }
             current_version += 1;

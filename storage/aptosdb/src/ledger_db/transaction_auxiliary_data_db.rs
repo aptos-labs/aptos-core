@@ -65,13 +65,13 @@ impl TransactionAuxiliaryDataDb {
     pub(crate) fn put_transaction_auxiliary_data(
         version: Version,
         transaction_auxiliary_data: &TransactionAuxiliaryData,
-        batch: &SchemaBatch,
+        batch: &mut SchemaBatch,
     ) -> Result<()> {
         batch.put::<TransactionAuxiliaryDataSchema>(&version, transaction_auxiliary_data)
     }
 
     /// Deletes the transaction info between a range of version in [begin, end)
-    pub(crate) fn prune(begin: Version, end: Version, batch: &SchemaBatch) -> Result<()> {
+    pub(crate) fn prune(begin: Version, end: Version, batch: &mut SchemaBatch) -> Result<()> {
         for version in begin..end {
             batch.delete::<TransactionAuxiliaryDataSchema>(&version)?;
         }

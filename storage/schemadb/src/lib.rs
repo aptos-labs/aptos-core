@@ -25,13 +25,13 @@ use crate::{
         APTOS_SCHEMADB_DELETES_SAMPLED, APTOS_SCHEMADB_GET_BYTES,
         APTOS_SCHEMADB_GET_LATENCY_SECONDS, APTOS_SCHEMADB_ITER_BYTES,
         APTOS_SCHEMADB_ITER_LATENCY_SECONDS, APTOS_SCHEMADB_PUT_BYTES_SAMPLED,
-        APTOS_SCHEMADB_SEEK_LATENCY_SECONDS,
+        APTOS_SCHEMADB_SEEK_LATENCY_SECONDS, TIMER,
     },
     schema::{KeyCodec, Schema, SeekKeyCodec, ValueCodec},
 };
 use anyhow::format_err;
-use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{AptosDbError, Result as DbResult};
 use iterator::{ScanDirection, SchemaIterator};
 use rand::Rng;
@@ -57,17 +57,9 @@ enum WriteOp {
 
 /// `SchemaBatch` holds a collection of updates that can be applied to a DB atomically. The updates
 /// will be applied in the order in which they are added to the `SchemaBatch`.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct SchemaBatch {
-    rows: Mutex<HashMap<ColumnFamilyName, Vec<WriteOp>>>,
-}
-
-impl Default for SchemaBatch {
-    fn default() -> Self {
-        Self {
-            rows: Mutex::new(HashMap::new()),
-        }
-    }
+    rows: HashMap<ColumnFamilyName, Vec<WriteOp>>,
 }
 
 impl SchemaBatch {
@@ -78,14 +70,13 @@ impl SchemaBatch {
 
     /// Adds an insert/update operation to the batch.
     pub fn put<S: Schema>(
-        &self,
+        &mut self,
         key: &S::Key,
         value: &S::Value,
     ) -> aptos_storage_interface::Result<()> {
         let key = <S::Key as KeyCodec<S>>::encode_key(key)?;
         let value = <S::Value as ValueCodec<S>>::encode_value(value)?;
         self.rows
-            .lock()
             .entry(S::COLUMN_FAMILY_NAME)
             .or_default()
             .push(WriteOp::Value { key, value });
@@ -94,10 +85,9 @@ impl SchemaBatch {
     }
 
     /// Adds a delete operation to the batch.
-    pub fn delete<S: Schema>(&self, key: &S::Key) -> DbResult<()> {
+    pub fn delete<S: Schema>(&mut self, key: &S::Key) -> DbResult<()> {
         let key = <S::Key as KeyCodec<S>>::encode_key(key)?;
         self.rows
-            .lock()
             .entry(S::COLUMN_FAMILY_NAME)
             .or_default()
             .push(WriteOp::Deletion { key });
@@ -268,7 +258,7 @@ impl DB {
     /// Writes single record.
     pub fn put<S: Schema>(&self, key: &S::Key, value: &S::Value) -> DbResult<()> {
         // Not necessary to use a batch, but we'd like a central place to bump counters.
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         batch.put::<S>(key, value)?;
         self.write_schemas(batch)
     }
@@ -276,7 +266,7 @@ impl DB {
     /// Deletes a single record.
     pub fn delete<S: Schema>(&self, key: &S::Key) -> DbResult<()> {
         // Not necessary to use a batch, but we'd like a central place to bump counters.
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         batch.delete::<S>(key)?;
         self.write_schemas(batch)
     }
@@ -327,20 +317,24 @@ impl DB {
         let _timer = APTOS_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS
             .with_label_values(&[&self.name])
             .start_timer();
-        let rows_locked = batch.rows.lock();
         let sampling_rate_pct = 1;
         let sampled_kv_bytes = should_sample(sampling_rate_pct);
 
-        let mut db_batch = rocksdb::WriteBatch::default();
-        for (cf_name, rows) in rows_locked.iter() {
-            let cf_handle = self.get_cf_handle(cf_name)?;
-            for write_op in rows {
-                match write_op {
-                    WriteOp::Value { key, value } => db_batch.put_cf(cf_handle, key, value),
-                    WriteOp::Deletion { key } => db_batch.delete_cf(cf_handle, key),
+        let db_batch = {
+            let _timer = TIMER.timer_with(&["convert_to_db_batch", &self.name]);
+
+            let mut ret = rocksdb::WriteBatch::default();
+            for (cf_name, rows) in batch.rows.iter() {
+                let cf_handle = self.get_cf_handle(cf_name)?;
+                for write_op in rows {
+                    match write_op {
+                        WriteOp::Value { key, value } => ret.put_cf(cf_handle, key, value),
+                        WriteOp::Deletion { key } => ret.delete_cf(cf_handle, key),
+                    }
                 }
             }
-        }
+            ret
+        };
         let serialized_size = db_batch.size_in_bytes();
 
         self.inner
@@ -349,7 +343,7 @@ impl DB {
 
         // Bump counters only after DB write succeeds.
         if sampled_kv_bytes {
-            for (cf_name, rows) in rows_locked.iter() {
+            for (cf_name, rows) in batch.rows.iter() {
                 for write_op in rows {
                     match write_op {
                         WriteOp::Value { key, value } => {

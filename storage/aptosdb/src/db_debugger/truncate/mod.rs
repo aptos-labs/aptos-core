@@ -120,7 +120,7 @@ impl Cmd {
         }
 
         println!("Starting db truncation...");
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::OverallCommitProgress,
             &DbMetadataValue::Version(target_version),

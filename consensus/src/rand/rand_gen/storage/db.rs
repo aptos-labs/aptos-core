@@ -58,14 +58,14 @@ impl RandDb {
     }
 
     fn put<S: Schema>(&self, key: &S::Key, value: &S::Value) -> Result<(), DbError> {
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         batch.put::<S>(key, value)?;
         self.commit(batch)?;
         Ok(())
     }
 
     fn delete<S: Schema>(&self, mut keys: impl Iterator<Item = S::Key>) -> Result<(), DbError> {
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         keys.try_for_each(|key| batch.delete::<S>(&key))?;
         self.commit(batch)
     }

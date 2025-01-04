@@ -23,8 +23,8 @@ impl DBSubPruner for WriteSetPruner {
     }
 
     fn prune(&self, current_progress: Version, target_version: Version) -> Result<()> {
-        let batch = SchemaBatch::new();
-        WriteSetDb::prune(current_progress, target_version, &batch)?;
+        let mut batch = SchemaBatch::new();
+        WriteSetDb::prune(current_progress, target_version, &mut batch)?;
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::WriteSetPrunerProgress,
             &DbMetadataValue::Version(target_version),
