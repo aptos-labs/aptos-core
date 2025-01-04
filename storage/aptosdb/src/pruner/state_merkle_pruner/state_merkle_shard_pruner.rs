@@ -61,7 +61,7 @@ where
         target_version: Version,
     ) -> Result<()> {
         loop {
-            let batch = SchemaBatch::new();
+            let mut batch = SchemaBatch::new();
             let (indices, next_version) = StateMerklePruner::get_stale_node_indices(
                 &self.db_shard,
                 current_progress,

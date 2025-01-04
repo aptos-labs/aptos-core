@@ -86,13 +86,13 @@ impl TransactionInfoDb {
     pub(crate) fn put_transaction_info(
         version: Version,
         transaction_info: &TransactionInfo,
-        batch: &SchemaBatch,
+        batch: &mut SchemaBatch,
     ) -> Result<()> {
         batch.put::<TransactionInfoSchema>(&version, transaction_info)
     }
 
     /// Deletes the transaction info between a range of version in [begin, end)
-    pub(crate) fn prune(begin: Version, end: Version, batch: &SchemaBatch) -> Result<()> {
+    pub(crate) fn prune(begin: Version, end: Version, batch: &mut SchemaBatch) -> Result<()> {
         for version in begin..end {
             batch.delete::<TransactionInfoSchema>(&version)?;
         }

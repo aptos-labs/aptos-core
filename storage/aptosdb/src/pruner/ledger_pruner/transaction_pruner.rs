@@ -34,16 +34,16 @@ impl DBSubPruner for TransactionPruner {
     }
 
     fn prune(&self, current_progress: Version, target_version: Version) -> Result<()> {
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         let candidate_transactions =
             self.get_pruning_candidate_transactions(current_progress, target_version)?;
         self.ledger_db
             .transaction_db()
-            .prune_transaction_by_hash_indices(&candidate_transactions, &batch)?;
+            .prune_transaction_by_hash_indices(&candidate_transactions, &mut batch)?;
         self.ledger_db.transaction_db().prune_transactions(
             current_progress,
             target_version,
-            &batch,
+            &mut batch,
         )?;
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::TransactionPrunerProgress,
@@ -51,9 +51,9 @@ impl DBSubPruner for TransactionPruner {
         )?;
         if let Some(indexer_db) = self.internal_indexer_db.as_ref() {
             if indexer_db.transaction_enabled() {
-                let index_batch = SchemaBatch::new();
+                let mut index_batch = SchemaBatch::new();
                 self.transaction_store
-                    .prune_transaction_by_account(&candidate_transactions, &index_batch)?;
+                    .prune_transaction_by_account(&candidate_transactions, &mut index_batch)?;
                 index_batch.put::<InternalIndexerMetadataSchema>(
                     &IndexerMetadataKey::TransactionPrunerProgress,
                     &IndexerMetadataValue::Version(target_version),
@@ -61,7 +61,7 @@ impl DBSubPruner for TransactionPruner {
                 indexer_db.get_inner_db_ref().write_schemas(index_batch)?;
             } else {
                 self.transaction_store
-                    .prune_transaction_by_account(&candidate_transactions, &batch)?;
+                    .prune_transaction_by_account(&candidate_transactions, &mut batch)?;
             }
         }
         self.ledger_db.transaction_db().write_schemas(batch)

@@ -681,8 +681,8 @@ impl StateStore {
     pub fn calculate_state_and_put_updates(
         &self,
         state_update_refs: &StateUpdateRefs,
-        ledger_batch: &SchemaBatch,
-        sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
+        ledger_batch: &mut SchemaBatch,
+        sharded_state_kv_batches: &mut ShardedStateKvSchemaBatch,
     ) -> Result<LedgerState> {
         let current = self.current_state_locked().ledger_state();
         let persisted = self.persisted_state_locked().state().clone();
@@ -705,8 +705,8 @@ impl StateStore {
         state: &LedgerState,
         state_update_refs: &PerVersionStateUpdateRefs,
         state_reads: &ShardedStateCache,
-        ledger_batch: &SchemaBatch,
-        sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
+        ledger_batch: &mut SchemaBatch,
+        sharded_state_kv_batches: &mut ShardedStateKvSchemaBatch,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["put_value_sets"]);
         let current_state = self.current_state_locked().state().clone();
@@ -726,13 +726,13 @@ impl StateStore {
     pub fn put_state_values(
         &self,
         state_update_refs: &PerVersionStateUpdateRefs,
-        sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
+        sharded_state_kv_batches: &mut ShardedStateKvSchemaBatch,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["add_state_kv_batch"]);
 
         // TODO(aldenhu): put by refs; batch put
         sharded_state_kv_batches
-            .par_iter()
+            .par_iter_mut()
             .zip_eq(state_update_refs.shards.par_iter())
             .try_for_each(|(batch, updates)| {
                 updates.iter().try_for_each(|(key, update)| {
@@ -774,8 +774,8 @@ impl StateStore {
         state_update_refs: &PerVersionStateUpdateRefs,
         // TODO(grao): Restructure this function.
         state_reads: &ShardedStateCache,
-        batch: &SchemaBatch,
-        sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
+        batch: &mut SchemaBatch,
+        sharded_state_kv_batches: &mut ShardedStateKvSchemaBatch,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["put_stats_and_indices"]);
 
@@ -806,7 +806,7 @@ impl StateStore {
 
     fn put_stale_state_value_index(
         state_update_refs: &PerVersionStateUpdateRefs,
-        sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
+        sharded_state_kv_batches: &mut ShardedStateKvSchemaBatch,
         enable_sharding: bool,
         sharded_state_cache: &ShardedStateCache,
         ignore_state_cache_miss: bool,
@@ -818,7 +818,7 @@ impl StateStore {
             .shards
             .par_iter()
             .zip_eq(state_update_refs.shards.par_iter())
-            .zip_eq(sharded_state_kv_batches.par_iter())
+            .zip_eq(sharded_state_kv_batches.par_iter_mut())
             .enumerate()
             .for_each(|(shard_id, ((cache, updates), batch))| {
                 Self::put_stale_state_value_index_for_shard(
@@ -840,7 +840,7 @@ impl StateStore {
         num_versions: usize,
         cache: &StateCacheShard,
         updates: &[(&'kv StateKey, StateUpdateRef<'kv>)],
-        batch: &SchemaBatch,
+        batch: &mut SchemaBatch,
         enable_sharding: bool,
         ignore_state_cache_miss: bool,
     ) {
@@ -885,7 +885,7 @@ impl StateStore {
     }
 
     fn put_state_kv_index(
-        batch: &SchemaBatch,
+        batch: &mut SchemaBatch,
         enable_sharding: bool,
         stale_since_version: Version,
         version: Version,
@@ -916,7 +916,7 @@ impl StateStore {
         }
     }
 
-    fn put_usage(state: &State, batch: &SchemaBatch) -> Result<()> {
+    fn put_usage(state: &State, batch: &mut SchemaBatch) -> Result<()> {
         if let Some(version) = state.version() {
             let usage = state.usage();
             info!("Write usage at version {version}, {usage:?}.");
@@ -931,7 +931,7 @@ impl StateStore {
 
     pub(crate) fn shard_state_value_batch(
         &self,
-        sharded_batch: &ShardedStateKvSchemaBatch,
+        sharded_batch: &mut ShardedStateKvSchemaBatch,
         values: &StateValueBatch,
         enable_sharding: bool,
     ) -> Result<()> {
@@ -1125,8 +1125,8 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["state_value_writer_write_chunk"])
             .start_timer();
-        let batch = SchemaBatch::new();
-        let sharded_schema_batch = new_sharded_kv_schema_batch();
+        let mut batch = SchemaBatch::new();
+        let mut sharded_schema_batch = new_sharded_kv_schema_batch();
 
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::StateSnapshotKvRestoreProgress(version),
@@ -1147,7 +1147,7 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
                 .write_keys_to_indexer_db(&keys, version, progress)?;
         }
         self.shard_state_value_batch(
-            &sharded_schema_batch,
+            &mut sharded_schema_batch,
             node_batch,
             self.state_kv_db.enabled_sharding(),
         )?;
@@ -1159,7 +1159,7 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
         self.ledger_db.metadata_db().put_usage(version, usage)?;
         if let Some(internal_indexer_db) = self.internal_indexer_db.as_ref() {
             if version > 0 {
-                let batch = SchemaBatch::new();
+                let mut batch = SchemaBatch::new();
                 batch.put::<InternalIndexerMetadataSchema>(
                     &MetadataKey::LatestVersion,
                     &MetadataValue::Version(version - 1),
@@ -1282,14 +1282,14 @@ mod test_only {
                 Some(num_versions - 1),
             );
 
-            let ledger_batch = SchemaBatch::new();
-            let sharded_state_kv_batches = new_sharded_kv_schema_batch();
+            let mut ledger_batch = SchemaBatch::new();
+            let mut sharded_state_kv_batches = new_sharded_kv_schema_batch();
 
             let new_ledger_state = self
                 .calculate_state_and_put_updates(
                     &state_update_refs,
-                    &ledger_batch,
-                    &sharded_state_kv_batches,
+                    &mut ledger_batch,
+                    &mut sharded_state_kv_batches,
                 )
                 .unwrap();
 

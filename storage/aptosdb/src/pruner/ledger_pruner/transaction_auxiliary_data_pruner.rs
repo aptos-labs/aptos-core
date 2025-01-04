@@ -23,8 +23,8 @@ impl DBSubPruner for TransactionAuxiliaryDataPruner {
     }
 
     fn prune(&self, current_progress: Version, target_version: Version) -> Result<()> {
-        let batch = SchemaBatch::new();
-        TransactionAuxiliaryDataDb::prune(current_progress, target_version, &batch)?;
+        let mut batch = SchemaBatch::new();
+        TransactionAuxiliaryDataDb::prune(current_progress, target_version, &mut batch)?;
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::TransactionAuxiliaryDataPrunerProgress,
             &DbMetadataValue::Version(target_version),
