@@ -1,4 +1,6 @@
 spec aptos_framework::governed_gas_pool {
+    use aptos_framework::coin::CoinStore; 
+
     /// <high-level-req>
     /// No.: 1
     /// Requirement: The GovernedGasPool resource must exist at the aptos_framework address after initialization.
@@ -37,9 +39,9 @@ spec aptos_framework::governed_gas_pool {
         invariant exists<GovernedGasPool>(@aptos_framework);
 
         /// Ghost variables for balances
-        global governed_gas_pool_balance: num;
-        global depositor_balance: num;
-        global gas_payer_balance: num;
+        global governed_gas_pool_balance<CoinType>: num;
+        global depositor_balance<CoinType>: num;
+        global gas_payer_balance<CoinType>: num;
     }
 
     spec initialize(aptos_framework: &signer, delegation_pool_creation_seed: vector<u8>) {
@@ -50,20 +52,27 @@ spec aptos_framework::governed_gas_pool {
 
     spec fund<CoinType>(aptos_framework: &signer, account: address, amount: u64) {
         /// [high-level-req-4]
+        // Abort if the caller is not the Aptos framework
         aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
-        /// Updates to the ghost balance variables
-        ensures depositor_balance == old(depositor_balance) + amount;
-        ensures governed_gas_pool_balance == old(governed_gas_pool_balance) - amount;
-    }
 
+        // Abort if the governed gas pool has insufficient balance
+        aborts_if coin::balance<CoinType>(governed_gas_pool_address()) < amount;
+
+        // Ensures depositor's balance is increased by the funded amount
+        ensures depositor_balance<CoinType> == old(depositor_balance<CoinType>) + amount;
+
+        // Ensures the governed gas pool balance is decreased by the funded amount
+        ensures governed_gas_pool_balance<CoinType> == old(governed_gas_pool_balance<CoinType>) - amount;
+    }
+   
     spec deposit<CoinType>(coin: Coin<CoinType>) {
         /// [high-level-req-3]
-        ensures governed_gas_pool_balance == old(governed_gas_pool_balance) + coin.value;
+        ensures governed_gas_pool_balance<CoinType> == old(governed_gas_pool_balance<CoinType>) + coin.value;
     }
 
     spec deposit_gas_fee(gas_payer: address, gas_fee: u64) {
         /// [high-level-req-5]
-        ensures governed_gas_pool_balance == old(governed_gas_pool_balance) + gas_fee;
-        ensures gas_payer_balance == old(gas_payer_balance) - gas_fee;
+        ensures governed_gas_pool_balance<AptosCoin> == old(governed_gas_pool_balance<AptosCoin>) + gas_fee;
+        ensures gas_payer_balance<AptosCoin> == old(gas_payer_balance<AptosCoin>) - gas_fee;
     }
 }
