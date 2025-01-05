@@ -71,6 +71,16 @@ pub(crate) fn realistic_env_sweep_wrap(
             // no epoch change.
             helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
         }))
+        .with_validator_resource_override(NodeResourceOverride {
+            cpu_cores: Some(60),
+            memory_gib: Some(200),
+            storage_gib: Some(500), // assuming we're using these large marchines for long-running or expensive tests which need more disk
+        })
+        .with_fullnode_resource_override(NodeResourceOverride {
+            cpu_cores: Some(60),
+            memory_gib: Some(200),
+            storage_gib: Some(500),
+        })
         .with_success_criteria(
             SuccessCriteria::new(0)
                 .add_no_restarts()
@@ -83,21 +93,19 @@ pub(crate) fn realistic_env_load_sweep_test() -> ForgeConfig {
     realistic_env_sweep_wrap(10, 5, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TPS(vec![20000]),
-        criteria: [
-            (95, 0.9, 1.1, 1.2, 0),
-        ]
-        .into_iter()
-        .map(
-            |(min_tps, max_lat_p50, max_lat_p90, max_lat_p99, max_expired_tps)| {
-                SuccessCriteria::new(min_tps)
-                    .add_max_expired_tps(max_expired_tps as f64)
-                    .add_max_failed_submission_tps(0.0)
-                    .add_latency_threshold(max_lat_p50, LatencyType::P50)
-                    .add_latency_threshold(max_lat_p90, LatencyType::P90)
-                    .add_latency_threshold(max_lat_p99, LatencyType::P99)
-            },
-        )
-        .collect(),
+        criteria: [(95, 0.9, 1.1, 1.2, 0)]
+            .into_iter()
+            .map(
+                |(min_tps, max_lat_p50, max_lat_p90, max_lat_p99, max_expired_tps)| {
+                    SuccessCriteria::new(min_tps)
+                        .add_max_expired_tps(max_expired_tps as f64)
+                        .add_max_failed_submission_tps(0.0)
+                        .add_latency_threshold(max_lat_p50, LatencyType::P50)
+                        .add_latency_threshold(max_lat_p90, LatencyType::P90)
+                        .add_latency_threshold(max_lat_p99, LatencyType::P99)
+                },
+            )
+            .collect(),
         background_traffic: None, //background_traffic_for_sweep(5),
     })
 }
