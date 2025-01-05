@@ -24,7 +24,6 @@ use crate::{
     state_store::{buffered_state::BufferedState, persisted_state::PersistedState},
     utils::{
         iterators::PrefixedStateValueIterator,
-        new_sharded_kv_schema_batch,
         truncation_helper::{
             find_tree_root_at_or_before, get_max_version_in_state_merkle_db, truncate_ledger_db,
             truncate_state_kv_db, truncate_state_merkle_db,
@@ -45,7 +44,7 @@ use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
-use aptos_schemadb::SchemaBatch;
+use aptos_schemadb::batch::{NativeBatch, SchemaBatch, WriteBatch};
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     db_ensure as ensure, db_other_bail as bail,
@@ -840,7 +839,7 @@ impl StateStore {
         num_versions: usize,
         cache: &StateCacheShard,
         updates: &[(&'kv StateKey, StateUpdateRef<'kv>)],
-        batch: &mut SchemaBatch,
+        batch: &mut NativeBatch,
         enable_sharding: bool,
         ignore_state_cache_miss: bool,
     ) {
@@ -885,7 +884,7 @@ impl StateStore {
     }
 
     fn put_state_kv_index(
-        batch: &mut SchemaBatch,
+        batch: &mut NativeBatch,
         enable_sharding: bool,
         stale_since_version: Version,
         version: Version,
@@ -1126,7 +1125,7 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
             .with_label_values(&["state_value_writer_write_chunk"])
             .start_timer();
         let mut batch = SchemaBatch::new();
-        let mut sharded_schema_batch = new_sharded_kv_schema_batch();
+        let mut sharded_schema_batch = self.state_kv_db.new_sharded_native_batches();
 
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::StateSnapshotKvRestoreProgress(version),
@@ -1240,9 +1239,9 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
 
 #[cfg(test)]
 mod test_only {
-    use crate::{state_store::StateStore, utils::new_sharded_kv_schema_batch};
+    use crate::state_store::StateStore;
     use aptos_crypto::HashValue;
-    use aptos_schemadb::SchemaBatch;
+    use aptos_schemadb::batch::SchemaBatch;
     use aptos_storage_interface::state_store::{
         state_summary::ProvableStateSummary, state_update_refs::StateUpdateRefs,
         state_with_summary::LedgerStateWithSummary,
@@ -1283,7 +1282,7 @@ mod test_only {
             );
 
             let mut ledger_batch = SchemaBatch::new();
-            let mut sharded_state_kv_batches = new_sharded_kv_schema_batch();
+            let mut sharded_state_kv_batches = self.state_kv_db.new_sharded_native_batches();
 
             let new_ledger_state = self
                 .calculate_state_and_put_updates(

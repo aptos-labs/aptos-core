@@ -32,8 +32,9 @@ use crate::{
 use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
 use aptos_logger::info;
 use aptos_schemadb::{
+    batch::SchemaBatch,
     schema::{Schema, SeekKeyCodec},
-    SchemaBatch, DB,
+    DB,
 };
 use aptos_storage_interface::Result;
 use aptos_types::{proof::position::Position, transaction::Version};
@@ -161,6 +162,7 @@ pub(crate) fn truncate_state_merkle_db(
         delete_nodes_and_stale_indices_at_or_after_version(
             state_merkle_db.metadata_db(),
             current_version,
+            None, // shard_id
             &mut top_levels_batch,
         )?;
 
@@ -192,9 +194,10 @@ pub(crate) fn truncate_state_merkle_db_single_shard(
     delete_nodes_and_stale_indices_at_or_after_version(
         state_merkle_db.db_shard(shard_id),
         target_version + 1,
+        Some(shard_id),
         &mut batch,
     )?;
-    state_merkle_db.commit_single_shard(target_version, shard_id, batch)
+    state_merkle_db.db_shard(shard_id).write_schemas(batch)
 }
 
 pub(crate) fn find_tree_root_at_or_before(
@@ -557,6 +560,7 @@ where
 fn delete_nodes_and_stale_indices_at_or_after_version(
     db: &DB,
     version: Version,
+    shard_id: Option<u8>,
     batch: &mut SchemaBatch,
 ) -> Result<()> {
     delete_stale_node_index_at_or_after_version::<StaleNodeIndexSchema>(db, version, batch)?;
@@ -571,7 +575,7 @@ fn delete_nodes_and_stale_indices_at_or_after_version(
         batch.delete::<JellyfishMerkleNodeSchema>(&key)?;
     }
 
-    Ok(())
+    StateMerkleDb::put_progress(version.checked_sub(1), shard_id, batch)
 }
 
 struct Progress {

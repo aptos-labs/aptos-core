@@ -9,7 +9,7 @@ use aptos_db_indexer_schemas::{
     schema::transaction_by_account::TransactionByAccountSchema,
     utils::AccountTransactionVersionIter,
 };
-use aptos_schemadb::SchemaBatch;
+use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::{
     account_address::AccountAddress,

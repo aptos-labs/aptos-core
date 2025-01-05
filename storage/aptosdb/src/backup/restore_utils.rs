@@ -14,10 +14,10 @@ use crate::{
         transaction_accumulator::TransactionAccumulatorSchema,
     },
     state_store::StateStore,
-    utils::{new_sharded_kv_schema_batch, ShardedStateKvSchemaBatch},
+    utils::ShardedStateKvSchemaBatch,
 };
 use aptos_crypto::HashValue;
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_schemadb::{batch::SchemaBatch, DB};
 use aptos_storage_interface::{
     db_ensure as ensure, state_store::state_update_refs::StateUpdateRefs, AptosDbError, Result,
 };
@@ -140,7 +140,10 @@ pub(crate) fn save_transactions(
         )?;
     } else {
         let mut ledger_db_batch = LedgerDbSchemaBatches::new();
-        let mut sharded_kv_schema_batch = new_sharded_kv_schema_batch();
+        let mut sharded_kv_schema_batch = state_store
+            .state_db
+            .state_kv_db
+            .new_sharded_native_batches();
         save_transactions_impl(
             Arc::clone(&state_store),
             Arc::clone(&ledger_db),

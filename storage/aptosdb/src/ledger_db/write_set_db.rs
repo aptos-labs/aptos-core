@@ -10,7 +10,10 @@ use crate::{
     utils::iterators::ExpectContinuousVersions,
 };
 use aptos_metrics_core::TimerHelper;
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_schemadb::{
+    batch::{SchemaBatch, WriteBatch},
+    DB,
+};
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
     transaction::{TransactionOutput, Version},
@@ -46,10 +49,6 @@ impl WriteSetDb {
 
     pub(crate) fn write_schemas(&self, batch: SchemaBatch) -> Result<()> {
         self.db.write_schemas(batch)
-    }
-
-    pub(crate) fn write_in_one_db_batch(&self, batches: Vec<SchemaBatch>) -> Result<()> {
-        self.db.write_in_one_db_batch(batches)
     }
 }
 
@@ -123,7 +122,7 @@ impl WriteSetDb {
             .par_chunks(chunk_size)
             .enumerate()
             .map(|(chunk_idx, chunk)| {
-                let mut batch = SchemaBatch::new();
+                let mut batch = self.db().new_native_batch();
                 let chunk_first_version = first_version + (chunk_idx * chunk_size) as Version;
 
                 chunk.iter().enumerate().try_for_each(|(i, txn_out)| {
@@ -139,7 +138,10 @@ impl WriteSetDb {
 
         {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_write_sets___commit"]);
-            self.write_in_one_db_batch(batches)
+            for batch in batches {
+                self.db().write_schemas(batch)?
+            }
+            Ok(())
         }
     }
 
@@ -147,7 +149,7 @@ impl WriteSetDb {
     pub(crate) fn put_write_set(
         version: Version,
         write_set: &WriteSet,
-        batch: &mut SchemaBatch,
+        batch: &mut impl WriteBatch,
     ) -> Result<()> {
         batch.put::<WriteSetSchema>(&version, write_set)
     }
