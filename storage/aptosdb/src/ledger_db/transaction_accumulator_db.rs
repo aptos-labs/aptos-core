@@ -12,7 +12,7 @@ use aptos_crypto::{
     hash::{CryptoHash, TransactionAccumulatorHasher},
     HashValue,
 };
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_schemadb::{batch::SchemaBatch, DB};
 use aptos_storage_interface::Result;
 use aptos_types::{
     proof::{

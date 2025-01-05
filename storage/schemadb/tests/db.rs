@@ -4,9 +4,10 @@
 
 use anyhow::Result;
 use aptos_schemadb::{
+    batch::SchemaBatch,
     define_schema,
     schema::{KeyCodec, Schema, ValueCodec},
-    ColumnFamilyName, SchemaBatch, DB,
+    ColumnFamilyName, DB,
 };
 use aptos_storage_interface::AptosDbError;
 use byteorder::{LittleEndian, ReadBytesExt};

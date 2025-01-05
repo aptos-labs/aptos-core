@@ -10,19 +10,17 @@ use crate::{
     state_store::{buffered_state::CommitMessage, persisted_state::PersistedState, StateDb},
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_logger::{info, trace};
 use aptos_metrics_core::TimerHelper;
-use aptos_schemadb::SchemaBatch;
+use aptos_schemadb::batch::RawBatch;
 use aptos_storage_interface::state_store::{state::State, state_with_summary::StateWithSummary};
 use std::sync::{mpsc::Receiver, Arc};
 
 pub struct StateMerkleBatch {
-    pub top_levels_batch: SchemaBatch,
-    pub batches_for_shards: Vec<SchemaBatch>,
-    pub root_hash: HashValue,
+    pub top_levels_batch: RawBatch,
+    pub batches_for_shards: Vec<RawBatch>,
     pub snapshot: StateWithSummary,
 }
 
@@ -53,7 +51,6 @@ impl StateMerkleBatchCommitter {
                     let StateMerkleBatch {
                         top_levels_batch,
                         batches_for_shards,
-                        root_hash,
                         snapshot,
                     } = state_merkle_batch;
 
@@ -80,7 +77,7 @@ impl StateMerkleBatchCommitter {
                     info!(
                         version = current_version,
                         base_version = self.persisted_state.lock().version(),
-                        root_hash = root_hash,
+                        root_hash = snapshot.summary().root_hash(),
                         "State snapshot committed."
                     );
                     LATEST_SNAPSHOT_VERSION.set(current_version as i64);

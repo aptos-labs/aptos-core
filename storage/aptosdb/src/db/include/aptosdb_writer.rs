@@ -132,7 +132,7 @@ impl DbWriter for AptosDB {
 
             // Create a single change set for all further write operations
             let mut ledger_db_batch = LedgerDbSchemaBatches::new();
-            let mut sharded_kv_batch = new_sharded_kv_schema_batch();
+            let mut sharded_kv_batch = self.state_kv_db.new_sharded_native_batches();
             let mut state_kv_metadata_batch = SchemaBatch::new();
             // Save the target transactions, outputs, infos and events
             let (transactions, outputs): (Vec<Transaction>, Vec<TransactionOutput>) =
@@ -294,7 +294,7 @@ impl AptosDB {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_state_kv_and_ledger_metadata"]);
 
         let mut ledger_metadata_batch = SchemaBatch::new();
-        let mut sharded_state_kv_batches = new_sharded_kv_schema_batch();
+        let mut sharded_state_kv_batches = self.state_kv_db.new_sharded_native_batches();
 
         self.state_store.put_state_updates(
             chunk.state,
@@ -364,7 +364,7 @@ impl AptosDB {
             .par_chunks(chunk_size)
             .enumerate()
             .map(|(chunk_idx, chunk)| {
-                let mut batch = SchemaBatch::new();
+                let mut batch = self.ledger_db.event_db().db().new_native_batch();
                 let chunk_first_ver = first_version + (chunk_size * chunk_idx) as u64;
                 chunk.iter().enumerate().try_for_each(|(i, txn_out)| {
                     self.ledger_db.event_db().put_events(
@@ -382,7 +382,10 @@ impl AptosDB {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["commit_events___commit"])
                 .start_timer();
-            self.ledger_db.event_db().write_in_one_db_batch(batches)
+            for batch in batches {
+                self.ledger_db.event_db().db().write_schemas(batch)?
+            }
+            Ok(())
         }
     }
 

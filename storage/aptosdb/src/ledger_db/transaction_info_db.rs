@@ -9,7 +9,7 @@ use crate::{
     },
     utils::iterators::ExpectContinuousVersions,
 };
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_schemadb::{batch::SchemaBatch, DB};
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::{
     proof::TransactionInfoWithProof,

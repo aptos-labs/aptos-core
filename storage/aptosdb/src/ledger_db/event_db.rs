@@ -18,7 +18,10 @@ use aptos_crypto::{
 use aptos_db_indexer_schemas::schema::{
     event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
 };
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_schemadb::{
+    batch::{SchemaBatch, WriteBatch},
+    DB,
+};
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::{
     account_config::new_block_event_key, contract_event::ContractEvent, transaction::Version,
@@ -48,7 +51,7 @@ impl EventDb {
         )
     }
 
-    pub(super) fn db(&self) -> &DB {
+    pub(crate) fn db(&self) -> &DB {
         &self.db
     }
 
@@ -58,10 +61,6 @@ impl EventDb {
 
     pub(crate) fn write_schemas(&self, batch: SchemaBatch) -> Result<()> {
         self.db.write_schemas(batch)
-    }
-
-    pub(crate) fn write_in_one_db_batch(&self, batches: Vec<SchemaBatch>) -> Result<()> {
-        self.db.write_in_one_db_batch(batches)
     }
 
     /// Returns all of the events for a given transaction version.
@@ -148,7 +147,7 @@ impl EventDb {
         version: u64,
         events: &[ContractEvent],
         skip_index: bool,
-        batch: &mut SchemaBatch,
+        batch: &mut impl WriteBatch,
     ) -> Result<()> {
         // Event table and indices updates
         events

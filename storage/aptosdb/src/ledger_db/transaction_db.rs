@@ -13,7 +13,10 @@ use crate::{
 use aptos_crypto::hash::{CryptoHash, HashValue};
 use aptos_db_indexer_schemas::schema::transaction_by_account::TransactionByAccountSchema;
 use aptos_metrics_core::TimerHelper;
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_schemadb::{
+    batch::{NativeBatch, SchemaBatch, WriteBatch},
+    DB,
+};
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::transaction::{Transaction, Version};
 use rayon::prelude::*;
@@ -46,10 +49,6 @@ impl TransactionDb {
 
     pub(crate) fn write_schemas(&self, batch: SchemaBatch) -> Result<()> {
         self.db.write_schemas(batch)
-    }
-
-    pub(crate) fn write_in_one_db_batch(&self, batches: Vec<SchemaBatch>) -> Result<()> {
-        self.db.write_in_one_db_batch(batches)
     }
 
     /// Returns signed transaction given its `version`.
@@ -93,8 +92,8 @@ impl TransactionDb {
         let batches = transactions
             .par_chunks(chunk_size)
             .enumerate()
-            .map(|(chunk_index, txns_in_chunk)| -> Result<SchemaBatch> {
-                let mut batch = SchemaBatch::new();
+            .map(|(chunk_index, txns_in_chunk)| -> Result<NativeBatch> {
+                let mut batch = self.db().new_native_batch();
                 let chunk_first_version = first_version + (chunk_size * chunk_index) as u64;
                 txns_in_chunk
                     .iter()
@@ -118,8 +117,10 @@ impl TransactionDb {
         // side unless this really becomes the bottleneck on production.
         {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_transactions___commit"]);
-
-            self.write_in_one_db_batch(batches)
+            for batch in batches {
+                self.db().write_schemas(batch)?
+            }
+            Ok(())
         }
     }
 
@@ -130,7 +131,7 @@ impl TransactionDb {
         version: Version,
         transaction: &Transaction,
         skip_index: bool,
-        batch: &mut SchemaBatch,
+        batch: &mut impl WriteBatch,
     ) -> Result<()> {
         if !skip_index {
             if let Some(txn) = transaction.try_as_signed_user_txn() {

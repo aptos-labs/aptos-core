@@ -163,17 +163,23 @@ impl StateSnapshotCommitter {
                             )
                             .expect("Error calculating StateMerkleBatch for top levels.")
                     };
+                    assert_eq!(
+                        root_hash,
+                        snapshot.summary().root_hash(),
+                        "root hash mismatch: jmt: {}, smt: {}",
+                        root_hash,
+                        snapshot.summary().root_hash(),
+                    );
+
+                    self.last_snapshot = snapshot.clone();
 
                     self.state_merkle_batch_commit_sender
                         .send(CommitMessage::Data(StateMerkleBatch {
                             top_levels_batch,
                             batches_for_shards,
-                            root_hash,
-                            snapshot: snapshot.clone(),
+                            snapshot,
                         }))
                         .unwrap();
-
-                    self.last_snapshot = snapshot;
                 },
                 CommitMessage::Sync(finish_sender) => {
                     self.state_merkle_batch_commit_sender

@@ -21,7 +21,7 @@ use aptos_db_indexer_schemas::{
     },
 };
 use aptos_logger::warn;
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_schemadb::{batch::SchemaBatch, DB};
 use aptos_storage_interface::{
     db_ensure as ensure, db_other_bail as bail, AptosDbError, DbReader, Result,
 };

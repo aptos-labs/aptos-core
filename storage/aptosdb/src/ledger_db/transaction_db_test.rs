@@ -4,7 +4,7 @@
 use crate::{ledger_db::transaction_db::TransactionDb, AptosDB};
 use aptos_crypto::hash::CryptoHash;
 use aptos_proptest_helpers::Index;
-use aptos_schemadb::SchemaBatch;
+use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::Result;
 use aptos_temppath::TempPath;
 use aptos_types::{

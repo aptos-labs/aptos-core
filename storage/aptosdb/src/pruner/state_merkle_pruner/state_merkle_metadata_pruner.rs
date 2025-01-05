@@ -11,7 +11,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_jellyfish_merkle::StaleNodeIndex;
-use aptos_schemadb::{schema::KeyCodec, SchemaBatch, DB};
+use aptos_schemadb::{batch::SchemaBatch, schema::KeyCodec, DB};
 use aptos_types::transaction::{AtomicVersion, Version};
 use std::{
     cmp::max,

@@ -16,7 +16,7 @@ use aptos_db_indexer_schemas::{
     schema::indexer_metadata::InternalIndexerMetadataSchema,
 };
 use aptos_logger::info;
-use aptos_schemadb::SchemaBatch;
+use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::transaction::{Transaction, Version};
 use std::sync::Arc;

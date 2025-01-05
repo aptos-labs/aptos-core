@@ -26,7 +26,6 @@ use crate::{
     state_merkle_db::StateMerkleDb,
     state_store::StateStore,
     transaction_store::TransactionStore,
-    utils::new_sharded_kv_schema_batch,
 };
 use aptos_config::config::{
     PrunerConfig, RocksdbConfig, RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG,
@@ -37,7 +36,7 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
 use aptos_resource_viewer::AptosValueAnnotator;
-use aptos_schemadb::SchemaBatch;
+use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::{
     db_ensure as ensure, db_other_bail as bail, AptosDbError, DbReader, DbWriter, LedgerSummary,
     Order, Result, StateSnapshotReceiver, MAX_REQUEST_LIMIT,

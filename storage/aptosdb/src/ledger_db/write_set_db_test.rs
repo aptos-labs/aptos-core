@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{ledger_db::WriteSetDb, AptosDB};
-use aptos_schemadb::SchemaBatch;
+use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::Result;
 use aptos_temppath::TempPath;
 use aptos_types::{

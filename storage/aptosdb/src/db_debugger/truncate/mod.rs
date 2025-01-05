@@ -11,7 +11,7 @@ use crate::{
     },
 };
 use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
-use aptos_schemadb::SchemaBatch;
+use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use claims::assert_le;
 use clap::Parser;

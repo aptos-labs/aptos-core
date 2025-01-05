@@ -8,9 +8,10 @@ use crate::{
 use anyhow::{anyhow, Result};
 use aptos_logger::prelude::*;
 use aptos_schemadb::{
+    batch::SchemaBatch,
     define_schema,
     schema::{KeyCodec, ValueCodec},
-    ColumnFamilyName, Options, SchemaBatch, DB,
+    ColumnFamilyName, Options, DB,
 };
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use serde::{Deserialize, Serialize};
