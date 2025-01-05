@@ -89,7 +89,7 @@ impl TransactionDb {
         skip_index: bool,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_transactions"]);
-        let chunk_size = transactions.len() / 8 + 1;
+        let chunk_size = transactions.len() / 16 + 1;
         let batches = transactions
             .par_chunks(chunk_size)
             .enumerate()
