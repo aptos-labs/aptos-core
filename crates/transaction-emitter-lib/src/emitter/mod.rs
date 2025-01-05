@@ -32,6 +32,7 @@ use aptos_transaction_generator_lib::{
 };
 use aptos_types::account_config::aptos_test_root_address;
 use futures::future::{try_join_all, FutureExt};
+use itertools::Itertools;
 use once_cell::sync::Lazy;
 use rand::{
     rngs::StdRng,
@@ -49,7 +50,7 @@ use std::{
     },
     time::{Duration, Instant},
 };
-use tokio::{runtime::Handle, task::JoinHandle, time};
+use tokio::{runtime::Handle, sync::Semaphore, task::JoinHandle, time};
 
 // Max is 100k TPS for 3 hours
 const MAX_TXNS: u64 = 1_000_000_000;
@@ -589,13 +590,21 @@ impl EmitModeParams {
                     }
                 })
                 .collect(),
-            WorkerOffsetMode::Spread => index_range
-                .map(|i| {
-                    let start_offset_multiplier_millis =
-                        self.wait_millis as f64 / (self.num_accounts) as f64;
-                    (start_offset_multiplier_millis * i as f64) as u64
-                })
-                .collect(),
+            WorkerOffsetMode::Spread => {
+                let start_offset_multiplier_millis =
+                    self.wait_millis as f64 / (self.num_accounts) as f64;
+                info!(
+                    "start_offset_multiplier_millis {}",
+                    start_offset_multiplier_millis
+                );
+                index_range
+                    .map(|i| {
+                        let start_offset_multiplier_millis =
+                            self.wait_millis as f64 / (self.num_accounts) as f64;
+                        (start_offset_multiplier_millis * i as f64) as u64
+                    })
+                    .collect()
+            },
             WorkerOffsetMode::Wave {
                 wave_ratio,
                 num_waves,
@@ -893,15 +902,24 @@ impl TxnEmitter {
             submission_workers.push(worker);
         }
 
-        info!("Tx emitter workers created");
+        let chunk_size = max(submission_workers.len() / 20, 1);
+        let chunks = submission_workers.into_iter().chunks(chunk_size);
+        let mut workers = Vec::new();
+
         let phase_start = Instant::now();
-        let workers = submission_workers
-            .into_iter()
-            .map(|worker| Worker {
-                join_handle: tokio_handle.spawn(worker.run(phase_start).boxed()),
-            })
-            .collect();
-        info!("Tx emitter workers started");
+        for chunk in &chunks {
+            info!("Tx emitter workers created");
+            let phase_start = Instant::now();
+            let mut chunks = chunk
+                .into_iter()
+                .map(|worker| Worker {
+                    join_handle: tokio_handle.spawn(worker.run(phase_start).boxed()),
+                })
+                .collect();
+            info!("Tx emitter workers started");
+            workers.append(&mut chunks);
+            tokio::time::sleep(Duration::from_millis(10_000)).await;
+        }
 
         Ok(EmitJob {
             workers,
