@@ -7,7 +7,7 @@ use crate::{
     native_functions::{NativeFunction, NativeFunctions},
     storage::{
         struct_name_index_map::StructNameIndexMap, ty_cache::StructInfoCache,
-        verified_module_cache::VERIFIED_MODULES_V2,
+        ty_tag_cache::TypeTagCache, verified_module_cache::VERIFIED_MODULES_V2,
     },
     Module, Script,
 };
@@ -51,6 +51,10 @@ pub struct RuntimeEnvironment {
     ///   with different layouts it is fine to re-use the index.
     ///   We wrap the index map into an [Arc] so that on republishing these clones are cheap.
     struct_name_index_map: Arc<StructNameIndexMap>,
+
+    /// Caches struct tags for instantiated types. This cache can be used concurrently and
+    /// speculatively.
+    ty_tag_cache: Arc<TypeTagCache>,
 
     /// Type cache for struct layouts, tags and depths, shared across multiple threads.
     ///
@@ -100,6 +104,7 @@ impl RuntimeEnvironment {
             vm_config,
             natives,
             struct_name_index_map: Arc::new(StructNameIndexMap::empty()),
+            ty_tag_cache: Arc::new(TypeTagCache::empty()),
             ty_cache: StructInfoCache::empty(),
         }
     }
@@ -261,6 +266,12 @@ impl RuntimeEnvironment {
         &self.struct_name_index_map
     }
 
+    /// Returns the type tag cache used by this environment to store already constructed struct
+    /// tags.
+    pub(crate) fn ty_tag_cache(&self) -> &TypeTagCache {
+        &self.ty_tag_cache
+    }
+
     /// Returns the type cache owned by this runtime environment which stores information about
     /// struct layouts, tags and depth formulae.
     pub(crate) fn ty_cache(&self) -> &StructInfoCache {
@@ -276,6 +287,7 @@ impl RuntimeEnvironment {
     /// Flushes the struct information (type) cache. Flushing this cache does not invalidate struct
     /// name index map or module cache.
     pub fn flush_struct_info_cache(&self) {
+        self.ty_tag_cache.flush();
         self.ty_cache.flush();
     }
 
@@ -307,14 +319,15 @@ impl RuntimeEnvironment {
 }
 
 impl Clone for RuntimeEnvironment {
-    /// Returns the cloned environment. Struct re-indexing map and type caches are cloned and no
-    /// longer shared with the original environment.
+    /// Returns the cloned environment.
     fn clone(&self) -> Self {
         Self {
             vm_config: self.vm_config.clone(),
             natives: self.natives.clone(),
-            struct_name_index_map: self.struct_name_index_map.clone(),
             ty_cache: self.ty_cache.clone(),
+            // Cloning arcs below.
+            struct_name_index_map: self.struct_name_index_map.clone(),
+            ty_tag_cache: self.ty_tag_cache.clone(),
         }
     }
 }

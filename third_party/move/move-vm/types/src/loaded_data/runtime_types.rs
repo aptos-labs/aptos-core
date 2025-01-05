@@ -817,6 +817,16 @@ impl TypeBuilder {
         Type::U256
     }
 
+    #[inline]
+    pub fn create_address_ty(&self) -> Type {
+        Type::Address
+    }
+
+    #[inline]
+    pub fn create_signer_ty(&self) -> Type {
+        Type::Signer
+    }
+
     /// Creates a (possibly mutable) reference type from the given inner type.
     /// Returns an error if the type size or depth are too large.
     #[inline]
