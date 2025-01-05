@@ -53,7 +53,7 @@ pub struct RuntimeEnvironment {
     struct_name_index_map: Arc<StructNameIndexMap>,
 
     /// Caches struct tags for instantiated types. This cache can be used concurrently and
-    /// speculatively.
+    /// speculatively because type tag information does not change with module publishes.
     ty_tag_cache: Arc<TypeTagCache>,
 
     /// Type cache for struct layouts, tags and depths, shared across multiple threads.

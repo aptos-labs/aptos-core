@@ -138,7 +138,7 @@ impl<'a> TypeTagBuilder<'a> {
 
     /// Converts the struct type (based on its indexed name and type arguments) into a struct tag.
     /// If the tag has not been previously cached, it will be cached. Just like for types, if the
-    /// type arguments are to complex, etc. the tag construction fails.
+    /// type arguments are too complex, etc. the tag construction fails.
     pub(crate) fn struct_ty_to_struct_tag(
         &self,
         struct_name_idx: &StructNameIndex,
