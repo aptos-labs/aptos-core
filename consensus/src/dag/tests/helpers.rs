@@ -11,7 +11,7 @@ use crate::{
 use aptos_bitvec::BitVec;
 use aptos_consensus_types::{
     block::Block,
-    common::{Author, Payload, Round, TxnSummaryWithExpiration},
+    common::{Author, Payload, Round},
     pipelined_block::PipelinedBlock,
 };
 use aptos_executor_types::ExecutorResult;
@@ -25,13 +25,7 @@ pub(super) struct MockPayloadManager {}
 
 #[async_trait]
 impl TPayloadManager for MockPayloadManager {
-    fn notify_commit(
-        &self,
-        _block_timestamp: u64,
-        _block: Option<PipelinedBlock>,
-        _txns: Option<Vec<TxnSummaryWithExpiration>>,
-    ) {
-    }
+    fn notify_commit(&self, _block_timestamp: u64, _block: Option<PipelinedBlock>) {}
 
     fn notify_ordered(&self, _block: PipelinedBlock) {}
 

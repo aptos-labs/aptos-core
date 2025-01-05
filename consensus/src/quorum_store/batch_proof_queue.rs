@@ -951,11 +951,7 @@ impl BatchProofQueue {
     }
 
     // Mark in the hashmap committed PoS, but keep them until they expire
-    pub(crate) fn mark_committed(
-        &mut self,
-        batches: Vec<BatchInfo>,
-        txns: Vec<TxnSummaryWithExpiration>,
-    ) {
+    pub(crate) fn mark_committed(&mut self, batches: Vec<BatchInfo>) {
         let start = Instant::now();
 
         for batch in batches.into_iter() {

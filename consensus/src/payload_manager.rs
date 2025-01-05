@@ -13,7 +13,7 @@ use crate::{
 use aptos_bitvec::BitVec;
 use aptos_consensus_types::{
     block::Block,
-    common::{DataStatus, Payload, ProofWithData, Round, TxnSummaryWithExpiration},
+    common::{DataStatus, Payload, ProofWithData, Round},
     payload::{BatchPointer, DataFetchFut, TDataInfo},
     pipelined_block::PipelinedBlock,
     proof_of_store::BatchInfo,
@@ -42,12 +42,7 @@ use tokio::sync::oneshot;
 pub trait TPayloadManager: Send + Sync {
     /// Notify the payload manager that a block has been committed. This indicates that the
     /// transactions in the block's payload are no longer required for consensus.
-    fn notify_commit(
-        &self,
-        block_timestamp: u64,
-        block: Option<PipelinedBlock>,
-        txns: Option<Vec<TxnSummaryWithExpiration>>,
-    );
+    fn notify_commit(&self, block_timestamp: u64, block: Option<PipelinedBlock>);
 
     fn notify_ordered(&self, block: PipelinedBlock);
 
@@ -82,13 +77,7 @@ impl DirectMempoolPayloadManager {
 
 #[async_trait]
 impl TPayloadManager for DirectMempoolPayloadManager {
-    fn notify_commit(
-        &self,
-        _block_timestamp: u64,
-        _block: Option<PipelinedBlock>,
-        _txns: Option<Vec<TxnSummaryWithExpiration>>,
-    ) {
-    }
+    fn notify_commit(&self, _block_timestamp: u64, _block: Option<PipelinedBlock>) {}
 
     fn notify_ordered(&self, _block: PipelinedBlock) {}
 
@@ -249,12 +238,7 @@ impl QuorumStorePayloadManager {
 
 #[async_trait]
 impl TPayloadManager for QuorumStorePayloadManager {
-    fn notify_commit(
-        &self,
-        block_timestamp: u64,
-        block: Option<PipelinedBlock>,
-        txns: Option<Vec<TxnSummaryWithExpiration>>,
-    ) {
+    fn notify_commit(&self, block_timestamp: u64, block: Option<PipelinedBlock>) {
         self.batch_reader
             .update_certified_timestamp(block_timestamp);
 
@@ -268,14 +252,11 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 .join(", ")
         );
 
-        let txns_to_remove = txns.unwrap_or(vec![]);
-
         let mut tx = self.coordinator_tx.clone();
 
         if let Err(e) = tx.try_send(CoordinatorCommand::CommitNotification(
             block_timestamp,
             batches_to_remove,
-            txns_to_remove,
         )) {
             warn!(
                 "CommitNotification failed. Is the epoch shutting down? error: {}",
@@ -861,12 +842,7 @@ impl ConsensusObserverPayloadManager {
 
 #[async_trait]
 impl TPayloadManager for ConsensusObserverPayloadManager {
-    fn notify_commit(
-        &self,
-        _block_timestamp: u64,
-        _block: Option<PipelinedBlock>,
-        _txns: Option<Vec<TxnSummaryWithExpiration>>,
-    ) {
+    fn notify_commit(&self, _block_timestamp: u64, _block: Option<PipelinedBlock>) {
         // noop
     }
 

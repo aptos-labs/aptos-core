@@ -15,7 +15,7 @@ use anyhow::anyhow;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{
     block::Block,
-    common::{Round, TxnSummaryWithExpiration},
+    common::Round,
     pipeline::commit_vote::CommitVote,
     pipelined_block::{
         CommitLedgerResult, CommitVoteResult, ExecuteResult, LedgerUpdateResult, PipelineFutures,
@@ -636,19 +636,6 @@ impl PipelineBuilder {
         let _timer = counters::OP_COUNTERS.timer("pre_commit_notify");
 
         let txns = compute_result.transactions_to_commit().to_vec();
-        // TODO: is this too expensive? Use only hash and expiration if possible?
-        let txn_hashes: Vec<_> = txns
-            .iter()
-            .filter_map(|txn| match txn {
-                Transaction::UserTransaction(txn) => Some(TxnSummaryWithExpiration::new(
-                    txn.sender(),
-                    txn.sequence_number(),
-                    txn.expiration_timestamp_secs(),
-                    txn.committed_hash(),
-                )),
-                _ => None,
-            })
-            .collect();
         let subscribable_events = compute_result.subscribable_events().to_vec();
         if let Err(e) = monitor!(
             "notify_state_sync",
@@ -659,7 +646,7 @@ impl PipelineBuilder {
             error!(error = ?e, "Failed to notify state synchronizer");
         }
 
-        payload_manager.notify_commit(timestamp, Some(block.as_ref().clone()), Some(txn_hashes));
+        payload_manager.notify_commit(timestamp, Some(block.as_ref().clone()));
         Ok(())
     }
 

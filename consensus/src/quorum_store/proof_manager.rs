@@ -25,7 +25,7 @@ pub enum ProofManagerCommand {
     ReceiveProofs(ProofOfStoreMsg),
     ReceiveBatches(Vec<(BatchInfo, Vec<TxnSummaryWithExpiration>)>),
     OrderedNotification(PipelinedBlock),
-    CommitNotification(u64, Vec<BatchInfo>, Vec<TxnSummaryWithExpiration>),
+    CommitNotification(u64, Vec<BatchInfo>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
 
@@ -98,13 +98,12 @@ impl ProofManager {
         &mut self,
         block_timestamp: u64,
         batches: Vec<BatchInfo>,
-        txns: Vec<TxnSummaryWithExpiration>,
     ) {
         trace!(
             "QS: got clean request from execution at block timestamp {}",
             block_timestamp
         );
-        self.batch_proof_queue.mark_committed(batches, txns);
+        self.batch_proof_queue.mark_committed(batches);
         self.batch_proof_queue
             .handle_updated_block_timestamp(block_timestamp);
         self.update_remaining_txns_and_proofs();
@@ -307,12 +306,11 @@ impl ProofManager {
                                 counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofManager::ordered_notification"]).inc();
                                 self.handle_ordered_notification(block);
                             },
-                            ProofManagerCommand::CommitNotification(block_timestamp, batches, txns) => {
+                            ProofManagerCommand::CommitNotification(block_timestamp, batches) => {
                                 counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofManager::commit_notification"]).inc();
                                 self.handle_commit_notification(
                                     block_timestamp,
                                     batches,
-                                    txns,
                                 );
                             },
                         }

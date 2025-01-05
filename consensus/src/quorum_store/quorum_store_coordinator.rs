@@ -11,9 +11,7 @@ use crate::{
 };
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::{
-    common::{Author, TxnSummaryWithExpiration},
-    pipelined_block::PipelinedBlock,
-    proof_of_store::BatchInfo,
+    common::Author, pipelined_block::PipelinedBlock, proof_of_store::BatchInfo,
 };
 use aptos_logger::prelude::*;
 use aptos_types::{account_address::AccountAddress, PeerId};
@@ -21,7 +19,7 @@ use futures::StreamExt;
 use tokio::sync::{mpsc, oneshot};
 
 pub enum CoordinatorCommand {
-    CommitNotification(u64, Vec<BatchInfo>, Vec<TxnSummaryWithExpiration>),
+    CommitNotification(u64, Vec<BatchInfo>),
     OrderedNotification(PipelinedBlock),
     Shutdown(futures_channel::oneshot::Sender<()>),
 }
@@ -58,7 +56,7 @@ impl QuorumStoreCoordinator {
         while let Some(cmd) = rx.next().await {
             monitor!("quorum_store_coordinator_loop", {
                 match cmd {
-                    CoordinatorCommand::CommitNotification(block_timestamp, batches, txns) => {
+                    CoordinatorCommand::CommitNotification(block_timestamp, batches) => {
                         counters::QUORUM_STORE_MSG_COUNT
                             .with_label_values(&["QSCoordinator::commit_notification"])
                             .inc();
@@ -72,7 +70,6 @@ impl QuorumStoreCoordinator {
                             .send(ProofManagerCommand::CommitNotification(
                                 block_timestamp,
                                 batches.clone(),
-                                txns,
                             ))
                             .await
                             .expect("Failed to send to ProofManager");

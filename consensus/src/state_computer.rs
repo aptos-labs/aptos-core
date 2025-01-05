@@ -20,8 +20,7 @@ use crate::{
 use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{
-    common::{Round, TxnSummaryWithExpiration},
-    pipeline_execution_result::PipelineExecutionResult,
+    common::Round, pipeline_execution_result::PipelineExecutionResult,
     pipelined_block::PipelinedBlock,
 };
 use aptos_crypto::HashValue;
@@ -34,7 +33,7 @@ use aptos_metrics_core::IntGauge;
 use aptos_types::{
     account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, randomness::Randomness,
-    transaction::Transaction, validator_signer::ValidatorSigner,
+    validator_signer::ValidatorSigner,
 };
 use fail::fail_point;
 use futures::{future::BoxFuture, SinkExt, StreamExt};
@@ -152,21 +151,6 @@ impl ExecutionProxy {
                         let _timer = counters::OP_COUNTERS.timer("pre_commit_notify");
 
                         let txns = state_compute_result.transactions_to_commit().to_vec();
-                        // TODO: is this too expensive? Use only hash and expiration if possible?
-                        let txn_hashes: Vec<_> = txns
-                            .iter()
-                            .filter_map(|txn| match txn {
-                                Transaction::UserTransaction(txn) => {
-                                    Some(TxnSummaryWithExpiration::new(
-                                        txn.sender(),
-                                        txn.sequence_number(),
-                                        txn.expiration_timestamp_secs(),
-                                        txn.committed_hash(),
-                                    ))
-                                },
-                                _ => None,
-                            })
-                            .collect();
                         let subscribable_events =
                             state_compute_result.subscribable_events().to_vec();
                         if let Err(e) = monitor!(
@@ -178,11 +162,7 @@ impl ExecutionProxy {
                             error!(error = ?e, "Failed to notify state synchronizer");
                         }
 
-                        payload_manager.notify_commit(
-                            timestamp,
-                            Some(block_cloned),
-                            Some(txn_hashes),
-                        );
+                        payload_manager.notify_commit(timestamp, Some(block_cloned));
                     }))
                     .await
                     .expect("Failed to send pre-commit notification");
@@ -471,9 +451,7 @@ impl StateComputer for ExecutionProxy {
         // Might be none if called in the recovery path, or between epoch stop and start.
         if let Some(inner) = self.state.read().as_ref() {
             let block_timestamp = target.commit_info().timestamp_usecs();
-            inner
-                .payload_manager
-                .notify_commit(block_timestamp, None, None);
+            inner.payload_manager.notify_commit(block_timestamp, None);
         }
 
         // Inject an error for fail point testing
