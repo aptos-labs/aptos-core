@@ -902,21 +902,22 @@ impl TxnEmitter {
             submission_workers.push(worker);
         }
 
-        let chunk_size = max(submission_workers.len() / 20, 1);
+        let chunk_size = max(submission_workers.len() / 5, 1);
         let mut chunks = Vec::new();
         while !submission_workers.is_empty() {
             let chunk = if submission_workers.len() <= chunk_size {
                 submission_workers.split_off(0) // Move all remaining elements if smaller than chunk_size
             } else {
-                submission_workers.split_off(chunk_size) // Split off the chunk and shrink `data`
+                submission_workers.split_off(submission_workers.len() - chunk_size)
             };
             chunks.push(chunk);
         }
+        info!("number of chunks: {}", chunks.len());
 
         let mut workers = Vec::new();
         let phase_start = Instant::now();
         for chunk in chunks {
-            info!("Tx emitter workers created");
+            info!("Tx emitter workers created: {}", chunk.len());
             let phase_start = Instant::now();
             let mut chunks = chunk
                 .into_iter()
@@ -926,7 +927,7 @@ impl TxnEmitter {
                 .collect();
             info!("Tx emitter workers started");
             workers.append(&mut chunks);
-            tokio::time::sleep(Duration::from_millis(10_000)).await;
+            tokio::time::sleep(Duration::from_millis(num_accounts as u64)).await;
         }
 
         Ok(EmitJob {
