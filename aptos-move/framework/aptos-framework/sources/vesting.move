@@ -1213,12 +1213,6 @@ module aptos_framework::vesting {
     const VALIDATOR_STATUS_INACTIVE: u64 = 4;
 
     #[test_only]
-    const MODULE_EVENT: u64 = 26;
-
-    #[test_only]
-    const OPERATOR_BENEFICIARY_CHANGE: u64 = 39;
-
-    #[test_only]
     public fun setup(aptos_framework: &signer, accounts: &vector<address>) {
         use aptos_framework::aptos_account::create_account;
 
@@ -1240,7 +1234,8 @@ module aptos_framework::vesting {
             };
         });
 
-        std::features::change_feature_flags_for_testing(aptos_framework, vector[MODULE_EVENT, OPERATOR_BENEFICIARY_CHANGE], vector[]);
+        // In the test environment, the periodical_reward_rate_decrease feature is initially turned off.
+        std::features::change_feature_flags_for_testing(aptos_framework, vector[], vector[std::features::get_periodical_reward_rate_decrease_feature()]);
     }
 
     #[test_only]

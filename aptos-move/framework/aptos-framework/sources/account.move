@@ -175,6 +175,10 @@ module aptos_framework::account {
     const ENO_SIGNER_CAPABILITY_OFFERED: u64 = 19;
     // This account has exceeded the allocated GUIDs it can create. It should be impossible to reach this number for real applications.
     const EEXCEEDED_MAX_GUID_CREATION_NUM: u64 = 20;
+    /// The new authentication key already has an entry in the `OriginatingAddress` table
+    const ENEW_AUTH_KEY_ALREADY_MAPPED: u64 = 21;
+    /// The current authentication key and the new authentication key are the same
+    const ENEW_AUTH_KEY_SAME_AS_CURRENT: u64 = 22;
 
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const MAX_GUID_CREATION_NUM: u64 = 0x4000000000000;
@@ -260,6 +264,16 @@ module aptos_framework::account {
         borrow_global<Account>(addr).sequence_number
     }
 
+    #[view]
+    public fun originating_address(auth_key: address): Option<address> acquires OriginatingAddress {
+        let address_map_ref = &borrow_global<OriginatingAddress>(@aptos_framework).address_map;
+        if (table::contains(address_map_ref, auth_key)) {
+            option::some(*table::borrow(address_map_ref, auth_key))
+        } else {
+            option::none()
+        }
+    }
+
     public(friend) fun increment_sequence_number(addr: address) acquires Account {
         let sequence_number = &mut borrow_global_mut<Account>(addr).sequence_number;
 
@@ -297,6 +311,9 @@ module aptos_framework::account {
     /// does not come with a proof-of-knowledge of the underlying SK. Nonetheless, we need this functionality due to
     /// the introduction of non-standard key algorithms, such as passkeys, which cannot produce proofs-of-knowledge in
     /// the format expected in `rotate_authentication_key`.
+    ///
+    /// If you'd like to followup with updating the `OriginatingAddress` table, you can call
+    /// `set_originating_address()`.
     entry fun rotate_authentication_key_call(account: &signer, new_auth_key: vector<u8>) acquires Account {
         rotate_authentication_key_internal(account, new_auth_key);
     }
@@ -501,6 +518,36 @@ module aptos_framework::account {
         option::swap_or_fill(&mut account_resource.rotation_capability_offer.for, recipient_address);
     }
 
+    /// For the given account, add an entry to `OriginatingAddress` table mapping the account's
+    /// authentication key to the account's address.
+    ///
+    /// Can be used as a followup to `rotate_authentication_key_call()` to reconcile the
+    /// `OriginatingAddress` table, or to establish a mapping for a new account that has not yet had
+    /// its authentication key rotated.
+    ///
+    /// Aborts if there is already an entry in the `OriginatingAddress` table for the account's
+    /// authentication key.
+    ///
+    /// Kept as a private entry function to ensure that after an unproven rotation via
+    /// `rotate_authentication_key_call()`, the `OriginatingAddress` table is only updated under the
+    /// authority of the new authentication key.
+    entry fun set_originating_address(account: &signer) acquires Account, OriginatingAddress {
+        let account_addr = signer::address_of(account);
+        assert!(exists<Account>(account_addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+        let auth_key_as_address =
+            from_bcs::to_address(borrow_global<Account>(account_addr).authentication_key);
+        let address_map_ref_mut =
+            &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
+        if (table::contains(address_map_ref_mut, auth_key_as_address)) {
+            assert!(
+                *table::borrow(address_map_ref_mut, auth_key_as_address) == account_addr,
+                error::invalid_argument(ENEW_AUTH_KEY_ALREADY_MAPPED)
+            );
+        } else {
+            table::add(address_map_ref_mut, auth_key_as_address, account_addr);
+        };
+    }
+
     #[view]
     /// Returns true if the account at `account_addr` has a rotation capability offer.
     public fun is_rotation_capability_offered(account_addr: address): bool acquires Account {
@@ -662,6 +709,11 @@ module aptos_framework::account {
     ) acquires OriginatingAddress {
         let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
         let curr_auth_key = from_bcs::to_address(account_resource.authentication_key);
+        let new_auth_key = from_bcs::to_address(new_auth_key_vector);
+        assert!(
+            new_auth_key != curr_auth_key,
+            error::invalid_argument(ENEW_AUTH_KEY_SAME_AS_CURRENT)
+        );
 
         // Checks `OriginatingAddress[curr_auth_key]` is either unmapped, or mapped to `originating_address`.
         // If it's mapped to the originating address, removes that mapping.
@@ -683,7 +735,10 @@ module aptos_framework::account {
         };
 
         // Set `OriginatingAddress[new_auth_key] = originating_address`.
-        let new_auth_key = from_bcs::to_address(new_auth_key_vector);
+        assert!(
+            !table::contains(address_map, new_auth_key),
+            error::invalid_argument(ENEW_AUTH_KEY_ALREADY_MAPPED)
+        );
         table::add(address_map, new_auth_key, originating_addr);
 
         if (std::features::module_event_migration_enabled()) {
@@ -1535,7 +1590,6 @@ module aptos_framework::account {
         create_account_unchecked(addr);
         register_coin<FakeCoin>(addr);
 
-        let eventhandle = &borrow_global<Account>(addr).coin_register_events;
         let event = CoinRegister { account: addr, type_info: type_info::type_of<FakeCoin>() };
 
         let events = event::emitted_events<CoinRegister>();

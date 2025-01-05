@@ -4,7 +4,7 @@
 use crate::{
     abstract_write_op::AbstractResourceWriteOp,
     change_set::{ChangeSetInterface, VMChangeSet},
-    module_write_set::ModuleWriteSet,
+    module_write_set::{ModuleWrite, ModuleWriteSet},
 };
 use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::AggregatorV1Resolver,
@@ -34,7 +34,6 @@ pub struct VMOutput {
     module_write_set: ModuleWriteSet,
     fee_statement: FeeStatement,
     status: TransactionStatus,
-    auxiliary_data: TransactionAuxiliaryData,
 }
 
 impl VMOutput {
@@ -43,14 +42,12 @@ impl VMOutput {
         module_write_set: ModuleWriteSet,
         fee_statement: FeeStatement,
         status: TransactionStatus,
-        auxiliary_data: TransactionAuxiliaryData,
     ) -> Self {
         Self {
             change_set,
             module_write_set,
             fee_statement,
             status,
-            auxiliary_data,
         }
     }
 
@@ -60,7 +57,6 @@ impl VMOutput {
             module_write_set: ModuleWriteSet::empty(),
             fee_statement: FeeStatement::zero(),
             status,
-            auxiliary_data: TransactionAuxiliaryData::default(),
         }
     }
 
@@ -76,8 +72,8 @@ impl VMOutput {
         self.change_set.resource_write_set()
     }
 
-    pub fn module_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
-        self.module_write_set.write_ops()
+    pub fn module_write_set(&self) -> &BTreeMap<StateKey, ModuleWrite<WriteOp>> {
+        self.module_write_set.writes()
     }
 
     pub fn delayed_field_change_set(
@@ -102,10 +98,6 @@ impl VMOutput {
         &self.status
     }
 
-    pub fn auxiliary_data(&self) -> &TransactionAuxiliaryData {
-        &self.auxiliary_data
-    }
-
     pub fn materialized_size(&self) -> u64 {
         let mut size = 0;
         for (state_key, write_size) in self
@@ -125,9 +117,9 @@ impl VMOutput {
     pub fn concrete_write_set_iter(&self) -> impl Iterator<Item = (&StateKey, Option<&WriteOp>)> {
         self.change_set.concrete_write_set_iter().chain(
             self.module_write_set
-                .write_ops()
+                .writes()
                 .iter()
-                .map(|(k, v)| (k, Some(v))),
+                .map(|(k, v)| (k, Some(v.write_op()))),
         )
     }
 
@@ -179,7 +171,6 @@ impl VMOutput {
             module_write_set,
             fee_statement,
             status,
-            auxiliary_data,
         } = self;
         let (write_set, events) = change_set
             .try_combine_into_storage_change_set(module_write_set)?
@@ -189,7 +180,7 @@ impl VMOutput {
             events,
             fee_statement.gas_used(),
             status,
-            auxiliary_data,
+            TransactionAuxiliaryData::default(),
         ))
     }
 

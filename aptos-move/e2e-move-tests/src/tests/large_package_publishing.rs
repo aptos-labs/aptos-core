@@ -4,7 +4,8 @@
 use crate::{assert_move_abort, assert_success, assert_vm_status, tests::common, MoveHarness};
 use aptos_framework::{
     chunked_publish::{
-        chunk_package_and_create_payloads, PublishType, LARGE_PACKAGES_MODULE_ADDRESS,
+        chunk_package_and_create_payloads, PublishType, CHUNK_SIZE_IN_BYTES,
+        LARGE_PACKAGES_MODULE_ADDRESS,
     },
     natives::{
         code::{PackageMetadata, PackageRegistry, UpgradePolicy},
@@ -21,7 +22,7 @@ use move_core_types::{
     account_address::AccountAddress, parser::parse_struct_tag, vm_status::StatusCode,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, option::Option, path::Path};
+use std::{collections::BTreeMap, option::Option, path::Path, str::FromStr};
 
 /// Number of transactions needed for staging code chunks before publishing to accounts or objects
 /// This is used to derive object address for testing object code deployment feature
@@ -143,6 +144,8 @@ impl LargePackageTestContext {
             package_code,
             publish_type,
             Some(self.object_address),
+            AccountAddress::from_str(LARGE_PACKAGES_MODULE_ADDRESS).unwrap(),
+            CHUNK_SIZE_IN_BYTES,
         )
     }
 }

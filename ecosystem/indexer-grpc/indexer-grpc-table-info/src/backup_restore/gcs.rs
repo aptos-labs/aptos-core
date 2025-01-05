@@ -176,6 +176,17 @@ impl GcsBackupRestoreOperator {
             snapshot_tar_file_name = snapshot_tar_file_name.as_str(),
             "[Table Info] Starting to compress the folder.",
         );
+        // If target path does not exist, wait and log.
+        if !snapshot_path.exists() {
+            aptos_logger::warn!(
+                snapshot_path = snapshot_path.to_str(),
+                snapshot_tar_file_name = snapshot_tar_file_name.as_str(),
+                epoch = epoch,
+                "[Table Info] Directory does not exist. Waiting for the directory to be created."
+            );
+            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+            return Ok(());
+        }
         let tar_file = task::spawn_blocking(move || {
             aptos_logger::info!(
                 snapshot_tar_file_name = snapshot_tar_file_name.as_str(),

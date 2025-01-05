@@ -42,6 +42,12 @@ error: cannot use `integer` with an operator which expects a value of type `R`
 14 │         let () = move_to<R>(a, 0);
    │                                ^
 
+error: constraint `integer` does not have required ability `key`
+   ┌─ tests/checking/typing/global_builtins_invalid.move:15:29
+   │
+15 │         let () = move_to(a, 0);
+   │                             ^
+
 error: cannot use `integer` with an operator which expects a value of type `address`
    ┌─ tests/checking/typing/global_builtins_invalid.move:16:39
    │

@@ -9,12 +9,15 @@ use anyhow::Result;
 use aptos_executor_types::execution_output::ExecutionOutput;
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_metrics_core::TimerHelper;
-use aptos_storage_interface::cached_state_view::CachedStateView;
+use aptos_storage_interface::state_store::state_view::cached_state_view::CachedStateView;
 use aptos_types::{
-    block_executor::config::BlockExecutorConfigFromOnchain,
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain,
+        transaction_slice_metadata::TransactionSliceMetadata,
+    },
     transaction::{Transaction, TransactionOutput, Version},
 };
-use aptos_vm::VMExecutor;
+use aptos_vm::VMBlockExecutor;
 use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::sync::Arc;
@@ -38,7 +41,10 @@ pub trait TransactionChunk {
         self.len() == 0
     }
 
-    fn into_output<V: VMExecutor>(self, state_view: CachedStateView) -> Result<ExecutionOutput>;
+    fn into_output<V: VMBlockExecutor>(
+        self,
+        state_view: CachedStateView,
+    ) -> Result<ExecutionOutput>;
 }
 
 pub struct ChunkToExecute {
@@ -55,7 +61,10 @@ impl TransactionChunk for ChunkToExecute {
         self.transactions.len()
     }
 
-    fn into_output<V: VMExecutor>(self, state_view: CachedStateView) -> Result<ExecutionOutput> {
+    fn into_output<V: VMBlockExecutor>(
+        self,
+        state_view: CachedStateView,
+    ) -> Result<ExecutionOutput> {
         let ChunkToExecute {
             transactions,
             first_version: _,
@@ -78,9 +87,11 @@ impl TransactionChunk for ChunkToExecute {
 
         let _timer = VM_EXECUTE_CHUNK.start_timer();
         DoGetExecutionOutput::by_transaction_execution::<V>(
+            &V::new(),
             sig_verified_txns.into(),
             state_view,
             BlockExecutorConfigFromOnchain::new_no_block_limit(),
+            TransactionSliceMetadata::unknown(),
         )
     }
 }
@@ -100,7 +111,10 @@ impl TransactionChunk for ChunkToApply {
         self.transactions.len()
     }
 
-    fn into_output<V: VMExecutor>(self, state_view: CachedStateView) -> Result<ExecutionOutput> {
+    fn into_output<V: VMBlockExecutor>(
+        self,
+        state_view: CachedStateView,
+    ) -> Result<ExecutionOutput> {
         let Self {
             transactions,
             transaction_outputs,

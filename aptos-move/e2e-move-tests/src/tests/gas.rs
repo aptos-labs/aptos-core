@@ -28,8 +28,8 @@ use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     fee_statement::FeeStatement,
     transaction::{EntryFunction, TransactionPayload},
-    vm::configs::set_paranoid_type_checks,
 };
+use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
 use move_core_types::{identifier::Identifier, language_storage::ModuleId};
 use rand::{rngs::StdRng, SeedableRng};
 use sha3::{Digest, Sha3_512};
@@ -684,7 +684,8 @@ fn test_txn_generator_workloads_calibrate_gas() {
                 runner.harness.run_transaction_payload(
                     &publisher,
                     init_entry_point.create_payload(
-                        package.get_module_id(init_entry_point.module_name()),
+                        &package,
+                        init_entry_point.module_name(),
                         Some(&mut rng),
                         Some(publisher.address()),
                     ),
@@ -695,7 +696,8 @@ fn test_txn_generator_workloads_calibrate_gas() {
                 &format!("entry_point_{entry_point:?}"),
                 &user,
                 entry_point.create_payload(
-                    package.get_module_id(entry_point.module_name()),
+                    &package,
+                    entry_point.module_name(),
                     Some(&mut rng),
                     Some(publisher.address()),
                 ),

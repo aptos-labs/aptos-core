@@ -32,6 +32,7 @@ random_word = { workspace = true }
 reqwest = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
+sugars = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
 

@@ -2,7 +2,41 @@
 
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## Unreleased
+# Unreleased
+- Add flag `--benchmark` to `aptos move prove`, which allows to benchmark verification times of individual functions in a package.
+- Add flag `--only <name>` to `aptos move prove`, which allows to scope verification to a function.
+
+- Fix `aptos init` to show the explorer link for accounts when account is already created on chain instead of prompting to fund the account.
+
+## [5.1.0] - 2024/12/13
+- More optimizations are now default for compiler v2.
+- Downgrade bytecode version to v6 before calling the Revela decompiler, if possible, i.e. no enum types are used. This allows to continue to use Revela until the new decompiler is ready.
+
+## [5.0.0] - 2024/12/11
+- [**Breaking Change**] `aptos init` and `aptos account fund-with-faucet` no longer work directly with testnet, you must now use the minting page at the [Aptos dev docs](https://aptos.dev/network/faucet). 
+## [4.7.0] - 2024/12/10
+- [`Fix`] CLI config should not always require a private key field to be present.
+
+## [4.6.0] - 2024/11/29
+- Add `--node-api-key` flag to `aptos move replay` to allow for querying the fullnode with an API key.
+- Add `--chunk-size` flag to allow configuring chunk size for chunked publish mode.
+- Lower the default chunk size for chunked publish mode (`CHUNK_SIZE_IN_BYTES`) from 60,000 to 55,000.
+
+## [4.5.0] - 2024/11/15
+- Determine network from URL to make explorer links better for legacy users
+- Add support for AIP-80 compliant strings when importing using the CLI arguments or manual input.
+- Add option `--print-metadata-only` to `aptos move decompile` and `aptos move disassemble` to print out the metadata attached to the bytecode.
+- Add `--existing-hasura-url` flag to localnet to tell it to use an existing Hasura instance instead of run Hasura itself. See https://github.com/aptos-labs/aptos-core/pull/15313.
+- Add `--skip-metadata-apply` flag to localnet, in which case we won't try to apply the Hasura metadata.
+- Upgrade Hasura image we use from 2.40.2 to 2.44.0.
+
+## [4.4.0] - 2024/11/06
+- Fix typos in `aptos move compile` help text.
+- Update the default version of `movefmt` to be installed from 1.0.5 to 1.0.6
+- Add `--host-postgres-host` flag: https://github.com/aptos-labs/aptos-core/pull/15216.
+
+## [4.3.0] - 2024/10/30
+- Allow for setting large-packages module for chunking publish mode with `--large-packages-module-address`
 - [`Fix`] Remove unwraps to make outputs go through regular error handling
 
 ## [4.2.6] - 2024/10/23

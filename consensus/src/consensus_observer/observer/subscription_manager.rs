@@ -79,6 +79,7 @@ impl SubscriptionManager {
         &mut self,
         connected_peers_and_metadata: &HashMap<PeerNetworkId, PeerMetadata>,
         peer_network_id: PeerNetworkId,
+        skip_peer_optimality_check: bool,
     ) -> Result<(), Error> {
         // Get the active subscription for the peer
         let mut active_observer_subscriptions = self.active_observer_subscriptions.lock();
@@ -86,9 +87,10 @@ impl SubscriptionManager {
 
         // Check the health of the subscription
         match active_subscription {
-            Some(active_subscription) => {
-                active_subscription.check_subscription_health(connected_peers_and_metadata)
-            },
+            Some(active_subscription) => active_subscription.check_subscription_health(
+                connected_peers_and_metadata,
+                skip_peer_optimality_check,
+            ),
             None => Err(Error::UnexpectedError(format!(
                 "The subscription to peer: {:?} is not active!",
                 peer_network_id
@@ -266,12 +268,19 @@ impl SubscriptionManager {
         &mut self,
         connected_peers_and_metadata: &HashMap<PeerNetworkId, PeerMetadata>,
     ) -> Vec<(PeerNetworkId, Error)> {
+        // Go through all active subscriptions and terminate any unhealthy ones
         let mut terminated_subscriptions = vec![];
         for subscription_peer in self.get_active_subscription_peers() {
+            // To avoid terminating too many subscriptions at once, we should skip
+            // the peer optimality check if we've already terminated a subscription.
+            let skip_peer_optimality_check = !terminated_subscriptions.is_empty();
+
             // Check the health of the subscription and terminate it if needed
-            if let Err(error) =
-                self.check_subscription_health(connected_peers_and_metadata, subscription_peer)
-            {
+            if let Err(error) = self.check_subscription_health(
+                connected_peers_and_metadata,
+                subscription_peer,
+                skip_peer_optimality_check,
+            ) {
                 // Log the subscription termination error
                 warn!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
@@ -1099,8 +1108,11 @@ mod test {
     ) {
         // Check the health of the subscription
         let connected_peers_and_metadata = subscription_manager.get_connected_peers_and_metadata();
-        let result = subscription_manager
-            .check_subscription_health(&connected_peers_and_metadata, subscription_peer);
+        let result = subscription_manager.check_subscription_health(
+            &connected_peers_and_metadata,
+            subscription_peer,
+            false,
+        );
 
         // Check the result based on the expected connection status
         if expect_connected {
@@ -1118,8 +1130,11 @@ mod test {
     ) {
         // Check the health of the subscription
         let connected_peers_and_metadata = subscription_manager.get_connected_peers_and_metadata();
-        let result = subscription_manager
-            .check_subscription_health(&connected_peers_and_metadata, subscription_peer);
+        let result = subscription_manager.check_subscription_health(
+            &connected_peers_and_metadata,
+            subscription_peer,
+            false,
+        );
 
         // Check the result based on the expected optimality status
         if expect_optimal {
@@ -1137,8 +1152,11 @@ mod test {
     ) {
         // Check the health of the subscription
         let connected_peers_and_metadata = subscription_manager.get_connected_peers_and_metadata();
-        let result = subscription_manager
-            .check_subscription_health(&connected_peers_and_metadata, subscription_peer);
+        let result = subscription_manager.check_subscription_health(
+            &connected_peers_and_metadata,
+            subscription_peer,
+            false,
+        );
 
         // Check the result based on the expected progress status
         if expect_progress {
@@ -1156,8 +1174,11 @@ mod test {
     ) {
         // Check the health of the subscription
         let connected_peers_and_metadata = subscription_manager.get_connected_peers_and_metadata();
-        let result = subscription_manager
-            .check_subscription_health(&connected_peers_and_metadata, subscription_peer);
+        let result = subscription_manager.check_subscription_health(
+            &connected_peers_and_metadata,
+            subscription_peer,
+            false,
+        );
 
         // Check the result based on the expected timeout status
         if expect_timeout {

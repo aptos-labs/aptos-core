@@ -11,15 +11,12 @@ use crate::{
     },
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_executor_types::state_checkpoint_output::StateCheckpointOutput;
-use aptos_storage_interface::{state_delta::StateDelta, DbReader, ExecutedTrees};
+use aptos_storage_interface::{state_store::state_delta::StateDelta, DbReader, LedgerSummary};
 use aptos_types::{proof::accumulator::InMemoryTransactionAccumulator, transaction::Version};
 use std::{collections::VecDeque, sync::Arc};
 
 pub(crate) struct ChunkToUpdateLedger {
     pub output: PartialStateComputeResult,
-    /// transactions sorted by status, state roots, state updates
-    pub state_checkpoint_output: StateCheckpointOutput,
 
     /// from the input -- can be checked / used only after the transaction accumulator
     /// is updated.
@@ -44,10 +41,10 @@ pub struct ChunkCommitQueue {
 
 impl ChunkCommitQueue {
     pub(crate) fn new_from_db(db: &Arc<dyn DbReader>) -> Result<Self> {
-        let ExecutedTrees {
+        let LedgerSummary {
             state,
             transaction_accumulator,
-        } = db.get_latest_executed_trees()?;
+        } = db.get_pre_committed_ledger_summary()?;
         Ok(Self {
             latest_state: state,
             latest_txn_accumulator: transaction_accumulator,
@@ -68,7 +65,7 @@ impl ChunkCommitQueue {
         &mut self,
         chunk_to_update_ledger: ChunkToUpdateLedger,
     ) -> Result<()> {
-        self.latest_state = chunk_to_update_ledger.output.result_state.clone();
+        self.latest_state = chunk_to_update_ledger.output.expect_result_state().clone();
         self.to_update_ledger
             .push_back(Some(chunk_to_update_ledger));
         Ok(())

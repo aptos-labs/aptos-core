@@ -37,7 +37,8 @@ pub async fn generate_traffic(
     .await?;
     let transaction_factory =
         TransactionFactory::new(swarm.chain_info().chain_id).with_gas_unit_price(gas_price);
-    let emitter = TxnEmitter::new(transaction_factory, rng);
+    let rest_cli = swarm.validators().next().unwrap().rest_client();
+    let emitter = TxnEmitter::new(transaction_factory, rng, rest_cli);
     emitter
         .emit_txn_for_with_stats(
             swarm.chain_info().root_account,
@@ -68,8 +69,8 @@ pub async fn generate_keyless_traffic(
     .await?;
     let transaction_factory =
         TransactionFactory::new(swarm.chain_info().chain_id).with_gas_unit_price(gas_price);
-
-    let emitter = TxnEmitter::new(transaction_factory, rng);
+    let rest_cli = swarm.validators().next().unwrap().rest_client();
+    let emitter = TxnEmitter::new(transaction_factory, rng, rest_cli);
     emitter
         .emit_txn_for_with_stats(
             swarm.chain_info().root_account,
@@ -267,7 +268,7 @@ async fn test_txn_emmitter_low_funds() {
         .collect::<Vec<_>>();
     let chain_info = swarm.chain_info();
     let transaction_factory = TransactionFactory::new(chain_info.chain_id).with_gas_unit_price(100);
-    let emitter = TxnEmitter::new(transaction_factory, rng);
+    let emitter = TxnEmitter::new(transaction_factory, rng, validator_clients[0].clone());
 
     let emit_job_request = EmitJobRequest::default()
         .rest_clients(validator_clients)

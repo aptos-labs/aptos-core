@@ -6,13 +6,22 @@ use crate::{
     monitor,
     network::QuorumStoreSender,
     quorum_store::{
-        batch_generator::BatchGeneratorCommand, batch_store::BatchReader, counters, utils::Timeouts,
+        batch_generator::BatchGeneratorCommand,
+        batch_store::BatchReader,
+        counters,
+        tracing::{observe_batch, observe_batch_vote_pct, BatchStage},
+        utils::Timeouts,
     },
 };
-use aptos_consensus_types::proof_of_store::{
-    BatchInfo, ProofCache, ProofOfStore, SignedBatchInfo, SignedBatchInfoError, SignedBatchInfoMsg,
+use aptos_consensus_types::{
+    payload::TDataInfo,
+    proof_of_store::{
+        BatchInfo, ProofCache, ProofOfStore, SignedBatchInfo, SignedBatchInfoError,
+        SignedBatchInfoMsg,
+    },
 };
 use aptos_logger::prelude::*;
+use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{
     ledger_info::SignatureAggregator, validator_verifier::ValidatorVerifier, PeerId,
 };
@@ -28,23 +37,28 @@ use tokio::{
 
 #[derive(Debug)]
 pub(crate) enum ProofCoordinatorCommand {
-    AppendSignature(SignedBatchInfoMsg),
+    AppendSignature(PeerId, SignedBatchInfoMsg),
     CommitNotification(Vec<BatchInfo>),
     Shutdown(TokioOneshot::Sender<()>),
 }
 
 struct IncrementalProofState {
     signature_aggregator: SignatureAggregator<BatchInfo>,
+    aggregated_voting_power: u128,
     self_voted: bool,
     completed: bool,
+    // Pct last time the diff was over 10%
+    last_increment_pct: u8,
 }
 
 impl IncrementalProofState {
     fn new(info: BatchInfo) -> Self {
         Self {
             signature_aggregator: SignatureAggregator::new(info),
+            aggregated_voting_power: 0,
             self_voted: false,
             completed: false,
+            last_increment_pct: 0,
         }
     }
 
@@ -52,6 +66,8 @@ impl IncrementalProofState {
         self.signature_aggregator.all_voters().count() as u64
     }
 
+    // Returns the aggregated voting power of all signatures include those that are invalid.
+    #[allow(unused)]
     pub fn aggregate_voting_power(&self, verifier: &ValidatorVerifier) -> u64 {
         self.signature_aggregator
             .check_voting_power(verifier, true)
@@ -71,11 +87,12 @@ impl IncrementalProofState {
         }
 
         match validator_verifier.get_voting_power(&signed_batch_info.signer()) {
-            Some(_voting_power) => {
+            Some(voting_power) => {
                 self.signature_aggregator.add_signature(
                     signed_batch_info.signer(),
                     signed_batch_info.signature_with_status(),
                 );
+                self.aggregated_voting_power += voting_power as u128;
                 if signed_batch_info.signer() == self.signature_aggregator.data().author() {
                     self.self_voted = true;
                 }
@@ -100,6 +117,20 @@ impl IncrementalProofState {
         self.signature_aggregator
             .check_voting_power(validator_verifier, check_super_majority)
             .is_ok()
+    }
+
+    /// Observes the voting percentage if it's 10% higher than last observation i.e. it
+    /// approximately observes every 10% increase in voting power.
+    fn observe_voting_pct(&mut self, timestamp: u64, validator_verifier: &ValidatorVerifier) {
+        let pct = self
+            .aggregated_voting_power
+            .saturating_mul(100)
+            .saturating_div(validator_verifier.total_voting_power()) as u8;
+        let author = self.signature_aggregator.data().author();
+        if pct >= self.last_increment_pct + 10 {
+            observe_batch_vote_pct(timestamp, author, pct);
+            self.last_increment_pct = pct;
+        }
     }
 
     /// Try to aggregate all signatures if the voting power is enough. If the aggregated signature is
@@ -139,6 +170,7 @@ pub(crate) struct ProofCoordinator {
     batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
     proof_cache: ProofCache,
     broadcast_proofs: bool,
+    batch_expiry_gap_when_init_usecs: u64,
 }
 
 //PoQS builder object - gather signed digest to form PoQS
@@ -150,6 +182,7 @@ impl ProofCoordinator {
         batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
         proof_cache: ProofCache,
         broadcast_proofs: bool,
+        batch_expiry_gap_when_init_usecs: u64,
     ) -> Self {
         Self {
             peer_id,
@@ -161,6 +194,7 @@ impl ProofCoordinator {
             batch_generator_cmd_tx,
             proof_cache,
             broadcast_proofs,
+            batch_expiry_gap_when_init_usecs,
         }
     }
 
@@ -241,10 +275,7 @@ impl ProofCoordinator {
         Ok(None)
     }
 
-    fn update_counters_on_expire(
-        state: &IncrementalProofState,
-        validator_verifier: &ValidatorVerifier,
-    ) {
+    fn update_counters_on_expire(state: &IncrementalProofState) {
         // Count late votes separately
         if !state.completed && !state.self_voted {
             counters::BATCH_RECEIVED_LATE_REPLIES_COUNT.inc_by(state.voter_count());
@@ -252,20 +283,20 @@ impl ProofCoordinator {
         }
 
         counters::BATCH_RECEIVED_REPLIES_COUNT.observe(state.voter_count() as f64);
-        counters::BATCH_RECEIVED_REPLIES_VOTING_POWER
-            .observe(state.aggregate_voting_power(validator_verifier) as f64);
+        counters::BATCH_RECEIVED_REPLIES_VOTING_POWER.observe(state.aggregated_voting_power as f64);
         if !state.completed {
             counters::BATCH_SUCCESSFUL_CREATION.observe(0.0);
         }
     }
 
-    async fn expire(&mut self, validator_verifier: &ValidatorVerifier) {
+    async fn expire(&mut self) {
         let mut batch_ids = vec![];
         for signed_batch_info_info in self.timeouts.expire() {
             if let Some(state) = self.batch_info_to_proof.remove(&signed_batch_info_info) {
                 if !state.completed {
                     batch_ids.push(signed_batch_info_info.batch_id());
                 }
+                Self::update_counters_on_expire(&state);
 
                 // We skip metrics if the proof did not complete and did not get a self vote, as it
                 // is considered a proof that was re-inited due to a very late vote.
@@ -281,7 +312,6 @@ impl ProofCoordinator {
                         self_voted = state.self_voted,
                     );
                 }
-                Self::update_counters_on_expire(&state, validator_verifier);
             }
         }
         if self
@@ -334,9 +364,19 @@ impl ProofCoordinator {
                                 }
                             }
                         },
-                        ProofCoordinatorCommand::AppendSignature(signed_batch_infos) => {
+                        ProofCoordinatorCommand::AppendSignature(signer, signed_batch_infos) => {
+                            let signed_batch_infos = signed_batch_infos.take();
+                            let Some(signed_batch_info) = signed_batch_infos.first() else {
+                                error!("Empty signed batch info received from {}", signer.short_str().as_str());
+                                return;
+                            };
+                            let info = signed_batch_info.info().clone();
+                            let approx_created_ts_usecs = signed_batch_info
+                                .expiration()
+                                .saturating_sub(self.batch_expiry_gap_when_init_usecs);
+
                             let mut proofs = vec![];
-                            for signed_batch_info in signed_batch_infos.take().into_iter() {
+                            for signed_batch_info in signed_batch_infos.into_iter() {
                                 let peer_id = signed_batch_info.signer();
                                 let digest = *signed_batch_info.digest();
                                 let batch_id = signed_batch_info.batch_id();
@@ -361,7 +401,11 @@ impl ProofCoordinator {
                                     },
                                 }
                             }
+                            if let Some(value) = self.batch_info_to_proof.get_mut(&info) {
+                                value.observe_voting_pct(approx_created_ts_usecs, &validator_verifier);
+                            }
                             if !proofs.is_empty() {
+                                observe_batch(approx_created_ts_usecs, self.peer_id, BatchStage::POS_FORMED);
                                 if self.broadcast_proofs {
                                     network_sender.broadcast_proof_of_store_msg(proofs).await;
                                 } else {
@@ -372,7 +416,7 @@ impl ProofCoordinator {
                     }
                 }),
                 _ = interval.tick() => {
-                    monitor!("proof_coordinator_handle_tick", self.expire(&validator_verifier).await);
+                    monitor!("proof_coordinator_handle_tick", self.expire().await);
                 }
             }
         }

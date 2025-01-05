@@ -1,18 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-mod docker;
-mod indexer_api;
 mod logging;
 mod postgres;
-mod processors;
 mod ready_server;
 mod utils;
 
 // This is to allow external crates to use the localnode.
+pub mod docker;
 pub mod faucet;
 pub mod health_checker;
+pub mod indexer_api;
 pub mod node;
+pub mod processors;
 pub mod traits;
 
 use self::{

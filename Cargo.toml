@@ -26,6 +26,7 @@ members = [
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
     "aptos-move/aptos-vm-benchmarks",
+    "aptos-move/aptos-vm-environment",
     "aptos-move/aptos-vm-logging",
     "aptos-move/aptos-vm-profiling",
     "aptos-move/aptos-vm-types",
@@ -41,6 +42,8 @@ members = [
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
     "aptos-move/package-builder",
+    "aptos-move/replay-benchmark",
+    "aptos-move/script-composer",
     "aptos-move/vm-genesis",
     "aptos-node",
     "aptos-utils",
@@ -75,6 +78,7 @@ members = [
     "crates/aptos-jwk-consensus",
     "crates/aptos-keygen",
     "crates/aptos-ledger",
+    "crates/aptos-localnet",
     "crates/aptos-log-derive",
     "crates/aptos-logger",
     "crates/aptos-metrics-core",
@@ -140,8 +144,6 @@ members = [
     "experimental/runtimes",
     "experimental/storage/hexy",
     "experimental/storage/layered-map",
-    "keyless/circuit",
-    "keyless/common",
     "keyless/pepper/common",
     "keyless/pepper/example-client-rust",
     "keyless/pepper/service",
@@ -232,20 +234,22 @@ members = [
     "third_party/move/move-prover/test-utils",
     "third_party/move/move-symbol-pool",
     "third_party/move/move-vm/integration-tests",
+    "third_party/move/move-vm/metrics",
     "third_party/move/move-vm/paranoid-tests",
     "third_party/move/move-vm/runtime",
     "third_party/move/move-vm/test-utils",
     "third_party/move/move-vm/transactional-tests",
     "third_party/move/move-vm/types",
     "third_party/move/testing-infra/module-generation",
-    "third_party/move/testing-infra/test-generation",
     "third_party/move/testing-infra/transactional-test-runner",
     "third_party/move/tools/move-bytecode-utils",
     "third_party/move/tools/move-bytecode-viewer",
     "third_party/move/tools/move-cli",
     "third_party/move/tools/move-coverage",
+    "third_party/move/tools/move-decompiler",
     "third_party/move/tools/move-disassembler",
     "third_party/move/tools/move-explain",
+    "third_party/move/tools/move-linter",
     "third_party/move/tools/move-package",
     "third_party/move/tools/move-resource-viewer",
     "third_party/move/tools/move-unit-test",
@@ -377,6 +381,7 @@ aptos-jwk-utils = { path = "crates/jwk-utils" }
 aptos-keygen = { path = "crates/aptos-keygen" }
 aptos-language-e2e-tests = { path = "aptos-move/e2e-tests" }
 aptos-ledger = { path = "crates/aptos-ledger" }
+aptos-localnet = { path = "crates/aptos-localnet" }
 aptos-log-derive = { path = "crates/aptos-log-derive" }
 aptos-logger = { path = "crates/aptos-logger" }
 aptos-memory-usage-tracker = { path = "aptos-move/aptos-memory-usage-tracker" }
@@ -417,6 +422,7 @@ aptos-push-metrics = { path = "crates/aptos-push-metrics" }
 aptos-rate-limiter = { path = "crates/aptos-rate-limiter" }
 aptos-release-builder = { path = "aptos-move/aptos-release-builder" }
 aptos-reliable-broadcast = { path = "crates/reliable-broadcast" }
+aptos-replay-benchmark = { path = "aptos-move/replay-benchmark" }
 aptos-resource-viewer = { path = "aptos-move/aptos-resource-viewer" }
 aptos-rest-client = { path = "crates/aptos-rest-client" }
 aptos-retrier = { path = "crates/aptos-retrier" }
@@ -426,6 +432,7 @@ aptos-runtimes = { path = "crates/aptos-runtimes" }
 aptos-safety-rules = { path = "consensus/safety-rules" }
 aptos-schemadb = { path = "storage/schemadb" }
 aptos-scratchpad = { path = "storage/scratchpad" }
+aptos-script-composer = { path = "aptos-move/script-composer" }
 aptos-sdk = { path = "sdk" }
 aptos-sdk-builder = { path = "aptos-move/aptos-sdk-builder" }
 aptos-secure-net = { path = "secure/net" }
@@ -456,10 +463,12 @@ aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }
 aptos-validator-transaction-pool = { path = "crates/validator-transaction-pool" }
 aptos-vault-client = { path = "secure/storage/vault" }
 aptos-vm = { path = "aptos-move/aptos-vm" }
+aptos-vm-environment = { path = "aptos-move/aptos-vm-environment" }
 aptos-vm-logging = { path = "aptos-move/aptos-vm-logging" }
 aptos-vm-genesis = { path = "aptos-move/vm-genesis" }
 aptos-vm-types = { path = "aptos-move/aptos-vm-types" }
 aptos-vm-validator = { path = "vm-validator" }
+aptos-workspace-server = { path = "aptos-move/aptos-workspace-server" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
 aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
 
@@ -471,6 +480,7 @@ atty = "0.2.14"
 nalgebra = "0.32"
 float-cmp = "0.9.0"
 again = "0.1.2"
+ambassador = "0.4.1"
 anyhow = "1.0.71"
 anstyle = "1.0.1"
 arbitrary = { version = "1.3.2", features = ["derive"] }
@@ -520,7 +530,12 @@ cfg_block = "0.1.1"
 cfg-if = "1.0.0"
 ciborium = "0.2"
 claims = "0.7"
-clap = { version = "4.3.9", features = ["derive", "env", "unstable-styles", "wrap_help"] }
+clap = { version = "4.3.9", features = [
+    "derive",
+    "env",
+    "unstable-styles",
+    "wrap_help",
+] }
 clap-verbosity-flag = "2.1.1"
 clap_complete = "4.4.1"
 cloud-storage = { version = "0.11.1", features = [
@@ -578,10 +593,12 @@ ethnum = "1.5.0"
 event-listener = "2.5.3"
 evm = { version = "0.33.1", features = ["tracing"] }
 evm-runtime = { version = "0.33.0", features = ["tracing"] }
+dearbitrary = { version = "1.0.4", features = ["derive"] }
 fail = "0.5.0"
 ff = { version = "0.13", features = ["derive"] }
 field_count = "0.1.1"
 file_diff = "1.0.0"
+firebase-token = { git = "https://github.com/aptos-labs/firebase-token", rev = "34ea512d3d1fad6c11df3e7d82ff72beccc05836" }
 firestore = "0.43.0"
 fixed = "1.25.1"
 flate2 = "1.0.24"
@@ -612,6 +629,7 @@ http = "0.2.9"
 httpmock = "0.6.8"
 hyper = { version = "0.14.18", features = ["full"] }
 hyper-tls = "0.5.0"
+im = "15.0.0"
 image = "0.24.5"
 indexmap = "1.9.3"
 include_dir = { version = "0.7.2", features = ["glob"] }
@@ -655,6 +673,7 @@ num-derive = "0.3.3"
 num-integer = "0.1.42"
 num-traits = "0.2.15"
 once_cell = "1.10.0"
+open = "5.3.1"
 ordered-float = "3.9.1"
 ouroboros = "0.15.6"
 owo-colors = "3.5.0"
@@ -676,8 +695,14 @@ petgraph = "0.6.5"
 pin-project = "1.0.10"
 plotters = { version = "0.3.5", default-features = false }
 # We're using git deps until https://github.com/poem-web/poem/pull/829 gets formally released.
-poem = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b", features = ["anyhow", "rustls"] }
-poem-openapi = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b", features = ["swagger-ui", "url"] }
+poem = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b", features = [
+    "anyhow",
+    "rustls",
+] }
+poem-openapi = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b", features = [
+    "swagger-ui",
+    "url",
+] }
 poem-openapi-derive = { git = "https://github.com/poem-web/poem.git", rev = "809b2816d3504beeba140fef3fdfe9432d654c5b" }
 poseidon-ark = { git = "https://github.com/arnaucube/poseidon-ark.git", rev = "6d2487aa1308d9d3860a2b724c485d73095c1c68" }
 pprof = { version = "0.11", features = ["flamegraph", "protobuf-codec"] }
@@ -695,6 +720,7 @@ prost = { version = "0.12.3", features = ["no-recursion-limit"] }
 prost-types = "0.12.3"
 quanta = "0.10.1"
 quick_cache = "0.5.1"
+quick-junit = "0.5.0"
 quote = "1.0.18"
 rand = "0.7.3"
 rand_core = "0.5.1"
@@ -757,6 +783,7 @@ stats_alloc = "0.1.8"
 status-line = "0.2.0"
 strum = "0.24.1"
 strum_macros = "0.24.2"
+sugars = "3.0.1"
 syn = { version = "1.0.92", features = ["derive", "extra-traits"] }
 sysinfo = "0.28.4"
 tar = "0.4.40"
@@ -775,6 +802,7 @@ toml_edit = "0.14.3"
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }
 trybuild = "1.0.80"
+try_match = "0.4.2"
 tokio = { version = "1.35.1", features = ["full"] }
 tokio-io-timeout = "1.2.0"
 tokio-metrics = "0.3.1"
@@ -795,6 +823,7 @@ tonic = { version = "0.11.0", features = [
 tonic-reflection = "0.11.0"
 topological-sort = "0.2.2"
 triomphe = "0.1.9"
+tsify-next = "0.5.4"
 tui = "0.19.0"
 typed-arena = "2.0.2"
 typenum = "1.17.0"
@@ -809,6 +838,8 @@ variant_count = "1.1.0"
 walkdir = "2.3.3"
 warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
+wasm-bindgen = "0.2.95"
+wasm-bindgen-futures = "0.4.42"
 which = "4.2.5"
 whoami = "1.5.0"
 x25519-dalek = "1.2.0"
@@ -817,8 +848,12 @@ z3tracer = "0.8.0"
 # MOVE DEPENDENCIES
 move-abigen = { path = "third_party/move/move-prover/move-abigen" }
 move-binary-format = { path = "third_party/move/move-binary-format" }
+move-borrow-graph = { path = "third_party/move/move-borrow-graph" }
+move-bytecode-source-map = { path = "third_party/move/move-ir-compiler/move-bytecode-source-map" }
 move-bytecode-spec = { path = "third_party/move/move-bytecode-spec" }
 move-bytecode-verifier = { path = "third_party/move/move-bytecode-verifier" }
+move-bytecode-verifier-invalid-mutations = { path = "third_party/move/move-bytecode-verifier/invalid-mutations" }
+move-bytecode-viewer = { path = "third_party/move/tools/move-bytecode-viewer" }
 move-bytecode-utils = { path = "third_party/move/tools/move-bytecode-utils" }
 move-cli = { path = "third_party/move/tools/move-cli" }
 move-command-line-common = { path = "third_party/move/move-command-line-common" }
@@ -826,32 +861,33 @@ move-coverage = { path = "third_party/move/tools/move-coverage" }
 move-compiler = { path = "third_party/move/move-compiler" }
 move-compiler-v2 = { path = "third_party/move/move-compiler-v2" }
 move-core-types = { path = "third_party/move/move-core/types" }
+move-decompiler = { path = "third_party/move/tools/move-decompiler" }
 move-docgen = { path = "third_party/move/move-prover/move-docgen" }
 move-disassembler = { path = "third_party/move/tools/move-disassembler" }
+move-errmapgen = { path = "third_party/move/move-prover/move-errmapgen" }
 move-ir-types = { path = "third_party/move/move-ir/types" }
 move-ir-compiler = { path = "third_party/move/move-ir-compiler" }
-move-bytecode-source-map = { path = "third_party/move/move-ir-compiler/move-bytecode-source-map" }
+move-ir-to-bytecode = { path = "third_party/move/move-ir-compiler/move-ir-to-bytecode" }
+move-linter = { path = "third_party/move/tools/move-linter" }
 move-model = { path = "third_party/move/move-model" }
 move-package = { path = "third_party/move/tools/move-package" }
 move-prover = { path = "third_party/move/move-prover" }
 move-prover-boogie-backend = { path = "third_party/move/move-prover/boogie-backend" }
 move-prover-bytecode-pipeline = { path = "third_party/move/move-prover/bytecode-pipeline" }
-move-stackless-bytecode = { path = "third_party/move/move-model/bytecode" }
-move-stackless-bytecode-test-utils = { path = "third_party/move/move-model/bytecode-test-utils" }
+move-prover-test-utils = { path = "third_party/move/move-prover/test-utils" }
+move-prover-lab = { path = "third_party/move/move-prover/lab" }
 aptos-move-stdlib = { path = "aptos-move/framework/move-stdlib" }
 aptos-table-natives = { path = "aptos-move/framework/table-natives" }
-move-prover-test-utils = { path = "third_party/move/move-prover/test-utils" }
 move-resource-viewer = { path = "third_party/move/tools/move-resource-viewer" }
+move-stackless-bytecode = { path = "third_party/move/move-model/bytecode" }
+move-stackless-bytecode-test-utils = { path = "third_party/move/move-model/bytecode-test-utils" }
 move-symbol-pool = { path = "third_party/move/move-symbol-pool" }
 move-table-extension = { path = "third_party/move/extensions/move-table-extension" }
 move-transactional-test-runner = { path = "third_party/move/testing-infra/transactional-test-runner" }
-move-unit-test = { path = "third_party/move/tools/move-unit-test", features = [
-    "table-extension",
-] }
+move-unit-test = { path = "third_party/move/tools/move-unit-test", features = ["table-extension"] }
+move-vm-metrics = { path = "third_party/move/move-vm/metrics" }
 move-vm-runtime = { path = "third_party/move/move-vm/runtime" }
-move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = [
-    "table-extension",
-] }
+move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = ["table-extension"] }
 move-vm-types = { path = "third_party/move/move-vm/types" }
 
 [profile.release]
@@ -890,3 +926,12 @@ serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev
 merlin = { git = "https://github.com/aptos-labs/merlin" }
 x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", branch = "zeroize_v1" }
 tonic = { git = "https://github.com/aptos-labs/tonic.git", rev = "0da1ba8b1751d6e19eb55be24cccf9ae933c666e" }
+futures = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-channel = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-executor = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-core = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-util = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-sink = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-io = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-task = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures-macro = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }

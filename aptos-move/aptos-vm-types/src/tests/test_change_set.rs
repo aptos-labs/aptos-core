@@ -436,10 +436,7 @@ fn test_aggregator_v2_snapshots_and_derived() {
 
 #[test]
 fn test_resource_groups_squashing() {
-    let modification_metadata = WriteOp::Modification {
-        data: Bytes::new(),
-        metadata: raw_metadata(2000),
-    };
+    let modification_metadata = WriteOp::modification(Bytes::new(), raw_metadata(2000));
 
     macro_rules! as_create_op {
         ($val:expr) => {
@@ -593,10 +590,7 @@ fn test_write_and_read_discrepancy_caught() {
         )])
         .try_build());
 
-    let metadata_op = WriteOp::Modification {
-        data: Bytes::new(),
-        metadata: raw_metadata(1000),
-    };
+    let metadata_op = WriteOp::modification(Bytes::new(), raw_metadata(1000));
     let group_size = ResourceGroupSize::Combined {
         num_tagged_resources: 1,
         all_tagged_resources_size: 14,
@@ -637,17 +631,9 @@ mod tests {
 
     pub(crate) fn write_op_with_metadata(type_idx: u8, v: u128) -> WriteOp {
         match type_idx {
-            CREATION => WriteOp::Creation {
-                data: vec![].into(),
-                metadata: raw_metadata(v as u64),
-            },
-            MODIFICATION => WriteOp::Modification {
-                data: vec![].into(),
-                metadata: raw_metadata(v as u64),
-            },
-            DELETION => WriteOp::Deletion {
-                metadata: raw_metadata(v as u64),
-            },
+            CREATION => WriteOp::creation(vec![].into(), raw_metadata(v as u64)),
+            MODIFICATION => WriteOp::modification(vec![].into(), raw_metadata(v as u64)),
+            DELETION => WriteOp::deletion(raw_metadata(v as u64)),
             _ => unreachable!("Wrong type index for test"),
         }
     }
@@ -694,9 +680,7 @@ mod tests {
             None
         );
         assert_group_write_size!(
-            WriteOp::Deletion {
-                metadata: raw_metadata(10)
-            },
+            WriteOp::deletion(raw_metadata(10)),
             ResourceGroupSize::zero_combined(),
             None
         );
@@ -729,10 +713,7 @@ mod tests {
             Some(sizes[0])
         );
         assert_group_write_size!(
-            WriteOp::Creation {
-                data: Bytes::new(),
-                metadata: raw_metadata(20)
-            },
+            WriteOp::creation(Bytes::new(), raw_metadata(20)),
             sizes[1],
             Some(sizes[1])
         );
@@ -742,10 +723,7 @@ mod tests {
             Some(sizes[2])
         );
         assert_group_write_size!(
-            WriteOp::Modification {
-                data: Bytes::new(),
-                metadata: raw_metadata(30)
-            },
+            WriteOp::modification(Bytes::new(), raw_metadata(30)),
             sizes[3],
             Some(sizes[3])
         );

@@ -76,6 +76,7 @@ spec aptos_framework::aptos_governance {
         ensures exists<GovernanceEvents>(addr);
         ensures exists<VotingRecords>(addr);
         ensures exists<ApprovedExecutionHashes>(addr);
+        ensures exists<VotingRecordsV2>(addr);
     }
 
     /// Signer address must be @aptos_framework.
@@ -104,6 +105,7 @@ spec aptos_framework::aptos_governance {
         aborts_if exists<VotingRecords>(addr);
         aborts_if exists<ApprovedExecutionHashes>(addr);
         aborts_if !exists<account::Account>(addr);
+        aborts_if exists<VotingRecordsV2>(addr);
     }
 
     /// Signer address must be @aptos_framework.
@@ -828,6 +830,16 @@ spec aptos_framework::aptos_governance {
 
     spec assert_voting_initialization() {
         include VotingInitializationAbortIfs;
+    }
+
+    spec assert_proposal_expiration(stake_pool: address, proposal_id: u64) {
+        include VotingInitializationAbortIfs;
+        include voting::AbortsIfNotContainProposalID<GovernanceProposal>{voting_forum_address: @aptos_framework};
+        let proposal_expiration = voting::spec_get_proposal_expiration_secs<GovernanceProposal>(@aptos_framework, proposal_id);
+        aborts_if !stake::stake_pool_exists(stake_pool);
+        aborts_if proposal_expiration > stake::spec_get_lockup_secs(stake_pool);
+        aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
+        aborts_if timestamp::now_seconds() > proposal_expiration;
     }
 
     spec force_end_epoch(aptos_framework: &signer) {

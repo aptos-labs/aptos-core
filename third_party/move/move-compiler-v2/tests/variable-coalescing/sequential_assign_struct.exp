@@ -98,7 +98,8 @@ fun m::sequential($t0: 0xc0ffee::m::Foo): 0xc0ffee::m::Foo {
      var $t4: 0xc0ffee::m::Foo [unused]
      var $t5: 0xc0ffee::m::Foo [unused]
      var $t6: 0xc0ffee::m::Foo [unused]
-  0: return $t0
+  0: $t0 := move($t0)
+  1: return $t0
 }
 
 

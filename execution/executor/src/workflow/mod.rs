@@ -6,9 +6,8 @@
 
 use crate::types::partial_state_compute_result::PartialStateComputeResult;
 use anyhow::Result;
-use aptos_crypto::HashValue;
 use aptos_executor_types::execution_output::ExecutionOutput;
-use aptos_storage_interface::ExecutedTrees;
+use aptos_storage_interface::LedgerSummary;
 use do_ledger_update::DoLedgerUpdate;
 use do_state_checkpoint::DoStateCheckpoint;
 
@@ -20,24 +19,21 @@ pub struct ApplyExecutionOutput;
 
 impl ApplyExecutionOutput {
     pub fn run(
-        chunk_output: ExecutionOutput,
-        base_view: &ExecutedTrees,
-        known_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
+        execution_output: ExecutionOutput,
+        base_view: &LedgerSummary,
     ) -> Result<PartialStateComputeResult> {
-        let (result_state, next_epoch_state, state_checkpoint_output) = DoStateCheckpoint::run(
-            chunk_output,
+        let state_checkpoint_output = DoStateCheckpoint::run(
+            &execution_output,
             base_view.state(),
-            None, // append_state_checkpoint_to_block
-            known_state_checkpoint_hashes,
-            /*is_block=*/ false,
+            Option::<Vec<_>>::None, // known_state_checkpoint_hashes
         )?;
-        let (ledger_update_output, _to_discard, _to_retry) =
-            DoLedgerUpdate::run(state_checkpoint_output, base_view.txn_accumulator().clone())?;
-        let output = PartialStateComputeResult::new(
-            base_view.state().clone(),
-            result_state,
-            next_epoch_state,
-        );
+        let ledger_update_output = DoLedgerUpdate::run(
+            &execution_output,
+            &state_checkpoint_output,
+            base_view.txn_accumulator().clone(),
+        )?;
+        let output = PartialStateComputeResult::new(execution_output);
+        output.set_state_checkpoint_output(state_checkpoint_output);
         output.set_ledger_update_output(ledger_update_output);
 
         Ok(output)

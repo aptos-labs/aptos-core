@@ -16,7 +16,7 @@ use crate::{
         },
         use_case_history::UseCaseHistory,
     },
-    thread_pool::IO_POOL,
+    thread_pool::{IO_POOL, VALIDATION_POOL},
     QuorumStoreRequest, QuorumStoreResponse, SubmissionStatus,
 };
 use anyhow::Result;
@@ -28,7 +28,7 @@ use aptos_logger::prelude::*;
 use aptos_mempool_notifications::CommittedTransaction;
 use aptos_metrics_core::HistogramTimer;
 use aptos_network::application::interface::NetworkClientInterface;
-use aptos_storage_interface::state_view::LatestDbStateCheckpointView;
+use aptos_storage_interface::state_store::state_view::db_state_view::LatestDbStateCheckpointView;
 use aptos_types::{
     account_address::AccountAddress,
     mempool_status::{MempoolStatus, MempoolStatusCode},
@@ -45,7 +45,6 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::runtime::Handle;
-
 // ============================== //
 //  broadcast_coordinator tasks  //
 // ============================== //
@@ -393,18 +392,20 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
     let vm_validation_timer = counters::PROCESS_TXN_BREAKDOWN_LATENCY
         .with_label_values(&[counters::VM_VALIDATION_LABEL])
         .start_timer();
-    let validation_results = transactions
-        .par_iter()
-        .map(|t| {
-            let result = smp.validator.read().validate_transaction(t.0.clone());
-            // Pre-compute the hash and length if the transaction is valid, before locking mempool
-            if result.is_ok() {
-                t.0.committed_hash();
-                t.0.txn_bytes_len();
-            }
-            result
-        })
-        .collect::<Vec<_>>();
+    let validation_results = VALIDATION_POOL.install(|| {
+        transactions
+            .par_iter()
+            .map(|t| {
+                let result = smp.validator.read().validate_transaction(t.0.clone());
+                // Pre-compute the hash and length if the transaction is valid, before locking mempool
+                if result.is_ok() {
+                    t.0.committed_hash();
+                    t.0.txn_bytes_len();
+                }
+                result
+            })
+            .collect::<Vec<_>>()
+    });
     vm_validation_timer.stop_and_record();
     {
         let mut mempool = smp.mempool.lock();
