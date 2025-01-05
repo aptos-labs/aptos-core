@@ -40,12 +40,22 @@ impl ClosureMask {
     /// stack than this number.
     pub const MAX_ARGS: usize = 64;
 
+    pub fn empty() -> Self {
+        Self(0)
+    }
+
     pub fn new(mask: u64) -> Self {
         Self(mask)
     }
 
     pub fn bits(&self) -> u64 {
         self.0
+    }
+
+    /// Returns true if the i'th argument is captured. If `i` is out of range, false will
+    /// be returned.
+    pub fn is_captured(&self, i: usize) -> bool {
+        i < 64 && self.0 & (1 << i) != 0
     }
 
     /// Apply a closure mask to a list of elements, returning only those
