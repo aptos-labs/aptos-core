@@ -359,7 +359,7 @@ impl AptosDB {
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_events"]);
 
-        let chunk_size = transaction_outputs.len() / 16 + 1;
+        let chunk_size = transaction_outputs.len() / 4 + 1;
         let batches = transaction_outputs
             .par_chunks(chunk_size)
             .enumerate()
