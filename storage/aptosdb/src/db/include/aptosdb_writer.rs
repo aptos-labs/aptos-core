@@ -382,9 +382,7 @@ impl AptosDB {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["commit_events___commit"])
                 .start_timer();
-            batches
-                .into_iter()
-                .try_for_each(|batch| self.ledger_db.event_db().write_schemas(batch))
+            self.ledger_db.event_db().write_in_one_db_batch(batches)
         }
     }
 

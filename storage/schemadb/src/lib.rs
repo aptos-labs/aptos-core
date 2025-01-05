@@ -305,6 +305,10 @@ impl DB {
 
     /// Writes a group of records wrapped in a [`SchemaBatch`].
     pub fn write_schemas(&self, batch: SchemaBatch) -> DbResult<()> {
+        self.write_in_one_db_batch(vec![batch])
+    }
+
+    pub fn write_in_one_db_batch(&self, batches: Vec<SchemaBatch>) -> DbResult<()> {
         // Function to determine if the counter should be sampled based on a sampling percentage
         fn should_sample(sampling_percentage: usize) -> bool {
             // Generate a random number between 0 and 100
@@ -324,12 +328,14 @@ impl DB {
             let _timer = TIMER.timer_with(&["convert_to_db_batch", &self.name]);
 
             let mut ret = rocksdb::WriteBatch::default();
-            for (cf_name, rows) in batch.rows.iter() {
-                let cf_handle = self.get_cf_handle(cf_name)?;
-                for write_op in rows {
-                    match write_op {
-                        WriteOp::Value { key, value } => ret.put_cf(cf_handle, key, value),
-                        WriteOp::Deletion { key } => ret.delete_cf(cf_handle, key),
+            for batch in &batches {
+                for (cf_name, rows) in batch.rows.iter() {
+                    let cf_handle = self.get_cf_handle(cf_name)?;
+                    for write_op in rows {
+                        match write_op {
+                            WriteOp::Value { key, value } => ret.put_cf(cf_handle, key, value),
+                            WriteOp::Deletion { key } => ret.delete_cf(cf_handle, key),
+                        }
                     }
                 }
             }
@@ -343,19 +349,21 @@ impl DB {
 
         // Bump counters only after DB write succeeds.
         if sampled_kv_bytes {
-            for (cf_name, rows) in batch.rows.iter() {
-                for write_op in rows {
-                    match write_op {
-                        WriteOp::Value { key, value } => {
-                            APTOS_SCHEMADB_PUT_BYTES_SAMPLED
-                                .with_label_values(&[cf_name])
-                                .observe((key.len() + value.len()) as f64);
-                        },
-                        WriteOp::Deletion { key: _ } => {
-                            APTOS_SCHEMADB_DELETES_SAMPLED
-                                .with_label_values(&[cf_name])
-                                .inc();
-                        },
+            for batch in batches {
+                for (cf_name, rows) in batch.rows.iter() {
+                    for write_op in rows {
+                        match write_op {
+                            WriteOp::Value { key, value } => {
+                                APTOS_SCHEMADB_PUT_BYTES_SAMPLED
+                                    .with_label_values(&[cf_name])
+                                    .observe((key.len() + value.len()) as f64);
+                            },
+                            WriteOp::Deletion { key: _ } => {
+                                APTOS_SCHEMADB_DELETES_SAMPLED
+                                    .with_label_values(&[cf_name])
+                                    .inc();
+                            },
+                        }
                     }
                 }
             }

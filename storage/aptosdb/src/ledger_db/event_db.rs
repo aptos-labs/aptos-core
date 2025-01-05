@@ -60,6 +60,10 @@ impl EventDb {
         self.db.write_schemas(batch)
     }
 
+    pub(crate) fn write_in_one_db_batch(&self, batches: Vec<SchemaBatch>) -> Result<()> {
+        self.db.write_in_one_db_batch(batches)
+    }
+
     /// Returns all of the events for a given transaction version.
     pub(crate) fn get_events_by_version(&self, version: Version) -> Result<Vec<ContractEvent>> {
         let mut events = vec![];

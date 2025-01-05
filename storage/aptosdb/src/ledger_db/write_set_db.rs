@@ -47,6 +47,10 @@ impl WriteSetDb {
     pub(crate) fn write_schemas(&self, batch: SchemaBatch) -> Result<()> {
         self.db.write_schemas(batch)
     }
+
+    pub(crate) fn write_in_one_db_batch(&self, batches: Vec<SchemaBatch>) -> Result<()> {
+        self.db.write_in_one_db_batch(batches)
+    }
 }
 
 impl WriteSetDb {
@@ -135,9 +139,7 @@ impl WriteSetDb {
 
         {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_write_sets___commit"]);
-            batches
-                .into_iter()
-                .try_for_each(|batch| self.write_schemas(batch))
+            self.write_in_one_db_batch(batches)
         }
     }
 

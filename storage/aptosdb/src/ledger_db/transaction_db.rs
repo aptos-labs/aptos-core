@@ -48,6 +48,10 @@ impl TransactionDb {
         self.db.write_schemas(batch)
     }
 
+    pub(crate) fn write_in_one_db_batch(&self, batches: Vec<SchemaBatch>) -> Result<()> {
+        self.db.write_in_one_db_batch(batches)
+    }
+
     /// Returns signed transaction given its `version`.
     pub(crate) fn get_transaction(&self, version: Version) -> Result<Transaction> {
         self.db
@@ -115,9 +119,7 @@ impl TransactionDb {
         {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_transactions___commit"]);
 
-            batches
-                .into_iter()
-                .try_for_each(|batch| self.write_schemas(batch))
+            self.write_in_one_db_batch(batches)
         }
     }
 
