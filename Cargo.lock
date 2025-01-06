@@ -275,7 +275,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "5.0.0"
+version = "5.1.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -1923,6 +1923,7 @@ dependencies = [
  "move-prover",
  "move-prover-boogie-backend",
  "move-prover-bytecode-pipeline",
+ "move-prover-lab",
  "move-stackless-bytecode",
  "move-unit-test",
  "move-vm-runtime",
@@ -1942,6 +1943,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tiny-keccak",
+ "toml 0.7.8",
 ]
 
 [[package]]
@@ -11251,6 +11253,7 @@ dependencies = [
  "anyhow",
  "bcs 0.1.4",
  "clap 4.5.21",
+ "codespan",
  "codespan-reporting",
  "datatest-stable",
  "ethnum",
@@ -11275,6 +11278,7 @@ dependencies = [
  "num 0.4.1",
  "once_cell",
  "petgraph 0.6.5",
+ "serde_json",
  "walkdir",
 ]
 
@@ -11649,7 +11653,6 @@ dependencies = [
  "codespan-reporting",
  "datatest-stable",
  "itertools 0.13.0",
- "log",
  "move-binary-format",
  "move-core-types",
  "move-model",
@@ -11659,6 +11662,23 @@ dependencies = [
  "shell-words",
  "tempfile",
  "walkdir",
+]
+
+[[package]]
+name = "move-prover-lab"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap 4.5.21",
+ "codespan-reporting",
+ "itertools 0.13.0",
+ "move-model",
+ "move-prover",
+ "move-prover-boogie-backend",
+ "move-prover-bytecode-pipeline",
+ "plotters",
+ "z3tracer",
 ]
 
 [[package]]
@@ -13979,26 +13999,6 @@ checksum = "95a29399fc94bcd3eeaa951c715f7bea69409b2445356b00519740bcd6ddd865"
 dependencies = [
  "protobuf",
  "protobuf-codegen",
-]
-
-[[package]]
-name = "prover-lab"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "clap 4.5.21",
- "codespan-reporting",
- "itertools 0.13.0",
- "log",
- "move-compiler",
- "move-compiler-v2",
- "move-model",
- "move-prover",
- "move-prover-boogie-backend",
- "move-prover-bytecode-pipeline",
- "plotters",
- "z3tracer",
 ]
 
 [[package]]

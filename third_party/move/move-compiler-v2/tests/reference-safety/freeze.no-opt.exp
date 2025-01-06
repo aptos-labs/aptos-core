@@ -5,9 +5,9 @@ error: cannot transfer mutable local `r` since it is borrowed
    │
 18 │         ref_mut_mut(r, r); // error
    │         ^^^^^^^^^^^^^^^^^
-   │         │
+   │         │           │
+   │         │           previously mutably borrowed here
    │         transfer attempted here
-   │         previously mutably borrowed here
 
 error: cannot transfer mutable local `r` since it is borrowed
    ┌─ tests/reference-safety/freeze.move:24:9

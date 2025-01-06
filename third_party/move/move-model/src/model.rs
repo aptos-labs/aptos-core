@@ -700,6 +700,11 @@ impl GlobalEnv {
         self.address_alias_map = map
     }
 
+    /// Gets the global address alias map
+    pub fn get_address_alias_map(&self) -> &BTreeMap<Symbol, AccountAddress> {
+        &self.address_alias_map
+    }
+
     /// Indicates that all modules in the environment should be treated as
     /// target modules, i.e. `module.is_target()` returns true. This can be
     /// used to temporarily override the default which distinguishes
@@ -879,6 +884,17 @@ impl GlobalEnv {
         let mut target_modules: Vec<ModuleEnv> = vec![];
         for module_env in self.get_modules() {
             if module_env.is_target() {
+                target_modules.push(module_env);
+            }
+        }
+        target_modules
+    }
+
+    /// Find all primary target modules and return in a vector
+    pub fn get_primary_target_modules(&self) -> Vec<ModuleEnv> {
+        let mut target_modules: Vec<ModuleEnv> = vec![];
+        for module_env in self.get_modules() {
+            if module_env.is_primary_target() {
                 target_modules.push(module_env);
             }
         }
@@ -1202,7 +1218,12 @@ impl GlobalEnv {
 
     /// Writes accumulated diagnostics of given or higher severity.
     pub fn report_diag<W: WriteColor>(&self, writer: &mut W, severity: Severity) {
-        self.report_diag_with_filter(writer, |d| d.severity >= severity)
+        self.report_diag_with_filter(
+            |files, diag| {
+                emit(writer, &Config::default(), files, diag).expect("emit must not fail")
+            },
+            |d| d.severity >= severity,
+        );
     }
 
     /// Helper function to report diagnostics, check for errors, and fail with a message on
@@ -1301,11 +1322,11 @@ impl GlobalEnv {
     }
 
     /// Writes accumulated diagnostics that pass through `filter`
-    pub fn report_diag_with_filter<W: WriteColor, F: FnMut(&Diagnostic<FileId>) -> bool>(
-        &self,
-        writer: &mut W,
-        mut filter: F,
-    ) {
+    pub fn report_diag_with_filter<E, F>(&self, mut emitter: E, mut filter: F)
+    where
+        E: FnMut(&Files<String>, &Diagnostic<FileId>),
+        F: FnMut(&Diagnostic<FileId>) -> bool,
+    {
         let mut shown = BTreeSet::new();
         self.diags.borrow_mut().sort_by(|a, b| {
             let reported_ordering = a.1.cmp(&b.1);
@@ -1327,8 +1348,7 @@ impl GlobalEnv {
                 // Avoid showing the same message twice. This can happen e.g. because of
                 // duplication of expressions via schema inclusion.
                 if shown.insert(format!("{:?}", diag)) {
-                    emit(writer, &Config::default(), &self.source_files, diag)
-                        .expect("emit must not fail");
+                    emitter(&self.source_files, diag);
                 }
                 *reported = true;
             }

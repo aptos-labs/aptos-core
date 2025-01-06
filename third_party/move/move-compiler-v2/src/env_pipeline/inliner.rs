@@ -41,7 +41,7 @@ use crate::env_pipeline::rewrite_target::{
     RewriteState, RewriteTarget, RewriteTargets, RewritingScope,
 };
 use codespan_reporting::diagnostic::Severity;
-use log::{debug, trace};
+use log::trace;
 use move_model::{
     ast::{Exp, ExpData, Operation, Pattern, Spec, SpecBlockTarget, TempIndex},
     exp_rewriter::ExpRewriterFunctions,
@@ -61,13 +61,14 @@ use std::{
 type QualifiedFunId = QualifiedId<FunId>;
 type CallSiteLocations = BTreeMap<(RewriteTarget, QualifiedFunId), BTreeSet<NodeId>>;
 
+const DEBUG: bool = false;
+
 // ======================================================================================
 // Entry
 
 /// Run inlining on current program's AST.  For each function which is target of the compilation,
 /// visit that function body and inline any calls to functions marked as "inline".
 pub fn run_inlining(env: &mut GlobalEnv, scope: RewritingScope, keep_inline_functions: bool) {
-    debug!("Inlining");
     // Get non-inline function roots for running inlining.
     // Also generate an error for any target inline functions lacking a body to inline.
     let mut targets = RewriteTargets::create(env, scope);
@@ -477,18 +478,22 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
                 };
                 // inline here
                 if let Some(expr) = body_expr {
-                    trace!(
-                        "inlining function `{}` with args `{}`",
-                        self.env.dump_fun(&func_env),
-                        args.iter()
-                            .map(|exp| format!("{}", exp.as_ref().display(self.env)))
-                            .collect::<Vec<_>>()
-                            .join(","),
-                    );
+                    if DEBUG {
+                        trace!(
+                            "inlining function `{}` with args `{}`",
+                            self.env.dump_fun(&func_env),
+                            args.iter()
+                                .map(|exp| format!("{}", exp.as_ref().display(self.env)))
+                                .collect::<Vec<_>>()
+                                .join(","),
+                        );
+                    }
                     let rewritten = InlinedRewriter::inline_call(
                         self.env, call_id, &func_loc, &expr, type_args, parameters, args,
                     );
-                    trace!("After inlining, expr is `{}`", rewritten.display(self.env));
+                    if DEBUG {
+                        trace!("After inlining, expr is `{}`", rewritten.display(self.env));
+                    }
                     Some(rewritten)
                 } else {
                     None

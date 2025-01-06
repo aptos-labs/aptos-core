@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    code_cache_global::GlobalModuleCache, types::InputOutputKey,
-    value_exchange::filter_value_for_exchange,
-};
+use crate::{code_cache_global::GlobalModuleCache, types::InputOutputKey, view::LatestView};
 use anyhow::bail;
 use aptos_aggregator::{
     delta_math::DeltaHistory,
@@ -21,15 +18,18 @@ use aptos_mvhashmap::{
 };
 use aptos_types::{
     error::{code_invariant_error, PanicError, PanicOr},
-    executable::ModulePath,
-    state_store::state_value::StateValueMetadata,
+    executable::{Executable, ModulePath},
+    state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
     write_set::TransactionWrite,
 };
 use aptos_vm_types::resolver::ResourceGroupSize;
 use derivative::Derivative;
 use move_core_types::value::MoveTypeLayout;
-use move_vm_types::code::{ModuleCode, SyncModuleCache, WithAddress, WithName, WithSize};
+use move_vm_types::{
+    code::{ModuleCode, SyncModuleCache, WithAddress, WithName, WithSize},
+    delayed_values::delayed_field_id::DelayedFieldID,
+};
 use std::{
     collections::{
         hash_map::{
@@ -325,7 +325,7 @@ pub enum CacheRead<T> {
 pub(crate) struct CapturedReads<T: Transaction, K, DC, VC, S> {
     data_reads: HashMap<T::Key, DataRead<T::Value>>,
     group_reads: HashMap<T::Key, GroupRead<T>>,
-    delayed_field_reads: HashMap<T::Identifier, DelayedFieldRead>,
+    delayed_field_reads: HashMap<DelayedFieldID, DelayedFieldRead>,
 
     #[deprecated]
     pub(crate) deprecated_module_reads: Vec<T::Key>,
@@ -359,9 +359,13 @@ where
     S: WithSize,
 {
     // Return an iterator over the captured reads.
-    pub(crate) fn get_read_values_with_delayed_fields(
+    pub(crate) fn get_read_values_with_delayed_fields<
+        SV: TStateView<Key = T::Key>,
+        X: Executable,
+    >(
         &self,
-        delayed_write_set_ids: &HashSet<T::Identifier>,
+        view: &LatestView<T, SV, X>,
+        delayed_write_set_ids: &HashSet<DelayedFieldID>,
         skip: &HashSet<T::Key>,
     ) -> Result<BTreeMap<T::Key, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>, PanicError> {
         self.data_reads
@@ -372,7 +376,7 @@ where
                 }
 
                 if let DataRead::Versioned(_version, value, Some(layout)) = data_read {
-                    filter_value_for_exchange::<T>(value, layout, delayed_write_set_ids, key)
+                    view.filter_value_for_exchange(value, layout, delayed_write_set_ids, key)
                 } else {
                     None
                 }
@@ -511,7 +515,7 @@ where
 
     pub(crate) fn capture_delayed_field_read(
         &mut self,
-        id: T::Identifier,
+        id: DelayedFieldID,
         update: bool,
         read: DelayedFieldRead,
     ) -> Result<(), PanicOr<DelayedFieldsSpeculativeError>> {
@@ -571,7 +575,7 @@ where
 
     pub(crate) fn get_delayed_field_by_kind(
         &self,
-        id: &T::Identifier,
+        id: &DelayedFieldID,
         min_kind: DelayedFieldReadKind,
     ) -> Option<DelayedFieldRead> {
         self.delayed_field_reads
@@ -718,7 +722,7 @@ where
     // (as it internally uses read_latest_predicted_value to get the current value).
     pub(crate) fn validate_delayed_field_reads(
         &self,
-        delayed_fields: &dyn TVersionedDelayedFieldView<T::Identifier>,
+        delayed_fields: &dyn TVersionedDelayedFieldView<DelayedFieldID>,
         idx_to_validate: TxnIndex,
     ) -> Result<bool, PanicError> {
         if self.delayed_field_speculative_failure {
@@ -779,9 +783,7 @@ where
     K: Hash + Eq + Ord + Clone + WithAddress + WithName,
     VC: Deref<Target = Arc<DC>>,
 {
-    pub(crate) fn get_read_summary(
-        &self,
-    ) -> HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>> {
+    pub(crate) fn get_read_summary(&self) -> HashSet<InputOutputKey<T::Key, T::Tag>> {
         let mut ret = HashSet::new();
         for (key, read) in &self.data_reads {
             if let DataRead::Versioned(_, _, _) = read {
@@ -822,7 +824,7 @@ where
 pub(crate) struct UnsyncReadSet<T: Transaction, K> {
     pub(crate) resource_reads: HashSet<T::Key>,
     pub(crate) group_reads: HashMap<T::Key, HashSet<T::Tag>>,
-    pub(crate) delayed_field_reads: HashSet<T::Identifier>,
+    pub(crate) delayed_field_reads: HashSet<DelayedFieldID>,
 
     #[deprecated]
     pub(crate) deprecated_module_reads: HashSet<T::Key>,
@@ -839,9 +841,7 @@ where
         self.module_reads.insert(key);
     }
 
-    pub(crate) fn get_read_summary(
-        &self,
-    ) -> HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>> {
+    pub(crate) fn get_read_summary(&self) -> HashSet<InputOutputKey<T::Key, T::Tag>> {
         let mut ret = HashSet::new();
         for key in &self.resource_reads {
             ret.insert(InputOutputKey::Resource(key.clone()));
@@ -1067,7 +1067,6 @@ mod test {
 
     impl Transaction for TestTransactionType {
         type Event = MockEvent;
-        type Identifier = DelayedFieldID;
         type Key = KeyType<u32>;
         type Tag = u32;
         type Value = ValueType;

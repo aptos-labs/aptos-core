@@ -832,6 +832,16 @@ spec aptos_framework::aptos_governance {
         include VotingInitializationAbortIfs;
     }
 
+    spec assert_proposal_expiration(stake_pool: address, proposal_id: u64) {
+        include VotingInitializationAbortIfs;
+        include voting::AbortsIfNotContainProposalID<GovernanceProposal>{voting_forum_address: @aptos_framework};
+        let proposal_expiration = voting::spec_get_proposal_expiration_secs<GovernanceProposal>(@aptos_framework, proposal_id);
+        aborts_if !stake::stake_pool_exists(stake_pool);
+        aborts_if proposal_expiration > stake::spec_get_lockup_secs(stake_pool);
+        aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
+        aborts_if timestamp::now_seconds() > proposal_expiration;
+    }
+
     spec force_end_epoch(aptos_framework: &signer) {
         use aptos_framework::reconfiguration_with_dkg;
         use std::signer;
