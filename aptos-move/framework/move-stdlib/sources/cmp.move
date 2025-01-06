@@ -40,6 +40,11 @@ module std::cmp {
         !(self is Ordering::Less)
     }
 
+    spec compare {
+        // TODO: temporary mockup.
+        pragma opaque;
+    }
+
     #[test_only]
     struct SomeStruct has drop {
         field_1: u64,

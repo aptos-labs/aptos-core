@@ -35,9 +35,9 @@ VectorTrimAppend { vec_len: 100, element_len: 100, index: 10, repeats: 1000 }	11
 VectorRangeMove { vec_len: 100, element_len: 100, index: 50, move_len: 10, repeats: 1000 }	6	0.925	1.001	5316.2
 MapInsertRemove { len: 10, repeats: 0, use_simple_map: false }	6	0.925	1.001	378
 MapInsertRemove { len: 10, repeats: 100, use_simple_map: false }	6	0.925	1.001	8184
-MapInsertRemove { len: 10, repeats: 100, use_simple_map: true }	6	0.925	1.001	6419
+MapInsertRemove { len: 10, repeats: 100, use_simple_map: true }	6	0.925	1.001	8201.7
 MapInsertRemove { len: 100, repeats: 0, use_simple_map: false }	6	0.925	1.001	5094
 MapInsertRemove { len: 100, repeats: 100, use_simple_map: false }	6	0.925	1.001	15838
-MapInsertRemove { len: 100, repeats: 100, use_simple_map: true }	6	0.925	1.001	30962
+MapInsertRemove { len: 100, repeats: 100, use_simple_map: true }	6	0.925	1.001	39802.4
 MapInsertRemove { len: 1000, repeats: 0, use_simple_map: false }	6	0.925	1.001	66878
 MapInsertRemove { len: 1000, repeats: 100, use_simple_map: false }	6	0.925	1.001	79826

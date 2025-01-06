@@ -237,6 +237,7 @@ fn main() {
             index: 50,
             move_len: 10,
             repeats: 1000,
+        },
         EntryPoints::MapInsertRemove {
             len: 10,
             repeats: 0,
