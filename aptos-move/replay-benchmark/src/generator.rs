@@ -24,6 +24,7 @@ use std::{
 pub struct InputOutputDiffGenerator {
     debugger: AptosDebugger,
     override_config: OverrideConfig,
+    allow_different_gas_usage: bool,
 }
 
 impl InputOutputDiffGenerator {
@@ -34,10 +35,12 @@ impl InputOutputDiffGenerator {
         debugger: AptosDebugger,
         override_config: OverrideConfig,
         txn_blocks: Vec<TransactionBlock>,
+        allow_different_gas_usage: bool,
     ) -> anyhow::Result<(Vec<ReadSet>, Vec<Vec<TransactionDiff>>)> {
         let generator = Arc::new(Self {
             debugger,
             override_config,
+            allow_different_gas_usage,
         });
 
         let num_generated = Arc::new(AtomicU64::new(0));
@@ -87,6 +90,19 @@ impl InputOutputDiffGenerator {
         &self,
         txn_block: TransactionBlock,
     ) -> (ReadSet, Vec<TransactionDiff>) {
+        // For later comparison of outputs, find fee payers for transactions.
+        let fee_payers = txn_block
+            .transactions
+            .iter()
+            .map(|txn| {
+                txn.try_as_signed_user_txn().map(|txn| {
+                    txn.authenticator_ref()
+                        .fee_payer_address()
+                        .unwrap_or_else(|| txn.sender())
+                })
+            })
+            .collect::<Vec<_>>();
+
         let state_view = self.debugger.state_view_at_version(txn_block.begin_version);
         let state_override = self.override_config.get_state_override(&state_view);
         let workload = Workload::from(txn_block);
@@ -135,11 +151,14 @@ impl InputOutputDiffGenerator {
         let inputs = state_view_with_override.into_read_set();
 
         // Compute the differences between outputs.
-        let diff_builder = TransactionDiffBuilder::new();
+        let diff_builder = TransactionDiffBuilder::new(self.allow_different_gas_usage);
         let diffs = onchain_outputs
             .into_iter()
             .zip(outputs)
-            .map(|(onchain_output, output)| diff_builder.build_from_outputs(onchain_output, output))
+            .zip(fee_payers)
+            .map(|((onchain_output, output), maybe_fee_payer)| {
+                diff_builder.build_from_outputs(onchain_output, output, maybe_fee_payer)
+            })
             .collect();
 
         (inputs, diffs)

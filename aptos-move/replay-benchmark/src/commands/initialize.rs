@@ -43,6 +43,13 @@ pub struct InitializeCommand {
     )]
     disable_features: Vec<FeatureFlag>,
 
+    #[clap(
+        long,
+        default_value_t = false,
+        help = "If true, when comparing output diffs changes related to gas usage are ignored"
+    )]
+    allow_different_gas_usage: bool,
+
     #[clap(long, help = "Path to the file where the transactions are saved")]
     transactions_file: String,
 
@@ -69,6 +76,10 @@ impl InitializeCommand {
             )
         })?;
 
+        // When downloading transactions, we ensure we have at least 1 block with 1 transaction.
+        // Use this counter to report diffs.
+        let mut diff_version = txn_blocks[0].begin_version;
+
         // TODO:
         //  Right now, only features can be overridden. In general, this can be allowed for anything:
         //      1. Framework code, e.g., to test performance of new natives or compiler,
@@ -77,9 +88,23 @@ impl InitializeCommand {
         let override_config = OverrideConfig::new(self.enable_features, self.disable_features);
 
         let debugger = build_debugger(self.rest_api.rest_endpoint, self.rest_api.api_key)?;
-        // FIXME: add diff comparison after/during generation step!
-        let (inputs, _) =
-            InputOutputDiffGenerator::generate(debugger, override_config, txn_blocks).await?;
+        let (inputs, diffs) = InputOutputDiffGenerator::generate(
+            debugger,
+            override_config,
+            txn_blocks,
+            self.allow_different_gas_usage,
+        )
+        .await?;
+
+        for block_diff in diffs {
+            for txn_diff in block_diff {
+                if !txn_diff.is_empty() {
+                    println!("Non-empty output diff for transaction {}:", diff_version);
+                    txn_diff.println();
+                }
+                diff_version += 1;
+            }
+        }
 
         let bytes = bcs::to_bytes(&inputs).map_err(|err| {
             anyhow!(
