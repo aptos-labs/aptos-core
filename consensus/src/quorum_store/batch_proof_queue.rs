@@ -165,11 +165,11 @@ impl BatchProofQueue {
     }
 
     fn remaining_txns_without_duplicates(&self) -> u64 {
-        // txn_summary_num_occurrences counts all the unexpired and uncommitted proofs that have txn summaries
+        // unordered_txns_in_proofs counts all the unexpired and unordered proofs that have txn summaries
         // in batch_summaries.
         let mut remaining_txns = self.unordered_txns_in_proofs.len() as u64;
 
-        // For the unexpired and uncommitted proofs that don't have transaction summaries in batch_summaries,
+        // For the unexpired and unordered proofs that don't have transaction summaries in batch_summaries,
         // we need to add the proof.num_txns() to the remaining_txns.
         remaining_txns += self
             .author_to_batches

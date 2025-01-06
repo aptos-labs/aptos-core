@@ -31,7 +31,7 @@ impl Default for QuorumStoreBackPressureConfig {
         QuorumStoreBackPressureConfig {
             // QS will be backpressured if the remaining total txns is more than this number
             // Roughly, ordering TPS * ordering latency seconds
-            backlog_txn_limit_count: 18_000,
+            backlog_txn_limit_count: 15_000,
             // QS will create batches at the max rate until this number is reached
             backlog_per_validator_batch_limit_count: 20,
             decrease_duration_ms: 1000,

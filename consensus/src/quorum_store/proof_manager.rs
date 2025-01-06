@@ -92,6 +92,7 @@ impl ProofManager {
             block.id()
         );
         self.batch_proof_queue.handle_ordered(block);
+        self.update_remaining_txns_and_proofs();
     }
 
     pub(crate) fn handle_commit_notification(
