@@ -496,7 +496,7 @@ async fn test_get_transaction_by_hash() {
 async fn test_get_transaction_by_hash_with_delayed_internal_indexer() {
     let mut context = new_test_context_with_sharding_and_delayed_internal_indexer(
         current_function_name!(),
-        Some(1),
+        Some(2),
     );
 
     let mut account = context.gen_account();

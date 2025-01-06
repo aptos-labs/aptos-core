@@ -593,7 +593,7 @@ impl AptosDB {
             LATEST_TXN_VERSION.set(version as i64);
             if let Some(update_sender) = &self.update_subscriber {
                 update_sender.send(
-                    version
+                    (Instant::now(), version)
                 ).map_err(| err | {
                         AptosDbError::Other(format!("Failed to send update to subscriber: {}", err))
                     })?;
