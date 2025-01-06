@@ -47,6 +47,7 @@ impl DownloadCommand {
             .await?;
 
         let txn_blocks = partition(self.begin_version, txns);
+        assert!(!txn_blocks.is_empty());
         println!(
             "Downloaded {} blocks with {} transactions in total",
             txn_blocks.len(),
@@ -92,8 +93,8 @@ fn partition(begin_version: Version, txns: Vec<Transaction>) -> Vec<TransactionB
 mod tests {
     use super::*;
     use aptos_crypto::{
-        ed25519::{Ed25519PublicKey, Ed25519Signature},
-        HashValue,
+        ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
+        HashValue, Uniform,
     };
     use aptos_types::{
         block_metadata::BlockMetadata,
@@ -103,6 +104,7 @@ mod tests {
     use move_core_types::{
         account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     };
+    use rand::{rngs::StdRng, SeedableRng};
 
     #[test]
     fn verify_tool() {
@@ -127,9 +129,12 @@ mod tests {
             10,
             ChainId::test(),
         );
-        let pub_key = Ed25519PublicKey::arbitrary().unwrap();
+
+        let mut rng = StdRng::from_seed([0; 32]);
+        let pub_key = Ed25519PublicKey::from(&Ed25519PrivateKey::generate(&mut rng));
         let signature = Ed25519Signature::dummy_signature();
         let signed_txn = SignedTransaction::new(raw_txn, pub_key, signature);
+
         Transaction::UserTransaction(signed_txn)
     }
 
