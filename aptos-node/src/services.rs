@@ -32,7 +32,9 @@ use aptos_peer_monitoring_service_server::{
 use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
 use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_time_service::TimeService;
-use aptos_types::{chain_id::ChainId, indexer::indexer_db_reader::IndexerReader};
+use aptos_types::{
+    chain_id::ChainId, indexer::indexer_db_reader::IndexerReader, transaction::Version,
+};
 use aptos_validator_transaction_pool::VTxnPoolState;
 use futures::channel::{mpsc, mpsc::Sender, oneshot};
 use std::{sync::Arc, time::Instant};
@@ -51,7 +53,7 @@ pub fn bootstrap_api_and_indexer(
     db_rw: DbReaderWriter,
     chain_id: ChainId,
     internal_indexer_db: Option<InternalIndexerDB>,
-    update_receiver: Option<WatchReceiver<u64>>,
+    update_receiver: Option<WatchReceiver<(Instant, Version)>>,
     api_port_tx: Option<oneshot::Sender<u16>>,
     indexer_grpc_port_tx: Option<oneshot::Sender<u16>>,
 ) -> anyhow::Result<(
