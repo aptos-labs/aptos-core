@@ -58,6 +58,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>, v2: bool) {
 
 #[test]
 fn one_bytecode_dep() {
+    // TODO: automatically discovers all Move packages under a package directory and runs unit tests for them
     run_tests_for_pkg("tests/packages/one-bytecode-dep", true);
     run_tests_for_pkg("tests/packages/one-bytecode-dep", false);
 }
