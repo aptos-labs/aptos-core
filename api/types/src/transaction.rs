@@ -1219,7 +1219,7 @@ impl TryFrom<TransactionSignature> for TransactionAuthenticator {
             TransactionSignature::SingleSender(sig) => {
                 TransactionAuthenticator::single_sender(sig.try_into()?)
             },
-            TransactionSignature::NoAccountSignature(sig) => sig.try_into()?
+            TransactionSignature::NoAccountSignature(sig) => sig.try_into()?,
         })
     }
 }
