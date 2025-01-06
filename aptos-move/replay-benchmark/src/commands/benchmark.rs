@@ -22,10 +22,10 @@ pub struct BenchmarkCommand {
     #[clap(long, default_value_t = Level::Error)]
     log_level: Level,
 
-    #[clap(long, help = "Directory where transactions are saved")]
+    #[clap(long, help = "File where blocks of transactions are saved")]
     transactions_file: String,
 
-    #[clap(long, help = "Directory where the state is be saved")]
+    #[clap(long, help = "File where the input states are saved")]
     inputs_file: String,
 
     #[clap(
@@ -76,19 +76,14 @@ impl BenchmarkCommand {
         );
 
         let txn_blocks_bytes = fs::read(PathBuf::from(&self.transactions_file)).await?;
-        let txn_blocks: Vec<TransactionBlock> =
-            bcs::from_bytes(&txn_blocks_bytes).map_err(|err| {
-                anyhow!(
-                    "Error when deserializing a block of transactions: {:?}",
-                    err
-                )
-            })?;
+        let txn_blocks: Vec<TransactionBlock> = bcs::from_bytes(&txn_blocks_bytes)
+            .map_err(|err| anyhow!("Error when deserializing blocks of transactions: {:?}", err))?;
 
-        let input_bytes = fs::read(PathBuf::from(&self.inputs_file)).await?;
-        let inputs: Vec<ReadSet> = bcs::from_bytes(&input_bytes)
+        let inputs_bytes = fs::read(PathBuf::from(&self.inputs_file)).await?;
+        let inputs: Vec<ReadSet> = bcs::from_bytes(&inputs_bytes)
             .map_err(|err| anyhow!("Error when deserializing inputs: {:?}", err))?;
 
-        // Ensure we have at least one block to benchmark.
+        // Ensure we have at least one block to benchmark, and that we do not skip all the blocks.
         assert_eq!(txn_blocks.len(), inputs.len());
         assert!(
             self.num_blocks_to_skip < txn_blocks.len(),

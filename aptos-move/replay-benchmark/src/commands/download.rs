@@ -47,6 +47,12 @@ impl DownloadCommand {
             .await?;
 
         let txn_blocks = partition(self.begin_version, txns);
+        println!(
+            "Downloaded {} blocks with {} transactions in total",
+            txn_blocks.len(),
+            limit
+        );
+
         let bytes = bcs::to_bytes(&txn_blocks)
             .map_err(|err| anyhow!("Error when serializing blocks of transactions: {:?}", err))?;
         fs::write(PathBuf::from(&self.output_file), &bytes).await?;
@@ -85,10 +91,107 @@ fn partition(begin_version: Version, txns: Vec<Transaction>) -> Vec<TransactionB
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aptos_crypto::{
+        ed25519::{Ed25519PublicKey, Ed25519Signature},
+        HashValue,
+    };
+    use aptos_types::{
+        block_metadata::BlockMetadata,
+        chain_id::ChainId,
+        transaction::{EntryFunction, RawTransaction, SignedTransaction},
+    };
+    use move_core_types::{
+        account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+    };
 
     #[test]
     fn verify_tool() {
         use clap::CommandFactory;
         DownloadCommand::command().debug_assert();
+    }
+
+    fn user_transaction() -> Transaction {
+        // The actual values for signed transaction do not matter.
+        let entry_func = EntryFunction::new(
+            ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap()),
+            Identifier::new("foo_func").unwrap(),
+            vec![],
+            vec![],
+        );
+        let raw_txn = RawTransaction::new_entry_function(
+            AccountAddress::ONE,
+            0,
+            entry_func,
+            100,
+            1,
+            10,
+            ChainId::test(),
+        );
+        let pub_key = Ed25519PublicKey::arbitrary().unwrap();
+        let signature = Ed25519Signature::dummy_signature();
+        let signed_txn = SignedTransaction::new(raw_txn, pub_key, signature);
+        Transaction::UserTransaction(signed_txn)
+    }
+
+    fn block_metadata() -> Transaction {
+        // The actual values for block metadata do not matter.
+        let block_metadata = BlockMetadata::new(
+            HashValue::zero(),
+            0,
+            0,
+            AccountAddress::ONE,
+            vec![],
+            vec![],
+            100,
+        );
+        Transaction::BlockMetadata(block_metadata)
+    }
+
+    #[test]
+    fn test_block_partition_1() {
+        let txns = vec![block_metadata(), block_metadata(), block_metadata()];
+        let blocks = partition(1, txns);
+        assert_eq!(blocks.len(), 3);
+
+        assert_eq!(blocks[0].begin_version, 1);
+        assert_eq!(blocks[0].transactions.len(), 1);
+
+        assert_eq!(blocks[1].begin_version, 2);
+        assert_eq!(blocks[1].transactions.len(), 1);
+
+        assert_eq!(blocks[2].begin_version, 3);
+        assert_eq!(blocks[2].transactions.len(), 1);
+    }
+
+    #[test]
+    fn test_block_partition_2() {
+        let txns = vec![
+            user_transaction(),
+            user_transaction(),
+            user_transaction(),
+            block_metadata(),
+            user_transaction(),
+            user_transaction(),
+            user_transaction(),
+        ];
+
+        let blocks = partition(0, txns);
+        assert_eq!(blocks.len(), 2);
+
+        assert_eq!(blocks[0].begin_version, 0);
+        assert_eq!(blocks[0].transactions.len(), 3);
+
+        assert_eq!(blocks[1].begin_version, 3);
+        assert_eq!(blocks[1].transactions.len(), 4);
+    }
+
+    #[test]
+    fn test_block_partition_3() {
+        let txns = vec![user_transaction(), user_transaction(), user_transaction()];
+        let blocks = partition(10, txns);
+        assert_eq!(blocks.len(), 1);
+
+        assert_eq!(blocks[0].begin_version, 10);
+        assert_eq!(blocks[0].transactions.len(), 3);
     }
 }

@@ -29,3 +29,6 @@ parking_lot = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
+
+[dev-dependencies]
+aptos-crypto = { workspace = true }
