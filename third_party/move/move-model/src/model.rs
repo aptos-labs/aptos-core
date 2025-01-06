@@ -3025,7 +3025,7 @@ impl<'env> ModuleEnv<'env> {
     fn can_call_package_fun_in(&self, other: &Self) -> bool {
         !self.is_script_module()
             && !other.is_script_module()
-            // TODO: fix this when we have a way to check if
+            // TODO(#13745): fix this when we have a way to check if
             // two non-primary targets are in the same package
             && (!self.is_primary_target() || other.is_primary_target())
             && self.self_address() == other.self_address()
