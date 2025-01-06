@@ -30,7 +30,6 @@ module aptos_std::ordered_map {
     use std::option::{Self, Option};
     use std::cmp;
     use std::error;
-    use std::mem;
 
     /// Map key already exists
     const EKEY_ALREADY_EXISTS: u64 = 1;
@@ -153,6 +152,9 @@ module aptos_std::ordered_map {
         let index = binary_search(old_key, &self.entries, 0, len);
         assert!(index < len, error::invalid_argument(EKEY_NOT_FOUND));
 
+        assert!(old_key == &self.entries[index].key, error::invalid_argument(EKEY_NOT_FOUND));
+
+        // check that after we update the key, order is going to be respected
         if (index > 0) {
             assert!(cmp::compare(&self.entries[index - 1].key, &new_key).is_lt(), error::invalid_argument(ENEW_KEY_NOT_IN_ORDER))
         };
@@ -161,9 +163,7 @@ module aptos_std::ordered_map {
             assert!(cmp::compare(&new_key, &self.entries[index + 1].key).is_lt(), error::invalid_argument(ENEW_KEY_NOT_IN_ORDER))
         };
 
-        let entry = self.entries.borrow_mut(index);
-        assert!(old_key == &entry.key, error::invalid_argument(EKEY_NOT_FOUND));
-        entry.key = new_key;
+        self.entries[index].key = new_key;
     }
 
     /// Add multiple key/value pairs to the map. The keys must not already exist.
@@ -171,40 +171,54 @@ module aptos_std::ordered_map {
     public fun add_all<K, V>(self: &mut OrderedMap<K, V>, keys: vector<K>, values: vector<V>) {
         // TODO: Can be optimized, by sorting keys and values, and then creating map.
         vector::zip(keys, values, |key, value| {
-            add(self, key, value);
+            self.add(key, value);
         });
     }
 
     /// Add multiple key/value pairs to the map, overwrites values if they exist already,
-    /// or if duplicate keys are passed in.s
+    /// or if duplicate keys are passed in.
     public fun upsert_all<K: drop, V: drop>(self: &mut OrderedMap<K, V>, keys: vector<K>, values: vector<V>) {
         // TODO: Can be optimized, by sorting keys and values, and then creating map.
         vector::zip(keys, values, |key, value| {
-            upsert(self, key, value);
+            self.upsert(key, value);
         });
+    }
+
+    /// Takes all elements from `other` and adds them to `self`,
+    /// overwritting if any key is already present in self.
+    public fun append<K: drop, V: drop>(self: &mut OrderedMap<K, V>, other: OrderedMap<K, V>) {
+        self.append_impl(other);
     }
 
     /// Takes all elements from `other` and adds them to `self`.
     /// Aborts with EKEY_ALREADY_EXISTS if `other` has a key already present in `self`.
-    public fun append<K, V>(self: &mut OrderedMap<K, V>, other: OrderedMap<K, V>) {
+    public fun append_disjoint<K, V>(self: &mut OrderedMap<K, V>, other: OrderedMap<K, V>) {
+        let overwritten = self.append_impl(other);
+        assert!(overwritten.length() == 0, error::invalid_argument(EKEY_ALREADY_EXISTS));
+        overwritten.destroy_empty();
+    }
+
+    /// Takes all elements from `other` and adds them to `self`, returning list of entries in self that were overwritten.
+    fun append_impl<K, V>(self: &mut OrderedMap<K, V>, other: OrderedMap<K, V>): vector<Entry<K,V>> {
         let OrderedMap::SortedVectorMap {
             entries: other_entries,
         } = other;
+        let overwritten = vector::empty();
 
         if (other_entries.is_empty()) {
             other_entries.destroy_empty();
-            return;
+            return overwritten;
         };
 
         if (self.entries.is_empty()) {
             self.entries.append(other_entries);
-            return;
+            return overwritten;
         };
 
         // Optimization: if all elements in `other` are larger than all elements in `self`, we can just move them over.
         if (cmp::compare(&self.entries.borrow(self.entries.length() - 1).key, &other_entries.borrow(0).key).is_lt()) {
             self.entries.append(other_entries);
-            return;
+            return overwritten;
         };
 
         // In O(n), traversing from the back, build reverse sorted result, and then reverse it back
@@ -215,28 +229,37 @@ module aptos_std::ordered_map {
         // after the end of the loop, other_entries is empty, and any leftover is in entries
         loop {
             let ord = cmp::compare(&self.entries[cur_i].key, &other_entries[other_i].key);
-            assert!(!ord.is_eq(), error::invalid_argument(EKEY_ALREADY_EXISTS));
             if (ord.is_gt()) {
                 reverse_result.push_back(self.entries.pop_back());
                 if (cur_i == 0) {
                     // make other_entries empty, and rest in entries.
-                    mem::swap(&mut self.entries, &mut other_entries);
+                    // TODO cannot use mem::swap until it is public/released
+                    // mem::swap(&mut self.entries, &mut other_entries);
+                    self.entries.append(other_entries);
                     break;
                 } else {
                     cur_i = cur_i - 1;
-                }
+                };
             } else {
+                // is_lt or is_eq
+                if (ord.is_eq()) {
+                    // we skip the entries one, and below put in the result one from other.
+                    overwritten.push_back(self.entries.pop_back());
+                };
+
                 reverse_result.push_back(other_entries.pop_back());
                 if (other_i == 0) {
+                    other_entries.destroy_empty();
                     break;
                 } else {
                     other_i = other_i - 1;
-                }
+                };
             };
         };
 
-        other_entries.destroy_empty();
         self.entries.reverse_append(reverse_result);
+
+        overwritten
     }
 
     /// Splits the collection into two, such to leave `self` with `at` number of elements.
@@ -351,6 +374,7 @@ module aptos_std::ordered_map {
     }
 
     /// Borrows the key given iterator points to.
+    /// Aborts with EITER_OUT_OF_BOUNDS if iterator is pointing to the end.
     /// Note: Requires that the map is not changed after the input iterator is generated.
     public(friend) fun iter_borrow_key<K, V>(self: &IteratorPtr, map: &OrderedMap<K, V>): &K {
         assert!(!(self is IteratorPtr::End), error::invalid_argument(EITER_OUT_OF_BOUNDS));
@@ -359,6 +383,7 @@ module aptos_std::ordered_map {
     }
 
     /// Borrows the value given iterator points to.
+    /// Aborts with EITER_OUT_OF_BOUNDS if iterator is pointing to the end.
     /// Note: Requires that the map is not changed after the input iterator is generated.
     public(friend) fun iter_borrow<K, V>(self: IteratorPtr, map: &OrderedMap<K, V>): &V {
         assert!(!(self is IteratorPtr::End), error::invalid_argument(EITER_OUT_OF_BOUNDS));
@@ -366,6 +391,7 @@ module aptos_std::ordered_map {
     }
 
     /// Mutably borrows the value iterator points to.
+    /// Aborts with EITER_OUT_OF_BOUNDS if iterator is pointing to the end.
     /// Note: Requires that the map is not changed after the input iterator is generated.
     public(friend) fun iter_borrow_mut<K, V>(self: IteratorPtr, map: &mut OrderedMap<K, V>): &mut V {
         assert!(!(self is IteratorPtr::End), error::invalid_argument(EITER_OUT_OF_BOUNDS));
@@ -373,23 +399,52 @@ module aptos_std::ordered_map {
     }
 
     /// Removes (key, value) pair iterator points to, returning the previous value.
-    /// Aborts with EKEY_NOT_FOUND if iterator is pointing to the end.
+    /// Aborts with EITER_OUT_OF_BOUNDS if iterator is pointing to the end.
     /// Note: Requires that the map is not changed after the input iterator is generated.
     public(friend) fun iter_remove<K: drop, V>(self: IteratorPtr, map: &mut OrderedMap<K, V>): V {
-        assert!(!(self is IteratorPtr::End), error::invalid_argument(EKEY_NOT_FOUND));
+        assert!(!(self is IteratorPtr::End), error::invalid_argument(EITER_OUT_OF_BOUNDS));
 
         let Entry { key: _, value } = map.entries.remove(self.index);
         value
     }
 
     /// Replaces the value iterator is pointing to, returning the previous value.
-    /// Aborts with EKEY_NOT_FOUND if iterator is pointing to the end.
+    /// Aborts with EITER_OUT_OF_BOUNDS if iterator is pointing to the end.
     /// Note: Requires that the map is not changed after the input iterator is generated.
-    public(friend) fun iter_replace<K, V>(self: IteratorPtr, map: &mut OrderedMap<K, V>, value: V): V {
-        assert!(!(self is IteratorPtr::End), error::invalid_argument(EKEY_NOT_FOUND));
+    public(friend) fun iter_replace<K: copy + drop, V>(self: IteratorPtr, map: &mut OrderedMap<K, V>, value: V): V {
+        assert!(!(self is IteratorPtr::End), error::invalid_argument(EITER_OUT_OF_BOUNDS));
 
-        let entry = map.entries.borrow_mut(self.index);
-        mem::replace(&mut entry.value, value)
+        // TODO once mem::replace is public/released, update to:
+        // let entry = map.entries.borrow_mut(self.index);
+        // mem::replace(&mut entry.value, value)
+        let key = map.entries[self.index].key;
+        let Entry {
+            key: _,
+            value: prev_value,
+        } = map.entries.replace(self.index, Entry { key, value });
+        prev_value
+    }
+
+    /// Add key/value pair to the map, at the iterator position (before the element at the iterator position).
+    /// Aborts with ENEW_KEY_NOT_IN_ORDER is key is not larger than the key before the iterator,
+    /// or smaller than the key at the iterator position.
+    public(friend) fun iter_add<K, V>(self: IteratorPtr, map: &mut OrderedMap<K, V>, key: K, value: V) {
+        let len = map.entries.length();
+        let insert_index = if (self is IteratorPtr::End) {
+            len
+        } else {
+            self.index
+        };
+
+        if (insert_index > 0) {
+            assert!(cmp::compare(&map.entries[insert_index - 1].key, &key).is_lt(), error::invalid_argument(ENEW_KEY_NOT_IN_ORDER))
+        };
+
+        if (insert_index < len) {
+            assert!(cmp::compare(&key, &map.entries[insert_index].key).is_lt(), error::invalid_argument(ENEW_KEY_NOT_IN_ORDER))
+        };
+
+        map.entries.insert(insert_index, Entry { key, value });
     }
 
     /// Destroys empty map.
@@ -617,16 +672,47 @@ module aptos_std::ordered_map {
         let map = new<u64, u64>();
 
         assert!(length(&map) == 0, 0);
-        add_all(&mut map, vector[1, 2, 3], vector[10, 20, 30]);
+        add_all(&mut map, vector[2, 1, 3], vector[20, 10, 30]);
+
+        assert!(map == new_from(vector[1, 2, 3], vector[10, 20, 30]), 1);
+
         assert!(length(&map) == 3, 1);
         assert!(borrow(&map, &1) == &10, 2);
         assert!(borrow(&map, &2) == &20, 3);
         assert!(borrow(&map, &3) == &30, 4);
+    }
 
-        remove(&mut map, &1);
-        remove(&mut map, &2);
-        remove(&mut map, &3);
-        destroy_empty(map);
+    #[test]
+    #[expected_failure(abort_code = 0x20002, location = Self)] /// EKEY_ALREADY_EXISTS
+    public fun test_add_all_mismatch() {
+        new_from(vector[1, 3], vector[10]);
+    }
+
+    #[test]
+    public fun test_upsert_all() {
+        let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+        upsert_all(&mut map, vector[7, 2, 3], vector[70, 20, 35]);
+        assert!(map == new_from(vector[1, 2, 3, 5, 7], vector[10, 20, 35, 50, 70]), 1);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10001, location = Self)] /// EKEY_ALREADY_EXISTS
+    public fun test_new_from_duplicate() {
+        new_from(vector[1, 3, 1, 5], vector[10, 30, 11, 50]);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x20002, location = Self)] /// EKEY_ALREADY_EXISTS
+    public fun test_upsert_all_mismatch() {
+        let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+        upsert_all(&mut map, vector[2], vector[20, 35]);
+    }
+
+    #[test]
+    public fun test_to_vec_pair() {
+        let (keys, values) = new_from(vector[3, 1, 5], vector[30, 10, 50]).to_vec_pair();
+        assert!(keys == vector[1, 3, 5], 1);
+        assert!(values == vector[10, 30, 50], 2);
     }
 
     #[test]
@@ -650,7 +736,7 @@ module aptos_std::ordered_map {
     }
 
     #[test]
-    #[expected_failure]
+    #[expected_failure(abort_code = 0x10001, location = Self)] /// EKEY_ALREADY_EXISTS
     public fun test_add_twice() {
         let map = new<u64, u64>();
         add(&mut map, 3, 1);
@@ -661,10 +747,22 @@ module aptos_std::ordered_map {
     }
 
     #[test]
-    #[expected_failure]
-    public fun test_remove_twice() {
+    #[expected_failure(abort_code = 0x10002, location = Self)] /// EKEY_NOT_FOUND
+    public fun test_remove_twice_1() {
         let map = new<u64, u64>();
         add(&mut map, 3, 1);
+        remove(&mut map, &3);
+        remove(&mut map, &3);
+
+        destroy_empty(map);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10002, location = Self)] /// EKEY_NOT_FOUND
+    public fun test_remove_twice_2() {
+        let map = new<u64, u64>();
+        add(&mut map, 3, 1);
+        add(&mut map, 4, 1);
         remove(&mut map, &3);
         remove(&mut map, &3);
 
@@ -725,22 +823,223 @@ module aptos_std::ordered_map {
             let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
             let other = new_from(vector[2, 4], vector[20, 40]);
             map.append(other);
-            assert!(map == new_from(vector[1, 2, 3, 4, 5], vector[10, 20, 30, 40, 50]), 3);
+            assert!(map == new_from(vector[1, 2, 3, 4, 5], vector[10, 20, 30, 40, 50]), 4);
         };
         {
             let map = new_from(vector[2, 4], vector[20, 40]);
             let other = new_from(vector[1, 3, 5], vector[10, 30, 50]);
             map.append(other);
-            assert!(map == new_from(vector[1, 2, 3, 4, 5], vector[10, 20, 30, 40, 50]), 3);
+            assert!(map == new_from(vector[1, 2, 3, 4, 5], vector[10, 20, 30, 40, 50]), 6);
+        };
+        {
+            let map = new_from(vector[1], vector[10]);
+            let other = new_from(vector[1], vector[11]);
+            map.append(other);
+            assert!(map == new_from(vector[1], vector[11]), 7);
+        }
+    }
+
+    #[test]
+    fun test_append_disjoint() {
+        let map = new_from(vector[1, 2, 3], vector[10, 20, 30]);
+        let other = new_from(vector[4, 5], vector[40, 50]);
+        map.append_disjoint(other);
+        assert!(map == new_from(vector[1, 2, 3, 4, 5], vector[10, 20, 30, 40, 50]), 1);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10001, location = Self)] /// EKEY_ALREADY_EXISTS
+    fun test_append_disjoint_abort() {
+        let map = new_from(vector[1], vector[10]);
+        let other = new_from(vector[1], vector[11]);
+        map.append_disjoint(other);
+    }
+
+    #[test]
+    fun test_trim() {
+        let map = new_from(vector[1, 2, 3], vector[10, 20, 30]);
+        let rest = map.trim(2);
+        assert!(map == new_from(vector[1, 2], vector[10, 20]), 1);
+        assert!(rest == new_from(vector[3], vector[30]), 2);
+    }
+
+    #[test]
+    fun test_replace_key_inplace() {
+        let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+        map.replace_key_inplace(&5, 6);
+        assert!(map == new_from(vector[1, 3, 6], vector[10, 30, 50]), 1);
+        map.replace_key_inplace(&3, 4);
+        assert!(map == new_from(vector[1, 4, 6], vector[10, 30, 50]), 2);
+        map.replace_key_inplace(&1, 0);
+        assert!(map == new_from(vector[0, 4, 6], vector[10, 30, 50]), 3);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10002, location = Self)] /// EKEY_NOT_FOUND
+    fun test_replace_key_inplace_not_found_1() {
+        let map = new_from(vector[1, 3, 6], vector[10, 30, 50]);
+        map.replace_key_inplace(&4, 5);
+
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10002, location = Self)] /// EKEY_NOT_FOUND
+    fun test_replace_key_inplace_not_found_2() {
+        let map = new_from(vector[1, 3, 6], vector[10, 30, 50]);
+        map.replace_key_inplace(&7, 8);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10004, location = Self)] /// ENEW_KEY_NOT_IN_ORDER
+    fun test_replace_key_inplace_not_in_order_1() {
+        let map = new_from(vector[1, 3, 6], vector[10, 30, 50]);
+        map.replace_key_inplace(&3, 7);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10004, location = Self)] /// ENEW_KEY_NOT_IN_ORDER
+    fun test_replace_key_inplace_not_in_order_2() {
+        let map = new_from(vector[1, 3, 6], vector[10, 30, 50]);
+        map.replace_key_inplace(&1, 3);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10004, location = Self)] /// ENEW_KEY_NOT_IN_ORDER
+    fun test_replace_key_inplace_not_in_order_3() {
+        let map = new_from(vector[1, 3, 6], vector[10, 30, 50]);
+        map.replace_key_inplace(&6, 3);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
+    public fun test_iter_end_next_abort() {
+        let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+        map.new_end_iter().iter_next(&map);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
+    public fun test_iter_end_borrow_key_abort() {
+        let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+        map.new_end_iter().iter_borrow_key(&map);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
+    public fun test_iter_end_borrow_abort() {
+        let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+        map.new_end_iter().iter_borrow(&map);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
+    public fun test_iter_end_borrow_mut_abort() {
+        let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+        map.new_end_iter().iter_borrow_mut(&mut map);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
+    public fun test_iter_begin_prev_abort() {
+        let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+        map.new_begin_iter().iter_prev(&map);
+    }
+
+    #[test]
+    public fun test_iter_is_begin_from_non_empty() {
+        let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+        let iter = map.new_begin_iter();
+        assert!(iter.iter_is_begin(&map), 1);
+        assert!(iter.iter_is_begin_from_non_empty(), 1);
+
+        iter = iter.iter_next(&map);
+        assert!(!iter.iter_is_begin(&map), 1);
+        assert!(!iter.iter_is_begin_from_non_empty(), 1);
+
+        let map = new<u64, u64>();
+        let iter = map.new_begin_iter();
+        assert!(iter.iter_is_begin(&map), 1);
+        assert!(!iter.iter_is_begin_from_non_empty(), 1);
+    }
+
+    #[test]
+    public fun test_iter_remove() {
+        let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+        map.new_begin_iter().iter_next(&map).iter_remove(&mut map);
+        assert!(map == new_from(vector[1, 5], vector[10, 50]), 1);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
+        public fun test_iter_remove_abort() {
+        let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+        map.new_end_iter().iter_remove(&mut map);
+    }
+
+    #[test]
+    public fun test_iter_replace() {
+        let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+        map.new_begin_iter().iter_next(&map).iter_replace(&mut map, 35);
+        assert!(map == new_from(vector[1, 3, 5], vector[10, 35, 50]), 1);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
+        public fun test_iter_replace_abort() {
+        let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+        map.new_end_iter().iter_replace(&mut map, 35);
+    }
+
+    #[test]
+    public fun test_iter_add() {
+        {
+            let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+            map.new_begin_iter().iter_add(&mut map, 0, 5);
+            assert!(map == new_from(vector[0, 1, 3, 5], vector[5, 10, 30, 50]), 1);
+        };
+        {
+            let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+            map.new_begin_iter().iter_next(&map).iter_add(&mut map, 2, 20);
+            assert!(map == new_from(vector[1, 2, 3, 5], vector[10, 20, 30, 50]), 2);
+        };
+        {
+            let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+            map.new_end_iter().iter_add(&mut map, 6, 60);
+            assert!(map == new_from(vector[1, 3, 5, 6], vector[10, 30, 50, 60]), 3);
+        };
+        {
+            let map = new();
+            map.new_end_iter().iter_add(&mut map, 1, 10);
+            assert!(map == new_from(vector[1], vector[10]), 4);
         };
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x10001 )] /// EKEY_ALREADY_EXISTS
-    fun test_append_abort() {
-        let map = new_from(vector[1], vector[10]);
-        let other = new_from(vector[1], vector[10]);
-        map.append(other);
+    #[expected_failure(abort_code = 0x10004, location = Self)] /// ENEW_KEY_NOT_IN_ORDER
+    public fun test_iter_add_abort_1() {
+        let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+        map.new_begin_iter().iter_add(&mut map, 1, 5);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10004, location = Self)] /// ENEW_KEY_NOT_IN_ORDER
+    public fun test_iter_add_abort_2() {
+        let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+        map.new_end_iter().iter_add(&mut map, 5, 55);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10004, location = Self)] /// ENEW_KEY_NOT_IN_ORDER
+    public fun test_iter_add_abort_3() {
+        let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+        map.new_begin_iter().iter_next(&map).iter_add(&mut map, 1, 15);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10004, location = Self)] /// ENEW_KEY_NOT_IN_ORDER
+    public fun test_iter_add_abort_4() {
+        let map = new_from(vector[1, 3, 5], vector[10, 30, 50]);
+        map.new_begin_iter().iter_next(&map).iter_add(&mut map, 3, 25);
     }
 
     #[test_only]
