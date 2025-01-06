@@ -605,7 +605,7 @@ impl Flags {
     pub fn set_language_version(self, language_version: LanguageVersion) -> Self {
         Self {
             language_version,
-            lang_v2: language_version >= LanguageVersion::V2,
+            lang_v2: language_version >= LanguageVersion::V2_0,
             ..self
         }
     }
@@ -627,20 +627,23 @@ pub enum LanguageVersion {
     #[value(name = "1")]
     V1,
     #[value(name = "2")]
-    V2, /* V2 is the same as V2_0, here for the parser */
+    V2, /* V2 is the same as V2_1, here for the parser */
     #[value(name = "2.0")]
     V2_0,
     #[value(name = "2.1")]
     V2_1,
+    #[value(name = "2.2")]
+    V2_2,
 }
 
 impl LanguageVersion {
     fn to_ordinal(self) -> usize {
+        use LanguageVersion::*;
         match self {
-            LanguageVersion::V1 => 0,
-            LanguageVersion::V2 => 1,
-            LanguageVersion::V2_0 => 1,
-            LanguageVersion::V2_1 => 2,
+            V1 => 0,
+            V2_0 => 1,
+            V2 | V2_1 => 2,
+            V2_2 => 3,
         }
     }
 }
@@ -672,6 +675,7 @@ impl std::fmt::Display for LanguageVersion {
             LanguageVersion::V2 => "2",
             LanguageVersion::V2_0 => "2.0",
             LanguageVersion::V2_1 => "2.1",
+            LanguageVersion::V2_2 => "2.2",
         })
     }
 }

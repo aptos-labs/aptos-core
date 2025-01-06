@@ -30,7 +30,7 @@ error: cannot move local `x` since it is still in use
 16 │         if (cond) { _ = move x } else { _ = move x };
    │                         ^^^^^^ attempted to move here
 17 │         let _ = x + 1;
-   │                 ----- used here
+   │                 - used here
 
 error: cannot move local `x` since it is still in use
    ┌─ tests/more-v1/locals/use_after_move_if_else.move:16:45
@@ -38,7 +38,7 @@ error: cannot move local `x` since it is still in use
 16 │         if (cond) { _ = move x } else { _ = move x };
    │                                             ^^^^^^ attempted to move here
 17 │         let _ = x + 1;
-   │                 ----- used here
+   │                 - used here
 
 error: cannot move local `x` since it is still in use
    ┌─ tests/more-v1/locals/use_after_move_if_else.move:23:25
@@ -46,7 +46,7 @@ error: cannot move local `x` since it is still in use
 23 │         if (cond) { _ = move x } else { _ = x };
    │                         ^^^^^^ attempted to move here
 24 │         let _ = x + 1;
-   │                 ----- used here
+   │                 - used here
 
 error: cannot move local `x` since it is still in use
    ┌─ tests/more-v1/locals/use_after_move_if_else.move:29:25

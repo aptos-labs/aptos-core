@@ -263,7 +263,10 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                     field_names.into_iter().zip(values).collect(),
                 )
             },
-            MoveStruct::WithFields(fields) | MoveStruct::WithTypes { fields, .. } => (None, fields),
+            MoveStruct::WithFields(fields)
+            | MoveStruct::WithTypes {
+                _fields: fields, ..
+            } => (None, fields),
             MoveStruct::WithVariantFields(name, _, fields) => (Some(name), fields),
         })
     }

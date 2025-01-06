@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::NUM_STATE_SHARDS,
     db::{
         test_helper::{arb_state_kv_sets, update_store},
         AptosDB,
@@ -20,7 +19,11 @@ use crate::{
 use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_schemadb::SchemaBatch;
-use aptos_storage_interface::{jmt_update_refs, jmt_updates, DbReader};
+use aptos_storage_interface::{
+    jmt_update_refs, jmt_updates,
+    state_store::{sharded_state_update_refs::ShardedStateUpdateRefs, NUM_STATE_SHARDS},
+    DbReader,
+};
 use aptos_temppath::TempPath;
 use aptos_types::{
     state_store::{
@@ -63,14 +66,13 @@ fn put_value_set(
     let enable_sharding = state_store.state_kv_db.enabled_sharding();
     state_store
         .put_value_sets(
-            vec![&sharded_value_set],
             version,
+            &ShardedStateUpdateRefs::index_per_version_updates([value_set], 1),
             StateStorageUsage::new_untracked(),
             None,
             &ledger_batch,
             &sharded_state_kv_batches,
             enable_sharding,
-            /*skip_usage=*/ false,
             /*last_checkpoint_index=*/ None,
         )
         .unwrap();

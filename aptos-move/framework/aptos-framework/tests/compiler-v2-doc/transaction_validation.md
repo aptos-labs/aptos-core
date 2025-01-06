@@ -888,26 +888,11 @@ Called by the Adapter
             );
         };
 
-        <b>let</b> amount_to_burn = <b>if</b> (<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_collect_and_distribute_gas_fees">features::collect_and_distribute_gas_fees</a>()) {
-            // TODO(gas): We might want <b>to</b> distinguish the refundable part of the charge and burn it or track
-            // it separately, so that we don't increase the total supply by refunding.
-
-            // If transaction fees are redistributed <b>to</b> validators, collect them here for
-            // later redistribution.
-            <a href="transaction_fee.md#0x1_transaction_fee_collect_fee">transaction_fee::collect_fee</a>(gas_payer, transaction_fee_amount);
-            0
-        } <b>else</b> {
-            // Otherwise, just burn the fee.
-            // TODO: this branch should be removed completely when transaction fee collection
-            // is tested and is fully proven <b>to</b> work well.
-            transaction_fee_amount
-        };
-
-        <b>if</b> (amount_to_burn &gt; storage_fee_refunded) {
-            <b>let</b> burn_amount = amount_to_burn - storage_fee_refunded;
+        <b>if</b> (transaction_fee_amount &gt; storage_fee_refunded) {
+            <b>let</b> burn_amount = transaction_fee_amount - storage_fee_refunded;
             <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(gas_payer, burn_amount);
-        } <b>else</b> <b>if</b> (amount_to_burn &lt; storage_fee_refunded) {
-            <b>let</b> mint_amount = storage_fee_refunded - amount_to_burn;
+        } <b>else</b> <b>if</b> (transaction_fee_amount &lt; storage_fee_refunded) {
+            <b>let</b> mint_amount = storage_fee_refunded - transaction_fee_amount;
             <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(gas_payer, mint_amount)
         };
     };
@@ -1372,19 +1357,7 @@ Skip transaction_fee::burn_fee verification.
     <b>aborts_if</b> !<b>exists</b>&lt;Account&gt;(addr);
     <b>aborts_if</b> !(<b>global</b>&lt;Account&gt;(addr).sequence_number &lt; <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>);
     <b>ensures</b> <a href="account.md#0x1_account">account</a>.sequence_number == pre_account.sequence_number + 1;
-    <b>let</b> collect_fee_enabled = <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/features.md#0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES">features::COLLECT_AND_DISTRIBUTE_GAS_FEES</a>);
-    <b>let</b> collected_fees = <b>global</b>&lt;CollectedFeesPerBlock&gt;(@aptos_framework).amount;
-    <b>let</b> aggr = collected_fees.value;
-    <b>let</b> aggr_val = <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(aggr);
-    <b>let</b> aggr_lim = <a href="aggregator.md#0x1_aggregator_spec_get_limit">aggregator::spec_get_limit</a>(aggr);
-    // This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
-    <b>aborts_if</b> collect_fee_enabled && !<b>exists</b>&lt;CollectedFeesPerBlock&gt;(@aptos_framework);
-    <b>aborts_if</b> collect_fee_enabled && transaction_fee_amount &gt; 0 && aggr_val + transaction_fee_amount &gt; aggr_lim;
-    <b>let</b> amount_to_burn = <b>if</b> (collect_fee_enabled) {
-        0
-    } <b>else</b> {
-        transaction_fee_amount - storage_fee_refunded
-    };
+    <b>let</b> amount_to_burn = transaction_fee_amount - storage_fee_refunded;
     <b>let</b> apt_addr = <a href="../../../aptos-stdlib/tests/compiler-v2-doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;AptosCoin&gt;().account_address;
     <b>let</b> maybe_apt_supply = <b>global</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(apt_addr).supply;
     <b>let</b> total_supply_enabled = <a href="../../../aptos-stdlib/../move-stdlib/tests/compiler-v2-doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(maybe_apt_supply);
@@ -1397,11 +1370,7 @@ Skip transaction_fee::burn_fee verification.
     <b>aborts_if</b> amount_to_burn &gt; 0 && !<b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(apt_addr);
     <b>aborts_if</b> amount_to_burn &gt; 0 && total_supply_enabled && apt_supply_value &lt; amount_to_burn;
     <b>ensures</b> total_supply_enabled ==&gt; apt_supply_value - amount_to_burn == post_apt_supply_value;
-    <b>let</b> amount_to_mint = <b>if</b> (collect_fee_enabled) {
-        storage_fee_refunded
-    } <b>else</b> {
-        storage_fee_refunded - transaction_fee_amount
-    };
+    <b>let</b> amount_to_mint = storage_fee_refunded - transaction_fee_amount;
     <b>let</b> total_supply = <a href="coin.md#0x1_coin_supply">coin::supply</a>&lt;AptosCoin&gt;;
     <b>let</b> <b>post</b> post_total_supply = <a href="coin.md#0x1_coin_supply">coin::supply</a>&lt;AptosCoin&gt;;
     <b>aborts_if</b> amount_to_mint &gt; 0 && !<b>exists</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(addr);

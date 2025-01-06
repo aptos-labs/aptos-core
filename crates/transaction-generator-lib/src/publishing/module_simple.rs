@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(unused)]
 
+use crate::publishing::publish_util::Package;
 use aptos_framework::natives::code::{MoveOption, PackageMetadata};
 use aptos_sdk::{
     bcs,
@@ -11,7 +12,7 @@ use aptos_sdk::{
     },
     types::{
         serde_helper::bcs_utils::bcs_size_of_byte_array,
-        transaction::{EntryFunction, TransactionPayload},
+        transaction::{EntryFunction, Script, TransactionPayload},
     },
 };
 use move_binary_format::{
@@ -125,6 +126,8 @@ pub enum AutomaticArgs {
 // More info in the Simple.move
 #[derive(Debug, Copy, Clone)]
 pub enum EntryPoints {
+    /// Republish the module
+    Republish,
     /// Empty (NoOp) function
     Nop,
     /// Empty (NoOp) function, signed by publisher as fee-payer
@@ -226,6 +229,25 @@ pub enum EntryPoints {
         num_objects: u64,
         object_payload_size: u64,
     },
+    VectorTrimAppend {
+        vec_len: u64,
+        element_len: u64,
+        index: u64,
+        repeats: u64,
+    },
+    VectorRemoveInsert {
+        vec_len: u64,
+        element_len: u64,
+        index: u64,
+        repeats: u64,
+    },
+    VectorRangeMove {
+        vec_len: u64,
+        element_len: u64,
+        index: u64,
+        move_len: u64,
+        repeats: u64,
+    },
     /// Initialize Token V1 NFT collection
     TokenV1InitializeCollection,
     /// Mint an NFT token. Should be called only after InitializeCollection is called
@@ -267,12 +289,17 @@ pub enum EntryPoints {
         num_points_per_txn: usize,
     },
     DeserializeU256,
+    /// No-op script with dependencies in *::simple.move. The script has unreachable code that is
+    /// there to slow down deserialization & verification, effectively making it more expensive to
+    /// load it into code cache.
+    SimpleScript,
 }
 
 impl EntryPoints {
     pub fn package_name(&self) -> &'static str {
         match self {
-            EntryPoints::Nop
+            EntryPoints::Republish
+            | EntryPoints::Nop
             | EntryPoints::NopFeePayer
             | EntryPoints::Nop2Signers
             | EntryPoints::Nop5Signers
@@ -291,12 +318,16 @@ impl EntryPoints {
             | EntryPoints::BytesMakeOrChange { .. }
             | EntryPoints::EmitEvents { .. }
             | EntryPoints::MakeOrChangeTable { .. }
-            | EntryPoints::MakeOrChangeTableRandom { .. } => "simple",
+            | EntryPoints::MakeOrChangeTableRandom { .. }
+            | EntryPoints::SimpleScript => "simple",
             EntryPoints::IncGlobal
             | EntryPoints::IncGlobalAggV2
             | EntryPoints::ModifyGlobalBoundedAggV2 { .. }
             | EntryPoints::CreateObjects { .. }
             | EntryPoints::CreateObjectsConflict { .. }
+            | EntryPoints::VectorTrimAppend { .. }
+            | EntryPoints::VectorRemoveInsert { .. }
+            | EntryPoints::VectorRangeMove { .. }
             | EntryPoints::TokenV1InitializeCollection
             | EntryPoints::TokenV1MintAndStoreNFTParallel
             | EntryPoints::TokenV1MintAndStoreNFTSequential
@@ -328,7 +359,8 @@ impl EntryPoints {
 
     pub fn module_name(&self) -> &'static str {
         match self {
-            EntryPoints::Nop
+            EntryPoints::Republish
+            | EntryPoints::Nop
             | EntryPoints::NopFeePayer
             | EntryPoints::Nop2Signers
             | EntryPoints::Nop5Signers
@@ -347,13 +379,17 @@ impl EntryPoints {
             | EntryPoints::BytesMakeOrChange { .. }
             | EntryPoints::EmitEvents { .. }
             | EntryPoints::MakeOrChangeTable { .. }
-            | EntryPoints::MakeOrChangeTableRandom { .. } => "simple",
+            | EntryPoints::MakeOrChangeTableRandom { .. }
+            | EntryPoints::SimpleScript => "simple",
             EntryPoints::IncGlobal
             | EntryPoints::IncGlobalAggV2
             | EntryPoints::ModifyGlobalBoundedAggV2 { .. } => "aggregator_example",
             EntryPoints::CreateObjects { .. } | EntryPoints::CreateObjectsConflict { .. } => {
                 "objects"
             },
+            EntryPoints::VectorTrimAppend { .. }
+            | EntryPoints::VectorRemoveInsert { .. }
+            | EntryPoints::VectorRangeMove { .. } => "vector_example",
             EntryPoints::TokenV1InitializeCollection
             | EntryPoints::TokenV1MintAndStoreNFTParallel
             | EntryPoints::TokenV1MintAndStoreNFTSequential
@@ -387,11 +423,20 @@ impl EntryPoints {
 
     pub fn create_payload(
         &self,
-        module_id: ModuleId,
+        package: &Package,
+        module_name: &str,
         rng: Option<&mut StdRng>,
         other: Option<&AccountAddress>,
     ) -> TransactionPayload {
+        let module_id = package.get_module_id(module_name);
         match self {
+            EntryPoints::Republish => {
+                let (metadata_serialized, code) = package.get_publish_args();
+                get_payload(module_id, ident_str!("publish_p").to_owned(), vec![
+                    bcs::to_bytes(&metadata_serialized).unwrap(),
+                    bcs::to_bytes(&code).unwrap(),
+                ])
+            },
             // 0 args
             EntryPoints::Nop | EntryPoints::NopFeePayer => {
                 get_payload_void(module_id, ident_str!("nop").to_owned())
@@ -411,6 +456,9 @@ impl EntryPoints {
             },
             EntryPoints::Double => get_payload_void(module_id, ident_str!("double").to_owned()),
             EntryPoints::Half => get_payload_void(module_id, ident_str!("half").to_owned()),
+            EntryPoints::SimpleScript => {
+                Package::script(*other.expect("Must provide sender's address"))
+            },
             // 1 arg
             EntryPoints::Loop {
                 loop_count,
@@ -531,6 +579,51 @@ impl EntryPoints {
                     bcs::to_bytes(num_objects).unwrap(),
                     bcs::to_bytes(object_payload_size).unwrap(),
                     bcs::to_bytes(other.expect("Must provide other")).unwrap(),
+                ],
+            ),
+            EntryPoints::VectorTrimAppend {
+                vec_len,
+                element_len,
+                index,
+                repeats,
+            }
+            | EntryPoints::VectorRemoveInsert {
+                vec_len,
+                element_len,
+                index,
+                repeats,
+            } => get_payload(
+                module_id,
+                ident_str!(
+                    if let EntryPoints::VectorTrimAppend { .. } = self {
+                        "test_trim_append"
+                    } else {
+                        "test_remove_insert"
+                    }
+                )
+                .to_owned(),
+                vec![
+                    bcs::to_bytes(vec_len).unwrap(),
+                    bcs::to_bytes(element_len).unwrap(),
+                    bcs::to_bytes(index).unwrap(),
+                    bcs::to_bytes(repeats).unwrap(),
+                ],
+            ),
+            EntryPoints::VectorRangeMove {
+                vec_len,
+                element_len,
+                index,
+                move_len,
+                repeats,
+            } => get_payload(
+                module_id,
+                ident_str!("test_middle_range_move").to_owned(),
+                vec![
+                    bcs::to_bytes(vec_len).unwrap(),
+                    bcs::to_bytes(element_len).unwrap(),
+                    bcs::to_bytes(index).unwrap(),
+                    bcs::to_bytes(move_len).unwrap(),
+                    bcs::to_bytes(repeats).unwrap(),
                 ],
             ),
             EntryPoints::TokenV1InitializeCollection => get_payload_void(
@@ -755,6 +848,7 @@ impl EntryPoints {
 
     pub fn multi_sig_additional_num(&self) -> MultiSigConfig {
         match self {
+            EntryPoints::Republish => MultiSigConfig::Publisher,
             EntryPoints::NopFeePayer => MultiSigConfig::FeePayerPublisher,
             EntryPoints::Nop2Signers => MultiSigConfig::Random(1),
             EntryPoints::Nop5Signers => MultiSigConfig::Random(4),
@@ -774,6 +868,7 @@ impl EntryPoints {
 
     pub fn automatic_args(&self) -> AutomaticArgs {
         match self {
+            EntryPoints::Republish => AutomaticArgs::Signer,
             EntryPoints::Nop
             | EntryPoints::NopFeePayer
             | EntryPoints::Step
@@ -791,7 +886,8 @@ impl EntryPoints {
             | EntryPoints::BytesMakeOrChange { .. }
             | EntryPoints::EmitEvents { .. }
             | EntryPoints::MakeOrChangeTable { .. }
-            | EntryPoints::MakeOrChangeTableRandom { .. } => AutomaticArgs::Signer,
+            | EntryPoints::MakeOrChangeTableRandom { .. }
+            | EntryPoints::SimpleScript => AutomaticArgs::Signer,
             EntryPoints::Nop2Signers | EntryPoints::Nop5Signers => AutomaticArgs::SignerAndMultiSig,
             EntryPoints::IncGlobal
             | EntryPoints::IncGlobalAggV2
@@ -799,6 +895,9 @@ impl EntryPoints {
             EntryPoints::CreateObjects { .. } | EntryPoints::CreateObjectsConflict { .. } => {
                 AutomaticArgs::Signer
             },
+            EntryPoints::VectorTrimAppend { .. }
+            | EntryPoints::VectorRemoveInsert { .. }
+            | EntryPoints::VectorRangeMove { .. } => AutomaticArgs::None,
             EntryPoints::TokenV1InitializeCollection
             | EntryPoints::TokenV1MintAndStoreNFTParallel
             | EntryPoints::TokenV1MintAndStoreNFTSequential
@@ -868,18 +967,26 @@ const GEN_ENTRY_POINTS: &[EntryPoints; 12] = &[
     EntryPoints::BytesMakeOrChange { data_length: None },
 ];
 
-pub fn rand_simple_function(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
+pub fn rand_simple_function(
+    package: &Package,
+    module_name: &str,
+    rng: &mut StdRng,
+) -> TransactionPayload {
     SIMPLE_ENTRY_POINTS
         .choose(rng)
         .unwrap()
-        .create_payload(module_id, Some(rng), None)
+        .create_payload(package, module_name, Some(rng), None)
 }
 
-pub fn rand_gen_function(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
+pub fn rand_gen_function(
+    package: &Package,
+    module_name: &str,
+    rng: &mut StdRng,
+) -> TransactionPayload {
     GEN_ENTRY_POINTS
         .choose(rng)
         .unwrap()
-        .create_payload(module_id, Some(rng), None)
+        .create_payload(package, module_name, Some(rng), None)
 }
 
 //

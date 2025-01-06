@@ -7,10 +7,11 @@
 use crate::account::AccountData;
 use aptos_types::{
     account_config::CoinInfoResource,
+    chain_id::ChainId,
     on_chain_config::{Features, OnChainConfig},
     state_store::{
-        errors::StateviewError, in_memory_state_view::InMemoryStateView, state_key::StateKey,
-        state_storage_usage::StateStorageUsage, state_value::StateValue, TStateView,
+        errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
+        state_value::StateValue, TStateView,
     },
     transaction::ChangeSet,
     write_set::{TransactionWrite, WriteSet},
@@ -121,6 +122,14 @@ impl FakeDataStore {
         );
     }
 
+    pub fn set_chain_id(&mut self, chain_id: ChainId) {
+        let bytes = bcs::to_bytes(&chain_id).expect("Chain id should always be serializable");
+        self.set(
+            StateKey::resource(ChainId::address(), &ChainId::struct_tag()).unwrap(),
+            StateValue::new_legacy(bytes.into()),
+        );
+    }
+
     pub fn set_features(&mut self, features: Features) {
         let bytes = bcs::to_bytes(&features).expect("Features should always be serializable");
         self.set(
@@ -134,20 +143,16 @@ impl FakeDataStore {
 impl TStateView for FakeDataStore {
     type Key = StateKey;
 
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>, StateviewError> {
+    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>, StateViewError> {
         Ok(self.state_data.get(state_key).cloned())
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
+    fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
         let mut usage = StateStorageUsage::new_untracked();
         for (k, v) in self.state_data.iter() {
             usage.add_item(k.size() + v.size())
         }
         Ok(usage)
-    }
-
-    fn as_in_memory_state_view(&self) -> InMemoryStateView {
-        InMemoryStateView::new(self.state_data.clone())
     }
 }
 

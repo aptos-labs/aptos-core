@@ -461,13 +461,9 @@ function install_toolchain {
 }
 
 function install_rustup_components_and_nightly {
-  echo "Printing the rustup version and toolchain list"
-  rustup --version
-  rustup show
-  rustup toolchain list -v
-
-  echo "Updating rustup and installing rustfmt & clippy"
+  echo "Updating rustup and installing the latest rustc, rustfmt & clippy"
   rustup update
+  rustup toolchain install stable # Install the latest toolchain to ensure that dependencies can always be built (even if aptos-core is behind)
   rustup component add rustfmt
   rustup component add clippy
 
@@ -490,6 +486,11 @@ function install_rustup_components_and_nightly {
   if ! rustup component add rustfmt --toolchain nightly; then
     echo "Failed to install rustfmt nightly using rustup."
   fi
+
+  echo "Printing the rustup version and toolchain list"
+  rustup --version
+  rustup show
+  rustup toolchain list -v
 }
 
 function install_cargo_sort {
@@ -506,7 +507,7 @@ function install_cargo_machete {
 
 function install_cargo_nextest {
   if ! command -v cargo-nextest &>/dev/null; then
-    cargo install cargo-nextest --locked
+    cargo install cargo-nextest --locked --version 0.9.85
   fi
 }
 

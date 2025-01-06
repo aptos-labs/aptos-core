@@ -17,9 +17,10 @@ use aptos_types::{
 use bytes::Bytes;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::value::{IdentifierMappingKind, MoveTypeLayout};
+use move_vm_runtime::AsFunctionValueExtension;
 use move_vm_types::{
-    delayed_values::delayed_field_id::{ExtractWidth, TryFromMoveValue},
-    value_serde::{deserialize_and_allow_delayed_values, ValueToIdentifierMapping},
+    delayed_values::delayed_field_id::{DelayedFieldID, ExtractWidth, TryFromMoveValue},
+    value_serde::{ValueSerDeContext, ValueToIdentifierMapping},
     value_traversal::find_identifiers_in_value,
     values::Value,
 };
@@ -35,7 +36,7 @@ pub(crate) struct TemporaryValueToIdentifierMapping<
     txn_idx: TxnIndex,
     // These are the delayed field keys that were touched when utilizing this mapping
     // to replace ids with values or values with ids
-    delayed_field_ids: RefCell<HashSet<T::Identifier>>,
+    delayed_field_ids: RefCell<HashSet<DelayedFieldID>>,
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
@@ -49,11 +50,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
         }
     }
 
-    fn generate_delayed_field_id(&self, width: u32) -> T::Identifier {
+    fn generate_delayed_field_id(&self, width: u32) -> DelayedFieldID {
         self.latest_view.generate_delayed_field_id(width)
     }
 
-    pub fn into_inner(self) -> HashSet<T::Identifier> {
+    pub fn into_inner(self) -> HashSet<DelayedFieldID> {
         self.delayed_field_ids.into_inner()
     }
 }
@@ -64,14 +65,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIdentifierMapping
     for TemporaryValueToIdentifierMapping<'a, T, S, X>
 {
-    type Identifier = T::Identifier;
-
     fn value_to_identifier(
         &self,
         kind: &IdentifierMappingKind,
         layout: &MoveTypeLayout,
         value: Value,
-    ) -> PartialVMResult<Self::Identifier> {
+    ) -> PartialVMResult<DelayedFieldID> {
         let (base_value, width) = DelayedFieldValue::try_from_move_value(layout, value, kind)?;
         let id = self.generate_delayed_field_id(width);
         match &self.latest_view.latest_view {
@@ -85,7 +84,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
     fn identifier_to_value(
         &self,
         layout: &MoveTypeLayout,
-        identifier: Self::Identifier,
+        identifier: DelayedFieldID,
     ) -> PartialVMResult<Value> {
         self.delayed_field_ids.borrow_mut().insert(identifier);
         let delayed_field = match &self.latest_view.latest_view {
@@ -106,68 +105,87 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
     }
 }
 
-// Given bytes, where values were already exchanged with identifiers,
-// return a list of identifiers present in it.
-fn extract_identifiers_from_value<T: Transaction>(
-    bytes: &Bytes,
-    layout: &MoveTypeLayout,
-) -> anyhow::Result<HashSet<T::Identifier>> {
-    // TODO[agg_v2](optimize): this performs 2 traversals of a value:
-    //   1) deserialize,
-    //   2) find identifiers to populate the set.
-    //   See if can cache identifiers in advance, or combine it with
-    //   deserialization.
-    let value = deserialize_and_allow_delayed_values(bytes, layout)
-        .ok_or_else(|| anyhow::anyhow!("Failed to deserialize resource during id replacement"))?;
+impl<'a, T, S, X> LatestView<'a, T, S, X>
+where
+    T: Transaction,
+    S: TStateView<Key = T::Key>,
+    X: Executable,
+{
+    /// Given bytes, where values were already exchanged with identifiers, returns a list of
+    /// identifiers present in it.
+    fn extract_identifiers_from_value(
+        &self,
+        bytes: &Bytes,
+        layout: &MoveTypeLayout,
+    ) -> anyhow::Result<HashSet<DelayedFieldID>> {
+        // TODO[agg_v2](optimize): this performs 2 traversals of a value:
+        //   1) deserialize,
+        //   2) find identifiers to populate the set.
+        //   See if can cache identifiers in advance, or combine it with
+        //   deserialization.
+        let function_value_extension = self.as_function_value_extension();
+        let value = ValueSerDeContext::new()
+            .with_func_args_deserialization(&function_value_extension)
+            .with_delayed_fields_serde()
+            .deserialize(bytes, layout)
+            .ok_or_else(|| {
+                anyhow::anyhow!("Failed to deserialize resource during id replacement")
+            })?;
 
-    let mut identifiers = HashSet::new();
-    find_identifiers_in_value(&value, &mut identifiers)?;
-    // TODO[agg_v2](cleanup): ugly way of converting delayed ids to generic type params.
-    Ok(identifiers.into_iter().map(T::Identifier::from).collect())
-}
-
-// Deletion returns a PanicError.
-pub(crate) fn does_value_need_exchange<T: Transaction>(
-    value: &T::Value,
-    layout: &MoveTypeLayout,
-    delayed_write_set_ids: &HashSet<T::Identifier>,
-) -> Result<bool, PanicError> {
-    if let Some(bytes) = value.bytes() {
-        extract_identifiers_from_value::<T>(bytes, layout)
-            .map(|identifiers_in_read| !delayed_write_set_ids.is_disjoint(&identifiers_in_read))
-            .map_err(|e| code_invariant_error(format!("Identifier extraction failed with {:?}", e)))
-    } else {
-        // Deletion returns an error.
-        Err(code_invariant_error(
-            "Delete shouldn't be in values considered for exchange",
-        ))
+        let mut identifiers = HashSet::new();
+        find_identifiers_in_value(&value, &mut identifiers)?;
+        // TODO[agg_v2](cleanup): ugly way of converting delayed ids to generic type params.
+        Ok(identifiers.into_iter().map(DelayedFieldID::from).collect())
     }
-}
 
-// Exclude deletions, and values that do not contain any delayed field IDs that were written to.
-pub(crate) fn filter_value_for_exchange<T: Transaction>(
-    value: &T::Value,
-    layout: &Arc<MoveTypeLayout>,
-    delayed_write_set_ids: &HashSet<T::Identifier>,
-    key: &T::Key,
-) -> Option<Result<(T::Key, (StateValueMetadata, u64, Arc<MoveTypeLayout>)), PanicError>> {
-    if value.is_deletion() {
-        None
-    } else {
-        does_value_need_exchange::<T>(value, layout, delayed_write_set_ids).map_or_else(
-            |e| Some(Err(e)),
-            |needs_exchange| {
-                needs_exchange.then(|| {
-                    Ok((
-                        key.clone(),
-                        (
-                            value.as_state_value_metadata().unwrap().clone(),
-                            value.write_op_size().write_len().unwrap(),
-                            layout.clone(),
-                        ),
-                    ))
+    // Deletion returns a PanicError.
+    pub(crate) fn does_value_need_exchange(
+        &self,
+        value: &T::Value,
+        layout: &MoveTypeLayout,
+        delayed_write_set_ids: &HashSet<DelayedFieldID>,
+    ) -> Result<bool, PanicError> {
+        if let Some(bytes) = value.bytes() {
+            self.extract_identifiers_from_value(bytes, layout)
+                .map(|identifiers_in_read| !delayed_write_set_ids.is_disjoint(&identifiers_in_read))
+                .map_err(|e| {
+                    code_invariant_error(format!("Identifier extraction failed with {:?}", e))
                 })
-            },
-        )
+        } else {
+            // Deletion returns an error.
+            Err(code_invariant_error(
+                "Delete shouldn't be in values considered for exchange",
+            ))
+        }
+    }
+
+    // Exclude deletions, and values that do not contain any delayed field IDs that were written to.
+    pub(crate) fn filter_value_for_exchange(
+        &self,
+        value: &T::Value,
+        layout: &Arc<MoveTypeLayout>,
+        delayed_write_set_ids: &HashSet<DelayedFieldID>,
+        key: &T::Key,
+    ) -> Option<Result<(T::Key, (StateValueMetadata, u64, Arc<MoveTypeLayout>)), PanicError>> {
+        if value.is_deletion() {
+            None
+        } else {
+            self.does_value_need_exchange(value, layout, delayed_write_set_ids)
+                .map_or_else(
+                    |e| Some(Err(e)),
+                    |needs_exchange| {
+                        needs_exchange.then(|| {
+                            Ok((
+                                key.clone(),
+                                (
+                                    value.as_state_value_metadata().unwrap().clone(),
+                                    value.write_op_size().write_len().unwrap(),
+                                    layout.clone(),
+                                ),
+                            ))
+                        })
+                    },
+                )
+        }
     }
 }

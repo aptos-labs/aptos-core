@@ -426,11 +426,12 @@ module aptos_framework::staking_contract {
 
         if (std::features::module_event_migration_enabled()) {
             emit(CreateStakingContract { operator, voter, pool_address, principal, commission_percentage });
+        } else {
+            emit_event(
+                &mut store.create_staking_contract_events,
+                CreateStakingContractEvent { operator, voter, pool_address, principal, commission_percentage },
+            );
         };
-        emit_event(
-            &mut store.create_staking_contract_events,
-            CreateStakingContractEvent { operator, voter, pool_address, principal, commission_percentage },
-        );
         pool_address
     }
 
@@ -450,11 +451,12 @@ module aptos_framework::staking_contract {
         let pool_address = staking_contract.pool_address;
         if (std::features::module_event_migration_enabled()) {
             emit(AddStake { operator, pool_address, amount });
+        } else {
+            emit_event(
+                &mut store.add_stake_events,
+                AddStakeEvent { operator, pool_address, amount },
+            );
         };
-        emit_event(
-            &mut store.add_stake_events,
-            AddStakeEvent { operator, pool_address, amount },
-        );
     }
 
     /// Convenient function to allow the staker to update the voter address in a staking contract they made.
@@ -470,12 +472,12 @@ module aptos_framework::staking_contract {
 
         if (std::features::module_event_migration_enabled()) {
             emit(UpdateVoter { operator, pool_address, old_voter, new_voter });
+        } else {
+            emit_event(
+                &mut store.update_voter_events,
+                UpdateVoterEvent { operator, pool_address, old_voter, new_voter },
+            );
         };
-        emit_event(
-            &mut store.update_voter_events,
-            UpdateVoterEvent { operator, pool_address, old_voter, new_voter },
-        );
-
     }
 
     /// Convenient function to allow the staker to reset their stake pool's lockup period to start now.
@@ -490,8 +492,9 @@ module aptos_framework::staking_contract {
 
         if (std::features::module_event_migration_enabled()) {
             emit(ResetLockup { operator, pool_address });
+        } else {
+            emit_event(&mut store.reset_lockup_events, ResetLockupEvent { operator, pool_address });
         };
-        emit_event(&mut store.reset_lockup_events, ResetLockupEvent { operator, pool_address });
     }
 
     /// Convenience function to allow a staker to update the commission percentage paid to the operator.
@@ -534,11 +537,12 @@ module aptos_framework::staking_contract {
             emit(
                 UpdateCommission { staker: staker_address, operator, old_commission_percentage, new_commission_percentage }
             );
+        } else {
+            emit_event(
+                &mut borrow_global_mut<StakingGroupUpdateCommissionEvent>(staker_address).update_commission_events,
+                UpdateCommissionEvent { staker: staker_address, operator, old_commission_percentage, new_commission_percentage }
+            );
         };
-        emit_event(
-            &mut borrow_global_mut<StakingGroupUpdateCommissionEvent>(staker_address).update_commission_events,
-            UpdateCommissionEvent { staker: staker_address, operator, old_commission_percentage, new_commission_percentage }
-        );
     }
 
     /// Unlock commission amount from the stake pool. Operator needs to wait for the amount to become withdrawable
@@ -601,11 +605,12 @@ module aptos_framework::staking_contract {
         let pool_address = staking_contract.pool_address;
         if (std::features::module_event_migration_enabled()) {
             emit(RequestCommission { operator, pool_address, accumulated_rewards, commission_amount });
+        } else {
+            emit_event(
+                request_commission_events,
+                RequestCommissionEvent { operator, pool_address, accumulated_rewards, commission_amount },
+            );
         };
-        emit_event(
-            request_commission_events,
-            RequestCommissionEvent { operator, pool_address, accumulated_rewards, commission_amount },
-        );
 
         commission_amount
     }
@@ -656,11 +661,12 @@ module aptos_framework::staking_contract {
         let pool_address = staking_contract.pool_address;
         if (std::features::module_event_migration_enabled()) {
             emit(UnlockStake { pool_address, operator, amount, commission_paid });
+        } else {
+            emit_event(
+                &mut store.unlock_stake_events,
+                UnlockStakeEvent { pool_address, operator, amount, commission_paid },
+            );
         };
-        emit_event(
-            &mut store.unlock_stake_events,
-            UnlockStakeEvent { pool_address, operator, amount, commission_paid },
-        );
     }
 
     /// Unlock all accumulated rewards since the last recorded principals.
@@ -726,11 +732,12 @@ module aptos_framework::staking_contract {
         simple_map::add(staking_contracts, new_operator, staking_contract);
         if (std::features::module_event_migration_enabled()) {
             emit(SwitchOperator { pool_address, old_operator, new_operator });
+        } else {
+            emit_event(
+                &mut store.switch_operator_events,
+                SwitchOperatorEvent { pool_address, old_operator, new_operator }
+            );
         };
-        emit_event(
-            &mut store.switch_operator_events,
-            SwitchOperatorEvent { pool_address, old_operator, new_operator }
-        );
     }
 
     /// Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new
@@ -842,11 +849,12 @@ module aptos_framework::staking_contract {
 
             if (std::features::module_event_migration_enabled()) {
                 emit(Distribute { operator, pool_address, recipient, amount: amount_to_distribute });
+            } else {
+                emit_event(
+                    distribute_events,
+                    DistributeEvent { operator, pool_address, recipient, amount: amount_to_distribute }
+                );
             };
-            emit_event(
-                distribute_events,
-                DistributeEvent { operator, pool_address, recipient, amount: amount_to_distribute }
-            );
         };
 
         // In case there's any dust left, send them all to the staker.
@@ -885,11 +893,12 @@ module aptos_framework::staking_contract {
         let pool_address = staking_contract.pool_address;
         if (std::features::module_event_migration_enabled()) {
             emit(AddDistribution { operator, pool_address, amount: coins_amount });
+        } else {
+            emit_event(
+                add_distribution_events,
+                AddDistributionEvent { operator, pool_address, amount: coins_amount }
+            );
         };
-        emit_event(
-            add_distribution_events,
-            AddDistributionEvent { operator, pool_address, amount: coins_amount }
-        );
     }
 
     /// Calculate accumulated rewards and commissions since last update.
@@ -1008,12 +1017,6 @@ module aptos_framework::staking_contract {
     const MAXIMUM_STAKE: u64 = 100000000000000000; // 1B APT coins with 8 decimals.
 
     #[test_only]
-    const MODULE_EVENT: u64 = 26;
-
-    #[test_only]
-    const OPERATOR_BENEFICIARY_CHANGE: u64 = 39;
-
-    #[test_only]
     public fun setup(aptos_framework: &signer, staker: &signer, operator: &signer, initial_balance: u64) {
         // Reward rate of 0.1% per epoch.
         stake::initialize_for_test_custom(
@@ -1052,7 +1055,8 @@ module aptos_framework::staking_contract {
 
         // Voter is initially set to operator but then updated to be staker.
         create_staking_contract(staker, operator_address, operator_address, amount, commission, vector::empty<u8>());
-        std::features::change_feature_flags_for_testing(aptos_framework, vector[MODULE_EVENT, OPERATOR_BENEFICIARY_CHANGE], vector[]);
+        // In the test environment, the periodical_reward_rate_decrease feature is initially turned off.
+        std::features::change_feature_flags_for_testing(aptos_framework, vector[], vector[features::get_periodical_reward_rate_decrease_feature()]);
     }
 
     #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]

@@ -13,9 +13,10 @@ edition = "2021"
 anyhow = { workspace = true }
 arbitrary = { workspace = true, optional = true, features = ["derive"] }
 backtrace = { workspace = true }
+dearbitrary = { workspace = true, optional = true, features = ["derive"] }
 indexmap = { workspace = true }
 move-bytecode-spec = { workspace = true }
-move-core-types = { path = "../move-core/types" }
+move-core-types = { workspace = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 ref-cast = { workspace = true }
@@ -23,12 +24,12 @@ serde = { workspace = true }
 variant_count = { workspace = true }
 
 [dev-dependencies]
-move-core-types = { path = "../move-core/types", features = ["fuzzing"] }
+move-core-types = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 serde_json = { workspace = true }
 
 [features]
 default = []
-fuzzing = ["proptest", "proptest-derive", "arbitrary", "move-core-types/fuzzing"]
+fuzzing = ["proptest", "proptest-derive", "arbitrary", "dearbitrary", "move-core-types/fuzzing"]
 testing = []

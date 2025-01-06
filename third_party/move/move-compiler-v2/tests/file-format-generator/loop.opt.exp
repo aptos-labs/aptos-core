@@ -5,34 +5,34 @@ module 42.loops {
 
 
 nested_loop(Arg0: u64): u64 /* def_idx: 0 */ {
-L1:	loc0: u64
 B0:
 	0: CopyLoc[0](Arg0: u64)
 	1: LdU64(0)
 	2: Gt
-	3: BrFalse(17)
+	3: BrFalse(18)
 B1:
 	4: CopyLoc[0](Arg0: u64)
 	5: LdU64(10)
 	6: Gt
-	7: BrFalse(12)
+	7: BrTrue(9)
 B2:
-	8: MoveLoc[0](Arg0: u64)
-	9: LdU64(1)
-	10: Sub
-	11: StLoc[0](Arg0: u64)
+	8: Branch(13)
 B3:
-	12: MoveLoc[0](Arg0: u64)
-	13: LdU64(1)
-	14: Sub
-	15: StLoc[0](Arg0: u64)
-	16: Branch(0)
+	9: MoveLoc[0](Arg0: u64)
+	10: LdU64(1)
+	11: Sub
+	12: StLoc[0](Arg0: u64)
 B4:
-	17: MoveLoc[0](Arg0: u64)
-	18: Ret
+	13: MoveLoc[0](Arg0: u64)
+	14: LdU64(1)
+	15: Sub
+	16: StLoc[0](Arg0: u64)
+	17: Branch(0)
+B5:
+	18: MoveLoc[0](Arg0: u64)
+	19: Ret
 }
 while_loop(Arg0: u64): u64 /* def_idx: 1 */ {
-L1:	loc0: u64
 B0:
 	0: CopyLoc[0](Arg0: u64)
 	1: LdU64(0)
@@ -49,31 +49,36 @@ B2:
 	10: Ret
 }
 while_loop_with_break_and_continue(Arg0: u64): u64 /* def_idx: 2 */ {
-L1:	loc0: u64
 B0:
 	0: CopyLoc[0](Arg0: u64)
 	1: LdU64(0)
 	2: Gt
-	3: BrFalse(8)
+	3: BrTrue(5)
 B1:
-	4: CopyLoc[0](Arg0: u64)
-	5: LdU64(42)
-	6: Eq
-	7: BrFalse(10)
+	4: Branch(10)
 B2:
-	8: MoveLoc[0](Arg0: u64)
-	9: Ret
+	5: CopyLoc[0](Arg0: u64)
+	6: LdU64(42)
+	7: Eq
+	8: BrFalse(12)
 B3:
-	10: CopyLoc[0](Arg0: u64)
-	11: LdU64(21)
-	12: Eq
-	13: BrTrue(0)
+	9: Branch(10)
 B4:
-	14: MoveLoc[0](Arg0: u64)
-	15: LdU64(1)
-	16: Sub
-	17: StLoc[0](Arg0: u64)
-	18: Branch(0)
+	10: MoveLoc[0](Arg0: u64)
+	11: Ret
+B5:
+	12: CopyLoc[0](Arg0: u64)
+	13: LdU64(21)
+	14: Eq
+	15: BrFalse(17)
+B6:
+	16: Branch(0)
+B7:
+	17: MoveLoc[0](Arg0: u64)
+	18: LdU64(1)
+	19: Sub
+	20: StLoc[0](Arg0: u64)
+	21: Branch(0)
 }
 }
 ============ bytecode verification succeeded ========

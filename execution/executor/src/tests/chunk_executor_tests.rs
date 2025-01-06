@@ -8,8 +8,10 @@ use crate::{
     block_executor::BlockExecutor,
     chunk_executor::ChunkExecutor,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
-    mock_vm::{encode_mint_transaction, MockVM},
-    tests::{self, create_blocks_and_chunks, create_transaction_chunks},
+    tests::{
+        self, create_blocks_and_chunks, create_transaction_chunks,
+        mock_vm::{encode_mint_transaction, MockVM},
+    },
 };
 use aptos_crypto::HashValue;
 use aptos_db::AptosDB;
@@ -344,9 +346,7 @@ fn commit_1_pre_commit_2_return_3() -> (
             output.root_hash(),
             ledger_info.ledger_info().transaction_accumulator_hash()
         );
-        block_executor
-            .pre_commit_block(block_id, parent_block_id)
-            .unwrap();
+        block_executor.pre_commit_block(block_id).unwrap();
         parent_block_id = block_id;
     }
     // commit till block 1

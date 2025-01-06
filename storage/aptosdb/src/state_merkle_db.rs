@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::NUM_STATE_SHARDS,
     db_options::gen_state_merkle_cfds,
     lru_node_cache::LruNodeCache,
     metrics::{NODE_CACHE_SECONDS, OTHER_TIMERS_SECONDS},
@@ -26,7 +25,9 @@ use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{SchemaBatch, DB};
 #[cfg(test)]
 use aptos_scratchpad::get_state_shard_id;
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{
+    db_ensure as ensure, state_store::NUM_STATE_SHARDS, AptosDbError, Result,
+};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProofExt, SparseMerkleRangeProof},
@@ -582,13 +583,24 @@ impl StateMerkleDb {
             "Opened state merkle metadata db!"
         );
 
-        let mut shard_id: usize = 0;
-        let state_merkle_db_shards = arr![{
-            let shard_root_path = db_paths.state_merkle_db_shard_root_path(shard_id as u8);
-            let db = Self::open_shard(shard_root_path, shard_id as u8, &state_merkle_db_config, readonly)?;
-            shard_id += 1;
-            Arc::new(db)
-        }; 16];
+        let state_merkle_db_shards = (0..NUM_STATE_SHARDS)
+            .into_par_iter()
+            .map(|shard_id| {
+                let shard_root_path = db_paths.state_merkle_db_shard_root_path(shard_id as u8);
+                let db = Self::open_shard(
+                    shard_root_path,
+                    shard_id as u8,
+                    &state_merkle_db_config,
+                    readonly,
+                )
+                .unwrap_or_else(|e| {
+                    panic!("Failed to open state merkle db shard {shard_id}: {e:?}.")
+                });
+                Arc::new(db)
+            })
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
 
         let state_merkle_db = Self {
             state_merkle_metadata_db,
@@ -599,13 +611,15 @@ impl StateMerkleDb {
             lru_cache,
         };
 
-        if let Some(overall_state_merkle_commit_progress) =
-            get_state_merkle_commit_progress(&state_merkle_db)?
-        {
-            truncate_state_merkle_db_shards(
-                &state_merkle_db,
-                overall_state_merkle_commit_progress,
-            )?;
+        if !readonly {
+            if let Some(overall_state_merkle_commit_progress) =
+                get_state_merkle_commit_progress(&state_merkle_db)?
+            {
+                truncate_state_merkle_db_shards(
+                    &state_merkle_db,
+                    overall_state_merkle_commit_progress,
+                )?;
+            }
         }
 
         Ok(state_merkle_db)

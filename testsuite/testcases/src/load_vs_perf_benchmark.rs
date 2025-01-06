@@ -196,9 +196,9 @@ impl TransactionWorkload {
             );
             request.transaction_mix_per_phase(vec![
                 // warmup
+                vec![(account_creation_type.clone(), 1)],
                 vec![(account_creation_type, 1)],
-                vec![(account_creation_type, 1)],
-                vec![(write_type, 1)],
+                vec![(write_type.clone(), 1)],
                 // cooldown
                 vec![(write_type, 1)],
             ])
@@ -471,7 +471,7 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
 
     let mut table = Vec::new();
     table.push(format!(
-        "{: <name_width$} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",
+        "{: <name_width$} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <14} | {: <12} | {: <13} | {: <12} | {: <12} | {: <12} | {: <12}",
         type_name,
         "submitted/s",
         "committed/s",
@@ -482,8 +482,7 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
         "p50 lat",
         "p90 lat",
         "p99 lat",
-        "batch->pos",
-        "pos->prop",
+        "mempool->block",
         "prop->order",
         "order->commit",
         "actual dur",
@@ -497,7 +496,7 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
         for result in run_results {
             let rate = result.stats.rate();
             table.push(format!(
-                "{: <name_width$} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12} | {: <12.3} | {: <12.3} | {: <12.3}",
+                "{: <name_width$} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.2} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <14.3} | {: <12.3} | {: <13.3} | {: <12.3} | {: <12} | {: <12.3} | {: <12.3}",
                 result.name,
                 rate.submitted,
                 rate.committed,
@@ -508,8 +507,7 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
                 rate.p50_latency as f64 / 1000.0,
                 rate.p90_latency as f64 / 1000.0,
                 rate.p99_latency as f64 / 1000.0,
-                result.latency_breakdown.get_samples(&LatencyBreakdownSlice::QsBatchToPos).unwrap_or(&MetricSamples::default()).max_sample(),
-                result.latency_breakdown.get_samples(&LatencyBreakdownSlice::QsPosToProposal).unwrap_or(&MetricSamples::default()).max_sample(),
+                result.latency_breakdown.get_samples(&LatencyBreakdownSlice::MempoolToBlockCreation).unwrap_or(&MetricSamples::default()).max_sample(),
                 result.latency_breakdown.get_samples(&LatencyBreakdownSlice::ConsensusProposalToOrdered).unwrap_or(&MetricSamples::default()).max_sample(),
                 result.latency_breakdown.get_samples(&LatencyBreakdownSlice::ConsensusOrderedToCommit).unwrap_or(&MetricSamples::default()).max_sample(),
                 result.actual_duration.as_secs(),

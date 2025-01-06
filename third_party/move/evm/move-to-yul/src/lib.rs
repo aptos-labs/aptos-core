@@ -51,7 +51,7 @@ pub fn run_to_yul_errors_to_stderr(options: Options) -> anyhow::Result<()> {
 pub fn run_to_yul<W: WriteColor>(error_writer: &mut W, mut options: Options) -> anyhow::Result<()> {
     // Run the model builder.
     let addrs = parse_addresses_from_options(options.named_address_mapping.clone())?;
-    let flags = Flags::empty().set_flavor("async");
+    let flags = Flags::empty().set_flavor("evm");
     let known_attributes = get_known_attributes_for_flavor(&flags);
     let env = run_model_builder_with_options_and_compilation_flags(
         vec![PackagePaths {
@@ -108,7 +108,7 @@ pub fn run_to_abi_metadata<W: WriteColor>(
 ) -> anyhow::Result<Vec<Metadata>> {
     // Run the model builder.
     let addrs = parse_addresses_from_options(options.named_address_mapping.clone())?;
-    let flags = Flags::empty().set_flavor("async");
+    let flags = Flags::empty().set_flavor("evm");
     let known_attributes = get_known_attributes_for_flavor(&flags);
     let env = run_model_builder_with_options_and_compilation_flags(
         vec![PackagePaths {

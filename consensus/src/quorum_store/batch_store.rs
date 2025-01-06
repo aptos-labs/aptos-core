@@ -12,8 +12,8 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_consensus_types::proof_of_store::SignedBatchInfo;
-use aptos_crypto::HashValue;
+use aptos_consensus_types::proof_of_store::{BatchInfo, SignedBatchInfo};
+use aptos_crypto::{CryptoMaterialError, HashValue};
 use aptos_executor_types::{ExecutorError, ExecutorResult};
 use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, validator_signer::ValidatorSigner, PeerId};
@@ -117,17 +117,20 @@ pub struct BatchStore {
     batch_quota: usize,
     validator_signer: ValidatorSigner,
     persist_subscribers: DashMap<HashValue, Vec<oneshot::Sender<PersistedValue>>>,
+    expiration_buffer_usecs: u64,
 }
 
 impl BatchStore {
     pub(crate) fn new(
         epoch: u64,
+        is_new_epoch: bool,
         last_certified_time: u64,
         db: Arc<dyn QuorumStoreStorage>,
         memory_quota: usize,
         db_quota: usize,
         batch_quota: usize,
         validator_signer: ValidatorSigner,
+        expiration_buffer_usecs: u64,
     ) -> Self {
         let db_clone = db.clone();
         let batch_store = Self {
@@ -142,19 +145,75 @@ impl BatchStore {
             batch_quota,
             validator_signer,
             persist_subscribers: DashMap::new(),
+            expiration_buffer_usecs,
         };
-        let db_content = db_clone
-            .get_all_batches()
-            .expect("failed to read data from db");
-        let mut expired_keys = Vec::new();
-        trace!(
-            "QS: Batchreader {} {} {}",
+
+        if is_new_epoch {
+            tokio::task::spawn_blocking(move || {
+                Self::gc_previous_epoch_batches_from_db(db_clone, epoch);
+            });
+        } else {
+            Self::populate_cache_and_gc_expired_batches(
+                db_clone,
+                epoch,
+                last_certified_time,
+                expiration_buffer_usecs,
+                &batch_store,
+            );
+        }
+
+        batch_store
+    }
+
+    fn gc_previous_epoch_batches_from_db(db: Arc<dyn QuorumStoreStorage>, current_epoch: u64) {
+        let db_content = db.get_all_batches().expect("failed to read data from db");
+        info!(
+            epoch = current_epoch,
+            "QS: Read batches from storage. Len: {}",
             db_content.len(),
-            epoch,
+        );
+
+        let mut expired_keys = Vec::new();
+        for (digest, value) in db_content {
+            let epoch = value.epoch();
+
+            trace!(
+                "QS: Batchreader recovery content epoch {:?}, digest {}",
+                epoch,
+                digest
+            );
+
+            if epoch < current_epoch {
+                expired_keys.push(digest);
+            }
+        }
+
+        info!(
+            "QS: Batch store bootstrap expired keys len {}",
+            expired_keys.len()
+        );
+        db.delete_batches(expired_keys)
+            .expect("Deletion of expired keys should not fail");
+    }
+
+    fn populate_cache_and_gc_expired_batches(
+        db: Arc<dyn QuorumStoreStorage>,
+        current_epoch: u64,
+        last_certified_time: u64,
+        expiration_buffer_usecs: u64,
+        batch_store: &BatchStore,
+    ) {
+        let db_content = db.get_all_batches().expect("failed to read data from db");
+        info!(
+            epoch = current_epoch,
+            "QS: Read batches from storage. Len: {}, Last Cerified Time: {}",
+            db_content.len(),
             last_certified_time
         );
+
+        let mut expired_keys = Vec::new();
         for (digest, value) in db_content {
-            let expiration = value.expiration();
+            let expiration = value.expiration().saturating_sub(expiration_buffer_usecs);
 
             trace!(
                 "QS: Batchreader recovery content exp {:?}, digest {}",
@@ -170,15 +229,15 @@ impl BatchStore {
                     .expect("Storage limit exceeded upon BatchReader construction");
             }
         }
-        trace!(
-            "QS: Batchreader recovery expired keys len {}",
+
+        info!(
+            "QS: Batch store bootstrap expired keys len {}",
             expired_keys.len()
         );
-        db_clone
-            .delete_batches(expired_keys)
-            .expect("Deletion of expired keys should not fail");
-
-        batch_store
+        tokio::task::spawn_blocking(move || {
+            db.delete_batches(expired_keys)
+                .expect("Deletion of expired keys should not fail");
+        });
     }
 
     fn epoch(&self) -> u64 {
@@ -283,7 +342,11 @@ impl BatchStore {
     // pub(crate) for testing
     #[allow(clippy::unwrap_used)]
     pub(crate) fn clear_expired_payload(&self, certified_time: u64) -> Vec<HashValue> {
-        let expired_digests = self.expirations.lock().unwrap().expire(certified_time);
+        // To help slow nodes catch up via execution without going to state sync we keep the blocks for 60 extra seconds
+        // after the expiration time. This will help remote peers fetch batches that just expired but are within their
+        // execution window.
+        let expiration_time = certified_time.saturating_sub(self.expiration_buffer_usecs);
+        let expired_digests = self.expirations.lock().unwrap().expire(expiration_time);
         let mut ret = Vec::new();
         for h in expired_digests {
             let removed_value = match self.db_cache.entry(h) {
@@ -291,7 +354,7 @@ impl BatchStore {
                     // We need to check up-to-date expiration again because receiving the same
                     // digest with a higher expiration would update the persisted value and
                     // effectively extend the expiration.
-                    if entry.get().expiration() <= certified_time {
+                    if entry.get().expiration() <= expiration_time {
                         self.persist_subscribers.remove(entry.get().digest());
                         Some(entry.remove())
                     } else {
@@ -309,6 +372,20 @@ impl BatchStore {
         ret
     }
 
+    fn generate_signed_batch_info(
+        &self,
+        batch_info: BatchInfo,
+    ) -> Result<SignedBatchInfo, CryptoMaterialError> {
+        fail_point!("quorum_store::create_invalid_signed_batch_info", |_| {
+            Ok(SignedBatchInfo::new_with_signature(
+                batch_info.clone(),
+                self.validator_signer.author(),
+                aptos_crypto::bls12381::Signature::dummy_signature(),
+            ))
+        });
+        SignedBatchInfo::new(batch_info, &self.validator_signer)
+    }
+
     fn persist_inner(&self, persist_request: PersistedValue) -> Option<SignedBatchInfo> {
         match self.save(&persist_request) {
             Ok(needs_db) => {
@@ -320,7 +397,7 @@ impl BatchStore {
                         .save_batch(persist_request)
                         .expect("Could not write to DB");
                 }
-                SignedBatchInfo::new(batch_info, &self.validator_signer).ok()
+                self.generate_signed_batch_info(batch_info).ok()
             },
 
             Err(e) => {

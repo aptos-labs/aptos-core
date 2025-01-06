@@ -11,6 +11,9 @@ use super::{
     RunLocalnet,
 };
 use anyhow::{anyhow, Context, Result};
+pub use aptos_localnet::indexer_api::{
+    make_hasura_metadata_request, post_metadata, HASURA_IMAGE, HASURA_METADATA,
+};
 use async_trait::async_trait;
 use bollard::{
     container::{Config, CreateContainerOptions, StartContainerOptions, WaitContainerOptions},
@@ -20,49 +23,50 @@ use clap::Parser;
 use futures::TryStreamExt;
 use maplit::{hashmap, hashset};
 use reqwest::Url;
-use std::{collections::HashSet, path::PathBuf};
+use std::{collections::HashSet, path::PathBuf, time::Duration};
 use tracing::{info, warn};
 
 const INDEXER_API_CONTAINER_NAME: &str = "local-testnet-indexer-api";
-const HASURA_IMAGE: &str = "hasura/graphql-engine:v2.40.2-ce";
-
-/// This Hasura metadata originates from the aptos-indexer-processors repo.
-///
-/// This metadata here should come from the same revision as the `processor` dep.
-///
-/// The metadata file is not taken verbatim, it is currently edited by hand to remove
-/// any references to tables that aren't created by the Rust processor migrations.
-///
-/// To arrive at the final edited file I normally start with the new metadata file,
-/// try to start the localnet, and check .aptos/testnet/main/tracing.log to
-/// see what error Hasura returned. Remove the culprit from the metadata, which is
-/// generally a few tables and relations to those tables, and try again. Repeat until
-/// it accepts the metadata.
-///
-/// This works fine today since all the key processors you'd need in a localnet
-/// are in the set of processors written in Rust. If this changes, we can explore
-/// alternatives, e.g. running processors in other languages using containers.
-const HASURA_METADATA: &str = include_str!("hasura_metadata.json");
 
 /// Args related to running an indexer API for the localnet.
 #[derive(Debug, Parser)]
 pub struct IndexerApiArgs {
-    /// If set, we will run a postgres DB using Docker (unless
-    /// --use-host-postgres is set), run the standard set of indexer processors (see
-    /// --processors), and configure them to write to this DB, and run an API that lets
-    /// you access the data they write to storage. This is opt in because it requires
-    /// Docker to be installed on the host system.
+    /// If set, we will run a postgres DB using Docker (unless --use-host-postgres is
+    /// set), run the standard set of indexer processors (see --processors), and
+    /// configure them to write to this DB, and run an API that lets you access the data
+    /// they write to storage. This is opt in because it requires Docker to be installed
+    /// on the host system.
     #[clap(long, conflicts_with = "no_txn_stream")]
     pub with_indexer_api: bool,
 
     /// The port at which to run the indexer API.
     #[clap(long, default_value_t = 8090)]
     pub indexer_api_port: u16,
+
+    /// If set we will assume a Hasura instance is running at the given URL rather than
+    /// running our own.
+    ///
+    /// If set, we will not run the indexer API, and will instead assume that a Hasura
+    /// instance is running at the given URL. We will wait for it to become healthy by
+    /// waiting for / to return 200 and then apply the Hasura metadata. The URL should
+    /// look something like this: http://127.0.0.1:8090, assuming the Hasura instance is
+    /// running at port 8090. When the localnet shuts down, we will not attempt to stop
+    /// the Hasura instance, this is up to you to handle. If you're using this, you
+    /// should probably use `--use-host-postgres` as well, otherwise you won't be able
+    /// to start your Hasura instance because the DB we create won't exist yet.
+    #[clap(long)]
+    pub existing_hasura_url: Option<Url>,
+
+    /// If set, we will not try to apply the Hasura metadata.
+    #[clap(long)]
+    pub skip_metadata_apply: bool,
 }
 
 #[derive(Clone, Debug)]
 pub struct IndexerApiManager {
     indexer_api_port: u16,
+    existing_hasura_url: Option<Url>,
+    skip_metadata_apply: bool,
     prerequisite_health_checkers: HashSet<HealthChecker>,
     test_dir: PathBuf,
     postgres_connection_string: String,
@@ -77,6 +81,8 @@ impl IndexerApiManager {
     ) -> Result<Self> {
         Ok(Self {
             indexer_api_port: args.indexer_api_args.indexer_api_port,
+            existing_hasura_url: args.indexer_api_args.existing_hasura_url.clone(),
+            skip_metadata_apply: args.indexer_api_args.skip_metadata_apply,
             prerequisite_health_checkers,
             test_dir,
             postgres_connection_string,
@@ -84,7 +90,10 @@ impl IndexerApiManager {
     }
 
     pub fn get_url(&self) -> Url {
-        Url::parse(&format!("http://127.0.0.1:{}", self.indexer_api_port)).unwrap()
+        match &self.existing_hasura_url {
+            Some(url) => url.clone(),
+            None => Url::parse(&format!("http://127.0.0.1:{}", self.indexer_api_port)).unwrap(),
+        }
     }
 }
 
@@ -95,6 +104,10 @@ impl ServiceManager for IndexerApiManager {
     }
 
     async fn pre_run(&self) -> Result<()> {
+        if self.existing_hasura_url.is_some() {
+            return Ok(());
+        }
+
         // Confirm Docker is available.
         get_docker().await?;
 
@@ -120,12 +133,15 @@ impl ServiceManager for IndexerApiManager {
     /// In this case we we return two HealthCheckers, one for whether the Hasura API
     /// is up at all and one for whether the metadata is applied.
     fn get_health_checkers(&self) -> HashSet<HealthChecker> {
-        hashset! {
+        let mut checkers = hashset! {
             // This first one just checks if the API is up at all.
             HealthChecker::Http(self.get_url(), "Indexer API".to_string()),
+        };
+        if !self.skip_metadata_apply {
             // This second one checks if the metadata is applied.
-            HealthChecker::IndexerApiMetadata(self.get_url()),
+            checkers.insert(HealthChecker::IndexerApiMetadata(self.get_url()));
         }
+        checkers
     }
 
     fn get_prerequisite_health_checkers(&self) -> HashSet<&HealthChecker> {
@@ -133,6 +149,25 @@ impl ServiceManager for IndexerApiManager {
     }
 
     async fn run_service(self: Box<Self>) -> Result<()> {
+        // If we're using an existing Hasura instance we just do nothing. If the Hasura
+        // instance becomes unhealthy we print an error and exit.
+        if let Some(url) = self.existing_hasura_url {
+            info!("Using existing Hasura instance at {}", url);
+            // Periodically check that the Hasura instance is healthy.
+            let checker = HealthChecker::Http(url.clone(), "Indexer API".to_string());
+            loop {
+                if let Err(e) = checker.wait(None).await {
+                    eprintln!(
+                        "Existing Hasura instance at {} became unhealthy: {}",
+                        url, e
+                    );
+                    break;
+                }
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            }
+            return Ok(());
+        }
+
         setup_docker_logging(&self.test_dir, "indexer-api", INDEXER_API_CONTAINER_NAME)?;
 
         // This is somewhat hard to maintain. If it requires any further maintenance we
@@ -239,6 +274,10 @@ impl ServiceManager for IndexerApiManager {
     }
 
     fn get_post_healthy_steps(&self) -> Vec<Box<dyn PostHealthyStep>> {
+        if self.skip_metadata_apply {
+            return vec![];
+        }
+
         /// There is no good way to apply Hasura metadata (the JSON format, anyway) to
         /// an instance of Hasura in a container at startup:
         ///
@@ -267,6 +306,10 @@ impl ServiceManager for IndexerApiManager {
     }
 
     fn get_shutdown_steps(&self) -> Vec<Box<dyn ShutdownStep>> {
+        if self.existing_hasura_url.is_some() {
+            return vec![];
+        }
+
         // Unfortunately the Hasura container does not shut down when the CLI does and
         // there doesn't seem to be a good way to make it do so. To work around this,
         // we register a step that will stop the container on shutdown.
@@ -275,36 +318,6 @@ impl ServiceManager for IndexerApiManager {
             INDEXER_API_CONTAINER_NAME,
         ))]
     }
-}
-
-/// This submits a POST request to apply metadata to a Hasura API.
-async fn post_metadata(url: Url, metadata_content: &str) -> Result<()> {
-    // Parse the metadata content as JSON.
-    let metadata_json: serde_json::Value = serde_json::from_str(metadata_content)?;
-
-    // Make the request.
-    info!("Submitting request to apply Hasura metadata");
-    let response =
-        make_hasura_metadata_request(url, "replace_metadata", Some(metadata_json)).await?;
-    info!(
-        "Received response for applying Hasura metadata: {:?}",
-        response
-    );
-
-    // Confirm that the metadata was applied successfully and there is no inconsistency
-    // between the schema and the underlying DB schema.
-    if let Some(obj) = response.as_object() {
-        if let Some(is_consistent_val) = obj.get("is_consistent") {
-            if is_consistent_val.as_bool() == Some(true) {
-                return Ok(());
-            }
-        }
-    }
-
-    Err(anyhow!(
-        "Something went wrong applying the Hasura metadata, perhaps it is not consistent with the DB. Response: {:#?}",
-        response
-    ))
 }
 
 /// This confirms that the metadata has been applied. We use this in the health
@@ -333,42 +346,4 @@ pub async fn confirm_metadata_applied(url: Url) -> Result<()> {
         "The Hasura metadata has not been applied yet. Response: {:#?}",
         response
     ))
-}
-
-/// The /v1/metadata endpoint supports a few different operations based on the `type`
-/// field in the request body. All requests have a similar format, with these `type`
-/// and `args` fields.
-async fn make_hasura_metadata_request(
-    mut url: Url,
-    typ: &str,
-    args: Option<serde_json::Value>,
-) -> Result<serde_json::Value> {
-    let client = reqwest::Client::new();
-
-    // Update the query path.
-    url.set_path("/v1/metadata");
-
-    // Construct the payload.
-    let mut payload = serde_json::Map::new();
-    payload.insert(
-        "type".to_string(),
-        serde_json::Value::String(typ.to_string()),
-    );
-
-    // If args is provided, use that. Otherwise use an empty object. We have to set it
-    // no matter what because the API expects the args key to be set.
-    let args = match args {
-        Some(args) => args,
-        None => serde_json::Value::Object(serde_json::Map::new()),
-    };
-    payload.insert("args".to_string(), args);
-
-    // Send the POST request.
-    let response = client.post(url).json(&payload).send().await?;
-
-    // Return the response as a JSON value.
-    response
-        .json()
-        .await
-        .context("Failed to parse response as JSON")
 }

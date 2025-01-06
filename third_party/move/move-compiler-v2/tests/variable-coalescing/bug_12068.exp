@@ -6,34 +6,38 @@ fun m::main() {
      var $t1: bool
      var $t2: u64
      var $t3: u64
-     var $t4: bool
-     var $t5: u64
+     var $t4: u64
+     var $t5: bool
      var $t6: u64
+     var $t7: u64
+     var $t8: u64
   0: $t0 := 0
   1: label L0
   2: $t1 := true
-  3: if ($t1) goto 4 else goto 10
+  3: if ($t1) goto 4 else goto 11
   4: label L2
-  5: $t3 := 1
-  6: $t2 := +($t0, $t3)
-  7: $t0 := infer($t2)
-  8: goto 14
-  9: goto 12
- 10: label L3
- 11: goto 14
- 12: label L4
- 13: goto 1
- 14: label L1
- 15: $t5 := 1
- 16: $t4 := ==($t0, $t5)
- 17: if ($t4) goto 18 else goto 20
- 18: label L5
- 19: goto 23
- 20: label L6
- 21: $t6 := 42
- 22: abort($t6)
- 23: label L7
- 24: return ()
+  5: $t3 := infer($t0)
+  6: $t4 := 1
+  7: $t2 := +($t3, $t4)
+  8: $t0 := infer($t2)
+  9: goto 15
+ 10: goto 13
+ 11: label L3
+ 12: goto 15
+ 13: label L4
+ 14: goto 1
+ 15: label L1
+ 16: $t6 := infer($t0)
+ 17: $t7 := 1
+ 18: $t5 := ==($t6, $t7)
+ 19: if ($t5) goto 20 else goto 22
+ 20: label L5
+ 21: goto 25
+ 22: label L6
+ 23: $t8 := 42
+ 24: abort($t8)
+ 25: label L7
+ 26: return ()
 }
 
 ============ after DeadStoreElimination: ================
@@ -44,25 +48,31 @@ fun m::main() {
      var $t1: bool
      var $t2: u64
      var $t3: u64
-     var $t4: bool
-     var $t5: u64
+     var $t4: u64
+     var $t5: bool
      var $t6: u64
+     var $t7: u64
+     var $t8: u64
   0: $t0 := 0
   1: $t1 := true
-  2: if ($t1) goto 3 else goto 7
-  3: label L2
-  4: $t3 := 1
-  5: $t2 := +($t0, $t3)
-  6: $t0 := move($t2)
-  7: label L1
-  8: $t5 := 1
-  9: $t4 := ==($t0, $t5)
- 10: if ($t4) goto 11 else goto 13
- 11: label L5
- 12: return ()
- 13: label L6
- 14: $t6 := 42
- 15: abort($t6)
+  2: if ($t1) goto 5 else goto 3
+  3: label L7
+  4: goto 10
+  5: label L2
+  6: $t3 := move($t0)
+  7: $t4 := 1
+  8: $t2 := +($t3, $t4)
+  9: $t0 := move($t2)
+ 10: label L1
+ 11: $t6 := move($t0)
+ 12: $t7 := 1
+ 13: $t5 := ==($t6, $t7)
+ 14: if ($t5) goto 15 else goto 17
+ 15: label L5
+ 16: return ()
+ 17: label L6
+ 18: $t8 := 42
+ 19: abort($t8)
 }
 
 ============ after VariableCoalescingAnnotator: ================
@@ -73,9 +83,11 @@ fun m::main() {
      var $t1: bool
      var $t2: u64
      var $t3: u64
-     var $t4: bool
-     var $t5: u64
+     var $t4: u64
+     var $t5: bool
      var $t6: u64
+     var $t7: u64
+     var $t8: u64
      # live vars:
      # events: b:$t0
   0: $t0 := 0
@@ -84,41 +96,51 @@ fun m::main() {
   1: $t1 := true
      # live vars: $t0, $t1
      # events: e:$t1
-  2: if ($t1) goto 3 else goto 7
+  2: if ($t1) goto 5 else goto 3
      # live vars: $t0
-  3: label L2
+  3: label L7
+     # live vars: $t0
+  4: goto 10
+     # live vars: $t0
+  5: label L2
      # live vars: $t0
      # events: b:$t3
-  4: $t3 := 1
-     # live vars: $t0, $t3
-     # events: e:$t3, b:$t2
-  5: $t2 := +($t0, $t3)
+  6: $t3 := move($t0)
+     # live vars: $t3
+     # events: b:$t4
+  7: $t4 := 1
+     # live vars: $t3, $t4
+     # events: e:$t3, e:$t4, b:$t2
+  8: $t2 := +($t3, $t4)
      # live vars: $t2
      # events: e:$t2
-  6: $t0 := move($t2)
+  9: $t0 := move($t2)
      # live vars: $t0
-  7: label L1
+ 10: label L1
      # live vars: $t0
-     # events: b:$t5
-  8: $t5 := 1
-     # live vars: $t0, $t5
-     # events: e:$t0, e:$t5, b:$t4
-  9: $t4 := ==($t0, $t5)
-     # live vars: $t4
-     # events: e:$t4
- 10: if ($t4) goto 11 else goto 13
-     # live vars:
- 11: label L5
-     # live vars:
- 12: return ()
-     # live vars:
- 13: label L6
-     # live vars:
-     # events: b:$t6
- 14: $t6 := 42
+     # events: e:$t0, b:$t6
+ 11: $t6 := move($t0)
      # live vars: $t6
-     # events: e:$t6
- 15: abort($t6)
+     # events: b:$t7
+ 12: $t7 := 1
+     # live vars: $t6, $t7
+     # events: e:$t6, e:$t7, b:$t5
+ 13: $t5 := ==($t6, $t7)
+     # live vars: $t5
+     # events: e:$t5
+ 14: if ($t5) goto 15 else goto 17
+     # live vars:
+ 15: label L5
+     # live vars:
+ 16: return ()
+     # live vars:
+ 17: label L6
+     # live vars:
+     # events: b:$t8
+ 18: $t8 := 42
+     # live vars: $t8
+     # events: e:$t8
+ 19: abort($t8)
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -129,25 +151,31 @@ fun m::main() {
      var $t1: bool
      var $t2: u64 [unused]
      var $t3: u64
-     var $t4: bool [unused]
-     var $t5: u64 [unused]
+     var $t4: u64
+     var $t5: bool [unused]
      var $t6: u64 [unused]
+     var $t7: u64 [unused]
+     var $t8: u64 [unused]
   0: $t0 := 0
   1: $t1 := true
-  2: if ($t1) goto 3 else goto 7
-  3: label L2
-  4: $t3 := 1
-  5: $t3 := +($t0, $t3)
-  6: $t0 := move($t3)
-  7: label L1
-  8: $t3 := 1
-  9: $t1 := ==($t0, $t3)
- 10: if ($t1) goto 11 else goto 13
- 11: label L5
- 12: return ()
- 13: label L6
- 14: $t0 := 42
- 15: abort($t0)
+  2: if ($t1) goto 5 else goto 3
+  3: label L7
+  4: goto 10
+  5: label L2
+  6: $t3 := move($t0)
+  7: $t4 := 1
+  8: $t3 := +($t3, $t4)
+  9: $t0 := move($t3)
+ 10: label L1
+ 11: $t0 := move($t0)
+ 12: $t3 := 1
+ 13: $t1 := ==($t0, $t3)
+ 14: if ($t1) goto 15 else goto 17
+ 15: label L5
+ 16: return ()
+ 17: label L6
+ 18: $t0 := 42
+ 19: abort($t0)
 }
 
 ============ after DeadStoreElimination: ================
@@ -158,25 +186,31 @@ fun m::main() {
      var $t1: bool
      var $t2: u64 [unused]
      var $t3: u64
-     var $t4: bool [unused]
-     var $t5: u64 [unused]
+     var $t4: u64
+     var $t5: bool [unused]
      var $t6: u64 [unused]
+     var $t7: u64 [unused]
+     var $t8: u64 [unused]
   0: $t0 := 0
   1: $t1 := true
-  2: if ($t1) goto 3 else goto 7
-  3: label L2
-  4: $t3 := 1
-  5: $t3 := +($t0, $t3)
-  6: $t0 := move($t3)
-  7: label L1
-  8: $t3 := 1
-  9: $t1 := ==($t0, $t3)
- 10: if ($t1) goto 11 else goto 13
- 11: label L5
- 12: return ()
- 13: label L6
- 14: $t0 := 42
- 15: abort($t0)
+  2: if ($t1) goto 5 else goto 3
+  3: label L7
+  4: goto 10
+  5: label L2
+  6: $t3 := move($t0)
+  7: $t4 := 1
+  8: $t3 := +($t3, $t4)
+  9: $t0 := move($t3)
+ 10: label L1
+ 11: $t0 := move($t0)
+ 12: $t3 := 1
+ 13: $t1 := ==($t0, $t3)
+ 14: if ($t1) goto 15 else goto 17
+ 15: label L5
+ 16: return ()
+ 17: label L6
+ 18: $t0 := 42
+ 19: abort($t0)
 }
 
 
@@ -187,19 +221,27 @@ module 32.m {
 
 main() /* def_idx: 0 */ {
 L0:	loc0: u64
-L1:	loc1: u64
 B0:
 	0: LdU64(0)
-	1: LdU64(1)
-	2: Add
-	3: LdU64(1)
-	4: Eq
-	5: BrFalse(7)
+	1: StLoc[0](loc0: u64)
+	2: Branch(4)
 B1:
-	6: Ret
+	3: Branch(8)
 B2:
-	7: LdU64(42)
-	8: Abort
+	4: MoveLoc[0](loc0: u64)
+	5: LdU64(1)
+	6: Add
+	7: StLoc[0](loc0: u64)
+B3:
+	8: MoveLoc[0](loc0: u64)
+	9: LdU64(1)
+	10: Eq
+	11: BrFalse(13)
+B4:
+	12: Ret
+B5:
+	13: LdU64(42)
+	14: Abort
 }
 }
 ============ bytecode verification succeeded ========

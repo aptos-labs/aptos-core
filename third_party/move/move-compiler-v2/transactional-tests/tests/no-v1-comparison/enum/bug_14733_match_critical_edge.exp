@@ -1,0 +1,22 @@
+processed 8 tasks
+
+task 1 'run'. lines 73-73:
+return values: 22
+
+task 2 'run'. lines 75-75:
+return values: 0
+
+task 3 'run'. lines 77-77:
+return values: 10
+
+task 4 'run'. lines 79-79:
+return values: 21
+
+task 5 'run'. lines 81-81:
+return values: 43
+
+task 6 'run'. lines 83-83:
+return values: 25
+
+task 7 'run'. lines 85-85:
+return values: 15

@@ -41,10 +41,11 @@ use crate::env_pipeline::rewrite_target::{
     RewriteState, RewriteTarget, RewriteTargets, RewritingScope,
 };
 use codespan_reporting::diagnostic::Severity;
-use log::{debug, trace};
+use log::trace;
 use move_model::{
     ast::{Exp, ExpData, Operation, Pattern, Spec, SpecBlockTarget, TempIndex},
     exp_rewriter::ExpRewriterFunctions,
+    metadata::LanguageVersion,
     model::{FunId, GlobalEnv, Loc, NodeId, Parameter, QualifiedId},
     symbol::Symbol,
     ty::{ReferenceKind, Type},
@@ -60,13 +61,14 @@ use std::{
 type QualifiedFunId = QualifiedId<FunId>;
 type CallSiteLocations = BTreeMap<(RewriteTarget, QualifiedFunId), BTreeSet<NodeId>>;
 
+const DEBUG: bool = false;
+
 // ======================================================================================
 // Entry
 
 /// Run inlining on current program's AST.  For each function which is target of the compilation,
 /// visit that function body and inline any calls to functions marked as "inline".
 pub fn run_inlining(env: &mut GlobalEnv, scope: RewritingScope, keep_inline_functions: bool) {
-    debug!("Inlining");
     // Get non-inline function roots for running inlining.
     // Also generate an error for any target inline functions lacking a body to inline.
     let mut targets = RewriteTargets::create(env, scope);
@@ -89,7 +91,7 @@ pub fn run_inlining(env: &mut GlobalEnv, scope: RewritingScope, keep_inline_func
         let mut visited_targets = BTreeSet::new();
         while let Some(target) = todo.pop_first() {
             if visited_targets.insert(target.clone()) {
-                let callees_with_sites = target.called_funs_with_call_sites(env);
+                let callees_with_sites = target.used_funs_with_uses(env);
                 for (callee, sites) in callees_with_sites {
                     todo.insert(RewriteTarget::MoveFun(callee));
                     targets.entry(RewriteTarget::MoveFun(callee));
@@ -476,18 +478,22 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
                 };
                 // inline here
                 if let Some(expr) = body_expr {
-                    trace!(
-                        "inlining function `{}` with args `{}`",
-                        self.env.dump_fun(&func_env),
-                        args.iter()
-                            .map(|exp| format!("{}", exp.as_ref().display(self.env)))
-                            .collect::<Vec<_>>()
-                            .join(","),
-                    );
+                    if DEBUG {
+                        trace!(
+                            "inlining function `{}` with args `{}`",
+                            self.env.dump_fun(&func_env),
+                            args.iter()
+                                .map(|exp| format!("{}", exp.as_ref().display(self.env)))
+                                .collect::<Vec<_>>()
+                                .join(","),
+                        );
+                    }
                     let rewritten = InlinedRewriter::inline_call(
                         self.env, call_id, &func_loc, &expr, type_args, parameters, args,
                     );
-                    trace!("After inlining, expr is `{}`", rewritten.display(self.env));
+                    if DEBUG {
+                        trace!("After inlining, expr is `{}`", rewritten.display(self.env));
+                    }
                     Some(rewritten)
                 } else {
                     None
@@ -833,7 +839,11 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             .map(|param| {
                 let Parameter(sym, ty, loc) = *param;
                 let id = env.new_node(loc.clone(), ty.instantiate(self.type_args));
-                if let Some(new_sym) = self.shadow_stack.get_shadow_symbol(*sym, true) {
+                if env.language_version().is_at_least(LanguageVersion::V2_1)
+                    && env.symbol_pool().string(*sym).as_ref() == "_"
+                {
+                    Pattern::Wildcard(id)
+                } else if let Some(new_sym) = self.shadow_stack.get_shadow_symbol(*sym, true) {
                     Pattern::Var(id, new_sym)
                 } else {
                     Pattern::Var(id, *sym)
@@ -1156,7 +1166,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
         };
         let call_loc = self.env.get_node_loc(id);
         if let Some(lambda_target) = optional_lambda_target {
-            if let ExpData::Lambda(_, pat, body) = lambda_target.as_ref() {
+            if let ExpData::Lambda(_, pat, body, _, _) = lambda_target.as_ref() {
                 let args_vec: Vec<Exp> = args.to_vec();
                 Some(InlinedRewriter::construct_inlined_call_expression(
                     self.env,

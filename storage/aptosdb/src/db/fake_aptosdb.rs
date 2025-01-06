@@ -16,8 +16,12 @@ use aptos_infallible::Mutex;
 use aptos_logger::debug;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
-    cached_state_view::ShardedStateCache, db_ensure as ensure, state_delta::StateDelta,
-    AptosDbError, DbReader, DbWriter, ExecutedTrees, MAX_REQUEST_LIMIT,
+    db_ensure as ensure,
+    state_store::{
+        sharded_state_updates::ShardedStateUpdates, state_delta::StateDelta,
+        state_view::cached_state_view::ShardedStateCache,
+    },
+    AptosDbError, DbReader, DbWriter, LedgerSummary, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     access_path::AccessPath,
@@ -40,7 +44,7 @@ use aptos_types::{
         state_key::{prefix::StateKeyPrefix, StateKey},
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
-        table, ShardedStateUpdates,
+        table,
     },
     transaction::{
         Transaction, TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof,
@@ -104,7 +108,7 @@ impl FakeBufferedState {
 
     pub fn update(
         &mut self,
-        updates_until_next_checkpoint_since_current_option: Option<ShardedStateUpdates>,
+        updates_until_next_checkpoint_since_current_option: Option<&ShardedStateUpdates>,
         new_state_after_checkpoint: StateDelta,
     ) -> Result<()> {
         ensure!(
@@ -118,10 +122,9 @@ impl FakeBufferedState {
                 new_state_after_checkpoint.base_version > self.state_after_checkpoint.base_version,
                 "Diff between base and latest checkpoints provided, while they are the same.",
             );
-            combine_sharded_state_updates(
-                &mut self.state_after_checkpoint.updates_since_base,
-                updates_until_next_checkpoint_since_current,
-            );
+            self.state_after_checkpoint
+                .updates_since_base
+                .clone_merge(updates_until_next_checkpoint_since_current);
             self.state_after_checkpoint.current = new_state_after_checkpoint.base.clone();
             self.state_after_checkpoint.current_version = new_state_after_checkpoint.base_version;
             let state_after_checkpoint = self
@@ -197,7 +200,7 @@ impl FakeAptosDB {
                 first_version, /* num_existing_leaves */
                 &txn_hashes,
             )?;
-        // Store the transaction hash by position to serve [DbReader::get_latest_executed_trees] calls
+        // Store the transaction hash by position to serve [DbReader::get_pre_committed_ledger_summary] calls
         writes.iter().for_each(|(pos, hash)| {
             self.txn_hash_by_position.insert(*pos, *hash);
         });
@@ -406,7 +409,7 @@ impl FakeAptosDB {
                     base_state_version,
                     ledger_info_with_sigs,
                     sync_commit,
-                    latest_in_memory_state.clone(),
+                    &latest_in_memory_state,
                 )?;
             }
 
@@ -830,16 +833,16 @@ impl DbReader for FakeAptosDB {
             .get_state_value_with_proof_by_version_ext(state_key, version, root_depth)
     }
 
-    fn get_latest_executed_trees(&self) -> Result<ExecutedTrees> {
+    fn get_pre_committed_ledger_summary(&self) -> Result<LedgerSummary> {
         // If the genesis is not executed yet, we need to get the executed trees from the inner AptosDB
         // This is because when we call save_transactions for the genesis block, we call [AptosDB::save_transactions]
         // where there is an expectation that the root of the SMTs are the same pointers. Here,
         // we get from the inner AptosDB which ensures that the pointers match when save_transactions is called.
         if self.ensure_synced_version().unwrap_or_default() == 0 {
-            return self.inner.get_latest_executed_trees();
+            return self.inner.get_pre_committed_ledger_summary();
         }
 
-        gauged_api("get_latest_executed_trees", || {
+        gauged_api("get_pre_committed_ledger_summary", || {
             let buffered_state = self.buffered_state.lock();
             let num_txns = buffered_state
                 .current_state()
@@ -849,11 +852,11 @@ impl DbReader for FakeAptosDB {
             let frozen_subtrees = self.get_frozen_subtree_hashes(num_txns)?;
             let transaction_accumulator =
                 Arc::new(InMemoryAccumulator::new(frozen_subtrees, num_txns)?);
-            let executed_trees = ExecutedTrees::new(
+            let ledger_summary = LedgerSummary::new(
                 buffered_state.current_state().clone(),
                 transaction_accumulator,
             );
-            Ok(executed_trees)
+            Ok(ledger_summary)
         })
     }
 
@@ -943,7 +946,7 @@ impl DbReader for FakeAptosDB {
     }
 }
 
-/// This is necessary for constructing the [ExecutedTrees] to serve [DbReader::get_latest_executed_trees]
+/// This is necessary for constructing the [LedgerSummary] to serve [DbReader::get_pre_committed_ledger_summary]
 /// requests.
 impl HashReader for FakeAptosDB {
     fn get(&self, position: Position) -> anyhow::Result<HashValue> {
@@ -972,7 +975,9 @@ mod tests {
     };
     use anyhow::{anyhow, ensure, Result};
     use aptos_crypto::{hash::CryptoHash, HashValue};
-    use aptos_storage_interface::{cached_state_view::ShardedStateCache, DbReader, DbWriter};
+    use aptos_storage_interface::{
+        state_store::state_view::cached_state_view::ShardedStateCache, DbReader, DbWriter,
+    };
     use aptos_temppath::TempPath;
     use aptos_types::{
         account_address::AccountAddress,
@@ -994,10 +999,7 @@ mod tests {
 
             let mut in_memory_state = db
                 .inner
-                .buffered_state()
-                .lock()
-                .current_state()
-                .clone();
+            .get_pre_committed_ledger_summary().state;
 
             let mut cur_ver: Version = 0;
             for (txns_to_commit, ledger_info_with_sigs) in input.iter() {
@@ -1008,7 +1010,7 @@ mod tests {
                     cur_ver.checked_sub(1), /* base_state_version */
                     Some(ledger_info_with_sigs),
                     false, /* sync_commit */
-                    in_memory_state.clone(),
+                    &in_memory_state,
                     None, // ignored
                     Some(&ShardedStateCache::default()) // ignored
                 )

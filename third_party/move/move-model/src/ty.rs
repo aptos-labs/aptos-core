@@ -14,9 +14,14 @@ use crate::{
     symbol::Symbol,
 };
 use itertools::Itertools;
-use move_binary_format::file_format::{Ability, AbilitySet, TypeParameterIndex};
 #[allow(deprecated)]
 use move_binary_format::normalized::Type as MType;
+use move_binary_format::{
+    access::ModuleAccess,
+    file_format::{Ability, AbilitySet, SignatureToken, TypeParameterIndex},
+    views::StructHandleView,
+    CompiledModule,
+};
 use move_core_types::{
     language_storage::{StructTag, TypeTag},
     u256::U256,
@@ -39,7 +44,11 @@ pub enum Type {
     Vector(Box<Type>),
     Struct(ModuleId, StructId, /*type-params*/ Vec<Type>),
     TypeParameter(u16),
-    Fun(/*args*/ Box<Type>, /*result*/ Box<Type>),
+    Fun(
+        /* known args */ Box<Type>,
+        /*result*/ Box<Type>,
+        AbilitySet,
+    ),
 
     // Types only appearing in programs.
     Reference(ReferenceKind, Box<Type>),
@@ -150,14 +159,24 @@ pub enum Constraint {
     /// as a type argument for a phantom type parameter.
     NoPhantom,
     /// The type must have the given set of abilities.
-    HasAbilities(AbilitySet),
+    HasAbilities(AbilitySet, AbilityCheckingScope),
     /// The type variable defaults to the given type if no other binding is found. This is
     /// a pseudo constraint which never fails, but used to generate a default for
     /// inference.
     WithDefault(Type),
-    /// The type must not be function because it is used as the type of some field or
-    /// as a type argument.
-    NoFunction,
+}
+
+/// Scope of ability checking.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum AbilityCheckingScope {
+    /// Type parameters are excluded from ability checking. This is in usages the case
+    /// where we check abilities for field types, for example, since those constraints
+    /// are modulo an actual type instantiation.
+    ExcludeTypeParams,
+    /// Type parameters are included in ability checking. This is the case if
+    /// we check ability constraints for a type instantiation, as in `S<T>`,
+    /// and we have `struct S<X:A>`.
+    IncludeTypeParams,
 }
 
 /// A type to describe the context from where a constraint stems. Used for
@@ -387,10 +406,7 @@ impl Constraint {
     /// for internal constraints which would be mostly confusing to users.
     pub fn hidden(&self) -> bool {
         use Constraint::*;
-        matches!(
-            self,
-            NoPhantom | NoReference | NoTuple | NoFunction | WithDefault(..)
-        )
+        matches!(self, NoPhantom | NoReference | NoTuple | WithDefault(..))
     }
 
     /// Returns true if this context is accumulating. When adding a new constraint
@@ -403,12 +419,11 @@ impl Constraint {
     pub fn accumulating(&self) -> bool {
         matches!(
             self,
-            Constraint::HasAbilities(_)
+            Constraint::HasAbilities(..)
                 | Constraint::WithDefault(_)
                 | Constraint::NoPhantom
                 | Constraint::NoTuple
                 | Constraint::NoReference
-                | Constraint::NoFunction
         )
     }
 
@@ -427,20 +442,19 @@ impl Constraint {
     /// the same type.
     pub fn report_only_once(&self) -> bool {
         use Constraint::*;
-        matches!(
-            self,
-            HasAbilities(..) | NoReference | NoFunction | NoPhantom | NoTuple
-        )
+        matches!(self, HasAbilities(..) | NoReference | NoPhantom | NoTuple)
     }
 
     /// Joins the two constraints. If they are incompatible, produces a type unification error.
     /// Otherwise, returns true if `self` absorbs the `other` constraint (and waives the `other`).
+    /// ctx_opt is for additional error info
     pub fn join(
         &mut self,
         context: &mut impl UnificationContext,
         subs: &mut Substitution,
         loc: &Loc,
         other: &Constraint,
+        ctx_opt: Option<ConstraintContext>,
     ) -> Result<bool, TypeUnificationError> {
         match (&mut *self, other) {
             (Constraint::SomeNumber(opts1), Constraint::SomeNumber(opts2)) => {
@@ -515,13 +529,42 @@ impl Constraint {
                     ))
                 }
             },
-            (Constraint::NoFunction, Constraint::NoFunction) => Ok(true),
             (Constraint::NoReference, Constraint::NoReference) => Ok(true),
             (Constraint::NoTuple, Constraint::NoTuple) => Ok(true),
             (Constraint::NoPhantom, Constraint::NoPhantom) => Ok(true),
-            (Constraint::HasAbilities(a1), Constraint::HasAbilities(a2)) => {
+            (Constraint::HasAbilities(a1, scope1), Constraint::HasAbilities(a2, scope2))
+                if scope1 == scope2 =>
+            {
                 *a1 = a1.union(*a2);
                 Ok(true)
+            },
+            // After the above checks on same type of constraint
+            // Check compatibility between ability and number
+            // This check is needed because sometime the concrete integer type is not available
+            // TODO: check other combination of constraints may be necessary as well.
+            (Constraint::HasAbilities(a1, _), Constraint::SomeNumber(_)) => {
+                let unsupported_abilities = a1.setminus(AbilitySet::PRIMITIVES);
+                if !unsupported_abilities.is_empty() {
+                    return Err(TypeUnificationError::MissingAbilitiesForConstraints(
+                        loc.clone(),
+                        other.clone(),
+                        unsupported_abilities,
+                        ctx_opt,
+                    ));
+                }
+                Ok(false)
+            },
+            (Constraint::SomeNumber(_), Constraint::HasAbilities(a1, _)) => {
+                let unsupported_abilities = a1.setminus(AbilitySet::PRIMITIVES);
+                if !unsupported_abilities.is_empty() {
+                    return Err(TypeUnificationError::MissingAbilitiesForConstraints(
+                        loc.clone(),
+                        self.clone(),
+                        unsupported_abilities,
+                        ctx_opt,
+                    ));
+                }
+                Ok(false)
             },
             // After the above checks, if one of the constraints is
             // accumulating, indicate its compatible but cannot be joined.
@@ -536,14 +579,10 @@ impl Constraint {
     }
 
     /// Returns the constraints which need to be satisfied to instantiate the given type
-    /// parameter. This creates NoReference, NoFunction, NoTuple, NoPhantom unless the type
+    /// parameter. This creates NoReference, NoTuple, NoPhantom unless the type
     /// parameter is phantom, and HasAbilities if any abilities need to be met.
     pub fn for_type_parameter(param: &TypeParameter) -> Vec<Constraint> {
-        let mut result = vec![
-            Constraint::NoReference,
-            Constraint::NoTuple,
-            Constraint::NoFunction, // TODO(LAMBDA) - remove when implement LAMBDA_AS_TYPE_PARAMETERS
-        ];
+        let mut result = vec![Constraint::NoReference, Constraint::NoTuple];
         let TypeParameter(
             _,
             TypeParameterKind {
@@ -556,7 +595,10 @@ impl Constraint {
             result.push(Constraint::NoPhantom)
         }
         if !abilities.is_empty() {
-            result.push(Constraint::HasAbilities(*abilities));
+            result.push(Constraint::HasAbilities(
+                *abilities,
+                AbilityCheckingScope::IncludeTypeParams,
+            ));
         }
         result
     }
@@ -567,29 +609,26 @@ impl Constraint {
             Constraint::NoPhantom,
             Constraint::NoReference,
             Constraint::NoTuple,
-            Constraint::NoFunction, // TODO(LAMBDA) - remove when we implement LAMBDA_IN_VECTORS
         ]
     }
 
     /// Returns the constraints which need to be satisfied for a field type,
     /// given a struct with declared abilities.
-    pub fn for_field(struct_abilities: AbilitySet, field_ty: &Type) -> Vec<Constraint> {
+    pub fn for_field(struct_abilities: AbilitySet, _field_ty: &Type) -> Vec<Constraint> {
         let mut result = vec![
             Constraint::NoPhantom,
             Constraint::NoTuple,
             Constraint::NoReference,
-            Constraint::NoFunction,
         ];
-        let abilities = if !field_ty.depends_from_type_parameter() {
-            if struct_abilities.has_ability(Ability::Key) {
-                struct_abilities.remove(Ability::Key).add(Ability::Store)
-            } else {
-                struct_abilities
-            }
+        let abilities = if struct_abilities.has_ability(Ability::Key) {
+            struct_abilities.remove(Ability::Key).add(Ability::Store)
         } else {
-            AbilitySet::EMPTY
+            struct_abilities
         };
-        result.push(Constraint::HasAbilities(abilities));
+        result.push(Constraint::HasAbilities(
+            abilities,
+            AbilityCheckingScope::ExcludeTypeParams,
+        ));
         result
     }
 
@@ -649,10 +688,9 @@ impl Constraint {
                 )
             },
             Constraint::NoReference => "no-ref".to_string(),
-            Constraint::NoFunction => "no-func".to_string(),
             Constraint::NoTuple => "no-tuple".to_string(),
             Constraint::NoPhantom => "no-phantom".to_string(),
-            Constraint::HasAbilities(required_abilities) => {
+            Constraint::HasAbilities(required_abilities, _) => {
                 format!("{}", required_abilities)
             },
             Constraint::WithDefault(_ty) => "".to_owned(),
@@ -680,6 +718,8 @@ pub enum TypeUnificationError {
     ),
     /// The `HasAbilities` constraint failed: `MissingAbilities(loc, ty, missing, ctx)`.
     MissingAbilities(Loc, Type, AbilitySet, Option<ConstraintContext>),
+    /// The `HasAbilities` constraint failed: `MissingAbilitiesForConstraints(loc, ctr, missing, ctx)`.
+    MissingAbilitiesForConstraints(Loc, Constraint, AbilitySet, Option<ConstraintContext>),
     /// The two constraints are incompatible and cannot be joined.
     ConstraintsIncompatible(Loc, Constraint, Constraint),
     /// A cyclic substitution when trying to unify the given types.
@@ -800,20 +840,6 @@ impl Type {
         matches!(self, Type::TypeParameter(..))
     }
 
-    /// Returns true if the type depends on type parameters.
-    pub fn depends_from_type_parameter(&self) -> bool {
-        use Type::*;
-        match self {
-            TypeParameter(_) => true,
-            Tuple(ts) | Struct(_, _, ts) | ResourceDomain(_, _, Some(ts)) => {
-                ts.iter().any(|t| t.depends_from_type_parameter())
-            },
-            Vector(t) | Reference(_, t) | TypeDomain(t) => t.depends_from_type_parameter(),
-            Fun(t, r) => t.depends_from_type_parameter() || r.depends_from_type_parameter(),
-            _ => false,
-        }
-    }
-
     /// Determines whether this is a primitive.
     pub fn is_primitive(&self) -> bool {
         matches!(self, Type::Primitive(_))
@@ -928,7 +954,7 @@ impl Type {
         use Type::*;
         match self {
             Primitive(p) => p.is_spec(),
-            Fun(args, result) => args.is_spec() || result.is_spec(),
+            Fun(args, result, _) => args.is_spec() || result.is_spec(),
             TypeDomain(..) | ResourceDomain(..) | Error => true,
             Var(..) | TypeParameter(..) => false,
             Tuple(ts) => ts.iter().any(|t| t.is_spec()),
@@ -1155,9 +1181,10 @@ impl Type {
                 Type::Reference(*kind, Box::new(bt.replace(params, subs, use_constr)))
             },
             Type::Struct(mid, sid, args) => Type::Struct(*mid, *sid, replace_vec(args)),
-            Type::Fun(arg, result) => Type::Fun(
+            Type::Fun(arg, result, abilities) => Type::Fun(
                 Box::new(arg.replace(params, subs, use_constr)),
                 Box::new(result.replace(params, subs, use_constr)),
+                *abilities,
             ),
             Type::Tuple(args) => Type::Tuple(replace_vec(args)),
             Type::Vector(et) => Type::Vector(Box::new(et.replace(params, subs, use_constr))),
@@ -1183,7 +1210,7 @@ impl Type {
             match self {
                 Type::Reference(_, bt) => bt.contains(p),
                 Type::Struct(_, _, args) => contains_vec(args),
-                Type::Fun(arg, result) => arg.contains(p) || result.contains(p),
+                Type::Fun(arg, result, _) => arg.contains(p) || result.contains(p),
                 Type::Tuple(args) => contains_vec(args),
                 Type::Vector(et) => et.contains(p),
                 _ => false,
@@ -1197,7 +1224,7 @@ impl Type {
         match self {
             Var(_) => true,
             Tuple(ts) => ts.iter().any(|t| t.is_incomplete()),
-            Fun(a, r) => a.is_incomplete() || r.is_incomplete(),
+            Fun(a, r, _) => a.is_incomplete() || r.is_incomplete(),
             Struct(_, _, ts) => ts.iter().any(|t| t.is_incomplete()),
             Vector(et) => et.is_incomplete(),
             Reference(_, bt) => bt.is_incomplete(),
@@ -1218,7 +1245,7 @@ impl Type {
         use Type::*;
         match self {
             Tuple(ts) => ts.iter().for_each(|t| t.module_usage(usage)),
-            Fun(a, r) => {
+            Fun(a, r, _) => {
                 a.module_usage(usage);
                 r.module_usage(usage);
             },
@@ -1308,6 +1335,68 @@ impl Type {
         }
     }
 
+    /// Generates a type from a signature token in the context of the given binary module.
+    /// The `env` is only passed for general purposes, type name resolution is done
+    /// via a special resolver function, allowing to work with partially populated
+    /// environments.
+    pub fn from_signature_token(
+        env: &GlobalEnv,
+        module: &CompiledModule,
+        struct_resolver: &impl Fn(ModuleName, Symbol) -> QualifiedId<StructId>,
+        sig: &SignatureToken,
+    ) -> Self {
+        match sig {
+            SignatureToken::Bool => Type::Primitive(PrimitiveType::Bool),
+            SignatureToken::U8 => Type::Primitive(PrimitiveType::U8),
+            SignatureToken::U16 => Type::Primitive(PrimitiveType::U16),
+            SignatureToken::U32 => Type::Primitive(PrimitiveType::U32),
+            SignatureToken::U64 => Type::Primitive(PrimitiveType::U64),
+            SignatureToken::U128 => Type::Primitive(PrimitiveType::U128),
+            SignatureToken::U256 => Type::Primitive(PrimitiveType::U256),
+            SignatureToken::Address => Type::Primitive(PrimitiveType::Address),
+            SignatureToken::Signer => Type::Primitive(PrimitiveType::Signer),
+            SignatureToken::Reference(t) => Type::Reference(
+                ReferenceKind::Immutable,
+                Box::new(Self::from_signature_token(env, module, struct_resolver, t)),
+            ),
+            SignatureToken::MutableReference(t) => Type::Reference(
+                ReferenceKind::Mutable,
+                Box::new(Self::from_signature_token(env, module, struct_resolver, t)),
+            ),
+            SignatureToken::TypeParameter(index) => Type::TypeParameter(*index),
+            SignatureToken::Vector(bt) => Type::Vector(Box::new(Self::from_signature_token(
+                env,
+                module,
+                struct_resolver,
+                bt,
+            ))),
+            SignatureToken::Struct(handle_idx) => {
+                let struct_view =
+                    StructHandleView::new(module, module.struct_handle_at(*handle_idx));
+                let struct_id = struct_resolver(
+                    env.to_module_name(&struct_view.module_id()),
+                    env.symbol_pool.make(struct_view.name().as_str()),
+                );
+                Type::Struct(struct_id.module_id, struct_id.id, vec![])
+            },
+            SignatureToken::StructInstantiation(handle_idx, args) => {
+                let struct_view =
+                    StructHandleView::new(module, module.struct_handle_at(*handle_idx));
+                let struct_id = struct_resolver(
+                    env.to_module_name(&struct_view.module_id()),
+                    env.symbol_pool.make(struct_view.name().as_str()),
+                );
+                Type::Struct(
+                    struct_id.module_id,
+                    struct_id.id,
+                    args.iter()
+                        .map(|t| Self::from_signature_token(env, module, struct_resolver, t))
+                        .collect(),
+                )
+            },
+        }
+    }
+
     /// Get the unbound type variables in the type.
     pub fn get_vars(&self) -> BTreeSet<u32> {
         let mut vars = BTreeSet::new();
@@ -1322,7 +1411,7 @@ impl Type {
                 vars.insert(*id);
             },
             Tuple(ts) => ts.iter().for_each(|t| t.internal_get_vars(vars)),
-            Fun(a, r) => {
+            Fun(a, r, _) => {
                 a.internal_get_vars(vars);
                 r.internal_get_vars(vars);
             },
@@ -1345,7 +1434,7 @@ impl Type {
             Type::Vector(bt) => bt.visit(visitor),
             Type::Struct(_, _, tys) => visit_slice(tys, visitor),
             Type::Reference(_, ty) => ty.visit(visitor),
-            Type::Fun(a, ty) => {
+            Type::Fun(a, ty, _) => {
                 a.visit(visitor);
                 ty.visit(visitor);
             },
@@ -1513,6 +1602,10 @@ pub trait UnificationContext: AbilityContext {
 pub struct ReceiverFunctionInstance {
     /// Qualified id
     pub id: QualifiedId<FunId>,
+    /// Function name
+    pub fun_name: Symbol,
+    /// Type parameters
+    pub type_params: Vec<TypeParameter>,
     /// Type instantiation of the function
     pub type_inst: Vec<Type>,
     /// Types of the arguments, instantiated
@@ -1594,7 +1687,7 @@ impl Substitution {
         let mut absorbed = false;
         for (_, _, c) in current.iter_mut() {
             // Join constraints. If join returns true the constraint is absorbed.
-            absorbed = c.join(context, self, &loc, &ctr)?;
+            absorbed = c.join(context, self, &loc, &ctr, ctx_opt.clone())?;
             if absorbed {
                 break;
             }
@@ -1786,6 +1879,7 @@ impl Substitution {
                     if let Some(receiver) = context.get_receiver_function(ty, *name) {
                         self.eval_receiver_function_constraint(
                             context,
+                            loc,
                             variance,
                             ty_args_opt,
                             args_loc,
@@ -1797,18 +1891,17 @@ impl Substitution {
                         constraint_unsatisfied_error()
                     }
                 },
-                (Constraint::HasAbilities(required_abilities), ty) => {
-                    self.eval_ability_constraint(context, loc, *required_abilities, ty, ctx_opt)
-                },
+                (Constraint::HasAbilities(required_abilities, scope), ty) => self
+                    .eval_ability_constraint(
+                        context,
+                        loc,
+                        *required_abilities,
+                        *scope,
+                        ty,
+                        ctx_opt,
+                    ),
                 (Constraint::NoReference, ty) => {
                     if ty.is_reference() {
-                        constraint_unsatisfied_error()
-                    } else {
-                        Ok(())
-                    }
-                },
-                (Constraint::NoFunction, ty) => {
-                    if ty.is_function() {
                         constraint_unsatisfied_error()
                     } else {
                         Ok(())
@@ -1838,6 +1931,7 @@ impl Substitution {
         context: &mut impl UnificationContext,
         loc: &Loc,
         required_abilities: AbilitySet,
+        required_abilities_scope: AbilityCheckingScope,
         ty: &Type,
         ctx_opt: Option<ConstraintContext>,
     ) -> Result<(), TypeUnificationError> {
@@ -1865,6 +1959,7 @@ impl Substitution {
                         context,
                         loc,
                         required_abilities,
+                        required_abilities_scope,
                         t,
                         ctx_opt.clone().map(|ctx| ctx.derive_tuple_element(i)),
                     )?;
@@ -1877,6 +1972,7 @@ impl Substitution {
                     context,
                     loc,
                     required_abilities,
+                    required_abilities_scope,
                     t,
                     ctx_opt.map(|ctx| ctx.derive_vector_type_param()),
                 )
@@ -1900,6 +1996,7 @@ impl Substitution {
                             context,
                             loc,
                             required,
+                            required_abilities_scope,
                             t,
                             ctx_opt
                                 .clone()
@@ -1926,10 +2023,17 @@ impl Substitution {
                 Ok(())
             },
             TypeParameter(idx) => {
-                let tparam = context.type_param(*idx);
-                check(tparam.1.abilities)
+                if required_abilities_scope == AbilityCheckingScope::IncludeTypeParams {
+                    let tparam = context.type_param(*idx);
+                    check(tparam.1.abilities)
+                } else {
+                    Ok(())
+                }
             },
-            Fun(_, _) => check(AbilitySet::FUNCTIONS),
+            Fun(_, _, abilities) => {
+                assert!(AbilitySet::FUNCTIONS.is_subset(*abilities));
+                check(*abilities)
+            },
             Reference(_, _) => check(AbilitySet::REFERENCES),
             TypeDomain(_) | ResourceDomain(_, _, _) => check(AbilitySet::EMPTY),
             Error => Ok(()),
@@ -1941,7 +2045,7 @@ impl Substitution {
                     *idx,
                     loc.clone(),
                     WideningOrder::LeftToRight,
-                    Constraint::HasAbilities(required_abilities),
+                    Constraint::HasAbilities(required_abilities, required_abilities_scope),
                     ctx_opt,
                 )
             },
@@ -1951,6 +2055,7 @@ impl Substitution {
     fn eval_receiver_function_constraint(
         &mut self,
         context: &mut impl UnificationContext,
+        loc: &Loc,
         variance: Variance,
         ty_args_opt: &Option<(Vec<Loc>, Vec<Type>)>,
         args_loc: &[Loc],
@@ -1977,6 +2082,24 @@ impl Substitution {
                 &ty_args.1,
                 &receiver.type_inst,
             )?;
+        }
+        // Need to add any constraints for type parameters.
+        for (tparam, targ) in receiver.type_params.iter().zip(&receiver.type_inst) {
+            for ctr in Constraint::for_type_parameter(tparam) {
+                self.eval_constraint(
+                    context,
+                    loc,
+                    &self.specialize(targ),
+                    Variance::NoVariance,
+                    WideningOrder::LeftToRight,
+                    ctr,
+                    Some(ConstraintContext::default().for_type_param(
+                        false,
+                        receiver.fun_name,
+                        tparam.clone(),
+                    )),
+                )?
+            }
         }
         self.unify_vec(
             context,
@@ -2172,13 +2295,15 @@ impl Substitution {
                     .map_err(TypeUnificationError::lift(order, t1, t2))?,
                 ));
             },
-            (Type::Fun(a1, r1), Type::Fun(a2, r2)) => {
+            (Type::Fun(a1, r1, abilities1), Type::Fun(a2, r2, abilities2)) => {
                 // Same as for tuples, we pass on `variance` not `sub_variance`, allowing
                 // conversion for arguments. We also have contra-variance of arguments:
                 //   |T1|R1 <= |T2|R2  <==>  T1 >= T2 && R1 <= R2
                 // Intuitively, function f1 can safely _substitute_ function f2 if any argument
                 // of type T2 can be passed as a T1 -- which is the case since T1 >= T2 (every
                 // T2 is also a T1).
+                //
+                // We test for abilities match last, to give more intuitive error messages.
                 return Ok(Type::Fun(
                     Box::new(
                         self.unify(context, variance, order.swap(), a1, a2)
@@ -2188,6 +2313,25 @@ impl Substitution {
                         self.unify(context, variance, order, r1, r2)
                             .map_err(TypeUnificationError::lift(order, t1, t2))?,
                     ),
+                    {
+                        // Widening/conversion can remove abilities, not add them.  So check that
+                        // the target has no more abilities than the source.
+                        let (missing_abilities, bad_ty) = match order {
+                            WideningOrder::LeftToRight => (abilities2.setminus(*abilities1), t1),
+                            WideningOrder::RightToLeft => (abilities1.setminus(*abilities2), t2),
+                            WideningOrder::Join => (AbilitySet::EMPTY, t1),
+                        };
+                        if missing_abilities.is_empty() {
+                            abilities1.intersect(*abilities2)
+                        } else {
+                            return Err(TypeUnificationError::MissingAbilities(
+                                Loc::default(),
+                                bad_ty.clone(),
+                                missing_abilities,
+                                None,
+                            ));
+                        }
+                    },
                 ));
             },
             (Type::Struct(m1, s1, ts1), Type::Struct(m2, s2, ts2)) => {
@@ -2840,6 +2984,7 @@ impl TypeUnificationError {
             | TypeUnificationError::MissingAbilities(loc, ..) => Some(loc.clone()),
             _ => None,
         }
+        .and_then(|loc| if loc.is_default() { None } else { Some(loc) })
     }
 
     /// Return the message for this error.
@@ -2895,6 +3040,27 @@ impl TypeUnificationError {
                     format!(
                         "type `{}` is missing required {} `{}`{}",
                         ty.display(display_context),
+                        pluralize("ability", missing.iter().count()),
+                        missing,
+                        if !note.is_empty() {
+                            format!(" ({})", note)
+                        } else {
+                            "".to_string()
+                        }
+                    ),
+                    hints,
+                    labels,
+                )
+            },
+            TypeUnificationError::MissingAbilitiesForConstraints(_, ctr, missing, ctx_opt) => {
+                let (note, hints, labels) = ctx_opt
+                    .as_ref()
+                    .map(|ctx| ctx.describe(display_context))
+                    .unwrap_or_default();
+                (
+                    format!(
+                        "constraint `{}` does not have required {} `{}`{}",
+                        ctr.display(display_context),
                         pluralize("ability", missing.iter().count()),
                         missing,
                         if !note.is_empty() {
@@ -2984,20 +3150,13 @@ impl TypeUnificationError {
                             item_name()
                         )
                     },
-                    Constraint::NoFunction => {
-                        format!(
-                            "function type `{}` is not allowed {}",
-                            ty.display(display_context),
-                            item_name()
-                        )
-                    },
                     Constraint::NoPhantom => {
                         format!(
                             "phantom type `{}` can only be used as an argument for another phantom type parameter",
                             ty.display(display_context)
                         )
                     },
-                    Constraint::HasAbilities(_) | Constraint::WithDefault(_) => {
+                    Constraint::HasAbilities(..) | Constraint::WithDefault(_) => {
                         unreachable!("unexpected constraint in error message")
                     },
                 };
@@ -3311,6 +3470,8 @@ pub struct TypeDisplayContext<'a> {
     pub used_modules: BTreeSet<ModuleId>,
     /// Whether to use `m::T` for representing types, for stable output in docgen
     pub use_module_qualification: bool,
+    /// Var types that are recursive and should appear as `..` in display
+    pub recursive_vars: Option<BTreeSet<u32>>,
 }
 
 impl<'a> TypeDisplayContext<'a> {
@@ -3324,6 +3485,7 @@ impl<'a> TypeDisplayContext<'a> {
             display_type_vars: false,
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
+            recursive_vars: None,
         }
     }
 
@@ -3347,6 +3509,7 @@ impl<'a> TypeDisplayContext<'a> {
             display_type_vars: false,
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
+            recursive_vars: None,
         }
     }
 
@@ -3354,6 +3517,19 @@ impl<'a> TypeDisplayContext<'a> {
         Self {
             subs_opt: Some(subs),
             ..self
+        }
+    }
+
+    pub fn map_var_to_self(&self, idx: u32) -> Self {
+        Self {
+            recursive_vars: if let Some(existing_set) = &self.recursive_vars {
+                let mut new_set = existing_set.clone();
+                new_set.insert(idx);
+                Some(new_set)
+            } else {
+                Some(BTreeSet::from([idx]))
+            },
+            ..self.clone()
         }
     }
 }
@@ -3406,12 +3582,22 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                 }
                 f.write_str(">")
             },
-            Fun(a, t) => {
+            Fun(a, t, abilities) => {
                 f.write_str("|")?;
                 write!(f, "{}", a.display(self.context))?;
                 f.write_str("|")?;
                 if !t.is_unit() {
-                    write!(f, "{}", t.display(self.context))
+                    write!(f, "{}", t.display(self.context))?;
+                }
+                if !abilities.is_subset(AbilitySet::FUNCTIONS) {
+                    // Default formatter for Abilities is not compact, manually convert here.
+                    let abilities_as_str = abilities
+                        .setminus(AbilitySet::FUNCTIONS)
+                        .iter()
+                        .map(|a| a.to_string())
+                        .reduce(|l, r| format!("{}+{}", l, r))
+                        .unwrap_or_default();
+                    write!(f, " with {}", abilities_as_str)
                 } else {
                     Ok(())
                 }
@@ -3447,6 +3633,11 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                 }
             },
             Var(idx) => {
+                if let Some(recursive_vars) = &self.context.recursive_vars {
+                    if recursive_vars.contains(idx) {
+                        return f.write_str("..");
+                    }
+                }
                 if let Some(ty) = self.context.subs_opt.and_then(|s| s.subs.get(idx)) {
                     write!(f, "{}", ty.display(self.context))
                 } else if let Some(ctrs) =
@@ -3456,9 +3647,10 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                     if ctrs.is_empty() {
                         f.write_str(&self.type_var_str(*idx))
                     } else {
+                        let recursive_context = self.context.map_var_to_self(*idx);
                         let out = ctrs
                             .iter()
-                            .map(|(_, _, c)| c.display(self.context).to_string())
+                            .map(|(_, _, c)| c.display(&recursive_context).to_string())
                             .join(" + ");
                         f.write_str(&out)
                     }
@@ -3547,7 +3739,7 @@ pub trait AbilityInference: AbilityContext {
     /// Infers the abilities of the type. The returned boolean indicates whether
     /// the type is a phantom type parameter,
     fn infer_abilities(&self, ty: &Type) -> (bool, AbilitySet) {
-        match ty {
+        let res = match ty {
             Type::Primitive(p) => match p {
                 PrimitiveType::Bool
                 | PrimitiveType::U8
@@ -3583,10 +3775,12 @@ pub trait AbilityInference: AbilityContext {
                     .reduce(|a, b| a.intersect(b))
                     .unwrap_or(AbilitySet::PRIMITIVES),
             ),
-            Type::Fun(_, _) | Type::TypeDomain(_) | Type::ResourceDomain(_, _, _) | Type::Error => {
+            Type::Fun(_, _, abilities) => (false, *abilities),
+            Type::TypeDomain(_) | Type::ResourceDomain(_, _, _) | Type::Error => {
                 (false, AbilitySet::EMPTY)
             },
-        }
+        };
+        res
     }
 
     fn infer_struct_abilities(&self, qid: QualifiedId<StructId>, ty_args: &[Type]) -> AbilitySet {

@@ -16,11 +16,12 @@ use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
-    transaction::{ExecutionStatus, TransactionAuxiliaryData, TransactionStatus},
+    transaction::{ExecutionStatus, TransactionStatus},
     write_set::WriteOp,
 };
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
+    ident_str,
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
     value::MoveTypeLayout,
@@ -47,8 +48,9 @@ macro_rules! as_bytes {
     };
 }
 
-use crate::module_write_set::ModuleWriteSet;
+use crate::module_write_set::{ModuleWrite, ModuleWriteSet};
 pub(crate) use as_bytes;
+use move_core_types::language_storage::ModuleId;
 
 pub(crate) fn raw_metadata(v: u64) -> StateValueMetadata {
     StateValueMetadata::legacy(v, &CurrentTimeMicroseconds { microseconds: v })
@@ -65,6 +67,15 @@ pub(crate) fn mock_modify(k: impl ToString, v: u128) -> (StateKey, WriteOp) {
     (
         as_state_key!(k),
         WriteOp::legacy_modification(as_bytes!(v).into()),
+    )
+}
+
+pub(crate) fn mock_module_modify(k: impl ToString, v: u128) -> (StateKey, ModuleWrite<WriteOp>) {
+    let dummy_module_id = ModuleId::new(AccountAddress::ONE, ident_str!("dummy").to_owned());
+    let write_op = WriteOp::legacy_modification(as_bytes!(v).into());
+    (
+        as_state_key!(k),
+        ModuleWrite::new(dummy_module_id, write_op),
     )
 }
 
@@ -224,7 +235,7 @@ impl VMChangeSetBuilder {
 // For testing, output has always a success execution status and uses 100 gas units.
 pub(crate) fn build_vm_output(
     resource_write_set: impl IntoIterator<Item = (StateKey, AbstractResourceWriteOp)>,
-    module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
+    module_write_set: impl IntoIterator<Item = (StateKey, ModuleWrite<WriteOp>)>,
     delayed_field_change_set: impl IntoIterator<Item = (DelayedFieldID, DelayedChange<DelayedFieldID>)>,
     aggregator_v1_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
     aggregator_v1_delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
@@ -241,7 +252,6 @@ pub(crate) fn build_vm_output(
         ModuleWriteSet::new(false, module_write_set.into_iter().collect()),
         FeeStatement::new(GAS_USED, GAS_USED, 0, 0, 0),
         STATUS,
-        TransactionAuxiliaryData::default(),
     )
 }
 

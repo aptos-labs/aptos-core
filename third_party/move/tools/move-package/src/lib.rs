@@ -22,6 +22,7 @@ use clap::*;
 use move_compiler::{
     command_line::SKIP_ATTRIBUTE_CHECKS, shared::known_attributes::KnownAttribute,
 };
+use move_compiler_v2::external_checks::ExternalChecks;
 use move_core_types::account_address::AccountAddress;
 use move_model::{
     metadata::{CompilerVersion, LanguageVersion},
@@ -34,14 +35,12 @@ use std::{
     fmt,
     io::Write,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Architecture {
     Move,
-
-    AsyncMove,
-
     Ethereum,
 }
 
@@ -49,9 +48,6 @@ impl fmt::Display for Architecture {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Move => write!(f, "move"),
-
-            Self::AsyncMove => write!(f, "async-move"),
-
             Self::Ethereum => write!(f, "ethereum"),
         }
     }
@@ -61,7 +57,6 @@ impl Architecture {
     fn all() -> impl Iterator<Item = Self> {
         IntoIterator::into_iter([
             Self::Move,
-            Self::AsyncMove,
             #[cfg(feature = "evm-backend")]
             Self::Ethereum,
         ])
@@ -70,11 +65,7 @@ impl Architecture {
     fn try_parse_from_str(s: &str) -> Result<Self> {
         Ok(match s {
             "move" => Self::Move,
-
-            "async-move" => Self::AsyncMove,
-
             "ethereum" => Self::Ethereum,
-
             _ => {
                 let supported_architectures = Self::all()
                     .map(|arch| format!("\"{}\"", arch))
@@ -210,15 +201,18 @@ impl BuildConfig {
 
     /// Compile the package at `path` or the containing Move package. Do not exit process on warning
     /// or failure.
+    /// External checks on Move code can be provided, these are only run if compiler v2 is used.
     pub fn compile_package_no_exit<W: Write>(
         self,
         path: &Path,
+        external_checks: Vec<Arc<dyn ExternalChecks>>,
         writer: &mut W,
     ) -> Result<(CompiledPackage, Option<model::GlobalEnv>)> {
         let config = self.compiler_config.clone(); // Need clone because of mut self
         let resolved_graph = self.resolution_graph_for_package(path, writer)?;
         let mutx = PackageLock::lock();
-        let ret = BuildPlan::create(resolved_graph)?.compile_no_exit(&config, writer);
+        let ret =
+            BuildPlan::create(resolved_graph)?.compile_no_exit(&config, external_checks, writer);
         mutx.unlock();
         ret
     }

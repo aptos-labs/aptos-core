@@ -18,6 +18,7 @@ use aptos_logger::{debug, trace, warn};
 use aptos_rest_client::{
     aptos_api_types::{AptosError, AptosErrorCode, ViewFunction},
     error::{AptosErrorResponse, RestError},
+    Client,
 };
 use aptos_types::{account_address::AccountAddress, account_config::AccountResource};
 use move_core_types::{
@@ -25,7 +26,7 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag, TypeTag},
     parser::parse_type_tag,
 };
-use std::str::FromStr;
+use std::{collections::HashSet, str::FromStr};
 use warp::Filter;
 
 /// Account routes e.g. balance
@@ -105,43 +106,62 @@ async fn get_balances(
 
     let mut balances = vec![];
     let mut lockup_expiration: u64 = 0;
-    let mut total_requested_balance: Option<u64> = None;
+    let mut maybe_operators = None;
 
-    // Lookup the delegation pool, if it's provided in the account information
-    if pool_address.is_some() {
-        match get_delegation_stake_balances(
-            rest_client.as_ref(),
-            &account,
-            owner_address,
-            pool_address.unwrap(),
-            version,
-        )
-        .await
-        {
-            Ok(Some(balance_result)) => {
-                if let Some(balance) = balance_result.balance {
-                    total_requested_balance = Some(
-                        total_requested_balance.unwrap_or_default()
-                            + u64::from_str(&balance.value).unwrap_or_default(),
-                    );
-                }
-                lockup_expiration = balance_result.lockup_expiration;
-                if let Some(balance) = total_requested_balance {
-                    balances.push(Amount {
-                        value: balance.to_string(),
-                        currency: native_coin(),
-                    })
-                }
-            },
-            result => {
-                warn!(
-                    "Failed to retrieve requested balance for delegator_address: {}, pool_address: {}: {:?}",
-                    owner_address, pool_address.unwrap(), result
-                )
-            },
+    // Handle the things that must always happen
+
+    // Retrieve the sequence number
+    let sequence_number = get_sequence_number(&rest_client, owner_address, version).await?;
+
+    // Filter currencies to lookup
+    let currencies_to_lookup = if let Some(currencies) = maybe_filter_currencies {
+        currencies.into_iter().collect()
+    } else {
+        server_context.currencies.clone()
+    };
+
+    // Regular account, FA and Coin
+    if account.is_base_account() {
+        balances =
+            get_base_balances(&rest_client, owner_address, version, currencies_to_lookup).await?;
+    } else if pool_address.is_some() {
+        // Lookup the delegation pool, if it's provided in the account information
+        // Filter appropriately, must have native coin
+        if currencies_to_lookup.contains(&native_coin()) {
+            (balances, lockup_expiration) = get_delegation_info(
+                &rest_client,
+                &account,
+                owner_address,
+                pool_address.unwrap(),
+                version,
+            )
+            .await?;
+        }
+    } else {
+        // Retrieve staking information (if it applies)
+        // Only non-pool addresses, and non base accounts
+        //
+        // These are special cases around querying the stake amounts
+        // Filter appropriately, must have native coin
+        if currencies_to_lookup.contains(&native_coin()) {
+            (balances, lockup_expiration, maybe_operators) =
+                get_staking_info(&rest_client, &account, owner_address, version).await?;
         }
     }
 
+    Ok((
+        sequence_number,
+        maybe_operators,
+        balances,
+        lockup_expiration,
+    ))
+}
+
+async fn get_sequence_number(
+    rest_client: &Client,
+    owner_address: AccountAddress,
+    version: u64,
+) -> ApiResult<u64> {
     // Retrieve sequence number
     let sequence_number = match rest_client
         .get_account_resource_at_version_bcs(owner_address, "0x1::account::Account", version)
@@ -178,77 +198,111 @@ async fn get_balances(
         },
     };
 
-    // Retrieve staking information (if it applies)
-    // Only non-pool addresses, and non base accounts
+    Ok(sequence_number)
+}
+
+async fn get_staking_info(
+    rest_client: &Client,
+    account: &AccountIdentifier,
+    owner_address: AccountAddress,
+    version: u64,
+) -> ApiResult<(Vec<Amount>, u64, Option<Vec<AccountAddress>>)> {
+    let mut balances = vec![];
+    let mut lockup_expiration: u64 = 0;
     let mut maybe_operators = None;
-    if !account.is_base_account() && pool_address.is_none() {
-        if let Ok(response) = rest_client
-            .get_account_resource_at_version_bcs(
-                owner_address,
-                "0x1::staking_contract::Store",
-                version,
-            )
-            .await
-        {
-            let store: Store = response.into_inner();
-            maybe_operators = Some(vec![]);
-            for (operator, contract) in store.staking_contracts {
-                // Keep track of operators
-                maybe_operators.as_mut().unwrap().push(operator);
-                match get_stake_balances(
-                    rest_client.as_ref(),
+    let mut total_balance = 0;
+    let mut has_staking = false;
+
+    if let Ok(response) = rest_client
+        .get_account_resource_at_version_bcs(owner_address, "0x1::staking_contract::Store", version)
+        .await
+    {
+        let store: Store = response.into_inner();
+        maybe_operators = Some(vec![]);
+        for (operator, contract) in store.staking_contracts {
+            // Keep track of operators
+            maybe_operators.as_mut().unwrap().push(operator);
+            match get_stake_balances(rest_client, account, contract.pool_address, version).await {
+                Ok(Some(balance_result)) => {
+                    if let Some(balance) = balance_result.balance {
+                        has_staking = true;
+                        total_balance += u64::from_str(&balance.value).unwrap_or_default();
+                    }
+                    // TODO: This seems like it only works if there's only one staking contract (hopefully it stays that way)
+                    lockup_expiration = balance_result.lockup_expiration;
+                },
+                result => {
+                    warn!(
+                        "Failed to retrieve requested balance for account: {}, address: {}: {:?}",
+                        owner_address, contract.pool_address, result
+                    )
+                },
+            }
+        }
+        if has_staking {
+            balances.push(Amount {
+                value: total_balance.to_string(),
+                currency: native_coin(),
+            })
+        }
+
+        /* TODO: Right now operator stake is not supported
+        else if account.is_operator_stake() {
+            // For operator stake, filter on operator address
+            let operator_address = account.operator_address()?;
+            if let Some(contract) = store.staking_contracts.get(&operator_address) {
+                balances.push(get_total_stake(
+                    rest_client,
                     &account,
                     contract.pool_address,
                     version,
-                )
-                .await
-                {
-                    Ok(Some(balance_result)) => {
-                        if let Some(balance) = balance_result.balance {
-                            total_requested_balance = Some(
-                                total_requested_balance.unwrap_or_default()
-                                    + u64::from_str(&balance.value).unwrap_or_default(),
-                            );
-                        }
-                        lockup_expiration = balance_result.lockup_expiration;
-                    },
-                    result => {
-                        warn!(
-                                        "Failed to retrieve requested balance for account: {}, address: {}: {:?}",
-                                        owner_address, contract.pool_address, result
-                                    )
-                    },
-                }
+                ).await?);
             }
-            if let Some(balance) = total_requested_balance {
-                balances.push(Amount {
-                    value: balance.to_string(),
-                    currency: native_coin(),
-                })
-            }
-
-            /* TODO: Right now operator stake is not supported
-            else if account.is_operator_stake() {
-                // For operator stake, filter on operator address
-                let operator_address = account.operator_address()?;
-                if let Some(contract) = store.staking_contracts.get(&operator_address) {
-                    balances.push(get_total_stake(
-                        rest_client,
-                        &account,
-                        contract.pool_address,
-                        version,
-                    ).await?);
-                }
-            }*/
-        }
+        }*/
     }
 
-    // Filter currencies to lookup
-    let currencies_to_lookup = if let Some(currencies) = maybe_filter_currencies {
-        currencies.into_iter().collect()
-    } else {
-        server_context.currencies.clone()
-    };
+    Ok((balances, lockup_expiration, maybe_operators))
+}
+
+async fn get_delegation_info(
+    rest_client: &Client,
+    account: &AccountIdentifier,
+    owner_address: AccountAddress,
+    pool_address: AccountAddress,
+    version: u64,
+) -> ApiResult<(Vec<Amount>, u64)> {
+    let mut balances = vec![];
+    let mut lockup_expiration: u64 = 0;
+
+    match get_delegation_stake_balances(rest_client, account, owner_address, pool_address, version)
+        .await
+    {
+        Ok(Some(balance_result)) => {
+            if let Some(balance) = balance_result.balance {
+                balances.push(Amount {
+                    value: balance.value,
+                    currency: native_coin(),
+                });
+            }
+            lockup_expiration = balance_result.lockup_expiration;
+        },
+        result => {
+            warn!(
+                    "Failed to retrieve requested balance for delegator_address: {}, pool_address: {}: {:?}",
+                    owner_address, pool_address, result
+                )
+        },
+    }
+    Ok((balances, lockup_expiration))
+}
+
+async fn get_base_balances(
+    rest_client: &Client,
+    owner_address: AccountAddress,
+    version: u64,
+    currencies_to_lookup: HashSet<Currency>,
+) -> ApiResult<Vec<Amount>> {
+    let mut balances = vec![];
 
     // Retrieve the fungible asset balances and the coin balances
     for currency in currencies_to_lookup.iter() {
@@ -330,10 +384,5 @@ async fn get_balances(
         }
     }
 
-    Ok((
-        sequence_number,
-        maybe_operators,
-        balances,
-        lockup_expiration,
-    ))
+    Ok(balances)
 }

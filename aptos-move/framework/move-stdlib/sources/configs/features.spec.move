@@ -66,10 +66,6 @@ spec std::features {
         spec_is_enabled(FEE_PAYER_ENABLED)
     }
 
-    spec fun spec_collect_and_distribute_gas_fees_enabled(): bool {
-        spec_is_enabled(COLLECT_AND_DISTRIBUTE_GAS_FEES)
-    }
-
     spec fun spec_module_event_enabled(): bool {
         spec_is_enabled(MODULE_EVENT)
     }
@@ -98,6 +94,10 @@ spec std::features {
 
     spec fun spec_abort_if_multisig_payload_mismatch_enabled(): bool {
         spec_is_enabled(ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
+    }
+
+    spec fun spec_new_accounts_default_to_fa_apt_store_enabled(): bool {
+        spec_is_enabled(NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE)
     }
 
     spec fun spec_simulation_enhancement_enabled(): bool {

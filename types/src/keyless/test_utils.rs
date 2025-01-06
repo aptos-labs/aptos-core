@@ -29,7 +29,7 @@ use ark_groth16::{prepare_verifying_key, PreparedVerifyingKey};
 use base64::{encode_config, URL_SAFE_NO_PAD};
 use move_core_types::account_address::AccountAddress;
 use once_cell::sync::Lazy;
-use ring::signature;
+use ring::{signature, signature::RsaKeyPair};
 
 static DUMMY_EPHEMERAL_SIGNATURE: Lazy<EphemeralSignature> = Lazy::new(|| {
     let sk = Ed25519PrivateKey::generate_for_testing();
@@ -306,6 +306,20 @@ pub fn get_sample_jwt_token_from_payload(payload: &str) -> String {
     let base64url_string = encode_config(jwt_sig.clone(), URL_SAFE_NO_PAD);
 
     format!("{}.{}", msg, base64url_string)
+}
+
+pub fn oidc_provider_sign(sk: &RsaKeyPair, msg: &[u8]) -> Vec<u8> {
+    let mut jwt_sig = vec![0u8; sk.public_modulus_len()];
+    let rng = ring::rand::SystemRandom::new();
+    sk.sign(
+        &signature::RSA_PKCS1_SHA256,
+        &rng,
+        msg,
+        jwt_sig.as_mut_slice(),
+    )
+    .unwrap();
+
+    jwt_sig
 }
 
 /// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the

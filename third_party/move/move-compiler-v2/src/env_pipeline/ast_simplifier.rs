@@ -66,6 +66,8 @@ use std::{
     vec::Vec,
 };
 
+const DEBUG: bool = false;
+
 /// Run the AST simplification pass on all target functions in the `env`.
 /// Optionally do some aggressive simplifications that may eliminate code.
 pub fn run_simplifier(env: &mut GlobalEnv, eliminate_code: bool) {
@@ -91,10 +93,12 @@ pub fn run_simplifier(env: &mut GlobalEnv, eliminate_code: bool) {
     // Actually do the writing of new definitions.
     for (qfid, def) in new_definitions.into_iter() {
         env.set_function_def(qfid, def);
-        debug!(
-            "After simplifier, function is `{}`",
-            env.dump_fun(&env.get_function(qfid))
-        );
+        if DEBUG {
+            debug!(
+                "After simplifier, function is `{}`",
+                env.dump_fun(&env.get_function(qfid))
+            );
+        }
     }
 }
 
@@ -359,7 +363,7 @@ fn find_possibly_modified_vars(
                     _ => {},
                 }
             },
-            Lambda(node_id, pat, _) => {
+            Lambda(node_id, pat, _, _, _) => {
                 // Define a new scope for bound vars, and turn off `modifying` within.
                 match pos {
                     VisitorPosition::Pre => {
@@ -978,7 +982,8 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
                     let ability_set = self
                         .env()
                         .type_abilities(&ty, self.func_env.get_type_parameters_ref());
-                    ability_set.has_ability(Ability::Drop)
+                    // Don't drop a function-valued expression so we don't lose errors.
+                    !ty.has_function() && ability_set.has_ability(Ability::Drop)
                 } else {
                     // We're missing type info, be conservative
                     false

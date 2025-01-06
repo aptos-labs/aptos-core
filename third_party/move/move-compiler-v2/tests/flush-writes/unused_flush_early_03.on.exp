@@ -29,52 +29,71 @@ public fun m::test1() {
      var $t1: u64
      var $t2: u64
      var $t3: bool
-     var $t4: u64
-     var $t5: bool [unused]
-     var $t6: u64 [unused]
-     var $t7: bool [unused]
+     var $t4: u64 [unused]
+     var $t5: u64
+     var $t6: bool [unused]
+     var $t7: u64 [unused]
      var $t8: u64 [unused]
+     var $t9: bool [unused]
+     var $t10: u64 [unused]
+     var $t11: u64 [unused]
      # flush: $t1, $t2
      # live vars:
   0: ($t0, $t1, $t2) := m::foo()
      # live vars: $t0, $t1, $t2
-  1: $t4 := 0
-     # live vars: $t0, $t1, $t2, $t4
-  2: $t3 := ==($t0, $t4)
+  1: $t5 := 0
+     # live vars: $t0, $t1, $t2, $t5
+  2: $t3 := ==($t0, $t5)
      # live vars: $t1, $t2, $t3
-  3: if ($t3) goto 4 else goto 6
+  3: if ($t3) goto 6 else goto 4
      # live vars: $t1, $t2
-  4: label L0
+  4: label L9
      # live vars: $t1, $t2
-  5: m::bar()
+  5: goto 8
      # live vars: $t1, $t2
-  6: label L2
+  6: label L0
      # live vars: $t1, $t2
-  7: $t0 := 0
+  7: m::bar()
+     # live vars: $t1, $t2
+  8: label L2
+     # live vars: $t1, $t2
+  9: $t1 := move($t1)
+     # live vars: $t1, $t2
+ 10: $t0 := 0
      # live vars: $t0, $t1, $t2
-  8: $t3 := ==($t1, $t0)
+ 11: $t3 := ==($t1, $t0)
      # live vars: $t2, $t3
-  9: if ($t3) goto 10 else goto 12
+ 12: if ($t3) goto 15 else goto 13
      # live vars: $t2
- 10: label L3
+ 13: label L10
      # live vars: $t2
- 11: m::bar()
+ 14: goto 17
      # live vars: $t2
- 12: label L5
+ 15: label L3
      # live vars: $t2
- 13: $t0 := 0
+ 16: m::bar()
+     # live vars: $t2
+ 17: label L5
+     # live vars: $t2
+ 18: $t2 := move($t2)
+     # live vars: $t2
+ 19: $t0 := 0
      # live vars: $t0, $t2
- 14: $t3 := ==($t2, $t0)
+ 20: $t3 := ==($t2, $t0)
      # live vars: $t3
- 15: if ($t3) goto 16 else goto 18
+ 21: if ($t3) goto 24 else goto 22
      # live vars:
- 16: label L6
+ 22: label L11
      # live vars:
- 17: m::bar()
+ 23: goto 26
      # live vars:
- 18: label L8
+ 24: label L6
      # live vars:
- 19: return ()
+ 25: m::bar()
+     # live vars:
+ 26: label L8
+     # live vars:
+ 27: return ()
 }
 
 
@@ -97,32 +116,37 @@ B0:
 public test1() /* def_idx: 2 */ {
 L0:	loc0: u64
 L1:	loc1: u64
-L2:	loc2: u64
 B0:
 	0: Call foo(): u64 * u64 * u64
 	1: StLoc[0](loc0: u64)
 	2: StLoc[1](loc1: u64)
 	3: LdU64(0)
 	4: Eq
-	5: BrFalse(7)
+	5: BrTrue(7)
 B1:
-	6: Call bar()
+	6: Branch(8)
 B2:
-	7: MoveLoc[1](loc1: u64)
-	8: LdU64(0)
-	9: Eq
-	10: BrFalse(12)
+	7: Call bar()
 B3:
-	11: Call bar()
+	8: MoveLoc[1](loc1: u64)
+	9: LdU64(0)
+	10: Eq
+	11: BrTrue(13)
 B4:
-	12: MoveLoc[0](loc0: u64)
-	13: LdU64(0)
-	14: Eq
-	15: BrFalse(17)
+	12: Branch(14)
 B5:
-	16: Call bar()
+	13: Call bar()
 B6:
-	17: Ret
+	14: MoveLoc[0](loc0: u64)
+	15: LdU64(0)
+	16: Eq
+	17: BrTrue(19)
+B7:
+	18: Branch(20)
+B8:
+	19: Call bar()
+B9:
+	20: Ret
 }
 }
 ============ bytecode verification succeeded ========

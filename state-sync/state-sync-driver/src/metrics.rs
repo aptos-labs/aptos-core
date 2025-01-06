@@ -3,7 +3,8 @@
 
 use aptos_metrics_core::{
     exponential_buckets, histogram_opts, register_histogram_vec, register_int_counter_vec,
-    register_int_gauge_vec, HistogramTimer, HistogramVec, IntCounterVec, IntGaugeVec,
+    register_int_gauge, register_int_gauge_vec, HistogramTimer, HistogramVec, IntCounterVec,
+    IntGauge, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 use std::time::Instant;
@@ -42,6 +43,7 @@ pub const STORAGE_SYNCHRONIZER_COMMIT_POST_PROCESSOR: &str = "commit_post_proces
 pub const STORAGE_SYNCHRONIZER_STATE_SNAPSHOT_RECEIVER: &str = "state_snapshot_receiver";
 
 /// An enum representing the component currently executing
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ExecutingComponent {
     Bootstrapper,
     Consensus,
@@ -60,13 +62,16 @@ impl ExecutingComponent {
     }
 }
 
-/// An enum of storage synchronizer operations performed by state sync
+/// An enum of storage synchronizer operations performed by
+/// state sync. Each of these is a metric label to track.
 pub enum StorageSynchronizerOperations {
-    AppliedTransactionOutputs, // Applied a chunk of transactions outputs.
-    ExecutedTransactions,      // Executed a chunk of transactions.
-    Synced,                    // Wrote a chunk of transactions and outputs to storage.
-    SyncedStates,              // Wrote a chunk of state values to storage.
-    SyncedEpoch, // Wrote a chunk of transactions and outputs to storage that resulted in a new epoch.
+    AppliedTransactionOutputs, // The total number of applied transaction outputs
+    ExecutedTransactions,      // The total number of executed transactions
+    Synced,                    // The latest synced version (as read from storage)
+    SyncedIncremental, // The latest synced version (calculated as the sum of all processed transactions)
+    SyncedStates,      // The total number of synced states
+    SyncedEpoch,       // The latest synced epoch (as read from storage)
+    SyncedEpochIncremental, // The latest synced epoch (calculated as the sum of all processed epochs)
 }
 
 impl StorageSynchronizerOperations {
@@ -77,8 +82,10 @@ impl StorageSynchronizerOperations {
             },
             StorageSynchronizerOperations::ExecutedTransactions => "executed_transactions",
             StorageSynchronizerOperations::Synced => "synced",
-            StorageSynchronizerOperations::SyncedEpoch => "synced_epoch",
+            StorageSynchronizerOperations::SyncedIncremental => "synced_incremental",
             StorageSynchronizerOperations::SyncedStates => "synced_states",
+            StorageSynchronizerOperations::SyncedEpoch => "synced_epoch",
+            StorageSynchronizerOperations::SyncedEpochIncremental => "synced_epoch_incremental",
         }
     }
 }
@@ -96,6 +103,15 @@ pub static BOOTSTRAPPER_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
         "aptos_state_sync_bootstrapper_errors",
         "Counters related to state sync bootstrapper errors",
         &["error_label"]
+    )
+    .unwrap()
+});
+
+/// Gauge indicating whether consensus is currently executing
+pub static CONSENSUS_EXECUTING_GAUGE: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_state_sync_consensus_executing_gauge",
+        "Gauge indicating whether consensus is currently executing"
     )
     .unwrap()
 });
@@ -141,7 +157,7 @@ pub static DRIVER_FALLBACK_MODE: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Counters related to the currently executing component
+/// Counters related to the currently executing component in the main driver loop
 pub static EXECUTING_COMPONENT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_state_sync_executing_component_counters",

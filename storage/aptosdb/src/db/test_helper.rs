@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module provides reusable helpers in tests.
-use super::gather_state_updates_until_last_checkpoint;
 #[cfg(test)]
 use crate::state_store::StateStore;
 #[cfg(test)]
@@ -19,7 +18,7 @@ use aptos_executor_types::ProofReader;
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
 #[cfg(test)]
 use aptos_schemadb::SchemaBatch;
-use aptos_storage_interface::{state_delta::StateDelta, DbReader, DbWriter, Order, Result};
+use aptos_storage_interface::{state_store::state_delta::StateDelta, DbReader, Order, Result};
 use aptos_temppath::TempPath;
 #[cfg(test)]
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
@@ -34,9 +33,8 @@ use aptos_types::{
     proptest_types::{AccountInfoUniverse, BlockGen},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, TransactionToCommit, Version},
+    write_set::TransactionWrite,
 };
-#[cfg(test)]
-use arr_macro::arr;
 use proptest::{collection::vec, prelude::*, sample::Index};
 use std::{collections::HashMap, fmt::Debug};
 
@@ -69,12 +67,14 @@ pub(crate) fn update_store(
     first_version: Version,
     enable_sharding: bool,
 ) -> HashValue {
-    use aptos_storage_interface::{jmt_update_refs, jmt_updates};
+    use aptos_storage_interface::{
+        jmt_update_refs, jmt_updates,
+        state_store::sharded_state_update_refs::ShardedStateUpdateRefs,
+    };
+
     let mut root_hash = *aptos_crypto::hash::SPARSE_MERKLE_PLACEHOLDER_HASH;
     for (i, (key, value)) in input.enumerate() {
         let value_state_set = vec![(&key, value.as_ref())].into_iter().collect();
-        let mut sharded_value_state_set = arr![HashMap::new(); 16];
-        sharded_value_state_set[key.get_shard_id() as usize].insert(key.clone(), value.clone());
         let jmt_updates = jmt_updates(&value_state_set);
         let version = first_version + i as Version;
         root_hash = store
@@ -89,14 +89,13 @@ pub(crate) fn update_store(
         let schema_batch = SchemaBatch::new();
         store
             .put_value_sets(
-                vec![&sharded_value_state_set],
                 version,
+                &ShardedStateUpdateRefs::index_per_version_updates([[(&key, value.as_ref())]], 1),
                 StateStorageUsage::new_untracked(),
                 None,
                 &ledger_batch,
                 &sharded_state_kv_batches,
                 /*put_state_value_indices=*/ enable_sharding,
-                /*skip_usage=*/ false,
                 /*last_checkpoint_index=*/ None,
             )
             .unwrap();
@@ -117,12 +116,10 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
     let mut next_version = state.current_version.map_or(0, |v| v + 1);
     for txn_to_commit in txns_to_commit {
         txn_to_commit
-            .state_updates()
-            .iter()
-            .flatten()
+            .write_set
+            .state_updates_cloned()
             .for_each(|(key, value)| {
-                state.updates_since_base[key.get_shard_id() as usize]
-                    .insert(key.clone(), value.clone());
+                state.updates_since_base.insert(key, value);
             });
         next_version += 1;
         if txn_to_commit.has_state_checkpoint_hash() {
@@ -131,6 +128,7 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
                 .batch_update(
                     state
                         .updates_since_base
+                        .shards
                         .iter()
                         .flatten()
                         .map(|(k, v)| (k.hash(), v.as_ref()))
@@ -141,9 +139,13 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
             state.current_version = next_version.checked_sub(1);
             state.base = state.current.clone();
             state.base_version = state.current_version;
-            state.updates_since_base.iter_mut().for_each(|shard| {
-                shard.clear();
-            });
+            state
+                .updates_since_base
+                .shards
+                .iter_mut()
+                .for_each(|shard| {
+                    shard.clear();
+                });
         }
     }
 
@@ -153,6 +155,7 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
             .batch_update(
                 state
                     .updates_since_base
+                    .shards
                     .iter()
                     .flatten()
                     .map(|(k, v)| (k.hash(), v.as_ref()))
@@ -320,36 +323,27 @@ fn gen_snapshot_version(
     let mut snapshot_version = None;
     let last_checkpoint = txns_to_commit
         .iter()
-        .enumerate()
-        .filter(|(_idx, x)| x.has_state_checkpoint_hash())
-        .last()
-        .map(|(idx, _)| idx);
+        .rposition(TransactionToCommit::has_state_checkpoint_hash);
     if let Some(idx) = last_checkpoint {
         updates.extend(
             txns_to_commit[0..=idx]
                 .iter()
-                .flat_map(|x| x.state_updates().clone())
-                .flatten()
-                .collect::<HashMap<_, _>>(),
+                .flat_map(|x| x.write_set().state_updates_cloned()),
         );
-        if updates.len() >= threshold {
+        if updates.len() >= threshold || txns_to_commit[idx].is_reconfig {
             snapshot_version = Some(cur_ver + idx as u64);
             updates.clear();
         }
         updates.extend(
             txns_to_commit[idx + 1..]
                 .iter()
-                .flat_map(|x| x.state_updates().clone())
-                .flatten()
-                .collect::<HashMap<_, _>>(),
+                .flat_map(|x| x.write_set().state_updates_cloned()),
         );
     } else {
         updates.extend(
             txns_to_commit
                 .iter()
-                .flat_map(|x| x.state_updates().clone())
-                .flatten()
-                .collect::<HashMap<_, _>>(),
+                .flat_map(|x| x.write_set().state_updates_cloned()),
         );
     }
     snapshot_version
@@ -363,14 +357,8 @@ pub fn test_save_blocks_impl(
     let db =
         AptosDB::new_for_test_with_buffered_state_target_items(&tmp_dir, snapshot_size_threshold);
 
-    let mut in_memory_state = db
-        .state_store
-        .buffered_state()
-        .lock()
-        .current_state()
-        .clone();
+    let mut in_memory_state = db.state_store.current_state_cloned();
     let _ancester = in_memory_state.current.clone();
-    let _usage = _ancester.usage();
     let num_batches = input.len();
     let mut cur_ver: Version = 0;
     let mut all_committed_txns = vec![];
@@ -384,7 +372,7 @@ pub fn test_save_blocks_impl(
             cur_ver.checked_sub(1), /* base_state_version */
             Some(ledger_info_with_sigs),
             false, /* sync_commit */
-            in_memory_state.clone(),
+            &in_memory_state,
         )
         .unwrap();
 
@@ -459,7 +447,7 @@ fn verify_snapshots(
     txns_to_commit: Vec<&TransactionToCommit>,
 ) {
     let mut cur_version = start_version;
-    let mut updates: HashMap<&StateKey, Option<&StateValue>> = HashMap::new();
+    let mut updates: HashMap<StateKey, Option<StateValue>> = HashMap::new();
     for snapshot_version in snapshot_versions {
         let start = (cur_version - start_version) as usize;
         let end = (snapshot_version - start_version) as usize;
@@ -474,19 +462,14 @@ fn verify_snapshots(
         updates.extend(
             txns_to_commit[start..=end]
                 .iter()
-                .flat_map(|x| {
-                    x.state_updates()
-                        .iter()
-                        .flatten()
-                        .map(|(k, v_opt)| (k, v_opt.as_ref()))
-                })
-                .collect::<HashMap<&StateKey, Option<&StateValue>>>(),
+                .flat_map(|x| x.write_set().iter())
+                .map(|(k, op)| (k.clone(), op.as_state_value())),
         );
         for (state_key, state_value) in &updates {
             let (state_value_in_db, proof) = db
                 .get_state_value_with_proof_by_version(state_key, snapshot_version)
                 .unwrap();
-            assert_eq!(state_value_in_db.as_ref(), *state_value);
+            assert_eq!(state_value_in_db.as_ref(), state_value.as_ref());
             proof
                 .verify(
                     expected_root_hash,
@@ -820,10 +803,10 @@ pub fn verify_committed_transactions(
         );
 
         // Fetch and verify account states.
-        for (state_key, state_value) in txn_to_commit.state_updates().iter().flatten() {
-            updates.insert(state_key, state_value);
+        for (state_key, state_value) in txn_to_commit.write_set().state_update_refs() {
             let state_value_in_db = db.get_state_value_by_version(state_key, cur_ver).unwrap();
-            assert_eq!(state_value_in_db, *state_value);
+            assert_eq!(state_value_in_db.as_ref(), state_value);
+            updates.insert(state_key, state_value);
         }
 
         if !txn_to_commit.has_state_checkpoint_hash() {
@@ -916,14 +899,8 @@ pub(crate) fn put_transaction_infos(
     version: Version,
     txn_infos: &[TransactionInfo],
 ) -> HashValue {
-    let txns_to_commit: Vec<_> = txn_infos
-        .iter()
-        .cloned()
-        .map(TransactionToCommit::dummy_with_transaction_info)
-        .collect();
-    db.commit_transaction_infos(&txns_to_commit, version)
-        .unwrap();
-    db.commit_transaction_accumulator(&txns_to_commit, version)
+    db.commit_transaction_infos(version, txn_infos).unwrap();
+    db.commit_transaction_accumulator(version, txn_infos)
         .unwrap()
 }
 
@@ -933,12 +910,7 @@ pub(crate) fn put_transaction_auxiliary_data(
     version: Version,
     auxiliary_data: &[TransactionAuxiliaryData],
 ) {
-    let txns_to_commit: Vec<_> = auxiliary_data
-        .iter()
-        .cloned()
-        .map(TransactionToCommit::dummy_with_transaction_auxiliary_data)
-        .collect();
-    db.commit_transaction_auxiliary_data(&txns_to_commit, version)
+    db.commit_transaction_auxiliary_data(version, auxiliary_data)
         .unwrap();
 }
 
@@ -957,19 +929,14 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
         .metadata_db()
         .put::<StateValueSchema>(&(key.clone(), version), &Some(value.clone()))
         .unwrap();
-    let mut in_memory_state = db
-        .state_store
-        .buffered_state()
-        .lock()
-        .current_state()
-        .clone();
+    let mut in_memory_state = db.state_store.current_state_cloned();
     in_memory_state.current = smt;
     in_memory_state.current_version = Some(version);
-    in_memory_state.updates_since_base[key.get_shard_id() as usize].insert(key, Some(value));
+    in_memory_state.updates_since_base.insert(key, Some(value));
     db.state_store
         .buffered_state()
         .lock()
-        .update(None, in_memory_state, true)
+        .update(None, &in_memory_state, true)
         .unwrap();
 }
 
@@ -981,12 +948,7 @@ pub fn test_sync_transactions_impl(
     let db =
         AptosDB::new_for_test_with_buffered_state_target_items(&tmp_dir, snapshot_size_threshold);
 
-    let mut in_memory_state = db
-        .state_store
-        .buffered_state()
-        .lock()
-        .current_state()
-        .clone();
+    let mut in_memory_state = db.state_store.current_state_cloned();
     let _ancester = in_memory_state.current.clone();
     let num_batches = input.len();
     let mut cur_ver: Version = 0;
@@ -999,34 +961,26 @@ pub fn test_sync_transactions_impl(
         if batch1_len > 0 {
             let txns_to_commit_batch = &txns_to_commit[..batch1_len];
             update_in_memory_state(&mut in_memory_state, txns_to_commit_batch);
-            db.save_transactions(
+            db.save_transactions_for_test(
                 txns_to_commit_batch,
                 cur_ver, /* first_version */
                 base_state_version,
-                None,
+                None,  /* ledger_info_with_sigs */
                 false, /* sync_commit */
-                in_memory_state.clone(),
-                gather_state_updates_until_last_checkpoint(
-                    cur_ver,
-                    &in_memory_state,
-                    txns_to_commit_batch,
-                ),
-                None,
+                &in_memory_state,
             )
             .unwrap();
         }
         let ver = cur_ver + batch1_len as Version;
         let txns_to_commit_batch = &txns_to_commit[batch1_len..];
         update_in_memory_state(&mut in_memory_state, txns_to_commit_batch);
-        db.save_transactions(
+        db.save_transactions_for_test(
             txns_to_commit_batch,
             ver,
             base_state_version,
             Some(ledger_info_with_sigs),
             false, /* sync_commit */
-            in_memory_state.clone(),
-            gather_state_updates_until_last_checkpoint(ver, &in_memory_state, txns_to_commit_batch),
-            None,
+            &in_memory_state,
         )
         .unwrap();
 

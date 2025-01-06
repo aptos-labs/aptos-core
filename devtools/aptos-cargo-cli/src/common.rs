@@ -30,7 +30,7 @@ const DEVTOOL_TARGET_DIRECTORY: &str = "target/aptos-x-tool";
 
 // File types in `aptos-core` that are not relevant to the rust build and test process.
 // Note: this is a best effort list and will need to be updated as time goes on.
-const IGNORED_DETERMINATOR_FILE_TYPES: [&str; 4] = ["*.json", "*.md", "*.yaml", "*.yml"];
+const IGNORED_DETERMINATOR_FILE_TYPES: [&str; 1] = ["*.md"];
 
 // Paths in `aptos-core` that are not relevant to the rust build and test process.
 // Note: this is a best effort list and will need to be updated as time goes on.
@@ -45,7 +45,7 @@ const IGNORED_DETERMINATOR_PATHS: [&str; 8] = [
     "terraform/*",
 ];
 
-// The maximum number of days allowed since the merge-base commit for the branch
+// The maximum number of days allowed since the merge-base commit for the branch.
 const MAX_NUM_DAYS_SINCE_MERGE_BASE: u64 = 7;
 
 // The delimiter used to separate the package path and the package name.

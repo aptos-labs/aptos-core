@@ -18,7 +18,6 @@ aptos-bitvec = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 aptos-dkg = { workspace = true }
-aptos-experimental-runtimes = { workspace = true }
 aptos-infallible = { workspace = true }
 arbitrary = { workspace = true, features = ["derive"], optional = true }
 ark-bn254 = { workspace = true }
@@ -28,7 +27,6 @@ ark-groth16 = { workspace = true }
 ark-relations = { workspace = true }
 ark-serialize = { workspace = true }
 ark-std = { workspace = true }
-arr_macro = { workspace = true }
 base64 = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
@@ -41,10 +39,8 @@ hex = { workspace = true }
 itertools = { workspace = true }
 jsonwebtoken = { workspace = true }
 move-binary-format = { workspace = true }
-move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
 move-table-extension = { workspace = true }
-move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
 num-bigint = { workspace = true }
 num-derive = { workspace = true }
@@ -96,6 +92,7 @@ url = { workspace = true }
 
 [features]
 default = []
+testing = ["aptos-crypto/fuzzing"]
 fuzzing = ["proptest", "proptest-derive", "aptos-crypto/fuzzing", "move-core-types/fuzzing", "arbitrary"]
 
 [[bench]]

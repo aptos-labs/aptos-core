@@ -31,7 +31,7 @@ use aptos_consensus_types::{
     pipeline::commit_vote::CommitVote,
     pipelined_block::PipelinedBlock,
 };
-use aptos_crypto::{bls12381, HashValue};
+use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_logger::prelude::*;
 use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId};
@@ -127,8 +127,12 @@ pub struct BufferManager {
     commit_proof_rb_handle: Option<DropGuard>,
 
     // message received from the network
-    commit_msg_rx:
-        Option<aptos_channels::aptos_channel::Receiver<AccountAddress, IncomingCommitRequest>>,
+    commit_msg_rx: Option<
+        aptos_channels::aptos_channel::Receiver<
+            AccountAddress,
+            (AccountAddress, IncomingCommitRequest),
+        >,
+    >,
 
     persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
     persisting_phase_rx: Receiver<ExecutorResult<Round>>,
@@ -186,7 +190,7 @@ impl BufferManager {
         commit_msg_tx: Arc<NetworkSender>,
         commit_msg_rx: aptos_channels::aptos_channel::Receiver<
             AccountAddress,
-            IncomingCommitRequest,
+            (AccountAddress, IncomingCommitRequest),
         >,
         persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
         persisting_phase_rx: Receiver<ExecutorResult<Round>>,
@@ -472,7 +476,8 @@ impl BufferManager {
             let executed_item = item.unwrap_executed_ref();
             let request = self.create_new_request(SigningRequest {
                 ordered_ledger_info: executed_item.ordered_proof.clone(),
-                commit_ledger_info: executed_item.partial_commit_proof.ledger_info().clone(),
+                commit_ledger_info: executed_item.partial_commit_proof.data().clone(),
+                blocks: executed_item.executed_blocks.clone(),
             });
             if cursor == self.signing_root {
                 let sender = self.signing_phase_tx.clone();
@@ -557,6 +562,13 @@ impl BufferManager {
     /// Internal requests are managed with ongoing_tasks.
     /// Incoming ordered blocks are pulled, it should only have existing blocks but no new blocks until reset finishes.
     async fn reset(&mut self) {
+        while let Some(item) = self.buffer.pop_front() {
+            for b in item.get_blocks() {
+                if let Some(futs) = b.abort_pipeline() {
+                    futs.wait_until_executor_finishes().await;
+                }
+            }
+        }
         self.buffer = Buffer::new();
         self.execution_root = None;
         self.signing_root = None;
@@ -703,7 +715,7 @@ impl BufferManager {
             CommitMessage::Vote(CommitVote::new_with_signature(
                 commit_vote.author(),
                 commit_vote.ledger_info().clone(),
-                bls12381::Signature::dummy_signature(),
+                aptos_crypto::bls12381::Signature::dummy_signature(),
             ))
         });
         CommitMessage::Vote(commit_vote)
@@ -763,7 +775,7 @@ impl BufferManager {
                 // find the corresponding item
                 let author = vote.author();
                 let commit_info = vote.commit_info().clone();
-                trace!("Receive commit vote {} from {}", commit_info, author);
+                debug!("Receive commit vote {} from {}", commit_info, author);
                 let target_block_id = vote.commit_info().id();
                 let current_cursor = self
                     .buffer
@@ -936,12 +948,12 @@ impl BufferManager {
         let epoch_state = self.epoch_state.clone();
         let bounded_executor = self.bounded_executor.clone();
         spawn_named!("buffer manager verification", async move {
-            while let Some(commit_msg) = commit_msg_rx.next().await {
+            while let Some((sender, commit_msg)) = commit_msg_rx.next().await {
                 let tx = verified_commit_msg_tx.clone();
                 let epoch_state_clone = epoch_state.clone();
                 bounded_executor
                     .spawn(async move {
-                        match commit_msg.req.verify(&epoch_state_clone.verifier) {
+                        match commit_msg.req.verify(sender, &epoch_state_clone.verifier) {
                             Ok(_) => {
                                 let _ = tx.unbounded_send(commit_msg);
                             },
@@ -991,7 +1003,7 @@ impl BufferManager {
                 },
                 _ = self.execution_schedule_retry_rx.next() => {
                     monitor!("buffer_manager_process_execution_schedule_retry",
-                    self.retry_schedule_phase().await);
+                        self.retry_schedule_phase().await);
                 },
                 Some(response) = self.signing_phase_rx.next() => {
                     monitor!("buffer_manager_process_signing_response", {

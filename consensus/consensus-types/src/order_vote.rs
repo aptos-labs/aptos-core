@@ -76,13 +76,6 @@ impl OrderVote {
         self.signature.is_verified()
     }
 
-    /// Only the verify method in validator verifier can set the signature status verified.
-    /// This method additionally lets the tests to set the status to verified.
-    #[cfg(any(test, feature = "fuzzing"))]
-    pub fn set_verified(&self) {
-        self.signature.set_verified();
-    }
-
     pub fn epoch(&self) -> u64 {
         self.ledger_info.epoch()
     }

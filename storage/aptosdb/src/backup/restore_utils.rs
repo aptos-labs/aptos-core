@@ -18,8 +18,11 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use aptos_schemadb::{SchemaBatch, DB};
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{
+    db_ensure as ensure, state_store::state_delta::StateDelta, AptosDbError, Result,
+};
 use aptos_types::{
+    account_config::new_block_event_key,
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
@@ -161,9 +164,10 @@ pub(crate) fn save_transactions(
         )?;
 
         ledger_db.write_schemas(ledger_db_batch)?;
-        ledger_db
-            .metadata_db()
-            .set_pre_committed_version(last_version);
+
+        state_store
+            .current_state()
+            .set(StateDelta::new_empty_with_version(Some(last_version)));
     }
 
     Ok(())
@@ -226,6 +230,22 @@ pub(crate) fn save_transactions_impl(
         events,
         &ledger_db_batch.event_db_batches,
     )?;
+
+    if ledger_db.enable_storage_sharding() {
+        for (idx, txn_events) in events.iter().enumerate() {
+            for event in txn_events {
+                if let Some(event_key) = event.event_key() {
+                    if *event_key == new_block_event_key() {
+                        LedgerMetadataDb::put_block_info(
+                            first_version + idx as Version,
+                            event,
+                            &ledger_db_batch.ledger_metadata_db_batches,
+                        )?;
+                    }
+                }
+            }
+        }
+    }
     // insert changes in write set schema batch
     for (idx, ws) in write_sets.iter().enumerate() {
         WriteSetDb::put_write_set(

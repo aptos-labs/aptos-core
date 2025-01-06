@@ -4,8 +4,8 @@
 
 use crate::{
     data_cache::TransactionDataCache,
-    interpreter::Interpreter,
-    loader::{Function, Resolver},
+    interpreter::InterpreterDebugInterface,
+    loader::{Function, Loader, Resolver},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
 };
@@ -21,11 +21,11 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
+    loaded_data::runtime_types::Type, natives::function::NativeResult,
+    value_serde::FunctionValueExtension, values::Value,
 };
 use std::{
     collections::{HashMap, VecDeque},
-    fmt::Write,
     sync::Arc,
 };
 
@@ -97,7 +97,7 @@ impl NativeFunctions {
 }
 
 pub struct NativeContext<'a, 'b, 'c> {
-    interpreter: &'a mut Interpreter,
+    interpreter: &'a mut dyn InterpreterDebugInterface,
     data_store: &'a mut TransactionDataCache<'c>,
     resolver: &'a Resolver<'a>,
     extensions: &'a mut NativeContextExtensions<'b>,
@@ -107,7 +107,7 @@ pub struct NativeContext<'a, 'b, 'c> {
 
 impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     pub(crate) fn new(
-        interpreter: &'a mut Interpreter,
+        interpreter: &'a mut dyn InterpreterDebugInterface,
         data_store: &'a mut TransactionDataCache<'c>,
         resolver: &'a Resolver<'a>,
         extensions: &'a mut NativeContextExtensions<'b>,
@@ -126,22 +126,25 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
 }
 
 impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
-    pub fn print_stack_trace<B: Write>(&self, buf: &mut B) -> PartialVMResult<()> {
-        self.interpreter
-            .debug_print_stack_trace(buf, self.resolver.loader())
+    pub fn print_stack_trace(&self, buf: &mut String) -> PartialVMResult<()> {
+        self.interpreter.debug_print_stack_trace(buf, self.resolver)
     }
 
     pub fn exists_at(
         &mut self,
         address: AccountAddress,
-        type_: &Type,
+        ty: &Type,
     ) -> VMResult<(bool, Option<NumBytes>)> {
+        // TODO(Rati, George): propagate exists call the way to resolver, because we
+        //                     can implement the check more efficiently, without the
+        //                     need to actually load bytes.
         let (value, num_bytes) = self
             .data_store
             .load_resource(
                 self.resolver.loader(),
+                self.resolver.module_storage(),
                 address,
-                type_,
+                ty,
                 self.resolver.module_store(),
             )
             .map_err(|err| err.finish(Location::Undefined))?;
@@ -152,7 +155,9 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     }
 
     pub fn type_to_type_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
-        self.resolver.loader().type_to_type_tag(ty)
+        self.resolver
+            .loader()
+            .type_to_type_tag(ty, self.resolver.module_storage())
     }
 
     pub fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
@@ -193,28 +198,45 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         self.traversal_context
     }
 
+    pub fn function_value_extension(&self) -> &dyn FunctionValueExtension {
+        self.resolver
+    }
+
     pub fn load_function(
         &mut self,
-        module: &ModuleId,
+        module_id: &ModuleId,
         function_name: &Identifier,
     ) -> PartialVMResult<Arc<Function>> {
-        // Load the module that contains this function regardless of the traversal context.
-        //
-        // This is just a precautionary step to make sure that caching status of the VM will not alter execution
-        // result in case framework code forgot to use LoadFunction result to load the modules into cache
-        // and charge properly.
-        self.resolver
-            .loader()
-            .load_module(module, self.data_store, self.resolver.module_store())
-            .map_err(|_| {
-                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                    .with_message(format!("Module {} doesn't exist", module))
-            })?;
+        let (_, function) = match self.resolver.loader() {
+            Loader::V1(loader) => {
+                // Load the module that contains this function regardless of the traversal context.
+                //
+                // This is just a precautionary step to make sure that caching status of the VM will not alter execution
+                // result in case framework code forgot to use LoadFunction result to load the modules into cache
+                // and charge properly.
+                loader
+                    .load_module(module_id, self.data_store, self.resolver.module_store())
+                    .map_err(|_| {
+                        PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                            .with_message(format!("Module {} doesn't exist", module_id))
+                    })?;
 
-        let (_, function) = self
-            .resolver
-            .module_store()
-            .resolve_module_and_function_by_name(module, function_name)?;
+                self.resolver
+                    .module_store()
+                    .resolve_module_and_function_by_name(module_id, function_name)?
+            },
+            Loader::V2(_) => self
+                .resolver
+                .module_storage()
+                .fetch_function_definition(module_id.address(), module_id.name(), function_name)
+                // TODO(loader_v2):
+                //   Keeping this consistent with loader V1 implementation which returned that
+                //   error. Check if we can avoid remapping by replaying transactions.
+                .map_err(|_| {
+                    PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                        .with_message(format!("Module {} doesn't exist", module_id))
+                })?,
+        };
         Ok(function)
     }
 }
