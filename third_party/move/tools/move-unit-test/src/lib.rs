@@ -209,9 +209,11 @@ impl UnitTestingConfig {
 
             let compilation_result = compiler.at_cfgir(cfgir).build();
 
-        let (units, warnings) =
-            diagnostics::unwrap_or_report_diagnostics(&files, compilation_result);
-        diagnostics::report_warnings(&files, warnings);
+            let (units, warnings) =
+                diagnostics::unwrap_or_report_diagnostics(&files, compilation_result);
+            diagnostics::report_warnings(&files, warnings);
+            (test_plan, files, units)
+        };
         test_plan.map(|tests| TestPlan::new(tests, files, units, vec![]))
     }
 
