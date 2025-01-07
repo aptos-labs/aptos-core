@@ -29,7 +29,7 @@ use poem::{
     handler,
     http::Method,
     listener::{Listener, RustlsCertificate, RustlsConfig, TcpListener},
-    middleware::Cors,
+    middleware::{Compression, Cors},
     web::Html,
     EndpointExt, Route, Server,
 };
@@ -251,6 +251,7 @@ pub fn attach_poem_to_runtime(
                     ),
             )
             .with(cors)
+            .with(Compression::new())
             .with(PostSizeLimit::new(size_limit))
             // NOTE: Make sure to keep this after all the `with` middleware.
             .catch_all_error(convert_error)
