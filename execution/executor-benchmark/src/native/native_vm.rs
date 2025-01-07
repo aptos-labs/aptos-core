@@ -642,14 +642,6 @@ impl NativeVMExecutorTask {
                             None,
                         ));
                     }
-                    events.push((
-                        WithdrawFAEvent {
-                            store: sender_store_address,
-                            amount: gas,
-                        }
-                        .create_event_v2(),
-                        None,
-                    ));
                     Ok(())
                 } else {
                     Err(())

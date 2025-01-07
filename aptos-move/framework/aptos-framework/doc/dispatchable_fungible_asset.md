@@ -239,7 +239,7 @@ The semantics of deposit will be governed by the function specified in DispatchF
         <b>assert</b>!(amount &lt;= start_balance - end_balance, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_aborted">error::aborted</a>(<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_EAMOUNT_MISMATCH">EAMOUNT_MISMATCH</a>));
         fa
     } <b>else</b> {
-        <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">fungible_asset::withdraw_internal</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store), amount)
+        <a href="fungible_asset.md#0x1_fungible_asset_unchecked_withdraw">fungible_asset::unchecked_withdraw</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store), amount)
     }
 }
 </code></pre>
@@ -283,7 +283,7 @@ The semantics of deposit will be governed by the function specified in DispatchF
             func
         )
     } <b>else</b> {
-        <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">fungible_asset::deposit_internal</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store), fa)
+        <a href="fungible_asset.md#0x1_fungible_asset_unchecked_deposit">fungible_asset::unchecked_deposit</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store), fa)
     }
 }
 </code></pre>
