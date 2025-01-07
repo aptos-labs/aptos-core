@@ -660,10 +660,7 @@ pub fn run_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub fn run_test_v1(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    run_test_with_config(
-        TestRunConfig::CompilerV1,
-        path,
-    )
+    run_test_with_config(TestRunConfig::CompilerV1, path)
 }
 
 fn precompiled_v1_stdlib_if_needed(

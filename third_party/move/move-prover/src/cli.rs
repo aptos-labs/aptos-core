@@ -124,7 +124,7 @@ impl Default for Options {
                 CompilerVersion::V1 => false,
                 CompilerVersion::V2_0 | CompilerVersion::V2_1 => true,
             },
-            language_version: None,
+            language_version: Some(LanguageVersion::default()),
         }
     }
 }
