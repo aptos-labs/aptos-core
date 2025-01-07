@@ -782,6 +782,11 @@ where
                 versioned_cache.module_cache(),
             )?;
         }
+
+        // Ensure that after publish layout caches are empty. If we do not do that, it is possible
+        // to read the wrong (old) layout information.
+        runtime_environment.flush_struct_info_cache();
+
         Ok(())
     }
 
@@ -1293,6 +1298,7 @@ where
             unsync_map.write(key, Arc::new(write_op), None);
         }
 
+        let num_modules_published = output.module_write_set().len();
         for (key, write) in output.module_write_set().into_iter() {
             if runtime_environment.vm_config().use_loader_v2 {
                 Self::add_module_write_to_module_cache(
@@ -1306,6 +1312,12 @@ where
                 #[allow(deprecated)]
                 unsync_map.write_module(key, write.into_write_op());
             }
+        }
+
+        // In case of publishing, flush the struct layout cache to ensure that subsequent
+        // transactions read correct re-published layouts.
+        if runtime_environment.vm_config().use_loader_v2 && num_modules_published > 0 {
+            runtime_environment.flush_struct_info_cache();
         }
 
         let mut second_phase = Vec::new();

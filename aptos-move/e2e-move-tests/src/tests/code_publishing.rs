@@ -23,6 +23,8 @@ use move_core_types::{
 use rstest::rstest;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use aptos_framework::BuildOptions;
+use move_core_types::language_storage::StructTag;
 
 // Note: this module uses parameterized tests via the
 // [`rstest` crate](https://crates.io/crates/rstest)
@@ -587,4 +589,77 @@ fn test_module_publishing_does_not_leak_speculative_information() {
             },
         }
     }
+}
+
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+enum Data {
+    V1 { x: u64, },
+    V2 { x: u64, y: u8, }
+}
+
+#[test]
+fn test_module_publishing_with_layout_changes() {
+    let executor = FakeExecutor::from_head_genesis().set_parallel();
+    let mut h = MoveHarness::new_with_executor(executor);
+
+    let addr = AccountAddress::from_hex_literal("0x123").unwrap();
+    let account = h.new_account_at(addr);
+
+    let mut package = PackageBuilder::new("Package");
+    package.add_source(
+        "m.move",
+        r#"
+        module 0x123::m {
+            enum Data has drop, key, store {
+               V1{ x: u64 }
+            }
+
+            entry fun f(acc: &signer) {
+                let data = Data::V1 { x: 30 };
+                move_to(acc, data);
+            }
+        }
+    "#,
+    );
+    let package_dir = package.write_to_temp().unwrap();
+    let txn_1 = h.create_publish_package(&account, package_dir.path(), Some(BuildOptions::move_2()), |_| {});
+
+    let mut upgraded_package = PackageBuilder::new("Package");
+    upgraded_package.add_source(
+        "m.move",
+        r#"
+        module 0x123::m {
+            enum Data has drop, key, store {
+               V1{ x: u64 },
+               V2{ x: u64, y: u8 },
+            }
+
+            entry fun f(acc: &signer) {
+                let data = Data::V2 { x: 30, y: 10 };
+                move_to(acc, data);
+            }
+        }
+    "#,
+    );
+    let upgraded_package_dir = upgraded_package.write_to_temp().unwrap();
+    let txn_2 = h.create_publish_package(&account, upgraded_package_dir.path(), Some(BuildOptions::move_2()), |_| {});
+
+    let user_account = h.new_account_at(AccountAddress::random());
+    let txn_3 = h.create_entry_function(
+        &user_account,
+        MemberId::from_str("0x123::m::f").unwrap(),
+        vec![],
+        vec![],
+    );
+
+    let outputs = h.run_block_get_output(vec![txn_1, txn_2, txn_3]);
+    assert!(outputs.into_iter().all(|output| output.status().status().unwrap().is_success()));
+
+    let data = h.read_resource::<Data>(user_account.address(), StructTag {
+        address: addr,
+        module: Identifier::new("m").unwrap(),
+        name: Identifier::new("Data").unwrap(),
+        type_args: vec![],
+    }).unwrap();
+    assert_eq!(data, Data::V2 { x: 30, y: 10 })
 }
