@@ -13,7 +13,9 @@ use anyhow::Result;
 use colored::*;
 use move_binary_format::{errors::VMResult, file_format::CompiledModule};
 use move_bytecode_utils::Modules;
-use move_compiler::unit_test::{ExpectedFailure, ModuleTestPlan, TestCase, TestPlan};
+use move_compiler::unit_test::{
+    ExpectedFailure, ModuleTestPlan, NamedOrBytecodeModule, TestCase, TestPlan,
+};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Op},
@@ -131,7 +133,10 @@ impl TestRunner {
             .values()
             .map(|(filepath, _)| filepath.to_string())
             .collect();
-        let modules = tests.module_info.values().map(|info| &info.module);
+        let modules = tests.module_info.values().map(|info| match info {
+            NamedOrBytecodeModule::Named(named_compiled_module) => &named_compiled_module.module,
+            NamedOrBytecodeModule::Bytecode(compiled_module) => compiled_module,
+        });
         let mut starting_storage_state = setup_test_storage(modules)?;
         if let Some(genesis_state) = genesis_state {
             starting_storage_state.apply(genesis_state)?;

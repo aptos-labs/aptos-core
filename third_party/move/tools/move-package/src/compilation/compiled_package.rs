@@ -83,7 +83,7 @@ pub struct CompiledPackage {
     /// The output compiled bytecode for dependencies
     pub deps_compiled_units: Vec<(PackageName, CompiledUnitWithSource)>,
     /// Bytecode dependencies of this compiled package
-    pub bytecode_deps: BTreeMap<PackageName, NumericalAddress>,
+    pub bytecode_deps: BTreeMap<PackageName, CompiledModule>,
 
     // Optional artifacts from compilation
     //
@@ -809,8 +809,7 @@ impl CompiledPackage {
                 .flat_map(|package| {
                     let name = package.name.unwrap();
                     package.paths.iter().map(move |pkg_path| {
-                        get_addr_from_module_in_package(name, pkg_path.as_str())
-                            .map(|addr| (name, addr))
+                        get_module_in_package(name, pkg_path.as_str()).map(|module| (name, module))
                     })
                 })
                 .try_collect()?,
@@ -1166,8 +1165,8 @@ pub fn build_and_report_no_exit_v2_driver(
     ))
 }
 
-/// Returns the address of the module
-fn get_addr_from_module_in_package(pkg_name: Symbol, pkg_path: &str) -> Result<NumericalAddress> {
+/// Returns the deserialized module from the bytecode file
+fn get_module_in_package(pkg_name: Symbol, pkg_path: &str) -> Result<CompiledModule> {
     // Read the bytecode file
     let mut bytecode = Vec::new();
     std::fs::File::open(pkg_path)
@@ -1183,5 +1182,4 @@ fn get_addr_from_module_in_package(pkg_name: Symbol, pkg_path: &str) -> Result<N
                 pkg_name
             ))
         })
-        .map(|module| NumericalAddress::from_account_address(*module.self_addr()))
 }
