@@ -564,8 +564,14 @@ impl CliCommand<&'static str> for TestPackage {
                     self.move_options.bytecode_version,
                     self.move_options.language_version,
                 ),
-                compiler_version: self.move_options.compiler_version,
-                language_version: self.move_options.language_version,
+                compiler_version: self
+                    .move_options
+                    .compiler_version
+                    .or_else(|| Some(CompilerVersion::latest_stable())),
+                language_version: self
+                    .move_options
+                    .language_version
+                    .or_else(|| Some(LanguageVersion::latest_stable())),
                 experiments: experiments_from_opt_level(&self.move_options.optimize),
             },
             ..Default::default()
@@ -717,8 +723,12 @@ impl CliCommand<&'static str> for DocumentPackage {
                 move_options.bytecode_version,
                 move_options.language_version,
             ),
-            compiler_version: move_options.compiler_version,
-            language_version: move_options.language_version,
+            compiler_version: move_options
+                .compiler_version
+                .or_else(|| Some(CompilerVersion::latest_stable())),
+            language_version: move_options
+                .language_version
+                .or_else(|| Some(LanguageVersion::latest_stable())),
             skip_attribute_checks: move_options.skip_attribute_checks,
             check_test_code: move_options.check_test_code,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
@@ -899,8 +909,12 @@ impl IncludedArtifacts {
         let override_std = move_options.override_std.clone();
         let bytecode_version =
             fix_bytecode_version(move_options.bytecode_version, move_options.language_version);
-        let compiler_version = move_options.compiler_version;
-        let language_version = move_options.language_version;
+        let compiler_version = move_options
+            .compiler_version
+            .or_else(|| Some(CompilerVersion::latest_stable()));
+        let language_version = move_options
+            .language_version
+            .or_else(|| Some(LanguageVersion::latest_stable()));
         let skip_attribute_checks = move_options.skip_attribute_checks;
         let check_test_code = move_options.check_test_code;
         let optimize = move_options.optimize.clone();
@@ -909,8 +923,10 @@ impl IncludedArtifacts {
         experiments.append(&mut more_experiments);
 
         if matches!(
-            move_options.compiler_version,
-            Option::None | Some(CompilerVersion::V1)
+            move_options
+                .compiler_version
+                .or_else(|| Some(CompilerVersion::latest_stable())),
+            Some(CompilerVersion::V1)
         ) {
             if !matches!(optimize, Option::None | Some(OptimizationLevel::Default)) {
                 return Err(CliError::CommandArgumentError(

@@ -983,8 +983,10 @@ impl CompileScriptFunction {
             &self.framework_package_args,
             prompt_options,
             self.bytecode_version,
-            self.language_version,
-            self.compiler_version,
+            self.language_version
+                .or_else(|| Some(LanguageVersion::latest_stable())),
+            self.compiler_version
+                .or_else(|| Some(CompilerVersion::latest_stable())),
         )
     }
 }
