@@ -1525,7 +1525,9 @@ def test(
     # Perform cluster selection
     if not forge_cluster_name or balance_clusters:
         cluster_names = config.get("enabled_clusters")
+        print(f"Selecting from clusters: {cluster_names}")
         forge_cluster_name = seeded_random_choice(forge_namespace, cluster_names)
+        print(f"Selected cluster: {forge_cluster_name}")
 
     assert forge_cluster_name, "Forge cluster name is required"
 
