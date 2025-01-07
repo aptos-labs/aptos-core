@@ -55,7 +55,7 @@ spec aptos_framework::governed_gas_pool {
         aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
 
         /// Abort if the governed gas pool has insufficient funds
-        aborts_with coin::EINSUFFICIENT_BALANCE, error::invalid_argument(EINSUFFICIENT_BALANCE), 0x1, 0x5;
+        aborts_with coin::EINSUFFICIENT_BALANCE, error::invalid_argument(EINSUFFICIENT_BALANCE), 0x1, 0x5, 0x7;
     }
    
     spec deposit<CoinType>(coin: Coin<CoinType>) {
@@ -64,11 +64,11 @@ spec aptos_framework::governed_gas_pool {
         /// [high-level-req-3]
         /// Ensure the deposit increases the value in the CoinStore
 
+        //@TODO: Calling governed_gas_pool_adddress() doesn't work as the boogie gen cant check the signer 
+        // created for the resource account created at runtime
+
         /// Ensure the governed gas pool resource account exists
-        //@TODO: this is failing because initialize is not called and the resource account 
-        // does not exist
-        let governed_gas_pool_address = governed_gas_pool_address();
-        //aborts_if !exists<CoinStore<CoinType>>(governed_gas_pool_address);
+        //aborts_if !exists<CoinStore<CoinType>>(governed_gas_pool_address());
 
         //ensures global<CoinStore<CoinType>>(aptos_framework_address).coin.value ==
         //old(global<CoinStore<CoinType>>(aptos_framework_address).coin.value) + coin.value;
