@@ -214,7 +214,7 @@ impl UnitTestingConfig {
             diagnostics::report_warnings(&files, warnings);
             (test_plan, files, units)
         };
-        test_plan.map(|tests| TestPlan::new(tests, files, units))
+        test_plan.map(|tests| TestPlan::new(tests, files, units, vec![]))
     }
 
     /// Build a test plan from a unit test config

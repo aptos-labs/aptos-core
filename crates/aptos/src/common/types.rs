@@ -50,6 +50,7 @@ use aptos_vm_types::output::VMOutput;
 use async_trait::async_trait;
 use clap::{Parser, ValueEnum};
 use hex::FromHexError;
+use indoc::indoc;
 use move_core_types::{
     account_address::AccountAddress, language_storage::TypeTag, vm_status::VMStatus,
 };
@@ -78,6 +79,18 @@ const ACCEPTED_CLOCK_SKEW_US: u64 = 5 * US_IN_SECS;
 pub const DEFAULT_EXPIRATION_SECS: u64 = 30;
 pub const DEFAULT_PROFILE: &str = "default";
 pub const GIT_IGNORE: &str = ".gitignore";
+
+pub const APTOS_FOLDER_GIT_IGNORE: &str = indoc! {"
+    *
+    testnet/
+    config.yaml
+"};
+pub const MOVE_FOLDER_GIT_IGNORE: &str = indoc! {"
+  .aptos/
+  build/
+  .coverage_map.mvcov
+  .trace"
+};
 
 // Custom header value to identify the client
 const X_APTOS_CLIENT_VALUE: &str = concat!("aptos-cli/", env!("CARGO_PKG_VERSION"));
@@ -392,7 +405,7 @@ impl CliConfig {
             write_to_user_only_file(
                 aptos_folder.join(GIT_IGNORE).as_path(),
                 GIT_IGNORE,
-                "*\ntestnet/\nconfig.yaml".as_bytes(),
+                APTOS_FOLDER_GIT_IGNORE.as_bytes(),
             )?;
         }
 
