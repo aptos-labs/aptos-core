@@ -4,7 +4,7 @@
 use crate::{
     block_preparation::BlockPreparationStage,
     ledger_update_stage::{CommitProcessing, LedgerUpdateStage},
-    metrics::NUM_TXNS,
+    metrics::{NUM_TXNS, TIMER},
     OverallMeasuring, TransactionCommitter, TransactionExecutor,
 };
 use aptos_block_partitioner::v2::config::PartitionerV2Config;
@@ -12,6 +12,8 @@ use aptos_crypto::HashValue;
 use aptos_executor::block_executor::BlockExecutor;
 use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
 use aptos_logger::info;
+use aptos_metrics_core::TimerHelper;
+use aptos_storage_interface::DbWriter;
 use aptos_types::{
     block_executor::partitioner::ExecutableBlock,
     transaction::{Transaction, Version},
@@ -49,6 +51,7 @@ pub struct Pipeline<V> {
     join_handles: Vec<JoinHandle<u64>>,
     phantom: PhantomData<V>,
     start_pipeline_tx: Option<SyncSender<()>>,
+    db: Arc<dyn DbWriter>,
 }
 
 impl<V> Pipeline<V>
@@ -63,6 +66,7 @@ where
         num_blocks: Option<usize>,
     ) -> (Self, SyncSender<Vec<Transaction>>) {
         let parent_block_id = executor.committed_block_id();
+        let db = executor.db.writer.clone();
         let executor_1 = Arc::new(executor);
         let executor_2 = executor_1.clone();
         let executor_3 = executor_1.clone();
@@ -249,6 +253,7 @@ where
                 join_handles,
                 phantom: PhantomData,
                 start_pipeline_tx,
+                db,
             },
             raw_block_sender,
         )
@@ -266,6 +271,12 @@ where
                 counts.push(count);
             }
         }
+
+        {
+            let _timer = TIMER.timer_with(&["final_db_flush"]);
+            self.db.try_flush_buffers();
+        }
+
         counts.into_iter().min()
     }
 }

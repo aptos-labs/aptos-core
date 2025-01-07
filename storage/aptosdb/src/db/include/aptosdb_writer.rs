@@ -215,6 +215,10 @@ impl DbWriter for AptosDB {
             Ok(())
         })
     }
+
+    fn try_flush_buffers(&self) {
+        self.state_store.buffered_state().lock().sync_commit()
+    }
 }
 
 impl AptosDB {
