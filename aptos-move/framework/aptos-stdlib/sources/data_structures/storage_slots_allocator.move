@@ -132,7 +132,11 @@ module aptos_std::storage_slots_allocator {
                 reuse_spare_count: _,
             } => {
                 assert!(reuse_head_index == NULL_INDEX, EINTERNAL_INVARIANT_BROKEN);
-                slots.destroy_some().destroy_known_empty_unsafe();
+                if (slots.is_some()) {
+                    slots.destroy_some().destroy_known_empty_unsafe();
+                } else {
+                    slots.destroy_none();
+                }
             },
         };
     }
