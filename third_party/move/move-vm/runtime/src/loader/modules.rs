@@ -575,7 +575,6 @@ impl Module {
     ) -> PartialVMResult<StructType> {
         let struct_handle = module.struct_handle_at(struct_def.struct_handle);
         let abilities = struct_handle.abilities;
-        let name = module.identifier_at(struct_handle.name).to_owned();
         let ty_params = struct_handle.type_parameters.clone();
         let layout = match &struct_def.field_information {
             StructFieldInformation::Native => unreachable!("native structs have been removed"),
@@ -613,8 +612,6 @@ impl Module {
             abilities,
             ty_params,
             idx: struct_name_table[struct_def.struct_handle.0 as usize],
-            module: module.self_id(),
-            name,
         })
     }
 
