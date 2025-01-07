@@ -4,7 +4,10 @@
 use crate::{
     assert_abort, assert_success, assert_vm_status, build_package, tests::common, MoveHarness,
 };
-use aptos_framework::natives::code::{PackageRegistry, UpgradePolicy};
+use aptos_framework::{
+    natives::code::{PackageRegistry, UpgradePolicy},
+    BuildOptions,
+};
 use aptos_language_e2e_tests::executor::FakeExecutor;
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{
@@ -16,15 +19,13 @@ use aptos_types::{
 use claims::assert_ok;
 use move_core_types::{
     identifier::Identifier,
-    language_storage::ModuleId,
+    language_storage::{ModuleId, StructTag},
     parser::parse_struct_tag,
     vm_status::{AbortLocation, StatusCode},
 };
 use rstest::rstest;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use aptos_framework::BuildOptions;
-use move_core_types::language_storage::StructTag;
 
 // Note: this module uses parameterized tests via the
 // [`rstest` crate](https://crates.io/crates/rstest)
@@ -593,8 +594,8 @@ fn test_module_publishing_does_not_leak_speculative_information() {
 
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 enum Data {
-    V1 { x: u64, },
-    V2 { x: u64, y: u8, }
+    V1 { x: u64 },
+    V2 { x: u64, y: u8 },
 }
 
 #[test]
@@ -622,7 +623,12 @@ fn test_module_publishing_with_layout_changes() {
     "#,
     );
     let package_dir = package.write_to_temp().unwrap();
-    let txn_1 = h.create_publish_package(&account, package_dir.path(), Some(BuildOptions::move_2()), |_| {});
+    let txn_1 = h.create_publish_package(
+        &account,
+        package_dir.path(),
+        Some(BuildOptions::move_2()),
+        |_| {},
+    );
 
     let mut upgraded_package = PackageBuilder::new("Package");
     upgraded_package.add_source(
@@ -642,7 +648,12 @@ fn test_module_publishing_with_layout_changes() {
     "#,
     );
     let upgraded_package_dir = upgraded_package.write_to_temp().unwrap();
-    let txn_2 = h.create_publish_package(&account, upgraded_package_dir.path(), Some(BuildOptions::move_2()), |_| {});
+    let txn_2 = h.create_publish_package(
+        &account,
+        upgraded_package_dir.path(),
+        Some(BuildOptions::move_2()),
+        |_| {},
+    );
 
     let user_account = h.new_account_at(AccountAddress::random());
     let txn_3 = h.create_entry_function(
@@ -653,13 +664,17 @@ fn test_module_publishing_with_layout_changes() {
     );
 
     let outputs = h.run_block_get_output(vec![txn_1, txn_2, txn_3]);
-    assert!(outputs.into_iter().all(|output| output.status().status().unwrap().is_success()));
+    assert!(outputs
+        .into_iter()
+        .all(|output| output.status().status().unwrap().is_success()));
 
-    let data = h.read_resource::<Data>(user_account.address(), StructTag {
-        address: addr,
-        module: Identifier::new("m").unwrap(),
-        name: Identifier::new("Data").unwrap(),
-        type_args: vec![],
-    }).unwrap();
+    let data = h
+        .read_resource::<Data>(user_account.address(), StructTag {
+            address: addr,
+            module: Identifier::new("m").unwrap(),
+            name: Identifier::new("Data").unwrap(),
+            type_args: vec![],
+        })
+        .unwrap();
     assert_eq!(data, Data::V2 { x: 30, y: 10 })
 }
