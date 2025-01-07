@@ -2,7 +2,7 @@
 ///
 /// Has O(1) push/pop operations at both front and back, unlike a vector
 /// which has O(n) push/pop operations at the front.
-module 0x1::ring_deque {
+module ring_deque::ring_deque {
 
     use std::option::{Self, Option};
     use std::vector;
