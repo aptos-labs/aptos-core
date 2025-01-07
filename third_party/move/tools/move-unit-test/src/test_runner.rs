@@ -4,6 +4,7 @@
 
 use crate::{
     extensions, format_module_id,
+    json::Event,
     test_reporter::{
         FailureReason, MoveError, TestFailure, TestResults, TestRunInfo, TestStatistics,
         UnitTestFactory,
@@ -51,6 +52,7 @@ pub struct SharedTestingConfig {
     #[allow(dead_code)] // used by some features
     source_files: Vec<String>,
     record_writeset: bool,
+    format_json: bool,
 
     #[cfg(feature = "evm-backend")]
     evm: bool,
@@ -124,6 +126,7 @@ impl TestRunner {
         native_function_table: Option<NativeFunctionTable>,
         genesis_state: Option<ChangeSet>,
         record_writeset: bool,
+        format_json: bool,
         #[cfg(feature = "evm-backend")] evm: bool,
     ) -> Result<Self> {
         let source_files = tests
@@ -150,6 +153,7 @@ impl TestRunner {
                 native_function_table,
                 source_files,
                 record_writeset,
+                format_json,
                 #[cfg(feature = "evm-backend")]
                 evm,
             },
@@ -168,13 +172,17 @@ impl TestRunner {
             .build()
             .unwrap()
             .install(|| {
-                let final_statistics = self
-                    .tests
+                let test_plan = &self.tests;
+                let final_statistics = test_plan
                     .module_tests
                     .par_iter()
-                    .map(|(_, test_plan)| {
-                        self.testing_config
-                            .exec_module_tests(test_plan, writer, options)
+                    .map(|(_, module_test_plan)| {
+                        self.testing_config.exec_module_tests(
+                            test_plan,
+                            module_test_plan,
+                            writer,
+                            options,
+                        )
                     })
                     .reduce(TestStatistics::new, |acc, stats| acc.combine(stats));
 
@@ -202,43 +210,122 @@ impl TestRunner {
 }
 
 // TODO: do not expose this to backend implementations
-struct TestOutput<'a, 'b, W> {
-    test_plan: &'a ModuleTestPlan,
+struct TestOutput<'a, 'b, 'c, W> {
+    module_test_plan: &'a ModuleTestPlan,
     writer: &'b Mutex<W>,
+    test_plan: &'c TestPlan,
+    format_json: bool,
 }
 
-impl<'a, 'b, W: Write> TestOutput<'a, 'b, W> {
-    fn pass(&self, fn_name: &str) {
-        writeln!(
-            self.writer.lock().unwrap(),
-            "[ {}    ] {}::{}",
-            "PASS".bold().bright_green(),
-            format_module_id(&self.test_plan.module_id),
+impl<'a, 'b, 'c, W: Write> TestOutput<'a, 'b, 'c, W> {
+    fn module_started(&self) -> Instant {
+        if self.format_json {
+            let module_name = format_module_id(&self.module_test_plan.module_id);
+            let event = Event::module_started(module_name);
+            let mut writer = self.writer.lock().unwrap();
+            writeln!(writer, "{}", serde_json::to_string(&event).unwrap()).unwrap();
+        }
+        Instant::now()
+    }
+
+    fn module_finished(&self, start_time: Instant) {
+        if self.format_json {
+            let module_name = format_module_id(&self.module_test_plan.module_id);
+            let exec_time = Instant::now() - start_time;
+            let event = Event::module_finished(module_name, exec_time.as_secs_f64());
+            let mut writer = self.writer.lock().unwrap();
+            writeln!(writer, "{}", serde_json::to_string(&event).unwrap()).unwrap();
+        }
+    }
+
+    fn start(&self, fn_name: &str) -> Instant {
+        if self.format_json {
+            let mut writer = self.writer.lock().unwrap();
+            let fq_test_name = self.qualified_test_name(fn_name);
+            let event = Event::test_started(fq_test_name);
+            writeln!(writer, "{}", serde_json::to_string(&event).unwrap()).unwrap();
+        }
+        Instant::now()
+    }
+
+    fn pass(&self, fn_name: &str, start_time: Instant) {
+        let fq_test_name = self.qualified_test_name(fn_name);
+        let mut writer = self.writer.lock().unwrap();
+        if self.format_json {
+            let event = Event::test_passed(fq_test_name, self.execution_time(start_time));
+            writeln!(writer, "{}", serde_json::to_string(&event).unwrap()).unwrap();
+        } else {
+            writeln!(
+                writer,
+                "[ {}    ] {}",
+                "PASS".bold().bright_green(),
+                fq_test_name
+            )
+            .unwrap();
+        }
+    }
+
+    fn fail(&self, fn_name: &str, start_time: Instant, failure: TestFailure) {
+        let fq_test_name = self.qualified_test_name(fn_name);
+        let mut writer = self.writer.lock().unwrap();
+        if self.format_json {
+            let event = Event::test_failed(
+                fq_test_name,
+                self.execution_time(start_time),
+                self.render_failure(failure),
+            );
+            writeln!(writer, "{}", serde_json::to_string(&event).unwrap()).unwrap();
+        } else {
+            writeln!(
+                writer,
+                "[ {}    ] {}",
+                "FAIL".bold().bright_red(),
+                fq_test_name,
+            )
+            .unwrap();
+        }
+    }
+
+    fn timeout(&self, fn_name: &str, start_time: Instant, failure: TestFailure) {
+        let fq_test_name = self.qualified_test_name(fn_name);
+        let mut writer = self.writer.lock().unwrap();
+        if self.format_json {
+            let event = Event::test_timeout(
+                fq_test_name,
+                self.execution_time(start_time),
+                self.render_failure(failure),
+            );
+            writeln!(writer, "{}", serde_json::to_string(&event).unwrap()).unwrap();
+        } else {
+            writeln!(
+                writer,
+                "[ {} ] {}",
+                "TIMEOUT".bold().bright_yellow(),
+                fq_test_name,
+            )
+            .unwrap();
+        }
+    }
+
+    fn qualified_test_name(&self, fn_name: &str) -> String {
+        format!(
+            "{}::{}",
+            format_module_id(&self.module_test_plan.module_id),
             fn_name
         )
-        .unwrap()
     }
 
-    fn fail(&self, fn_name: &str) {
-        writeln!(
-            self.writer.lock().unwrap(),
-            "[ {}    ] {}::{}",
-            "FAIL".bold().bright_red(),
-            format_module_id(&self.test_plan.module_id),
-            fn_name,
-        )
-        .unwrap()
+    fn execution_time(&self, start_time: Instant) -> f64 {
+        let exec_time = Instant::now() - start_time;
+        exec_time.as_secs_f64()
     }
 
-    fn timeout(&self, fn_name: &str) {
-        writeln!(
-            self.writer.lock().unwrap(),
-            "[ {} ] {}::{}",
-            "TIMEOUT".bold().bright_yellow(),
-            format_module_id(&self.test_plan.module_id),
-            fn_name,
-        )
-        .unwrap();
+    fn render_failure(&self, failure: TestFailure) -> String {
+        let mut rendered_failure = Vec::new();
+        failure
+            .emit_failure(&mut rendered_failure, self.test_plan)
+            .unwrap();
+        String::from_utf8_lossy(&rendered_failure).to_string()
     }
 }
 
@@ -321,12 +408,16 @@ impl SharedTestingConfig {
         output: &TestOutput<impl Write>,
         factory: &Mutex<F>,
     ) -> TestStatistics {
-        let mut stats = TestStatistics::new();
+        let module_start_time = output.module_started();
 
+        let mut stats = TestStatistics::new();
         for (function_name, test_info) in &test_plan.tests {
+            let test_start_time = output.start(function_name);
+
             let (cs_result, ext_result, exec_result, test_run_info) =
                 self.execute_via_move_vm(test_plan, function_name, test_info, factory);
 
+            // note: it's always false in `aptos move test`, so we ignore it in the json output
             if self.record_writeset {
                 stats.test_output(
                     function_name.to_string(),
@@ -364,13 +455,13 @@ impl SharedTestingConfig {
                     assert!(err.major_status() != StatusCode::EXECUTED);
                     match test_info.expected_failure.as_ref() {
                         Some(ExpectedFailure::Expected) => {
-                            output.pass(function_name);
+                            output.pass(function_name, test_start_time);
                             stats.test_success(test_run_info, test_plan);
                         },
                         Some(ExpectedFailure::ExpectedWithError(expected_err))
                             if expected_err == &actual_err =>
                         {
-                            output.pass(function_name);
+                            output.pass(function_name, test_start_time);
                             stats.test_success(test_run_info, test_plan);
                         },
                         Some(ExpectedFailure::ExpectedWithCodeDEPRECATED(code))
@@ -378,85 +469,74 @@ impl SharedTestingConfig {
                                 && actual_err.1.is_some()
                                 && actual_err.1.unwrap() == *code =>
                         {
-                            output.pass(function_name);
+                            output.pass(function_name, test_start_time);
                             stats.test_success(test_run_info, test_plan);
                         },
                         // incorrect cases
                         Some(ExpectedFailure::ExpectedWithError(expected_err)) => {
-                            output.fail(function_name);
-                            stats.test_failure(
-                                TestFailure::new(
-                                    FailureReason::wrong_error(expected_err.clone(), actual_err),
-                                    test_run_info,
-                                    Some(err),
-                                    save_session_state(),
-                                ),
-                                test_plan,
-                            )
+                            let failure = TestFailure::new(
+                                FailureReason::wrong_error(expected_err.clone(), actual_err),
+                                test_run_info,
+                                Some(err),
+                                save_session_state(),
+                            );
+                            output.fail(function_name, test_start_time, failure.clone());
+                            stats.test_failure(failure, test_plan)
                         },
                         Some(ExpectedFailure::ExpectedWithCodeDEPRECATED(expected_code)) => {
-                            output.fail(function_name);
-                            stats.test_failure(
-                                TestFailure::new(
-                                    FailureReason::wrong_abort_deprecated(
-                                        *expected_code,
-                                        actual_err,
-                                    ),
-                                    test_run_info,
-                                    Some(err),
-                                    save_session_state(),
-                                ),
-                                test_plan,
-                            )
+                            let failure = TestFailure::new(
+                                FailureReason::wrong_abort_deprecated(*expected_code, actual_err),
+                                test_run_info,
+                                Some(err),
+                                save_session_state(),
+                            );
+                            output.fail(function_name, test_start_time, failure.clone());
+                            stats.test_failure(failure, test_plan)
                         },
                         None if err.major_status() == StatusCode::OUT_OF_GAS => {
                             // Ran out of ticks, report a test timeout and log a test failure
-                            output.timeout(function_name);
-                            stats.test_failure(
-                                TestFailure::new(
-                                    FailureReason::timeout(),
-                                    test_run_info,
-                                    Some(err),
-                                    save_session_state(),
-                                ),
-                                test_plan,
-                            )
+                            let failure = TestFailure::new(
+                                FailureReason::timeout(),
+                                test_run_info,
+                                Some(err),
+                                save_session_state(),
+                            );
+                            output.timeout(function_name, test_start_time, failure.clone());
+                            stats.test_failure(failure, test_plan)
                         },
                         None => {
-                            output.fail(function_name);
-                            stats.test_failure(
-                                TestFailure::new(
-                                    FailureReason::unexpected_error(actual_err),
-                                    test_run_info,
-                                    Some(err),
-                                    save_session_state(),
-                                ),
-                                test_plan,
-                            )
+                            let failure = TestFailure::new(
+                                FailureReason::unexpected_error(actual_err),
+                                test_run_info,
+                                Some(err),
+                                save_session_state(),
+                            );
+                            output.fail(function_name, test_start_time, failure.clone());
+                            stats.test_failure(failure, test_plan)
                         },
                     }
                 },
                 Ok(_) => {
                     // Expected the test to fail, but it executed
                     if test_info.expected_failure.is_some() {
-                        output.fail(function_name);
-                        stats.test_failure(
-                            TestFailure::new(
-                                FailureReason::no_error(),
-                                test_run_info,
-                                None,
-                                save_session_state(),
-                            ),
-                            test_plan,
-                        )
+                        let failure = TestFailure::new(
+                            FailureReason::no_error(),
+                            test_run_info,
+                            None,
+                            save_session_state(),
+                        );
+                        output.fail(function_name, test_start_time, failure.clone());
+                        stats.test_failure(failure, test_plan)
                     } else {
                         // Expected the test to execute fully and it did
-                        output.pass(function_name);
+                        output.pass(function_name, test_start_time);
                         stats.test_success(test_run_info, test_plan);
                     }
                 },
             }
         }
+
+        output.module_finished(module_start_time);
 
         stats
     }
@@ -680,17 +760,23 @@ impl SharedTestingConfig {
 
     fn exec_module_tests<F: UnitTestFactory>(
         &self,
-        test_plan: &ModuleTestPlan,
+        test_plan: &TestPlan,
+        module_test_plan: &ModuleTestPlan,
         writer: &Mutex<impl Write>,
         factory: &Mutex<F>,
     ) -> TestStatistics {
-        let output = TestOutput { test_plan, writer };
+        let output = TestOutput {
+            module_test_plan,
+            writer,
+            test_plan,
+            format_json: self.format_json,
+        };
 
         #[cfg(feature = "evm-backend")]
         if self.evm {
-            return self.exec_module_tests_evm(test_plan, &output);
+            return self.exec_module_tests_evm(module_test_plan, &output);
         }
 
-        self.exec_module_tests_move_vm_and_stackless_vm(test_plan, &output, factory)
+        self.exec_module_tests_move_vm_and_stackless_vm(module_test_plan, &output, factory)
     }
 }

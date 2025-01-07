@@ -39,6 +39,8 @@ once_cell = { workspace = true }
 primitive-types = { workspace = true, optional = true }
 rayon = { workspace = true }
 regex = { workspace = true }
+serde = { workspace = true, features = ["derive", "serde_derive"] }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 datatest-stable = { workspace = true }

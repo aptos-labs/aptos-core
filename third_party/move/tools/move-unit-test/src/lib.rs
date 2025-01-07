@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod extensions;
+pub mod json;
 pub mod test_reporter;
 pub mod test_runner;
 
@@ -78,6 +79,9 @@ pub struct UnitTestingConfig {
     )]
     pub report_stacktrace_on_abort: bool,
 
+    #[clap(long = "format_json", hide = true)]
+    pub format_json: bool,
+
     /// Ignore compiler's warning, and continue run tests
     #[clap(name = "ignore_compile_warnings", long = "ignore_compile_warnings")]
     pub ignore_compile_warnings: bool,
@@ -130,6 +134,7 @@ impl Default for UnitTestingConfig {
             report_statistics: false,
             report_storage_on_error: false,
             report_stacktrace_on_abort: false,
+            format_json: false,
             ignore_compile_warnings: false,
             source_files: vec![],
             dep_files: vec![],
@@ -267,6 +272,7 @@ impl UnitTestingConfig {
             native_function_table,
             genesis_state,
             self.verbose,
+            self.format_json,
             #[cfg(feature = "evm-backend")]
             self.evm,
         )
@@ -285,6 +291,10 @@ impl UnitTestingConfig {
             test_results.report_goldens(&shared_writer)?;
         }
 
+        // if the `--format-json` is passed, failures are rendered as a field in JSON events
+        if !self.format_json {
+            test_results.report_failures(&shared_writer)?;
+        }
         let ok = test_results.summarize(&shared_writer)?;
 
         let writer = shared_writer.into_inner().unwrap();

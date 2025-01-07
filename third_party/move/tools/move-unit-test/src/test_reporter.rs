@@ -25,6 +25,7 @@ use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     io::{Result, Write},
+    ops::DerefMut,
     sync::Mutex,
     time::Duration,
 };
@@ -617,6 +618,24 @@ impl TestResults {
         writeln!(writer.lock().unwrap())
     }
 
+    pub fn report_failures<W: Write>(&self, writer: &Mutex<W>) -> Result<()> {
+        if !self.final_statistics.failed.is_empty() {
+            let mut writer = writer.lock().unwrap();
+            writeln!(writer.deref_mut(), "\nTest failures:\n")?;
+            for (module_id, test_failures) in &self.final_statistics.failed {
+                writeln!(
+                    writer.deref_mut(),
+                    "Failures in {}:",
+                    format_module_id(module_id)
+                )?;
+                for test_failure in test_failures {
+                    test_failure.emit_failure(writer.deref_mut(), &self.test_plan)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Returns `true` if all tests passed, `false` if there was a test failure/timeout
     pub fn summarize<W: Write>(self, writer: &Mutex<W>) -> Result<bool> {
         let num_failed_tests = self
@@ -629,32 +648,6 @@ impl TestResults {
             .passed
             .iter()
             .fold(0, |acc, (_, fns)| acc + fns.len()) as u64;
-        if !self.final_statistics.failed.is_empty() {
-            writeln!(writer.lock().unwrap(), "\nTest failures:\n")?;
-            for (module_id, test_failures) in &self.final_statistics.failed {
-                writeln!(
-                    writer.lock().unwrap(),
-                    "Failures in {}:",
-                    format_module_id(module_id)
-                )?;
-                for test_failure in test_failures {
-                    writeln!(
-                        writer.lock().unwrap(),
-                        "\n┌── {} ──────",
-                        test_failure.test_run_info.function_ident.bold()
-                    )?;
-                    writeln!(
-                        writer.lock().unwrap(),
-                        "│ {}",
-                        test_failure
-                            .render_error(&self.test_plan)
-                            .replace('\n', "\n│ ")
-                    )?;
-                    writeln!(writer.lock().unwrap(), "└──────────────────\n")?;
-                }
-            }
-        }
-
         writeln!(
             writer.lock().unwrap(),
             "Test result: {}. Total tests: {}; passed: {}; failed: {}",
@@ -668,5 +661,22 @@ impl TestResults {
             num_failed_tests
         )?;
         Ok(num_failed_tests == 0)
+    }
+}
+
+impl TestFailure {
+    pub(crate) fn emit_failure(&self, writer: &mut impl Write, test_plan: &TestPlan) -> Result<()> {
+        writeln!(
+            writer,
+            "\n┌── {} ──────",
+            self.test_run_info.function_ident.bold()
+        )?;
+        writeln!(
+            writer,
+            "│ {}",
+            self.render_error(test_plan).replace('\n', "\n│ ")
+        )?;
+        writeln!(writer, "└──────────────────\n")?;
+        Ok(())
     }
 }

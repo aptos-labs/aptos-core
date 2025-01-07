@@ -11896,6 +11896,8 @@ dependencies = [
  "primitive-types 0.10.1",
  "rayon",
  "regex",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
