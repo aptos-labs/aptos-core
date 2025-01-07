@@ -7706,7 +7706,6 @@ dependencies = [
  "claims",
  "hex",
  "move-binary-format",
- "move-command-line-common",
  "move-core-types",
  "move-model",
  "move-package",

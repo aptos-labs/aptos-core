@@ -14,14 +14,4 @@ fn runner(path: &Path) -> anyhow::Result<(), Box<dyn std::error::Error>> {
         language_version: LanguageVersion::latest_stable(),
         v2_experiments: vec![("attach-compiled-module".to_owned(), true)],
     })
-    // if path.to_str().unwrap().contains("v2-tests/") {
-    //     // TODO: we may later want to change this to comparison testing. For now we are mostly
-    //     //    interested in debugging v2 bytecode.
-    //     run_aptos_test_with_config(path, TestRunConfig::CompilerV2 {
-    //         language_version: LanguageVersion::latest_stable(),
-    //         v2_experiments: vec![("attach-compiled-module".to_owned(), true)],
-    //     })
-    // } else {
-    //     run_aptos_test_with_config(path, TestRunConfig::CompilerV1)
-    // }
 }

@@ -179,7 +179,10 @@ pub trait MoveTestAdapter<'a>: Sized {
     fn default_syntax(&self) -> SyntaxChoice;
     fn known_attributes(&self) -> &BTreeSet<String>;
     fn run_config(&self) -> TestRunConfig {
-        TestRunConfig::CompilerV1
+        TestRunConfig::CompilerV2 {
+            language_version: LanguageVersion::default(),
+            v2_experiments: vec![],
+        }
     }
     fn init(
         default_syntax: SyntaxChoice,

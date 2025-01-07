@@ -11,7 +11,7 @@ pub mod stake;
 use anyhow::bail;
 use aptos_framework::{BuildOptions, BuiltPackage, UPGRADE_POLICY_CUSTOM_FIELD};
 pub use harness::*;
-use move_command_line_common::env::get_move_compiler_v2_from_env;
+#[cfg(test)]
 use move_model::metadata::CompilerVersion;
 use move_package::{package_hooks::PackageHooks, source_package::parsed_manifest::CustomDepInfo};
 use move_symbol_pool::Symbol;
@@ -45,12 +45,6 @@ pub(crate) fn build_package(
     package_path: PathBuf,
     options: BuildOptions,
 ) -> anyhow::Result<BuiltPackage> {
-    let mut options = options;
-    if get_move_compiler_v2_from_env() {
-        options.compiler_version = Some(CompilerVersion::latest_stable());
-        options.language_version =
-            Some(CompilerVersion::latest_stable().infer_stable_language_version());
-    }
     BuiltPackage::build(package_path.to_owned(), options)
 }
 
