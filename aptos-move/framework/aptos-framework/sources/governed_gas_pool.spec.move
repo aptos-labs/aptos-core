@@ -39,7 +39,6 @@ spec aptos_framework::governed_gas_pool {
         /// [high-level-req-1]
         /// The GovernedGasPool resource must exist at aptos_framework after initialization.
         invariant exists<GovernedGasPool>(@aptos_framework);
-        initialize, initialize_internal,
     }
 
     spec initialize(aptos_framework: &signer, delegation_pool_creation_seed: vector<u8>) {
@@ -66,6 +65,8 @@ spec aptos_framework::governed_gas_pool {
         /// Ensure the deposit increases the value in the CoinStore
 
         /// Ensure the governed gas pool resource account exists
+        //@TODO: this is failing because initialize is not called and the resource account 
+        // does not exist
         let governed_gas_pool_address = governed_gas_pool_address();
         //aborts_if !exists<CoinStore<CoinType>>(governed_gas_pool_address);
 
