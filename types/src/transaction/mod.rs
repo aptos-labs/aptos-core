@@ -2065,6 +2065,13 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
 
     /// Size of the user transaction in bytes, 0 otherwise
     fn user_txn_bytes_len(&self) -> usize;
+
+    /// Returns true if self is SignatureVerifiedTransaction kind, internally matching either
+    /// BlockMetadata, BlockMetadataExt, or GenesisTransaction. Such transactions have read-write
+    /// conflicts with other transactions in the block, and benefit from synchronization barrier.
+    /// TODO: get rid of this interface (used by block executor) when signaling the barrier
+    /// can happen directly from aptos-vm.
+    fn is_block_metadata_txn(&self) -> bool;
 }
 
 pub struct ViewFunctionOutput {

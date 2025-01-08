@@ -110,6 +110,10 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
 
         for txn in txns.iter() {
             match txn {
+                MockTransaction::BlockMetadata => {
+                    read_values.push(Ok(vec![]));
+                    resolved_deltas.push(Ok(HashMap::new()));
+                },
                 MockTransaction::Abort => {
                     status = BaselineStatus::Aborted;
                     break;

@@ -392,6 +392,7 @@ impl<K, E> MockIncarnation<K, E> {
 /// value determines the index for choosing the read & write sets of the particular execution.
 #[derive(Clone, Debug)]
 pub(crate) enum MockTransaction<K, E> {
+    BlockMetadata,
     Write {
         /// Incarnation counter, increased during each mock (re-)execution. Allows tracking the final
         /// incarnation for each mock transaction, whose behavior should be reproduced for baseline.
@@ -424,6 +425,9 @@ impl<K, E> MockTransaction<K, E> {
 
     pub(crate) fn into_behaviors(self) -> Vec<MockIncarnation<K, E>> {
         match self {
+            Self::BlockMetadata => {
+                unreachable!("BlockMetadata does not contain incarnation behaviors")
+            },
             Self::Write {
                 incarnation_behaviors,
                 ..
@@ -446,6 +450,10 @@ impl<
 
     fn user_txn_bytes_len(&self) -> usize {
         0
+    }
+
+    fn is_block_metadata_txn(&self) -> bool {
+        matches!(self, MockTransaction::BlockMetadata)
     }
 }
 
@@ -854,6 +862,11 @@ where
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
         match txn {
+            MockTransaction::BlockMetadata => {
+                let mut mock_output = MockOutput::skip_output();
+                mock_output.total_gas = 0;
+                ExecutionStatus::Success(mock_output)
+            },
             MockTransaction::Write {
                 incarnation_counter,
                 incarnation_behaviors,
