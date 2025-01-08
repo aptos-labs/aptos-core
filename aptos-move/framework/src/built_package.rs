@@ -25,10 +25,7 @@ use move_compiler::{
 use move_compiler_v2::{external_checks::ExternalChecks, options::Options, Experiment};
 use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_model::{
-    metadata::{
-        CompilerVersion, LanguageVersion, LATEST_STABLE_COMPILER_VERSION,
-        LATEST_STABLE_LANGUAGE_VERSION,
-    },
+    metadata::{CompilerVersion, LanguageVersion},
     model::GlobalEnv,
 };
 use move_package::{
@@ -91,13 +88,11 @@ pub struct BuildOptions {
     pub docgen_options: Option<DocgenOptions>,
     #[clap(long)]
     pub skip_fetch_latest_git_deps: bool,
-    #[clap(long, default_value_if("move_2", "true", "7"))]
+    #[clap(long)]
     pub bytecode_version: Option<u32>,
-    #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
-           default_value_if("move_2", "true", LATEST_STABLE_COMPILER_VERSION))]
+    #[clap(long, value_parser = clap::value_parser!(CompilerVersion))]
     pub compiler_version: Option<CompilerVersion>,
-    #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
-           default_value_if("move_2", "true", LATEST_STABLE_LANGUAGE_VERSION))]
+    #[clap(long, value_parser = clap::value_parser!(LanguageVersion))]
     pub language_version: Option<LanguageVersion>,
     #[clap(long)]
     pub skip_attribute_checks: bool,
@@ -107,9 +102,6 @@ pub struct BuildOptions {
     pub known_attributes: BTreeSet<String>,
     #[clap(skip)]
     pub experiments: Vec<String>,
-    /// Select bytecode, language, compiler for Move 2
-    #[clap(long)]
-    pub move_2: bool,
 }
 
 // Because named_addresses has no parser, we can't use clap's default impl. This must be aligned
@@ -130,21 +122,25 @@ impl Default for BuildOptions {
             // This is false by default, because it could accidentally pull new dependencies
             // while in a test (and cause some havoc)
             skip_fetch_latest_git_deps: false,
-            bytecode_version: Some(VERSION_7),
-            compiler_version: Some(CompilerVersion::latest_stable()),
-            language_version: Some(LanguageVersion::latest_stable()),
+            bytecode_version: None,
+            compiler_version: None,
+            language_version: None,
             skip_attribute_checks: false,
             check_test_code: false,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             experiments: vec![],
-            move_2: true,
         }
     }
 }
 
 impl BuildOptions {
     pub fn move_2() -> Self {
-        Self::default()
+        BuildOptions {
+            bytecode_version: Some(VERSION_7),
+            language_version: Some(LanguageVersion::latest_stable()),
+            compiler_version: Some(CompilerVersion::latest_stable()),
+            ..Self::default()
+        }
     }
 
     pub fn inferred_bytecode_version(&self) -> u32 {
