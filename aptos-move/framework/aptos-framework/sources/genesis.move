@@ -160,7 +160,7 @@ module aptos_framework::genesis {
     }
 
     fun initialize_governed_gas_pool(
-        aptos_framework: &signer
+        aptos_framework: &signer,
         delegation_pool_creation_seed: vector<u8>,
     ) {
         governed_gas_pool::initialize(aptos_framework, delegation_pool_creation_seed);
