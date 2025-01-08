@@ -641,6 +641,8 @@ impl AccountAuthenticator {
             Self::NoAccountAuthenticator => bail!("No signature to verify."),
             // Abstraction delayed the authentication after prologue.
             Self::Abstraction { auth_data, .. } => {
+                println!("{:?}", signing_message(message));
+                println!("{:?}", &HashValue::sha3_256_of(signing_message(message)?.as_slice()).to_vec());
                 ensure!(auth_data.signing_message_digest() == &HashValue::sha3_256_of(signing_message(message)?.as_slice()).to_vec(), "The signing message digest provided in Abstraction Authenticator is not expected");
                 Ok(())
             },
