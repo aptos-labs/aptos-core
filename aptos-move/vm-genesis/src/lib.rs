@@ -483,7 +483,7 @@ fn initialize_governed_gas_pool(session: &mut SessionExt) {
         vec![],
         serialize_values(&vec![
             MoveValue::Signer(CORE_CODE_ADDRESS),
-            MoveValue::Vector(MoveValue::U8(22)),
+            MoveValue::Vector(vec![MoveValue::U8(22)]),
         ]),
     );
 }
