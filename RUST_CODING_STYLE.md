@@ -53,7 +53,7 @@ The Aptos codebase uses inclusive terminology (similar to other projects such as
 
 ### Constants and fields
 
-Describe the purpose and definition of this data. If the unit is a measurement of time, include it, e.g., `TIMEOUT_MS` for timeout in milliseconds.
+Describe the purpose and definition of this data. If the unit is a measurement of time, include it, e.g., `TIMEOUT_MS` for a timeout in milliseconds.
 
 ### Functions and methods
 
@@ -62,13 +62,13 @@ Document the following for each function:
 - The action the method performs - “This method _adds_ a new transaction to the mempool.” Use _active voice_ and _present tense_ (i.e. adds/creates/checks/updates/deletes).
 - Describe how and why to use this method.
 - Any condition that must be met _before_ calling the method.
-- State conditions under which the function will `panic!()` or returns an `Error`
+- State conditions under which the function will `panic!()` or return an `Error`
 - Brief description of return values.
 - Any special behavior that is not obvious
 
 ### README.md for top-level directories and other major components
 
-Each major component of Aptos Core needs to have a `README.md` file. Major components are:
+Each major component of Aptos Core needs to have a `README.md` file. The major components are:
 
 - top-level directories (e.g. `aptos-core/network`, `aptos-core/language`)
 - the most important crates in the system (e.g. `vm-runtime`)
@@ -118,7 +118,7 @@ Refer to the Aptos Project contributing guide [LINK].
 Refer to the Aptos Project License [LINK].
 ```
 
-A good example of README.md is `aptos-core/network/README.md` that describes the networking crate.
+A good example of README.md is `aptos-core/network/README.md` which describes the networking crate.
 
 ## Binary, Argument, and Crate Naming
 
@@ -158,7 +158,7 @@ We recommend that you use `//` and `///` comments rather than block comments `/*
 
 ### Concurrent types
 
-Concurrent types such as [`CHashMap`](https://docs.rs/crate/chashmap), [`AtomicUsize`](https://doc.rust-lang.org/std/sync/atomic/struct.AtomicUsize.html), etc. have an immutable borrow on self i.e. `fn foo_mut(&self,...)` in order to support concurrent access on interior mutating methods. Good practices (such as those in the examples mentioned) avoid exposing synchronization primitives externally (e.g. `Mutex`, `RwLock`) and document the method semantics and invariants clearly.
+Concurrent types such as [`CHashMap`](https://docs.rs/crate/chashmap), [`AtomicUsize`](https://doc.rust-lang.org/std/sync/atomic/struct.AtomicUsize.html), etc. have an immutable borrow on self i.e. `fn foo_mut(&self,...)` in order to support concurrent access on interior mutating methods. Good practices (such as those in the examples mentioned) avoid exposing synchronization primitives externally (e.g. `Mutex`, `RwLock`) and document the method semantics and invariants.
 
 _When to use channels vs concurrent types?_
 
@@ -184,7 +184,7 @@ _Panic_
 - `assert!()` - This macro is kept in both debug/release and should be used to protect invariants of the system as necessary.
 - `unreachable!()` - This macro will panic on code that should not be reached (violating an invariant) and can be used where appropriate.
 
-In production (non-test) code, outside of lock management, all unrecoverable errors should be cleanly documented describing why said event is unrecoverable. For example, if the system is now in a bad state, state what that state is and the motivation for why a crash / restart is more effective than resolving it within a running system, and what if any steps an operator would need to take to resolve the issue.
+In production (non-test) code, outside of lock management, all unrecoverable errors should be cleanly documented describing why said event is unrecoverable. For example, if the system is now in a bad state, state what that state is the motivation for why a crash/restart is more effective than resolving it within a running system, and what if any steps an operator would need to take to resolve the issue.
 
 ### Generics
 
