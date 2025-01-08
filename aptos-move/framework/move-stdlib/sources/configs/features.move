@@ -488,8 +488,9 @@ module std::features {
 
     public fun get_coin_to_fungible_asset_migration_feature(): u64 { COIN_TO_FUNGIBLE_ASSET_MIGRATION }
 
-    public fun coin_to_fungible_asset_migration_feature_enabled(): bool acquires Features {
-        is_enabled(COIN_TO_FUNGIBLE_ASSET_MIGRATION) 
+    public fun coin_to_fungible_asset_migration_feature_enabled(): bool {
+        false
+        //is_enabled(COIN_TO_FUNGIBLE_ASSET_MIGRATION) 
     }
 
     const PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS: u64 = 61;
