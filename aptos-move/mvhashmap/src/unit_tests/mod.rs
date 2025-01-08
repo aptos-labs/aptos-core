@@ -17,7 +17,6 @@ use aptos_aggregator::{
     delta_math::DeltaHistory,
 };
 use aptos_types::{
-    executable::ExecutableTestType,
     on_chain_config::CurrentTimeMicroseconds,
     state_store::state_value::{StateValue, StateValueMetadata},
     write_set::WriteOpKind,
@@ -100,8 +99,7 @@ impl TransactionWrite for TestMetadataValue {
 fn write_metadata() {
     let ap = KeyType(b"/foo/b".to_vec());
 
-    let mvtbl: MVHashMap<KeyType<Vec<u8>>, usize, TestMetadataValue, ExecutableTestType, ()> =
-        MVHashMap::new();
+    let mvtbl: MVHashMap<KeyType<Vec<u8>>, usize, TestMetadataValue, ()> = MVHashMap::new();
 
     let metadata_5 = TestMetadataValue { metadata: 5 };
     let metadata_6 = TestMetadataValue { metadata: 6 };
@@ -130,8 +128,7 @@ fn create_write_read_placeholder_struct() {
     let ap2 = KeyType(b"/foo/c".to_vec());
     let ap3 = KeyType(b"/foo/d".to_vec());
 
-    let mvtbl: MVHashMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()> =
-        MVHashMap::new();
+    let mvtbl: MVHashMap<KeyType<Vec<u8>>, usize, TestValue, ()> = MVHashMap::new();
 
     // Reads that should go the DB return Err(Uninitialized)
     let r_db = mvtbl.data().fetch_data(&ap1, 5);
