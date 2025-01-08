@@ -28,13 +28,7 @@ spec aptos_framework::governed_gas_pool {
     /// Implementation: The fund function verifies the signer is the aptos_framework address.
     /// Enforcement: Formally verified via [high-level-req-4](fund).
     ///
-    /// No.: 5
-    /// Requirement: Gas fees must be deposited into the GovernedGasPool whenever specified by the configuration.
-    /// Criticality: High
-    /// Implementation: The deposit_gas_fee function ensures gas fees are deposited correctly.
-    /// Enforcement: Formally verified via [high-level-req-5](deposit_gas_fee).
-    /// </high-level-req>
-
+    
     spec module {
         /// [high-level-req-1]
         /// The GovernedGasPool resource must exist at aptos_framework after initialization.
