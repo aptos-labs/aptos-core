@@ -922,12 +922,7 @@ impl IncludedArtifacts {
         experiments.append(&mut move_options.experiments.clone());
         experiments.append(&mut more_experiments);
 
-        if matches!(
-            move_options
-                .compiler_version
-                .or_else(|| Some(CompilerVersion::latest_stable())),
-            Some(CompilerVersion::V1)
-        ) {
+        if matches!(compiler_version, Some(CompilerVersion::V1)) {
             if !matches!(optimize, Option::None | Some(OptimizationLevel::Default)) {
                 return Err(CliError::CommandArgumentError(
                     "`--optimization-level`/`--optimize` flag is not compatible with Move Compiler V1"
