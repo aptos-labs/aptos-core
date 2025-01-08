@@ -474,6 +474,19 @@ fn initialize_aptos_coin(session: &mut SessionExt) {
     );
 }
 
+fn initialize_governed_gas_pool(session: &mut SessionExt) {
+    exec_function(
+        session,
+        GENESIS_MODULE_NAME,
+        "initialize_governed_gas_pool",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            MoveValue::Vector(22),
+        ]),
+    );
+}
+
 fn initialize_config_buffer(session: &mut SessionExt) {
     exec_function(
         session,
@@ -1330,12 +1343,11 @@ mod tests {
         assert!(!validator_set_addresses.contains(&same_owner_validator_3_pool_address));
     }
 
-
     #[test]
     fn test_zero_rewards_apy_percentage() {
         let test_validators = TestValidator::new_test_set(Some(1), Some(100_000_000));
         let validators: Vec<Validator> = test_validators.into_iter().map(|t| t.data).collect();
-    
+
         let _genesis = encode_genesis_change_set(
             &GENESIS_KEYPAIR.1,
             &validators,
@@ -1368,10 +1380,10 @@ mod tests {
 
     #[test]
     fn test_pathological_epoch_duration() {
-		let epoch_duration_secs: u64 = 60 * 60 * 24 * 1024 * 128;
+        let epoch_duration_secs: u64 = 60 * 60 * 24 * 1024 * 128;
         let test_validators = TestValidator::new_test_set(Some(1), Some(100_000_000));
         let validators: Vec<Validator> = test_validators.into_iter().map(|t| t.data).collect();
-    
+
         let _genesis = encode_genesis_change_set(
             &GENESIS_KEYPAIR.1,
             &validators,
