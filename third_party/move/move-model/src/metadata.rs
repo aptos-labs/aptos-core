@@ -3,8 +3,9 @@
 
 use anyhow::bail;
 use move_binary_format::file_format_common::{VERSION_DEFAULT, VERSION_DEFAULT_LANG_V2};
-use move_command_line_common::env;
+use move_command_line_common::{env, env::get_move_compiler_v1_from_env};
 use move_compiler::shared::LanguageVersion as CompilerLanguageVersion;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt,
@@ -89,7 +90,12 @@ pub enum CompilerVersion {
 impl Default for CompilerVersion {
     /// We allow the default to be set via an environment variable.
     fn default() -> Self {
-        Self::latest_stable()
+        static MOVE_COMPILER_V1: Lazy<bool> = Lazy::new(get_move_compiler_v1_from_env);
+        if *MOVE_COMPILER_V1 {
+            Self::V1
+        } else {
+            Self::latest_stable()
+        }
     }
 }
 
@@ -215,7 +221,12 @@ impl LanguageVersion {
 
 impl Default for LanguageVersion {
     fn default() -> Self {
-        Self::latest_stable()
+        static MOVE_COMPILER_V1: Lazy<bool> = Lazy::new(get_move_compiler_v1_from_env);
+        if *MOVE_COMPILER_V1 {
+            Self::V1
+        } else {
+            Self::latest_stable()
+        }
     }
 }
 
