@@ -16,7 +16,6 @@ pub mod stake;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test;
 pub mod update;
-pub mod workspace;
 
 use crate::common::{
     types::{CliCommand, CliResult, CliTypedResult},
@@ -52,8 +51,6 @@ pub enum Tool {
     Stake(stake::StakeTool),
     #[clap(subcommand)]
     Update(update::UpdateTool),
-    #[clap(subcommand, hide(true))]
-    Workspace(workspace::WorkspaceTool),
 }
 
 impl Tool {
@@ -73,7 +70,6 @@ impl Tool {
             Node(tool) => tool.execute().await,
             Stake(tool) => tool.execute().await,
             Update(tool) => tool.execute().await,
-            Workspace(tool) => tool.execute().await,
         }
     }
 }
