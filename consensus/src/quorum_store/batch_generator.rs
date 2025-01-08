@@ -452,8 +452,8 @@ impl BatchGenerator {
                         tick_start.duration_since(last_non_empty_pull).as_millis(),
                         self.config.batch_generation_max_interval_ms as u128
                     ) as usize;
-                    if (!self.back_pressure.proof_count
-                        && since_last_non_empty_pull_ms >= self.config.batch_generation_min_non_empty_interval_ms)
+                    // TODO: completely ignoring proof count for now
+                    if (since_last_non_empty_pull_ms >= self.config.batch_generation_min_non_empty_interval_ms)
                         || since_last_non_empty_pull_ms == self.config.batch_generation_max_interval_ms {
 
                         let dynamic_pull_max_txn = std::cmp::max(
