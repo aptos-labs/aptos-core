@@ -201,7 +201,11 @@ export interface Block {
     | Transaction[]
     | undefined;
   /** Chain ID informs us which chain we're trying to index, this is important to ensure that we're not mixing chains within a single pipeline. */
-  chainId?: number | undefined;
+  chainId?:
+    | number
+    | undefined;
+  /** This is for testing. */
+  testing?: number | undefined;
 }
 
 /**
@@ -1189,7 +1193,7 @@ export interface WriteOpSizeInfo {
 }
 
 function createBaseBlock(): Block {
-  return { timestamp: undefined, height: BigInt("0"), transactions: [], chainId: 0 };
+  return { timestamp: undefined, height: BigInt("0"), transactions: [], chainId: 0, testing: 0 };
 }
 
 export const Block = {
@@ -1210,6 +1214,9 @@ export const Block = {
     }
     if (message.chainId !== undefined && message.chainId !== 0) {
       writer.uint32(32).uint32(message.chainId);
+    }
+    if (message.testing !== undefined && message.testing !== 0) {
+      writer.uint32(40).uint32(message.testing);
     }
     return writer;
   },
@@ -1248,6 +1255,13 @@ export const Block = {
           }
 
           message.chainId = reader.uint32();
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.testing = reader.uint32();
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -1298,6 +1312,7 @@ export const Block = {
         ? object.transactions.map((e: any) => Transaction.fromJSON(e))
         : [],
       chainId: isSet(object.chainId) ? globalThis.Number(object.chainId) : 0,
+      testing: isSet(object.testing) ? globalThis.Number(object.testing) : 0,
     };
   },
 
@@ -1315,6 +1330,9 @@ export const Block = {
     if (message.chainId !== undefined && message.chainId !== 0) {
       obj.chainId = Math.round(message.chainId);
     }
+    if (message.testing !== undefined && message.testing !== 0) {
+      obj.testing = Math.round(message.testing);
+    }
     return obj;
   },
 
@@ -1329,6 +1347,7 @@ export const Block = {
     message.height = object.height ?? BigInt("0");
     message.transactions = object.transactions?.map((e) => Transaction.fromPartial(e)) || [];
     message.chainId = object.chainId ?? 0;
+    message.testing = object.testing ?? 0;
     return message;
   },
 };

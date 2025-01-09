@@ -41,17 +41,28 @@ jobs:
         run: git diff --exit-code
   update-sdk:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
     if: | # Only run on each PR once an appropriate event occurs
       (
         github.event_name == 'push' ||
         contains(github.event.pull_request.labels.*.name, 'indexer-sdk-update')
       )
     steps:
+      - name: Google Cloud Auth
+        id: auth
+        uses: "google-github-actions/auth@v2"
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+      - name: Get Secret Manager Secrets
+        id: secrets
+        uses: 'google-github-actions/get-secretmanager-secrets@v2'
+        with:
+          secrets: |-
+            token:aptos-ci/github-actions-repository-dispatch
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          token: ${{ steps.secrets.outputs.token }}
 
       # Install buf, which we use to generate code from the protos for Rust and TS.
       - name: Install buf
@@ -71,19 +82,6 @@ jobs:
           echo "::set-output name=commit_hash::$(echo $GITHUB_SHA)"
           # Echo the PR branch name to the output
           echo "::set-output name=branch_name::${{ github.head_ref }}"
-      
-      - name: Google Cloud Auth
-        id: auth
-        uses: "google-github-actions/auth@v2"
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-      - name: Get Secret Manager Secrets
-        id: secrets
-        uses: 'google-github-actions/get-secretmanager-secrets@v2'
-        with:
-          secrets: |-
-            token:aptos-ci/github-actions-repository-dispatch
 
       - name: Dispatch Event to SDK Repo
         uses: peter-evans/repository-dispatch@v3.0.0
