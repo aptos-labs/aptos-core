@@ -1,19 +1,12 @@
 ---
 remote_endpoint: https://fullnode.mainnet.aptoslabs.com
-name: "TBD"
+name: "keyless_circuit_update_202501"
 proposals:
-  - name: proposal_1_upgrade_framework
+  - name: keyless_circuit_update_202501
     metadata:
-      title: "Multi-step proposal to upgrade mainnet framework, version TBD"
-      description: "This includes changes in (TBA: URL to changes)"
+      title: "keyless_circuit_update_202501"
+      description: "keyless_circuit_update_202501"
     execution_mode: MultiStep
     update_sequence:
-      - Gas:
-          new: current
-      - Framework:
-          bytecode_version: 6
-          git_hash: ~
-      - FeatureFlag:
-          enabled:
-            - allow_serialized_script_args
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/vk_rotation_proposal_id.move
 
