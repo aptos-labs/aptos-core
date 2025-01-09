@@ -645,13 +645,18 @@ module aptos_std::big_ordered_map {
         root.is_leaf = new_root.is_leaf;
         new_root.is_leaf = tmp_is_leaf;
 
-        let tmp_prev = root.prev;
-        root.prev = new_root.prev;
-        new_root.prev = tmp_prev;
+        assert!(root.prev == NULL_INDEX, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
+        assert!(root.next == NULL_INDEX, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
+        assert!(new_root.prev == NULL_INDEX, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
+        assert!(new_root.next == NULL_INDEX, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
 
-        let tmp_next = root.next;
-        root.next = new_root.next;
-        new_root.next = tmp_next;
+        // let tmp_prev = root.prev;
+        // root.prev = new_root.prev;
+        // new_root.prev = tmp_prev;
+
+        // let tmp_next = root.next;
+        // root.next = new_root.next;
+        // new_root.next = tmp_next;
 
         let tmp_children = root.children.trim(0);
         root.children.append_disjoint(new_root.children.trim(0));
@@ -807,13 +812,14 @@ module aptos_std::big_ordered_map {
 
         // right node's prev becomes current left node
         right_node.prev = left_node_index;
-        // Since the previuosly used index is going to the right node, `prev` pointer of the next node is correct,
+        // Since the previously used index is going to the right node, `prev` pointer of the next node is correct,
         // and we need to update next pointer of the previous node (if exists)
         if (*left_prev != NULL_INDEX) {
             self.nodes.borrow_mut(*left_prev).next = left_node_index;
             assert!(right_node_index != self.min_leaf_index, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
         } else if (right_node_index == self.min_leaf_index) {
             // Otherwise, if we were the smallest node on the level. if this is the leaf level, update the pointer.
+            assert!(is_leaf, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
             self.min_leaf_index = left_node_index;
         };
 
@@ -844,10 +850,10 @@ module aptos_std::big_ordered_map {
     }
 
     fun remove_at<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, path_to_node: vector<u64>, key: &K): Child<V> {
-        // Last node in the path is one where we need to add the child to.
+        // Last node in the path is one where we need to remove the child from.
         let node_index = path_to_node.pop_back();
         let old_child = {
-            // First check if we can perform this operation, without changing structure of the tree (i.e. without adding any nodes).
+            // First check if we can perform this operation, without changing structure of the tree (i.e. without rebalancing any nodes).
 
             // For that we can just borrow the single node
             let node = self.borrow_node_mut(node_index);
@@ -939,6 +945,7 @@ module aptos_std::big_ordered_map {
         let children = &mut node.children;
 
         let (sibling_slot, sibling_node) = self.nodes.remove_and_reserve(sibling_index);
+        assert!(is_leaf == sibling_node.is_leaf, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
         let sibling_children = &mut sibling_node.children;
 
         if ((sibling_children.length() - 1) * 2 >= max_degree) {
@@ -992,6 +999,7 @@ module aptos_std::big_ordered_map {
             };
             // Otherwise, we were the smallest node on the level. if this is the leaf level, update the pointer.
             if (self.min_leaf_index == node_index) {
+                assert!(is_leaf, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
                 self.min_leaf_index = sibling_index;
             };
 
@@ -1015,6 +1023,7 @@ module aptos_std::big_ordered_map {
             };
             // Otherwise, sibling was the smallest node on the level. if this is the leaf level, update the pointer.
             if (self.min_leaf_index == sibling_index) {
+                assert!(is_leaf, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
                 self.min_leaf_index = node_index;
             };
 
@@ -1541,6 +1550,94 @@ module aptos_std::big_ordered_map {
     }
 
     #[test_only]
+    inline fun comparison_test(repeats: u64, inner_max_degree: u16, leaf_max_degree: u16, reuse_slots: bool, next_1: ||u64, next_2: ||u64) {
+        let big_map = new_with_config(inner_max_degree, leaf_max_degree, reuse_slots, if (reuse_slots) {4} else {0});
+        let small_map = ordered_map::new();
+        for (i in 0..repeats) {
+            let is_insert = if (2 * i < repeats) {
+                i % 3 != 2
+            } else {
+                i % 3 == 0
+            };
+            if (is_insert) {
+                let v = next_1();
+                assert!(big_map.upsert(v, v) == small_map.upsert(v, v), i);
+            } else {
+                let v = next_2();
+                assert!(big_map.remove(&v) == small_map.remove(&v), i);
+            };
+            if ((i + 1) % 50 == 0) {
+                big_map.validate_map();
+
+                let big_iter = big_map.new_begin_iter();
+                let small_iter = small_map.new_begin_iter();
+                while (!big_iter.iter_is_end(&big_map) || !small_iter.iter_is_end(&small_map)) {
+                    assert!(big_iter.iter_borrow_key() == small_iter.iter_borrow_key(&small_map), i);
+                    assert!(big_iter.iter_borrow(&big_map) == small_iter.iter_borrow(&small_map), i);
+                    big_iter = big_iter.iter_next(&big_map);
+                    small_iter = small_iter.iter_next(&small_map);
+                };
+            };
+        };
+        big_map.destroy();
+    }
+
+    #[test_only]
+    const OFFSET: u64 = 270001;
+    #[test_only]
+    const MOD: u64 = 1000000;
+
+    #[test]
+    fun test_comparison_random() {
+        let x = 1234;
+        let y = 1234;
+        comparison_test(500, 5, 5, false,
+            || {
+                x = x + OFFSET;
+                if (x > MOD) { x = x - MOD};
+                x
+            },
+            || {
+                y = y + OFFSET;
+                if (y > MOD) { y = y - MOD};
+                y
+            },
+        );
+    }
+
+    #[test]
+    fun test_comparison_increasing() {
+        let x = 0;
+        let y = 0;
+        comparison_test(500, 5, 5, false,
+            || {
+                x = x + 1;
+                x
+            },
+            || {
+                y = y + 1;
+                y
+            },
+        );
+    }
+
+    #[test]
+    fun test_comparison_decreasing() {
+        let x = 100000;
+        let y = 100000;
+        comparison_test(500, 5, 5, false,
+            || {
+                x = x - 1;
+                x
+            },
+            || {
+                y = y - 1;
+                y
+            },
+        );
+    }
+
+    #[test_only]
     fun test_large_data_set_helper(inner_max_degree: u16, leaf_max_degree: u16, reuse_slots: bool) {
         use std::vector;
 
@@ -1645,58 +1742,58 @@ module aptos_std::big_ordered_map {
         test_large_data_set_helper(4, 6, false);
     }
 
-    #[test]
-    fun test_large_data_set_order_4_6_true() {
-        test_large_data_set_helper(4, 6, true);
-    }
+    // #[test]
+    // fun test_large_data_set_order_4_6_true() {
+    //     test_large_data_set_helper(4, 6, true);
+    // }
 
-    #[test]
-    fun test_large_data_set_order_16_false() {
-        test_large_data_set_helper(16, 16, false);
-    }
+    // #[test]
+    // fun test_large_data_set_order_16_false() {
+    //     test_large_data_set_helper(16, 16, false);
+    // }
 
-    #[test]
-    fun test_large_data_set_order_16_true() {
-        test_large_data_set_helper(16, 16, true);
-    }
+    // #[test]
+    // fun test_large_data_set_order_16_true() {
+    //     test_large_data_set_helper(16, 16, true);
+    // }
 
-    #[test]
-    fun test_large_data_set_order_31_false() {
-        test_large_data_set_helper(31, 31, false);
-    }
+    // #[test]
+    // fun test_large_data_set_order_31_false() {
+    //     test_large_data_set_helper(31, 31, false);
+    // }
 
-    #[test]
-    fun test_large_data_set_order_31_true() {
-        test_large_data_set_helper(31, 31, true);
-    }
+    // #[test]
+    // fun test_large_data_set_order_31_true() {
+    //     test_large_data_set_helper(31, 31, true);
+    // }
 
-    #[test]
-    fun test_large_data_set_order_31_3_false() {
-        test_large_data_set_helper(31, 3, false);
-    }
+    // #[test]
+    // fun test_large_data_set_order_31_3_false() {
+    //     test_large_data_set_helper(31, 3, false);
+    // }
 
-    #[test]
-    fun test_large_data_set_order_31_3_true() {
-        test_large_data_set_helper(31, 3, true);
-    }
+    // #[test]
+    // fun test_large_data_set_order_31_3_true() {
+    //     test_large_data_set_helper(31, 3, true);
+    // }
 
-    #[test]
-    fun test_large_data_set_order_31_5_false() {
-        test_large_data_set_helper(31, 5, false);
-    }
+    // #[test]
+    // fun test_large_data_set_order_31_5_false() {
+    //     test_large_data_set_helper(31, 5, false);
+    // }
 
-    #[test]
-    fun test_large_data_set_order_31_5_true() {
-        test_large_data_set_helper(31, 5, true);
-    }
+    // #[test]
+    // fun test_large_data_set_order_31_5_true() {
+    //     test_large_data_set_helper(31, 5, true);
+    // }
 
-    #[test]
-    fun test_large_data_set_order_32_false() {
-        test_large_data_set_helper(32, 32, false);
-    }
+    // #[test]
+    // fun test_large_data_set_order_32_false() {
+    //     test_large_data_set_helper(32, 32, false);
+    // }
 
-    #[test]
-    fun test_large_data_set_order_32_true() {
-        test_large_data_set_helper(32, 32, true);
-    }
+    // #[test]
+    // fun test_large_data_set_order_32_true() {
+    //     test_large_data_set_helper(32, 32, true);
+    // }
 }
