@@ -22,7 +22,7 @@ module dispatching_check_signature::check_signature_example {
         move_to(publisher, SignatureExampleConfig {
             obj_ref: object::generate_extend_ref(&constructor_ref),
         });
-        register(publisher);
+        register(publisher)
     }
 
     fun register(signer: &signer) {

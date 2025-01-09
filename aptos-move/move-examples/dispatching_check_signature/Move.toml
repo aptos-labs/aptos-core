@@ -12,3 +12,6 @@ rev = "mainnet"
 subdir = "aptos-move/framework/aptos-framework"
 
 [dev-dependencies]
+
+[dev-addresses]
+dispatching_check_signature = "0x101"

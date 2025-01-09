@@ -30,12 +30,13 @@ module dispatching_check_signature::check_signature {
           
           let result = dispatch(module_address);
           if (option::is_some(&result)) {
-            return *option::borrow(&result) == VERIFY_SUCCESS
-          };
-          return false
-      };
-
-      true
+            *option::borrow(&result) == VERIFY_SUCCESS
+          } else {
+            false
+          }
+      } else {
+        true
+      }
     }
 
     /// Register the dispatchable function of the dispatcher.
