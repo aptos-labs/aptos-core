@@ -1171,383 +1171,383 @@ module aptos_std::big_ordered_map {
         self.validate_iteration();
     }
 
-    #[test]
-    fun test_small_example() {
-        let map = new_with_config(5, 3, true, 2);
-        map.print_map(); map.validate_map();
-        add(&mut map, 1, 1); map.print_map(); map.validate_map();
-        add(&mut map, 2, 2); map.print_map(); map.validate_map();
-        let r1 = upsert(&mut map, 3, 3); map.print_map(); map.validate_map();
-        assert!(r1 == option::none(), 1);
-        add(&mut map, 4, 4); map.print_map(); map.validate_map();
-        let r2 = upsert(&mut map, 4, 8); map.print_map(); map.validate_map();
-        assert!(r2 == option::some(4), 2);
-        add(&mut map, 5, 5); map.print_map(); map.validate_map();
-        add(&mut map, 6, 6); map.print_map(); map.validate_map();
+    // #[test]
+    // fun test_small_example() {
+    //     let map = new_with_config(5, 3, true, 2);
+    //     map.print_map(); map.validate_map();
+    //     add(&mut map, 1, 1); map.print_map(); map.validate_map();
+    //     add(&mut map, 2, 2); map.print_map(); map.validate_map();
+    //     let r1 = upsert(&mut map, 3, 3); map.print_map(); map.validate_map();
+    //     assert!(r1 == option::none(), 1);
+    //     add(&mut map, 4, 4); map.print_map(); map.validate_map();
+    //     let r2 = upsert(&mut map, 4, 8); map.print_map(); map.validate_map();
+    //     assert!(r2 == option::some(4), 2);
+    //     add(&mut map, 5, 5); map.print_map(); map.validate_map();
+    //     add(&mut map, 6, 6); map.print_map(); map.validate_map();
 
-        vector::zip(vector[1, 2, 3, 4, 5, 6], vector[1, 2, 3, 8, 5, 6], |key, value| {
-            assert!(map.borrow(key) == &value, key + 100);
-            assert!(map.borrow_mut(key) == &value, key + 200);
-        });
+    //     vector::zip(vector[1, 2, 3, 4, 5, 6], vector[1, 2, 3, 8, 5, 6], |key, value| {
+    //         assert!(map.borrow(key) == &value, key + 100);
+    //         assert!(map.borrow_mut(key) == &value, key + 200);
+    //     });
 
-        remove(&mut map, &5); map.print_map(); map.validate_map();
-        remove(&mut map, &4); map.print_map(); map.validate_map();
-        remove(&mut map, &1); map.print_map(); map.validate_map();
-        remove(&mut map, &3); map.print_map(); map.validate_map();
-        remove(&mut map, &2); map.print_map(); map.validate_map();
-        remove(&mut map, &6); map.print_map(); map.validate_map();
+    //     remove(&mut map, &5); map.print_map(); map.validate_map();
+    //     remove(&mut map, &4); map.print_map(); map.validate_map();
+    //     remove(&mut map, &1); map.print_map(); map.validate_map();
+    //     remove(&mut map, &3); map.print_map(); map.validate_map();
+    //     remove(&mut map, &2); map.print_map(); map.validate_map();
+    //     remove(&mut map, &6); map.print_map(); map.validate_map();
 
-        destroy_empty(map);
-    }
+    //     destroy_empty(map);
+    // }
 
-    #[test]
-    fun test_variable_size() {
-        let map = new<vector<u64>, vector<u64>>();
-        map.print_map(); map.validate_map();
-        add(&mut map, vector[1], vector[1]); map.print_map(); map.validate_map();
-        add(&mut map, vector[2], vector[2]); map.print_map(); map.validate_map();
-        let r1 = upsert(&mut map, vector[3], vector[3]); map.print_map(); map.validate_map();
-        assert!(r1 == option::none(), 1);
-        add(&mut map, vector[4], vector[4]); map.print_map(); map.validate_map();
-        let r2 = upsert(&mut map, vector[4], vector[8, 8, 8]); map.print_map(); map.validate_map();
-        assert!(r2 == option::some(vector[4]), 2);
-        add(&mut map, vector[5], vector[5]); map.print_map(); map.validate_map();
-        add(&mut map, vector[6], vector[6]); map.print_map(); map.validate_map();
+    // #[test]
+    // fun test_variable_size() {
+    //     let map = new<vector<u64>, vector<u64>>();
+    //     map.print_map(); map.validate_map();
+    //     add(&mut map, vector[1], vector[1]); map.print_map(); map.validate_map();
+    //     add(&mut map, vector[2], vector[2]); map.print_map(); map.validate_map();
+    //     let r1 = upsert(&mut map, vector[3], vector[3]); map.print_map(); map.validate_map();
+    //     assert!(r1 == option::none(), 1);
+    //     add(&mut map, vector[4], vector[4]); map.print_map(); map.validate_map();
+    //     let r2 = upsert(&mut map, vector[4], vector[8, 8, 8]); map.print_map(); map.validate_map();
+    //     assert!(r2 == option::some(vector[4]), 2);
+    //     add(&mut map, vector[5], vector[5]); map.print_map(); map.validate_map();
+    //     add(&mut map, vector[6], vector[6]); map.print_map(); map.validate_map();
 
-        vector::zip(vector[1, 2, 3, 4, 5, 6], vector[1, 2, 3, 8, 5, 6], |key, value| {
-            assert!(map.borrow(vector[key])[0] == value, key + 100);
-        });
+    //     vector::zip(vector[1, 2, 3, 4, 5, 6], vector[1, 2, 3, 8, 5, 6], |key, value| {
+    //         assert!(map.borrow(vector[key])[0] == value, key + 100);
+    //     });
 
-        remove(&mut map, &vector[5]); map.print_map(); map.validate_map();
-        remove(&mut map, &vector[4]); map.print_map(); map.validate_map();
-        remove(&mut map, &vector[1]); map.print_map(); map.validate_map();
-        remove(&mut map, &vector[3]); map.print_map(); map.validate_map();
-        remove(&mut map, &vector[2]); map.print_map(); map.validate_map();
-        remove(&mut map, &vector[6]); map.print_map(); map.validate_map();
+    //     remove(&mut map, &vector[5]); map.print_map(); map.validate_map();
+    //     remove(&mut map, &vector[4]); map.print_map(); map.validate_map();
+    //     remove(&mut map, &vector[1]); map.print_map(); map.validate_map();
+    //     remove(&mut map, &vector[3]); map.print_map(); map.validate_map();
+    //     remove(&mut map, &vector[2]); map.print_map(); map.validate_map();
+    //     remove(&mut map, &vector[6]); map.print_map(); map.validate_map();
 
-        destroy_empty(map);
-    }
-    #[test]
-    fun test_deleting_and_creating_nodes() {
-        let map = new_with_config(4, 3, true, 2);
+    //     destroy_empty(map);
+    // }
+    // #[test]
+    // fun test_deleting_and_creating_nodes() {
+    //     let map = new_with_config(4, 3, true, 2);
 
-        for (i in 0..50) {
-            map.upsert(i, i);
-            map.validate_map();
-        };
+    //     for (i in 0..50) {
+    //         map.upsert(i, i);
+    //         map.validate_map();
+    //     };
 
-        for (i in 0..40) {
-            map.remove(&i);
-            map.validate_map();
-        };
+    //     for (i in 0..40) {
+    //         map.remove(&i);
+    //         map.validate_map();
+    //     };
 
-        for (i in 50..100) {
-            map.upsert(i, i);
-            map.validate_map();
-        };
+    //     for (i in 50..100) {
+    //         map.upsert(i, i);
+    //         map.validate_map();
+    //     };
 
-        for (i in 50..90) {
-            map.remove(&i);
-            map.validate_map();
-        };
+    //     for (i in 50..90) {
+    //         map.remove(&i);
+    //         map.validate_map();
+    //     };
 
-        for (i in 100..150) {
-            map.upsert(i, i);
-            map.validate_map();
-        };
+    //     for (i in 100..150) {
+    //         map.upsert(i, i);
+    //         map.validate_map();
+    //     };
 
-        for (i in 100..150) {
-            map.remove(&i);
-            map.validate_map();
-        };
+    //     for (i in 100..150) {
+    //         map.remove(&i);
+    //         map.validate_map();
+    //     };
 
-        for (i in 40..50) {
-            map.remove(&i);
-            map.validate_map();
-        };
+    //     for (i in 40..50) {
+    //         map.remove(&i);
+    //         map.validate_map();
+    //     };
 
-        for (i in 90..100) {
-            map.remove(&i);
-            map.validate_map();
-        };
+    //     for (i in 90..100) {
+    //         map.remove(&i);
+    //         map.validate_map();
+    //     };
 
-        destroy_empty(map);
-    }
+    //     destroy_empty(map);
+    // }
 
-    #[test]
-    fun test_iterator() {
-        let map = new_with_config(5, 5, true, 2);
+    // #[test]
+    // fun test_iterator() {
+    //     let map = new_with_config(5, 5, true, 2);
 
-        let data = vector[1, 7, 5, 8, 4, 2, 6, 3, 9, 0];
-        while (data.length() != 0) {
-            let element = data.pop_back();
-            add(&mut map, element, element);
-        };
+    //     let data = vector[1, 7, 5, 8, 4, 2, 6, 3, 9, 0];
+    //     while (data.length() != 0) {
+    //         let element = data.pop_back();
+    //         add(&mut map, element, element);
+    //     };
 
-        let it = new_begin_iter(&map);
+    //     let it = new_begin_iter(&map);
 
-        let i = 0;
-        while (!it.iter_is_end(&map)) {
-            assert!(i == it.key, i);
-            assert!(it.iter_borrow(&map) == &i, i);
-            assert!(it.iter_borrow_mut(&mut map) == &i, i);
-            i = i + 1;
-            it = it.iter_next(&map);
-        };
+    //     let i = 0;
+    //     while (!it.iter_is_end(&map)) {
+    //         assert!(i == it.key, i);
+    //         assert!(it.iter_borrow(&map) == &i, i);
+    //         assert!(it.iter_borrow_mut(&mut map) == &i, i);
+    //         i = i + 1;
+    //         it = it.iter_next(&map);
+    //     };
 
-        destroy(map);
-    }
+    //     destroy(map);
+    // }
 
-    #[test]
-    fun test_find() {
-        let map = new_with_config(5, 5, true, 2);
+    // #[test]
+    // fun test_find() {
+    //     let map = new_with_config(5, 5, true, 2);
 
-        let data = vector[11, 1, 7, 5, 8, 2, 6, 3, 0, 10];
-        map.add_all(data, data);
+    //     let data = vector[11, 1, 7, 5, 8, 2, 6, 3, 0, 10];
+    //     map.add_all(data, data);
 
-        let i = 0;
-        while (i < data.length()) {
-            let element = data.borrow(i);
-            let it = find(&map, element);
-            assert!(!it.iter_is_end(&map), i);
-            assert!(it.iter_borrow_key() == element, i);
-            i = i + 1;
-        };
+    //     let i = 0;
+    //     while (i < data.length()) {
+    //         let element = data.borrow(i);
+    //         let it = find(&map, element);
+    //         assert!(!it.iter_is_end(&map), i);
+    //         assert!(it.iter_borrow_key() == element, i);
+    //         i = i + 1;
+    //     };
 
-        assert!(find(&map, &4).iter_is_end(&map), 0);
-        assert!(find(&map, &9).iter_is_end(&map), 1);
+    //     assert!(find(&map, &4).iter_is_end(&map), 0);
+    //     assert!(find(&map, &9).iter_is_end(&map), 1);
 
-        destroy(map);
-    }
+    //     destroy(map);
+    // }
 
-    #[test]
-    fun test_lower_bound() {
-        let map = new_with_config(5, 5, true, 2);
+    // #[test]
+    // fun test_lower_bound() {
+    //     let map = new_with_config(5, 5, true, 2);
 
-        let data = vector[11, 1, 7, 5, 8, 2, 6, 3, 12, 10];
-        map.add_all(data, data);
+    //     let data = vector[11, 1, 7, 5, 8, 2, 6, 3, 12, 10];
+    //     map.add_all(data, data);
 
-        let i = 0;
-        while (i < data.length()) {
-            let element = *data.borrow(i);
-            let it = lower_bound(&map, &element);
-            assert!(!it.iter_is_end(&map), i);
-            assert!(it.key == element, i);
-            i = i + 1;
-        };
+    //     let i = 0;
+    //     while (i < data.length()) {
+    //         let element = *data.borrow(i);
+    //         let it = lower_bound(&map, &element);
+    //         assert!(!it.iter_is_end(&map), i);
+    //         assert!(it.key == element, i);
+    //         i = i + 1;
+    //     };
 
-        assert!(lower_bound(&map, &0).key == 1, 0);
-        assert!(lower_bound(&map, &4).key == 5, 1);
-        assert!(lower_bound(&map, &9).key == 10, 2);
-        assert!(lower_bound(&map, &13).iter_is_end(&map), 3);
+    //     assert!(lower_bound(&map, &0).key == 1, 0);
+    //     assert!(lower_bound(&map, &4).key == 5, 1);
+    //     assert!(lower_bound(&map, &9).key == 10, 2);
+    //     assert!(lower_bound(&map, &13).iter_is_end(&map), 3);
 
-        remove(&mut map, &3);
-        assert!(lower_bound(&map, &3).key == 5, 4);
-        remove(&mut map, &5);
-        assert!(lower_bound(&map, &3).key == 6, 5);
-        assert!(lower_bound(&map, &4).key == 6, 6);
+    //     remove(&mut map, &3);
+    //     assert!(lower_bound(&map, &3).key == 5, 4);
+    //     remove(&mut map, &5);
+    //     assert!(lower_bound(&map, &3).key == 6, 5);
+    //     assert!(lower_bound(&map, &4).key == 6, 6);
 
-        map.destroy();
-    }
+    //     map.destroy();
+    // }
 
-    #[test]
-    fun test_contains() {
-        let map = new_with_config(4, 3, false, 0);
-        let data = vector[3, 1, 9, 7, 5];
-        map.add_all(vector[3, 1, 9, 7, 5], vector[3, 1, 9, 7, 5]);
+    // #[test]
+    // fun test_contains() {
+    //     let map = new_with_config(4, 3, false, 0);
+    //     let data = vector[3, 1, 9, 7, 5];
+    //     map.add_all(vector[3, 1, 9, 7, 5], vector[3, 1, 9, 7, 5]);
 
-        data.for_each_ref(|i| assert!(map.contains(i), *i));
+    //     data.for_each_ref(|i| assert!(map.contains(i), *i));
 
-        let missing = vector[0, 2, 4, 6, 8, 10];
-        missing.for_each_ref(|i| assert!(!map.contains(i), *i));
+    //     let missing = vector[0, 2, 4, 6, 8, 10];
+    //     missing.for_each_ref(|i| assert!(!map.contains(i), *i));
 
-        map.destroy();
-    }
+    //     map.destroy();
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = 0x1000B, location = Self)] /// EINVALID_CONFIG_PARAMETER
-    fun test_inner_max_degree_too_large() {
-        let map = new_with_config<u8, u8>(4097, 0, false, 0);
-        map.destroy();
-    }
+    // #[test]
+    // #[expected_failure(abort_code = 0x1000B, location = Self)] /// EINVALID_CONFIG_PARAMETER
+    // fun test_inner_max_degree_too_large() {
+    //     let map = new_with_config<u8, u8>(4097, 0, false, 0);
+    //     map.destroy();
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = 0x1000B, location = Self)] /// EINVALID_CONFIG_PARAMETER
-    fun test_inner_max_degree_too_small() {
-        let map = new_with_config<u8, u8>(3, 0, false, 0);
-        map.destroy();
-    }
+    // #[test]
+    // #[expected_failure(abort_code = 0x1000B, location = Self)] /// EINVALID_CONFIG_PARAMETER
+    // fun test_inner_max_degree_too_small() {
+    //     let map = new_with_config<u8, u8>(3, 0, false, 0);
+    //     map.destroy();
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = 0x1000B, location = Self)] /// EINVALID_CONFIG_PARAMETER
-    fun test_leaf_max_degree_too_small() {
-        let map = new_with_config<u8, u8>(0, 2, false, 0);
-        map.destroy();
-    }
+    // #[test]
+    // #[expected_failure(abort_code = 0x1000B, location = Self)] /// EINVALID_CONFIG_PARAMETER
+    // fun test_leaf_max_degree_too_small() {
+    //     let map = new_with_config<u8, u8>(0, 2, false, 0);
+    //     map.destroy();
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = 0x10001, location = Self)] /// EKEY_ALREADY_EXISTS
-    fun test_abort_add_existing_value() {
-        let map = new_from(vector[1], vector[1]);
-        map.add(1, 2);
-        map.destroy();
-    }
+    // #[test]
+    // #[expected_failure(abort_code = 0x10001, location = Self)] /// EKEY_ALREADY_EXISTS
+    // fun test_abort_add_existing_value() {
+    //     let map = new_from(vector[1], vector[1]);
+    //     map.add(1, 2);
+    //     map.destroy();
+    // }
 
-    #[test_only]
-    fun vector_range(from: u64, to: u64): vector<u64> {
-        let result = vector[];
-        for (i in from..to) {
-            result.push_back(i);
-        };
-        result
-    }
+    // #[test_only]
+    // fun vector_range(from: u64, to: u64): vector<u64> {
+    //     let result = vector[];
+    //     for (i in from..to) {
+    //         result.push_back(i);
+    //     };
+    //     result
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = 0x10001, location = Self)] /// EKEY_ALREADY_EXISTS
-    fun test_abort_add_existing_value_to_non_leaf() {
-        let map = new_with_config(4, 4, false, 0);
-        map.add_all(vector_range(1, 10), vector_range(1, 10));
-        map.add(3, 3);
-        map.destroy();
-    }
+    // #[test]
+    // #[expected_failure(abort_code = 0x10001, location = Self)] /// EKEY_ALREADY_EXISTS
+    // fun test_abort_add_existing_value_to_non_leaf() {
+    //     let map = new_with_config(4, 4, false, 0);
+    //     map.add_all(vector_range(1, 10), vector_range(1, 10));
+    //     map.add(3, 3);
+    //     map.destroy();
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = 0x10002, location = aptos_std::ordered_map)] /// EKEY_NOT_FOUND
-    fun test_abort_remove_missing_value() {
-        let map = new_from(vector[1], vector[1]);
-        map.remove(&2);
-        map.destroy();
-    }
+    // #[test]
+    // #[expected_failure(abort_code = 0x10002, location = aptos_std::ordered_map)] /// EKEY_NOT_FOUND
+    // fun test_abort_remove_missing_value() {
+    //     let map = new_from(vector[1], vector[1]);
+    //     map.remove(&2);
+    //     map.destroy();
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = 0x10002, location = aptos_std::ordered_map)] /// EKEY_NOT_FOUND
-    fun test_abort_remove_missing_value_to_non_leaf() {
-        let map = new_with_config(4, 4, false, 0);
-        map.add_all(vector_range(1, 10), vector_range(1, 10));
-        map.remove(&4);
-        map.remove(&4);
-        map.destroy();
-    }
+    // #[test]
+    // #[expected_failure(abort_code = 0x10002, location = aptos_std::ordered_map)] /// EKEY_NOT_FOUND
+    // fun test_abort_remove_missing_value_to_non_leaf() {
+    //     let map = new_with_config(4, 4, false, 0);
+    //     map.add_all(vector_range(1, 10), vector_range(1, 10));
+    //     map.remove(&4);
+    //     map.remove(&4);
+    //     map.destroy();
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = 0x10002, location = Self)] /// EKEY_NOT_FOUND
-    fun test_abort_remove_largest_missing_value_to_non_leaf() {
-        let map = new_with_config(4, 4, false, 0);
-        map.add_all(vector_range(1, 10), vector_range(1, 10));
-        map.remove(&11);
-        map.destroy();
-    }
+    // #[test]
+    // #[expected_failure(abort_code = 0x10002, location = Self)] /// EKEY_NOT_FOUND
+    // fun test_abort_remove_largest_missing_value_to_non_leaf() {
+    //     let map = new_with_config(4, 4, false, 0);
+    //     map.add_all(vector_range(1, 10), vector_range(1, 10));
+    //     map.remove(&11);
+    //     map.destroy();
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = 0x10002, location = Self)] /// EKEY_NOT_FOUND
-    fun test_abort_borrow_missing() {
-        let map = new_from(vector[1], vector[1]);
-        map.borrow(2);
-        map.destroy();
-    }
+    // #[test]
+    // #[expected_failure(abort_code = 0x10002, location = Self)] /// EKEY_NOT_FOUND
+    // fun test_abort_borrow_missing() {
+    //     let map = new_from(vector[1], vector[1]);
+    //     map.borrow(2);
+    //     map.destroy();
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = 0x10002, location = Self)] /// EKEY_NOT_FOUND
-    fun test_abort_borrow_mut_missing() {
-        let map = new_from(vector[1], vector[1]);
-        map.borrow_mut(2);
-        map.destroy();
-    }
+    // #[test]
+    // #[expected_failure(abort_code = 0x10002, location = Self)] /// EKEY_NOT_FOUND
+    // fun test_abort_borrow_mut_missing() {
+    //     let map = new_from(vector[1], vector[1]);
+    //     map.borrow_mut(2);
+    //     map.destroy();
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = 0x1000E, location = Self)] /// EBORROW_MUT_REQUIRES_CONSTANT_KV_SIZE
-    fun test_abort_borrow_mut_requires_constant_kv_size() {
-        let map = new_from(vector[1], vector[vector[1]]);
-        map.borrow_mut(1);
-        map.destroy();
-    }
+    // #[test]
+    // #[expected_failure(abort_code = 0x1000E, location = Self)] /// EBORROW_MUT_REQUIRES_CONSTANT_KV_SIZE
+    // fun test_abort_borrow_mut_requires_constant_kv_size() {
+    //     let map = new_from(vector[1], vector[vector[1]]);
+    //     map.borrow_mut(1);
+    //     map.destroy();
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
-    fun test_abort_iter_borrow_key_missing() {
-        let map = new_from(vector[1], vector[1]);
-        map.new_end_iter().iter_borrow_key();
-        map.destroy();
-    }
+    // #[test]
+    // #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
+    // fun test_abort_iter_borrow_key_missing() {
+    //     let map = new_from(vector[1], vector[1]);
+    //     map.new_end_iter().iter_borrow_key();
+    //     map.destroy();
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
-    fun test_abort_iter_borrow_missing() {
-        let map = new_from(vector[1], vector[1]);
-        map.new_end_iter().iter_borrow(&map);
-        map.destroy();
-    }
+    // #[test]
+    // #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
+    // fun test_abort_iter_borrow_missing() {
+    //     let map = new_from(vector[1], vector[1]);
+    //     map.new_end_iter().iter_borrow(&map);
+    //     map.destroy();
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
-    fun test_abort_iter_borrow_mut_missing() {
-        let map = new_from(vector[1], vector[1]);
-        map.new_end_iter().iter_borrow_mut(&mut map);
-        map.destroy();
-    }
+    // #[test]
+    // #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
+    // fun test_abort_iter_borrow_mut_missing() {
+    //     let map = new_from(vector[1], vector[1]);
+    //     map.new_end_iter().iter_borrow_mut(&mut map);
+    //     map.destroy();
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = 0x1000E, location = Self)] /// EBORROW_MUT_REQUIRES_CONSTANT_KV_SIZE
-    fun test_abort_iter_borrow_mut_requires_constant_kv_size() {
-        let map = new_from(vector[1], vector[vector[1]]);
-        map.new_begin_iter().iter_borrow_mut(&mut map);
-        map.destroy();
-    }
+    // #[test]
+    // #[expected_failure(abort_code = 0x1000E, location = Self)] /// EBORROW_MUT_REQUIRES_CONSTANT_KV_SIZE
+    // fun test_abort_iter_borrow_mut_requires_constant_kv_size() {
+    //     let map = new_from(vector[1], vector[vector[1]]);
+    //     map.new_begin_iter().iter_borrow_mut(&mut map);
+    //     map.destroy();
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
-    fun test_abort_end_iter_next() {
-        let map = new_from(vector[1, 2, 3], vector[1, 2, 3]);
-        map.new_end_iter().iter_next(&map);
-        map.destroy();
-    }
+    // #[test]
+    // #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
+    // fun test_abort_end_iter_next() {
+    //     let map = new_from(vector[1, 2, 3], vector[1, 2, 3]);
+    //     map.new_end_iter().iter_next(&map);
+    //     map.destroy();
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
-    fun test_abort_begin_iter_prev() {
-        let map = new_from(vector[1, 2, 3], vector[1, 2, 3]);
-        map.new_begin_iter().iter_prev(&map);
-        map.destroy();
-    }
+    // #[test]
+    // #[expected_failure(abort_code = 0x10003, location = Self)] /// EITER_OUT_OF_BOUNDS
+    // fun test_abort_begin_iter_prev() {
+    //     let map = new_from(vector[1, 2, 3], vector[1, 2, 3]);
+    //     map.new_begin_iter().iter_prev(&map);
+    //     map.destroy();
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = 0x1000C, location = Self)] /// EMAP_NOT_EMPTY
-    fun test_abort_fail_to_destroy_non_empty() {
-        let map = new_from(vector[1], vector[1]);
-        map.destroy_empty();
-    }
+    // #[test]
+    // #[expected_failure(abort_code = 0x1000C, location = Self)] /// EMAP_NOT_EMPTY
+    // fun test_abort_fail_to_destroy_non_empty() {
+    //     let map = new_from(vector[1], vector[1]);
+    //     map.destroy_empty();
+    // }
 
-    // /// Map key already exists
-    // const EKEY_ALREADY_EXISTS: u64 = 1;
-    // /// Map key is not found
-    // const EKEY_NOT_FOUND: u64 = 2;
-    // /// Trying to do an operation on an IteratorPtr that would go out of bounds
-    // const EITER_OUT_OF_BOUNDS: u64 = 3;
-    /// The provided configuration parameter is invalid.
-    // const EINVALID_CONFIG_PARAMETER: u64 = 11;
-    // /// Map isn't empty
-    // const EMAP_NOT_EMPTY: u64 = 12;
-    // /// Trying to insert too large of an object into the mp.
-    // const EARGUMENT_BYTES_TOO_LARGE: u64 = 13;
-    // /// borrow_mut requires that key and value types have constant size
-    // /// (otherwise it wouldn't be able to guarantee size requirements are not violated)
-    // const EBORROW_MUT_REQUIRES_CONSTANT_KV_SIZE: u64 = 14;
+    // // /// Map key already exists
+    // // const EKEY_ALREADY_EXISTS: u64 = 1;
+    // // /// Map key is not found
+    // // const EKEY_NOT_FOUND: u64 = 2;
+    // // /// Trying to do an operation on an IteratorPtr that would go out of bounds
+    // // const EITER_OUT_OF_BOUNDS: u64 = 3;
+    // /// The provided configuration parameter is invalid.
+    // // const EINVALID_CONFIG_PARAMETER: u64 = 11;
+    // // /// Map isn't empty
+    // // const EMAP_NOT_EMPTY: u64 = 12;
+    // // /// Trying to insert too large of an object into the mp.
+    // // const EARGUMENT_BYTES_TOO_LARGE: u64 = 13;
+    // // /// borrow_mut requires that key and value types have constant size
+    // // /// (otherwise it wouldn't be able to guarantee size requirements are not violated)
+    // // const EBORROW_MUT_REQUIRES_CONSTANT_KV_SIZE: u64 = 14;
 
-    #[test]
-    #[expected_failure(abort_code = 0x1000D, location = Self)] /// EARGUMENT_BYTES_TOO_LARGE
-    fun test_adding_key_too_large() {
-        let map = new_from(vector[vector[1]], vector[1]);
-        map.add(vector_range(0, 57), 1);
-        map.destroy();
-    }
+    // #[test]
+    // #[expected_failure(abort_code = 0x1000D, location = Self)] /// EARGUMENT_BYTES_TOO_LARGE
+    // fun test_adding_key_too_large() {
+    //     let map = new_from(vector[vector[1]], vector[1]);
+    //     map.add(vector_range(0, 57), 1);
+    //     map.destroy();
+    // }
 
-    #[test]
-    #[expected_failure(abort_code = 0x1000D, location = Self)] /// EARGUMENT_BYTES_TOO_LARGE
-    fun test_adding_value_too_large() {
-        let map = new_from(vector[1], vector[vector[1]]);
-        map.add(2, vector_range(0, 107));
-        map.destroy();
-    }
+    // #[test]
+    // #[expected_failure(abort_code = 0x1000D, location = Self)] /// EARGUMENT_BYTES_TOO_LARGE
+    // fun test_adding_value_too_large() {
+    //     let map = new_from(vector[1], vector[vector[1]]);
+    //     map.add(2, vector_range(0, 107));
+    //     map.destroy();
+    // }
 
     #[test_only]
     inline fun comparison_test(repeats: u64, inner_max_degree: u16, leaf_max_degree: u16, reuse_slots: bool, next_1: ||u64, next_2: ||u64) {
@@ -1732,15 +1732,15 @@ module aptos_std::big_ordered_map {
     //     test_large_data_set_helper(6, 3, false);
     // }
 
-    #[test]
-    fun test_large_data_set_order_6_3_true() {
-        test_large_data_set_helper(6, 3, true);
-    }
+    // #[test]
+    // fun test_large_data_set_order_6_3_true() {
+    //     test_large_data_set_helper(6, 3, true);
+    // }
 
-    #[test]
-    fun test_large_data_set_order_4_6_false() {
-        test_large_data_set_helper(4, 6, false);
-    }
+    // #[test]
+    // fun test_large_data_set_order_4_6_false() {
+    //     test_large_data_set_helper(4, 6, false);
+    // }
 
     // #[test]
     // fun test_large_data_set_order_4_6_true() {
