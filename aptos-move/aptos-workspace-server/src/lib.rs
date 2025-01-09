@@ -26,17 +26,20 @@
 mod common;
 mod services;
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
+use aptos_localnet::docker::get_docker;
+use clap::Parser;
 use common::make_shared;
 use futures::TryFutureExt;
 use services::{
-    docker_common::create_docker_network, indexer_api::start_indexer_api,
+    docker_common::create_docker_network_permanent, indexer_api::start_indexer_api,
     processors::start_all_processors,
 };
+use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-pub async fn run_all_services() -> Result<()> {
+async fn run_all_services(timeout: u64) -> Result<()> {
     let test_dir = tempfile::tempdir()?;
     let test_dir = test_dir.path();
     println!("Created test directory: {}", test_dir.display());
@@ -50,9 +53,15 @@ pub async fn run_all_services() -> Result<()> {
         //       waiting for it to trigger.
         let shutdown = shutdown.clone();
         tokio::spawn(async move {
-            tokio::signal::ctrl_c().await.unwrap();
-
-            println!("\nCtrl-C received. Shutting down services. This may take a while.\n");
+            tokio::select! {
+                res = tokio::signal::ctrl_c() => {
+                    res.unwrap();
+                    println!("\nCtrl-C received. Shutting down services. This may take a while.\n");
+                }
+                _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
+                    println!("\nTimeout reached. Shutting down services. This may take a while.\n");
+                }
+            }
 
             shutdown.cancel();
         });
@@ -72,15 +81,22 @@ pub async fn run_all_services() -> Result<()> {
         fut_indexer_grpc.clone(),
     );
 
+    // Docker
+    let fut_docker = make_shared(get_docker());
+
     // Docker Network
-    let docker_network_name = format!("aptos-workspace-{}", instance_id);
-    let (fut_docker_network, fut_docker_network_clean_up) =
-        create_docker_network(shutdown.clone(), docker_network_name);
+    let docker_network_name = "aptos-workspace".to_string();
+    let fut_docker_network = make_shared(create_docker_network_permanent(
+        shutdown.clone(),
+        fut_docker.clone(),
+        docker_network_name,
+    ));
 
     // Indexer part 1: postgres db
     let (fut_postgres, fut_postgres_finish, fut_postgres_clean_up) =
         services::postgres::start_postgres(
             shutdown.clone(),
+            fut_docker.clone(),
             fut_docker_network.clone(),
             instance_id,
         );
@@ -98,6 +114,7 @@ pub async fn run_all_services() -> Result<()> {
     let (fut_indexer_api, fut_indexer_api_finish, fut_indexer_api_clean_up) = start_indexer_api(
         instance_id,
         shutdown.clone(),
+        fut_docker.clone(),
         fut_docker_network.clone(),
         fut_postgres.clone(),
         fut_all_processors_ready.clone(),
@@ -106,11 +123,11 @@ pub async fn run_all_services() -> Result<()> {
     // Phase 2: Wait for all services to be up.
     let all_services_up = async move {
         tokio::try_join!(
-            fut_node_api.map_err(anyhow::Error::msg),
-            fut_indexer_grpc.map_err(anyhow::Error::msg),
+            fut_node_api.map_err(|err| anyhow!(err)),
+            fut_indexer_grpc.map_err(|err| anyhow!(err)),
             fut_faucet,
-            fut_postgres.map_err(anyhow::Error::msg),
-            fut_all_processors_ready.map_err(anyhow::Error::msg),
+            fut_postgres.map_err(|err| anyhow!(err)),
+            fut_all_processors_ready.map_err(|err| anyhow!(err)),
             fut_indexer_api,
         )
     };
@@ -118,7 +135,6 @@ pub async fn run_all_services() -> Result<()> {
         eprintln!("Running shutdown steps");
         fut_indexer_api_clean_up.await;
         fut_postgres_clean_up.await;
-        fut_docker_network_clean_up.await;
     };
     tokio::select! {
         _ = shutdown.cancelled() => {
@@ -180,4 +196,20 @@ pub async fn run_all_services() -> Result<()> {
     println!("Finished running all services");
 
     Ok(())
+}
+
+#[derive(Parser)]
+pub enum WorkspaceCommand {
+    Run {
+        #[arg(long, default_value_t = 1800)]
+        timeout: u64,
+    },
+}
+
+impl WorkspaceCommand {
+    pub async fn run(self) -> Result<()> {
+        match self {
+            WorkspaceCommand::Run { timeout } => run_all_services(timeout).await,
+        }
+    }
 }

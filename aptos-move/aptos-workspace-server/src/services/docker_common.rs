@@ -1,18 +1,68 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::make_shared;
+use crate::common::{make_shared, ArcError};
 use anyhow::{anyhow, bail, Context, Result};
-use aptos_localnet::docker;
 use bollard::{
     container::{CreateContainerOptions, InspectContainerOptions, StartContainerOptions},
+    image::CreateImageOptions,
     network::CreateNetworkOptions,
     secret::ContainerInspectResponse,
     volume::CreateVolumeOptions,
+    Docker,
 };
+use futures::TryStreamExt;
 use std::{future::Future, sync::Arc};
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
+
+/// Creates a permanent docker network which does not need to be cleaned up.
+pub async fn create_docker_network_permanent(
+    shutdown: CancellationToken,
+    fut_docker: impl Future<Output = Result<Docker, ArcError>> + Clone + Send + 'static,
+    name: String,
+) -> Result<String, anyhow::Error> {
+    let handle = tokio::spawn(async move {
+        let docker = tokio::select! {
+            _ = shutdown.cancelled() => {
+                bail!("failed to create docker network: cancelled")
+            }
+            res = fut_docker => {
+                res.context("failed to create docker network")?
+            }
+        };
+
+        let res = docker
+            .create_network(CreateNetworkOptions {
+                name: name.clone(),
+                internal: false,
+                check_duplicate: true,
+                ..Default::default()
+            })
+            .await;
+
+        match res {
+            Ok(_response) => {
+                println!("Created docker network {}", name);
+
+                Ok(name)
+            },
+            Err(err) => match err {
+                bollard::errors::Error::DockerResponseServerError {
+                    status_code: 409, ..
+                } => {
+                    println!("Docker network {} already exists, not creating it", name);
+                    Ok(name)
+                },
+                err => Err(err.into()),
+            },
+        }
+    });
+
+    handle
+        .await
+        .map_err(|err| anyhow!("failed to join task handle: {}", err))?
+}
 
 /// Creates a Docker network asynchronously and provides a cleanup task for network removal.
 ///
@@ -28,11 +78,13 @@ use tokio_util::sync::CancellationToken;
 ///
 /// Note that the cleanup is a "best-effort" operation -- success is not guaranteed due to
 /// reliance on external commands, which may fail for various reasons.
+#[allow(unused)]
 pub fn create_docker_network(
     shutdown: CancellationToken,
+    fut_docker: impl Future<Output = Result<Docker, ArcError>> + Clone + Send + 'static,
     name: String,
 ) -> (
-    impl Future<Output = Result<String, Arc<anyhow::Error>>> + Clone,
+    impl Future<Output = Result<String, ArcError>> + Clone,
     impl Future<Output = ()>,
 ) {
     // Flag indicating whether cleanup is needed.
@@ -44,13 +96,14 @@ pub fn create_docker_network(
     let fut_create_network = make_shared({
         let needs_cleanup = needs_cleanup.clone();
         let name = name.clone();
+        let fut_docker = fut_docker.clone();
 
         let handle = tokio::spawn(async move {
             let docker = tokio::select! {
                 _ = shutdown.cancelled() => {
                     bail!("failed to create docker network: cancelled")
                 }
-                res = docker::get_docker() => {
+                res = fut_docker => {
                     res.context("failed to create docker network")?
                 }
             };
@@ -92,7 +145,7 @@ pub fn create_docker_network(
             let network_name = name.as_str();
             let cleanup = async move {
                 if *needs_cleanup.lock().await {
-                    let docker = docker::get_docker().await?;
+                    let docker = fut_docker.await?;
                     docker.remove_network(network_name).await?;
                 }
 
@@ -130,9 +183,10 @@ pub fn create_docker_network(
 /// various reasons.
 pub fn create_docker_volume(
     shutdown: CancellationToken,
+    fut_docker: impl Future<Output = Result<Docker, ArcError>> + Clone + Send + 'static,
     name: String,
 ) -> (
-    impl Future<Output = Result<String, Arc<anyhow::Error>>> + Clone,
+    impl Future<Output = Result<String, ArcError>> + Clone,
     impl Future<Output = ()>,
 ) {
     // Flag indicating whether cleanup is needed.
@@ -144,13 +198,14 @@ pub fn create_docker_volume(
     let fut_create_volume = make_shared({
         let needs_cleanup = needs_cleanup.clone();
         let name = name.clone();
+        let fut_docker = fut_docker.clone();
 
         let handle = tokio::spawn(async move {
             let docker = tokio::select! {
                 _ = shutdown.cancelled() => {
                     bail!("failed to create docker volume: cancelled")
                 }
-                res = docker::get_docker() => {
+                res = fut_docker => {
                     res.context("failed to create docker volume")?
                 }
             };
@@ -190,7 +245,7 @@ pub fn create_docker_volume(
             let volume_name = name.as_str();
             let cleanup = async move {
                 if *needs_cleanup.lock().await {
-                    let docker = docker::get_docker().await?;
+                    let docker = fut_docker.await?;
                     docker.remove_volume(volume_name, None).await?;
                 }
 
@@ -231,10 +286,11 @@ pub fn create_docker_volume(
 /// various reasons.
 pub fn create_start_and_inspect_container(
     shutdown: CancellationToken,
+    fut_docker: impl Future<Output = Result<Docker, ArcError>> + Clone + Send + 'static,
     options: CreateContainerOptions<String>,
     config: bollard::container::Config<String>,
 ) -> (
-    impl Future<Output = Result<Arc<ContainerInspectResponse>, Arc<anyhow::Error>>> + Clone,
+    impl Future<Output = Result<Arc<ContainerInspectResponse>, ArcError>> + Clone,
     impl Future<Output = ()>,
 ) {
     #[derive(PartialEq, Eq, Clone, Copy)]
@@ -255,16 +311,45 @@ pub fn create_start_and_inspect_container(
     let fut_run = make_shared({
         let state = state.clone();
         let name = name.clone();
+        let fut_docker = fut_docker.clone();
 
         let handle = tokio::spawn(async move {
             let docker = tokio::select! {
                 _ = shutdown.cancelled() => {
                     bail!("failed to create docker container: cancelled")
                 }
-                res = docker::get_docker() => {
+                res = fut_docker => {
                     res.context("failed to create docker container")?
                 }
             };
+
+            let image_name = config.image.as_ref().unwrap();
+            match docker.inspect_image(image_name).await {
+                Ok(_) => {
+                    println!("Docker image {} already exists", image_name);
+                },
+                Err(_err) => {
+                    println!(
+                        "Docker image {} does not exist. Pulling image..",
+                        image_name
+                    );
+
+                    docker
+                        .create_image(
+                            Some(CreateImageOptions {
+                                from_image: image_name.clone(),
+                                ..Default::default()
+                            }),
+                            None,
+                            None,
+                        )
+                        .try_collect::<Vec<_>>()
+                        .await
+                        .context("failed to create docker container")?;
+
+                    println!("Pulled docker image {}", image_name);
+                },
+            }
 
             let mut state = state.lock().await;
 
@@ -319,7 +404,7 @@ pub fn create_start_and_inspect_container(
                 return;
             }
 
-            let docker = match docker::get_docker().await {
+            let docker = match fut_docker.await {
                 Ok(docker) => docker,
                 Err(err) => {
                     eprintln!("Failed to clean up docker container {}: {}", name, err);
