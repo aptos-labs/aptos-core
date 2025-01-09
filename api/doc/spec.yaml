@@ -12224,6 +12224,7 @@ components:
       - $ref: '#/components/schemas/TransactionSignature_MultiAgentSignature'
       - $ref: '#/components/schemas/TransactionSignature_FeePayerSignature'
       - $ref: '#/components/schemas/TransactionSignature_AccountSignature'
+      - $ref: '#/components/schemas/TransactionSignature_NoAccountSignature'
       discriminator:
         propertyName: type
         mapping:
@@ -12232,6 +12233,7 @@ components:
           multi_agent_signature: '#/components/schemas/TransactionSignature_MultiAgentSignature'
           fee_payer_signature: '#/components/schemas/TransactionSignature_FeePayerSignature'
           single_sender: '#/components/schemas/TransactionSignature_AccountSignature'
+          no_account_signature: '#/components/schemas/TransactionSignature_NoAccountSignature'
     TransactionSignature_AccountSignature:
       allOf:
       - type: object
@@ -12292,6 +12294,18 @@ components:
             - multi_ed25519_signature
             example: multi_ed25519_signature
       - $ref: '#/components/schemas/MultiEd25519Signature'
+    TransactionSignature_NoAccountSignature:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - no_account_signature
+            example: no_account_signature
+      - $ref: '#/components/schemas/NoAccountSignature'
     Transaction_BlockEpilogueTransaction:
       allOf:
       - type: object
