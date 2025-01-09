@@ -270,7 +270,7 @@ fn fetch_config_and_update_hash<T: OnChainConfig>(
 }
 
 #[cfg(test)]
-pub mod test {
+pub mod tests {
     use super::*;
     use aptos_types::{
         on_chain_config::{FeatureFlag, GasScheduleV2},
@@ -320,55 +320,42 @@ pub mod test {
     }
 
     #[test]
-    fn test_environment_ne_configuration() {
-        let mut configuration = ConfigurationResource::default();
-        assert_eq!(configuration.last_reconfiguration_time_micros(), 0);
-        configuration.set_last_reconfiguration_time_for_test(1);
+    fn test_environment_ne() {
+        let mut non_default_configuration = ConfigurationResource::default();
+        assert_eq!(
+            non_default_configuration.last_reconfiguration_time_micros(),
+            0
+        );
+        non_default_configuration.set_last_reconfiguration_time_for_test(1);
 
-        let environment_1 = AptosEnvironment::new(&MockStateView::empty());
-        let environment_2 =
-            AptosEnvironment::new(&state_view_with_non_default_config(configuration));
-        assert!(environment_1 != environment_2);
-    }
+        let mut non_default_features = Features::default();
+        assert!(non_default_features.is_enabled(FeatureFlag::LIMIT_VM_TYPE_SIZE));
+        non_default_features.disable(FeatureFlag::LIMIT_VM_TYPE_SIZE);
 
-    #[test]
-    fn test_environment_ne_chain_id() {
-        let environment_1 = AptosEnvironment::new(&MockStateView::empty());
-        let environment_2 =
-            AptosEnvironment::new(&state_view_with_non_default_config(ChainId::mainnet()));
-        assert!(environment_1 != environment_2);
-    }
-
-    #[test]
-    fn test_environment_ne_features() {
-        let mut features = Features::default();
-        assert!(features.is_enabled(FeatureFlag::LIMIT_VM_TYPE_SIZE));
-        features.disable(FeatureFlag::LIMIT_VM_TYPE_SIZE);
-
-        let environment_1 = AptosEnvironment::new(&MockStateView::empty());
-        let environment_2 = AptosEnvironment::new(&state_view_with_non_default_config(features));
-        assert!(environment_1 != environment_2);
-    }
-
-    #[test]
-    fn test_environment_ne_gas_schedule() {
         let state_views = [
             MockStateView::empty(),
+            // Change configuration resource (epoch change).
+            state_view_with_non_default_config(non_default_configuration),
+            // Change features set.
+            state_view_with_non_default_config(non_default_features),
+            // Different chain ID.
+            state_view_with_non_default_config(ChainId::mainnet()),
+            // Different gas schedules:
+            //  - different feature version,
+            //  - same feature version, but an extra parameter,
+            //  - completely different gas schedule.
             state_view_with_non_default_config(GasScheduleV2 {
                 feature_version: 12,
                 entries: vec![],
             }),
-            // Different feature version.
             state_view_with_non_default_config(GasScheduleV2 {
                 feature_version: 13,
                 entries: vec![],
             }),
-            // Same feature version, but an extra param.
             state_view_with_non_default_config(GasScheduleV2 {
                 feature_version: 12,
                 entries: vec![(String::from("gas.param.base"), 12)],
             }),
-            // Completely different gas schedule.
             state_view_with_non_default_config(GasScheduleV2 {
                 feature_version: 0,
                 entries: vec![],
