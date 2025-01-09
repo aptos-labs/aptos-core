@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    publishing::module_simple::LoopType, EntryPoints, TransactionType, WorkflowKind,
-    WorkflowProgress,
+    move_workloads::{LoopType, PreBuiltPackagesImpl},
+    token_workflow::TokenWorkflowKind,
+    EntryPoints,
 };
+use aptos_transaction_generator_lib::{TransactionType, WorkflowProgress};
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 
@@ -91,7 +93,7 @@ impl TransactionTypeArg {
     ) -> TransactionType {
         let call_custom_module = |entry_point: EntryPoints| -> TransactionType {
             TransactionType::CallCustomModules {
-                entry_point,
+                entry_point: Box::new(entry_point),
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             }
@@ -134,6 +136,8 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::PublishPackage => TransactionType::PublishPackage {
                 use_account_pool: sender_use_account_pool,
+                pre_built: &PreBuiltPackagesImpl,
+                package_name: "simple".to_string(),
             },
             TransactionTypeArg::Batch100Transfer => {
                 TransactionType::BatchTransfer { batch_size: 100 }
@@ -170,7 +174,10 @@ impl TransactionTypeArg {
                 })
             },
             TransactionTypeArg::RepublishAndCall => TransactionType::CallCustomModulesMix {
-                entry_points: vec![(EntryPoints::Nop, 1), (EntryPoints::Republish, 1)],
+                entry_points: vec![
+                    (Box::new(EntryPoints::Nop), 1),
+                    (Box::new(EntryPoints::Republish), 1),
+                ],
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -286,10 +293,10 @@ impl TransactionTypeArg {
                 call_custom_module(EntryPoints::TokenV2AmbassadorMint { numbered: true })
             },
             TransactionTypeArg::TokenV2AmbassadorMintAndBurn1M => TransactionType::Workflow {
-                workflow_kind: WorkflowKind::CreateMintBurn {
+                workflow_kind: Box::new(TokenWorkflowKind::CreateMintBurn {
                     count: 10000,
                     creation_balance: 200000,
-                },
+                }),
                 num_modules: 1,
                 use_account_pool: sender_use_account_pool,
                 progress_type: workflow_progress_type,
@@ -408,5 +415,51 @@ impl TransactionTypeArg {
         }
 
         transaction_mix_per_phase
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
+pub struct EmitWorkloadArgs {
+    #[clap(
+        long,
+        value_enum,
+        default_value = "coin-transfer",
+        num_args = 1..,
+        ignore_case = true
+    )]
+    pub transaction_type: Vec<TransactionTypeArg>,
+
+    /// Number of copies of the modules that will be published,
+    /// under separate accounts, creating independent contracts,
+    /// removing contention.
+    /// For example for NFT minting, setting to 1 will be equivalent
+    /// to minting from single collection,
+    /// setting to 20 means minting from 20 collections in parallel.
+    #[clap(long)]
+    pub module_working_set_size: Option<usize>,
+
+    /// Whether to use burner accounts for the sender.
+    /// For example when transaction can only be done once per account.
+    /// (pool needs to be populated by account-creation transactions)
+    #[clap(long)]
+    pub sender_use_account_pool: Option<bool>,
+
+    #[clap(long, num_args = 0..)]
+    pub transaction_weights: Vec<usize>,
+
+    #[clap(long, num_args = 0..)]
+    pub transaction_phases: Vec<usize>,
+}
+
+impl EmitWorkloadArgs {
+    pub fn args_to_transaction_mix_per_phase(&self) -> Vec<Vec<(TransactionType, usize)>> {
+        TransactionTypeArg::args_to_transaction_mix_per_phase(
+            &self.transaction_type,
+            &self.transaction_weights,
+            &self.transaction_phases,
+            self.module_working_set_size.unwrap_or(1),
+            self.sender_use_account_pool.unwrap_or(false),
+            WorkflowProgress::when_done_default(),
+        )
     }
 }

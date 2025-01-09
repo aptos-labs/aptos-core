@@ -1511,6 +1511,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-transaction-generator-lib",
+ "aptos-transaction-workloads-lib",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-environment",
@@ -1799,6 +1800,7 @@ dependencies = [
  "aptos-state-sync-driver",
  "aptos-transaction-emitter-lib",
  "aptos-transaction-generator-lib",
+ "aptos-transaction-workloads-lib",
  "async-trait",
  "chrono",
  "clap 4.5.21",
@@ -2891,6 +2893,7 @@ dependencies = [
  "aptos-language-e2e-tests",
  "aptos-logger",
  "aptos-transaction-generator-lib",
+ "aptos-transaction-workloads-lib",
  "aptos-types",
  "rand 0.7.3",
  "serde_json",
@@ -3267,6 +3270,7 @@ dependencies = [
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-transaction-emitter-lib",
+ "aptos-transaction-workloads-lib",
  "async-trait",
  "clap 4.5.21",
  "futures",
@@ -4266,6 +4270,7 @@ dependencies = [
  "aptos-logger",
  "aptos-sdk",
  "aptos-transaction-emitter-lib",
+ "aptos-transaction-workloads-lib",
  "clap 4.5.21",
  "futures",
  "rand 0.7.3",
@@ -4327,6 +4332,21 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-sdk",
+ "async-trait",
+ "clap 4.5.21",
+ "move-binary-format",
+ "once_cell",
+ "rand 0.7.3",
+ "serde",
+]
+
+[[package]]
+name = "aptos-transaction-workloads-lib"
+version = "0.0.0"
+dependencies = [
+ "aptos-framework",
+ "aptos-sdk",
+ "aptos-transaction-generator-lib",
  "async-trait",
  "clap 4.5.21",
  "move-binary-format",
@@ -7642,6 +7662,7 @@ dependencies = [
  "aptos-language-e2e-tests",
  "aptos-package-builder",
  "aptos-transaction-generator-lib",
+ "aptos-transaction-workloads-lib",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-environment",
@@ -11010,10 +11031,8 @@ name = "module-publish"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-framework",
- "bcs 0.1.4",
+ "aptos-transaction-generator-lib",
  "clap 4.5.21",
- "move-binary-format",
 ]
 
 [[package]]

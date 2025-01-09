@@ -6,12 +6,10 @@ use aptos_language_e2e_tests::{
     executor::{ExecFuncTimerDynamicArgs, FakeExecutor, GasMeterType, Measurement},
 };
 use aptos_transaction_generator_lib::{
-    publishing::{
-        module_simple::{AutomaticArgs, LoopType, MultiSigConfig},
-        publish_util::{Package, PackageHandler},
-    },
-    EntryPoints,
+    entry_point_trait::{AutomaticArgs, EntryPointTrait, MultiSigConfig},
+    publishing::publish_util::{Package, PackageHandler},
 };
+use aptos_transaction_workloads_lib::{EntryPoints, LoopType};
 use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
 use rand::{rngs::StdRng, SeedableRng};
 use serde_json::json;
@@ -254,7 +252,8 @@ fn main() {
             .expected_time_micros;
         let publisher = executor.new_account_at(AccountAddress::random());
 
-        let mut package_handler = PackageHandler::new(entry_point.package_name());
+        let mut package_handler =
+            PackageHandler::new(entry_point.pre_built_packages(), entry_point.package_name());
         let mut rng = StdRng::seed_from_u64(14);
         let package = package_handler.pick_package(&mut rng, *publisher.address());
         execute_txn(
