@@ -4,7 +4,13 @@
 // @generated
 /// Generated client implementations.
 pub mod fullnode_data_client {
-    #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
+    #![allow(
+        unused_variables,
+        dead_code,
+        missing_docs,
+        clippy::wildcard_imports,
+        clippy::let_unit_value,
+    )]
     use tonic::codegen::*;
     use tonic::codegen::http::Uri;
     ///
@@ -27,8 +33,8 @@ pub mod fullnode_data_client {
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
         T::Error: Into<StdError>,
-        T::ResponseBody: Body<Data = Bytes> + Send + 'static,
-        <T::ResponseBody as Body>::Error: Into<StdError> + Send,
+        T::ResponseBody: Body<Data = Bytes> + std::marker::Send + 'static,
+        <T::ResponseBody as Body>::Error: Into<StdError> + std::marker::Send,
     {
         pub fn new(inner: T) -> Self {
             let inner = tonic::client::Grpc::new(inner);
@@ -53,7 +59,7 @@ pub mod fullnode_data_client {
             >,
             <T as tonic::codegen::Service<
                 http::Request<tonic::body::BoxBody>,
-            >>::Error: Into<StdError> + Send + Sync,
+            >>::Error: Into<StdError> + std::marker::Send + std::marker::Sync,
         {
             FullnodeDataClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -102,8 +108,7 @@ pub mod fullnode_data_client {
                 .ready()
                 .await
                 .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
+                    tonic::Status::unknown(
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
@@ -125,19 +130,25 @@ pub mod fullnode_data_client {
 }
 /// Generated server implementations.
 pub mod fullnode_data_server {
-    #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
+    #![allow(
+        unused_variables,
+        dead_code,
+        missing_docs,
+        clippy::wildcard_imports,
+        clippy::let_unit_value,
+    )]
     use tonic::codegen::*;
     /// Generated trait containing gRPC methods that should be implemented for use with FullnodeDataServer.
     #[async_trait]
-    pub trait FullnodeData: Send + Sync + 'static {
+    pub trait FullnodeData: std::marker::Send + std::marker::Sync + 'static {
         /// Server streaming response type for the GetTransactionsFromNode method.
-        type GetTransactionsFromNodeStream: futures_core::Stream<
+        type GetTransactionsFromNodeStream: tonic::codegen::tokio_stream::Stream<
                 Item = std::result::Result<
                     super::TransactionsFromNodeResponse,
                     tonic::Status,
                 >,
             >
-            + Send
+            + std::marker::Send
             + 'static;
         ///
         async fn get_transactions_from_node(
@@ -150,20 +161,18 @@ pub mod fullnode_data_server {
     }
     ///
     #[derive(Debug)]
-    pub struct FullnodeDataServer<T: FullnodeData> {
-        inner: _Inner<T>,
+    pub struct FullnodeDataServer<T> {
+        inner: Arc<T>,
         accept_compression_encodings: EnabledCompressionEncodings,
         send_compression_encodings: EnabledCompressionEncodings,
         max_decoding_message_size: Option<usize>,
         max_encoding_message_size: Option<usize>,
     }
-    struct _Inner<T>(Arc<T>);
-    impl<T: FullnodeData> FullnodeDataServer<T> {
+    impl<T> FullnodeDataServer<T> {
         pub fn new(inner: T) -> Self {
             Self::from_arc(Arc::new(inner))
         }
         pub fn from_arc(inner: Arc<T>) -> Self {
-            let inner = _Inner(inner);
             Self {
                 inner,
                 accept_compression_encodings: Default::default(),
@@ -213,8 +222,8 @@ pub mod fullnode_data_server {
     impl<T, B> tonic::codegen::Service<http::Request<B>> for FullnodeDataServer<T>
     where
         T: FullnodeData,
-        B: Body + Send + 'static,
-        B::Error: Into<StdError> + Send + 'static,
+        B: Body + std::marker::Send + 'static,
+        B::Error: Into<StdError> + std::marker::Send + 'static,
     {
         type Response = http::Response<tonic::body::BoxBody>;
         type Error = std::convert::Infallible;
@@ -226,7 +235,6 @@ pub mod fullnode_data_server {
             Poll::Ready(Ok(()))
         }
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
-            let inner = self.inner.clone();
             match req.uri().path() {
                 "/aptos.internal.fullnode.v1.FullnodeData/GetTransactionsFromNode" => {
                     #[allow(non_camel_case_types)]
@@ -250,7 +258,11 @@ pub mod fullnode_data_server {
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                (*inner).get_transactions_from_node(request).await
+                                <T as FullnodeData>::get_transactions_from_node(
+                                        &inner,
+                                        request,
+                                    )
+                                    .await
                             };
                             Box::pin(fut)
                         }
@@ -261,7 +273,6 @@ pub mod fullnode_data_server {
                     let max_encoding_message_size = self.max_encoding_message_size;
                     let inner = self.inner.clone();
                     let fut = async move {
-                        let inner = inner.0;
                         let method = GetTransactionsFromNodeSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
@@ -280,20 +291,25 @@ pub mod fullnode_data_server {
                 }
                 _ => {
                     Box::pin(async move {
-                        Ok(
-                            http::Response::builder()
-                                .status(200)
-                                .header("grpc-status", "12")
-                                .header("content-type", "application/grpc")
-                                .body(empty_body())
-                                .unwrap(),
-                        )
+                        let mut response = http::Response::new(empty_body());
+                        let headers = response.headers_mut();
+                        headers
+                            .insert(
+                                tonic::Status::GRPC_STATUS,
+                                (tonic::Code::Unimplemented as i32).into(),
+                            );
+                        headers
+                            .insert(
+                                http::header::CONTENT_TYPE,
+                                tonic::metadata::GRPC_CONTENT_TYPE,
+                            );
+                        Ok(response)
                     })
                 }
             }
         }
     }
-    impl<T: FullnodeData> Clone for FullnodeDataServer<T> {
+    impl<T> Clone for FullnodeDataServer<T> {
         fn clone(&self) -> Self {
             let inner = self.inner.clone();
             Self {
@@ -305,17 +321,9 @@ pub mod fullnode_data_server {
             }
         }
     }
-    impl<T: FullnodeData> Clone for _Inner<T> {
-        fn clone(&self) -> Self {
-            Self(Arc::clone(&self.0))
-        }
-    }
-    impl<T: std::fmt::Debug> std::fmt::Debug for _Inner<T> {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "{:?}", self.0)
-        }
-    }
-    impl<T: FullnodeData> tonic::server::NamedService for FullnodeDataServer<T> {
-        const NAME: &'static str = "aptos.internal.fullnode.v1.FullnodeData";
+    /// Generated gRPC service name
+    pub const SERVICE_NAME: &str = "aptos.internal.fullnode.v1.FullnodeData";
+    impl<T> tonic::server::NamedService for FullnodeDataServer<T> {
+        const NAME: &'static str = SERVICE_NAME;
     }
 }
