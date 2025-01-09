@@ -13,7 +13,7 @@ use std::convert::Infallible;
 use std::{fs::File, io::Read, panic::PanicInfo, path::PathBuf, process};
 use tracing::error;
 use tracing_subscriber::EnvFilter;
-use warp::{http::Response, Filter};
+use warp::{http::Response, reply::Reply, Filter};
 
 /// ServerArgs bootstraps a server with all common pieces. And then triggers the run method for
 /// the specific service.
@@ -45,8 +45,9 @@ where
 {
     let health_port = config.health_check_port;
     // Start liveness and readiness probes.
+    let config_clone = config.clone();
     let task_handler = tokio::spawn(async move {
-        register_probes_and_metrics_handler(health_port).await;
+        register_probes_and_metrics_handler(config_clone, health_port).await;
         anyhow::Ok(())
     });
     let main_task_handler =
@@ -71,7 +72,7 @@ where
     }
 }
 
-#[derive(Deserialize, Debug, Serialize)]
+#[derive(Deserialize, Clone, Debug, Serialize)]
 pub struct GenericConfig<T> {
     // Shared configuration among all services.
     pub health_check_port: u16,
@@ -96,11 +97,15 @@ where
     fn get_server_name(&self) -> String {
         self.server_config.get_server_name()
     }
+
+    async fn status_page(&self) -> Result<warp::reply::Response, warp::Rejection> {
+        self.server_config.status_page().await
+    }
 }
 
 /// RunnableConfig is a trait that all services must implement for their configuration.
 #[async_trait::async_trait]
-pub trait RunnableConfig: DeserializeOwned + Send + Sync + 'static {
+pub trait RunnableConfig: Clone + DeserializeOwned + Send + Sync + 'static {
     // Validate the config.
     fn validate(&self) -> Result<()> {
         Ok(())
@@ -111,6 +116,10 @@ pub trait RunnableConfig: DeserializeOwned + Send + Sync + 'static {
 
     // Get the server name.
     fn get_server_name(&self) -> String;
+
+    async fn status_page(&self) -> Result<warp::reply::Response, warp::Rejection> {
+        Ok("Status page is not found.".into_response())
+    }
 }
 
 /// Parse a yaml file into a struct.
@@ -181,7 +190,10 @@ pub fn setup_logging(make_writer: Option<Box<dyn Fn() -> Box<dyn std::io::Write>
 }
 
 /// Register readiness and liveness probes and set up metrics endpoint.
-async fn register_probes_and_metrics_handler(port: u16) {
+async fn register_probes_and_metrics_handler<C>(config: GenericConfig<C>, port: u16)
+where
+    C: RunnableConfig,
+{
     let readiness = warp::path("readiness")
         .map(move || warp::reply::with_status("ready", warp::http::StatusCode::OK));
 
@@ -199,6 +211,11 @@ async fn register_probes_and_metrics_handler(port: u16) {
         Response::builder()
             .header("Content-Type", "text/plain")
             .body(encode_buffer)
+    });
+
+    let status_endpoint = warp::path::end().and_then(move || {
+        let config = config.clone();
+        async move { config.status_page().await }
     });
 
     if cfg!(target_os = "linux") {
@@ -228,11 +245,16 @@ async fn register_probes_and_metrics_handler(port: u16) {
             })
         });
         #[cfg(target_os = "linux")]
-        warp::serve(readiness.or(metrics_endpoint).or(profilez))
-            .run(([0, 0, 0, 0], port))
-            .await;
+        warp::serve(
+            readiness
+                .or(metrics_endpoint)
+                .or(status_endpoint)
+                .or(profilez),
+        )
+        .run(([0, 0, 0, 0], port))
+        .await;
     } else {
-        warp::serve(readiness.or(metrics_endpoint))
+        warp::serve(readiness.or(metrics_endpoint).or(status_endpoint))
             .run(([0, 0, 0, 0], port))
             .await;
     }
