@@ -141,11 +141,13 @@ impl BatchProofQueue {
 
     #[inline]
     fn dec_unordered_proofs(&mut self, author: &PeerId, num_txns: u64) {
-        self.remaining_txns_with_duplicates -= num_txns;
-        self.remaining_proofs -= 1;
+        // TODO: figure out why sometimes there are overflows, and if that's expected
+        self.remaining_txns_with_duplicates =
+            self.remaining_txns_with_duplicates.saturating_sub(num_txns);
+        self.remaining_proofs = self.remaining_proofs.saturating_sub(1);
         if *author == self.my_peer_id {
-            self.remaining_local_txns -= num_txns;
-            self.remaining_local_proofs -= 1;
+            self.remaining_local_txns = self.remaining_local_txns.saturating_sub(num_txns);
+            self.remaining_local_proofs = self.remaining_local_proofs.saturating_sub(1);
         }
     }
 
