@@ -342,7 +342,7 @@ pub(crate) fn realistic_env_max_load_test(
     }
 
     // Create the test
-    let mempool_backlog = if ha_proxy { 30000 } else { 40000 };
+    let mempool_backlog = if ha_proxy { 30000 } else { 50000 };
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
@@ -355,10 +355,10 @@ pub(crate) fn realistic_env_max_load_test(
                     7000
                 } else if long_running {
                     // This is for forge stable
-                    11000
+                    14000
                 } else {
                     // During land time we want to be less strict, otherwise we flaky fail
-                    10000
+                    13000
                 },
             ),
         }))
@@ -395,10 +395,10 @@ pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     // the actual throughput to be able to have reasonable queueing but also so throughput
     // will improve as performance improves.
     // Overestimate: causes mempool and/or batch queueing. Underestimate: not enough txns in blocks.
-    const TARGET_TPS: usize = 15_000;
+    const TARGET_TPS: usize = 22_000;
     // Overestimate: causes blocks to be too small. Underestimate: causes blocks that are too large.
     // Ideally, want the block size to take 200-250ms of execution time to match broadcast RTT.
-    const MAX_TXNS_PER_BLOCK: usize = 3500;
+    const MAX_TXNS_PER_BLOCK: usize = 6500;
     // Overestimate: causes batch queueing. Underestimate: not enough txns in quorum store.
     // This is validator latency, minus mempool queueing time.
     const VN_LATENCY_S: f64 = 2.5;
@@ -413,7 +413,7 @@ pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             }))
             .with_validator_override_node_config_fn(Arc::new(|config, _| {
                 // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
-                optimize_state_sync_for_throughput(config, 15_000);
+                optimize_state_sync_for_throughput(config, TARGET_TPS as u64);
 
                 optimize_for_maximum_throughput(config, TARGET_TPS, MAX_TXNS_PER_BLOCK, VN_LATENCY_S);
 
@@ -452,7 +452,7 @@ pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             .with_initial_fullnode_count(VALIDATOR_COUNT)
             .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
                 // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
-                optimize_state_sync_for_throughput(config, 15_000);
+                optimize_state_sync_for_throughput(config, TARGET_TPS as u64);
 
                 // Experimental storage optimizations
                 config.storage.rocksdb_configs.enable_storage_sharding = true;
@@ -487,7 +487,7 @@ pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             );
     } else {
         forge_config = forge_config.with_success_criteria(
-            SuccessCriteria::new(11000)
+            SuccessCriteria::new(20000)
                 .add_no_restarts()
                 /* This test runs at high load, so we need more catchup time */
                 .add_wait_for_catchup_s(120),

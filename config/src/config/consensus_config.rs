@@ -14,10 +14,12 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 // NOTE: when changing, make sure to update QuorumStoreBackPressureConfig::backlog_txn_limit_count as well.
-const MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING: u64 = 3000;
-const MAX_SENDING_BLOCK_TXNS: u64 = 7000;
+const MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING: u64 = 4000;
+const MAX_SENDING_BLOCK_TXNS: u64 = 8000;
 pub(crate) static MAX_RECEIVING_BLOCK_TXNS: Lazy<u64> =
     Lazy::new(|| 10000.max(2 * MAX_SENDING_BLOCK_TXNS));
+
+const MAX_SENDING_BLOCK_BYTES: u64 = 6 * 1024 * 1024;
 // stop reducing size at this point, so 1MB transactions can still go through
 const MIN_BLOCK_BYTES_OVERRIDE: u64 = 1024 * 1024 + BATCH_PADDING_BYTES as u64;
 // We should reduce block size only until two QS batch sizes.
@@ -162,7 +164,7 @@ impl Default for ConsensusConfig {
             max_network_channel_size: 1024,
             max_sending_block_txns: MAX_SENDING_BLOCK_TXNS,
             max_sending_block_txns_after_filtering: MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
-            max_sending_block_bytes: 3 * 1024 * 1024, // 3MB
+            max_sending_block_bytes: MAX_SENDING_BLOCK_BYTES,
             max_receiving_block_txns: *MAX_RECEIVING_BLOCK_TXNS,
             max_sending_inline_txns: 100,
             max_sending_inline_bytes: 200 * 1024,       // 200 KB
@@ -213,21 +215,21 @@ impl Default for ConsensusConfig {
                     back_pressure_pipeline_latency_limit_ms: 1200,
                     max_sending_block_txns_after_filtering_override:
                         MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
+                    max_sending_block_bytes_override: MAX_SENDING_BLOCK_BYTES,
                     backpressure_proposal_delay_ms: 50,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 1500,
                     max_sending_block_txns_after_filtering_override:
                         MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
+                    max_sending_block_bytes_override: MAX_SENDING_BLOCK_BYTES,
                     backpressure_proposal_delay_ms: 100,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 1900,
                     max_sending_block_txns_after_filtering_override:
                         MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
+                    max_sending_block_bytes_override: MAX_SENDING_BLOCK_BYTES,
                     backpressure_proposal_delay_ms: 200,
                 },
                 // with execution backpressure, only later start reducing block size
@@ -266,7 +268,7 @@ impl Default for ConsensusConfig {
                     backoff_if_below_participating_voting_power_percentage: 80,
                     max_sending_block_txns_after_filtering_override:
                         MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
+                    max_sending_block_bytes_override: MAX_SENDING_BLOCK_BYTES,
                     backoff_proposal_delay_ms: 150,
                 },
                 ChainHealthBackoffValues {
