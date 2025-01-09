@@ -2159,6 +2159,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-indexer-grpc-data-service-v2"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-indexer-grpc-server-framework",
+ "async-trait",
+ "clap 4.5.21",
+ "jemallocator",
+ "serde",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-indexer-grpc-file-checker"
 version = "1.0.0"
 dependencies = [
@@ -2285,6 +2298,19 @@ dependencies = [
  "once_cell",
  "redis",
  "redis-test",
+ "tokio",
+]
+
+[[package]]
+name = "aptos-indexer-grpc-manager"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-indexer-grpc-server-framework",
+ "async-trait",
+ "clap 4.5.21",
+ "jemallocator",
+ "serde",
  "tokio",
 ]
 
