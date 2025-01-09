@@ -152,6 +152,7 @@ impl Loader {
 
     versioned_loader_getter!(ty_builder, TypeBuilder);
 
+    #[allow(dead_code)]
     fn ty_cache<'a>(&'a self, module_storage: &'a dyn ModuleStorage) -> &StructInfoCache {
         match self {
             Self::V1(loader) => &loader.type_cache,
@@ -1778,15 +1779,15 @@ impl Loader {
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
-        let ty_cache = self.ty_cache(module_storage);
-        if let Some((struct_layout, node_count, has_identifier_mappings)) =
-            ty_cache.get_struct_layout_info(&struct_name_idx, ty_args)
-        {
-            *count += node_count;
-            return Ok((struct_layout, has_identifier_mappings));
-        }
+        // let ty_cache = self.ty_cache(module_storage);
+        // if let Some((struct_layout, node_count, has_identifier_mappings)) =
+        //     ty_cache.get_struct_layout_info(&struct_name_idx, ty_args)
+        // {
+        //     *count += node_count;
+        //     return Ok((struct_layout, has_identifier_mappings));
+        // }
 
-        let count_before = *count;
+        // let count_before = *count;
         let struct_type =
             self.fetch_struct_ty_by_idx(struct_name_idx, module_store, module_storage)?;
 
@@ -1871,14 +1872,14 @@ impl Loader {
             },
         };
 
-        let field_node_count = *count - count_before;
-        ty_cache.store_struct_layout_info(
-            struct_name_idx,
-            ty_args.to_vec(),
-            layout.clone(),
-            field_node_count,
-            has_identifier_mappings,
-        );
+        // let field_node_count = *count - count_before;
+        // ty_cache.store_struct_layout_info(
+        //     struct_name_idx,
+        //     ty_args.to_vec(),
+        //     layout.clone(),
+        //     field_node_count,
+        //     has_identifier_mappings,
+        // );
         Ok((layout, has_identifier_mappings))
     }
 
@@ -2030,13 +2031,13 @@ impl Loader {
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<MoveTypeLayout> {
-        let ty_cache = self.ty_cache(module_storage);
-        if let Some((layout, annotated_node_count)) =
-            ty_cache.get_annotated_struct_layout_info(&struct_name_idx, ty_args)
-        {
-            *count += annotated_node_count;
-            return Ok(layout);
-        }
+        // let ty_cache = self.ty_cache(module_storage);
+        // if let Some((layout, annotated_node_count)) =
+        //     ty_cache.get_annotated_struct_layout_info(&struct_name_idx, ty_args)
+        // {
+        //     *count += annotated_node_count;
+        //     return Ok(layout);
+        // }
 
         let struct_type =
             self.fetch_struct_ty_by_idx(struct_name_idx, module_store, module_storage)?;
@@ -2056,7 +2057,7 @@ impl Loader {
                 .map(|(l, _)| l);
         }
 
-        let count_before = *count;
+        // let count_before = *count;
         let mut gas_context = PseudoGasContext {
             cost: 0,
             max_cost: self.vm_config().type_max_cost,
@@ -2087,14 +2088,14 @@ impl Loader {
             .collect::<PartialVMResult<Vec<_>>>()?;
         let struct_layout =
             MoveTypeLayout::Struct(MoveStructLayout::with_types(struct_tag, field_layouts));
-        let field_node_count = *count - count_before;
+        // let field_node_count = *count - count_before;
 
-        ty_cache.store_annotated_struct_layout_info(
-            struct_name_idx,
-            ty_args.to_vec(),
-            struct_layout.clone(),
-            field_node_count,
-        );
+        // ty_cache.store_annotated_struct_layout_info(
+        //     struct_name_idx,
+        //     ty_args.to_vec(),
+        //     struct_layout.clone(),
+        //     field_node_count,
+        // );
         Ok(struct_layout)
     }
 
@@ -2173,10 +2174,10 @@ impl Loader {
         module_store: &LegacyModuleStorageAdapter,
         module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<DepthFormula> {
-        let ty_cache = self.ty_cache(module_storage);
-        if let Some(depth_formula) = ty_cache.get_depth_formula(&struct_name_idx) {
-            return Ok(depth_formula);
-        }
+        // let ty_cache = self.ty_cache(module_storage);
+        // if let Some(depth_formula) = ty_cache.get_depth_formula(&struct_name_idx) {
+        //     return Ok(depth_formula);
+        // }
 
         let struct_type =
             self.fetch_struct_ty_by_idx(struct_name_idx, module_store, module_storage)?;
@@ -2198,8 +2199,8 @@ impl Loader {
 
         let formula = DepthFormula::normalize(formulas);
 
-        let struct_name_index_map = self.struct_name_index_map(module_storage);
-        ty_cache.store_depth_formula(struct_name_idx, struct_name_index_map, &formula)?;
+        // let struct_name_index_map = self.struct_name_index_map(module_storage);
+        // ty_cache.store_depth_formula(struct_name_idx, struct_name_index_map, &formula)?;
         Ok(formula)
     }
 

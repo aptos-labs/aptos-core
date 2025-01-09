@@ -86,12 +86,14 @@ impl StructInfoCache {
     }
 
     /// Returns the depth formula associated with a struct, or [None] if it has not been cached.
+    #[allow(dead_code)]
     pub(crate) fn get_depth_formula(&self, idx: &StructNameIndex) -> Option<DepthFormula> {
         Some(self.0.read().get(idx)?.depth_formula.as_ref()?.0.clone())
     }
 
     /// Caches the depth formula, returning an error if the same thread has cached it before (i.e.,
     /// a recursive type has been found).
+    #[allow(dead_code)]
     pub(crate) fn store_depth_formula(
         &self,
         idx: StructNameIndex,
@@ -164,6 +166,7 @@ impl StructInfoCache {
     }
 
     /// Returns struct layout information if it has been cached, and [None] otherwise.
+    #[allow(dead_code)]
     pub(crate) fn get_struct_layout_info(
         &self,
         idx: &StructNameIndex,
@@ -180,6 +183,7 @@ impl StructInfoCache {
     }
 
     /// Caches struct layout information.
+    #[allow(dead_code)]
     pub(crate) fn store_struct_layout_info(
         &self,
         idx: StructNameIndex,
@@ -203,6 +207,7 @@ impl StructInfoCache {
     }
 
     /// Returns annotated struct layout information if it has been cached, and [None] otherwise.
+    #[allow(dead_code)]
     pub(crate) fn get_annotated_struct_layout_info(
         &self,
         idx: &StructNameIndex,
@@ -219,6 +224,7 @@ impl StructInfoCache {
     }
 
     /// Caches annotated struct layout information.
+    #[allow(dead_code)]
     pub(crate) fn store_annotated_struct_layout_info(
         &self,
         idx: StructNameIndex,
