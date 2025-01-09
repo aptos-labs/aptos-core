@@ -12,6 +12,7 @@ use aptos_types::block_executor::{
 };
 use aptos_vm::VMBlockExecutor;
 use std::{
+    collections::HashMap,
     sync::{mpsc, Arc},
     time::{Duration, Instant},
 };
@@ -50,6 +51,7 @@ where
         current_block_start_time: Instant,
         partition_time: Duration,
         executable_block: ExecutableBlock,
+        event_summary: &mut HashMap<String, usize>,
     ) {
         let execution_start_time = Instant::now();
         if self.maybe_first_block_start_time.is_none() {

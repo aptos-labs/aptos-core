@@ -31,6 +31,8 @@ class Flow(Flag):
     AGG_V2 = auto()
     # Test resource groups
     RESOURCE_GROUPS = auto()
+    # Econia tests
+    ECONIA = auto()
     # Test different executor types
     EXECUTORS = auto()
 
@@ -38,8 +40,7 @@ class Flow(Flag):
 # Tests that are run on LAND_BLOCKING and continuously on main
 LAND_BLOCKING_AND_C = Flow.LAND_BLOCKING | Flow.CONTINUOUS
 
-SELECTED_FLOW = Flow[os.environ.get("FLOW", default="LAND_BLOCKING")]
-
+SELECTED_FLOW = Flow[os.environ.get("FLOW", default="ECONIA")]
 print(f"Executing flow: {SELECTED_FLOW}")
 IS_MAINNET = SELECTED_FLOW in [Flow.MAINNET, Flow.MAINNET_LARGE_DB]
 SOURCE = os.environ.get("SOURCE", default="LOCAL")
@@ -50,19 +51,21 @@ if SOURCE not in ["ADHOC", "CI", "LOCAL"]:
 RUNNER_NAME = os.environ.get("RUNNER_NAME", default="none")
 
 DEFAULT_NUM_INIT_ACCOUNTS = (
-    "100000000" if SELECTED_FLOW == Flow.MAINNET_LARGE_DB else "2000000"
+    "100000000" if SELECTED_FLOW == Flow.MAINNET_LARGE_DB else "300000"
 )
 DEFAULT_MAX_BLOCK_SIZE = "10000"
 
 MAX_BLOCK_SIZE = int(os.environ.get("MAX_BLOCK_SIZE", default=DEFAULT_MAX_BLOCK_SIZE))
-NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=30))
+NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=200))
 NUM_BLOCKS_DETAILED = 10
-NUM_ACCOUNTS = max(
-    [
-        int(os.environ.get("NUM_INIT_ACCOUNTS", default=DEFAULT_NUM_INIT_ACCOUNTS)),
-        (2 + 2 * NUM_BLOCKS) * MAX_BLOCK_SIZE,
-    ]
-)
+# NUM_ACCOUNTS = max(
+#     [
+#         int(os.environ.get("NUM_INIT_ACCOUNTS", default=DEFAULT_NUM_INIT_ACCOUNTS)),
+#         (2 + 2 * NUM_BLOCKS) * MAX_BLOCK_SIZE,
+#     ]
+# )
+# NUM_ACCOUNTS = (2 + 2 * NUM_BLOCKS) * MAX_BLOCK_SIZE
+NUM_ACCOUNTS = 10000
 MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 
 NOISE_LOWER_LIMIT = 0.98 if IS_MAINNET else 0.8
@@ -176,6 +179,18 @@ with open('testsuite/single_node_performance_values.tsv', 'r') as file:
 DEFAULT_MODULE_WORKING_SET_SIZE = 100
 
 TESTS = [
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-basic1-market"), expected_stages=10, included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-mixed1-market"), expected_stages=10, included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-mixed10-market"), expected_stages=10, included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-mixed100-market"), expected_stages=10, included_in=Flow.ECONIA),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-basic1-market"), included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-market1-market"), included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-market10-market"), included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-market100-market"), included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-mixed1-market"), included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-mixed10-market"), included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-mixed100-market"), included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-real"), included_in=Flow.ECONIA),
     RunGroupConfig(key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(key=RunGroupKey("apt-fa-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.MAINNET),

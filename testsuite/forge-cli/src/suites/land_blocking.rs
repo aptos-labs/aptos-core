@@ -2,9 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::ungrouped::mixed_emit_job;
-use crate::{suites::realistic_environment::realistic_env_max_load_test, TestCommand};
-use aptos_forge::{success_criteria::SuccessCriteria, ForgeConfig};
+use super::{pfn::pfn_const_tps, ungrouped::mixed_emit_job};
+use crate::TestCommand;
+use aptos_forge::{success_criteria::SuccessCriteria, ForgeConfig, args::TransactionTypeArg};
 use aptos_testcases::{
     compatibility_test::SimpleValidatorUpgrade, framework_upgrade::FrameworkUpgrade,
 };
@@ -14,11 +14,12 @@ use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 pub(crate) fn get_land_blocking_test(
     test_name: &str,
     duration: Duration,
-    test_cmd: &TestCommand,
+    _test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" | "realistic_env_max_load" => {
-            realistic_env_max_load_test(duration, test_cmd, 7, 5)
+            pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaMarket1MarketReuseAccounts.materialize_default(), 10000)
+            // realistic_env_max_load_test(duration, test_cmd, 7, 5)
         },
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
