@@ -62,16 +62,6 @@ pub(crate) fn realistic_env_sweep_wrap(
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
         }))
         .add_network_test(test)
-        .with_validator_resource_override(NodeResourceOverride {
-            cpu_cores: Some(60),
-            memory_gib: Some(200),
-            storage_gib: Some(500), // assuming we're using these large marchines for long-running or expensive tests which need more disk
-        })
-        .with_fullnode_resource_override(NodeResourceOverride {
-            cpu_cores: Some(60),
-            memory_gib: Some(200),
-            storage_gib: Some(500),
-        })
         // Test inherits the main EmitJobRequest, so update here for more precise latency measurements
         .with_emit_job(
             EmitJobRequest::default().latency_polling_interval(Duration::from_millis(100)),
