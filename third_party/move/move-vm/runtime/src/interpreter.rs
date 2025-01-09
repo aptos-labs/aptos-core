@@ -5,7 +5,9 @@
 use crate::{
     access_control::AccessControlState,
     data_cache::TransactionDataCache,
-    frame_type_cache::{FrameTypeCache, PerInstructionCache},
+    frame_type_cache::{
+        AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, PerInstructionCache, RuntimeCacheTraits,
+    },
     loader::{LegacyModuleStorageAdapter, Loader, Resolver},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
@@ -41,9 +43,11 @@ use move_vm_types::{
     views::TypeView,
 };
 use std::{
+    cell::RefCell,
     cmp::min,
     collections::{BTreeSet, VecDeque},
     fmt::Write,
+    rc::Rc,
 };
 
 macro_rules! set_err_info {
@@ -146,9 +150,9 @@ impl InterpreterImpl {
             active_modules: BTreeSet::new(),
         };
 
-        let function = std::rc::Rc::new(function);
+        let function = Rc::new(function);
         if loader.vm_config().paranoid_type_checks {
-            interpreter.execute_main::<FullRuntimeTypeCheck>(
+            interpreter.dispatch_execute_main::<FullRuntimeTypeCheck>(
                 loader,
                 data_store,
                 module_store,
@@ -160,7 +164,7 @@ impl InterpreterImpl {
                 args,
             )
         } else {
-            interpreter.execute_main::<NoRuntimeTypeCheck>(
+            interpreter.dispatch_execute_main::<NoRuntimeTypeCheck>(
                 loader,
                 data_store,
                 module_store,
@@ -212,13 +216,52 @@ impl InterpreterImpl {
         Ok(function)
     }
 
+    fn dispatch_execute_main<RTTCheck: RuntimeTypeCheck>(
+        self,
+        loader: &Loader,
+        data_store: &mut TransactionDataCache,
+        module_store: &LegacyModuleStorageAdapter,
+        module_storage: &impl ModuleStorage,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+        extensions: &mut NativeContextExtensions,
+        function: Rc<LoadedFunction>,
+        args: Vec<Value>,
+    ) -> VMResult<Vec<Value>> {
+        if true {
+            self.execute_main::<RTTCheck, NoRuntimeCaches>(
+                loader,
+                data_store,
+                module_store,
+                module_storage,
+                gas_meter,
+                traversal_context,
+                extensions,
+                function,
+                args,
+            )
+        } else {
+            self.execute_main::<RTTCheck, AllRuntimeCaches>(
+                loader,
+                data_store,
+                module_store,
+                module_storage,
+                gas_meter,
+                traversal_context,
+                extensions,
+                function,
+                args,
+            )
+        }
+    }
+
     /// Main loop for the execution of a function.
     ///
     /// This function sets up a `Frame` and calls `execute_code_unit` to execute code of the
     /// function represented by the frame. Control comes back to this function on return or
     /// on call. When that happens the frame is changes to a new one (call) or to the one
     /// at the top of the stack (return). If the call stack is empty execution is completed.
-    fn execute_main<RTTCheck: RuntimeTypeCheck>(
+    fn execute_main<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         mut self,
         loader: &Loader,
         data_store: &mut TransactionDataCache,
@@ -227,7 +270,7 @@ impl InterpreterImpl {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
-        function: std::rc::Rc<LoadedFunction>,
+        function: Rc<LoadedFunction>,
         args: Vec<Value>,
     ) -> VMResult<Vec<Value>> {
         let mut locals = Locals::new(function.local_tys().len());
@@ -241,9 +284,9 @@ impl InterpreterImpl {
             self.active_modules.insert(module_id.clone());
         }
 
-        let frame_cache = std::rc::Rc::new(std::cell::RefCell::new(Default::default()));
+        let frame_cache = Rc::new(RefCell::new(Default::default()));
 
-        if !function.is_native() {
+        if RTCaches::per_instruction_cache_enabled() && !function.is_native() {
             let f_cache: &mut FrameTypeCache = &mut frame_cache.borrow_mut();
             f_cache
                 .per_instruction_cache
@@ -262,7 +305,7 @@ impl InterpreterImpl {
         loop {
             let resolver = current_frame.resolver(loader, module_store, module_storage);
             let exit_code = current_frame
-                .execute_code::<RTTCheck>(&resolver, &mut self, data_store, gas_meter)
+                .execute_code::<RTTCheck, RTCaches>(&resolver, &mut self, data_store, gas_meter)
                 .map_err(|err| self.attach_state_if_invariant_violation(err, &current_frame))?;
 
             match exit_code {
@@ -301,22 +344,25 @@ impl InterpreterImpl {
                     }
                 },
                 ExitCode::Call(fh_idx) => {
-                    let (function, frame_cache) = {
+                    let (function, frame_cache) = if RTCaches::call_tree_cache_enabled() {
                         let current_frame_cache = &mut *current_frame.ty_cache.borrow_mut();
 
                         match current_frame_cache.sub_frame_cache.entry(fh_idx) {
                             std::collections::btree_map::Entry::Occupied(entry) => {
                                 let entry = entry.get();
-                                (std::rc::Rc::clone(&entry.0), std::rc::Rc::clone(&entry.1))
+                                (Rc::clone(&entry.0), Rc::clone(&entry.1))
                             },
                             std::collections::btree_map::Entry::Vacant(entry) => {
-                                let function = std::rc::Rc::<LoadedFunction>::new(
-                                    self.load_function(&resolver, &current_frame, fh_idx)?,
-                                );
-                                let frame_cache =
-                                    std::rc::Rc::new(std::cell::RefCell::new(Default::default()));
+                                let function = Rc::<LoadedFunction>::new(self.load_function(
+                                    &resolver,
+                                    &current_frame,
+                                    fh_idx,
+                                )?);
+                                let frame_cache = Rc::new(RefCell::new(Default::default()));
 
-                                if !function.is_native() {
+                                if RTCaches::per_instruction_cache_enabled()
+                                    && !function.is_native()
+                                {
                                     let f_cache: &mut FrameTypeCache =
                                         &mut frame_cache.borrow_mut();
                                     f_cache
@@ -324,13 +370,18 @@ impl InterpreterImpl {
                                         .resize(function.code_size(), PerInstructionCache::Nothing);
                                 }
 
-                                entry.insert((
-                                    std::rc::Rc::clone(&function),
-                                    std::rc::Rc::clone(&frame_cache),
-                                ));
+                                entry.insert((Rc::clone(&function), Rc::clone(&frame_cache)));
                                 (function, frame_cache)
                             },
                         }
+                    } else {
+                        let function = Rc::<LoadedFunction>::new(self.load_function(
+                            &resolver,
+                            &current_frame,
+                            fh_idx,
+                        )?);
+                        let frame_cache = Rc::new(RefCell::new(Default::default()));
+                        (function, frame_cache)
                     };
 
                     // Charge gas
@@ -354,7 +405,7 @@ impl InterpreterImpl {
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
                     if function.is_native() {
-                        self.call_native::<RTTCheck>(
+                        self.call_native::<RTTCheck, RTCaches>(
                             &mut current_frame,
                             &resolver,
                             data_store,
@@ -366,7 +417,7 @@ impl InterpreterImpl {
                         continue;
                     }
 
-                    self.set_new_call_frame::<RTTCheck>(
+                    self.set_new_call_frame::<RTTCheck, RTCaches>(
                         &mut current_frame,
                         gas_meter,
                         loader,
@@ -375,27 +426,27 @@ impl InterpreterImpl {
                     )?;
                 },
                 ExitCode::CallGeneric(idx) => {
-                    let (function, frame_cache) = {
+                    let (function, frame_cache) = if RTCaches::call_tree_cache_enabled() {
                         let current_frame_cache = &mut *current_frame.ty_cache.borrow_mut();
 
                         match current_frame_cache.generic_sub_frame_cache.entry(idx) {
                             std::collections::btree_map::Entry::Occupied(entry) => {
                                 let entry = entry.get();
-                                (std::rc::Rc::clone(&entry.0), std::rc::Rc::clone(&entry.1))
+                                (Rc::clone(&entry.0), Rc::clone(&entry.1))
                             },
                             std::collections::btree_map::Entry::Vacant(entry) => {
-                                let function = std::rc::Rc::<LoadedFunction>::new(
-                                    self.load_generic_function(
+                                let function =
+                                    Rc::<LoadedFunction>::new(self.load_generic_function(
                                         &resolver,
                                         &current_frame,
                                         gas_meter,
                                         idx,
-                                    )?,
-                                );
-                                let frame_cache =
-                                    std::rc::Rc::new(std::cell::RefCell::new(Default::default()));
+                                    )?);
+                                let frame_cache = Rc::new(RefCell::new(Default::default()));
 
-                                if !function.is_native() {
+                                if RTCaches::per_instruction_cache_enabled()
+                                    && !function.is_native()
+                                {
                                     let f_cache: &mut FrameTypeCache =
                                         &mut frame_cache.borrow_mut();
                                     f_cache
@@ -403,13 +454,19 @@ impl InterpreterImpl {
                                         .resize(function.code_size(), PerInstructionCache::Nothing);
                                 }
 
-                                entry.insert((
-                                    std::rc::Rc::clone(&function),
-                                    std::rc::Rc::clone(&frame_cache),
-                                ));
+                                entry.insert((Rc::clone(&function), Rc::clone(&frame_cache)));
                                 (function, frame_cache)
                             },
                         }
+                    } else {
+                        let function = Rc::<LoadedFunction>::new(self.load_generic_function(
+                            &resolver,
+                            &current_frame,
+                            gas_meter,
+                            idx,
+                        )?);
+                        let frame_cache = Rc::new(RefCell::new(Default::default()));
+                        (function, frame_cache)
                     };
 
                     // Charge gas?
@@ -436,7 +493,7 @@ impl InterpreterImpl {
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
                     if function.is_native() {
-                        self.call_native::<RTTCheck>(
+                        self.call_native::<RTTCheck, RTCaches>(
                             &mut current_frame,
                             &resolver,
                             data_store,
@@ -448,7 +505,7 @@ impl InterpreterImpl {
                         continue;
                     }
 
-                    self.set_new_call_frame::<RTTCheck>(
+                    self.set_new_call_frame::<RTTCheck, RTCaches>(
                         &mut current_frame,
                         gas_meter,
                         loader,
@@ -460,13 +517,13 @@ impl InterpreterImpl {
         }
     }
 
-    fn set_new_call_frame<RTTCheck: RuntimeTypeCheck>(
+    fn set_new_call_frame<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         current_frame: &mut Frame,
         gas_meter: &mut impl GasMeter,
         loader: &Loader,
-        function: std::rc::Rc<LoadedFunction>,
-        frame_cache: std::rc::Rc<std::cell::RefCell<FrameTypeCache>>,
+        function: Rc<LoadedFunction>,
+        frame_cache: Rc<RefCell<FrameTypeCache>>,
     ) -> VMResult<()> {
         match (function.module_id(), current_frame.function.module_id()) {
             (Some(module_id), Some(current_module_id)) if module_id != current_module_id => {
@@ -489,7 +546,7 @@ impl InterpreterImpl {
         }
 
         let mut frame = self
-            .make_call_frame::<RTTCheck>(gas_meter, loader, function, frame_cache)
+            .make_call_frame::<RTTCheck, RTCaches>(gas_meter, loader, function, frame_cache)
             .map_err(|err| {
                 self.attach_state_if_invariant_violation(self.set_location(err), current_frame)
             })?;
@@ -513,12 +570,12 @@ impl InterpreterImpl {
     ///
     /// Native functions do not push a frame at the moment and as such errors from a native
     /// function are incorrectly attributed to the caller.
-    fn make_call_frame<RTTCheck: RuntimeTypeCheck>(
+    fn make_call_frame<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         gas_meter: &mut impl GasMeter,
         loader: &Loader,
-        function: std::rc::Rc<LoadedFunction>,
-        frame_cache: std::rc::Rc<std::cell::RefCell<FrameTypeCache>>,
+        function: Rc<LoadedFunction>,
+        frame_cache: Rc<RefCell<FrameTypeCache>>,
     ) -> PartialVMResult<Frame> {
         let mut locals = Locals::new(function.local_tys().len());
         let num_param_tys = function.param_tys().len();
@@ -555,9 +612,9 @@ impl InterpreterImpl {
         &self,
         gas_meter: &mut impl GasMeter,
         loader: &Loader,
-        function: std::rc::Rc<LoadedFunction>,
+        function: Rc<LoadedFunction>,
         locals: Locals,
-        frame_cache: std::rc::Rc<std::cell::RefCell<FrameTypeCache>>,
+        frame_cache: Rc<RefCell<FrameTypeCache>>,
     ) -> PartialVMResult<Frame> {
         let ty_args = function.ty_args();
         for ty in function.local_tys() {
@@ -590,7 +647,7 @@ impl InterpreterImpl {
     }
 
     /// Call a native functions.
-    fn call_native<RTTCheck: RuntimeTypeCheck>(
+    fn call_native<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         current_frame: &mut Frame,
         resolver: &Resolver,
@@ -601,7 +658,7 @@ impl InterpreterImpl {
         function: &LoadedFunction,
     ) -> VMResult<()> {
         // Note: refactor if native functions push a frame on the stack
-        self.call_native_impl::<RTTCheck>(
+        self.call_native_impl::<RTTCheck, RTCaches>(
             current_frame,
             resolver,
             data_store,
@@ -628,7 +685,7 @@ impl InterpreterImpl {
         })
     }
 
-    fn call_native_impl<RTTCheck: RuntimeTypeCheck>(
+    fn call_native_impl<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         current_frame: &mut Frame,
         resolver: &Resolver,
@@ -807,20 +864,20 @@ impl InterpreterImpl {
                     }
                 }
 
-                let frame_cache = std::rc::Rc::new(std::cell::RefCell::new(Default::default()));
+                let frame_cache = Rc::new(RefCell::new(Default::default()));
 
-                if !target_func.is_native() {
+                if RTCaches::per_instruction_cache_enabled() && !target_func.is_native() {
                     let f_cache: &mut FrameTypeCache = &mut frame_cache.borrow_mut();
                     f_cache
                         .per_instruction_cache
                         .resize(target_func.code_size(), PerInstructionCache::Nothing);
                 }
 
-                self.set_new_call_frame::<RTTCheck>(
+                self.set_new_call_frame::<RTTCheck, RTCaches>(
                     current_frame,
                     gas_meter,
                     resolver.loader(),
-                    std::rc::Rc::new(target_func),
+                    Rc::new(target_func),
                     frame_cache,
                 )
                 .map_err(|err| err.to_partial())
@@ -1558,13 +1615,13 @@ fn check_depth_of_type_impl(
 struct Frame {
     pc: u16,
     // Currently being executed function.
-    function: std::rc::Rc<LoadedFunction>,
+    function: Rc<LoadedFunction>,
     // Locals for this execution context and their instantiated types.
     locals: Locals,
     local_tys: Vec<Type>,
     // Cache of types accessed in this frame, to improve performance when accessing
     // and constructing types.
-    pub(crate) ty_cache: std::rc::Rc<std::cell::RefCell<FrameTypeCache>>,
+    pub(crate) ty_cache: Rc<RefCell<FrameTypeCache>>,
 }
 
 /// An `ExitCode` from `execute_code_unit`.
@@ -1587,14 +1644,14 @@ impl AccessSpecifierEnv for Frame {
 
 impl Frame {
     /// Execute a Move function until a return or a call opcode is found.
-    fn execute_code<RTTCheck: RuntimeTypeCheck>(
+    fn execute_code<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         resolver: &Resolver,
         interpreter: &mut InterpreterImpl,
         data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
     ) -> VMResult<ExitCode> {
-        self.execute_code_impl::<RTTCheck>(resolver, interpreter, data_store, gas_meter)
+        self.execute_code_impl::<RTTCheck, RTCaches>(resolver, interpreter, data_store, gas_meter)
             .map_err(|e| {
                 let e = if cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
                     e.with_exec_state(interpreter.get_internal_state())
@@ -1605,7 +1662,7 @@ impl Frame {
             })
     }
 
-    fn execute_code_impl<RTTCheck: RuntimeTypeCheck>(
+    fn execute_code_impl<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         resolver: &Resolver,
         interpreter: &mut InterpreterImpl,
@@ -1886,7 +1943,7 @@ impl Frame {
                         interpreter.operand_stack.push(field_ref)?;
                     },
                     Bytecode::Pack(sd_idx) => {
-                        let field_count = {
+                        let field_count = if RTCaches::per_instruction_cache_enabled() {
                             let cached_field_count =
                                 &ty_cache.per_instruction_cache[self.pc as usize];
                             if let PerInstructionCache::Pack(ref field_count) = cached_field_count {
@@ -1899,7 +1956,13 @@ impl Frame {
                                     PerInstructionCache::Pack(field_count);
                                 field_count
                             }
+                        } else {
+                            let field_count = resolver.field_count(*sd_idx);
+                            let struct_type = resolver.get_struct_ty(*sd_idx);
+                            check_depth_of_type(resolver, &struct_type)?;
+                            field_count
                         };
+
                         gas_meter.charge_pack(
                             false,
                             interpreter.operand_stack.last_n(field_count as usize)?,

@@ -17,6 +17,39 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
+pub(crate) trait RuntimeCacheTraits {
+    fn per_instruction_cache_enabled() -> bool;
+    fn call_tree_cache_enabled() -> bool;
+    fn global_instantiated_functions_cache_enabled() -> bool;
+}
+
+pub(crate) struct NoRuntimeCaches;
+pub(crate) struct AllRuntimeCaches;
+
+impl RuntimeCacheTraits for NoRuntimeCaches {
+    fn per_instruction_cache_enabled() -> bool {
+        false
+    }
+    fn call_tree_cache_enabled() -> bool {
+        false
+    }
+    fn global_instantiated_functions_cache_enabled() -> bool {
+        false
+    }
+}
+
+impl RuntimeCacheTraits for AllRuntimeCaches {
+    fn per_instruction_cache_enabled() -> bool {
+        true
+    }
+    fn call_tree_cache_enabled() -> bool {
+        true
+    }
+    fn global_instantiated_functions_cache_enabled() -> bool {
+        true
+    }
+}
+
 #[derive(Clone)]
 pub(crate) enum PerInstructionCache {
     Nothing,
