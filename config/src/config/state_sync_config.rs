@@ -11,13 +11,13 @@ use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
 // The maximum message size per state sync message
-const MAX_MESSAGE_SIZE: usize = 10 * 1024 * 1024; /* 10 MiB */
+const MAX_MESSAGE_SIZE: usize = 100 * 1024 * 1024; /* 10 MiB */
 
 // The maximum chunk sizes for data client requests and response
 const MAX_EPOCH_CHUNK_SIZE: u64 = 200;
 const MAX_STATE_CHUNK_SIZE: u64 = 4000;
-const MAX_TRANSACTION_CHUNK_SIZE: u64 = 3000;
-const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 3000;
+const MAX_TRANSACTION_CHUNK_SIZE: u64 = 30000;
+const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 30000;
 
 // The maximum number of concurrent requests to send
 const MAX_CONCURRENT_REQUESTS: u64 = 6;
