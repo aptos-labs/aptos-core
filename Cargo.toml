@@ -720,8 +720,8 @@ prometheus-http-query = "0.5.2"
 prometheus-parse = "0.2.4"
 proptest = "1.4.0"
 proptest-derive = "0.4.0"
-prost = { version = "0.12.3", features = ["no-recursion-limit"] }
-prost-types = "0.12.3"
+prost = { version = "0.13.4", features = ["no-recursion-limit"] }
+prost-types = "0.13.4"
 quanta = "0.10.1"
 quick_cache = "0.5.1"
 quick-junit = "0.5.0"
@@ -816,7 +816,7 @@ tokio-stream = { version = "0.1.14", features = ["fs"] }
 tokio-test = "0.4.1"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
 toml = "0.7.4"
-tonic = { version = "0.11.0", features = [
+tonic = { version = "0.12.3", features = [
     "tls-roots",
     "transport",
     "prost",
@@ -824,7 +824,7 @@ tonic = { version = "0.11.0", features = [
     "codegen",
     "zstd",
 ] }
-tonic-reflection = "0.11.0"
+tonic-reflection = "0.12.3"
 topological-sort = "0.2.2"
 triomphe = "0.1.9"
 tsify-next = "0.5.4"
