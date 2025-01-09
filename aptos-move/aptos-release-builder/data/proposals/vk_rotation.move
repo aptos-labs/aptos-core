@@ -6,8 +6,7 @@ script {
         let framework_signer = aptos_governance::resolve_multi_step_proposal(
             proposal_id,
             @0x1,
-            x"",
-            // {{ script_hash }},
+            {{ script_hash }},
         );
         keyless_account::update_training_wheels_for_next_epoch(&framework_signer, option::some(x"FF"));
         // Action: obtain the values below from vk file. https://github.com/aptos-labs/snarkjs-to-aptos may help.
