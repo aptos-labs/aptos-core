@@ -4,7 +4,13 @@
 // @generated
 /// Generated client implementations.
 pub mod network_message_service_client {
-    #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
+    #![allow(
+        unused_variables,
+        dead_code,
+        missing_docs,
+        clippy::wildcard_imports,
+        clippy::let_unit_value,
+    )]
     use tonic::codegen::*;
     use tonic::codegen::http::Uri;
     ///
@@ -27,8 +33,8 @@ pub mod network_message_service_client {
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
         T::Error: Into<StdError>,
-        T::ResponseBody: Body<Data = Bytes> + Send + 'static,
-        <T::ResponseBody as Body>::Error: Into<StdError> + Send,
+        T::ResponseBody: Body<Data = Bytes> + std::marker::Send + 'static,
+        <T::ResponseBody as Body>::Error: Into<StdError> + std::marker::Send,
     {
         pub fn new(inner: T) -> Self {
             let inner = tonic::client::Grpc::new(inner);
@@ -53,7 +59,7 @@ pub mod network_message_service_client {
             >,
             <T as tonic::codegen::Service<
                 http::Request<tonic::body::BoxBody>,
-            >>::Error: Into<StdError> + Send + Sync,
+            >>::Error: Into<StdError> + std::marker::Send + std::marker::Sync,
         {
             NetworkMessageServiceClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -97,8 +103,7 @@ pub mod network_message_service_client {
                 .ready()
                 .await
                 .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
+                    tonic::Status::unknown(
                         format!("Service was not ready: {}", e.into()),
                     )
                 })?;
@@ -120,11 +125,17 @@ pub mod network_message_service_client {
 }
 /// Generated server implementations.
 pub mod network_message_service_server {
-    #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
+    #![allow(
+        unused_variables,
+        dead_code,
+        missing_docs,
+        clippy::wildcard_imports,
+        clippy::let_unit_value,
+    )]
     use tonic::codegen::*;
     /// Generated trait containing gRPC methods that should be implemented for use with NetworkMessageServiceServer.
     #[async_trait]
-    pub trait NetworkMessageService: Send + Sync + 'static {
+    pub trait NetworkMessageService: std::marker::Send + std::marker::Sync + 'static {
         ///
         async fn simple_msg_exchange(
             &self,
@@ -133,14 +144,14 @@ pub mod network_message_service_server {
     }
     ///
     #[derive(Debug)]
-    pub struct NetworkMessageServiceServer<T: NetworkMessageService> {
+    pub struct NetworkMessageServiceServer<T> {
         inner: Arc<T>,
         accept_compression_encodings: EnabledCompressionEncodings,
         send_compression_encodings: EnabledCompressionEncodings,
         max_decoding_message_size: Option<usize>,
         max_encoding_message_size: Option<usize>,
     }
-    impl<T: NetworkMessageService> NetworkMessageServiceServer<T> {
+    impl<T> NetworkMessageServiceServer<T> {
         pub fn new(inner: T) -> Self {
             Self::from_arc(Arc::new(inner))
         }
@@ -195,8 +206,8 @@ pub mod network_message_service_server {
     for NetworkMessageServiceServer<T>
     where
         T: NetworkMessageService,
-        B: Body + Send + 'static,
-        B::Error: Into<StdError> + Send + 'static,
+        B: Body + std::marker::Send + 'static,
+        B::Error: Into<StdError> + std::marker::Send + 'static,
     {
         type Response = http::Response<tonic::body::BoxBody>;
         type Error = std::convert::Infallible;
@@ -260,23 +271,25 @@ pub mod network_message_service_server {
                 }
                 _ => {
                     Box::pin(async move {
-                        Ok(
-                            http::Response::builder()
-                                .status(200)
-                                .header("grpc-status", tonic::Code::Unimplemented as i32)
-                                .header(
-                                    http::header::CONTENT_TYPE,
-                                    tonic::metadata::GRPC_CONTENT_TYPE,
-                                )
-                                .body(empty_body())
-                                .unwrap(),
-                        )
+                        let mut response = http::Response::new(empty_body());
+                        let headers = response.headers_mut();
+                        headers
+                            .insert(
+                                tonic::Status::GRPC_STATUS,
+                                (tonic::Code::Unimplemented as i32).into(),
+                            );
+                        headers
+                            .insert(
+                                http::header::CONTENT_TYPE,
+                                tonic::metadata::GRPC_CONTENT_TYPE,
+                            );
+                        Ok(response)
                     })
                 }
             }
         }
     }
-    impl<T: NetworkMessageService> Clone for NetworkMessageServiceServer<T> {
+    impl<T> Clone for NetworkMessageServiceServer<T> {
         fn clone(&self) -> Self {
             let inner = self.inner.clone();
             Self {
@@ -288,8 +301,9 @@ pub mod network_message_service_server {
             }
         }
     }
-    impl<T: NetworkMessageService> tonic::server::NamedService
-    for NetworkMessageServiceServer<T> {
-        const NAME: &'static str = "aptos.remote_executor.v1.NetworkMessageService";
+    /// Generated gRPC service name
+    pub const SERVICE_NAME: &str = "aptos.remote_executor.v1.NetworkMessageService";
+    impl<T> tonic::server::NamedService for NetworkMessageServiceServer<T> {
+        const NAME: &'static str = SERVICE_NAME;
     }
 }
