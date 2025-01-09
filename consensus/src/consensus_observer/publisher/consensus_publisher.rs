@@ -17,9 +17,11 @@ use crate::consensus_observer::{
 };
 use aptos_channels::aptos_channel::Receiver;
 use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
+use aptos_crypto::HashValue;
 use aptos_infallible::RwLock;
 use aptos_logger::{error, info, warn};
 use aptos_network::application::interface::NetworkClient;
+use dashmap::DashMap;
 use futures::StreamExt;
 use futures_channel::mpsc;
 use std::{collections::HashSet, sync::Arc, time::Duration};
@@ -41,6 +43,8 @@ pub struct ConsensusPublisher {
 
     // The sender for outbound network messages
     outbound_message_sender: mpsc::Sender<(PeerNetworkId, ConsensusObserverDirectSend)>,
+
+    buffered_ordered_block: DashMap<HashValue, ConsensusObserverDirectSend>,
 }
 
 impl ConsensusPublisher {
@@ -64,6 +68,7 @@ impl ConsensusPublisher {
             consensus_observer_config,
             active_subscribers: Arc::new(RwLock::new(HashSet::new())),
             outbound_message_sender,
+            buffered_ordered_block: DashMap::new(),
         };
 
         // Return the publisher and the outbound message receiver
@@ -228,6 +233,16 @@ impl ConsensusPublisher {
                             peer_network_id, error
                     )));
             }
+        }
+    }
+
+    pub fn buffer_ordered_block(&self, block_id: HashValue, message: ConsensusObserverDirectSend) {
+        self.buffered_ordered_block.insert(block_id, message);
+    }
+
+    pub fn flush_buffered_ordered_block(&self, block_id: HashValue) {
+        if let Some((_, message)) = self.buffered_ordered_block.remove(&block_id) {
+            self.publish_message(message);
         }
     }
 
