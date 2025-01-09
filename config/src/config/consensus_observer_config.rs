@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
 // Useful constants for enabling consensus observer on different node types
-const ENABLE_ON_VALIDATORS: bool = false;
-const ENABLE_ON_VALIDATOR_FULLNODES: bool = false;
-const ENABLE_ON_PUBLIC_FULLNODES: bool = false;
+const ENABLE_ON_VALIDATORS: bool = true;
+const ENABLE_ON_VALIDATOR_FULLNODES: bool = true;
+const ENABLE_ON_PUBLIC_FULLNODES: bool = true;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
