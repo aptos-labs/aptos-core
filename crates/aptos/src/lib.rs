@@ -22,6 +22,7 @@ use crate::common::{
     types::{CliCommand, CliResult, CliTypedResult},
     utils::cli_build_information,
 };
+use aptos_workspace_server::WorkspaceCommand;
 use async_trait::async_trait;
 use clap::Parser;
 use std::collections::BTreeMap;
@@ -53,7 +54,7 @@ pub enum Tool {
     #[clap(subcommand)]
     Update(update::UpdateTool),
     #[clap(subcommand, hide(true))]
-    Workspace(workspace::WorkspaceTool),
+    Workspace(WorkspaceCommand),
 }
 
 impl Tool {
@@ -73,7 +74,7 @@ impl Tool {
             Node(tool) => tool.execute().await,
             Stake(tool) => tool.execute().await,
             Update(tool) => tool.execute().await,
-            Workspace(tool) => tool.execute().await,
+            Workspace(workspace) => workspace.execute_serialized_without_logger().await,
         }
     }
 }
