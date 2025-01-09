@@ -411,7 +411,9 @@ impl BufferManager {
                 ordered_blocks.clone().into_iter().map(Arc::new).collect(),
                 ordered_proof.clone(),
             );
-            consensus_publisher.publish_message(message);
+            // consensus_publisher.publish_message(message);
+            let block_id = ordered_blocks.last().unwrap().id();
+            consensus_publisher.buffer_ordered_block(block_id, message);
         }
         self.execution_schedule_phase_tx
             .send(request)
@@ -526,6 +528,8 @@ impl BufferManager {
                     self.reset().await;
                 }
                 if let Some(consensus_publisher) = &self.consensus_publisher {
+                    let block_id = block.id();
+                    consensus_publisher.flush_buffered_ordered_block(block_id);
                     let message =
                         ConsensusObserverMessage::new_commit_decision_message(commit_proof.clone());
                     consensus_publisher.publish_message(message);
