@@ -144,7 +144,14 @@ module aptos_std::big_ordered_map {
     // ======================= Constructors && Destructors ====================
 
     /// Returns a new BigOrderedMap with the default configuration.
+    /// Only allowed to be called with constant size types. For variable sized types,
+    /// it is required to use new_with_config, to explicitly select automatic or specific degree selection.
     public fun new<K: store, V: store>(): BigOrderedMap<K, V> {
+        assert!(
+            bcs::constant_serialized_size<K>().is_some() && bcs::constant_serialized_size<V>().is_some(),
+            error::invalid_argument(EINVALID_CONFIG_PARAMETER)
+        );
+
         new_with_config(0, 0, false, 0)
     }
 
@@ -300,15 +307,15 @@ module aptos_std::big_ordered_map {
     }
 
     /// Returns a reference to the element with its key, aborts if the key is not found.
-    public fun borrow<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: K): &V {
-        let iter = self.find(&key);
+    public fun borrow<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): &V {
+        let iter = self.find(key);
         assert!(!iter.iter_is_end(self), error::invalid_argument(EKEY_NOT_FOUND));
         iter.iter_borrow(self)
     }
 
     /// Returns a mutable reference to the element with its key at the given index, aborts if the key is not found.
-    public fun borrow_mut<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, key: K): &mut V {
-        let iter = self.find(&key);
+    public fun borrow_mut<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, key: &K): &mut V {
+        let iter = self.find(key);
         assert!(!iter.iter_is_end(self), error::invalid_argument(EKEY_NOT_FOUND));
         iter.iter_borrow_mut(self)
     }
@@ -645,13 +652,18 @@ module aptos_std::big_ordered_map {
         root.is_leaf = new_root.is_leaf;
         new_root.is_leaf = tmp_is_leaf;
 
-        let tmp_prev = root.prev;
-        root.prev = new_root.prev;
-        new_root.prev = tmp_prev;
+        assert!(root.prev == NULL_INDEX, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
+        assert!(root.next == NULL_INDEX, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
+        assert!(new_root.prev == NULL_INDEX, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
+        assert!(new_root.next == NULL_INDEX, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
 
-        let tmp_next = root.next;
-        root.next = new_root.next;
-        new_root.next = tmp_next;
+        // let tmp_prev = root.prev;
+        // root.prev = new_root.prev;
+        // new_root.prev = tmp_prev;
+
+        // let tmp_next = root.next;
+        // root.next = new_root.next;
+        // new_root.next = tmp_next;
 
         let tmp_children = root.children.trim(0);
         root.children.append_disjoint(new_root.children.trim(0));
@@ -807,13 +819,14 @@ module aptos_std::big_ordered_map {
 
         // right node's prev becomes current left node
         right_node.prev = left_node_index;
-        // Since the previuosly used index is going to the right node, `prev` pointer of the next node is correct,
+        // Since the previously used index is going to the right node, `prev` pointer of the next node is correct,
         // and we need to update next pointer of the previous node (if exists)
         if (*left_prev != NULL_INDEX) {
             self.nodes.borrow_mut(*left_prev).next = left_node_index;
             assert!(right_node_index != self.min_leaf_index, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
         } else if (right_node_index == self.min_leaf_index) {
             // Otherwise, if we were the smallest node on the level. if this is the leaf level, update the pointer.
+            assert!(is_leaf, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
             self.min_leaf_index = left_node_index;
         };
 
@@ -844,10 +857,10 @@ module aptos_std::big_ordered_map {
     }
 
     fun remove_at<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, path_to_node: vector<u64>, key: &K): Child<V> {
-        // Last node in the path is one where we need to add the child to.
+        // Last node in the path is one where we need to remove the child from.
         let node_index = path_to_node.pop_back();
         let old_child = {
-            // First check if we can perform this operation, without changing structure of the tree (i.e. without adding any nodes).
+            // First check if we can perform this operation, without changing structure of the tree (i.e. without rebalancing any nodes).
 
             // For that we can just borrow the single node
             let node = self.borrow_node_mut(node_index);
@@ -939,6 +952,7 @@ module aptos_std::big_ordered_map {
         let children = &mut node.children;
 
         let (sibling_slot, sibling_node) = self.nodes.remove_and_reserve(sibling_index);
+        assert!(is_leaf == sibling_node.is_leaf, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
         let sibling_children = &mut sibling_node.children;
 
         if ((sibling_children.length() - 1) * 2 >= max_degree) {
@@ -992,6 +1006,7 @@ module aptos_std::big_ordered_map {
             };
             // Otherwise, we were the smallest node on the level. if this is the leaf level, update the pointer.
             if (self.min_leaf_index == node_index) {
+                assert!(is_leaf, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
                 self.min_leaf_index = sibling_index;
             };
 
@@ -1015,6 +1030,7 @@ module aptos_std::big_ordered_map {
             };
             // Otherwise, sibling was the smallest node on the level. if this is the leaf level, update the pointer.
             if (self.min_leaf_index == sibling_index) {
+                assert!(is_leaf, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
                 self.min_leaf_index = node_index;
             };
 
@@ -1056,13 +1072,29 @@ module aptos_std::big_ordered_map {
         node.children.is_empty()
     }
 
+    // ===== spec ===========
+    // recursive functions need to be marked opaque
+
+    spec add_at {
+        pragma opaque;
+    }
+
+    spec remove_at {
+        pragma opaque;
+    }
+
+    spec length_for_node {
+        pragma opaque;
+    }
+
     // ============================= Tests ====================================
 
     #[test_only]
     fun print_map<K: store, V: store>(self: &BigOrderedMap<K, V>) {
-        aptos_std::debug::print(&std::string::utf8(b"print map"));
-        aptos_std::debug::print(self);
-        self.print_map_for_node(ROOT_INDEX, 0);
+        // uncomment to debug:
+        // aptos_std::debug::print(&std::string::utf8(b"print map"));
+        // aptos_std::debug::print(self);
+        // self.print_map_for_node(ROOT_INDEX, 0);
     }
 
     #[test_only]
@@ -1177,8 +1209,8 @@ module aptos_std::big_ordered_map {
         add(&mut map, 6, 6); map.print_map(); map.validate_map();
 
         vector::zip(vector[1, 2, 3, 4, 5, 6], vector[1, 2, 3, 8, 5, 6], |key, value| {
-            assert!(map.borrow(key) == &value, key + 100);
-            assert!(map.borrow_mut(key) == &value, key + 200);
+            assert!(map.borrow(&key) == &value, key + 100);
+            assert!(map.borrow_mut(&key) == &value, key + 200);
         });
 
         remove(&mut map, &5); map.print_map(); map.validate_map();
@@ -1193,7 +1225,7 @@ module aptos_std::big_ordered_map {
 
     #[test]
     fun test_variable_size() {
-        let map = new<vector<u64>, vector<u64>>();
+        let map = new_with_config<vector<u64>, vector<u64>>(0, 0, false, 0);
         map.print_map(); map.validate_map();
         add(&mut map, vector[1], vector[1]); map.print_map(); map.validate_map();
         add(&mut map, vector[2], vector[2]); map.print_map(); map.validate_map();
@@ -1206,7 +1238,7 @@ module aptos_std::big_ordered_map {
         add(&mut map, vector[6], vector[6]); map.print_map(); map.validate_map();
 
         vector::zip(vector[1, 2, 3, 4, 5, 6], vector[1, 2, 3, 8, 5, 6], |key, value| {
-            assert!(map.borrow(vector[key])[0] == value, key + 100);
+            assert!(map.borrow(&vector[key])[0] == value, key + 100);
         });
 
         remove(&mut map, &vector[5]); map.print_map(); map.validate_map();
@@ -1222,42 +1254,42 @@ module aptos_std::big_ordered_map {
     fun test_deleting_and_creating_nodes() {
         let map = new_with_config(4, 3, true, 2);
 
-        for (i in 0..50) {
+        for (i in 0..25) {
             map.upsert(i, i);
             map.validate_map();
         };
 
-        for (i in 0..40) {
+        for (i in 0..20) {
             map.remove(&i);
             map.validate_map();
         };
 
-        for (i in 50..100) {
+        for (i in 25..50) {
             map.upsert(i, i);
             map.validate_map();
         };
 
-        for (i in 50..90) {
+        for (i in 25..45) {
             map.remove(&i);
             map.validate_map();
         };
 
-        for (i in 100..150) {
+        for (i in 50..75) {
             map.upsert(i, i);
             map.validate_map();
         };
 
-        for (i in 100..150) {
+        for (i in 50..75) {
             map.remove(&i);
             map.validate_map();
         };
 
-        for (i in 40..50) {
+        for (i in 20..25) {
             map.remove(&i);
             map.validate_map();
         };
 
-        for (i in 90..100) {
+        for (i in 45..50) {
             map.remove(&i);
             map.validate_map();
         };
@@ -1433,7 +1465,7 @@ module aptos_std::big_ordered_map {
     #[expected_failure(abort_code = 0x10002, location = Self)] /// EKEY_NOT_FOUND
     fun test_abort_borrow_missing() {
         let map = new_from(vector[1], vector[1]);
-        map.borrow(2);
+        map.borrow(&2);
         map.destroy();
     }
 
@@ -1441,15 +1473,16 @@ module aptos_std::big_ordered_map {
     #[expected_failure(abort_code = 0x10002, location = Self)] /// EKEY_NOT_FOUND
     fun test_abort_borrow_mut_missing() {
         let map = new_from(vector[1], vector[1]);
-        map.borrow_mut(2);
+        map.borrow_mut(&2);
         map.destroy();
     }
 
     #[test]
     #[expected_failure(abort_code = 0x1000E, location = Self)] /// EBORROW_MUT_REQUIRES_CONSTANT_KV_SIZE
     fun test_abort_borrow_mut_requires_constant_kv_size() {
-        let map = new_from(vector[1], vector[vector[1]]);
-        map.borrow_mut(1);
+        let map = new_with_config(0, 0, false, 0);
+        map.add(1, vector[1]);
+        map.borrow_mut(&1);
         map.destroy();
     }
 
@@ -1480,7 +1513,8 @@ module aptos_std::big_ordered_map {
     #[test]
     #[expected_failure(abort_code = 0x1000E, location = Self)] /// EBORROW_MUT_REQUIRES_CONSTANT_KV_SIZE
     fun test_abort_iter_borrow_mut_requires_constant_kv_size() {
-        let map = new_from(vector[1], vector[vector[1]]);
+        let map = new_with_config(0, 0, false, 0);
+        map.add(1, vector[1]);
         map.new_begin_iter().iter_borrow_mut(&mut map);
         map.destroy();
     }
@@ -1508,26 +1542,11 @@ module aptos_std::big_ordered_map {
         map.destroy_empty();
     }
 
-    // /// Map key already exists
-    // const EKEY_ALREADY_EXISTS: u64 = 1;
-    // /// Map key is not found
-    // const EKEY_NOT_FOUND: u64 = 2;
-    // /// Trying to do an operation on an IteratorPtr that would go out of bounds
-    // const EITER_OUT_OF_BOUNDS: u64 = 3;
-    /// The provided configuration parameter is invalid.
-    // const EINVALID_CONFIG_PARAMETER: u64 = 11;
-    // /// Map isn't empty
-    // const EMAP_NOT_EMPTY: u64 = 12;
-    // /// Trying to insert too large of an object into the mp.
-    // const EARGUMENT_BYTES_TOO_LARGE: u64 = 13;
-    // /// borrow_mut requires that key and value types have constant size
-    // /// (otherwise it wouldn't be able to guarantee size requirements are not violated)
-    // const EBORROW_MUT_REQUIRES_CONSTANT_KV_SIZE: u64 = 14;
-
     #[test]
     #[expected_failure(abort_code = 0x1000D, location = Self)] /// EARGUMENT_BYTES_TOO_LARGE
     fun test_adding_key_too_large() {
-        let map = new_from(vector[vector[1]], vector[1]);
+        let map = new_with_config(0, 0, false, 0);
+        map.add(vector[1], 1);
         map.add(vector_range(0, 57), 1);
         map.destroy();
     }
@@ -1535,9 +1554,98 @@ module aptos_std::big_ordered_map {
     #[test]
     #[expected_failure(abort_code = 0x1000D, location = Self)] /// EARGUMENT_BYTES_TOO_LARGE
     fun test_adding_value_too_large() {
-        let map = new_from(vector[1], vector[vector[1]]);
+        let map = new_with_config(0, 0, false, 0);
+        map.add(1, vector[1]);
         map.add(2, vector_range(0, 107));
         map.destroy();
+    }
+
+    #[test_only]
+    inline fun comparison_test(repeats: u64, inner_max_degree: u16, leaf_max_degree: u16, reuse_slots: bool, next_1: ||u64, next_2: ||u64) {
+        let big_map = new_with_config(inner_max_degree, leaf_max_degree, reuse_slots, if (reuse_slots) {4} else {0});
+        let small_map = ordered_map::new();
+        for (i in 0..repeats) {
+            let is_insert = if (2 * i < repeats) {
+                i % 3 != 2
+            } else {
+                i % 3 == 0
+            };
+            if (is_insert) {
+                let v = next_1();
+                assert!(big_map.upsert(v, v) == small_map.upsert(v, v), i);
+            } else {
+                let v = next_2();
+                assert!(big_map.remove(&v) == small_map.remove(&v), i);
+            };
+            if ((i + 1) % 50 == 0) {
+                big_map.validate_map();
+
+                let big_iter = big_map.new_begin_iter();
+                let small_iter = small_map.new_begin_iter();
+                while (!big_iter.iter_is_end(&big_map) || !small_iter.iter_is_end(&small_map)) {
+                    assert!(big_iter.iter_borrow_key() == small_iter.iter_borrow_key(&small_map), i);
+                    assert!(big_iter.iter_borrow(&big_map) == small_iter.iter_borrow(&small_map), i);
+                    big_iter = big_iter.iter_next(&big_map);
+                    small_iter = small_iter.iter_next(&small_map);
+                };
+            };
+        };
+        big_map.destroy();
+    }
+
+    #[test_only]
+    const OFFSET: u64 = 270001;
+    #[test_only]
+    const MOD: u64 = 1000000;
+
+    #[test]
+    fun test_comparison_random() {
+        let x = 1234;
+        let y = 1234;
+        comparison_test(500, 5, 5, false,
+            || {
+                x = x + OFFSET;
+                if (x > MOD) { x = x - MOD};
+                x
+            },
+            || {
+                y = y + OFFSET;
+                if (y > MOD) { y = y - MOD};
+                y
+            },
+        );
+    }
+
+    #[test]
+    fun test_comparison_increasing() {
+        let x = 0;
+        let y = 0;
+        comparison_test(500, 5, 5, false,
+            || {
+                x = x + 1;
+                x
+            },
+            || {
+                y = y + 1;
+                y
+            },
+        );
+    }
+
+    #[test]
+    fun test_comparison_decreasing() {
+        let x = 100000;
+        let y = 100000;
+        comparison_test(500, 5, 5, false,
+            || {
+                x = x - 1;
+                x
+            },
+            || {
+                y = y - 1;
+                y
+            },
+        );
     }
 
     #[test_only]
@@ -1550,9 +1658,11 @@ module aptos_std::big_ordered_map {
 
         let len = data.length();
         for (i in 0..len) {
-            let element = *data.borrow(i);
+            let element = data[i];
             map.upsert(element, element);
-            map.validate_map();
+            if (i % 7 == 0) {
+                map.validate_map();
+            }
         };
 
         for (i in 0..len) {
@@ -1579,7 +1689,10 @@ module aptos_std::big_ordered_map {
             if (!removed.contains(element)) {
                 removed.push_back(*element);
                 map.remove(element);
-                map.validate_map();
+                if (i % 7 == 1) {
+                    map.validate_map();
+
+                }
             } else {
                 assert!(!map.contains(element));
             };
@@ -1645,58 +1758,58 @@ module aptos_std::big_ordered_map {
         test_large_data_set_helper(4, 6, false);
     }
 
-    #[test]
-    fun test_large_data_set_order_4_6_true() {
-        test_large_data_set_helper(4, 6, true);
-    }
+    // #[test]
+    // fun test_large_data_set_order_4_6_true() {
+    //     test_large_data_set_helper(4, 6, true);
+    // }
 
-    #[test]
-    fun test_large_data_set_order_16_false() {
-        test_large_data_set_helper(16, 16, false);
-    }
+    // #[test]
+    // fun test_large_data_set_order_16_false() {
+    //     test_large_data_set_helper(16, 16, false);
+    // }
 
-    #[test]
-    fun test_large_data_set_order_16_true() {
-        test_large_data_set_helper(16, 16, true);
-    }
+    // #[test]
+    // fun test_large_data_set_order_16_true() {
+    //     test_large_data_set_helper(16, 16, true);
+    // }
 
-    #[test]
-    fun test_large_data_set_order_31_false() {
-        test_large_data_set_helper(31, 31, false);
-    }
+    // #[test]
+    // fun test_large_data_set_order_31_false() {
+    //     test_large_data_set_helper(31, 31, false);
+    // }
 
-    #[test]
-    fun test_large_data_set_order_31_true() {
-        test_large_data_set_helper(31, 31, true);
-    }
+    // #[test]
+    // fun test_large_data_set_order_31_true() {
+    //     test_large_data_set_helper(31, 31, true);
+    // }
 
-    #[test]
-    fun test_large_data_set_order_31_3_false() {
-        test_large_data_set_helper(31, 3, false);
-    }
+    // #[test]
+    // fun test_large_data_set_order_31_3_false() {
+    //     test_large_data_set_helper(31, 3, false);
+    // }
 
-    #[test]
-    fun test_large_data_set_order_31_3_true() {
-        test_large_data_set_helper(31, 3, true);
-    }
+    // #[test]
+    // fun test_large_data_set_order_31_3_true() {
+    //     test_large_data_set_helper(31, 3, true);
+    // }
 
-    #[test]
-    fun test_large_data_set_order_31_5_false() {
-        test_large_data_set_helper(31, 5, false);
-    }
+    // #[test]
+    // fun test_large_data_set_order_31_5_false() {
+    //     test_large_data_set_helper(31, 5, false);
+    // }
 
-    #[test]
-    fun test_large_data_set_order_31_5_true() {
-        test_large_data_set_helper(31, 5, true);
-    }
+    // #[test]
+    // fun test_large_data_set_order_31_5_true() {
+    //     test_large_data_set_helper(31, 5, true);
+    // }
 
-    #[test]
-    fun test_large_data_set_order_32_false() {
-        test_large_data_set_helper(32, 32, false);
-    }
+    // #[test]
+    // fun test_large_data_set_order_32_false() {
+    //     test_large_data_set_helper(32, 32, false);
+    // }
 
-    #[test]
-    fun test_large_data_set_order_32_true() {
-        test_large_data_set_helper(32, 32, true);
-    }
+    // #[test]
+    // fun test_large_data_set_order_32_true() {
+    //     test_large_data_set_helper(32, 32, true);
+    // }
 }

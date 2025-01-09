@@ -33,11 +33,6 @@ VectorRangeMove { vec_len: 3000, element_len: 1, index: 1000, move_len: 500, rep
 VectorTrimAppend { vec_len: 100, element_len: 100, index: 0, repeats: 0 }	119	0.909	1.201	293.5
 VectorTrimAppend { vec_len: 100, element_len: 100, index: 10, repeats: 1000 }	119	0.951	1.143	12571.2
 VectorRangeMove { vec_len: 100, element_len: 100, index: 50, move_len: 10, repeats: 1000 }	6	0.925	1.001	5316.2
-MapInsertRemove { len: 10, repeats: 0, map_type: OrderedMap }	6	0.925	1.001	378
-MapInsertRemove { len: 10, repeats: 100, map_type: OrderedMap }	6	0.925	1.001	8184
-MapInsertRemove { len: 10, repeats: 100, map_type: SimpleMap }	6	0.925	1.001	8201.7
-MapInsertRemove { len: 100, repeats: 0, map_type: OrderedMap }	6	0.925	1.001	5094
 MapInsertRemove { len: 100, repeats: 100, map_type: OrderedMap }	6	0.925	1.001	15838
 MapInsertRemove { len: 100, repeats: 100, map_type: SimpleMap }	6	0.925	1.001	39802.4
-MapInsertRemove { len: 1000, repeats: 0, map_type: OrderedMap }	6	0.925	1.001	66878
 MapInsertRemove { len: 1000, repeats: 100, map_type: OrderedMap }	6	0.925	1.001	79826

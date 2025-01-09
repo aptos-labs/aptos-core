@@ -504,7 +504,11 @@ and can be used only in modules that know by themselves that allocator is empty.
             reuse_spare_count: _,
         } =&gt; {
             <b>assert</b>!(reuse_head_index == <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_NULL_INDEX">NULL_INDEX</a>, <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>);
-            slots.destroy_some().<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_destroy_known_empty_unsafe">destroy_known_empty_unsafe</a>();
+            <b>if</b> (slots.is_some()) {
+                slots.destroy_some().<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_destroy_known_empty_unsafe">destroy_known_empty_unsafe</a>();
+            } <b>else</b> {
+                slots.destroy_none();
+            }
         },
     };
 }

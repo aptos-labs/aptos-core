@@ -8,13 +8,8 @@ use aptos_language_e2e_tests::{
 use aptos_transaction_generator_lib::{
     entry_point_trait::{AutomaticArgs, EntryPointTrait, MultiSigConfig},
     publishing::publish_util::{Package, PackageHandler},
-    publishing::{
-        module_simple::{AutomaticArgs, LoopType, MapType, MultiSigConfig},
-        publish_util::{Package, PackageHandler},
-    },
-    EntryPoints,
 };
-use aptos_transaction_workloads_lib::{EntryPoints, LoopType};
+use aptos_transaction_workloads_lib::{EntryPoints, LoopType, MapType};
 use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
 use rand::{rngs::StdRng, SeedableRng};
 use serde_json::json;
@@ -244,26 +239,6 @@ fn main() {
             repeats: 1000,
         },
         EntryPoints::MapInsertRemove {
-            len: 10,
-            repeats: 0,
-            map_type: MapType::OrderedMap,
-        },
-        EntryPoints::MapInsertRemove {
-            len: 10,
-            repeats: 100,
-            map_type: MapType::OrderedMap,
-        },
-        EntryPoints::MapInsertRemove {
-            len: 10,
-            repeats: 100,
-            map_type: MapType::SimpleMap,
-        },
-        EntryPoints::MapInsertRemove {
-            len: 100,
-            repeats: 0,
-            map_type: MapType::OrderedMap,
-        },
-        EntryPoints::MapInsertRemove {
             len: 100,
             repeats: 100,
             map_type: MapType::OrderedMap,
@@ -272,11 +247,6 @@ fn main() {
             len: 100,
             repeats: 100,
             map_type: MapType::SimpleMap,
-        },
-        EntryPoints::MapInsertRemove {
-            len: 1000,
-            repeats: 0,
-            map_type: MapType::OrderedMap,
         },
         EntryPoints::MapInsertRemove {
             len: 1000,

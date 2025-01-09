@@ -38,4 +38,9 @@ module std::bcs {
         pragma opaque;
         ensures result == len(serialize(v));
     }
+
+    spec constant_serialized_size {
+        // TODO: temporary mockup.
+        pragma opaque;
+    }
 }
