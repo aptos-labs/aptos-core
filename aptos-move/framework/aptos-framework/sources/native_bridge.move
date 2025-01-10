@@ -113,6 +113,14 @@ module aptos_framework::native_bridge {
         value: u64
     }
 
+    struct OutboundRateLimitBudget has key, store {
+        day: SmartTable<u64, u64>,
+    }
+
+    struct InboundRateLimitBudget has key, store {
+        day: SmartTable<u64, u64>,
+    }
+
     /// A smart table wrapper
     struct SmartTableWrapper<K, V> has key, store {
         inner: SmartTable<K, V>,
@@ -155,8 +163,6 @@ module aptos_framework::native_bridge {
         move_to<Nonce>(aptos_framework, Nonce { 
             value: 0
         });
-
-        // Create the InboundRateLimitBudget resource
         
 
         move_to(aptos_framework, BridgeEvents {
@@ -165,8 +171,15 @@ module aptos_framework::native_bridge {
         });
         system_addresses::assert_aptos_framework(aptos_framework);
 
-        let inbound_rate_limit_budget = SmartTableWrapper<u64, u64> {
-            inner: smart_table::new(),
+        let outbound_rate_limit_budget = OutboundRateLimitBudget {
+            day: smart_table::new(),
+        };
+
+        move_to(aptos_framework, outbound_rate_limit_budget);
+
+
+        let inbound_rate_limit_budget = InboundRateLimitBudget {
+            day: smart_table::new(),
         };
 
         move_to(aptos_framework, inbound_rate_limit_budget);
@@ -436,12 +449,14 @@ module aptos_framework::native_bridge {
         initiator: &signer,  
         recipient: vector<u8>,  
         amount: u64  
-    ) acquires BridgeEvents, Nonce, AptosCoinBurnCapability, AptosCoinMintCapability, SmartTableWrapper, BridgeConfig {
+    ) acquires BridgeEvents, Nonce, AptosCoinBurnCapability, AptosCoinMintCapability, SmartTableWrapper, OutboundRateLimitBudget, BridgeConfig {
         let initiator_address = signer::address_of(initiator);  
-        let ethereum_address = ethereum::ethereum_address_20_bytes(recipient);  
+        let ethereum_address = ethereum::ethereum_address_20_bytes(recipient);
 
         // Ensure the amount is enough for the bridge fee and charge for it
         let new_amount = charge_bridge_fee(amount);
+
+        assert_outbound_rate_limit_budget_not_exceeded(new_amount);
 
         // Increment and retrieve the nonce  
         let nonce = increment_and_get_nonce();  
@@ -498,10 +513,10 @@ module aptos_framework::native_bridge {
         recipient: address,
         amount: u64,
         nonce: u64
-    ) acquires BridgeEvents, AptosCoinMintCapability, SmartTableWrapper, BridgeConfig {
+    ) acquires BridgeEvents, AptosCoinMintCapability, SmartTableWrapper, InboundRateLimitBudget, BridgeConfig {
         // Ensure the caller is the bridge relayer
         assert_is_caller_relayer(caller);
-        assert_rate_limit_budget_not_exceeded(amount);
+        assert_inbound_rate_limit_budget_not_exceeded(amount);
 
         // Check if the bridge transfer ID is already associated with an inbound nonce
         let inbound_nonce_exists = is_inbound_nonce_set(bridge_transfer_id);
@@ -652,16 +667,31 @@ module aptos_framework::native_bridge {
     /// Asserts that the rate limit budget is not exceeded.
     /// 
     /// @param amount The amount to be transferred.
-    fun assert_rate_limit_budget_not_exceeded(amount: u64) acquires SmartTableWrapper, BridgeConfig {
+    fun assert_outbound_rate_limit_budget_not_exceeded(amount: u64) acquires OutboundRateLimitBudget, BridgeConfig {
         let insurance_fund = borrow_global<BridgeConfig>(@aptos_framework).insurance_fund;
         let risk_denominator = borrow_global<BridgeConfig>(@aptos_framework).risk_denominator;
-        let table = borrow_global_mut<SmartTableWrapper<u64, u64>>(@aptos_framework);
+        let table = borrow_global_mut<OutboundRateLimitBudget>(@aptos_framework);
         
         let day = timestamp::now_seconds() / 86400;
-        let current_budget = smart_table::borrow_mut_with_default(&mut table.inner, day, 0);
-        smart_table::upsert(&mut table.inner, day, *current_budget + amount);
+        let current_budget = smart_table::borrow_mut_with_default(&mut table.day, day, 0);
+        smart_table::upsert(&mut table.day, day, *current_budget + amount);
         let rate_limit = coin::balance<AptosCoin>(insurance_fund) / risk_denominator;
-        assert!(*smart_table::borrow(&table.inner, day) < rate_limit, ERATE_LIMIT_EXCEEDED);
+        assert!(*smart_table::borrow(&table.day, day) < rate_limit, ERATE_LIMIT_EXCEEDED);
+    }
+
+    /// Asserts that the rate limit budget is not exceeded.
+    /// 
+    /// @param amount The amount to be transferred.
+    fun assert_inbound_rate_limit_budget_not_exceeded(amount: u64) acquires InboundRateLimitBudget, BridgeConfig {
+        let insurance_fund = borrow_global<BridgeConfig>(@aptos_framework).insurance_fund;
+        let risk_denominator = borrow_global<BridgeConfig>(@aptos_framework).risk_denominator;
+        let table = borrow_global_mut<InboundRateLimitBudget>(@aptos_framework);
+        
+        let day = timestamp::now_seconds() / 86400;
+        let current_budget = smart_table::borrow_mut_with_default(&mut table.day, day, 0);
+        smart_table::upsert(&mut table.day, day, *current_budget + amount);
+        let rate_limit = coin::balance<AptosCoin>(insurance_fund) / risk_denominator;
+        assert!(*smart_table::borrow(&table.day, day) < rate_limit, ERATE_LIMIT_EXCEEDED);
     }
 
     #[test(aptos_framework = @aptos_framework)]
@@ -771,12 +801,13 @@ module aptos_framework::native_bridge {
         assert_is_caller_relayer(bad);
     }
 
-    #[test(aptos_framework = @aptos_framework, relayer = @0xcafe, sender = @0x726563697069656e740000000000000000000000000000000000000000000000)]
+    #[test(aptos_framework = @aptos_framework, relayer = @0xcafe, sender = @0x726563697069656e740000000000000000000000000000000000000000000000, insurance_fund = @0xbeaf)]
     fun test_initiate_bridge_transfer_happy_path(
         sender: &signer,
         aptos_framework: &signer,
-        relayer: &signer
-    ) acquires BridgeEvents, Nonce, AptosCoinMintCapability, AptosCoinBurnCapability, SmartTableWrapper, BridgeConfig {
+        relayer: &signer,
+        insurance_fund: &signer
+    ) acquires BridgeEvents, Nonce, AptosCoinMintCapability, AptosCoinBurnCapability, SmartTableWrapper, OutboundRateLimitBudget, BridgeConfig {
         let sender_address = signer::address_of(sender);
         let relayer_address = signer::address_of(relayer);
         initialize_for_test(aptos_framework);
@@ -784,6 +815,15 @@ module aptos_framework::native_bridge {
         let amount = 1000;
         let bridge_fee = 40;
         update_bridge_fee(aptos_framework, bridge_fee);
+        let insurance_fund_address = signer::address_of(insurance_fund);
+        aptos_account::create_account(insurance_fund_address);
+        update_insurance_fund(aptos_framework, insurance_fund_address);        
+
+        // grant the insurance fund 4 * amount of coins
+        mint(insurance_fund_address, amount * 4 + 4);
+
+        timestamp::set_time_has_started_for_testing(aptos_framework);
+        
         
         // Update the bridge relayer so it can receive the bridge fee
         update_bridge_relayer(aptos_framework, relayer_address);
@@ -814,21 +854,31 @@ module aptos_framework::native_bridge {
         assert!(first_elem.amount == amount - bridge_fee, 0);
     }
 
-    #[test(aptos_framework = @aptos_framework, sender = @0xdaff, relayer = @0xcafe)]
+    #[test(aptos_framework = @aptos_framework, sender = @0xdaff, relayer = @0xcafe, insurance_fund = @0xbeaf)]
     #[expected_failure(abort_code = 0x10006, location = 0x1::coin)] 
     fun test_initiate_bridge_transfer_insufficient_balance(
         sender: &signer,
         aptos_framework: &signer,
-        relayer: &signer
-    ) acquires BridgeEvents, Nonce, AptosCoinBurnCapability, AptosCoinMintCapability, SmartTableWrapper, BridgeConfig {
+        relayer: &signer,
+        insurance_fund: &signer
+    ) acquires BridgeEvents, Nonce, AptosCoinBurnCapability, AptosCoinMintCapability, SmartTableWrapper, OutboundRateLimitBudget, BridgeConfig {
         let sender_address = signer::address_of(sender);
         let relayer_address = signer::address_of(relayer);
+        let insurance_fund_address = signer::address_of(insurance_fund);
         initialize_for_test(aptos_framework);
         aptos_account::create_account(sender_address);
 
         let recipient = ethereum::eth_address_20_bytes();
         let amount = 1000;
         let bridge_fee = 40;
+        aptos_account::create_account(insurance_fund_address);
+        update_insurance_fund(aptos_framework, insurance_fund_address);
+        
+
+        // grant the insurance fund 4 * amount of coins
+        mint(insurance_fund_address, amount * 4 + 4);
+
+        timestamp::set_time_has_started_for_testing(aptos_framework);
         update_bridge_fee(aptos_framework, bridge_fee);
 
         // Update the bridge relayer so it can receive the bridge fee
@@ -844,7 +894,7 @@ module aptos_framework::native_bridge {
     }
 
     #[test(aptos_framework = @aptos_framework)]
-    fun test_complete_bridge_transfer(aptos_framework: &signer) acquires BridgeEvents, AptosCoinMintCapability, SmartTableWrapper, BridgeConfig {
+    fun test_complete_bridge_transfer(aptos_framework: &signer) acquires BridgeEvents, AptosCoinMintCapability, SmartTableWrapper, InboundRateLimitBudget, BridgeConfig {
         initialize_for_test(aptos_framework);
         let initiator = b"5B38Da6a701c568545dCfcB03FcB875f56beddC4";
         let recipient = @0x726563697069656e740000000000000000000000000000000000000000000000;
@@ -895,7 +945,7 @@ module aptos_framework::native_bridge {
 
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 4, location = Self)] 
-    fun test_complete_bridge_transfer_rate_limit(aptos_framework: &signer) acquires BridgeEvents, AptosCoinMintCapability, SmartTableWrapper, BridgeConfig {
+    fun test_complete_bridge_transfer_rate_limit(aptos_framework: &signer) acquires BridgeEvents, AptosCoinMintCapability, SmartTableWrapper, InboundRateLimitBudget, BridgeConfig {
         initialize_for_test(aptos_framework);
         let initiator = b"5B38Da6a701c568545dCfcB03FcB875f56beddC4";
         let recipient = @0x726563697069656e740000000000000000000000000000000000000000000000;
@@ -987,7 +1037,7 @@ module aptos_framework::native_bridge {
     fun test_complete_bridge_transfer_by_non_relayer(
         sender: &signer,
         aptos_framework: &signer
-    ) acquires BridgeEvents, AptosCoinMintCapability, SmartTableWrapper, BridgeConfig {
+    ) acquires BridgeEvents, AptosCoinMintCapability, SmartTableWrapper, InboundRateLimitBudget, BridgeConfig {
         let sender_address = signer::address_of(sender);
         // Create an account for our recipient
         initialize_for_test(aptos_framework);
@@ -1011,7 +1061,7 @@ module aptos_framework::native_bridge {
     fun test_complete_bridge_with_erroneous_bridge_id_by_relayer(
         sender: &signer,
         aptos_framework: &signer
-    ) acquires BridgeEvents, AptosCoinMintCapability, SmartTableWrapper, BridgeConfig {
+    ) acquires BridgeEvents, AptosCoinMintCapability, SmartTableWrapper, InboundRateLimitBudget, BridgeConfig {
         let sender_address = signer::address_of(sender);
         // Create an account for our recipient
         initialize_for_test(aptos_framework);
