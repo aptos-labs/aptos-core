@@ -33,7 +33,7 @@ impl Default for QuorumStoreBackPressureConfig {
             // Roughly, ordering TPS * ordering latency seconds
             backlog_txn_limit_count: 15_000,
             // QS will create batches at the max rate until this number is reached
-            backlog_per_validator_batch_limit_count: 20,
+            backlog_per_validator_batch_limit_count: 5,
             decrease_duration_ms: 1000,
             increase_duration_ms: 1000,
             decrease_fraction: 0.5,
