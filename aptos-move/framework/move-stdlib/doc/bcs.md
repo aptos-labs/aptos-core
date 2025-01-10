@@ -85,7 +85,7 @@ On the other hand, if function has returned None for some type,
 it might change in the future to return Some() instead, if size becomes "known".
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bcs.md#0x1_bcs_constant_serialized_size">constant_serialized_size</a>&lt;MoveValue&gt;(): <a href="option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="bcs.md#0x1_bcs_constant_serialized_size">constant_serialized_size</a>&lt;MoveValue&gt;(): <a href="option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
 </code></pre>
 
 
@@ -94,7 +94,7 @@ it might change in the future to return Some() instead, if size becomes "known".
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>public</b>(<b>friend</b>) <b>fun</b> <a href="bcs.md#0x1_bcs_constant_serialized_size">constant_serialized_size</a>&lt;MoveValue&gt;(): Option&lt;u64&gt;;
+<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="bcs.md#0x1_bcs_constant_serialized_size">constant_serialized_size</a>&lt;MoveValue&gt;(): Option&lt;u64&gt;;
 </code></pre>
 
 
