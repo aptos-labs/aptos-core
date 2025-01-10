@@ -403,7 +403,7 @@ mod test {
                 get_sample_epk_blinder, get_sample_esk, get_sample_exp_date,
                 get_sample_groth16_sig_and_pk, get_sample_jwt_token, get_sample_pepper,
             },
-            Configuration, Groth16Proof, OpenIdSig, DEVNET_VERIFICATION_KEY,
+            Configuration, Groth16Proof, OpenIdSig, VERIFICATION_KEY_FOR_TESTING,
         },
         transaction::authenticator::EphemeralPublicKey,
     };
@@ -521,7 +521,7 @@ mod test {
             // Verify the proof with the test verifying key.  If this fails the verifying key does not match the proving used
             // to generate the proof.
             proof
-                .verify_proof(public_inputs_hash, DEVNET_VERIFICATION_KEY.deref())
+                .verify_proof(public_inputs_hash, VERIFICATION_KEY_FOR_TESTING.deref())
                 .unwrap();
 
             prover_response

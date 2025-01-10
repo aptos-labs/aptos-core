@@ -31,7 +31,7 @@ use aptos_types::{
         },
         AnyKeylessPublicKey, Configuration, EphemeralCertificate, Groth16ProofAndStatement,
         Groth16VerificationKey, KeylessPublicKey, KeylessSignature, TransactionAndProof,
-        DEVNET_VERIFICATION_KEY, KEYLESS_ACCOUNT_MODULE_NAME,
+        VERIFICATION_KEY_FOR_TESTING, KEYLESS_ACCOUNT_MODULE_NAME,
     },
     on_chain_config::{FeatureFlag, Features},
     transaction::{
@@ -891,6 +891,25 @@ pub(crate) async fn spawn_network_and_execute_gov_proposals(
         .await
         .expect("Epoch 2 taking too long to come!");
 
+    let vk_for_testing = Groth16VerificationKey::from(VERIFICATION_KEY_FOR_TESTING.clone());
+    let script = get_rotate_vk_governance_script(&vk_for_testing);
+
+    let gas_options = GasOptions {
+        gas_unit_price: Some(100),
+        max_gas: Some(2000000),
+        expiration_secs: 60,
+    };
+    let txn_summary = cli
+        .run_script_with_gas_options(root_idx, &script, Some(gas_options.clone()))
+        .await
+        .unwrap();
+    debug!("txn_summary={:?}", txn_summary);
+
+    let mut info = swarm.aptos_public_info();
+
+    // Increment sequence number since we installed the VK
+    info.root_account().increment_sequence_number();
+
     let vk = print_account_resource::<Groth16VerificationKey>(
         &client,
         AccountAddress::ONE,
@@ -900,10 +919,7 @@ pub(crate) async fn spawn_network_and_execute_gov_proposals(
     )
     .await;
 
-    assert_eq!(
-        vk,
-        Groth16VerificationKey::from(DEVNET_VERIFICATION_KEY.clone())
-    );
+    assert_eq!(vk, vk_for_testing);
 
     let old_config = print_account_resource::<Configuration>(
         &client,
@@ -962,11 +978,6 @@ fun main(core_resources: &signer) {{
         hex::encode(training_wheels_pk.to_bytes())
     );
 
-    let gas_options = GasOptions {
-        gas_unit_price: Some(100),
-        max_gas: Some(2000000),
-        expiration_secs: 60,
-    };
     let txn_summary = cli
         .run_script_with_gas_options(root_idx, &script, Some(gas_options))
         .await
@@ -998,8 +1009,6 @@ fun main(core_resources: &signer) {{
     assert_ne!(old_config, new_config);
     assert_eq!(new_config.max_exp_horizon_secs, max_exp_horizon_secs);
 
-    let mut info = swarm.aptos_public_info();
-
     // Increment sequence number since we patched a JWK
     info.root_account().increment_sequence_number();
 
@@ -1014,12 +1023,7 @@ async fn get_latest_jwkset(rest_client: &Client) -> PatchedJWKs {
     response.into_inner()
 }
 
-async fn rotate_vk_by_governance<'a>(
-    cli: &mut CliTestFramework,
-    info: &mut AptosPublicInfo,
-    vk: &Groth16VerificationKey,
-    root_idx: usize,
-) {
+fn get_rotate_vk_governance_script(vk: &Groth16VerificationKey) -> String {
     let script = format!(
         r#"
 script {{
@@ -1044,6 +1048,17 @@ script {{
         KEYLESS_ACCOUNT_MODULE_NAME
     );
     debug!("Move script for changing VK follows below:\n{:?}", script);
+
+    script
+}
+
+async fn rotate_vk_by_governance<'a>(
+    cli: &mut CliTestFramework,
+    info: &mut AptosPublicInfo,
+    vk: &Groth16VerificationKey,
+    root_idx: usize,
+) {
+    let script = get_rotate_vk_governance_script(vk);
 
     print_account_resource::<Groth16VerificationKey>(
         info.client(),
