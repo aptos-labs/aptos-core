@@ -2306,6 +2306,7 @@ dependencies = [
  "clap 4.5.21",
  "jemallocator",
  "serde",
+ "serde_json",
  "tokio",
  "tokio-scoped",
  "tonic 0.12.3",
