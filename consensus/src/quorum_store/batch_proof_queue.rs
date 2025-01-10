@@ -741,6 +741,11 @@ impl BatchProofQueue {
             full = full,
             return_non_full = return_non_full,
             elapsed_time_ms = start_time.elapsed().as_millis() as u64,
+            batches = result
+                .iter()
+                .map(|item| format!("{}, ", item.info))
+                .collect::<Vec<_>>()
+                .join(", "),
             "Pull payloads from QuorumStore: internal"
         );
 
