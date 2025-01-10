@@ -18,7 +18,7 @@ The `--check` flag can be used to check if the code is formatted correctly.
 
 Any public fields, functions, and methods should be documented with [Rustdoc](https://doc.rust-lang.org/book/ch14-02-publishing-to-crates-io.html#making-useful-documentation-comments).
 
-Please follow the conventions as detailed below for modules, structs, enums, and functions. The _single line_ is used as a preview when navigating Rustdoc. As an example, see the 'Structs' and 'Enums' sections in the [collections](https://doc.rust-lang.org/std/collections/index.html) Rustdoc.
+Please follow the conventions as detailed below for modules, structs, enums, and functions. The _single line_ is used as a preview when navigating Rustdoc. For example, see the 'Structs' and 'Enums' sections in the [collections](https://doc.rust-lang.org/std/collections/index.html) Rustdoc.
 
 ```
 /// [Single line] One line summary description
@@ -158,7 +158,7 @@ We recommend that you use `//` and `///` comments rather than block comments `/*
 
 ### Concurrent types
 
-Concurrent types such as [`CHashMap`](https://docs.rs/crate/chashmap), [`AtomicUsize`](https://doc.rust-lang.org/std/sync/atomic/struct.AtomicUsize.html), etc. have an immutable borrow on self i.e. `fn foo_mut(&self,...)` in order to support concurrent access on interior mutating methods. Good practices (such as those in the examples mentioned) avoid exposing synchronization primitives externally (e.g. `Mutex`, `RwLock`) and document the method semantics and invariants.
+Concurrent types such as [`CHashMap`](https://docs.rs/crate/chashmap), [`AtomicUsize`](https://doc.rust-lang.org/std/sync/atomic/struct.AtomicUsize.html), etc. have an immutable borrow on self i.e. `fn foo_mut(&self,...)` to support concurrent access on interior mutating methods. Good practices (such as those in the examples mentioned) avoid exposing synchronization primitives externally (e.g. `Mutex`, `RwLock`) and document the method semantics and invariants.
 
 _When to use channels vs concurrent types?_
 
@@ -188,7 +188,7 @@ In production (non-test) code, outside of lock management, all unrecoverable err
 
 ### Generics
 
-Generics allow dynamic behavior (similar to [`trait`](https://doc.rust-lang.org/book/ch10-02-traits.html) methods) with static dispatch. As the number of generic type parameters increases, the difficulty of using the type/method also increases (e.g. consider the combination of trait bounds required for this type, duplicate trait bounds on related types, etc.). In order to avoid this complexity, we generally try to avoid using a large number of generic type parameters. We have found that converting code with a large number of generic objects to trait objects with dynamic dispatch often simplifies our code.
+Generics allow dynamic behavior (similar to [`trait`](https://doc.rust-lang.org/book/ch10-02-traits.html) methods) with static dispatch. As the number of generic type parameters increases, the difficulty of using the type/method also increases (e.g. consider the combination of trait bounds required for this type, duplicate trait bounds on related types, etc.). To avoid this complexity, we generally try to avoid using a large number of generic type parameters. We have found that converting code with a large number of generic objects to trait objects with dynamic dispatch often simplifies our code.
 
 ### Getters/setters
 
@@ -221,7 +221,7 @@ impl Foo {
 
 As every integer operation (`+`, `-`, `/`, `*`, etc.) implies edge-cases (e.g. overflow `u64::MAX + 1`, underflow `0u64 -1`, division by zero, etc.),
 we use checked arithmetic instead of directly using math symbols.
-It forces us to think of edge-cases, and handle them explicitly.
+It forces us to think of edge cases and handle them explicitly.
 This is a brief and simplified mini guide of the different functions that exist to handle integer arithmetic:
 
 - [checked\_](https://doc.rust-lang.org/std/primitive.u32.html#method.checked_add): use this function if you want to handle overflow and underflow as a special edge-case. It returns `None` if an underflow or overflow has happened, and `Some(operation_result)` otherwise.
@@ -233,7 +233,7 @@ This is a brief and simplified mini guide of the different functions that exist 
 
 We currently use [log](https://docs.rs/log/) for logging.
 
-- [error!](https://docs.rs/log/latest/log/macro.error.html) - Error-level messages have the highest urgency in [log](https://docs.rs/log/). An unexpected error has occurred (e.g. exceeded the maximum number of retries to complete an RPC or inability to store data to local storage).
+- [error!](https://docs.rs/log/latest/log/macro.error.html) - Error-level messages have the highest urgency in [log](https://docs.rs/log/). An unexpected error has occurred (e.g. exceeded the maximum number of retries to complete an RPC or inability to store data in local storage).
 - [warn!](https://docs.rs/log/latest/log/macro.warn.html) - Warn-level messages help notify admins about automatically handled issues (e.g. retrying a failed network connection or receiving the same message multiple times, etc.).
 - [info!](https://docs.rs/log/latest/log/macro.info.html) - Info-level messages are well suited for "one-time" events (such as logging state on one-time startup and shutdown) or periodic events that are not frequently occurring - e.g. changing the validator set every day.
 - [debug!](https://docs.rs/log/latest/log/macro.debug.html) - Debug-level messages can occur frequently (i.e. potentially > 1 message per second) and are not typically expected to be enabled in production.
@@ -243,7 +243,7 @@ We currently use [log](https://docs.rs/log/) for logging.
 
 _Unit tests_
 
-We follow the general guidance provided [here](https://doc.rust-lang.org/book/ch11-03-test-organization.html). Ideally, all code should be unit tested. Unit tests should be in the same file as the code it is testing though in a distinct module, using the following syntax:
+We follow the general guidance provided [here](https://doc.rust-lang.org/book/ch11-03-test-organization.html). Ideally, all code should be unit-tested. Unit tests should be in the same file as the code it is testing though in a distinct module, using the following syntax:
 
 ```rust
 struct Foo {
@@ -284,7 +284,7 @@ References:
 Aptos [conditionally
 compiles](https://doc.rust-lang.org/stable/reference/conditional-compilation.html)
 code that is _only relevant for tests, but does not consist of tests_ (unitary
-or otherwise). Examples of this include proptest strategies, implementations
+or otherwise). Examples of this include prop test strategies, implementations
 and derivations of specific traits (e.g. the occasional `Clone`), helper
 functions, etc. Since Cargo is [currently not equipped for automatically activating features
 in tests/benchmarks](https://github.com/rust-lang/cargo/issues/2911), we rely on two
@@ -332,7 +332,7 @@ For the sake of example, we'll consider you are defining a test-only helper func
 
 **For test-only crates:**
 
-Test-only crates do not create published artifacts. They consist of tests, benchmarks or other code that verifies
+Test-only crates do not create published artifacts. They consist of tests, benchmarks, or other code that verifies
 the correctness or performance of published artifacts. Test-only crates are
 explicitly listed in `x.toml` under `[workspace.test-only]`.
 
@@ -349,8 +349,8 @@ elements in another crate need to activate the "fuzzing" feature through the
 `[features]` section in their `Cargo.toml`. [Integration
 tests](https://doc.rust-lang.org/rust-by-example/testing/integration_testing.html)
 can neither rely on the `test` flag nor do they have a proper `Cargo.toml` for
-feature activation. In the Aptos codebase, we therefore recommend that
-_integration tests which depend on test-only code in their tested crate_ be
+feature activation. In the Aptos codebase, we, therefore, recommend that
+_integration tests that depend on test-only code in their tested crate_ be
 extracted to their own test-only crate. See `language/move-binary-format/serializer_tests`
 for an example of such an extracted integration test.
 
