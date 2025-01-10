@@ -9,7 +9,6 @@ use crate::{
         BinaryCache,
     },
     native_functions::NativeFunctions,
-    storage::struct_name_index_map::StructNameIndexMap,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -29,8 +28,9 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_metrics::{Timer, VM_TIMER};
-use move_vm_types::loaded_data::runtime_types::{
-    StructIdentifier, StructLayout, StructNameIndex, StructType, Type,
+use move_vm_types::loaded_data::{
+    runtime_types::{StructIdentifier, StructLayout, StructType, Type},
+    struct_name_indexing::{StructNameIndex, StructNameIndexMap},
 };
 use parking_lot::RwLock;
 use std::{

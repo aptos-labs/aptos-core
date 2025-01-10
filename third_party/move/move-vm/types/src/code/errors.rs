@@ -2,17 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[macro_export]
-macro_rules! panic_error {
-    ($msg:expr) => {{
-        println!("[Error] panic detected: {}", $msg);
-        move_binary_format::errors::PartialVMError::new(
-            move_core_types::vm_status::StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR,
-        )
-        .with_message(format!("Panic detected: {:?}", $msg))
-    }};
-}
-
-#[macro_export]
 macro_rules! module_storage_error {
     ($addr:expr, $name:expr, $err:ident) => {
         move_binary_format::errors::PartialVMError::new(

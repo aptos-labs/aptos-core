@@ -15,7 +15,10 @@ use move_vm_runtime::{
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{
-    loaded_data::runtime_types::{AbilityInfo, StructIdentifier, StructNameIndex, TypeBuilder},
+    loaded_data::{
+        runtime_types::{AbilityInfo, StructIdentifier, TypeBuilder},
+        struct_name_indexing::StructNameIndex,
+    },
     value_serde::FunctionValueExtension,
 };
 use std::str::FromStr;
@@ -74,7 +77,7 @@ fn test_function_value_extension() {
     let foo_ty = types.pop().unwrap();
     let name = module_storage
         .runtime_environment()
-        .idx_to_struct_name_for_test(StructNameIndex(0))
+        .idx_to_struct_name_for_test(StructNameIndex::new(0))
         .unwrap();
     assert_eq!(name, StructIdentifier {
         module: test_id.clone(),
@@ -84,8 +87,10 @@ fn test_function_value_extension() {
         foo_ty,
         ty_builder
             .create_ref_ty(
-                &ty_builder
-                    .create_struct_ty(StructNameIndex(0), AbilityInfo::struct_(AbilitySet::EMPTY)),
+                &ty_builder.create_struct_ty(
+                    StructNameIndex::new(0),
+                    AbilityInfo::struct_(AbilitySet::EMPTY)
+                ),
                 false
             )
             .unwrap()
@@ -121,7 +126,7 @@ fn test_function_value_extension() {
     let bar_ty = types.pop().unwrap();
     let name = module_storage
         .runtime_environment()
-        .idx_to_struct_name_for_test(StructNameIndex(1))
+        .idx_to_struct_name_for_test(StructNameIndex::new(1))
         .unwrap();
     assert_eq!(name, StructIdentifier {
         module: other_test_id,
@@ -130,7 +135,7 @@ fn test_function_value_extension() {
     assert_eq!(
         bar_ty,
         ty_builder.create_struct_ty(
-            StructNameIndex(1),
+            StructNameIndex::new(1),
             AbilityInfo::struct_(AbilitySet::from_u8(Ability::Drop as u8).unwrap())
         )
     );

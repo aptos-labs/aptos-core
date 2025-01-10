@@ -28,10 +28,12 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
+use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::{AbilityInfo, StructNameIndex, StructType, Type},
     sha3_256,
+    value_serde::FunctionValueExtension,
 };
 use parking_lot::{Mutex, RwLock};
 use std::{
@@ -39,6 +41,7 @@ use std::{
     hash::Hash,
     sync::Arc,
 };
+use type_loader::intern_type;
 use typed_arena::Arena;
 
 mod access_specifier_loader;
@@ -71,7 +74,6 @@ use move_vm_types::{
 };
 pub use script::Script;
 pub(crate) use script::ScriptCache;
-use type_loader::intern_type;
 
 type ScriptHash = [u8; 32];
 
