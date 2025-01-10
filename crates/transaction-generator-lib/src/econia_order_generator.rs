@@ -36,8 +36,12 @@ fn base_coin_type(market_id: u64) -> &'static str {
     BASE_COIN_TYPES[(market_id - 1) as usize]
 }
 
-fn quote_coin_type(_market_id: u64) -> &'static str {
-    "QC"
+fn quote_coin_type(market_id: u64) -> &'static str {
+    switch (market_id % 3) {
+        0 => { "QAC" },
+        1 => { "QBC" },
+        2 => { "QCC" },
+    }
 }
 
 const ASK: bool = true;

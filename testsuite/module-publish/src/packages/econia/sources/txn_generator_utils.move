@@ -1,7 +1,7 @@
 module econia::txn_generator_utils {
     use econia::market;
     use econia::incentives;
-    use econia::assets::{Self, QC, UC, AAC, ABC, ACC, ADC, AEC, AFC, AGC, AHC, AIC, AJC, AKC, ALC, AMC, ANC, AOC, APC, AQC, ARC, ASC, ATC, AUC, AVC, AWC, AXC, AYC, AZC, BAC, BBC, BCC, BDC, BEC, BFC, BGC, BHC, BIC, BJC, BKC, BLC, BMC, BNC, BOC, BPC, BQC, BRC, BSC, BTC, BUC, BVC, BWC, BXC, BYC, BZC, CAC, CBC, CCC, CDC, CEC, CFC, CGC, CHC, CIC, CJC, CKC, CLC, CMC, CNC, COC, CPC, CQC, CRC, CSC, CTC, CUC, CVC, CWC, CXC, CYC, CZC, DAC, DBC, DCC, DDC, DEC, DFC, DGC, DHC, DIC, DJC, DKC, DLC, DMC, DNC, DOC, DPC, DQC, DRC, DSC, DTC, DUC, DVC, DWC, DXC, DYC, DZC};
+    use econia::assets::{Self, QC, QAC, QBC, QCC, UC, AAC, ABC, ACC, ADC, AEC, AFC, AGC, AHC, AIC, AJC, AKC, ALC, AMC, ANC, AOC, APC, AQC, ARC, ASC, ATC, AUC, AVC, AWC, AXC, AYC, AZC, BAC, BBC, BCC, BDC, BEC, BFC, BGC, BHC, BIC, BJC, BKC, BLC, BMC, BNC, BOC, BPC, BQC, BRC, BSC, BTC, BUC, BVC, BWC, BXC, BYC, BZC, CAC, CBC, CCC, CDC, CEC, CFC, CGC, CHC, CIC, CJC, CKC, CLC, CMC, CNC, COC, CPC, CQC, CRC, CSC, CTC, CUC, CVC, CWC, CXC, CYC, CZC, DAC, DBC, DCC, DDC, DEC, DFC, DGC, DHC, DIC, DJC, DKC, DLC, DMC, DNC, DOC, DPC, DQC, DRC, DSC, DTC, DUC, DVC, DWC, DXC, DYC, DZC};
     use econia::user;
     use aptos_framework::signer;
     use std::vector;
@@ -36,94 +36,94 @@ module econia::txn_generator_utils {
         assert!(num_markets < 105, E_NUM_MARKETS_HIGH);
 
         if (num_markets > 0) {
-            register_market<AAC, QC>(publisher);
+            register_market<AAC, QAC>(publisher);
         };
         if (num_markets > 1) {
-            register_market<ABC, QC>(publisher);
+            register_market<ABC, QBC>(publisher);
         };
         if (num_markets > 2) {
-            register_market<ACC, QC>(publisher);
+            register_market<ACC, QCC>(publisher);
         };
         if (num_markets > 3) {
-            register_market<ADC, QC>(publisher);
+            register_market<ADC, QAC>(publisher);
         };
         if (num_markets > 4) {
-            register_market<AEC, QC>(publisher);
+            register_market<AEC, QBC>(publisher);
         };
         if (num_markets > 5) {
-            register_market<AFC, QC>(publisher);
+            register_market<AFC, QCC>(publisher);
         };
         if (num_markets > 6) {
-            register_market<AGC, QC>(publisher);
+            register_market<AGC, QAC>(publisher);
         };
         if (num_markets > 7) {
-            register_market<AHC, QC>(publisher);
+            register_market<AHC, QBC>(publisher);
         };
         if (num_markets > 8) {
-            register_market<AIC, QC>(publisher);
+            register_market<AIC, QCC>(publisher);
         };
         if (num_markets > 9) {
-            register_market<AJC, QC>(publisher);
+            register_market<AJC, QAC>(publisher);
         };
         if (num_markets > 10) {
-            register_market<AKC, QC>(publisher);
+            register_market<AKC, QBC>(publisher);
         };
         if (num_markets > 11) {
-            register_market<ALC, QC>(publisher);
+            register_market<ALC, QCC>(publisher);
         };
         if (num_markets > 12) {
-            register_market<AMC, QC>(publisher);
+            register_market<AMC, QAC>(publisher);
         };
         if (num_markets > 13) {
-            register_market<ANC, QC>(publisher);
+            register_market<ANC, QBC>(publisher);
         };
         if (num_markets > 14) {
-            register_market<AOC, QC>(publisher);
+            register_market<AOC, QCC>(publisher);
         };
         if (num_markets > 15) {
-            register_market<APC, QC>(publisher);
+            register_market<APC, QAC>(publisher);
         };
         if (num_markets > 16) {
-            register_market<AQC, QC>(publisher);
+            register_market<AQC, QBC>(publisher);
         };
         if (num_markets > 17) {
-            register_market<ARC, QC>(publisher);
+            register_market<ARC, QCC>(publisher);
         };
         if (num_markets > 18) {
-            register_market<ASC, QC>(publisher);
+            register_market<ASC, QAC>(publisher);
         };
         if (num_markets > 19) {
-            register_market<ATC, QC>(publisher);
+            register_market<ATC, QBC>(publisher);
         };
         if (num_markets > 20) {
-            register_market<AUC, QC>(publisher);
+            register_market<AUC, QCC>(publisher);
         };
         if (num_markets > 21) {
-            register_market<AVC, QC>(publisher);
+            register_market<AVC, QAC>(publisher);
         };
         if (num_markets > 22) {
-            register_market<AWC, QC>(publisher);
+            register_market<AWC, QBC>(publisher);
         };
         if (num_markets > 23) {
-            register_market<AXC, QC>(publisher);
+            register_market<AXC, QCC>(publisher);
         };
         if (num_markets > 24) {
-            register_market<AYC, QC>(publisher);
+            register_market<AYC, QAC>(publisher);
         };
         if (num_markets > 25) {
-            register_market<AZC, QC>(publisher);
+            register_market<AZC, QBC>(publisher);
         };
         if (num_markets > 26) {
-            register_market<BAC, QC>(publisher);
+            register_market<BAC, QCC>(publisher);
         };
         if (num_markets > 27) {
-            register_market<BBC, QC>(publisher);
+            register_market<BBC, QAC>(publisher);
         };
         if (num_markets > 28) {
-            register_market<BCC, QC>(publisher);
+            register_market<BCC, QBC>(publisher);
         };
         if (num_markets > 29) {
-            register_market<BDC, QC>(publisher);
+            register_market<BDC, QCC>(publisher);
         };
         if (num_markets > 30) {
             register_market<BEC, QC>(publisher);

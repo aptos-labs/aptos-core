@@ -33,6 +33,12 @@ module econia::assets {
     /// Quote coin type.
     struct QC{}
 
+    struct QAC{}
+
+    struct QBC{}
+
+    struct QCC{}
+
     /// Utility coin type.
     struct UC{}
 
@@ -387,6 +393,12 @@ module econia::assets {
         init_coin_type<BC>(account, BASE_COIN_NAME, BASE_COIN_SYMBOL,
             BASE_COIN_DECIMALS); // Initialize mock base coin.
         init_coin_type<QC>(account, QUOTE_COIN_NAME, QUOTE_COIN_SYMBOL,
+            QUOTE_COIN_DECIMALS); // Initialize mock quote coin.
+        init_coin_type<QAC>(account, b"Quote A coin", b"QAC",
+            QUOTE_COIN_DECIMALS); // Initialize mock quote coin.
+        init_coin_type<QBC>(account, b"Quote B coin", b"QBC",
+            QUOTE_COIN_DECIMALS); // Initialize mock quote coin.
+        init_coin_type<QCC>(account, b"Quote C coin", b"QCC",
             QUOTE_COIN_DECIMALS); // Initialize mock quote coin.
         init_coin_type<UC>(account, UTILITY_COIN_NAME, UTILITY_COIN_SYMBOL,
             UTILITY_COIN_DECIMALS); // Initialize mock utility coin.
