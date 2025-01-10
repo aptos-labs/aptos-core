@@ -1,5 +1,5 @@
-no-op	1	VM	119	0.791	1.041	37778.7
-no-op	1000	VM	119	0.797	1.036	36375.2
+no-op	1	VM	119	0.791	1.041	39000.0
+no-op	1000	VM	119	0.797	1.036	36875.2
 apt-fa-transfer	1	VM	119	0.801	1.025	26858.2
 apt-fa-transfer	1	NativeVM	119	0.802	1.066	33063.8
 account-generation	1	VM	119	0.830	1.034	20232.4
