@@ -31,7 +31,7 @@ pub fn get_pfn_test(test_name: &str, duration: Duration) -> Option<ForgeConfig> 
         "pfn_const_tps_with_realistic_env_econia_market_10market" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaMarket10MarketReuseAccounts.materialize_default(), 10000),
         "pfn_const_tps_with_realistic_env_econia_market_15market" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaMarket15MarketReuseAccounts.materialize_default(), 10000),
         "pfn_const_tps_with_realistic_env_econia_real" => pfn_const_tps(duration, true, true, false, TransactionTypeArg::EconiaReal.materialize_default(), 10000),
-        
+         
         "pfn_performance" => pfn_performance(duration, false, false, true, 7, 1, false),
         "pfn_performance_with_network_chaos" => {
             pfn_performance(duration, false, true, false, 7, 1, false)
