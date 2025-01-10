@@ -37,7 +37,7 @@ fn base_coin_type(market_id: u64) -> &'static str {
 }
 
 fn quote_coin_type(market_id: u64) -> &'static str {
-    natch (market_id % 3) {
+    match (market_id % 3) {
         0 => { "QAC" },
         1 => { "QBC" },
         2 => { "QCC" },
