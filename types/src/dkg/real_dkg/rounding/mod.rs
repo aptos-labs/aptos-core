@@ -47,6 +47,14 @@ pub fn total_weight_upper_bound(
         .to_num::<usize>()
 }
 
+#[test]
+fn hihi() {
+    let n = U64F64::from_num(7);
+    let two = U64F64::from_num(3);
+    let x = n / two;
+    println!("x={x}");
+}
+
 #[derive(Clone, Debug)]
 pub struct DKGRounding {
     /// Currently either "binary_search" or "infallible".
@@ -131,6 +139,7 @@ impl DKGRounding {
 
 #[derive(Clone, Default)]
 pub struct DKGRoundingProfile {
+    pub ideal_total_weight: u128,
     // calculated weights for each validator after rounding
     pub validator_weights: Vec<u64>,
     // The ratio of stake that may reveal the randomness, e.g. 50%
@@ -203,6 +212,7 @@ impl DKGRoundingProfile {
         let mut weight_high = total_weight_max as u64;
         let mut best_profile = compute_profile_fixed_point(
             validator_stakes,
+            weight_low,
             max(
                 U64F64::from_num(1),
                 U64F64::from_num(stake_total) / U64F64::from_num(weight_low),
@@ -224,6 +234,7 @@ impl DKGRoundingProfile {
             );
             let profile = compute_profile_fixed_point(
                 validator_stakes,
+                weight_mid,
                 stake_per_weight,
                 secrecy_threshold_in_stake_ratio,
                 fast_secrecy_threshold_in_stake_ratio,
@@ -275,6 +286,7 @@ impl DKGRoundingProfile {
         let stake_per_weight = stake_total / U64F64::from_num(estimated_weight_total);
         compute_profile_fixed_point(
             validator_stakes,
+            estimated_weight_total as u64,
             stake_per_weight,
             secrecy_threshold_in_stake_ratio,
             fast_secrecy_threshold_in_stake_ratio,
@@ -294,6 +306,7 @@ fn is_valid_profile(
 
 fn compute_profile_fixed_point(
     validator_stakes: &Vec<u64>,
+    ideal_total_weight: u64,
     stake_per_weight: U64F64,
     secrecy_threshold_in_stake_ratio: U64F64,
     maybe_fast_secrecy_threshold_in_stake_ratio: Option<U64F64>,
@@ -323,15 +336,16 @@ fn compute_profile_fixed_point(
     let delta_total_fixed = delta_down_fixed + delta_up_fixed;
     let reconstruct_threshold_in_weights_fixed =
         (secrecy_threshold_in_stake_ratio * stake_sum_fixed / stake_per_weight + delta_up_fixed)
-            .ceil()
-            + one;
+            .ceil();
     let reconstruct_threshold_in_weights: u64 = min(
         weight_total,
         reconstruct_threshold_in_weights_fixed.to_num::<u64>(),
     );
     let stake_gap_fixed = stake_per_weight * delta_total_fixed / stake_sum_fixed;
-    let reconstruct_threshold_in_stake_ratio = secrecy_threshold_in_stake_ratio + stake_gap_fixed;
-
+    // let reconstruct_threshold_in_stake_ratio = secrecy_threshold_in_stake_ratio + stake_gap_fixed;
+    let reconstruct_threshold_in_stake_ratio =
+        (reconstruct_threshold_in_weights_fixed + delta_down_fixed) * stake_per_weight
+            / stake_sum_fixed;
     let (fast_reconstruct_threshold_in_stake_ratio, fast_reconstruct_threshold_in_weights) =
         if let Some(fast_secrecy_threshold_in_stake_ratio) =
             maybe_fast_secrecy_threshold_in_stake_ratio
@@ -351,6 +365,7 @@ fn compute_profile_fixed_point(
         };
 
     DKGRoundingProfile {
+        ideal_total_weight: ideal_total_weight as u128,
         validator_weights,
         secrecy_threshold_in_stake_ratio,
         reconstruct_threshold_in_stake_ratio,
