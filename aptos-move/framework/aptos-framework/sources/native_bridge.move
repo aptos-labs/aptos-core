@@ -53,10 +53,10 @@ module aptos_framework::native_bridge {
     }
 
     #[event]
-    /// An event triggered upon change of risk denominator
-    struct BridgeRiskDenominatorChangedEvent has store, drop {
-        old_risk_denominator: u64,
-        new_risk_denominator: u64,
+    /// An event triggered upon change of insurance budget divider
+    struct BridgeInsuranceBudgetDividerChangedEvent has store, drop {
+        old_insurance_budget_divider: u64,
+        new_insurance_budget_divider: u64,
     }
 
     #[event]
@@ -137,7 +137,7 @@ module aptos_framework::native_bridge {
     struct BridgeConfig has key {
         bridge_relayer: address,
         insurance_fund: address,
-        risk_denominator: u64,
+        insurance_budget_divider: u64,
         bridge_fee: u64,
     }
 
@@ -148,7 +148,7 @@ module aptos_framework::native_bridge {
         let bridge_config = BridgeConfig {
             bridge_relayer: signer::address_of(aptos_framework),
             insurance_fund: signer::address_of(aptos_framework),
-            risk_denominator: 4,
+            insurance_budget_divider: 4,
             bridge_fee: 40_000_000_000,
         };
         move_to(aptos_framework, bridge_config);
@@ -316,11 +316,11 @@ module aptos_framework::native_bridge {
     }
 
     #[view]
-    /// Retrieves the current risk denominator.
+    /// Retrieves the current insurance budget divider.
     /// 
-    /// @return The current risk denominator.
-    public fun risk_denominator(): u64 acquires BridgeConfig {
-        borrow_global_mut<BridgeConfig>(@aptos_framework).risk_denominator
+    /// @return The current insurance budget divider.
+    public fun insurance_budget_divider(): u64 acquires BridgeConfig {
+        borrow_global_mut<BridgeConfig>(@aptos_framework).insurance_budget_divider
     }
 
     #[view]
@@ -634,23 +634,23 @@ module aptos_framework::native_bridge {
         );
     }
 
-    /// Updates the risk denominator, requiring governance validation.
+    /// Updates the insurance budget divider, requiring governance validation.
     /// 
     /// @param aptos_framework The signer representing the Aptos framework.
-    /// @param new_risk_denominator The new risk denominator to be set.
-    /// @abort If the new risk denominator is the same as the old risk denominator.
-    public entry fun update_risk_denominator(aptos_framework: &signer, new_risk_denominator: u64
+    /// @param new_insurance_budget_divider The new insurance budget divider to be set.
+    /// @abort If the new insurance budget divider is the same as the old insurance budget divider.
+    public entry fun update_insurance_budget_divider(aptos_framework: &signer, new_insurance_budget_divider: u64
     ) acquires BridgeConfig {
         system_addresses::assert_aptos_framework(aptos_framework);
         let bridge_config = borrow_global_mut<BridgeConfig>(@aptos_framework);
-        let old_risk_denominator = bridge_config.risk_denominator;
-        assert!(old_risk_denominator != new_risk_denominator, ESAME_VALUE);
-        bridge_config.risk_denominator = new_risk_denominator;
+        let old_insurance_budget_divider = bridge_config.insurance_budget_divider;
+        assert!(old_insurance_budget_divider != new_insurance_budget_divider, ESAME_VALUE);
+        bridge_config.insurance_budget_divider = new_insurance_budget_divider;
 
         event::emit(
-            BridgeRiskDenominatorChangedEvent {
-                old_risk_denominator,
-                new_risk_denominator,
+            BridgeInsuranceBudgetDividerChangedEvent {
+                old_insurance_budget_divider,
+                new_insurance_budget_divider,
             },
         );
     }
@@ -669,13 +669,13 @@ module aptos_framework::native_bridge {
     /// @param amount The amount to be transferred.
     fun assert_outbound_rate_limit_budget_not_exceeded(amount: u64) acquires OutboundRateLimitBudget, BridgeConfig {
         let insurance_fund = borrow_global<BridgeConfig>(@aptos_framework).insurance_fund;
-        let risk_denominator = borrow_global<BridgeConfig>(@aptos_framework).risk_denominator;
+        let insurance_budget_divider = borrow_global<BridgeConfig>(@aptos_framework).insurance_budget_divider;
         let table = borrow_global_mut<OutboundRateLimitBudget>(@aptos_framework);
         
         let day = timestamp::now_seconds() / 86400;
         let current_budget = smart_table::borrow_mut_with_default(&mut table.day, day, 0);
         smart_table::upsert(&mut table.day, day, *current_budget + amount);
-        let rate_limit = coin::balance<AptosCoin>(insurance_fund) / risk_denominator;
+        let rate_limit = coin::balance<AptosCoin>(insurance_fund) / insurance_budget_divider;
         assert!(*smart_table::borrow(&table.day, day) < rate_limit, ERATE_LIMIT_EXCEEDED);
     }
 
@@ -684,13 +684,13 @@ module aptos_framework::native_bridge {
     /// @param amount The amount to be transferred.
     fun assert_inbound_rate_limit_budget_not_exceeded(amount: u64) acquires InboundRateLimitBudget, BridgeConfig {
         let insurance_fund = borrow_global<BridgeConfig>(@aptos_framework).insurance_fund;
-        let risk_denominator = borrow_global<BridgeConfig>(@aptos_framework).risk_denominator;
+        let insurance_budget_divider = borrow_global<BridgeConfig>(@aptos_framework).insurance_budget_divider;
         let table = borrow_global_mut<InboundRateLimitBudget>(@aptos_framework);
         
         let day = timestamp::now_seconds() / 86400;
         let current_budget = smart_table::borrow_mut_with_default(&mut table.day, day, 0);
         smart_table::upsert(&mut table.day, day, *current_budget + amount);
-        let rate_limit = coin::balance<AptosCoin>(insurance_fund) / risk_denominator;
+        let rate_limit = coin::balance<AptosCoin>(insurance_fund) / insurance_budget_divider;
         assert!(*smart_table::borrow(&table.day, day) < rate_limit, ERATE_LIMIT_EXCEEDED);
     }
 
@@ -720,23 +720,23 @@ module aptos_framework::native_bridge {
     }
 
     #[test(aptos_framework = @aptos_framework)]
-    /// Tests updating the risk denominator and emitting the corresponding event.
-    fun test_update_risk_denominator(aptos_framework: &signer
+    /// Tests updating the insurance budget divider and emitting the corresponding event.
+    fun test_update_insurance_budget_divider(aptos_framework: &signer
     ) acquires BridgeConfig {
         initialize_for_test(aptos_framework);
-        let old_risk_denominator = risk_denominator();
-        let new_risk_denominator = 5;
-        update_risk_denominator(aptos_framework, new_risk_denominator);
+        let old_insurance_budget_divider = insurance_budget_divider();
+        let new_insurance_budget_divider = 5;
+        update_insurance_budget_divider(aptos_framework, new_insurance_budget_divider);
 
         assert!(
-            event::was_event_emitted<BridgeRiskDenominatorChangedEvent>(
-                &BridgeRiskDenominatorChangedEvent {
-                    old_risk_denominator: old_risk_denominator,
-                    new_risk_denominator: new_risk_denominator,
+            event::was_event_emitted<BridgeInsuranceBudgetDividerChangedEvent>(
+                &BridgeInsuranceBudgetDividerChangedEvent {
+                    old_insurance_budget_divider: old_insurance_budget_divider,
+                    new_insurance_budget_divider: new_insurance_budget_divider,
                 }
             ), 0);
 
-        assert!(risk_denominator() == new_risk_denominator, 0);
+        assert!(insurance_budget_divider() == new_insurance_budget_divider, 0);
     }
 
     #[test(aptos_framework = @aptos_framework, new_insurance_fund = @0xdead)]
