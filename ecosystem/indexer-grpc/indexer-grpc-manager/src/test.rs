@@ -39,6 +39,7 @@ async fn test_run() {
         self_advertised_address: self_address.clone(),
         grpc_manager_addresses: vec![self_address],
         fullnode_addresses: vec![],
+        is_master: true,
     };
 
     let task = tokio::spawn(async move {
