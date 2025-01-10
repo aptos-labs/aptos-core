@@ -37,11 +37,18 @@ fn base_coin_type(market_id: u64) -> &'static str {
 }
 
 fn quote_coin_type(market_id: u64) -> &'static str {
-    match (market_id % 3) {
-        0 => { "QAC" },
-        1 => { "QBC" },
-        2 => { "QCC" },
+    if market_id < 30 {
+        if market_id % 3 == 0 {
+            "QAC"
+        } else if market_id % 3 == 1 {
+            "QBC"
+        } else {
+            "QCC"
+        }
+    } else {
+        "QC"
     }
+    
 }
 
 const ASK: bool = true;
