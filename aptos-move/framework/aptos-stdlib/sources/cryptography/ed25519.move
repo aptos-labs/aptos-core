@@ -258,5 +258,10 @@ module aptos_std::ed25519 {
         assert!(signature_verify_strict_t(&sig2, &pk, copy msg2), std::error::invalid_state(2));
     }
 
+    #[test]
+    fun hoho() {
+        let upk = new_unvalidated_public_key_from_bytes(x"1388de358cf4701696bd58ed4b96e9d670cbbb914b888be1ceda6374a3098ed4");
+        assert!(option::is_some(&public_key_validate(&upk)), 1);
+    }
 
 }
