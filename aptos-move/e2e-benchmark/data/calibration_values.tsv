@@ -17,18 +17,18 @@ ResourceGroupsSenderMultiChange { string_length: 1024 }	119	0.904	1.217	33.5
 TokenV1MintAndTransferFT	119	0.960	1.255	385.9
 TokenV1MintAndTransferNFTSequential	119	0.945	1.218	594.7
 TokenV2AmbassadorMint { numbered: true }	119	0.944	1.158	468.2
-LiquidityPoolSwap { is_stable: true }	119	0.914	1.123	610.5
-LiquidityPoolSwap { is_stable: false }	119	0.919	1.132	570.5
+LiquidityPoolSwap { is_stable: true }	119	0.914	1.123	683.6
+LiquidityPoolSwap { is_stable: false }	119	0.919	1.132	602.6
 CoinInitAndMint	119	0.933	1.143	211.0
 FungibleAssetMint	119	0.931	1.185	231.9
 IncGlobalMilestoneAggV2 { milestone_every: 1 }	119	0.892	1.100	34.1
 IncGlobalMilestoneAggV2 { milestone_every: 2 }	119	0.899	1.167	19.3
 EmitEvents { count: 1000 }	119	0.941	1.126	9007.3
 VectorTrimAppend { vec_len: 3000, element_len: 1, index: 0, repeats: 0 }	119	0.934	1.152	6490.3
-VectorTrimAppend { vec_len: 3000, element_len: 1, index: 100, repeats: 1000 }	119	0.931	1.256	30762.7
+VectorTrimAppend { vec_len: 3000, element_len: 1, index: 100, repeats: 1000 }	119	0.931	1.256	31235.5
 VectorTrimAppend { vec_len: 3000, element_len: 1, index: 2990, repeats: 1000 }	119	0.947	1.093	18431.4
 VectorRemoveInsert { vec_len: 3000, element_len: 1, index: 100, repeats: 1000 }	119	0.943	1.107	29034.8
-VectorRemoveInsert { vec_len: 3000, element_len: 1, index: 2998, repeats: 1000 }	119	0.954	1.149	20047.3
+VectorRemoveInsert { vec_len: 3000, element_len: 1, index: 2998, repeats: 1000 }	119	0.954	1.149	19644.1
 VectorRangeMove { vec_len: 3000, element_len: 1, index: 1000, move_len: 500, repeats: 1000 }	6	0.925	1.001	32535.4
 VectorTrimAppend { vec_len: 100, element_len: 100, index: 0, repeats: 0 }	119	0.909	1.201	293.5
 VectorTrimAppend { vec_len: 100, element_len: 100, index: 10, repeats: 1000 }	119	0.951	1.143	12571.2

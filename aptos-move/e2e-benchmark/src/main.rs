@@ -309,18 +309,6 @@ fn main() {
             entry_point
         );
 
-        json_lines.push(json!({
-            "grep": "grep_json_aptos_move_vm_perf",
-            "transaction_type": entry_point_name,
-            "wall_time_us": elapsed_micros,
-            "gas_units_per_second": gps,
-            "execution_gas_units": execution_gas_units,
-            "io_gas_units": io_gas_units,
-            "expected_wall_time_us": expected_time_micros,
-            "code_perf_version": CODE_PERF_VERSION,
-            "test_index": index,
-        }));
-
         let max_regression = f64::max(
             expected_time_micros * (1.0 + ALLOWED_REGRESSION) + ABSOLUTE_BUFFER_US,
             expected_time_micros * cur_calibration.max_ratio,
@@ -329,6 +317,21 @@ fn main() {
             expected_time_micros * (1.0 - ALLOWED_IMPROVEMENT) - ABSOLUTE_BUFFER_US,
             expected_time_micros * cur_calibration.min_ratio,
         );
+
+        json_lines.push(json!({
+            "grep": "grep_json_aptos_move_vm_perf",
+            "transaction_type": entry_point_name,
+            "wall_time_us": elapsed_micros,
+            "gas_units_per_second": gps,
+            "execution_gas_units": execution_gas_units,
+            "io_gas_units": io_gas_units,
+            "expected_wall_time_us": expected_time_micros,
+            "expected_max_wall_time_us": max_regression,
+            "expected_min_wall_time_us": max_improvement,
+            "code_perf_version": CODE_PERF_VERSION,
+            "test_index": index,
+        }));
+
         if elapsed_micros > max_regression {
             failures.push(format!(
                 "Performance regression detected: {:.1}us, expected: {:.1}us, limit: {:.1}us, diff: {}%, for {:?}",
