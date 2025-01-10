@@ -713,6 +713,7 @@ module aptos_framework::object {
         obj_owner
     }
 
+    /// Master signer offers a transfer permission of an object to a permissioned signer.
     public fun grant_permission<T>(
         master: &signer,
         permissioned_signer: &signer,
@@ -722,6 +723,17 @@ module aptos_framework::object {
             master,
             permissioned_signer,
             TransferPermission { object: object.inner }
+        )
+    }
+
+    /// Grant a transfer permission to the permissioned signer using TransferRef.
+    public fun grant_permission_with_transfer_ref(
+        permissioned_signer: &signer,
+        ref: &TransferRef,
+    ) {
+        permissioned_signer::grant_unlimited_with_permissioned_signer(
+            permissioned_signer,
+            TransferPermission { object: ref.self }
         )
     }
 
@@ -1159,6 +1171,27 @@ module aptos_framework::object {
         let creator_permission_handle = permissioned_signer::create_permissioned_handle(creator);
         let creator_permission_signer = permissioned_signer::signer_from_permissioned_handle(&creator_permission_handle);
 
+        transfer_to_object(&creator_permission_signer, weapon, hero);
+
+        permissioned_signer::destroy_permissioned_handle(creator_permission_handle);
+    }
+
+    #[test(creator = @0x123)]
+    fun test_create_and_transfer(
+        creator: &signer,
+    ) acquires ObjectCore {
+        let aptos_framework = account::create_signer_for_test(@0x1);
+        timestamp::set_time_has_started_for_testing(&aptos_framework);
+
+        let (_, hero) = create_hero(creator);
+        let (weapon_ref, weapon) = create_weapon(creator);
+        let t_ref = generate_transfer_ref(&weapon_ref);
+
+        // Create a permissioned signer
+        let creator_permission_handle = permissioned_signer::create_permissioned_handle(creator);
+        let creator_permission_signer = permissioned_signer::signer_from_permissioned_handle(&creator_permission_handle);
+
+        grant_permission_with_transfer_ref(&creator_permission_signer, &t_ref);
         transfer_to_object(&creator_permission_signer, weapon, hero);
 
         permissioned_signer::destroy_permissioned_handle(creator_permission_handle);
