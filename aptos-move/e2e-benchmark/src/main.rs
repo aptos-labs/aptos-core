@@ -86,6 +86,8 @@ const ABSOLUTE_BUFFER_US: f64 = 2.0;
 struct CalibrationInfo {
     // count: usize,
     expected_time_micros: f64,
+    min_ratio: f64,
+    max_ratio: f64,
 }
 
 fn get_parsed_calibration_values() -> HashMap<String, CalibrationInfo> {
@@ -100,6 +102,8 @@ fn get_parsed_calibration_values() -> HashMap<String, CalibrationInfo> {
             (parts[0].to_string(), CalibrationInfo {
                 // count: parts[1].parse().unwrap(),
                 expected_time_micros: parts[parts.len() - 1].parse().unwrap(),
+                min_ratio: parts[2].parse().unwrap(),
+                max_ratio: parts[3].parse().unwrap(),
             })
         })
         .collect()
@@ -206,13 +210,13 @@ fn main() {
             index: 2998,
             repeats: 1000,
         },
-        // EntryPoints::VectorRangeMove {
-        //     vec_len: 3000,
-        //     element_len: 1,
-        //     index: 1000,
-        //     move_len: 500,
-        //     repeats: 1000,
-        // },
+        EntryPoints::VectorRangeMove {
+            vec_len: 3000,
+            element_len: 1,
+            index: 1000,
+            move_len: 500,
+            repeats: 1000,
+        },
         // vectors with large elements
         EntryPoints::VectorTrimAppend {
             // baseline, only vector creation
@@ -227,13 +231,13 @@ fn main() {
             index: 10,
             repeats: 1000,
         },
-        // EntryPoints::VectorRangeMove {
-        //     vec_len: 100,
-        //     element_len: 100,
-        //     index: 50,
-        //     move_len: 10,
-        //     repeats: 1000,
-        // },
+        EntryPoints::VectorRangeMove {
+            vec_len: 100,
+            element_len: 100,
+            index: 50,
+            move_len: 10,
+            repeats: 1000,
+        },
     ];
 
     let mut failures = Vec::new();
@@ -246,10 +250,10 @@ fn main() {
 
     for (index, entry_point) in entry_points.into_iter().enumerate() {
         let entry_point_name = format!("{:?}", entry_point);
-        let expected_time_micros = calibration_values
+        let cur_calibration = calibration_values
             .get(&entry_point_name)
-            .expect(&entry_point_name)
-            .expected_time_micros;
+            .expect(&entry_point_name);
+        let expected_time_micros = cur_calibration.expected_time_micros;
         let publisher = executor.new_account_at(AccountAddress::random());
 
         let mut package_handler =
@@ -317,17 +321,23 @@ fn main() {
             "test_index": index,
         }));
 
-        if elapsed_micros > expected_time_micros * (1.0 + ALLOWED_REGRESSION) + ABSOLUTE_BUFFER_US {
+        let max_regression = f64::max(
+            expected_time_micros * (1.0 + ALLOWED_REGRESSION) + ABSOLUTE_BUFFER_US,
+            expected_time_micros * cur_calibration.max_ratio,
+        );
+        let max_improvement = f64::min(
+            expected_time_micros * (1.0 - ALLOWED_IMPROVEMENT) - ABSOLUTE_BUFFER_US,
+            expected_time_micros * cur_calibration.min_ratio,
+        );
+        if elapsed_micros > max_regression {
             failures.push(format!(
-                "Performance regression detected: {:.1}us, expected: {:.1}us, diff: {}%, for {:?}",
-                elapsed_micros, expected_time_micros, diff, entry_point
+                "Performance regression detected: {:.1}us, expected: {:.1}us, limit: {:.1}us, diff: {}%, for {:?}",
+                elapsed_micros, expected_time_micros, max_regression, diff, entry_point
             ));
-        } else if elapsed_micros + ABSOLUTE_BUFFER_US
-            < expected_time_micros * (1.0 - ALLOWED_IMPROVEMENT)
-        {
+        } else if elapsed_micros < max_improvement {
             failures.push(format!(
-                "Performance improvement detected: {:.1}us, expected {:.1}us, diff: {}%, for {:?}. You need to adjust expected time!",
-                elapsed_micros, expected_time_micros, diff, entry_point
+                "Performance improvement detected: {:.1}us, expected {:.1}us, limit {:.1}us, diff: {}%, for {:?}. You need to adjust expected time!",
+                elapsed_micros, expected_time_micros, max_improvement, diff, entry_point
             ));
         }
     }
