@@ -18,9 +18,7 @@ const APTOS_CLI_PACKAGE_NAME: &str = "aptos";
 // Relevant file paths to monitor when deciding to run the targeted tests.
 // Note: these paths should be relative to the root of the `aptos-core` repository,
 // and will be transformed into UTF-8 paths for cross-platform compatibility.
-const RELEVANT_FILE_PATHS_FOR_COMPILER_V2: [&str; 7] = [
-    ".github/actions/move-tests-compiler-v2",
-    ".github/workflows/move-test-compiler-v2.yaml",
+const RELEVANT_FILE_PATHS_FOR_COMPILER_V2: [&str; 5] = [
     "aptos-move/aptos-transactional-test-harness",
     "aptos-move/e2e-move-tests",
     "aptos-move/framework",
