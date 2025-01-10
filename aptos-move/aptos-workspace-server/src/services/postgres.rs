@@ -2,14 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::{make_shared, IP_LOCAL_HOST},
+    common::{make_shared, ArcError, IP_LOCAL_HOST},
     services::docker_common::{create_docker_volume, create_start_and_inspect_container},
 };
 use anyhow::{anyhow, Context, Result};
-use aptos_localnet::{docker, health_checker::HealthChecker};
+use aptos_localnet::health_checker::HealthChecker;
 use bollard::{
     container::{CreateContainerOptions, WaitContainerOptions},
     secret::{ContainerInspectResponse, HostConfig, PortBinding},
+    Docker,
 };
 use futures::TryStreamExt;
 use maplit::hashmap;
@@ -161,7 +162,8 @@ fn create_container_options_and_config(
 /// as it relies on external commands that may fail for various reasons.
 pub fn start_postgres(
     shutdown: CancellationToken,
-    fut_network: impl Future<Output = Result<String, Arc<anyhow::Error>>>,
+    fut_docker: impl Future<Output = Result<Docker, ArcError>> + Clone + Send + 'static,
+    fut_network: impl Future<Output = Result<String, ArcError>>,
     instance_id: Uuid,
 ) -> (
     impl Future<Output = Result<u16>>,
@@ -171,28 +173,26 @@ pub fn start_postgres(
     println!("Starting postgres..");
 
     let volume_name = format!("aptos-workspace-{}-postgres", instance_id);
-    let (fut_volume, fut_volume_clean_up) = create_docker_volume(shutdown.clone(), volume_name);
+    let (fut_volume, fut_volume_clean_up) =
+        create_docker_volume(shutdown.clone(), fut_docker.clone(), volume_name);
 
     let fut_container_clean_up = Arc::new(Mutex::new(None));
 
     let fut_create_postgres = make_shared({
         let fut_container_clean_up = fut_container_clean_up.clone();
+        let fut_docker = fut_docker.clone();
 
         async move {
             let (network_name, volume_name) = try_join!(fut_network, fut_volume)
-                .map_err(anyhow::Error::msg)
                 .context("failed to start postgres: one or more dependencies failed to start")?;
 
             let (options, config) =
                 create_container_options_and_config(instance_id, network_name, volume_name);
             let (fut_container, fut_container_cleanup) =
-                create_start_and_inspect_container(shutdown.clone(), options, config);
+                create_start_and_inspect_container(shutdown.clone(), fut_docker, options, config);
             *fut_container_clean_up.lock().await = Some(fut_container_cleanup);
 
-            let container_info = fut_container
-                .await
-                .map_err(anyhow::Error::msg)
-                .context("failed to start postgres")?;
+            let container_info = fut_container.await.context("failed to start postgres")?;
 
             let postgres_port = get_postgres_assigned_port(&container_info)
                 .ok_or_else(|| anyhow!("failed to get postgres port"))?;
@@ -205,7 +205,7 @@ pub fn start_postgres(
         let fut_create_postgres = fut_create_postgres.clone();
 
         async move {
-            let postgres_port = fut_create_postgres.await.map_err(anyhow::Error::msg)?;
+            let postgres_port = fut_create_postgres.await?;
 
             let health_checker =
                 HealthChecker::Postgres(get_postgres_connection_string(postgres_port));
@@ -221,7 +221,7 @@ pub fn start_postgres(
     };
 
     let fut_postgres_finish = async move {
-        let docker = docker::get_docker()
+        let docker = fut_docker
             .await
             .context("failed to wait on postgres container")?;
 

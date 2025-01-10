@@ -1,12 +1,12 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::IP_LOCAL_HOST;
+use crate::common::{ArcError, IP_LOCAL_HOST};
 use anyhow::{anyhow, Context, Result};
 use aptos_faucet_core::server::{FunderKeyEnum, RunConfig};
 use aptos_localnet::health_checker::HealthChecker;
 use futures::channel::oneshot;
-use std::{future::Future, path::PathBuf, sync::Arc};
+use std::{future::Future, path::PathBuf};
 use url::Url;
 
 /// Starts the faucet service.
@@ -21,8 +21,8 @@ use url::Url;
 ///   there is an error.
 pub fn start_faucet(
     test_dir: PathBuf,
-    fut_node_api: impl Future<Output = Result<u16, Arc<anyhow::Error>>> + Send + 'static,
-    fut_indexer_grpc: impl Future<Output = Result<u16, Arc<anyhow::Error>>> + Send + 'static,
+    fut_node_api: impl Future<Output = Result<u16, ArcError>> + Send + 'static,
+    fut_indexer_grpc: impl Future<Output = Result<u16, ArcError>> + Send + 'static,
 ) -> (
     impl Future<Output = Result<u16>>,
     impl Future<Output = Result<()>> + 'static,
@@ -32,12 +32,10 @@ pub fn start_faucet(
     let handle_faucet = tokio::spawn(async move {
         let api_port = fut_node_api
             .await
-            .map_err(anyhow::Error::msg)
             .context("failed to start faucet: node api did not start successfully")?;
 
         fut_indexer_grpc
             .await
-            .map_err(anyhow::Error::msg)
             .context("failed to start faucet: indexer grpc did not start successfully")?;
 
         println!("Starting faucet..");
