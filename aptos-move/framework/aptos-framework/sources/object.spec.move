@@ -139,9 +139,9 @@ spec aptos_framework::object {
         ensures [abstract] result == spec_create_guid_object_address(source, creation_num);
     }
 
-    spec object_address<T: key>(object: &Object<T>): address {
+    spec object_address<T: key>(self: &Object<T>): address {
         aborts_if false;
-        ensures result == object.inner;
+        ensures result == self.inner;
     }
 
     spec convert<X: key, Y: key>(object: Object<X>): Object<Y> {
@@ -335,10 +335,10 @@ spec aptos_framework::object {
         ensures global<ObjectCore>(ref.self).allow_ungated_transfer == false;
     }
 
-    spec object_from_constructor_ref<T: key>(ref: &ConstructorRef): Object<T> {
-        aborts_if !exists<ObjectCore>(ref.self);
-        aborts_if !spec_exists_at<T>(ref.self);
-        ensures result == Object<T> { inner: ref.self };
+    spec object_from_constructor_ref<T: key>(self: &ConstructorRef): Object<T> {
+        aborts_if !exists<ObjectCore>(self.self);
+        aborts_if !spec_exists_at<T>(self.self);
+        ensures result == Object<T> { inner: self.self };
     }
 
     spec create_guid(object: &signer): guid::GUID {
@@ -381,9 +381,9 @@ spec aptos_framework::object {
         ensures result == Object<T> { inner: ref.self };
     }
 
-    spec delete(ref: DeleteRef) {
-        aborts_if !exists<ObjectCore>(ref.self);
-        ensures !exists<ObjectCore>(ref.self);
+    spec delete(self: DeleteRef) {
+        aborts_if !exists<ObjectCore>(self.self);
+        ensures !exists<ObjectCore>(self.self);
     }
 
     spec set_untransferable(ref: &ConstructorRef) {

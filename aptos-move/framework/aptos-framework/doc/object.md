@@ -28,10 +28,12 @@ make it so that a reference to a global object can be returned from a function.
 -  [Struct `Object`](#0x1_object_Object)
 -  [Struct `ConstructorRef`](#0x1_object_ConstructorRef)
 -  [Struct `DeleteRef`](#0x1_object_DeleteRef)
+-  [Struct `DeleteAndRecreateRef`](#0x1_object_DeleteAndRecreateRef)
 -  [Struct `ExtendRef`](#0x1_object_ExtendRef)
 -  [Struct `TransferRef`](#0x1_object_TransferRef)
 -  [Struct `LinearTransferRef`](#0x1_object_LinearTransferRef)
 -  [Struct `DeriveRef`](#0x1_object_DeriveRef)
+-  [Enum `CreateAtAddressRef`](#0x1_object_CreateAtAddressRef)
 -  [Struct `TransferEvent`](#0x1_object_TransferEvent)
 -  [Struct `Transfer`](#0x1_object_Transfer)
 -  [Constants](#@Constants_0)
@@ -50,6 +52,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `create_named_object`](#0x1_object_create_named_object)
 -  [Function `create_user_derived_object`](#0x1_object_create_user_derived_object)
 -  [Function `create_object`](#0x1_object_create_object)
+-  [Function `create_object_at_address_from_ref`](#0x1_object_create_object_at_address_from_ref)
 -  [Function `create_sticky_object`](#0x1_object_create_sticky_object)
 -  [Function `create_sticky_object_at_address`](#0x1_object_create_sticky_object_at_address)
 -  [Function `create_object_from_account`](#0x1_object_create_object_from_account)
@@ -57,6 +60,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `create_object_from_guid`](#0x1_object_create_object_from_guid)
 -  [Function `create_object_internal`](#0x1_object_create_object_internal)
 -  [Function `generate_delete_ref`](#0x1_object_generate_delete_ref)
+-  [Function `generate_delete_and_recreate_ref`](#0x1_object_generate_delete_and_recreate_ref)
 -  [Function `generate_extend_ref`](#0x1_object_generate_extend_ref)
 -  [Function `generate_transfer_ref`](#0x1_object_generate_transfer_ref)
 -  [Function `generate_derive_ref`](#0x1_object_generate_derive_ref)
@@ -64,11 +68,15 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `address_from_constructor_ref`](#0x1_object_address_from_constructor_ref)
 -  [Function `object_from_constructor_ref`](#0x1_object_object_from_constructor_ref)
 -  [Function `can_generate_delete_ref`](#0x1_object_can_generate_delete_ref)
+-  [Function `address_from_create_at_ref`](#0x1_object_address_from_create_at_ref)
 -  [Function `create_guid`](#0x1_object_create_guid)
 -  [Function `new_event_handle`](#0x1_object_new_event_handle)
 -  [Function `address_from_delete_ref`](#0x1_object_address_from_delete_ref)
 -  [Function `object_from_delete_ref`](#0x1_object_object_from_delete_ref)
 -  [Function `delete`](#0x1_object_delete)
+-  [Function `address_from_delete_and_recreate_ref`](#0x1_object_address_from_delete_and_recreate_ref)
+-  [Function `object_from_delete_and_recreate_ref`](#0x1_object_object_from_delete_and_recreate_ref)
+-  [Function `delete_and_can_recreate`](#0x1_object_delete_and_can_recreate)
 -  [Function `generate_signer_for_extending`](#0x1_object_generate_signer_for_extending)
 -  [Function `address_from_extend_ref`](#0x1_object_address_from_extend_ref)
 -  [Function `disable_ungated_transfer`](#0x1_object_disable_ungated_transfer)
@@ -379,6 +387,34 @@ Used to remove an object from storage.
 
 </details>
 
+<a id="0x1_object_DeleteAndRecreateRef"></a>
+
+## Struct `DeleteAndRecreateRef`
+
+Used to remove an object from storage, such that it can be created again
+
+
+<pre><code><b>struct</b> <a href="object.md#0x1_object_DeleteAndRecreateRef">DeleteAndRecreateRef</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>self: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="0x1_object_ExtendRef"></a>
 
 ## Struct `ExtendRef`
@@ -495,6 +531,70 @@ Used to create derived objects from a given objects.
 </dd>
 </dl>
 
+
+</details>
+
+<a id="0x1_object_CreateAtAddressRef"></a>
+
+## Enum `CreateAtAddressRef`
+
+Used to (re)create object at a given address
+
+
+<pre><code>enum <a href="object.md#0x1_object_CreateAtAddressRef">CreateAtAddressRef</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>RecreateV1</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="object.md#0x1_object">object</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>owner: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>guid_creation_num: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>untransferable: bool</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>allow_ungated_transfer: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+</details>
 
 </details>
 
@@ -700,6 +800,16 @@ The resource is not stored at the specified address.
 
 
 <pre><code><b>const</b> <a href="object.md#0x1_object_ERESOURCE_DOES_NOT_EXIST">ERESOURCE_DOES_NOT_EXIST</a>: u64 = 7;
+</code></pre>
+
+
+
+<a id="0x1_object_ETOMBSTONE_CANNOT_BE_PRESENT"></a>
+
+Cannot delete_and_can_recreate with TombStone present.
+
+
+<pre><code><b>const</b> <a href="object.md#0x1_object_ETOMBSTONE_CANNOT_BE_PRESENT">ETOMBSTONE_CANNOT_BE_PRESENT</a>: u64 = 11;
 </code></pre>
 
 
@@ -1040,7 +1150,7 @@ Derives an object from an Account GUID.
 Returns the address of within an ObjectId.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_address">object_address</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_address">object_address</a>&lt;T: key&gt;(self: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
 </code></pre>
 
 
@@ -1049,8 +1159,8 @@ Returns the address of within an ObjectId.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_address">object_address</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: &<a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): <b>address</b> {
-    <a href="object.md#0x1_object">object</a>.inner
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_address">object_address</a>&lt;T: key&gt;(self: &<a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): <b>address</b> {
+    self.inner
 }
 </code></pre>
 
@@ -1160,6 +1270,54 @@ never be regenerated with future txs.
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_object">create_object</a>(owner_address: <b>address</b>): <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> {
     <b>let</b> unique_address = <a href="transaction_context.md#0x1_transaction_context_generate_auid_address">transaction_context::generate_auid_address</a>();
     <a href="object.md#0x1_object_create_object_internal">create_object_internal</a>(owner_address, unique_address, <b>true</b>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_object_create_object_at_address_from_ref"></a>
+
+## Function `create_object_at_address_from_ref`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_object_at_address_from_ref">create_object_at_address_from_ref</a>(create_ref: <a href="object.md#0x1_object_CreateAtAddressRef">object::CreateAtAddressRef</a>): <a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_object_at_address_from_ref">create_object_at_address_from_ref</a>(create_ref: <a href="object.md#0x1_object_CreateAtAddressRef">CreateAtAddressRef</a>): <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> {
+    <b>let</b> CreateAtAddressRef::RecreateV1 {
+        <a href="object.md#0x1_object">object</a>, owner, guid_creation_num, untransferable, allow_ungated_transfer,
+    } = create_ref;
+
+    <b>assert</b>!(!<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="object.md#0x1_object_EOBJECT_EXISTS">EOBJECT_EXISTS</a>));
+
+    <b>let</b> object_signer = <a href="create_signer.md#0x1_create_signer">create_signer</a>(<a href="object.md#0x1_object">object</a>);
+    <b>let</b> transfer_events_guid = <a href="guid.md#0x1_guid_create">guid::create</a>(<a href="object.md#0x1_object">object</a>, &<b>mut</b> guid_creation_num);
+
+    <b>move_to</b>(
+        &object_signer,
+        <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+            guid_creation_num,
+            owner,
+            allow_ungated_transfer,
+            // since transfer_events is not used <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> more, it is perfectly fine
+            // <b>to</b> create a new handle, when recreating.
+            transfer_events: <a href="event.md#0x1_event_new_event_handle">event::new_event_handle</a>(transfer_events_guid),
+        },
+    );
+
+    <b>if</b> (untransferable) {
+        <b>move_to</b>(&object_signer, <a href="object.md#0x1_object_Untransferable">Untransferable</a> {});
+    };
+    <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> { self: <a href="object.md#0x1_object">object</a>, can_delete: <b>true</b> }
 }
 </code></pre>
 
@@ -1381,6 +1539,31 @@ Generates the DeleteRef, which can be used to remove ObjectCore from global stor
 
 </details>
 
+<a id="0x1_object_generate_delete_and_recreate_ref"></a>
+
+## Function `generate_delete_and_recreate_ref`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_delete_and_recreate_ref">generate_delete_and_recreate_ref</a>(self: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_DeleteAndRecreateRef">object::DeleteAndRecreateRef</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_delete_and_recreate_ref">generate_delete_and_recreate_ref</a>(self: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <a href="object.md#0x1_object_DeleteAndRecreateRef">DeleteAndRecreateRef</a> {
+    <b>assert</b>!(self.can_delete, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ECANNOT_DELETE">ECANNOT_DELETE</a>));
+    <a href="object.md#0x1_object_DeleteAndRecreateRef">DeleteAndRecreateRef</a> { self: self.self }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_object_generate_extend_ref"></a>
 
 ## Function `generate_extend_ref`
@@ -1489,7 +1672,7 @@ Create a signer for the ConstructorRef
 Returns the address associated with the constructor
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_constructor_ref">address_from_constructor_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_constructor_ref">address_from_constructor_ref</a>(self: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <b>address</b>
 </code></pre>
 
 
@@ -1498,8 +1681,8 @@ Returns the address associated with the constructor
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_constructor_ref">address_from_constructor_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <b>address</b> {
-    ref.self
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_constructor_ref">address_from_constructor_ref</a>(self: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <b>address</b> {
+    self.self
 }
 </code></pre>
 
@@ -1514,7 +1697,7 @@ Returns the address associated with the constructor
 Returns an Object<T> from within a ConstructorRef
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_constructor_ref">object_from_constructor_ref</a>&lt;T: key&gt;(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_constructor_ref">object_from_constructor_ref</a>&lt;T: key&gt;(self: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;
 </code></pre>
 
 
@@ -1523,8 +1706,8 @@ Returns an Object<T> from within a ConstructorRef
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_constructor_ref">object_from_constructor_ref</a>&lt;T: key&gt;(ref: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; {
-    <a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;T&gt;(ref.self)
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_constructor_ref">object_from_constructor_ref</a>&lt;T: key&gt;(self: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; {
+    <a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;T&gt;(self.self)
 }
 </code></pre>
 
@@ -1550,6 +1733,30 @@ Returns whether or not the ConstructorRef can be used to create DeleteRef
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_can_generate_delete_ref">can_generate_delete_ref</a>(ref: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>): bool {
     ref.can_delete
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_object_address_from_create_at_ref"></a>
+
+## Function `address_from_create_at_ref`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_create_at_ref">address_from_create_at_ref</a>(ref: &<a href="object.md#0x1_object_CreateAtAddressRef">object::CreateAtAddressRef</a>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_create_at_ref">address_from_create_at_ref</a>(ref: &<a href="object.md#0x1_object_CreateAtAddressRef">CreateAtAddressRef</a>): <b>address</b> {
+    ref.<a href="object.md#0x1_object">object</a>
 }
 </code></pre>
 
@@ -1668,7 +1875,7 @@ Returns an Object<T> from within a DeleteRef.
 Removes from the specified Object from global storage.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_delete">delete</a>(ref: <a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_delete">delete</a>(self: <a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>)
 </code></pre>
 
 
@@ -1677,8 +1884,8 @@ Removes from the specified Object from global storage.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_delete">delete</a>(ref: <a href="object.md#0x1_object_DeleteRef">DeleteRef</a>) <b>acquires</b> <a href="object.md#0x1_object_Untransferable">Untransferable</a>, <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
-    <b>let</b> object_core = <b>move_from</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_delete">delete</a>(self: <a href="object.md#0x1_object_DeleteRef">DeleteRef</a>) <b>acquires</b> <a href="object.md#0x1_object_Untransferable">Untransferable</a>, <a href="object.md#0x1_object_ObjectCore">ObjectCore</a>, <a href="object.md#0x1_object_TombStone">TombStone</a> {
+    <b>let</b> object_core = <b>move_from</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
     <b>let</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
         guid_creation_num: _,
         owner: _,
@@ -1686,11 +1893,116 @@ Removes from the specified Object from global storage.
         transfer_events,
     } = object_core;
 
-    <b>if</b> (<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self)) {
-      <b>let</b> <a href="object.md#0x1_object_Untransferable">Untransferable</a> {} = <b>move_from</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(ref.self);
+    transfer_events.destroy_handle();
+
+    <b>if</b> (<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(self.self)) {
+      <b>let</b> <a href="object.md#0x1_object_Untransferable">Untransferable</a> {} = <b>move_from</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(self.self);
     };
 
-    <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(transfer_events);
+    // Since we are fully deleting the <a href="object.md#0x1_object">object</a>, remove <a href="object.md#0x1_object_TombStone">TombStone</a>
+    <b>if</b> (<b>exists</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(self.self)) {
+        <b>let</b> <a href="object.md#0x1_object_TombStone">TombStone</a> { original_owner: _ } = <b>move_from</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(self.self);
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_object_address_from_delete_and_recreate_ref"></a>
+
+## Function `address_from_delete_and_recreate_ref`
+
+Returns the address associated with the constructor
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_delete_and_recreate_ref">address_from_delete_and_recreate_ref</a>(self: &<a href="object.md#0x1_object_DeleteAndRecreateRef">object::DeleteAndRecreateRef</a>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_address_from_delete_and_recreate_ref">address_from_delete_and_recreate_ref</a>(self: &<a href="object.md#0x1_object_DeleteAndRecreateRef">DeleteAndRecreateRef</a>): <b>address</b> {
+    self.self
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_object_object_from_delete_and_recreate_ref"></a>
+
+## Function `object_from_delete_and_recreate_ref`
+
+Returns an Object<T> from within a DeleteRef.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_delete_and_recreate_ref">object_from_delete_and_recreate_ref</a>&lt;T: key&gt;(self: &<a href="object.md#0x1_object_DeleteAndRecreateRef">object::DeleteAndRecreateRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_delete_and_recreate_ref">object_from_delete_and_recreate_ref</a>&lt;T: key&gt;(self: &<a href="object.md#0x1_object_DeleteAndRecreateRef">DeleteAndRecreateRef</a>): <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; {
+    <a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;T&gt;(self.self)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_object_delete_and_can_recreate"></a>
+
+## Function `delete_and_can_recreate`
+
+Removes from the specified Object from global storage, and returns a handle to be able to recreate it
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_delete_and_can_recreate">delete_and_can_recreate</a>(self: <a href="object.md#0x1_object_DeleteAndRecreateRef">object::DeleteAndRecreateRef</a>): <a href="object.md#0x1_object_CreateAtAddressRef">object::CreateAtAddressRef</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_delete_and_can_recreate">delete_and_can_recreate</a>(self: <a href="object.md#0x1_object_DeleteAndRecreateRef">DeleteAndRecreateRef</a>): <a href="object.md#0x1_object_CreateAtAddressRef">CreateAtAddressRef</a> <b>acquires</b> <a href="object.md#0x1_object_Untransferable">Untransferable</a>, <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+    // We don't want <b>to</b> track <a href="object.md#0x1_object_TombStone">TombStone</a> through delete_and_can_recreate, and since <a href="object.md#0x1_object_TombStone">TombStone</a> is deprecated,
+    // don't support objects <b>with</b> it.
+    <b>assert</b>!(!<b>exists</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(self.self), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="object.md#0x1_object_ETOMBSTONE_CANNOT_BE_PRESENT">ETOMBSTONE_CANNOT_BE_PRESENT</a>));
+
+    <b>let</b> object_core = <b>move_from</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
+    <b>let</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+        guid_creation_num,
+        owner,
+        allow_ungated_transfer,
+        transfer_events,
+    } = object_core;
+
+    transfer_events.destroy_handle();
+
+    <b>let</b> untransferable = <b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(self.self);
+    <b>if</b> (untransferable) {
+        <b>let</b> <a href="object.md#0x1_object_Untransferable">Untransferable</a> {} = <b>move_from</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(self.self);
+    };
+
+    CreateAtAddressRef::RecreateV1 {
+        <a href="object.md#0x1_object">object</a>: self.self,
+        owner,
+        guid_creation_num,
+        untransferable,
+        allow_ungated_transfer,
+    }
 }
 </code></pre>
 
@@ -2574,14 +2886,14 @@ to determine the identity of the starting point of ownership.
 ### Function `object_address`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_address">object_address</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_address">object_address</a>&lt;T: key&gt;(self: &<a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <b>address</b>
 </code></pre>
 
 
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == <a href="object.md#0x1_object">object</a>.inner;
+<b>ensures</b> result == self.inner;
 </code></pre>
 
 
@@ -2956,15 +3268,15 @@ to determine the identity of the starting point of ownership.
 ### Function `object_from_constructor_ref`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_constructor_ref">object_from_constructor_ref</a>&lt;T: key&gt;(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_constructor_ref">object_from_constructor_ref</a>&lt;T: key&gt;(self: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;
 </code></pre>
 
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
-<b>aborts_if</b> !<a href="object.md#0x1_object_spec_exists_at">spec_exists_at</a>&lt;T&gt;(ref.self);
-<b>ensures</b> result == <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; { inner: ref.self };
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
+<b>aborts_if</b> !<a href="object.md#0x1_object_spec_exists_at">spec_exists_at</a>&lt;T&gt;(self.self);
+<b>ensures</b> result == <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; { inner: self.self };
 </code></pre>
 
 
@@ -3044,14 +3356,14 @@ to determine the identity of the starting point of ownership.
 ### Function `delete`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_delete">delete</a>(ref: <a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_delete">delete</a>(self: <a href="object.md#0x1_object_DeleteRef">object::DeleteRef</a>)
 </code></pre>
 
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
-<b>ensures</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
+<b>ensures</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
 </code></pre>
 
 
