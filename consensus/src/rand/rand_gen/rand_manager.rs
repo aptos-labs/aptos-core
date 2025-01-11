@@ -54,6 +54,8 @@ pub struct RandManager<S: TShare, D: TAugmentedData> {
     stop: bool,
     config: RandConfig,
     reliable_broadcast: Arc<ReliableBroadcast<RandMessage<S, D>, ExponentialBackoff>>,
+    // Only used in v2 mode to broadcast self apk forever.
+    apk_rb: Arc<ReliableBroadcast<RandMessage<S, D>, ExponentialBackoff>>,
     network_sender: Arc<NetworkSender>,
 
     // local channel received from rand_store
@@ -62,7 +64,7 @@ pub struct RandManager<S: TShare, D: TAugmentedData> {
     outgoing_blocks: Sender<OrderedBlocks>,
     // local state
     rand_store: Arc<Mutex<RandStore<S>>>,
-    aug_data_store: AugDataStore<D>,
+    aug_data_store: AugDataStore<D>, // Only used in v1
     block_queue: BlockQueue,
 
     // for randomness fast path
@@ -82,6 +84,18 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         bounded_executor: BoundedExecutor,
         rb_config: &ReliableBroadcastConfig,
     ) -> Self {
+        let apk_rb_policy = ExponentialBackoff::from_millis(10000)
+            .factor(1)
+            .max_delay(Duration::from_millis(10000));
+        let apk_rb = Arc::new(ReliableBroadcast::new(
+            author,
+            epoch_state.verifier.get_ordered_account_addresses(),
+            network_sender.clone(),
+            apk_rb_policy,
+            TimeService::real(),
+            Duration::from_millis(rb_config.rpc_timeout_ms),
+            bounded_executor.clone(),
+        ));
         let rb_backoff_policy = ExponentialBackoff::from_millis(rb_config.backoff_policy_base_ms)
             .factor(rb_config.backoff_policy_factor)
             .max_delay(Duration::from_millis(rb_config.backoff_policy_max_delay_ms));
@@ -116,6 +130,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             stop: false,
             config,
             reliable_broadcast,
+            apk_rb,
             network_sender,
 
             decision_rx,
@@ -174,7 +189,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             .flat_map(|b| b.ordered_blocks.iter().map(|b3| b3.round()))
             .collect();
         fail_point!("rand_manager::process_ready_blocks", |_| {});
-        info!(rounds = rounds, "Processing rand-ready blocks.");
+        info!(epoch = self.epoch_state.epoch, rounds = rounds, "Processing rand-ready blocks.");
 
         for blocks in ready_blocks {
             let _ = self.outgoing_blocks.unbounded_send(blocks);
@@ -345,6 +360,20 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         DropGuard::new(abort_handle)
     }
 
+    async fn broadcast_aug_data_v2(&mut self) -> DropGuard {
+        let data = D::generate(&self.config, &self.fast_config);
+        data.data()
+            .augment(&self.config, &self.fast_config, data.author());
+        let aug_ack = AugDataCertBuilder::new(data.clone(), self.epoch_state.clone());
+        let rb = self.apk_rb.clone();
+        let task = async move {
+            let _ = rb.broadcast(data, aug_ack).await;
+        };
+        let (abort_handle, abort_registration) = AbortHandle::new_pair();
+        tokio::spawn(Abortable::new(task, abort_registration));
+        DropGuard::new(abort_handle)
+    }
+
     pub async fn start(
         mut self,
         mut incoming_blocks: Receiver<OrderedBlocks>,
@@ -352,6 +381,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         mut reset_rx: Receiver<ResetRequest>,
         bounded_executor: BoundedExecutor,
         highest_known_round: Round,
+        v2: bool,
     ) {
         info!("RandManager started");
         let (verified_msg_tx, mut verified_msg_rx) = unbounded();
@@ -373,11 +403,16 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             )
         );
 
-        let _guard = self.broadcast_aug_data().await;
+        let _guard = if v2 {
+            self.broadcast_aug_data_v2().await
+        } else {
+            self.broadcast_aug_data().await
+        };
+
         let mut interval = tokio::time::interval(Duration::from_millis(5000));
         while !self.stop {
             tokio::select! {
-                Some(blocks) = incoming_blocks.next(), if self.aug_data_store.my_certified_aug_data_exists() => {
+                Some(blocks) = incoming_blocks.next(), if v2 || self.aug_data_store.my_certified_aug_data_exists() => {
                     self.process_incoming_blocks(blocks);
                 }
                 Some(reset) = reset_rx.next() => {
@@ -438,25 +473,33 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                                 .author(self.author)
                                 .epoch(aug_data.epoch())
                                 .remote_peer(*aug_data.author()));
-                            match self.aug_data_store.add_aug_data(aug_data) {
-                                Ok(sig) => self.process_response(protocol, response_sender, RandMessage::AugDataSignature(sig)),
-                                Err(e) => {
-                                    if e.to_string().contains("[AugDataStore] equivocate data") {
-                                        warn!("[RandManager] Failed to add aug data: {}", e);
-                                    } else {
-                                        error!("[RandManager] Failed to add aug data: {}", e);
-                                    }
-                                },
+                            if v2 {
+                                aug_data.data().augment(&self.config, &self.fast_config, aug_data.author());
+                            } else {
+                                match self.aug_data_store.add_aug_data(aug_data) {
+                                    Ok(sig) => self.process_response(protocol, response_sender, RandMessage::AugDataSignature(sig)),
+                                    Err(e) => {
+                                        if e.to_string().contains("[AugDataStore] equivocate data") {
+                                            warn!("[RandManager] Failed to add aug data: {}", e);
+                                        } else {
+                                            error!("[RandManager] Failed to add aug data: {}", e);
+                                        }
+                                    },
+                                }
                             }
                         }
                         RandMessage::CertifiedAugData(certified_aug_data) => {
-                            info!(LogSchema::new(LogEvent::ReceiveCertifiedAugData)
-                                .author(self.author)
-                                .epoch(certified_aug_data.epoch())
-                                .remote_peer(*certified_aug_data.author()));
-                            match self.aug_data_store.add_certified_aug_data(certified_aug_data) {
-                                Ok(ack) => self.process_response(protocol, response_sender, RandMessage::CertifiedAugDataAck(ack)),
-                                Err(e) => error!("[RandManager] Failed to add certified aug data: {}", e),
+                            if v2 {
+                                warn!("[RandManager] CertifiedAugData is unexpected in v2.");
+                            } else {
+                                info!(LogSchema::new(LogEvent::ReceiveCertifiedAugData)
+                                    .author(self.author)
+                                    .epoch(certified_aug_data.epoch())
+                                    .remote_peer(*certified_aug_data.author()));
+                                match self.aug_data_store.add_certified_aug_data(certified_aug_data) {
+                                    Ok(ack) => self.process_response(protocol, response_sender, RandMessage::CertifiedAugDataAck(ack)),
+                                    Err(e) => error!("[RandManager] Failed to add certified aug data: {}", e),
+                                }
                             }
                         }
                         _ => unreachable!("[RandManager] Unexpected message type after verification"),
