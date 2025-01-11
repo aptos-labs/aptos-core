@@ -15,7 +15,7 @@ pub fn run_and_assert_universe(
     let mut executor = FakeExecutor::from_head_genesis().set_parallel();
 
     universe.setup(&mut executor);
-    universe.caculate_expected_values();
+    universe.calculate_expected_values();
     universe.execute(&mut executor, additional_txns);
 }
 
@@ -58,7 +58,7 @@ proptest! {
     ) {
         let mut executor = FakeExecutor::from_head_genesis().set_parallel();
         universe.setup(&mut executor);
-        universe.caculate_expected_values();
+        universe.calculate_expected_values();
         universe.execute_and_check_deps_sizes(&mut executor);
     }
 }

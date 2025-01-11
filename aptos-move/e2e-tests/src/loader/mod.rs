@@ -25,7 +25,7 @@ use std::{
 };
 mod module_generator;
 
-const DEFAULT_BALANCE: u64 = 1_000_000_000;
+const DEFAULT_BALANCE: u64 = 10_000_000_000;
 
 #[derive(Debug)]
 pub struct Node {
@@ -51,7 +51,7 @@ pub enum LoaderTransactionGen {
     // - If such edge doesn't exist, add the dependency edge to the graph.
     // Then recompile the package based on the updated graph structure and publish updated package.
     UpdateEdge(Index, Index),
-    // Invoke the corresponing function at a given pacakge.
+    // Invoke the corresponding function at a given pacakge.
     Invoke(Index),
 }
 
@@ -100,7 +100,7 @@ pub enum LoaderTransactionGen {
 // }
 // }
 //
-// By using this strategy, we can generate a set of move packages with complex depenency relationship and assert that the new loader is always
+// By using this strategy, we can generate a set of move packages with complex dependency relationship and assert that the new loader is always
 // linking the call to the right module. We can also invoke the entrypoint function to validate if the module dependencies have been
 // resolved properly. Using LoaderTransactionGen we can also mutate the structure of the graph and invoke the corresponding entry point function.
 impl DependencyGraph {
@@ -177,7 +177,7 @@ impl DependencyGraph {
         executor.add_account_data(&self.sender_account);
     }
 
-    pub fn caculate_expected_values(&mut self) {
+    pub fn calculate_expected_values(&mut self) {
         let accounts = toposort(&self.graph, None).expect("Dep graph should be acyclic");
         for account_idx in accounts.iter().rev() {
             let mut result = 0;
@@ -202,7 +202,7 @@ impl DependencyGraph {
         }
     }
 
-    pub fn caculate_dependency_sizes(&mut self) {
+    pub fn calculate_dependency_sizes(&mut self) {
         let accounts = toposort(&self.graph, None).expect("Dep graph should be acyclic");
         let mut deps_map: BTreeMap<NodeIndex, BTreeSet<NodeIndex>> = BTreeMap::new();
         for account_idx in accounts.iter().rev() {
@@ -351,7 +351,7 @@ impl DependencyGraph {
             );
             executor.apply_write_set(output.write_set());
         }
-        self.caculate_dependency_sizes();
+        self.calculate_dependency_sizes();
         for account_idx in accounts.iter() {
             let txn = self.invoke_at(account_idx);
             let (output, log) = executor.execute_transaction_with_gas_profiler(txn).unwrap();
@@ -391,7 +391,7 @@ impl DependencyGraph {
                     self.graph.add_edge(lhs_idx, rhs_idx, ());
                 }
 
-                self.caculate_expected_values();
+                self.calculate_expected_values();
                 self.build_package_for_node(&lhs_idx)
             },
         })
