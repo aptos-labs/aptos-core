@@ -250,6 +250,7 @@ fn test_db_indexer_data() {
         ident_str!("math_fixed"),
         ident_str!("randomness"),
         ident_str!("simple_map"),
+        ident_str!("ordered_map"),
         ident_str!("smart_table"),
         ident_str!("storage_gas"),
         ident_str!("chain_status"),
