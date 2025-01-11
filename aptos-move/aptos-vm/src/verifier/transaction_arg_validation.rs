@@ -191,7 +191,10 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     Ok(combined_args)
 }
 
-// Return whether the argument is valid/allowed and whether it needs construction.
+/// Returns true if the argument is valid (that is, it is a primitive type or a struct with a
+/// known constructor function). Otherwise, (for structs without constructors, signers or
+/// references) returns false. An error is returned in cases when a struct type is encountered and
+/// its name cannot be queried for some reason.
 pub(crate) fn is_valid_txn_arg(
     session: &SessionExt,
     module_storage: &impl AptosModuleStorage,
