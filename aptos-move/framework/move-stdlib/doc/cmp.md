@@ -13,6 +13,8 @@
 -  [Function `is_le`](#0x1_cmp_is_le)
 -  [Function `is_gt`](#0x1_cmp_is_gt)
 -  [Function `is_ge`](#0x1_cmp_is_ge)
+-  [Specification](#@Specification_0)
+    -  [Function `compare`](#@Specification_0_compare)
 
 
 <pre><code></code></pre>
@@ -255,6 +257,25 @@ and if equal we proceed to the next.
 
 
 </details>
+
+<a id="@Specification_0"></a>
+
+## Specification
+
+
+<a id="@Specification_0_compare"></a>
+
+### Function `compare`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="cmp.md#0x1_cmp_compare">compare</a>&lt;T&gt;(first: &T, second: &T): <a href="cmp.md#0x1_cmp_Ordering">cmp::Ordering</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY
