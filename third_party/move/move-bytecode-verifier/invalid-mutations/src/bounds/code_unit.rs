@@ -498,6 +498,25 @@ impl<'a> ApplyCodeUnitBoundsContext<'a> {
                         // TODO(#13806): implement
                         panic!("Enum types bytecode NYI: {:?}", code[bytecode_idx])
                     },
+                    LdFunction(_) => struct_bytecode!(
+                        function_handles_len,
+                        current_fdef,
+                        bytecode_idx,
+                        offset,
+                        FunctionHandleIndex,
+                        LdFunction
+                    ),
+                    LdFunctionGeneric(_) => struct_bytecode!(
+                        function_inst_len,
+                        current_fdef,
+                        bytecode_idx,
+                        offset,
+                        FunctionInstantiationIndex,
+                        LdFunctionGeneric
+                    ),
+                    InvokeFunction(..) | EarlyBindFunction(..) => {
+                        panic!("Closure bytecode NYI: {:?}", code[bytecode_idx])
+                    },
                 };
 
                 code[bytecode_idx] = new_bytecode;
@@ -557,6 +576,10 @@ fn is_interesting(bytecode: &Bytecode) -> bool {
         | LdFalse | ReadRef | WriteRef | Add | Sub | Mul | Mod | Div | BitOr | BitAnd | Xor
         | Shl | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | Abort | Nop => false,
 
+        LdFunction(_) | LdFunctionGeneric(_) | InvokeFunction(_) | EarlyBindFunction(..) => {
+            // TODO(LAMBDA): implement
+            false
+        },
         PackVariant(_)
         | PackVariantGeneric(_)
         | UnpackVariant(_)

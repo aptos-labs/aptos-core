@@ -208,6 +208,10 @@ impl LocalState {
             SignatureToken::Vector(s) => {
                 TypeTag::Vector(Box::new(Self::type_tag_from_sig_token(script, s)?))
             },
+            SignatureToken::Function(..) => {
+                // TODO(LAMBDA)
+                bail!("function types not yet implemented for script composer")
+            },
             SignatureToken::Struct(s) => {
                 let module_handle = script.module_handle_at(script.struct_handle_at(*s).module);
                 TypeTag::Struct(Box::new(StructTag {
