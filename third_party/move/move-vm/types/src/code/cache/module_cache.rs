@@ -92,13 +92,14 @@ pub trait ModuleCache {
     ///   1. returns an error if the version of existing entry is higher,
     ///   2. does not perform the insertion if the version is the same,
     ///   3. inserts the new code if the new version is higher.
+    /// Returns the newly inserted (or existing) module at the specified key.
     fn insert_deserialized_module(
         &self,
         key: Self::Key,
         deserialized_code: Self::Deserialized,
         extension: Arc<Self::Extension>,
         version: Self::Version,
-    ) -> VMResult<()>;
+    ) -> VMResult<Arc<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>>;
 
     /// Stores verified code at specified version to the module cache if there was no entry
     /// associated with this key before. If module cache already contains an entry, then:
@@ -251,23 +252,29 @@ where
         deserialized_code: Self::Deserialized,
         extension: Arc<Self::Extension>,
         version: Self::Version,
-    ) -> VMResult<()> {
+    ) -> VMResult<Arc<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
         use hashbrown::hash_map::Entry::*;
 
         match self.module_cache.borrow_mut().entry(key) {
             Occupied(mut entry) => match version.cmp(&entry.get().version()) {
                 Ordering::Less => Err(version_too_small_error!()),
-                Ordering::Equal => Ok(()),
+                Ordering::Equal => Ok(entry.get().module_code().clone()),
                 Ordering::Greater => {
-                    let module = ModuleCode::from_deserialized(deserialized_code, extension);
-                    entry.insert(VersionedModuleCode::new(module, version));
-                    Ok(())
+                    let versioned_module = VersionedModuleCode::new(
+                        ModuleCode::from_deserialized(deserialized_code, extension),
+                        version,
+                    );
+                    let module = versioned_module.module_code().clone();
+                    entry.insert(versioned_module);
+                    Ok(module)
                 },
             },
             Vacant(entry) => {
                 let module = ModuleCode::from_deserialized(deserialized_code, extension);
-                entry.insert(VersionedModuleCode::new(module, version));
-                Ok(())
+                Ok(entry
+                    .insert(VersionedModuleCode::new(module, version))
+                    .module_code()
+                    .clone())
             },
         }
     }
@@ -399,23 +406,29 @@ where
         deserialized_code: Self::Deserialized,
         extension: Arc<Self::Extension>,
         version: Self::Version,
-    ) -> VMResult<()> {
+    ) -> VMResult<Arc<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
         use dashmap::mapref::entry::Entry::*;
 
         match self.module_cache.entry(key) {
             Occupied(mut entry) => match version.cmp(&entry.get().version()) {
                 Ordering::Less => Err(version_too_small_error!()),
-                Ordering::Equal => Ok(()),
+                Ordering::Equal => Ok(entry.get().module_code().clone()),
                 Ordering::Greater => {
-                    let module = ModuleCode::from_deserialized(deserialized_code, extension);
-                    entry.insert(CachePadded::new(VersionedModuleCode::new(module, version)));
-                    Ok(())
+                    let versioned_module = VersionedModuleCode::new(
+                        ModuleCode::from_deserialized(deserialized_code, extension),
+                        version,
+                    );
+                    let module = versioned_module.module_code().clone();
+                    entry.insert(CachePadded::new(versioned_module));
+                    Ok(module)
                 },
             },
             Vacant(entry) => {
                 let module = ModuleCode::from_deserialized(deserialized_code, extension);
-                entry.insert(CachePadded::new(VersionedModuleCode::new(module, version)));
-                Ok(())
+                Ok(entry
+                    .insert(CachePadded::new(VersionedModuleCode::new(module, version)))
+                    .module_code()
+                    .clone())
             },
         }
     }
