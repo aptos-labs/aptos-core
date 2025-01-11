@@ -87,6 +87,7 @@ const RANDOMNESS_CONFIG_SEQNUM_MODULE_NAME: &str = "randomness_config_seqnum";
 const RANDOMNESS_CONFIG_MODULE_NAME: &str = "randomness_config";
 const RANDOMNESS_MODULE_NAME: &str = "randomness";
 const RECONFIGURATION_STATE_MODULE_NAME: &str = "reconfiguration_state";
+const EXTERNAL_OBJECT_MODULE_NAME: &str = "external_object";
 
 const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
@@ -314,6 +315,7 @@ pub fn encode_genesis_change_set(
         genesis_config.initial_jwks.clone(),
         genesis_config.keyless_groth16_vk_override.clone(),
     );
+    initialize_external_objects(&mut session, &module_storage);
     set_genesis_end(&mut session, &module_storage);
 
     // Reconfiguration should happen after all on-chain invocations.
@@ -745,6 +747,17 @@ fn initialize_keyless_accounts(
             ]),
         );
     }
+}
+
+fn initialize_external_objects(session: &mut SessionExt, module_storage: &impl AptosModuleStorage) {
+    exec_function(
+        session,
+        module_storage,
+        EXTERNAL_OBJECT_MODULE_NAME,
+        "initialize_external_object",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
 }
 
 fn create_accounts(
