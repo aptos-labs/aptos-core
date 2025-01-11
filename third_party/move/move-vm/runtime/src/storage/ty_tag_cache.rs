@@ -25,6 +25,8 @@ pub(crate) struct PricedStructTag {
 /// A struct name corresponds to a unique [StructNameIndex]. So all non-generic structs with same
 /// names have the same struct tags. If structs are generic, the number of type parameters cannot
 /// be changed by the upgrade, so the tags stay the same for different "upgraded" struct versions.
+/// The type parameters themselves (vector of [Type]s in this cache used as keys) are also not
+/// changing.
 ///
 /// Note: even if we allow to add more type parameters (e.g., for enums), it still does not affect
 /// safety because different number of type parameters will correspond to a different entries in
@@ -100,26 +102,14 @@ impl TypeTagCache {
 /// Responsible for building type tags, while also doing the metering in order to bound space and
 /// time complexity.
 pub(crate) struct TypeTagBuilder<'a> {
-    // Parameters for metering type tag construction:
-    //   - maximum allowed cost,
-    //   - base cost for any type to tag conversion,
-    //   - cost for size of a struct tag.
-    max_cost: u64,
-    cost_base: u64,
-    cost_per_byte: u64,
-
-    // Stores caches for struct names and tags.
+    /// Stores caches for struct names and tags, as well as pseudo-gas metering configs.
     runtime_environment: &'a RuntimeEnvironment,
 }
 
 impl<'a> TypeTagBuilder<'a> {
     /// Creates a new builder for the specified environment and configs.
     pub(crate) fn new(runtime_environment: &'a RuntimeEnvironment) -> Self {
-        let vm_config = runtime_environment.vm_config();
         Self {
-            max_cost: vm_config.type_max_cost,
-            cost_base: vm_config.type_base_cost,
-            cost_per_byte: vm_config.type_byte_cost,
             runtime_environment,
         }
     }
@@ -127,30 +117,20 @@ impl<'a> TypeTagBuilder<'a> {
     /// Converts a runtime type into a type tag. If the type is too complex (e.g., struct name size
     /// too large, or type too deeply nested), an error is returned.
     pub(crate) fn ty_to_ty_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
-        let mut gas_context = PseudoGasContext {
-            cost: 0,
-            max_cost: self.max_cost,
-            cost_base: self.cost_base,
-            cost_per_byte: self.cost_per_byte,
-        };
+        let mut gas_context = PseudoGasContext::new(self.runtime_environment.vm_config());
         self.ty_to_ty_tag_impl(ty, &mut gas_context)
     }
 
     /// Converts the struct type (based on its indexed name and type arguments) into a struct tag.
     /// If the tag has not been previously cached, it will be cached. Just like for types, if the
     /// type arguments are too complex, etc. the tag construction fails.
-    pub(crate) fn struct_ty_to_struct_tag(
+    pub(crate) fn struct_name_idx_to_struct_tag(
         &self,
         struct_name_idx: &StructNameIndex,
         ty_args: &[Type],
     ) -> PartialVMResult<StructTag> {
-        let mut gas_context = PseudoGasContext {
-            cost: 0,
-            max_cost: self.max_cost,
-            cost_base: self.cost_base,
-            cost_per_byte: self.cost_per_byte,
-        };
-        self.struct_name_to_ty_tag(struct_name_idx, ty_args, &mut gas_context)
+        let mut gas_context = PseudoGasContext::new(self.runtime_environment.vm_config());
+        self.struct_name_idx_to_struct_tag_impl(struct_name_idx, ty_args, &mut gas_context)
     }
 
     fn ty_to_ty_tag_impl(
@@ -159,7 +139,7 @@ impl<'a> TypeTagBuilder<'a> {
         gas_context: &mut PseudoGasContext,
     ) -> PartialVMResult<TypeTag> {
         // Charge base cost at the start.
-        gas_context.charge(gas_context.cost_base)?;
+        gas_context.charge_base()?;
 
         Ok(match ty {
             // Primitive types.
@@ -181,11 +161,12 @@ impl<'a> TypeTagBuilder<'a> {
 
             // Structs: we need to convert indices to names, possibly caching struct tags.
             Type::Struct { idx, .. } => {
-                let struct_tag = self.struct_name_to_ty_tag(idx, &[], gas_context)?;
+                let struct_tag = self.struct_name_idx_to_struct_tag_impl(idx, &[], gas_context)?;
                 TypeTag::Struct(Box::new(struct_tag))
             },
             Type::StructInstantiation { idx, ty_args, .. } => {
-                let struct_tag = self.struct_name_to_ty_tag(idx, ty_args, gas_context)?;
+                let struct_tag =
+                    self.struct_name_idx_to_struct_tag_impl(idx, ty_args, gas_context)?;
                 TypeTag::Struct(Box::new(struct_tag))
             },
 
@@ -199,7 +180,7 @@ impl<'a> TypeTagBuilder<'a> {
         })
     }
 
-    fn struct_name_to_ty_tag(
+    fn struct_name_idx_to_struct_tag_impl(
         &self,
         struct_name_idx: &StructNameIndex,
         ty_args: &[Type],
@@ -214,7 +195,7 @@ impl<'a> TypeTagBuilder<'a> {
         }
 
         // If not cached, record the current cost and construct tags for type arguments.
-        let cur_cost = gas_context.cost;
+        let cur_cost = gas_context.current_cost();
 
         let type_args = ty_args
             .iter()
@@ -224,16 +205,12 @@ impl<'a> TypeTagBuilder<'a> {
         // Construct the struct tag as well.
         let struct_name_index_map = self.runtime_environment.struct_name_index_map();
         let struct_tag = struct_name_index_map.idx_to_struct_tag(*struct_name_idx, type_args)?;
-
-        // Calculate and charge the cost for the struct tag, proportionally to its size.
-        let size =
-            (struct_tag.address.len() + struct_tag.module.len() + struct_tag.name.len()) as u64;
-        gas_context.charge(size * gas_context.cost_per_byte)?;
+        gas_context.charge_struct_tag(&struct_tag)?;
 
         // Cache the struct tag. Record its gas cost as well.
         let priced_tag = PricedStructTag {
             struct_tag,
-            pseudo_gas_cost: gas_context.cost - cur_cost,
+            pseudo_gas_cost: gas_context.current_cost() - cur_cost,
         };
         ty_tag_cache.insert_struct_tag(struct_name_idx, ty_args, &priced_tag);
 
@@ -405,10 +382,11 @@ mod tests {
 
     #[test]
     fn test_ty_to_ty_tag_struct_metering() {
+        let type_max_cost = 75;
         let vm_config = VMConfig {
             type_base_cost: 1,
             type_byte_cost: 2,
-            type_max_cost: 76,
+            type_max_cost,
             ..Default::default()
         };
         let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
@@ -424,35 +402,36 @@ mod tests {
             .unwrap();
         let struct_tag = StructTag::from_str("0x1::foo::Foo").unwrap();
 
-        let mut gas_context = PseudoGasContext {
-            cost: 0,
-            max_cost: ty_tag_builder.max_cost,
-            cost_base: ty_tag_builder.cost_base,
-            cost_per_byte: ty_tag_builder.cost_per_byte,
-        };
+        let mut gas_context = PseudoGasContext::new(runtime_environment.vm_config());
         assert_ok_eq!(
-            ty_tag_builder.struct_name_to_ty_tag(&idx, &[], &mut gas_context),
+            ty_tag_builder.struct_name_idx_to_struct_tag_impl(&idx, &[], &mut gas_context),
             struct_tag.clone()
         );
 
         // Address size, plus module name and struct name each taking 3 characters.
         let expected_cost = 2 * (32 + 3 + 3);
-        assert_eq!(gas_context.cost, expected_cost);
+        assert_eq!(gas_context.current_cost(), expected_cost);
 
         let priced_tag = assert_some!(runtime_environment.ty_tag_cache().get_struct_tag(&idx, &[]));
         assert_eq!(priced_tag.pseudo_gas_cost, expected_cost);
         assert_eq!(priced_tag.struct_tag, struct_tag);
 
-        runtime_environment.ty_tag_cache().flush();
-        let mut gas_context = PseudoGasContext {
-            cost: 0,
+        // Now
+        let vm_config = VMConfig {
+            type_base_cost: 1,
+            type_byte_cost: 2,
             // Use smaller limit, to test metering.
-            max_cost: ty_tag_builder.max_cost - 1,
-            cost_base: ty_tag_builder.cost_base,
-            cost_per_byte: ty_tag_builder.cost_per_byte,
+            type_max_cost: type_max_cost - 1,
+            ..Default::default()
         };
+        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
+        let mut gas_context = PseudoGasContext::new(runtime_environment.vm_config());
 
-        let err = assert_err!(ty_tag_builder.struct_name_to_ty_tag(&idx, &[], &mut gas_context));
+        let err = assert_err!(ty_tag_builder.struct_name_idx_to_struct_tag_impl(
+            &idx,
+            &[],
+            &mut gas_context
+        ));
         assert_eq!(err.major_status(), StatusCode::TYPE_TAG_LIMIT_EXCEEDED);
         assert_none!(runtime_environment.ty_tag_cache().get_struct_tag(&idx, &[]));
     }

@@ -1673,13 +1673,40 @@ pub const VALUE_DEPTH_MAX: u64 = 128;
 const MAX_TYPE_TO_LAYOUT_NODES: u64 = 256;
 
 pub(crate) struct PseudoGasContext {
-    pub(crate) max_cost: u64,
+    // Parameters for metering type tag construction:
+    //   - maximum allowed cost,
+    //   - base cost for any type to tag conversion,
+    //   - cost for size of a struct tag.
+    max_cost: u64,
     pub(crate) cost: u64,
-    pub(crate) cost_base: u64,
-    pub(crate) cost_per_byte: u64,
+    cost_base: u64,
+    cost_per_byte: u64,
 }
 
 impl PseudoGasContext {
+    pub(crate) fn new(vm_config: &VMConfig) -> Self {
+        Self {
+            max_cost: vm_config.type_max_cost,
+            cost: 0,
+            cost_base: vm_config.type_base_cost,
+            cost_per_byte: vm_config.type_byte_cost,
+        }
+    }
+
+    pub(crate) fn current_cost(&mut self) -> u64 {
+        self.cost
+    }
+
+    pub(crate) fn charge_base(&mut self) -> PartialVMResult<()> {
+        self.charge(self.cost_base)
+    }
+
+    pub(crate) fn charge_struct_tag(&mut self, struct_tag: &StructTag) -> PartialVMResult<()> {
+        let size =
+            (struct_tag.address.len() + struct_tag.module.len() + struct_tag.name.len()) as u64;
+        self.charge(size * self.cost_per_byte)
+    }
+
     pub(crate) fn charge(&mut self, amount: u64) -> PartialVMResult<()> {
         self.cost += amount;
         if self.cost > self.max_cost {
@@ -1707,7 +1734,7 @@ impl LoaderV1 {
             return Ok(struct_tag.clone());
         }
 
-        let cur_cost = gas_context.cost;
+        let cur_cost = gas_context.current_cost();
 
         let type_args = ty_args
             .iter()
@@ -1717,14 +1744,12 @@ impl LoaderV1 {
             .name_cache
             .idx_to_struct_tag(struct_name_idx, type_args)?;
 
-        let size =
-            (struct_tag.address.len() + struct_tag.module.len() + struct_tag.name.len()) as u64;
-        gas_context.charge(size * gas_context.cost_per_byte)?;
+        gas_context.charge_struct_tag(&struct_tag)?;
         self.type_cache.store_struct_tag(
             struct_name_idx,
             ty_args.to_vec(),
             struct_tag.clone(),
-            gas_context.cost - cur_cost,
+            gas_context.current_cost() - cur_cost,
         );
         Ok(struct_tag)
     }
@@ -1734,7 +1759,7 @@ impl LoaderV1 {
         ty: &Type,
         gas_context: &mut PseudoGasContext,
     ) -> PartialVMResult<TypeTag> {
-        gas_context.charge(gas_context.cost_base)?;
+        gas_context.charge_base()?;
         Ok(match ty {
             Type::Bool => TypeTag::Bool,
             Type::U8 => TypeTag::U8,
@@ -2058,17 +2083,12 @@ impl Loader {
         let count_before = *count;
         let struct_tag = match self {
             Loader::V1(loader) => {
-                let mut gas_context = PseudoGasContext {
-                    cost: 0,
-                    max_cost: loader.vm_config().type_max_cost,
-                    cost_base: loader.vm_config().type_base_cost,
-                    cost_per_byte: loader.vm_config().type_byte_cost,
-                };
+                let mut gas_context = PseudoGasContext::new(loader.vm_config());
                 loader.struct_name_to_type_tag(struct_name_idx, ty_args, &mut gas_context)?
             },
             Loader::V2(_) => {
                 let ty_tag_builder = TypeTagBuilder::new(module_storage.runtime_environment());
-                ty_tag_builder.struct_ty_to_struct_tag(&struct_name_idx, ty_args)?
+                ty_tag_builder.struct_name_idx_to_struct_tag(&struct_name_idx, ty_args)?
             },
         };
         let fields = struct_type.fields(None)?;
@@ -2267,12 +2287,7 @@ impl Loader {
     ) -> PartialVMResult<TypeTag> {
         match self {
             Loader::V1(loader) => {
-                let mut gas_context = PseudoGasContext {
-                    cost: 0,
-                    max_cost: self.vm_config().type_max_cost,
-                    cost_base: self.vm_config().type_base_cost,
-                    cost_per_byte: self.vm_config().type_byte_cost,
-                };
+                let mut gas_context = PseudoGasContext::new(self.vm_config());
                 loader.type_to_type_tag_impl(ty, &mut gas_context)
             },
             Loader::V2(_) => {
