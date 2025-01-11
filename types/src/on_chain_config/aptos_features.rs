@@ -100,6 +100,10 @@ pub enum FeatureFlag {
     /// AIP-105 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-105.md)
     NATIVE_MEMORY_OPERATIONS = 80,
     ENABLE_LOADER_V2 = 81,
+    /// Prior to this feature flag, it was possible to attempt 'init_module' to publish modules
+    /// that results in a new package created but without any code. With this feature, it is no
+    /// longer possible and an explicit error is returned if publishing is attempted.
+    DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES = 82,
 }
 
 impl FeatureFlag {
@@ -181,6 +185,7 @@ impl FeatureFlag {
             FeatureFlag::NATIVE_MEMORY_OPERATIONS,
             FeatureFlag::COLLECTION_OWNER,
             FeatureFlag::ENABLE_LOADER_V2,
+            FeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES,
         ]
     }
 }
@@ -327,6 +332,10 @@ impl Features {
 
     pub fn is_loader_v2_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ENABLE_LOADER_V2)
+    }
+
+    pub fn is_disallow_init_module_to_publish_modules_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {
