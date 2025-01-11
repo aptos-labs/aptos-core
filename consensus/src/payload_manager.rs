@@ -632,7 +632,7 @@ async fn process_optqs_payload<T: TDataInfo>(
         let data_fut = data_fut_guard.as_mut().expect("must be initialized");
         // Protection against race, check the iteration number before rescheduling.
         if data_fut.iteration == iteration {
-            let batches_and_responders = data_ptr
+            let (batches_and_responders, responders) = data_ptr
                 .batch_summary
                 .iter()
                 .map(|summary| {
@@ -641,18 +641,22 @@ async fn process_optqs_payload<T: TDataInfo>(
                     if let Some(author) = block.author() {
                         signers.push(author);
                     }
+                    let responders = Arc::new(Mutex::new(signers));
 
-                    (summary.info().clone(), Arc::new(Mutex::new(signers)))
+                    ((summary.info().clone(), responders.clone()), responders)
                 })
-                .collect();
-            data_fut.fut = request_txns_from_quorum_store(
-                batches_and_responders,
-                block.timestamp_usecs(),
-                batch_reader,
-            )
-            .boxed()
-            .shared();
-            data_fut.iteration = iteration + 1;
+                .unzip();
+            *data_fut = DataFetchFut {
+                fut: request_txns_from_quorum_store(
+                    batches_and_responders,
+                    block.timestamp_usecs(),
+                    batch_reader,
+                )
+                .boxed()
+                .shared(),
+                iteration: iteration + 1,
+                responders,
+            };
         }
     }
     result
