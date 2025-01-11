@@ -1512,9 +1512,9 @@ impl AptosVM {
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<UserSessionChangeSet, VMStatus> {
         let maybe_publish_request = session.execute(|session| {
-            // With V2 loader, do not allow init_module to request module publish. While allowing
-            // it is harmless, the user experience can be bad - so we better avoid it completely.
-            let disable_publishing = self.features().is_loader_v2_enabled();
+            let disable_publishing = self
+                .features()
+                .is_disallow_init_module_to_publish_modules_enabled();
             session.extract_publish_request(disable_publishing)
         });
         if maybe_publish_request.is_none() {

@@ -197,8 +197,9 @@ pub struct NativeCodeContext {
     /// If false, publish requests are ignored and any attempts to publish code result in runtime
     /// errors.
     enabled: bool,
-    /// Remembers whether the publishing of a module bundle was requested during transaction
-    /// execution.
+    /// Possibly stores (if not [None]) the request to publish a module bundle. The request is made
+    /// using the native code defined in this context. It is later extracted by the VM for further
+    /// checks and processing the actual publish.
     requested_module_bundle: Option<PublishRequest>,
 }
 

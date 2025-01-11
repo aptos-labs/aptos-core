@@ -594,8 +594,11 @@ fn assert_move_abort(status: TransactionStatus, expected_abort_code: u64) {
 }
 
 #[test]
-fn test_init_module_should_not_publish_modules_v2_loader() {
-    let mut h = MoveHarness::new();
+fn test_init_module_should_not_publish_modules() {
+    let mut h = MoveHarness::new_with_features(
+        vec![FeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES],
+        vec![],
+    );
     let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
     let account = h.new_account_at(addr);
 
@@ -610,8 +613,10 @@ fn test_init_module_should_not_publish_modules_v2_loader() {
 }
 
 #[test]
-fn test_init_module_can_publish_modules_v1_loader() {
-    let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::ENABLE_LOADER_V2]);
+fn test_init_module_can_publish_modules() {
+    let mut h = MoveHarness::new_with_features(vec![], vec![
+        FeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES,
+    ]);
     let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
     let account = h.new_account_at(addr);
 

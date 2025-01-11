@@ -2,7 +2,7 @@ module 0xcafe::test {
     use aptos_framework::code;
 
     fun init_module(s: &signer) {
-        // The following metadata and code corresponds to an immutable packaged called `Package` with compatibility
+        // The following metadata and code corresponds to an immutable package called `Package` with compatibility
         // checks. Code:
         //   module 0xcafe::m {
         //       public fun f() {}
