@@ -50,14 +50,14 @@ impl BlockPreparer {
         });
         let start_time = Instant::now();
 
-        let mut block_voters = None;
         let (txns, max_txns_from_block_to_execute) = loop {
             tokio::select! {
                 // Poll the block qc future until a QC is received. Ignore None outcomes.
-                Some(qc) = block_qc_fut.clone(), if block_voters.is_none() => {
-                    block_voters = Some(qc.ledger_info().get_voters_bitvec().clone());
+                Some(qc) = block_qc_fut.clone() => {
+                    let block_voters = Some(qc.ledger_info().get_voters_bitvec().clone());
+                    break self.payload_manager.get_transactions(block, block_voters).await?;
                 },
-                result = self.payload_manager.get_transactions(block, block_voters.clone()) => {
+                result = self.payload_manager.get_transactions(block, None) => {
                    break result?;
                 }
             }
