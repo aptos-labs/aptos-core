@@ -1511,7 +1511,12 @@ impl AptosVM {
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<UserSessionChangeSet, VMStatus> {
-        let maybe_publish_request = session.execute(|session| session.extract_publish_request());
+        let maybe_publish_request = session.execute(|session| {
+            let disable_publishing = self
+                .features()
+                .is_disallow_init_module_to_publish_modules_enabled();
+            session.extract_publish_request(disable_publishing)
+        });
         if maybe_publish_request.is_none() {
             let user_change_set = session.finish(change_set_configs, module_storage)?;
 
