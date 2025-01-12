@@ -232,6 +232,12 @@ where
             .into_iter()
             .map(|(k, m)| (k, m.into_module_code()))
     }
+
+    /// Returns the version of the module stored in cache. Used for tests only.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn get_module_version(&self, key: &K) -> Option<V> {
+        self.module_cache.borrow().get(key).map(|m| m.version())
+    }
 }
 
 impl<K, DC, VC, E, V> ModuleCache for UnsyncModuleCache<K, DC, VC, E, V>
