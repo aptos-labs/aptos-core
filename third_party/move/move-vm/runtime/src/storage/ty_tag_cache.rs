@@ -382,7 +382,7 @@ mod tests {
 
     #[test]
     fn test_ty_to_ty_tag_struct_metering() {
-        let type_max_cost = 75;
+        let type_max_cost = 76;
         let vm_config = VMConfig {
             type_base_cost: 1,
             type_byte_cost: 2,
