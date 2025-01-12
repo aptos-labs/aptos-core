@@ -722,7 +722,6 @@ impl CliCommand<&'static str> for DocumentPackage {
             skip_attribute_checks: move_options.skip_attribute_checks,
             check_test_code: move_options.check_test_code,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
-            move_2: move_options.move_2,
             ..BuildOptions::default()
         };
         BuiltPackage::build(move_options.get_package_path()?, build_options)?;

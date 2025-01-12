@@ -308,3 +308,201 @@ public fun m::scalar_zero(): 0x42::m::Scalar {
   1: $t0 := pack 0x42::m::Scalar($t1)
   2: return $t0
 }
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::new_scalar_from_u8($t0: u8): 0x42::m::Scalar {
+     var $t1: 0x42::m::Scalar
+     var $t2: 0x42::m::Scalar
+     var $t3: &mut u8
+     var $t4: &mut vector<u8>
+     var $t5: &mut 0x42::m::Scalar
+     var $t6: u64
+     # live vars: $t0
+  0: $t2 := m::scalar_zero()
+     # live vars: $t0, $t2
+  1: $t5 := borrow_local($t2)
+     # live vars: $t0, $t2, $t5
+  2: $t4 := borrow_field<0x42::m::Scalar>.data($t5)
+     # live vars: $t0, $t2, $t4
+  3: $t6 := 0
+     # live vars: $t0, $t2, $t4, $t6
+  4: $t3 := vector::borrow_mut<u8>($t4, $t6)
+     # live vars: $t0, $t2, $t3
+  5: write_ref($t3, $t0)
+     # live vars: $t2
+  6: $t1 := move($t2)
+     # live vars: $t1
+  7: return $t1
+}
+
+
+[variant baseline]
+public fun m::scalar_zero(): 0x42::m::Scalar {
+     var $t0: 0x42::m::Scalar
+     var $t1: vector<u8>
+     # live vars:
+  0: $t1 := [0]
+     # live vars: $t1
+  1: $t0 := pack 0x42::m::Scalar($t1)
+     # live vars: $t0
+  2: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::new_scalar_from_u8($t0: u8): 0x42::m::Scalar {
+     var $t1: 0x42::m::Scalar
+     var $t2: 0x42::m::Scalar
+     var $t3: &mut u8
+     var $t4: &mut vector<u8>
+     var $t5: &mut 0x42::m::Scalar
+     var $t6: u64
+     # live vars: $t0
+  0: $t2 := m::scalar_zero()
+     # live vars: $t0, $t2
+  1: $t5 := borrow_local($t2)
+     # live vars: $t0, $t2, $t5
+  2: $t4 := borrow_field<0x42::m::Scalar>.data($t5)
+     # live vars: $t0, $t2, $t4
+  3: $t6 := 0
+     # live vars: $t0, $t2, $t4, $t6
+  4: $t3 := vector::borrow_mut<u8>($t4, $t6)
+     # live vars: $t0, $t2, $t3
+  5: write_ref($t3, $t0)
+     # live vars: $t2
+  6: $t1 := move($t2)
+     # live vars: $t1
+  7: return $t1
+}
+
+
+[variant baseline]
+public fun m::scalar_zero(): 0x42::m::Scalar {
+     var $t0: 0x42::m::Scalar
+     var $t1: vector<u8>
+     # live vars:
+  0: $t1 := [0]
+     # live vars: $t1
+  1: $t0 := pack 0x42::m::Scalar($t1)
+     # live vars: $t0
+  2: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::new_scalar_from_u8($t0: u8): 0x42::m::Scalar {
+     var $t1: 0x42::m::Scalar
+     var $t2: 0x42::m::Scalar
+     var $t3: &mut u8
+     var $t4: &mut vector<u8>
+     var $t5: &mut 0x42::m::Scalar
+     var $t6: u64
+     # live vars: $t0
+  0: $t2 := m::scalar_zero()
+     # live vars: $t0, $t2
+  1: $t5 := borrow_local($t2)
+     # live vars: $t0, $t2, $t5
+  2: $t4 := borrow_field<0x42::m::Scalar>.data($t5)
+     # live vars: $t0, $t2, $t4
+  3: $t6 := 0
+     # live vars: $t0, $t2, $t4, $t6
+  4: $t3 := vector::borrow_mut<u8>($t4, $t6)
+     # live vars: $t0, $t2, $t3
+  5: write_ref($t3, $t0)
+     # live vars: $t2
+  6: $t1 := move($t2)
+     # live vars: $t1
+  7: return $t1
+}
+
+
+[variant baseline]
+public fun m::scalar_zero(): 0x42::m::Scalar {
+     var $t0: 0x42::m::Scalar
+     var $t1: vector<u8>
+     # live vars:
+  0: $t1 := [0]
+     # live vars: $t1
+  1: $t0 := pack 0x42::m::Scalar($t1)
+     # live vars: $t0
+  2: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::new_scalar_from_u8($t0: u8): 0x42::m::Scalar {
+     var $t1: 0x42::m::Scalar
+     var $t2: 0x42::m::Scalar
+     var $t3: &mut u8
+     var $t4: &mut vector<u8>
+     var $t5: &mut 0x42::m::Scalar
+     var $t6: u64
+     # live vars: $t0
+  0: $t2 := m::scalar_zero()
+     # live vars: $t0, $t2
+  1: $t5 := borrow_local($t2)
+     # live vars: $t0, $t2, $t5
+  2: $t4 := borrow_field<0x42::m::Scalar>.data($t5)
+     # live vars: $t0, $t2, $t4
+  3: $t6 := 0
+     # live vars: $t0, $t2, $t4, $t6
+  4: $t3 := vector::borrow_mut<u8>($t4, $t6)
+     # live vars: $t0, $t2, $t3
+  5: write_ref($t3, $t0)
+     # live vars: $t2
+  6: $t1 := move($t2)
+     # live vars: $t1
+  7: return $t1
+}
+
+
+[variant baseline]
+public fun m::scalar_zero(): 0x42::m::Scalar {
+     var $t0: 0x42::m::Scalar
+     var $t1: vector<u8>
+     # live vars:
+  0: $t1 := [0]
+     # live vars: $t1
+  1: $t0 := pack 0x42::m::Scalar($t1)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.m {
+struct Scalar has copy, drop, store {
+	data: vector<u8>
+}
+
+public new_scalar_from_u8(Arg0: u8): Scalar /* def_idx: 0 */ {
+L1:	loc0: Scalar
+L2:	loc1: &mut u8
+B0:
+	0: Call scalar_zero(): Scalar
+	1: StLoc[1](loc0: Scalar)
+	2: MutBorrowLoc[1](loc0: Scalar)
+	3: MutBorrowField[0](Scalar.data: vector<u8>)
+	4: LdU64(0)
+	5: VecMutBorrow(0)
+	6: StLoc[2](loc1: &mut u8)
+	7: MoveLoc[0](Arg0: u8)
+	8: MoveLoc[2](loc1: &mut u8)
+	9: WriteRef
+	10: MoveLoc[1](loc0: Scalar)
+	11: Ret
+}
+public scalar_zero(): Scalar /* def_idx: 1 */ {
+B0:
+	0: LdConst[0](Vector(U8): [1, 0])
+	1: Pack[0](Scalar)
+	2: Ret
+}
+}
+============ bytecode verification succeeded ========

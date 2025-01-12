@@ -10,8 +10,8 @@ use aptos_package_builder::PackageBuilder;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     move_utils::MemberId,
-    on_chain_config::FeatureFlag,
-    transaction::{ExecutionStatus, TransactionPayload},
+    on_chain_config::{FeatureFlag, OnChainConfig},
+    transaction::{ExecutionStatus, TransactionPayload, TransactionStatus},
 };
 use claims::assert_ok;
 use move_core_types::{
@@ -22,7 +22,7 @@ use move_core_types::{
 };
 use rstest::rstest;
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
+use std::{collections::BTreeSet, str::FromStr};
 
 // Note: this module uses parameterized tests via the
 // [`rstest` crate](https://crates.io/crates/rstest)
@@ -564,20 +564,7 @@ fn test_module_publishing_does_not_leak_speculative_information() {
         let status = output.status().clone();
         match maybe_abort_code {
             Some(abort_code) => {
-                let status = assert_ok!(status.as_kept_status());
-                if let ExecutionStatus::MoveAbort {
-                    location: _,
-                    code,
-                    info: _,
-                } = status
-                {
-                    assert_eq!(code, abort_code);
-                } else {
-                    panic!(
-                        "Transaction should succeed with abort code {}, got {:?}",
-                        abort_code, status
-                    );
-                }
+                assert_move_abort(status, abort_code);
             },
             None => {
                 assert_success!(status);
@@ -587,4 +574,70 @@ fn test_module_publishing_does_not_leak_speculative_information() {
             },
         }
     }
+}
+
+fn assert_move_abort(status: TransactionStatus, expected_abort_code: u64) {
+    let status = assert_ok!(status.as_kept_status());
+    if let ExecutionStatus::MoveAbort {
+        location: _,
+        code,
+        info: _,
+    } = status
+    {
+        assert_eq!(code, expected_abort_code);
+    } else {
+        panic!(
+            "Transaction should succeed with abort code {}, got {:?}",
+            expected_abort_code, status
+        );
+    }
+}
+
+#[test]
+fn test_init_module_should_not_publish_modules() {
+    let mut h = MoveHarness::new_with_features(
+        vec![FeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES],
+        vec![],
+    );
+    let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
+    let account = h.new_account_at(addr);
+
+    let txn = h.create_publish_package_cache_building(
+        &account,
+        &common::test_dir_path("code_publishing.data/pack_init_module_code_publish"),
+        |_| {},
+    );
+    let output = h.run_block_get_output(vec![txn]).pop().unwrap();
+    // The abort code corresponds to EALREADY_REQUESTED.
+    assert_move_abort(output.status().clone(), 0x03_0000);
+}
+
+#[test]
+fn test_init_module_can_publish_modules() {
+    let mut h = MoveHarness::new_with_features(vec![], vec![
+        FeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES,
+    ]);
+    let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
+    let account = h.new_account_at(addr);
+
+    let txn = h.create_publish_package_cache_building(
+        &account,
+        &common::test_dir_path("code_publishing.data/pack_init_module_code_publish"),
+        |_| {},
+    );
+    let output = h.run_block_get_output(vec![txn]).pop().unwrap();
+    assert_success!(output.status().clone());
+
+    let registry: PackageRegistry = h
+        .read_resource(&addr, PackageRegistry::struct_tag())
+        .unwrap();
+    assert_eq!(registry.packages.len(), 2);
+    let mut package_names = BTreeSet::new();
+    for package in registry.packages {
+        package_names.insert(package.name);
+    }
+    // The package metadata containing init_module exists.
+    assert!(package_names.remove("test_package"));
+    // The package metadata published by init_module call also exists.
+    assert!(package_names.remove("Package"));
 }

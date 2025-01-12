@@ -24,6 +24,7 @@ use crate::{
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema},
 };
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs};
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{ColumnFamilyDescriptor, ColumnFamilyName, SchemaBatch, DB};
@@ -155,60 +156,95 @@ impl LedgerDb {
 
         let ledger_db_folder = db_root_path.as_ref().join(LEDGER_DB_FOLDER_NAME);
 
-        let event_db_raw = Arc::new(Self::open_rocksdb(
-            ledger_db_folder.join(EVENT_DB_NAME),
-            EVENT_DB_NAME,
-            &rocksdb_configs.ledger_db_config,
-            readonly,
-        )?);
-        let event_db = EventDb::new(event_db_raw.clone(), EventStore::new(event_db_raw));
-
-        let transaction_accumulator_db =
-            TransactionAccumulatorDb::new(Arc::new(Self::open_rocksdb(
-                ledger_db_folder.join(TRANSACTION_ACCUMULATOR_DB_NAME),
-                TRANSACTION_ACCUMULATOR_DB_NAME,
-                &rocksdb_configs.ledger_db_config,
-                readonly,
-            )?));
-
-        let transaction_auxiliary_data_db =
-            TransactionAuxiliaryDataDb::new(Arc::new(Self::open_rocksdb(
-                ledger_db_folder.join(TRANSACTION_AUXILIARY_DATA_DB_NAME),
-                TRANSACTION_AUXILIARY_DATA_DB_NAME,
-                &rocksdb_configs.ledger_db_config,
-                readonly,
-            )?));
-        let transaction_db = TransactionDb::new(Arc::new(Self::open_rocksdb(
-            ledger_db_folder.join(TRANSACTION_DB_NAME),
-            TRANSACTION_DB_NAME,
-            &rocksdb_configs.ledger_db_config,
-            readonly,
-        )?));
-
-        let transaction_info_db = TransactionInfoDb::new(Arc::new(Self::open_rocksdb(
-            ledger_db_folder.join(TRANSACTION_INFO_DB_NAME),
-            TRANSACTION_INFO_DB_NAME,
-            &rocksdb_configs.ledger_db_config,
-            readonly,
-        )?));
-
-        let write_set_db = WriteSetDb::new(Arc::new(Self::open_rocksdb(
-            ledger_db_folder.join(WRITE_SET_DB_NAME),
-            WRITE_SET_DB_NAME,
-            &rocksdb_configs.ledger_db_config,
-            readonly,
-        )?));
+        let mut event_db = None;
+        let mut transaction_accumulator_db = None;
+        let mut transaction_auxiliary_data_db = None;
+        let mut transaction_db = None;
+        let mut transaction_info_db = None;
+        let mut write_set_db = None;
+        THREAD_MANAGER.get_non_exe_cpu_pool().scope(|s| {
+            s.spawn(|_| {
+                let event_db_raw = Arc::new(
+                    Self::open_rocksdb(
+                        ledger_db_folder.join(EVENT_DB_NAME),
+                        EVENT_DB_NAME,
+                        &rocksdb_configs.ledger_db_config,
+                        readonly,
+                    )
+                    .unwrap(),
+                );
+                event_db = Some(EventDb::new(
+                    event_db_raw.clone(),
+                    EventStore::new(event_db_raw),
+                ));
+            });
+            s.spawn(|_| {
+                transaction_accumulator_db = Some(TransactionAccumulatorDb::new(Arc::new(
+                    Self::open_rocksdb(
+                        ledger_db_folder.join(TRANSACTION_ACCUMULATOR_DB_NAME),
+                        TRANSACTION_ACCUMULATOR_DB_NAME,
+                        &rocksdb_configs.ledger_db_config,
+                        readonly,
+                    )
+                    .unwrap(),
+                )));
+            });
+            s.spawn(|_| {
+                transaction_auxiliary_data_db = Some(TransactionAuxiliaryDataDb::new(Arc::new(
+                    Self::open_rocksdb(
+                        ledger_db_folder.join(TRANSACTION_AUXILIARY_DATA_DB_NAME),
+                        TRANSACTION_AUXILIARY_DATA_DB_NAME,
+                        &rocksdb_configs.ledger_db_config,
+                        readonly,
+                    )
+                    .unwrap(),
+                )))
+            });
+            s.spawn(|_| {
+                transaction_db = Some(TransactionDb::new(Arc::new(
+                    Self::open_rocksdb(
+                        ledger_db_folder.join(TRANSACTION_DB_NAME),
+                        TRANSACTION_DB_NAME,
+                        &rocksdb_configs.ledger_db_config,
+                        readonly,
+                    )
+                    .unwrap(),
+                )));
+            });
+            s.spawn(|_| {
+                transaction_info_db = Some(TransactionInfoDb::new(Arc::new(
+                    Self::open_rocksdb(
+                        ledger_db_folder.join(TRANSACTION_INFO_DB_NAME),
+                        TRANSACTION_INFO_DB_NAME,
+                        &rocksdb_configs.ledger_db_config,
+                        readonly,
+                    )
+                    .unwrap(),
+                )));
+            });
+            s.spawn(|_| {
+                write_set_db = Some(WriteSetDb::new(Arc::new(
+                    Self::open_rocksdb(
+                        ledger_db_folder.join(WRITE_SET_DB_NAME),
+                        WRITE_SET_DB_NAME,
+                        &rocksdb_configs.ledger_db_config,
+                        readonly,
+                    )
+                    .unwrap(),
+                )));
+            });
+        });
 
         // TODO(grao): Handle data inconsistency.
 
         Ok(Self {
             ledger_metadata_db: LedgerMetadataDb::new(ledger_metadata_db),
-            event_db,
-            transaction_accumulator_db,
-            transaction_auxiliary_data_db,
-            transaction_db,
-            transaction_info_db,
-            write_set_db,
+            event_db: event_db.unwrap(),
+            transaction_accumulator_db: transaction_accumulator_db.unwrap(),
+            transaction_auxiliary_data_db: transaction_auxiliary_data_db.unwrap(),
+            transaction_db: transaction_db.unwrap(),
+            transaction_info_db: transaction_info_db.unwrap(),
+            write_set_db: write_set_db.unwrap(),
             enable_storage_sharding: true,
         })
     }

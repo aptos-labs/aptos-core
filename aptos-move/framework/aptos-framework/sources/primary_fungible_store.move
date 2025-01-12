@@ -128,7 +128,7 @@ module aptos_framework::primary_fungible_store {
     /// Get the balance of `account`'s primary store.
     public fun balance<T: key>(account: address, metadata: Object<T>): u64 {
         if (primary_store_exists(account, metadata)) {
-            fungible_asset::balance(primary_store(account, metadata))
+            dispatchable_fungible_asset::derived_balance(primary_store(account, metadata))
         } else {
             0
         }
@@ -137,7 +137,7 @@ module aptos_framework::primary_fungible_store {
     #[view]
     public fun is_balance_at_least<T: key>(account: address, metadata: Object<T>, amount: u64): bool {
         if (primary_store_exists(account, metadata)) {
-            fungible_asset::is_balance_at_least(primary_store(account, metadata), amount)
+            dispatchable_fungible_asset::is_derived_balance_at_least(primary_store(account, metadata), amount)
         } else {
             amount == 0
         }
@@ -172,7 +172,7 @@ module aptos_framework::primary_fungible_store {
     public(friend) fun force_deposit(owner: address, fa: FungibleAsset) acquires DeriveRefPod {
         let metadata = fungible_asset::asset_metadata(&fa);
         let store = ensure_primary_store_exists(owner, metadata);
-        fungible_asset::deposit_internal(object::object_address(&store), fa);
+        fungible_asset::unchecked_deposit(object::object_address(&store), fa);
     }
 
     /// Transfer `amount` of fungible asset from sender's primary store to receiver's primary store.

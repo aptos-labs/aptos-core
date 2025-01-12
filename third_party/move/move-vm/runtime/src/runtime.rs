@@ -12,7 +12,7 @@ use crate::{
     native_extensions::NativeContextExtensions,
     session::SerializedReturnValues,
     storage::{code_storage::CodeStorage, module_storage::ModuleStorage},
-    RuntimeEnvironment,
+    AsFunctionValueExtension, RuntimeEnvironment,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -29,6 +29,7 @@ use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::Type,
+    value_serde::ValueSerDeContext,
     values::{Locals, Reference, VMValueCast, Value},
 };
 use std::{borrow::Borrow, collections::BTreeSet, sync::Arc};
@@ -270,7 +271,11 @@ impl VMRuntime {
             return Err(deserialization_error());
         }
 
-        match Value::simple_deserialize(arg.borrow(), &layout) {
+        let function_value_extension = module_storage.as_function_value_extension();
+        match ValueSerDeContext::new()
+            .with_func_args_deserialization(&function_value_extension)
+            .deserialize(arg.borrow(), &layout)
+        {
             Some(val) => Ok(val),
             None => Err(deserialization_error()),
         }
@@ -354,8 +359,10 @@ impl VMRuntime {
             return Err(serialization_error());
         }
 
-        let bytes = value
-            .simple_serialize(&layout)
+        let function_value_extension = module_storage.as_function_value_extension();
+        let bytes = ValueSerDeContext::new()
+            .with_func_args_deserialization(&function_value_extension)
+            .serialize(&value, &layout)?
             .ok_or_else(serialization_error)?;
         Ok((bytes, layout))
     }

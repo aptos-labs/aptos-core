@@ -9,7 +9,7 @@ use crate::{
 use ambassador::delegate_to_methods;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    executable::{Executable, ModulePath},
+    executable::ModulePath,
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
     vm::modules::AptosModuleExtension,
@@ -30,17 +30,15 @@ use move_vm_types::code::{
 };
 use std::sync::Arc;
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> WithRuntimeEnvironment
-    for LatestView<'a, T, S, X>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> WithRuntimeEnvironment
+    for LatestView<'a, T, S>
 {
     fn runtime_environment(&self) -> &RuntimeEnvironment {
         self.runtime_environment
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCodeBuilder
-    for LatestView<'a, T, S, X>
-{
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCodeBuilder for LatestView<'a, T, S> {
     type Deserialized = CompiledModule;
     type Extension = AptosModuleExtension;
     type Key = ModuleId;
@@ -64,9 +62,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCodeB
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCache
-    for LatestView<'a, T, S, X>
-{
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView<'a, T, S> {
     type Deserialized = CompiledModule;
     type Extension = AptosModuleExtension;
     type Key = ModuleId;
@@ -187,9 +183,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ModuleCache
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModuleStorage
-    for LatestView<'a, T, S, X>
-{
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> AptosModuleStorage for LatestView<'a, T, S> {
     fn fetch_state_value_metadata(
         &self,
         address: &AccountAddress,
@@ -206,7 +200,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> AptosModule
 
 #[delegate_to_methods]
 #[delegate(ScriptCache, target_ref = "as_script_cache")]
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     /// Returns the script cache.
     fn as_script_cache(
         &self,

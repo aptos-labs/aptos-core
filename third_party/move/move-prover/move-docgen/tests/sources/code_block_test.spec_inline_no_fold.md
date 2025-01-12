@@ -1,7 +1,7 @@
 
-<a id="main"></a>
+<a id="<SELF>_0"></a>
 
-# Script `main`
+# Script `<SELF>_0`
 
 
 
@@ -22,7 +22,7 @@ code block
 then <code>inline code</code>
 
 
-<pre><code><b>fun</b> <a href="code_block_test.md#main">main</a>()
+<pre><code><b>fun</b> <a href="code_block_test.md#<SELF>_0_main">main</a>()
 </code></pre>
 
 
@@ -30,5 +30,5 @@ then <code>inline code</code>
 ##### Implementation
 
 
-<pre><code><b>fun</b> <a href="code_block_test.md#main">main</a>() { }
+<pre><code><b>fun</b> <a href="code_block_test.md#<SELF>_0_main">main</a>() { }
 </code></pre>

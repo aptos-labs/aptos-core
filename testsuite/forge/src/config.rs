@@ -170,6 +170,7 @@ impl ForgeConfig {
         let existing_db_tag = self.existing_db_tag.clone();
         let validator_resource_override = self.validator_resource_override;
         let fullnode_resource_override = self.fullnode_resource_override;
+        let suite_name = self.get_suite_name();
 
         // Override specific helm values. See reference: terraform/helm/aptos-node/values.yaml
         Some(Arc::new(move |helm_values: &mut serde_yaml::Value| {
@@ -238,10 +239,17 @@ impl ForgeConfig {
                 ["enable_storage_sharding"] = true.into();
             helm_values["validator"]["config"]["indexer_db_config"]["enable_event"] = true.into();
             helm_values["fullnode"]["config"]["indexer_db_config"]["enable_event"] = true.into();
-            // enable new pipeline
-            helm_values["validator"]["config"]["consensus"]["enable_pipeline"] = true.into();
-            helm_values["fullnode"]["config"]["consensus_observer"]["enable_pipeline"] =
-                true.into();
+
+            // This is a temporary hack to disable new pipeline for compat tests.
+            if !suite_name
+                .as_ref()
+                .is_some_and(|name| name.eq_ignore_ascii_case("compat"))
+            {
+                // enable new pipeline
+                helm_values["validator"]["config"]["consensus"]["enable_pipeline"] = true.into();
+                helm_values["fullnode"]["config"]["consensus_observer"]["enable_pipeline"] =
+                    true.into();
+            }
         }))
     }
 

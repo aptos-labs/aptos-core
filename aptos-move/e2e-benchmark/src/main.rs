@@ -6,12 +6,10 @@ use aptos_language_e2e_tests::{
     executor::{ExecFuncTimerDynamicArgs, FakeExecutor, GasMeterType, Measurement},
 };
 use aptos_transaction_generator_lib::{
-    publishing::{
-        module_simple::{AutomaticArgs, LoopType, MultiSigConfig},
-        publish_util::{Package, PackageHandler},
-    },
-    EntryPoints,
+    entry_point_trait::{AutomaticArgs, EntryPointTrait, MultiSigConfig},
+    publishing::publish_util::{Package, PackageHandler},
 };
+use aptos_transaction_workloads_lib::{EntryPoints, LoopType};
 use aptos_types::{account_address::AccountAddress, transaction::TransactionPayload};
 use rand::{rngs::StdRng, SeedableRng};
 use serde_json::json;
@@ -88,6 +86,8 @@ const ABSOLUTE_BUFFER_US: f64 = 2.0;
 struct CalibrationInfo {
     // count: usize,
     expected_time_micros: f64,
+    min_ratio: f64,
+    max_ratio: f64,
 }
 
 fn get_parsed_calibration_values() -> HashMap<String, CalibrationInfo> {
@@ -101,7 +101,9 @@ fn get_parsed_calibration_values() -> HashMap<String, CalibrationInfo> {
             let parts = line.split('\t').collect::<Vec<_>>();
             (parts[0].to_string(), CalibrationInfo {
                 // count: parts[1].parse().unwrap(),
-                expected_time_micros: parts[parts.len() - 1].parse().unwrap(),
+                expected_time_micros: parts[parts.len() - 1].parse().expect(line),
+                min_ratio: parts[2].parse().expect(line),
+                max_ratio: parts[3].parse().expect(line),
             })
         })
         .collect()
@@ -176,6 +178,106 @@ fn main() {
         EntryPoints::IncGlobalMilestoneAggV2 { milestone_every: 1 },
         EntryPoints::IncGlobalMilestoneAggV2 { milestone_every: 2 },
         EntryPoints::EmitEvents { count: 1000 },
+        // long vectors with small elements
+        EntryPoints::VectorTrimAppend {
+            // baseline, only vector creation
+            vec_len: 3000,
+            element_len: 1,
+            index: 0,
+            repeats: 0,
+        },
+        EntryPoints::VectorTrimAppend {
+            vec_len: 3000,
+            element_len: 1,
+            index: 100,
+            repeats: 1000,
+        },
+        EntryPoints::VectorTrimAppend {
+            vec_len: 3000,
+            element_len: 1,
+            index: 2990,
+            repeats: 1000,
+        },
+        EntryPoints::VectorRemoveInsert {
+            vec_len: 3000,
+            element_len: 1,
+            index: 100,
+            repeats: 1000,
+        },
+        EntryPoints::VectorRemoveInsert {
+            vec_len: 3000,
+            element_len: 1,
+            index: 2998,
+            repeats: 1000,
+        },
+        EntryPoints::VectorRangeMove {
+            vec_len: 3000,
+            element_len: 1,
+            index: 1000,
+            move_len: 500,
+            repeats: 1000,
+        },
+        // vectors with large elements
+        EntryPoints::VectorTrimAppend {
+            // baseline, only vector creation
+            vec_len: 100,
+            element_len: 100,
+            index: 0,
+            repeats: 0,
+        },
+        EntryPoints::VectorTrimAppend {
+            vec_len: 100,
+            element_len: 100,
+            index: 10,
+            repeats: 1000,
+        },
+        EntryPoints::VectorRangeMove {
+            vec_len: 100,
+            element_len: 100,
+            index: 50,
+            move_len: 10,
+            repeats: 1000,
+        },
+        EntryPoints::MapInsertRemove {
+            len: 10,
+            repeats: 0,
+            use_simple_map: false,
+        },
+        EntryPoints::MapInsertRemove {
+            len: 10,
+            repeats: 100,
+            use_simple_map: false,
+        },
+        EntryPoints::MapInsertRemove {
+            len: 10,
+            repeats: 100,
+            use_simple_map: true,
+        },
+        EntryPoints::MapInsertRemove {
+            len: 100,
+            repeats: 0,
+            use_simple_map: false,
+        },
+        EntryPoints::MapInsertRemove {
+            len: 100,
+            repeats: 100,
+            use_simple_map: false,
+        },
+        EntryPoints::MapInsertRemove {
+            len: 100,
+            repeats: 100,
+            use_simple_map: true,
+        },
+        EntryPoints::MapInsertRemove {
+            len: 1000,
+            repeats: 0,
+            use_simple_map: false,
+        },
+        EntryPoints::MapInsertRemove {
+            len: 1000,
+            repeats: 100,
+            use_simple_map: false,
+        },
     ];
 
     let mut failures = Vec::new();
@@ -188,13 +290,14 @@ fn main() {
 
     for (index, entry_point) in entry_points.into_iter().enumerate() {
         let entry_point_name = format!("{:?}", entry_point);
-        let expected_time_micros = calibration_values
+        let cur_calibration = calibration_values
             .get(&entry_point_name)
-            .expect(&entry_point_name)
-            .expected_time_micros;
+            .expect(&entry_point_name);
+        let expected_time_micros = cur_calibration.expected_time_micros;
         let publisher = executor.new_account_at(AccountAddress::random());
 
-        let mut package_handler = PackageHandler::new(entry_point.package_name());
+        let mut package_handler =
+            PackageHandler::new(entry_point.pre_built_packages(), entry_point.package_name());
         let mut rng = StdRng::seed_from_u64(14);
         let package = package_handler.pick_package(&mut rng, *publisher.address());
         execute_txn(
@@ -246,6 +349,15 @@ fn main() {
             entry_point
         );
 
+        let max_regression = f64::max(
+            expected_time_micros * (1.0 + ALLOWED_REGRESSION) + ABSOLUTE_BUFFER_US,
+            expected_time_micros * cur_calibration.max_ratio,
+        );
+        let max_improvement = f64::min(
+            expected_time_micros * (1.0 - ALLOWED_IMPROVEMENT) - ABSOLUTE_BUFFER_US,
+            expected_time_micros * cur_calibration.min_ratio,
+        );
+
         json_lines.push(json!({
             "grep": "grep_json_aptos_move_vm_perf",
             "transaction_type": entry_point_name,
@@ -254,21 +366,21 @@ fn main() {
             "execution_gas_units": execution_gas_units,
             "io_gas_units": io_gas_units,
             "expected_wall_time_us": expected_time_micros,
+            "expected_max_wall_time_us": max_regression,
+            "expected_min_wall_time_us": max_improvement,
             "code_perf_version": CODE_PERF_VERSION,
             "test_index": index,
         }));
 
-        if elapsed_micros > expected_time_micros * (1.0 + ALLOWED_REGRESSION) + ABSOLUTE_BUFFER_US {
+        if elapsed_micros > max_regression {
             failures.push(format!(
-                "Performance regression detected: {:.1}us, expected: {:.1}us, diff: {}%, for {:?}",
-                elapsed_micros, expected_time_micros, diff, entry_point
+                "Performance regression detected: {:.1}us, expected: {:.1}us, limit: {:.1}us, diff: {}%, for {:?}",
+                elapsed_micros, expected_time_micros, max_regression, diff, entry_point
             ));
-        } else if elapsed_micros + ABSOLUTE_BUFFER_US
-            < expected_time_micros * (1.0 - ALLOWED_IMPROVEMENT)
-        {
+        } else if elapsed_micros < max_improvement {
             failures.push(format!(
-                "Performance improvement detected: {:.1}us, expected {:.1}us, diff: {}%, for {:?}. You need to adjust expected time!",
-                elapsed_micros, expected_time_micros, diff, entry_point
+                "Performance improvement detected: {:.1}us, expected {:.1}us, limit {:.1}us, diff: {}%, for {:?}. You need to adjust expected time!",
+                elapsed_micros, expected_time_micros, max_improvement, diff, entry_point
             ));
         }
     }

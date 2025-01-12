@@ -320,7 +320,7 @@ module 0x42::test {
         assert!(v[0].x == 8, 0);
     }
 
-    fun test_receiver() {
+    fun test_receiver() acquires S, W {
         let w = W {
             x: 3
         };
@@ -352,7 +352,7 @@ module 0x42::test {
         move_to(signer, wrapper);
     }
 
-    fun test_receiver_2() {
+    fun test_receiver_2() acquires Wrapper {
         assert!(dispatch(@0x1) == 2, 0);
         let wrapper = Wrapper {
             inner: 2

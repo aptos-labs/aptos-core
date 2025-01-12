@@ -10,7 +10,6 @@ publish = true
 edition = "2021"
 
 [dependencies]
-futures-core = { workspace = true }
 pbjson = { workspace = true }
 prost = { workspace = true }
 serde = { workspace = true }

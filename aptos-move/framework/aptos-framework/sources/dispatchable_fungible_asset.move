@@ -96,7 +96,7 @@ module aptos_framework::dispatchable_fungible_asset {
             assert!(amount <= start_balance - end_balance, error::aborted(EAMOUNT_MISMATCH));
             fa
         } else {
-            fungible_asset::withdraw_internal(object::object_address(&store), amount)
+            fungible_asset::unchecked_withdraw(object::object_address(&store), amount)
         }
     }
 
@@ -120,7 +120,7 @@ module aptos_framework::dispatchable_fungible_asset {
                 func
             )
         } else {
-            fungible_asset::deposit_internal(object::object_address(&store), fa)
+            fungible_asset::unchecked_deposit(object::object_address(&store), fa)
         }
     }
 
@@ -169,6 +169,25 @@ module aptos_framework::dispatchable_fungible_asset {
             dispatchable_derived_balance(store, func)
         } else {
             fungible_asset::balance(store)
+        }
+    }
+
+    #[view]
+    /// Whether the derived value of store using the overloaded hook is at least `amount`
+    ///
+    /// The semantics of value will be governed by the function specified in DispatchFunctionStore.
+    public fun is_derived_balance_at_least<T: key>(store: Object<T>, amount: u64): bool {
+        let func_opt = fungible_asset::derived_balance_dispatch_function(store);
+        if (option::is_some(&func_opt)) {
+            assert!(
+                features::dispatchable_fungible_asset_enabled(),
+                error::aborted(ENOT_ACTIVATED)
+            );
+            let func = option::borrow(&func_opt);
+            function_info::load_module_from_function(func);
+            dispatchable_derived_balance(store, func) >= amount
+        } else {
+            fungible_asset::is_balance_at_least(store, amount)
         }
     }
 
@@ -222,7 +241,7 @@ module aptos_framework::dispatchable_fungible_asset {
     ): u64;
 
     native fun dispatchable_derived_supply<T: key>(
-        store: Object<T>,
+        metadata: Object<T>,
         function: &FunctionInfo,
     ): Option<u128>;
 }

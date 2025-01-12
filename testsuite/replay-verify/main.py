@@ -10,6 +10,8 @@ import urllib.parse
 import json
 import argparse
 import sys
+from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
+
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
@@ -17,7 +19,7 @@ from testsuite import forge
 from archive_disk_utils import (
     TESTNET_SNAPSHOT_NAME,
     MAINNET_SNAPSHOT_NAME,
-    create_pvcs_from_snapshot,
+    create_replay_verify_pvcs_from_snapshot,
     get_kubectl_credentials,
 )
 
@@ -48,7 +50,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def construct_humio_url(labels_run, pod_name, start_time, end_time):
+def construct_humio_url(
+    labels_run: str, pod_name: str, start_time: float, end_time: float
+) -> str:
     query = f'#k8s.cluster = "devinfra-usce1-0" | k8s.labels.run = "{labels_run}" | "k8s.pod_name" = "{pod_name}"'
 
     params = {
@@ -64,7 +68,7 @@ def construct_humio_url(labels_run, pod_name, start_time, end_time):
     return url
 
 
-def set_env_var(container, name, value):
+def set_env_var(container: dict, name: str, value: str) -> None:
     if "env" not in container:
         container["env"] = []
 
@@ -78,24 +82,40 @@ def set_env_var(container, name, value):
     container["env"].append({"name": name, "value": value})
 
 
-def get_env_var(name, default_value=""):
+def get_env_var(name: str, default_value: str = "") -> str:
     return os.getenv(name, default_value)
+
+
+class ReplayConfig:
+    def __init__(self, network: Network) -> None:
+        if network == Network.TESTNET:
+            self.concurrent_replayer = 20
+            self.pvc_number = 5
+            self.min_range_size = 10_000
+            self.range_size = 5_000_000
+            self.timeout_secs = 900
+        else:
+            self.concurrent_replayer = 18
+            self.pvc_number = 8
+            self.min_range_size = 10_000
+            self.range_size = 2_000_000
+            self.timeout_secs = 400
 
 
 class WorkerPod:
     def __init__(
         self,
-        id,
-        start_version,
-        end_version,
-        label,
-        image,
-        pvcs,
-        replay_config,
-        network=Network.TESTNET,
-        namespace="default",
-    ):
-        self.id = id
+        worker_id: int,
+        start_version: int,
+        end_version: int,
+        label: str,
+        image: str,
+        pvcs: list[str],
+        replay_config: ReplayConfig,
+        network: Network = Network.TESTNET,
+        namespace: str = "default",
+    ) -> None:
+        self.worker_id = worker_id
         self.client = client.CoreV1Api()
         self.name = f"{label}-replay-verify-{start_version}-{end_version}"
         self.start_version = start_version
@@ -110,7 +130,7 @@ class WorkerPod:
         self.pvcs = pvcs
         self.config = replay_config
 
-    def update_status(self):
+    def update_status(self) -> None:
         if self.status is not None and self.status.status.phase in [
             "Succeeded",
             "Failed",
@@ -118,36 +138,42 @@ class WorkerPod:
             return
         self.status = self.get_pod_status()
 
-    def is_completed(self):
+    def is_completed(self) -> bool:
         self.update_status()
         if self.status and self.status.status.phase in ["Succeeded", "Failed"]:
             return True
         return False
 
-    def is_failed(self):
+    def is_failed(self) -> bool:
         self.update_status()
         if self.status and self.status.status.phase == "Failed":
             return True
         return False
 
-    def should_reschedule(self):
+    def should_reschedule(self) -> bool:
         if self.get_failure_reason() == "Evicted":
             return True
         return False
 
-    def get_failure_reason(self):
+    def get_failure_reason(self) -> str | None:
         self.update_status()
         if self.status and self.status.status.phase == "Failed":
             return self.status.status.reason
         return None
 
-    def get_phase(self):
+    def get_phase(self) -> str | None:
         self.update_status()
         if self.status:
             return self.status.status.phase
         return None
 
-    def has_txn_mismatch(self):
+    def get_container_status(self) -> list[client.V1ContainerStatus] | None:
+        self.update_status()
+        if self.status:
+            return self.status.status.container_statuses
+        return None
+
+    def has_txn_mismatch(self) -> bool:
         if self.status:
             container_statuses = self.status.status.container_statuses
             if (
@@ -158,14 +184,14 @@ class WorkerPod:
                 return container_statuses[0].state.terminated.exit_code == 2
         return False
 
-    def get_target_db_dir(self):
+    def get_target_db_dir(self) -> str:
         return "/mnt/archive/db"
 
-    def get_claim_name(self):
-        idx = self.id % len(self.pvcs)
+    def get_claim_name(self) -> str:
+        idx = self.worker_id % len(self.pvcs)
         return self.pvcs[idx]
 
-    def start(self):
+    def start(self) -> None:
         # Load the worker YAML from the file
         with open("replay-verify-worker-template.yaml", "r") as f:
             pod_manifest = yaml.safe_load(f)
@@ -217,6 +243,14 @@ class WorkerPod:
                 )
                 time.sleep(RETRY_DELAY)
 
+    @retry(
+        stop=stop_after_attempt(MAX_RETRIES),
+        wait=wait_fixed(RETRY_DELAY),
+        retry=retry_if_exception_type(ApiException),
+        before_sleep=lambda retry_state: logger.warning(
+            f"Retry {retry_state.attempt_number}/{MAX_RETRIES} failed: {retry_state.outcome.exception()}"
+        ),
+    )
     def delete_pod(self):
         response = self.client.delete_namespaced_pod(
             name=self.name,
@@ -233,6 +267,14 @@ class WorkerPod:
                 return container_status.state.terminated.exit_code
         return None
 
+    @retry(
+        stop=stop_after_attempt(MAX_RETRIES),
+        wait=wait_fixed(RETRY_DELAY),
+        retry=retry_if_exception_type(ApiException),
+        before_sleep=lambda retry_state: logger.warning(
+            f"Retry {retry_state.attempt_number}/{MAX_RETRIES} failed: {retry_state.outcome.exception()}"
+        ),
+    )
     def get_pod_status(self):
         pod_status = self.client.read_namespaced_pod_status(
             name=self.name, namespace=self.namespace
@@ -243,35 +285,19 @@ class WorkerPod:
         return construct_humio_url(self.label, self.name, self.start_time, time.time())
 
 
-class ReplayConfig:
-    def __init__(self, network):
-        if network == Network.TESTNET:
-            self.concurrent_replayer = 20
-            self.pvc_number = 5
-            self.min_range_size = 10_000
-            self.range_size = 5_000_000
-            self.timeout_secs = 900
-        else:
-            self.concurrent_replayer = 18
-            self.pvc_number = 8
-            self.min_range_size = 10_000
-            self.range_size = 2_000_000
-            self.timeout_secs = 400
-
-
 class TaskStats:
-    def __init__(self, name):
-        self.name = name
-        self.start_time = time.time()
-        self.end_time = None
-        self.retry_count = 0
-        self.durations = []
+    def __init__(self, name: str) -> None:
+        self.name: str = name
+        self.start_time: float = time.time()
+        self.end_time: float | None = None
+        self.retry_count: int = 0
+        self.durations: list[float] = []
 
-    def set_end_time(self):
+    def set_end_time(self) -> None:
         self.end_time = time.time()
         self.durations.append(self.end_time - self.start_time)
 
-    def increment_retry_count(self):
+    def increment_retry_count(self) -> None:
         self.retry_count += 1
 
     def __str__(self) -> str:
@@ -281,17 +307,17 @@ class TaskStats:
 class ReplayScheduler:
     def __init__(
         self,
-        id,
-        start_version,
-        end_version,
-        ranges_to_skip,
-        worker_cnt,
-        range_size,
-        image,
-        replay_config,
-        network=Network.TESTNET,
-        namespace="default",
-    ):
+        id: str,
+        start_version: int,
+        end_version: int,
+        ranges_to_skip: list[tuple[int, int]],
+        worker_cnt: int,
+        range_size: int,
+        image: str,
+        replay_config: ReplayConfig,
+        network: Network = Network.TESTNET,
+        namespace: str = "default",
+    ) -> None:
         KubernetesConfig.load_kube_config()
         self.client = client.CoreV1Api()
         self.id = id
@@ -327,7 +353,7 @@ class ReplayScheduler:
     def get_label(self):
         return f"{self.id}-{self.network}"
 
-    def create_tasks(self):
+    def create_tasks(self) -> None:
         current = self.start_version
 
         sorted_skips = [
@@ -362,7 +388,7 @@ class ReplayScheduler:
             if self.network == Network.TESTNET
             else MAINNET_SNAPSHOT_NAME
         )
-        pvcs = create_pvcs_from_snapshot(
+        pvcs = create_replay_verify_pvcs_from_snapshot(
             self.id,
             snapshot_name,
             self.namespace,
@@ -372,17 +398,40 @@ class ReplayScheduler:
         assert len(pvcs) == self.config.pvc_number, "failed to create all pvcs"
         self.pvcs = pvcs
 
-    def schedule(self, from_scratch=False):
+    @retry(
+        stop=stop_after_attempt(MAX_RETRIES),
+        wait=wait_fixed(RETRY_DELAY),
+        retry=retry_if_exception_type(ApiException),
+        before_sleep=lambda retry_state: logger.warning(
+            f"Retry {retry_state.attempt_number}/{MAX_RETRIES} failed: {retry_state.outcome.exception()}"
+        ),
+    )
+    def get_pvc_bound_status(self) -> list[bool]:
+        statuses = []
+        for pvc in self.pvcs:
+            pvc_status = self.client.read_namespaced_persistent_volume_claim_status(
+                name=pvc, namespace=self.namespace
+            )
+            if pvc_status.status.phase == "Bound":
+                statuses.append(True)
+            else:
+                statuses.append(False)
+        return statuses
+
+    def schedule(self, from_scratch: bool = False) -> None:
         if from_scratch:
             self.kill_all_pods()
         self.create_tasks()
 
         while len(self.tasks) > 0:
+            pvc_bound_status = self.get_pvc_bound_status()
             for i in range(len(self.current_workers)):
                 if (
                     self.current_workers[i] is None
                     or self.current_workers[i].is_completed()
-                ):
+                ) and (
+                    pvc_bound_status[i % len(self.pvcs)] or i < len(self.pvcs)
+                ):  # we only create a new pod to intialize the pvc before the PVC is bound
                     if (
                         self.current_workers[i] is not None
                         and self.current_workers[i].is_completed()
@@ -408,11 +457,20 @@ class ReplayScheduler:
                     self.task_stats[worker_pod.name] = TaskStats(worker_pod.name)
 
                 if self.current_workers[i] is not None:
+                    phase = self.current_workers[i].get_phase()
                     logger.info(
-                        f"Checking worker {i}: {self.current_workers[i].name}: {self.current_workers[i].get_phase()}"
+                        f"Checking worker {i}: {self.current_workers[i].name}: {phase}"
                     )
             time.sleep(QUERY_DELAY)
         logger.info("All tasks have been scheduled")
+
+    def reschedule_pod(self, worker_pod: WorkerPod, worker_idx: int):
+        # clean up the existing pod
+        worker_pod.delete_pod()
+        # re-enter the task to the queue
+        self.tasks.append((worker_pod.start_version, worker_pod.end_version))
+        self.task_stats[worker_pod.name].increment_retry_count()
+        self.current_workers[worker_idx] = None
 
     def process_completed_pod(self, worker_pod, worker_idx):
         if worker_pod.has_txn_mismatch():
@@ -424,16 +482,11 @@ class ReplayScheduler:
                 logger.info(
                     f"Worker {worker_pod.name} failed with {worker_pod.get_failure_reason()}. Rescheduling"
                 )
-                # clean up the existing pod
-                worker_pod.delete_pod()
-                # re-enter the task to the queue
-                self.tasks.append((worker_pod.start_version, worker_pod.end_version))
-                self.task_stats[worker_pod.name].increment_retry_count()
+                self.reschedule_pod(worker_pod, worker_idx)
             else:
                 self.failed_workpod_logs.append(worker_pod.get_humio_log_link())
-
+                self.current_workers[worker_idx] = None
         self.task_stats[worker_pod.name].set_end_time()
-        self.current_workers[worker_idx] = None
 
     def cleanup(self):
         self.kill_all_pods()
@@ -452,7 +505,7 @@ class ReplayScheduler:
             label_selector=f"run={self.get_label()}",
         )
 
-    def collect_all_failed_logs(self):
+    def collect_all_failed_logs(self) -> tuple[list[str], list[str]]:
         logger.info("Collecting logs from remaining pods")
         all_completed = False
         while not all_completed:
@@ -475,7 +528,7 @@ class ReplayScheduler:
     # read skip ranges from gcp bucket
 
 
-def read_skip_ranges(network):
+def read_skip_ranges(network: str) -> tuple[int, int, list[tuple[int, int]]]:
     storage_client = storage.Client()
     bucket = storage_client.bucket("replay_verify_skip_ranges")
     source_blob_name = f"{network}_skip_ranges.json"
@@ -490,7 +543,7 @@ def read_skip_ranges(network):
     return (data["start"], data["end"], skip_ranges)
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=__doc__,
@@ -500,14 +553,16 @@ def parse_args():
     parser.add_argument("--end", required=False, type=int)
     parser.add_argument("--worker_cnt", required=False, type=int)
     parser.add_argument("--range_size", required=False, type=int)
-    parser.add_argument("--namespace", required=False, type=str, default="default")
+    parser.add_argument(
+        "--namespace", required=False, type=str, default="replay-verify"
+    )
     parser.add_argument("--image_tag", required=False, type=str)
     parser.add_argument("--cleanup", required=False, action="store_true", default=False)
     args = parser.parse_args()
     return args
 
 
-def get_image(image_tag=None):
+def get_image(image_tag: str | None = None) -> str:
     shell = forge.LocalShell()
     git = forge.Git(shell)
     image_name = "tools"
@@ -525,7 +580,7 @@ def get_image(image_tag=None):
     return full_image
 
 
-def print_logs(failed_workpod_logs, txn_mismatch_logs):
+def print_logs(failed_workpod_logs: list[str], txn_mismatch_logs: list[str]) -> None:
     if len(failed_workpod_logs) > 0:
         logger.info("Failed workpods found")
         for log in failed_workpod_logs:
@@ -548,6 +603,16 @@ if __name__ == "__main__":
     config = ReplayConfig(network)
     worker_cnt = args.worker_cnt if args.worker_cnt else config.pvc_number * 7
     range_size = args.range_size if args.range_size else config.range_size
+
+    if args.start is not None:
+        assert (
+            args.start >= start
+        ), f"start version {args.start} is out of range {start} - {end}"
+    if args.end is not None:
+        assert (
+            args.end <= end
+        ), f"end version {args.end} is out of range {start} - {end}"
+
     scheduler = ReplayScheduler(
         run_id,
         start if args.start is None else args.start,
@@ -572,9 +637,9 @@ if __name__ == "__main__":
             (failed_logs, txn_mismatch_logs) = scheduler.collect_all_failed_logs()
             scheduler.print_stats()
             print_logs(failed_logs, txn_mismatch_logs)
-            if txn_mismatch_logs:  
-                logger.error("Transaction mismatch logs found.")  
-                exit(1)  
+            if txn_mismatch_logs:
+                logger.error("Transaction mismatch logs found.")
+                exit(1)
 
         finally:
             scheduler.cleanup()

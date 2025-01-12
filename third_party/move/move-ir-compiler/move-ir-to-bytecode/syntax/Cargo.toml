@@ -12,10 +12,10 @@ edition = "2021"
 [dependencies]
 anyhow = { workspace = true }
 hex = { workspace = true }
-move-command-line-common = { path = "../../../move-command-line-common" }
-move-core-types = { path = "../../../move-core/types" }
-move-ir-types = { path = "../../../move-ir/types" }
-move-symbol-pool = { path = "../../../move-symbol-pool" }
+move-command-line-common = { workspace = true }
+move-core-types = { workspace = true }
+move-ir-types = { workspace = true }
+move-symbol-pool = { workspace = true }
 
 [features]
 default = []
