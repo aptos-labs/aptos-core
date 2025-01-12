@@ -1,21 +1,3 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
-#![forbid(unsafe_code)]
-
-mod consensus;
-mod indexer;
-mod logger;
-mod network;
-mod services;
-mod state_sync;
-mod storage;
-pub mod utils;
-
-#[cfg(test)]
-mod tests;
-
 use anyhow::anyhow;
 use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
@@ -40,6 +22,7 @@ use std::{
     thread,
 };
 use tokio::runtime::Runtime;
+use fullnode_sync::sync_fullnode;
 
 const EPOCH_LENGTH_SECS: u64 = 60;
 
@@ -790,6 +773,11 @@ pub fn setup_environment_and_start_node(
         _telemetry_runtime: telemetry_runtime,
         _indexer_db_runtime: internal_indexer_db_runtime,
     })
+}
+
+pub fn run_fullnode_sync() -> anyhow::Result<()> {
+    sync_fullnode()?;
+    Ok(())
 }
 
 #[test]
