@@ -101,7 +101,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             chain_id.id(),
             maybe_user_transaction_context,
         ));
-        extensions.add(NativeCodeContext::default());
+        extensions.add(NativeCodeContext::new());
         extensions.add(NativeStateStorageContext::new(resolver));
         extensions.add(NativeEventContext::default());
         extensions.add(NativeObjectContext::default());
@@ -197,9 +197,11 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         Ok((change_set, module_write_set))
     }
 
-    pub fn extract_publish_request(&mut self) -> Option<PublishRequest> {
+    /// Returns the publish request if it exists. If the provided flag is set to true, disables any
+    /// subsequent module publish requests.
+    pub fn extract_publish_request(&mut self, disable: bool) -> Option<PublishRequest> {
         let ctx = self.get_native_extensions().get_mut::<NativeCodeContext>();
-        ctx.requested_module_bundle.take()
+        ctx.extract_publish_request(disable)
     }
 
     fn populate_v0_resource_group_change_set(
