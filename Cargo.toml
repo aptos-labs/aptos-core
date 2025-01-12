@@ -774,7 +774,7 @@ serde_repr = "0.1"
 serde_merge = "0.1.3"
 serde-name = "0.1.1"
 serde-generate = { path = "../serde-reflection/serde-generate" }
-serde-reflection = {path = "../serde-reflection/serde-reflection"  }
+serde-reflection = { path = "../serde-reflection/serde-reflection" }
 serde_with = "3.4.0"
 serde_yaml = "0.8.24"
 set_env = "1.3.4"
@@ -926,7 +926,7 @@ debug-assertions = true
 debug = true
 
 [patch.crates-io]
-serde-reflection = {path = "../serde-reflection/serde-reflection"  }
+serde-reflection = { path = "../serde-reflection/serde-reflection" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }
 x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", branch = "zeroize_v1" }
 tonic = { git = "https://github.com/aptos-labs/tonic.git", rev = "0da1ba8b1751d6e19eb55be24cccf9ae933c666e" }

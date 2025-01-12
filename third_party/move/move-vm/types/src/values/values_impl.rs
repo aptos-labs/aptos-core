@@ -3650,9 +3650,7 @@ fn invariant_violation<S: serde::Serializer>(message: String) -> S::Error {
     )
 }
 
-impl serde::Serialize
-    for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, ValueImpl>
-{
+impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, ValueImpl> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use MoveTypeLayout as L;
 
@@ -3776,9 +3774,7 @@ impl serde::Serialize
     }
 }
 
-impl serde::Serialize
-    for SerializationReadyValue<'_, '_, '_, MoveStructLayout, Vec<ValueImpl>>
-{
+impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveStructLayout, Vec<ValueImpl>> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut values = self.value.as_slice();
         if let Some((tag, variant_layouts)) = try_get_variant_field_layouts(self.layout, values) {
@@ -3855,9 +3851,7 @@ pub(crate) struct DeserializationSeed<'c, L> {
     pub(crate) layout: L,
 }
 
-impl<'d> serde::de::DeserializeSeed<'d>
-    for DeserializationSeed<'_, &MoveTypeLayout>
-{
+impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLayout> {
     type Value = Value;
 
     fn deserialize<D: serde::de::Deserializer<'d>>(

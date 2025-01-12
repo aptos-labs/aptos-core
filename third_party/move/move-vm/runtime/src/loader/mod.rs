@@ -1650,7 +1650,7 @@ impl Resolver<'_> {
     }
 }
 
-impl<'a> FunctionValueExtension for Resolver<'a> {
+impl FunctionValueExtension for Resolver<'_> {
     fn get_function_arg_tys(
         &self,
         module_id: &ModuleId,

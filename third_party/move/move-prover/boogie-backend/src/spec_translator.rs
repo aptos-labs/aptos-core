@@ -322,7 +322,7 @@ impl SpecTranslator<'_> {
                         .type_inst
                         .get(i)
                         .cloned()
-                        .unwrap_or_else(|| Type::TypeParameter(i as u16));
+                        .unwrap_or(Type::TypeParameter(i as u16));
                     // There can be name clashes after instantiation. Parameters still need
                     // to be there but all are instantiated with the same type. We escape
                     // the redundant parameters.

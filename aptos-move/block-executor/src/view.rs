@@ -1449,9 +1449,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     }
 }
 
-impl<T: Transaction, S: TStateView<Key = T::Key>> TResourceView
-    for LatestView<'_, T, S>
-{
+impl<T: Transaction, S: TStateView<Key = T::Key>> TResourceView for LatestView<'_, T, S> {
     type Key = T::Key;
     type Layout = MoveTypeLayout;
 
@@ -1494,9 +1492,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> TResourceView
     }
 }
 
-impl<T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView
-    for LatestView<'_, T, S>
-{
+impl<T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView for LatestView<'_, T, S> {
     type GroupKey = T::Key;
     type Layout = MoveTypeLayout;
     type ResourceTag = T::Tag;
@@ -1571,9 +1567,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> TResourceGroupView
     }
 }
 
-impl<T: Transaction, S: TStateView<Key = T::Key>> TModuleView
-    for LatestView<'_, T, S>
-{
+impl<T: Transaction, S: TStateView<Key = T::Key>> TModuleView for LatestView<'_, T, S> {
     type Key = T::Key;
 
     fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
@@ -1635,9 +1629,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> TModuleView
     }
 }
 
-impl<T: Transaction, S: TStateView<Key = T::Key>> StateStorageView
-    for LatestView<'_, T, S>
-{
+impl<T: Transaction, S: TStateView<Key = T::Key>> StateStorageView for LatestView<'_, T, S> {
     type Key = T::Key;
 
     fn id(&self) -> StateViewId {
@@ -1654,9 +1646,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> StateStorageView
     }
 }
 
-impl<T: Transaction, S: TStateView<Key = T::Key>> TAggregatorV1View
-    for LatestView<'_, T, S>
-{
+impl<T: Transaction, S: TStateView<Key = T::Key>> TAggregatorV1View for LatestView<'_, T, S> {
     type Identifier = T::Key;
 
     fn get_aggregator_v1_state_value(
@@ -1672,10 +1662,8 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> TAggregatorV1View
     }
 }
 
-impl<T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView
-    for LatestView<'_, T, S>
-{
-    type Identifier = T::Identifier;
+impl<T: Transaction, S: TStateView<Key = T::Key>> TDelayedFieldView for LatestView<'_, T, S> {
+    type Identifier = DelayedFieldID;
     type ResourceGroupTag = T::Tag;
     type ResourceKey = T::Key;
 

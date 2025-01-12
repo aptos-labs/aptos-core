@@ -98,7 +98,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> ValueToIdentifierMapping
     }
 }
 
-impl<'a, T, S> LatestView<'a, T, S>
+impl<T, S> LatestView<'_, T, S>
 where
     T: Transaction,
     S: TStateView<Key = T::Key>,

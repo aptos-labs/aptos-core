@@ -142,7 +142,7 @@ pub enum EntryFunctionCall {
     /// `set_originating_address()`.
     AccountRotateAuthenticationKeyCall { new_auth_key: Vec<u8> },
 
-    ///
+    /// TODO
     AccountRotateAuthenticationKeyWithRotationCapability {
         rotation_cap_offerer_address: AccountAddress,
         new_scheme: u8,
@@ -219,7 +219,7 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
-    ///
+    /// TODO
     AptosGovernanceAddApprovedScriptHashScript { proposal_id: u64 },
 
     /// Batch vote on proposal with proposal_id and specified voting power from multiple stake_pools.
@@ -303,7 +303,7 @@ pub enum EntryFunctionCall {
         code: Vec<Vec<u8>>,
     },
 
-    ///
+    /// TODO
     CoinCreateCoinConversionMap {},
 
     /// Create APT pairing by passing `AptosCoin`.
@@ -923,49 +923,49 @@ pub enum EntryFunctionCall {
         new_voter: AccountAddress,
     },
 
-    ///
+    /// TODO
     StakingProxySetOperator {
         old_operator: AccountAddress,
         new_operator: AccountAddress,
     },
 
-    ///
+    /// TODO
     StakingProxySetStakePoolOperator { new_operator: AccountAddress },
 
-    ///
+    /// TODO
     StakingProxySetStakePoolVoter { new_voter: AccountAddress },
 
-    ///
+    /// TODO
     StakingProxySetStakingContractOperator {
         old_operator: AccountAddress,
         new_operator: AccountAddress,
     },
 
-    ///
+    /// TODO
     StakingProxySetStakingContractVoter {
         operator: AccountAddress,
         new_voter: AccountAddress,
     },
 
-    ///
+    /// TODO
     StakingProxySetVestingContractOperator {
         old_operator: AccountAddress,
         new_operator: AccountAddress,
     },
 
-    ///
+    /// TODO
     StakingProxySetVestingContractVoter {
         operator: AccountAddress,
         new_voter: AccountAddress,
     },
 
-    ///
+    /// TODO
     StakingProxySetVoter {
         operator: AccountAddress,
         new_voter: AccountAddress,
     },
 
-    ///
+    /// TODO
     TransactionFeeConvertToAptosFaBurnRef {},
 
     /// Used in on-chain governances to update the major version for the next epoch.
@@ -1000,10 +1000,10 @@ pub enum EntryFunctionCall {
         shareholder: AccountAddress,
     },
 
-    ///
+    /// TODO
     VestingResetLockup { contract_address: AccountAddress },
 
-    ///
+    /// TODO
     VestingSetBeneficiary {
         contract_address: AccountAddress,
         shareholder: AccountAddress,
@@ -1013,13 +1013,13 @@ pub enum EntryFunctionCall {
     /// Set the beneficiary for the operator.
     VestingSetBeneficiaryForOperator { new_beneficiary: AccountAddress },
 
-    ///
+    /// TODO
     VestingSetBeneficiaryResetter {
         contract_address: AccountAddress,
         beneficiary_resetter: AccountAddress,
     },
 
-    ///
+    /// TODO
     VestingSetManagementRole {
         contract_address: AccountAddress,
         role: Vec<u8>,
@@ -1037,26 +1037,26 @@ pub enum EntryFunctionCall {
         contract_addresses: Vec<AccountAddress>,
     },
 
-    ///
+    /// TODO
     VestingUpdateCommissionPercentage {
         contract_address: AccountAddress,
         new_commission_percentage: u64,
     },
 
-    ///
+    /// TODO
     VestingUpdateOperator {
         contract_address: AccountAddress,
         new_operator: AccountAddress,
         commission_percentage: u64,
     },
 
-    ///
+    /// TODO
     VestingUpdateOperatorWithSameCommission {
         contract_address: AccountAddress,
         new_operator: AccountAddress,
     },
 
-    ///
+    /// TODO
     VestingUpdateVoter {
         contract_address: AccountAddress,
         new_voter: AccountAddress,
