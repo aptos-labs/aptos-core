@@ -100,6 +100,7 @@ pub enum FeatureFlag {
     /// AIP-105 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-105.md)
     NATIVE_MEMORY_OPERATIONS = 80,
     ENABLE_LOADER_V2 = 81,
+    ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE = 82,
 }
 
 impl FeatureFlag {
@@ -324,6 +325,10 @@ impl Features {
 
     pub fn is_loader_v2_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ENABLE_LOADER_V2)
+    }
+
+    pub fn is_call_tree_and_instruction_vm_cache_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

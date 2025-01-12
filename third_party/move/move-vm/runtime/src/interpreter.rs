@@ -228,8 +228,8 @@ impl InterpreterImpl {
         function: Rc<LoadedFunction>,
         args: Vec<Value>,
     ) -> VMResult<Vec<Value>> {
-        if true {
-            self.execute_main::<RTTCheck, NoRuntimeCaches>(
+        if loader.vm_config().use_call_tree_and_instruction_cache {
+            self.execute_main::<RTTCheck, AllRuntimeCaches>(
                 loader,
                 data_store,
                 module_store,
@@ -241,7 +241,7 @@ impl InterpreterImpl {
                 args,
             )
         } else {
-            self.execute_main::<RTTCheck, AllRuntimeCaches>(
+            self.execute_main::<RTTCheck, NoRuntimeCaches>(
                 loader,
                 data_store,
                 module_store,
