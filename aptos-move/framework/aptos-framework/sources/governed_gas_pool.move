@@ -1,12 +1,3 @@
-/**
-MIP-52: https://github.com/movementlabsxyz/MIP/pull/52
-
-The Governed Gas Pool is a pool into which and when enabled all gas fees are deposited.
-
-Non-view methods herein are only intended to be called by the aptos_framework, hence via a governance proposal.
-
-The implementation provided is based on Aptos Lab's Delegation Pool implementation: https://github.com/aptos-labs/aptos-core/blob/7e0aaa2ad12759f6afd6bac04bc55c2ea8046676/aptos-move/framework/aptos-framework/sources/delegation_pool.move#L4
-*/
 module aptos_framework::governed_gas_pool {
     use std::vector;
     use aptos_framework::account::{Self, SignerCapability, create_signer_with_capability};
@@ -56,6 +47,8 @@ module aptos_framework::governed_gas_pool {
         aptos_framework: &signer,
         delegation_pool_creation_seed: vector<u8>,
     ) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+
         // generate a seed to be used to create the resource account hosting the delegation pool
         let seed = create_resource_account_seed(delegation_pool_creation_seed);
 
@@ -71,13 +64,14 @@ module aptos_framework::governed_gas_pool {
 
     /// Borrows the signer of the governed gas pool.
     /// @return The signer of the governed gas pool.
-    fun governed_gas_signer(): signer  acquires GovernedGasPool {
+    fun governed_gas_signer(): signer acquires GovernedGasPool {
         let signer_cap = &borrow_global<GovernedGasPool>(@aptos_framework).signer_capability;
         create_signer_with_capability(signer_cap)
     }
 
     /// Gets the address of the governed gas pool.
     /// @return The address of the governed gas pool.
+    #[view]
     public fun governed_gas_pool_address(): address acquires GovernedGasPool {
         signer::address_of(&governed_gas_signer())
     }
@@ -141,6 +135,14 @@ module aptos_framework::governed_gas_pool {
             deposit_from<AptosCoin>(gas_payer, gas_fee);
         };
 
+    }
+
+    /// Gets the balance of a specified coin type in the governed gas pool.
+    /// @return The balance of the coin in the pool.
+    #[view]
+    public fun get_balance<CoinType>(): u64 acquires GovernedGasPool {
+        let pool_address = governed_gas_pool_address();
+        coin::balance<CoinType>(pool_address)
     }
 
     #[test_only]
@@ -273,6 +275,21 @@ module aptos_framework::governed_gas_pool {
     
     }
 
+    #[test(aptos_framework = @aptos_framework)]
+    /// Test for the get_balance view method.
+    fun test_governed_gas_pool_get_balance(aptos_framework: &signer) acquires GovernedGasPool, AptosCoinMintCapability {
+       
+        // initialize the modules
+        initialize_for_test(aptos_framework);
+
+        // fund the governed gas pool
+        let governed_gas_pool_address = governed_gas_pool_address();
+        mint_for_test(governed_gas_pool_address, 1000);
+
+        // assert the balance is correct
+        assert!(get_balance<AptosCoin>() == 1000, 1);
+    }
+
     #[test(aptos_framework = @aptos_framework, depositor = @0xdddd, beneficiary = @0xbbbb)]
     /// Funds the destination account with a given amount of coin.
     ///
@@ -311,5 +328,4 @@ module aptos_framework::governed_gas_pool {
         assert!(coin::balance<AptosCoin>(signer::address_of(beneficiary)) == 100, 4);
     
     }
-    
 }
