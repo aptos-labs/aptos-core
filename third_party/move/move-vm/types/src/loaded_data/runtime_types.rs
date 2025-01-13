@@ -817,12 +817,10 @@ impl TypeBuilder {
         Type::U256
     }
 
-    #[inline]
     pub fn create_address_ty(&self) -> Type {
         Type::Address
     }
 
-    #[inline]
     pub fn create_signer_ty(&self) -> Type {
         Type::Signer
     }

@@ -284,8 +284,8 @@ impl RuntimeEnvironment {
         self.struct_name_index_map.checked_len()
     }
 
-    /// Flushes the struct information (type) cache. Flushing this cache does not invalidate struct
-    /// name index map or module cache.
+    /// Flushes the struct information (type and tag) caches. Flushing this cache does not
+    /// invalidate struct name index map or module cache.
     pub fn flush_struct_info_cache(&self) {
         self.ty_tag_cache.flush();
         self.ty_cache.flush();
@@ -319,15 +319,13 @@ impl RuntimeEnvironment {
 }
 
 impl Clone for RuntimeEnvironment {
-    /// Returns the cloned environment.
     fn clone(&self) -> Self {
         Self {
             vm_config: self.vm_config.clone(),
             natives: self.natives.clone(),
             ty_cache: self.ty_cache.clone(),
-            // Cloning arcs below.
-            struct_name_index_map: self.struct_name_index_map.clone(),
-            ty_tag_cache: self.ty_tag_cache.clone(),
+            struct_name_index_map: Arc::clone(&self.struct_name_index_map),
+            ty_tag_cache: Arc::clone(&self.ty_tag_cache),
         }
     }
 }

@@ -11,7 +11,9 @@ use move_vm_types::loaded_data::runtime_types::{StructNameIndex, Type};
 use parking_lot::RwLock;
 use std::collections::{hash_map::Entry, HashMap};
 
-/// An entry in [TypeTagCache] that also stores a "cost" of the tag (proportional to its size).
+/// An entry in [TypeTagCache] that also stores a "cost" of the tag. The cost is proportional to
+/// the size of the tag, which includes the number of inner nodes and the sum of the sizes in bytes
+/// of addresses and identifiers.
 #[derive(Debug, Clone)]
 pub(crate) struct PricedStructTag {
     pub(crate) struct_tag: StructTag,
@@ -69,8 +71,8 @@ impl TypeTagCache {
         self.cache.read().get(idx)?.get(ty_args).cloned()
     }
 
-    /// Caches struct tag and its pseudo-gas cost, returning true if the tag was not cached before.
-    /// If the tag has been previously cached, returns false.
+    /// Inserts the struct tag and its pseudo-gas cost ([PricedStructTag]) into the cache. Returns
+    /// true if the tag was not cached before, and false otherwise.
     pub(crate) fn insert_struct_tag(
         &self,
         idx: &StructNameIndex,
