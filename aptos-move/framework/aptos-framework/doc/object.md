@@ -644,6 +644,16 @@ The object does not have ungated transfers enabled
 
 
 
+<a id="0x1_object_EOBJECT_ALREADY_BURNT"></a>
+
+Cannot burn an object that is already burnt.
+
+
+<pre><code><b>const</b> <a href="object.md#0x1_object_EOBJECT_ALREADY_BURNT">EOBJECT_ALREADY_BURNT</a>: u64 = 10;
+</code></pre>
+
+
+
 <a id="0x1_object_EOBJECT_DOES_NOT_EXIST"></a>
 
 An object does not exist at this address
@@ -2151,9 +2161,8 @@ Please use the test only [<code>object::burn_object_with_transfer</code>] for te
     <b>let</b> original_owner = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
     <b>assert</b>!(<a href="object.md#0x1_object_is_owner">is_owner</a>(<a href="object.md#0x1_object">object</a>, original_owner), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_OBJECT_OWNER">ENOT_OBJECT_OWNER</a>));
     <b>let</b> object_addr = <a href="object.md#0x1_object">object</a>.inner;
-    <b>if</b> (!<b>exists</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(object_addr)) {
-        <b>move_to</b>(&<a href="create_signer.md#0x1_create_signer">create_signer</a>(object_addr), <a href="object.md#0x1_object_TombStone">TombStone</a> { original_owner });
-    }
+    <b>assert</b>!(!<b>exists</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(object_addr), <a href="object.md#0x1_object_EOBJECT_ALREADY_BURNT">EOBJECT_ALREADY_BURNT</a>);
+    <b>move_to</b>(&<a href="create_signer.md#0x1_create_signer">create_signer</a>(object_addr), <a href="object.md#0x1_object_TombStone">TombStone</a> { original_owner });
 }
 </code></pre>
 
@@ -2454,6 +2463,33 @@ to determine the identity of the starting point of ownership.
 
 
 <pre><code><b>fun</b> <a href="object.md#0x1_object_spec_exists_at">spec_exists_at</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): bool;
+</code></pre>
+
+
+
+
+<a id="0x1_object_spec_create_object_address"></a>
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_object_address">spec_create_object_address</a>(source: <b>address</b>, seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b>;
+</code></pre>
+
+
+
+
+<a id="0x1_object_spec_create_user_derived_object_address"></a>
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_user_derived_object_address">spec_create_user_derived_object_address</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b>;
+</code></pre>
+
+
+
+
+<a id="0x1_object_spec_create_guid_object_address"></a>
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_guid_object_address">spec_create_guid_object_address</a>(source: <b>address</b>, creation_num: u64): <b>address</b>;
 </code></pre>
 
 
@@ -3385,33 +3421,6 @@ to determine the identity of the starting point of ownership.
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
-</code></pre>
-
-
-
-
-<a id="0x1_object_spec_create_object_address"></a>
-
-
-<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_object_address">spec_create_object_address</a>(source: <b>address</b>, seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b>;
-</code></pre>
-
-
-
-
-<a id="0x1_object_spec_create_user_derived_object_address"></a>
-
-
-<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_user_derived_object_address">spec_create_user_derived_object_address</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b>;
-</code></pre>
-
-
-
-
-<a id="0x1_object_spec_create_guid_object_address"></a>
-
-
-<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_guid_object_address">spec_create_guid_object_address</a>(source: <b>address</b>, creation_num: u64): <b>address</b>;
 </code></pre>
 
 

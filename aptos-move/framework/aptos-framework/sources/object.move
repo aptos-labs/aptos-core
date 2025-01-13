@@ -50,6 +50,8 @@ module aptos_framework::object {
     const EOBJECT_NOT_BURNT: u64 = 8;
     /// Object is untransferable any operations that might result in a transfer are disallowed.
     const EOBJECT_NOT_TRANSFERRABLE: u64 = 9;
+    /// Cannot burn an object that is already burnt.
+    const EOBJECT_ALREADY_BURNT: u64 = 10;
 
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const INIT_GUID_CREATION_NUM: u64 = 0x4000000000000;
@@ -620,9 +622,8 @@ module aptos_framework::object {
         let original_owner = signer::address_of(owner);
         assert!(is_owner(object, original_owner), error::permission_denied(ENOT_OBJECT_OWNER));
         let object_addr = object.inner;
-        if (!exists<TombStone>(object_addr)) {
-            move_to(&create_signer(object_addr), TombStone { original_owner });
-        }
+        assert!(!exists<TombStone>(object_addr), EOBJECT_ALREADY_BURNT);
+        move_to(&create_signer(object_addr), TombStone { original_owner });
     }
 
     /// Allow origin owners to reclaim any objects they previous burnt.
