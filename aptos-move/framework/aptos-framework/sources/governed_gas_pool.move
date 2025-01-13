@@ -64,7 +64,7 @@ module aptos_framework::governed_gas_pool {
 
     /// Borrows the signer of the governed gas pool.
     /// @return The signer of the governed gas pool.
-    public fun governed_gas_signer(): signer acquires GovernedGasPool {
+    fun governed_gas_signer(): signer acquires GovernedGasPool {
         let signer_cap = &borrow_global<GovernedGasPool>(@aptos_framework).signer_capability;
         create_signer_with_capability(signer_cap)
     }
