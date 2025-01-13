@@ -106,7 +106,7 @@ spec aptos_framework::account {
 
     spec module {
         pragma verify = false;
-        pragma aborts_if_is_partial;
+        // pragma aborts_if_is_partial;
     }
 
     /// Only the address `@aptos_framework` can call.

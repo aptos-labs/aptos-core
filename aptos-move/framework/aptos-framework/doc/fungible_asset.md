@@ -22,7 +22,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Struct `RawSupplyRef`](#0x1_fungible_asset_RawSupplyRef)
 -  [Struct `BurnRef`](#0x1_fungible_asset_BurnRef)
 -  [Struct `MutateMetadataRef`](#0x1_fungible_asset_MutateMetadataRef)
--  [Struct `WithdrawPermission`](#0x1_fungible_asset_WithdrawPermission)
+-  [Enum `WithdrawPermission`](#0x1_fungible_asset_WithdrawPermission)
 -  [Struct `Deposit`](#0x1_fungible_asset_Deposit)
 -  [Struct `Withdraw`](#0x1_fungible_asset_Withdraw)
 -  [Struct `Frozen`](#0x1_fungible_asset_Frozen)
@@ -84,7 +84,6 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `create_store`](#0x1_fungible_asset_create_store)
 -  [Function `remove_store`](#0x1_fungible_asset_remove_store)
 -  [Function `withdraw`](#0x1_fungible_asset_withdraw)
--  [Function `withdraw_with_permission`](#0x1_fungible_asset_withdraw_with_permission)
 -  [Function `withdraw_permission_check`](#0x1_fungible_asset_withdraw_permission_check)
 -  [Function `withdraw_permission_check_by_address`](#0x1_fungible_asset_withdraw_permission_check_by_address)
 -  [Function `withdraw_sanity_check`](#0x1_fungible_asset_withdraw_sanity_check)
@@ -123,9 +122,9 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `upgrade_to_concurrent`](#0x1_fungible_asset_upgrade_to_concurrent)
 -  [Function `upgrade_store_to_concurrent`](#0x1_fungible_asset_upgrade_store_to_concurrent)
 -  [Function `ensure_store_upgraded_to_concurrent_internal`](#0x1_fungible_asset_ensure_store_upgraded_to_concurrent_internal)
--  [Function `grant_permission`](#0x1_fungible_asset_grant_permission)
--  [Function `grant_apt_permission`](#0x1_fungible_asset_grant_apt_permission)
--  [Function `refill_permission_with_fa`](#0x1_fungible_asset_refill_permission_with_fa)
+-  [Function `grant_permission_by_store`](#0x1_fungible_asset_grant_permission_by_store)
+-  [Function `grant_permission_by_address`](#0x1_fungible_asset_grant_permission_by_address)
+-  [Function `refill_permission`](#0x1_fungible_asset_refill_permission)
 -  [Function `revoke_permission`](#0x1_fungible_asset_revoke_permission)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
@@ -640,13 +639,21 @@ MutateMetadataRef can be used to directly modify the fungible asset's Metadata.
 
 <a id="0x1_fungible_asset_WithdrawPermission"></a>
 
-## Struct `WithdrawPermission`
+## Enum `WithdrawPermission`
 
 
 
-<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_WithdrawPermission">WithdrawPermission</a> <b>has</b> <b>copy</b>, drop, store
+<pre><code>enum <a href="fungible_asset.md#0x1_fungible_asset_WithdrawPermission">WithdrawPermission</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>ByStore</summary>
 
 
 <details>
@@ -655,13 +662,17 @@ MutateMetadataRef can be used to directly modify the fungible asset's Metadata.
 
 <dl>
 <dt>
-<code>metadata_address: <b>address</b></code>
+<code>store_address: <b>address</b></code>
 </dt>
 <dd>
 
 </dd>
 </dl>
 
+
+</details>
+
+</details>
 
 </details>
 
@@ -1176,7 +1187,7 @@ The balance ref and the fungible asset do not match.
 The supply ref and the fungible asset do not match.
 
 
-<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_ERAW_SUPPLY_REF_AND_FUNGIBLE_ASSET_MISMATCH">ERAW_SUPPLY_REF_AND_FUNGIBLE_ASSET_MISMATCH</a>: u64 = 34;
+<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_ERAW_SUPPLY_REF_AND_FUNGIBLE_ASSET_MISMATCH">ERAW_SUPPLY_REF_AND_FUNGIBLE_ASSET_MISMATCH</a>: u64 = 35;
 </code></pre>
 
 
@@ -1266,7 +1277,7 @@ Provided withdraw function type doesn't meet the signature requirement.
 signer don't have the permission to perform withdraw operation
 
 
-<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_EWITHDRAW_PERMISSION_DENIED">EWITHDRAW_PERMISSION_DENIED</a>: u64 = 34;
+<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_EWITHDRAW_PERMISSION_DENIED">EWITHDRAW_PERMISSION_DENIED</a>: u64 = 36;
 </code></pre>
 
 
@@ -2995,42 +3006,8 @@ that function unless you DO NOT want to support fungible assets with dispatchabl
     amount: u64,
 ): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_DispatchFunctionStore">DispatchFunctionStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a> {
     <a href="fungible_asset.md#0x1_fungible_asset_withdraw_sanity_check">withdraw_sanity_check</a>(owner, store, <b>true</b>);
+    <a href="fungible_asset.md#0x1_fungible_asset_withdraw_permission_check">withdraw_permission_check</a>(owner, store, amount);
     <a href="fungible_asset.md#0x1_fungible_asset_unchecked_withdraw">unchecked_withdraw</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store), amount)
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_fungible_asset_withdraw_with_permission"></a>
-
-## Function `withdraw_with_permission`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_withdraw_with_permission">withdraw_with_permission</a>&lt;T: key&gt;(perm: &<b>mut</b> <a href="permissioned_signer.md#0x1_permissioned_signer_Permission">permissioned_signer::Permission</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_WithdrawPermission">fungible_asset::WithdrawPermission</a>&gt;, store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_withdraw_with_permission">withdraw_with_permission</a>&lt;T: key&gt;(
-    perm: &<b>mut</b> Permission&lt;<a href="fungible_asset.md#0x1_fungible_asset_WithdrawPermission">WithdrawPermission</a>&gt;,
-    store: Object&lt;T&gt;,
-    amount: u64,
-): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_DispatchFunctionStore">DispatchFunctionStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a> {
-    <a href="fungible_asset.md#0x1_fungible_asset_withdraw_sanity_check_impl">withdraw_sanity_check_impl</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_address_of">permissioned_signer::address_of</a>(perm), store, <b>true</b>);
-    <b>assert</b>!(
-        <a href="permissioned_signer.md#0x1_permissioned_signer_consume_permission">permissioned_signer::consume_permission</a>(perm, amount <b>as</b> u256, <a href="fungible_asset.md#0x1_fungible_asset_WithdrawPermission">WithdrawPermission</a> {
-            metadata_address: <a href="object.md#0x1_object_object_address">object::object_address</a>(&<a href="fungible_asset.md#0x1_fungible_asset_borrow_store_resource">borrow_store_resource</a>(&store).metadata)
-        }),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="fungible_asset.md#0x1_fungible_asset_EWITHDRAW_PERMISSION_DENIED">EWITHDRAW_PERMISSION_DENIED</a>)
-    );
-    <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">withdraw_internal</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store), amount)
 }
 </code></pre>
 
@@ -3058,9 +3035,9 @@ Check the permission for withdraw operation.
     owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     store: Object&lt;T&gt;,
     amount: u64,
-) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
-    <b>assert</b>!(<a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_consume">permissioned_signer::check_permission_consume</a>(owner, amount <b>as</b> u256, <a href="fungible_asset.md#0x1_fungible_asset_WithdrawPermission">WithdrawPermission</a> {
-        metadata_address: <a href="object.md#0x1_object_object_address">object::object_address</a>(&<a href="fungible_asset.md#0x1_fungible_asset_borrow_store_resource">borrow_store_resource</a>(&store).metadata)
+) {
+    <b>assert</b>!(<a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_consume">permissioned_signer::check_permission_consume</a>(owner, amount <b>as</b> u256, WithdrawPermission::ByStore {
+        store_address: <a href="object.md#0x1_object_object_address">object::object_address</a>(&store),
     }), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="fungible_asset.md#0x1_fungible_asset_EWITHDRAW_PERMISSION_DENIED">EWITHDRAW_PERMISSION_DENIED</a>));
 }
 </code></pre>
@@ -3076,7 +3053,7 @@ Check the permission for withdraw operation.
 Check the permission for withdraw operation.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_withdraw_permission_check_by_address">withdraw_permission_check_by_address</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata_address: <b>address</b>, amount: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_withdraw_permission_check_by_address">withdraw_permission_check_by_address</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, store_address: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -3087,11 +3064,11 @@ Check the permission for withdraw operation.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_withdraw_permission_check_by_address">withdraw_permission_check_by_address</a>(
     owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    metadata_address: <b>address</b>,
+    store_address: <b>address</b>,
     amount: u64,
 ) {
-    <b>assert</b>!(<a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_consume">permissioned_signer::check_permission_consume</a>(owner, amount <b>as</b> u256, <a href="fungible_asset.md#0x1_fungible_asset_WithdrawPermission">WithdrawPermission</a> {
-        metadata_address,
+    <b>assert</b>!(<a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_consume">permissioned_signer::check_permission_consume</a>(owner, amount <b>as</b> u256, WithdrawPermission::ByStore {
+        store_address,
     }), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="fungible_asset.md#0x1_fungible_asset_EWITHDRAW_PERMISSION_DENIED">EWITHDRAW_PERMISSION_DENIED</a>));
 }
 </code></pre>
@@ -4290,16 +4267,16 @@ Ensure a known <code><a href="fungible_asset.md#0x1_fungible_asset_FungibleStore
 
 </details>
 
-<a id="0x1_fungible_asset_grant_permission"></a>
+<a id="0x1_fungible_asset_grant_permission_by_store"></a>
 
-## Function `grant_permission`
+## Function `grant_permission_by_store`
 
 Permission management
 
 Master signer grant permissioned signer ability to withdraw a given amount of fungible asset.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_grant_permission">grant_permission</a>(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, token_type: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;, amount: u64)
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_grant_permission_by_store">grant_permission_by_store</a>&lt;T: key&gt;(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64)
 </code></pre>
 
 
@@ -4308,18 +4285,18 @@ Master signer grant permissioned signer ability to withdraw a given amount of fu
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_grant_permission">grant_permission</a>(
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_grant_permission_by_store">grant_permission_by_store</a>&lt;T: key&gt;(
     master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    token_type: Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;,
+    store: Object&lt;T&gt;,
     amount: u64
 ) {
-    <a href="permissioned_signer.md#0x1_permissioned_signer_authorize">permissioned_signer::authorize</a>(
+    <a href="permissioned_signer.md#0x1_permissioned_signer_authorize_increase">permissioned_signer::authorize_increase</a>(
         master,
         permissioned,
         amount <b>as</b> u256,
-        <a href="fungible_asset.md#0x1_fungible_asset_WithdrawPermission">WithdrawPermission</a> {
-            metadata_address: <a href="object.md#0x1_object_object_address">object::object_address</a>(&token_type),
+        WithdrawPermission::ByStore {
+            store_address: <a href="object.md#0x1_object_object_address">object::object_address</a>(&store),
         }
     )
 }
@@ -4329,13 +4306,13 @@ Master signer grant permissioned signer ability to withdraw a given amount of fu
 
 </details>
 
-<a id="0x1_fungible_asset_grant_apt_permission"></a>
+<a id="0x1_fungible_asset_grant_permission_by_address"></a>
 
-## Function `grant_apt_permission`
+## Function `grant_permission_by_address`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_grant_apt_permission">grant_apt_permission</a>(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, amount: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_grant_permission_by_address">grant_permission_by_address</a>(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, store_address: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -4344,16 +4321,17 @@ Master signer grant permissioned signer ability to withdraw a given amount of fu
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_grant_apt_permission">grant_apt_permission</a>(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_grant_permission_by_address">grant_permission_by_address</a>(
     master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    store_address: <b>address</b>,
     amount: u64
 ) {
-    <a href="permissioned_signer.md#0x1_permissioned_signer_authorize">permissioned_signer::authorize</a>(
+    <a href="permissioned_signer.md#0x1_permissioned_signer_authorize_increase">permissioned_signer::authorize_increase</a>(
         master,
         permissioned,
         amount <b>as</b> u256,
-        <a href="fungible_asset.md#0x1_fungible_asset_WithdrawPermission">WithdrawPermission</a> { metadata_address: @aptos_fungible_asset }
+        WithdrawPermission::ByStore { store_address }
     )
 }
 </code></pre>
@@ -4362,13 +4340,13 @@ Master signer grant permissioned signer ability to withdraw a given amount of fu
 
 </details>
 
-<a id="0x1_fungible_asset_refill_permission_with_fa"></a>
+<a id="0x1_fungible_asset_refill_permission"></a>
 
-## Function `refill_permission_with_fa`
+## Function `refill_permission`
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_refill_permission_with_fa">refill_permission_with_fa</a>(permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, fa: &<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_refill_permission">refill_permission</a>(permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, amount: u64, store_address: <b>address</b>)
 </code></pre>
 
 
@@ -4377,16 +4355,15 @@ Master signer grant permissioned signer ability to withdraw a given amount of fu
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_refill_permission_with_fa">refill_permission_with_fa</a>(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_refill_permission">refill_permission</a>(
     permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    fa: &<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>
+    amount: u64,
+    store_address: <b>address</b>,
 ) {
     <a href="permissioned_signer.md#0x1_permissioned_signer_increase_limit">permissioned_signer::increase_limit</a>(
         permissioned,
-        <a href="fungible_asset.md#0x1_fungible_asset_amount">amount</a>(fa) <b>as</b> u256,
-        <a href="fungible_asset.md#0x1_fungible_asset_WithdrawPermission">WithdrawPermission</a> {
-            metadata_address: <a href="object.md#0x1_object_object_address">object::object_address</a>(&<a href="fungible_asset.md#0x1_fungible_asset_metadata_from_asset">metadata_from_asset</a>(fa)),
-        }
+        amount <b>as</b> u256,
+        WithdrawPermission::ByStore { store_address }
     )
 }
 </code></pre>
@@ -4412,8 +4389,8 @@ Removing permissions from permissioned signer.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_revoke_permission">revoke_permission</a>(permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, token_type: Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;) {
-    <a href="permissioned_signer.md#0x1_permissioned_signer_revoke_permission">permissioned_signer::revoke_permission</a>(permissioned, <a href="fungible_asset.md#0x1_fungible_asset_WithdrawPermission">WithdrawPermission</a> {
-        metadata_address: <a href="object.md#0x1_object_object_address">object::object_address</a>(&token_type),
+    <a href="permissioned_signer.md#0x1_permissioned_signer_revoke_permission">permissioned_signer::revoke_permission</a>(permissioned, WithdrawPermission::ByStore {
+        store_address: <a href="object.md#0x1_object_object_address">object::object_address</a>(&token_type),
     })
 }
 </code></pre>

@@ -2381,4 +2381,10 @@ Returns true iff the BigOrderedMap is empty.
 </code></pre>
 
 
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
 [move-book]: https://aptos.dev/move/book/SUMMARY

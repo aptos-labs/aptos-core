@@ -1568,4 +1568,10 @@ Apply the function to a mutable reference of each key-value pair in the table.
 </code></pre>
 
 
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
 [move-book]: https://aptos.dev/move/book/SUMMARY

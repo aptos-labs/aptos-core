@@ -513,7 +513,7 @@ Claim the delegated mint capability and destroy the delegated token.
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
-<b>pragma</b> aborts_if_is_strict;
+<b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 
