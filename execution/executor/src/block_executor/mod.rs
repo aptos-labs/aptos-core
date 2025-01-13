@@ -42,7 +42,7 @@ use aptos_types::{
 };
 use aptos_vm::VMBlockExecutor;
 use block_tree::BlockTree;
-use fail::fail_point;
+// use fail::fail_point;
 use std::sync::Arc;
 
 pub mod block_tree;
@@ -232,11 +232,13 @@ where
 
                 let execution_output = {
                     let _timer = GET_BLOCK_EXECUTION_OUTPUT_BY_EXECUTING.start_timer();
+                    /*
                     fail_point!("executor::block_executor_execute_block", |_| {
                         Err(ExecutorError::from(anyhow::anyhow!(
                             "Injected error in block_executor_execute_block"
                         )))
                     });
+                     */
 
                     DoGetExecutionOutput::by_transaction_execution(
                         &self.block_executor,
@@ -250,9 +252,11 @@ where
                 let _timer = OTHER_TIMERS.timer_with(&["state_checkpoint"]);
 
                 let state_checkpoint_output = THREAD_MANAGER.get_exe_cpu_pool().install(|| {
+                    /*
                     fail_point!("executor::block_state_checkpoint", |_| {
                         Err(anyhow::anyhow!("Injected error in block state checkpoint."))
                     });
+                     */
                     DoStateCheckpoint::run(
                         &execution_output,
                         parent_output.expect_result_state(),
@@ -331,9 +335,11 @@ where
 
         let block = self.block_tree.get_block(block_id)?;
 
+        /*
         fail_point!("executor::pre_commit_block", |_| {
             Err(anyhow::anyhow!("Injected error in pre_commit_block.").into())
         });
+         */
 
         let output = block.output.expect_complete_result();
         let num_txns = output.num_transactions_to_commit();
@@ -369,9 +375,11 @@ where
         // Confirm the block to be committed is tracked in the tree.
         self.block_tree.get_block(block_id)?;
 
+        /*
         fail_point!("executor::commit_blocks", |_| {
             Err(anyhow::anyhow!("Injected error in commit_blocks.").into())
         });
+         */
 
         let target_version = ledger_info_with_sigs.ledger_info().version();
         self.db
