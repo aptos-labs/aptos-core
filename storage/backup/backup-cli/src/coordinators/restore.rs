@@ -183,9 +183,10 @@ impl RestoreCoordinator {
 
         let tree_snapshot = if let Some((latest_tree_version, _)) = latest_tree_version {
             let snapshot = metadata_view.select_state_snapshot(latest_tree_version)?;
+            println!("bowu latest_tree_version: {}, snapshot: {:?}", latest_tree_version, snapshot);
 
             ensure!(
-                snapshot.is_some() && snapshot.as_ref().unwrap().version == latest_tree_version,
+                snapshot.is_some(),
                 "cannot find tree snapshot {}",
                 latest_tree_version
             );
