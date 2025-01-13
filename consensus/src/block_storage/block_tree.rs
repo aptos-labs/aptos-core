@@ -209,6 +209,20 @@ impl BlockTree {
             .and_then(|block_id| self.get_block(block_id))
     }
 
+    pub(super) fn ordered_round(&self) -> Option<Round> {
+        match self.get_block(&self.ordered_root_id) {
+            Some(block) => Some(block.round()),
+            None => None,
+        }
+    }
+
+    pub(super) fn commit_round(&self) -> Option<Round> {
+        match self.get_block(&self.commit_root_id) {
+            Some(block) => Some(block.round()),
+            None => None,
+        }
+    }
+
     pub(super) fn ordered_root(&self) -> Arc<PipelinedBlock> {
         self.get_block(&self.ordered_root_id)
             .expect("Root must exist")
