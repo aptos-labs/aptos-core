@@ -846,6 +846,7 @@ pub enum ExecutionStatus {
         location: AbortLocation,
         function: u16,
         code_offset: u16,
+        message: Option<String>,
     },
     MiscellaneousError(Option<StatusCode>),
 }
@@ -872,11 +873,12 @@ impl From<KeptVMStatus> for ExecutionStatus {
                 location: loc,
                 function: func,
                 code_offset: offset,
-                message: _,
+                message,
             } => ExecutionStatus::ExecutionFailure {
                 location: loc,
                 function: func,
                 code_offset: offset,
+                message,
             },
             KeptVMStatus::MiscellaneousError => ExecutionStatus::MiscellaneousError(None),
         }

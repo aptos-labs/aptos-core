@@ -1064,6 +1064,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 location,
                 function,
                 code_offset,
+                message,
             } => {
                 let func_name = match location {
                     AbortLocation::Module(module_id) => self
@@ -1071,17 +1072,25 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                         .map(|name| format!("{}::{}", abort_location_to_str(location), name))
                         .unwrap_or_else(|_| {
                             format!(
-                                "{}::<#{} function>",
+                                "{}::<#{} function>, {:?}",
                                 abort_location_to_str(location),
-                                function
+                                function,
+                                message
                             )
                         }),
                     AbortLocation::Script => "script".to_owned(),
                 };
-                format!(
-                    "Execution failed in {} at code offset {}",
-                    func_name, code_offset
-                )
+                if let Some(message) = message {
+                    format!(
+                        "Execution failed in {} at code offset {}: {}",
+                        func_name, code_offset, message
+                    )
+                } else {
+                    format!(
+                        "Execution failed in {} at code offset {}",
+                        func_name, code_offset
+                    )
+                }
             },
             ExecutionStatus::MiscellaneousError(code) => {
                 if code.is_none() {
