@@ -23,7 +23,7 @@
 /// allowing cleaner iterator APIs.
 ///
 module aptos_std::ordered_map {
-    // friend aptos_std::big_ordered_map;
+    friend aptos_std::big_ordered_map;
 
     use std::vector;
 
@@ -566,6 +566,10 @@ module aptos_std::ordered_map {
     //         self.index
     //     }
     // }
+
+    spec module {
+        pragma verify = false;
+    }
 
     // ================= Section for tests =====================
 

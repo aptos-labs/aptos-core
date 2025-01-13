@@ -44,6 +44,16 @@ pub enum LoopType {
     BcsToBytes { len: u64 },
 }
 
+#[derive(Debug, Copy, Clone)]
+pub enum MapType {
+    SimpleMap,
+    OrderedMap,
+    BigOrderedMap {
+        inner_max_degree: u16,
+        leaf_max_degree: u16,
+    },
+}
+
 //
 // List of entry points to expose
 //
@@ -175,7 +185,7 @@ pub enum EntryPoints {
     MapInsertRemove {
         len: u64,
         repeats: u64,
-        use_simple_map: bool,
+        map_type: MapType,
     },
     /// Initialize Token V1 NFT collection
     TokenV1InitializeCollection,
@@ -564,12 +574,24 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::MapInsertRemove {
                 len,
                 repeats,
-                use_simple_map,
-            } => get_payload(module_id, ident_str!("test_add_remove").to_owned(), vec![
-                bcs::to_bytes(len).unwrap(),
-                bcs::to_bytes(repeats).unwrap(),
-                bcs::to_bytes(use_simple_map).unwrap(),
-            ]),
+                map_type,
+            } => {
+                let mut args = vec![bcs::to_bytes(len).unwrap(), bcs::to_bytes(repeats).unwrap()];
+                let func = match map_type {
+                    MapType::SimpleMap => ident_str!("test_add_remove_simple_map").to_owned(),
+                    MapType::OrderedMap => ident_str!("test_add_remove_ordered_map").to_owned(),
+                    MapType::BigOrderedMap {
+                        inner_max_degree,
+                        leaf_max_degree,
+                    } => {
+                        args.push(bcs::to_bytes(inner_max_degree).unwrap());
+                        args.push(bcs::to_bytes(leaf_max_degree).unwrap());
+                        ident_str!("test_add_remove_big_ordered_map").to_owned()
+                    },
+                };
+
+                get_payload(module_id, func, args)
+            },
             EntryPoints::TokenV1InitializeCollection => get_payload_void(
                 module_id,
                 ident_str!("token_v1_initialize_collection").to_owned(),
@@ -845,8 +867,8 @@ impl EntryPointTrait for EntryPoints {
             },
             EntryPoints::VectorTrimAppend { .. }
             | EntryPoints::VectorRemoveInsert { .. }
-            | EntryPoints::VectorRangeMove { .. }
-            | EntryPoints::MapInsertRemove { .. } => AutomaticArgs::None,
+            | EntryPoints::VectorRangeMove { .. } => AutomaticArgs::None,
+            EntryPoints::MapInsertRemove { .. } => AutomaticArgs::Signer,
             EntryPoints::TokenV1InitializeCollection
             | EntryPoints::TokenV1MintAndStoreNFTParallel
             | EntryPoints::TokenV1MintAndStoreNFTSequential
