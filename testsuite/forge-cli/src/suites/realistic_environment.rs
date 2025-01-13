@@ -43,7 +43,11 @@ pub(crate) fn get_realistic_env_test(
         "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
         "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
         "realistic_env_fairness_workload_sweep" => realistic_env_fairness_workload_sweep(),
-        "realistic_env_sequential_fairness_workload_sweep" => {
+        // TODO: revert for land
+        // "realistic_env_sequential_fairness_workload_sweep" => {
+        //     realistic_env_sequential_fairness_workload_sweep()
+        // },
+        "land_blocking" | "realistic_env_max_load" => {
             realistic_env_sequential_fairness_workload_sweep()
         },
         "realistic_env_graceful_workload_sweep" => realistic_env_graceful_workload_sweep(),
