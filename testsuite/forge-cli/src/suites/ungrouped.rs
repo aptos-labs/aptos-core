@@ -403,23 +403,16 @@ fn consensus_stress_test() -> ForgeConfig {
     )
 }
 
-fn background_emit_request() -> EmitJobRequest {
+fn background_emit_request(tps: usize, gas_price: u64) -> EmitJobRequest {
     EmitJobRequest::default()
         .num_accounts_mode(NumAccountsMode::TransactionsPerAccount(1))
-        .mode(EmitJobMode::ConstTps { tps: 10 })
-        .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
-}
-
-fn background_emit_request_1k_tps_low_priority() -> EmitJobRequest {
-    EmitJobRequest::default()
-        .num_accounts_mode(NumAccountsMode::TransactionsPerAccount(1))
-        .mode(EmitJobMode::ConstTps { tps: 1000 })
-        .gas_price(aptos_global_constants::GAS_UNIT_PRICE)
+        .mode(EmitJobMode::ConstTps { tps })
+        .gas_price(gas_price)
 }
 
 pub fn background_traffic_for_sweep(num_cases: usize) -> Option<BackgroundTraffic> {
     Some(BackgroundTraffic {
-        traffic: background_emit_request(),
+        traffic: background_emit_request(10, 5 * aptos_global_constants::GAS_UNIT_PRICE),
         criteria: std::iter::repeat(9.5)
             .take(num_cases)
             .map(|min_tps| {
@@ -435,7 +428,25 @@ pub fn background_traffic_for_sweep_with_latency(
     criteria: &[(f32, f32)],
 ) -> Option<BackgroundTraffic> {
     Some(BackgroundTraffic {
-        traffic: background_emit_request(),
+        traffic: background_emit_request(10, 5 * aptos_global_constants::GAS_UNIT_PRICE),
+        criteria: criteria
+            .iter()
+            .map(|(p50, p90)| {
+                SuccessCriteria::new_float(9.5)
+                    .add_max_expired_tps(0.1)
+                    .add_max_failed_submission_tps(0.0)
+                    .add_latency_threshold(*p50, LatencyType::P50)
+                    .add_latency_threshold(*p90, LatencyType::P90)
+            })
+            .collect(),
+    })
+}
+
+pub fn background_traffic_for_sweep_with_latency_1k_tps_low_priority(
+    criteria: &[(f32, f32)],
+) -> Option<BackgroundTraffic> {
+    Some(BackgroundTraffic {
+        traffic: background_emit_request(1000, aptos_global_constants::GAS_UNIT_PRICE),
         criteria: criteria
             .iter()
             .map(|(p50, p90)| {

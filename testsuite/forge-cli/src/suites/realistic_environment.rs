@@ -4,6 +4,7 @@
 
 use super::ungrouped::{
     background_traffic_for_sweep, background_traffic_for_sweep_with_latency,
+    background_traffic_for_sweep_with_latency_1k_tps_low_priority,
     RELIABLE_REAL_ENV_PROGRESS_THRESHOLD,
 };
 use crate::{
@@ -218,7 +219,7 @@ pub(crate) fn realistic_env_sequential_fairness_workload_sweep() -> ForgeConfig 
                 .with_transactions_per_account(30),
         ]),
         criteria: Vec::new(),
-        background_traffic: background_traffic_for_sweep_with_latency(&[
+        background_traffic: background_traffic_for_sweep_with_latency_1k_tps_low_priority(&[
             (3.0, 8.0),
             (3.0, 8.0),
             (3.0, 8.0),
