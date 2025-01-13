@@ -77,7 +77,7 @@ SKIP_PERF_IMPROVEMENT_NOTICE = IS_MAINNET
 
 # bump after a bigger test or perf change, so you can easily distinguish runs
 # that are on top of this commit
-CODE_PERF_VERSION = "v9"
+CODE_PERF_VERSION = "v10"
 
 # default to using production number of execution threads for assertions
 NUMBER_OF_EXECUTION_THREADS = int(
@@ -135,6 +135,7 @@ class RunGroupKeyExtra:
     skip_commit_override: bool = field(default=False)
     single_block_dst_working_set: bool = field(default=False)
     execution_sharding: bool = field(default=False)
+    block_size_override: Optional[float] = field(default=None)
 
 
 @dataclass
@@ -269,7 +270,6 @@ TESTS = [
 ] + [ 
     # no-commit throughput of different executor, used on continuous flow
     RunGroupConfig(
-        expected_tps=40000,
         key=RunGroupKey(
             "no_commit_{}{}".format(
                 transaction_type:="apt-fa-transfer" if FA_MIGRATION_COMPLETE else "coin-transfer", 
@@ -282,6 +282,7 @@ TESTS = [
             sig_verify_num_threads_override=16,
             skip_commit_override=True,
             execution_sharding=executor_sharding,
+            block_size_override=10000,
         ), 
         included_in=Flow.CONTINUOUS, 
         waived=True,
@@ -295,7 +296,7 @@ TESTS = [
 ] + [
     # sweep of all executors for the extensive EXECUTORS flow
     RunGroupConfig(
-        expected_tps=10000 if sequential else 30000, 
+        expected_tps=10000 if sequential else 30000,
         key=RunGroupKey(
             "{}_{}_by_stages".format(
                 transaction_type:="apt-fa-transfer" if FA_MIGRATION_COMPLETE else "coin-transfer", 
@@ -713,7 +714,12 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             )
 
         # target 250ms blocks, a bit larger than prod
-        cur_block_size = max(4, int(min([criteria.expected_tps / 4, MAX_BLOCK_SIZE])))
+        if test.key_extra.block_size_override is not None:
+            cur_block_size = test.key_extra.block_size_override
+        else:
+            cur_block_size = max(
+                4, int(min([criteria.expected_tps / 4, MAX_BLOCK_SIZE]))
+            )
 
         print(f"Testing {test.key}")
         if test.key_extra.transaction_type_override == "":
