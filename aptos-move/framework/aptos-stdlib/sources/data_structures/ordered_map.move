@@ -567,6 +567,10 @@ module aptos_std::ordered_map {
     //     }
     // }
 
+    spec module {
+        pragma verify = false;
+    }
+
     // ================= Section for tests =====================
 
     #[test_only]

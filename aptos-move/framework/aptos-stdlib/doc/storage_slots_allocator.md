@@ -49,6 +49,7 @@ for example:
 -  [Function `next_slot_index`](#0x1_storage_slots_allocator_next_slot_index)
 -  [Function `add_link`](#0x1_storage_slots_allocator_add_link)
 -  [Function `remove_link`](#0x1_storage_slots_allocator_remove_link)
+-  [Specification](#@Specification_1)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
@@ -907,6 +908,15 @@ Remove storage slot, but reserve it for later.
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

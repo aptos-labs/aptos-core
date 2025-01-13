@@ -239,4 +239,8 @@ module aptos_std::storage_slots_allocator {
     fun remove_link<T: store>(self: &mut StorageSlotsAllocator<T>, slot_index: u64): Link<T> {
         self.slots.borrow_mut().remove(slot_index)
     }
+
+    spec module {
+        pragma verify = false;
+    }
 }

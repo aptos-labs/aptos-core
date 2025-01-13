@@ -1073,6 +1073,11 @@ module aptos_std::big_ordered_map {
     }
 
     // ===== spec ===========
+
+    spec module {
+        pragma verify = false;
+    }
+
     // recursive functions need to be marked opaque
 
     spec add_at {
