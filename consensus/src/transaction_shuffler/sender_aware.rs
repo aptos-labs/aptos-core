@@ -16,8 +16,8 @@ use std::collections::{HashMap, VecDeque};
 /// invariant in terms of ordering
 /// 1. Relative ordering of all transactions from the same before and after shuffling is same
 /// 2. Relative ordering of all transactions across different senders will also be maintained if they are
-/// non-conflicting. In other words, if the input block has only one transaction per sender, the output
-/// ordering will remain unchanged.
+///    non-conflicting. In other words, if the input block has only one transaction per sender, the output
+///    ordering will remain unchanged.
 ///
 /// The shuffling algorithm is O(n) and following is the pseudo code for it.
 /// loop:
@@ -29,7 +29,6 @@ use std::collections::{HashMap, VecDeque};
 ///         else we add it to the block
 ///   else
 ///       take the first transaction from the pending transactions and add it to the block
-
 pub struct SenderAwareShuffler {
     conflict_window_size: usize,
 }

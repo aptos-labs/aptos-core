@@ -601,7 +601,7 @@ impl<'a> BorrowAnalysis<'a> {
     }
 }
 
-impl<'a> TransferFunctions for BorrowAnalysis<'a> {
+impl TransferFunctions for BorrowAnalysis<'_> {
     type State = BorrowInfo;
 
     const BACKWARD: bool = false;
@@ -765,7 +765,7 @@ impl<'a> TransferFunctions for BorrowAnalysis<'a> {
     }
 }
 
-impl<'a> DataflowAnalysis for BorrowAnalysis<'a> {}
+impl DataflowAnalysis for BorrowAnalysis<'_> {}
 
 // =================================================================================================
 // Formatting

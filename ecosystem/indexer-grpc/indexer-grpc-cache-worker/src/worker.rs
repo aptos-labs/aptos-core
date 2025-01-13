@@ -104,6 +104,7 @@ impl Worker {
     ///    * If metadata is not present and cache is not empty, crash.
     ///    * If metadata is present, start from file store version.
     /// 4. Process the streaming response.
+    ///
     /// TODO: Use the ! return type when it is stable.
     /// TODO: Rewrite logic to actually conform to this description
     pub async fn run(&mut self) -> Result<()> {

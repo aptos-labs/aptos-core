@@ -70,7 +70,7 @@ use std::{
 };
 use tempfile::NamedTempFile;
 
-/**
+/*
  * Definitions
  */
 
@@ -204,7 +204,7 @@ enum AptosSubCommand {
     ViewTableCommand(ViewTableCommand),
 }
 
-/**
+/*
  * Parsing
  */
 
@@ -270,7 +270,7 @@ impl aptos_storage_interface::DbReader for FakeDbReader {
     }
 }
 
-/**
+/*
  * Helpers
  */
 
@@ -355,11 +355,11 @@ static PRECOMPILED_APTOS_FRAMEWORK_V2: Lazy<PrecompiledFilesModules> = Lazy::new
     PrecompiledFilesModules::new(APTOS_FRAMEWORK_FILES.clone(), modules)
 });
 
-/**
+/*
  * Test Adapter Implementation
  */
 
-impl<'a> AptosTestAdapter<'a> {
+impl AptosTestAdapter<'_> {
     /// Look up the named private key in the mapping.
     fn resolve_named_private_key(&self, s: &IdentStr) -> Ed25519PrivateKey {
         if let Some(private_key) = self.private_key_mapping.get(s.as_str()) {
@@ -1048,13 +1048,13 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
     }
 }
 
-/**
+/*
  * Misc
  */
 
 struct PrettyEvent<'a>(&'a ContractEvent);
 
-impl<'a> fmt::Display for PrettyEvent<'a> {
+impl fmt::Display for PrettyEvent<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "{{")?;
         match self.0 {
@@ -1072,7 +1072,7 @@ impl<'a> fmt::Display for PrettyEvent<'a> {
 
 struct PrettyEvents<'a>(&'a [ContractEvent]);
 
-impl<'a> fmt::Display for PrettyEvents<'a> {
+impl fmt::Display for PrettyEvents<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Events:")?;
         for event in self.0.iter() {

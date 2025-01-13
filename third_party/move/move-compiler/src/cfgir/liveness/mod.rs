@@ -167,7 +167,6 @@ fn exp_list_item(state: &mut LivenessState, item: &ExpListItem) {
 ///   It will error if the `copy` was specified by the user
 /// - Reports an error if an assignment/let was not used
 ///   Switches it to an `Ignore` if it has the drop ability (helps with error messages for borrows)
-
 pub fn last_usage(
     compilation_env: &mut CompilationEnv,
     locals: &UniqueMap<Var, SingleType>,
@@ -407,7 +406,6 @@ mod last_usage {
 /// predecessors.
 /// Then `release_dead_refs_block` adds a release at the beginning of the block if the reference
 /// satisfies (1) and (2)
-
 pub fn release_dead_refs(
     locals_pre_states: &BTreeMap<Label, locals::state::LocalStates>,
     locals: &UniqueMap<Var, SingleType>,

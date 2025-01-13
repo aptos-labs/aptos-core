@@ -29,6 +29,7 @@ pub struct SpecAnchor {
 /// Compilation context for a single compilation unit (module or script).
 /// Contains all of the dependencies actually used in the module
 pub struct Context<'a> {
+    #[allow(dead_code)]
     pub env: &'a mut CompilationEnv,
     current_module: Option<&'a ModuleIdent>,
     seen_structs: BTreeSet<(ModuleIdent, StructName)>,

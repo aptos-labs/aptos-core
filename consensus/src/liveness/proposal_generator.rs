@@ -230,6 +230,7 @@ impl PipelineBackpressureConfig {
 /// round.
 /// ProposalGenerator is the one choosing the branch to extend:
 /// - round is given by the caller (typically determined by RoundState).
+///
 /// The transactions for the proposed block are delivered by PayloadClient.
 ///
 /// PayloadClient should be aware of the pending transactions in the branch that it is extending,
@@ -341,10 +342,10 @@ impl ProposalGenerator {
     /// Errors returned by the PayloadClient implementation are propagated to the caller.
     /// The logic for choosing the branch to extend is as follows:
     /// 1. The function gets the highest head of a one-chain from block tree.
-    /// The new proposal must extend hqc to ensure optimistic responsiveness.
+    ///    The new proposal must extend hqc to ensure optimistic responsiveness.
     /// 2. The round is provided by the caller.
     /// 3. In case a given round is not greater than the calculated parent, return an OldRound
-    /// error.
+    ///    error.
     pub async fn generate_proposal(
         &self,
         round: Round,

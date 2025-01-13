@@ -181,6 +181,7 @@ impl SplitCriticalEdgesTransformation {
     /// - a new empty block that
     ///     - starts with the fresh label
     ///     - jumps to `label`
+    ///
     /// otherwise returns `None`
     fn split_critical_edge(
         &mut self,

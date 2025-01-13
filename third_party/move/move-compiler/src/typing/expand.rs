@@ -224,11 +224,11 @@ pub fn exp(context: &mut Context, e: &mut T::Exp) {
                 _ => panic!("ICE inferred num failed {:?}", &e.ty.value),
             };
             let v = *v;
-            let u8_max = U256::from(std::u8::MAX);
-            let u16_max = U256::from(std::u16::MAX);
-            let u32_max = U256::from(std::u32::MAX);
-            let u64_max = U256::from(std::u64::MAX);
-            let u128_max = U256::from(std::u128::MAX);
+            let u8_max = U256::from(u8::MAX);
+            let u16_max = U256::from(u16::MAX);
+            let u32_max = U256::from(u32::MAX);
+            let u64_max = U256::from(u64::MAX);
+            let u128_max = U256::from(u128::MAX);
             let u256_max = U256::max_value();
             let max = match bt {
                 BT::U8 => u8_max,

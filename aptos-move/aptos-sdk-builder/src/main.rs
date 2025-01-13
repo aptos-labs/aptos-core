@@ -40,7 +40,7 @@ struct Options {
     /// * Rust crates may contain a version number, e.g. "test:1.2.0".
     /// * In Java, this is expected to be a package name, e.g. "com.test" to create Java files in `com/test`.
     /// * In Go, this is expected to be of the format "go_module/path/go_package_name",
-    /// and `aptos_types` is assumed to be in "go_module/path/aptos_types".
+    ///   and `aptos_types` is assumed to be in "go_module/path/aptos_types".
     #[clap(long)]
     module_name: Option<String>,
 

@@ -67,7 +67,7 @@ pub struct RuntimeEnvironment {
     ///     The design of V2 loader ensures that when modules are published, i.e., staged on top of
     ///     the existing module storage, the runtime environment is cloned. Hence, it is not even
     ///     possible to mutate this global cache speculatively.
-    ///  Importantly, this SHOULD NOT be mutated by speculative module publish.
+    ///     Importantly, this SHOULD NOT be mutated by speculative module publish.
     // TODO(loader_v2):
     //   Provide a generic (trait) implementation for clients to implement their own type caching
     //   logic.

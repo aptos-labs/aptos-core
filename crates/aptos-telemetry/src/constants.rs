@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-/// A collection of constants and default values for configuring telemetry components
+//! A collection of constants and default values for configuring telemetry components
 
 // Environment variables
 pub(crate) const ENV_APTOS_DISABLE_TELEMETRY: &str = "APTOS_DISABLE_TELEMETRY";

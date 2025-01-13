@@ -483,7 +483,7 @@ fn dump_and_compile_from_package_metadata(
             File::create(module_path.clone()).expect("Error encountered while creating file!");
         };
         let source_str = unzip_metadata_str(&module.source).unwrap();
-        std::fs::write(&module_path.clone(), source_str).unwrap();
+        std::fs::write(module_path.clone(), source_str).unwrap();
     }
 
     // step 2: unzip, parse the manifest file

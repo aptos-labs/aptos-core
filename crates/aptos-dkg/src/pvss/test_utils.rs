@@ -37,6 +37,7 @@ pub struct DealingArgs<T: Transcript> {
 ///  - a vector of `n` encryption PKs
 ///  - a vector of `n` input secrets, denoted by `iss`
 ///  - the aggregated dealt secret key from `\sum_i iss[i]`
+///
 /// Useful in tests and benchmarks when wanting to quickly deal & verify a transcript.
 pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng>(
     sc: &T::SecretSharingConfig,

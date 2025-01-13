@@ -418,7 +418,7 @@ impl<T: ModuleStorage> AsFunctionValueExtension for T {
     }
 }
 
-impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
+impl FunctionValueExtension for FunctionValueExtensionAdapter<'_> {
     fn get_function_arg_tys(
         &self,
         module_id: &ModuleId,

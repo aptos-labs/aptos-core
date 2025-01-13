@@ -111,12 +111,12 @@ impl BlockInfo {
     /// blockchain state after executing the initial genesis transaction.
     ///
     /// * `genesis_state_root_hash` - the state tree root hash after executing the
-    /// initial genesis transaction.
+    ///   initial genesis transaction.
     ///
     /// * `validator_set` - the initial validator set, configured when generating
-    /// the genesis transaction itself and emitted after executing the genesis
-    /// transaction. Using this genesis block means transitioning to a new epoch
-    /// (GENESIS_EPOCH + 1) with this `validator_set`.
+    ///   the genesis transaction itself and emitted after executing the genesis
+    ///   transaction. Using this genesis block means transitioning to a new epoch
+    ///   (GENESIS_EPOCH + 1) with this `validator_set`.
     pub fn genesis(genesis_state_root_hash: HashValue, validator_set: ValidatorSet) -> Self {
         let verifier: ValidatorVerifier = (&validator_set).into();
         Self {

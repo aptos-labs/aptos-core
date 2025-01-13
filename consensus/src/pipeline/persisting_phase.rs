@@ -19,7 +19,6 @@ use std::{
 /// PersistingPhase is a singleton that receives aggregated blocks from
 /// the buffer manager and persists them. Upon success, it returns
 /// a response.
-
 pub struct PersistingRequest {
     pub blocks: Vec<Arc<PipelinedBlock>>,
     pub commit_ledger_info: LedgerInfoWithSignatures,

@@ -470,7 +470,7 @@ impl<Loc: Copy, Lbl: Clone + Ord> BorrowGraph<Loc, Lbl> {
         borrowed_by
             .0
             .values()
-            .any(|edges| edges.iter().any(|edge| edge.path.first().is_none()))
+            .any(|edges| edges.iter().any(|edge| edge.path.is_empty()))
     }
 
     /// Checks if `id` is borrowed

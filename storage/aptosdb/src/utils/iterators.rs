@@ -172,7 +172,7 @@ impl<'a> PrefixedStateValueIterator<'a> {
     }
 }
 
-impl<'a> Iterator for PrefixedStateValueIterator<'a> {
+impl Iterator for PrefixedStateValueIterator<'_> {
     type Item = Result<(StateKey, StateValue)>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -226,7 +226,7 @@ impl<'a> EpochEndingLedgerInfoIter<'a> {
     }
 }
 
-impl<'a> Iterator for EpochEndingLedgerInfoIter<'a> {
+impl Iterator for EpochEndingLedgerInfoIter<'_> {
     type Item = Result<LedgerInfoWithSignatures>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -278,7 +278,7 @@ impl<'a> EventsByVersionIter<'a> {
     }
 }
 
-impl<'a> Iterator for EventsByVersionIter<'a> {
+impl Iterator for EventsByVersionIter<'_> {
     type Item = Result<Vec<ContractEvent>>;
 
     fn next(&mut self) -> Option<Self::Item> {

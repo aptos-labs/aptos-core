@@ -147,7 +147,7 @@ impl<'a> AbstractValueSizeVisitor<'a> {
     }
 }
 
-impl<'a> ValueVisitor for AbstractValueSizeVisitor<'a> {
+impl ValueVisitor for AbstractValueSizeVisitor<'_> {
     #[inline]
     fn visit_delayed(&mut self, _depth: usize, _id: DelayedFieldID) {
         // TODO[agg_v2](cleanup): add a new abstract value size parameter?
@@ -313,7 +313,7 @@ impl AbstractValueSizeGasParameters {
             res: Option<AbstractValueSize>,
         }
 
-        impl<'a> ValueVisitor for Visitor<'a> {
+        impl ValueVisitor for Visitor<'_> {
             #[inline]
             fn visit_delayed(&mut self, _depth: usize, _val: DelayedFieldID) {
                 // TODO[agg_v2](cleanup): add a new abstract value size parameter?
@@ -456,7 +456,7 @@ impl AbstractValueSizeGasParameters {
             res: Option<AbstractValueSize>,
         }
 
-        impl<'a> ValueVisitor for Visitor<'a> {
+        impl ValueVisitor for Visitor<'_> {
             #[inline]
             fn visit_delayed(&mut self, _depth: usize, _val: DelayedFieldID) {
                 // TODO[agg_v2](cleanup): add a new abstract value size parameter?

@@ -458,7 +458,7 @@ impl NetworkStream {
 
     /// Blocking write until able to successfully send an entire message
     pub fn write(&mut self, data: &[u8]) -> Result<(), Error> {
-        let u32_max = u32::max_value() as usize;
+        let u32_max = u32::MAX as usize;
         if u32_max <= data.len() {
             return Err(Error::DataTooLarge(data.len()));
         }

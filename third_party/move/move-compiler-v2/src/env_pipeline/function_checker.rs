@@ -304,6 +304,7 @@ fn check_privileged_operations_on_structs(env: &GlobalEnv, fun_env: &FunctionEnv
 /// If `before_inlining`, then
 /// - check that all function calls involving inline functions are accessible;
 /// - warn about unused private functions
+///
 /// Otherwise  (`!before_inlining`):
 /// - check that all function calls *not* involving inline functions are accessible.
 /// - check privileged operations on structs cannot be done across module boundary

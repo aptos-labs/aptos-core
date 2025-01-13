@@ -12,7 +12,7 @@ use bytes::Bytes;
 use proptest::{arbitrary::Arbitrary, prelude::*};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename = "StateValueMetadata")]
 pub enum PersistedStateValueMetadata {
     V0 {

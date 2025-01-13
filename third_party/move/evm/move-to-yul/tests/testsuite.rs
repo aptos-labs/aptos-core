@@ -151,7 +151,7 @@ fn execute_test(_env: &GlobalEnv, source: &str) -> anyhow::Result<String> {
         block_coinbase: H160::zero(),
         block_timestamp: 0.into(),
         block_difficulty: 0.into(),
-        block_gas_limit: U256::MAX,
+        block_gas_limit: U256::max_value(),
         block_base_fee_per_gas: 0.into(),
     };
     let mut exec = Executor::new(&vicinity);

@@ -34,7 +34,7 @@ struct BinaryComplexityMeter<'a> {
     balance: RefCell<u64>,
 }
 
-impl<'a> BinaryComplexityMeter<'a> {
+impl BinaryComplexityMeter<'_> {
     fn charge(&self, amount: u64) -> PartialVMResult<()> {
         let mut balance = self.balance.borrow_mut();
         match balance.checked_sub(amount) {

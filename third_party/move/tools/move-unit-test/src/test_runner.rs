@@ -212,7 +212,7 @@ struct TestOutput<'a, 'b, W> {
     writer: &'b Mutex<W>,
 }
 
-impl<'a, 'b, W: Write> TestOutput<'a, 'b, W> {
+impl<W: Write> TestOutput<'_, '_, W> {
     fn pass(&self, fn_name: &str) {
         writeln!(
             self.writer.lock().unwrap(),
@@ -481,7 +481,7 @@ impl SharedTestingConfig {
             block_coinbase: H160::zero(),
             block_timestamp: 0.into(),
             block_difficulty: 0.into(),
-            block_gas_limit: U256::MAX,
+            block_gas_limit: U256::max_value(),
             block_base_fee_per_gas: 0.into(),
         };
 

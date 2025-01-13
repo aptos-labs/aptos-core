@@ -37,3 +37,7 @@ pathdiff = "0.2.1"
 [[test]]
 name = "move_check_testsuite"
 harness = false
+
+[features]
+default = []
+evm-backend = []
