@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::loader::Resolver;
-use crate::LoadedFunction;
+use crate::{loader::Resolver, LoadedFunction};
 use move_binary_format::{
     errors::*,
     file_format::{
@@ -13,10 +12,9 @@ use move_binary_format::{
 };
 use move_core_types::gas_algebra::NumTypeNodes;
 use move_vm_types::loaded_data::runtime_types::Type;
-use std::cell::RefCell;
-use std::collections::BTreeMap;
-use std::rc::Rc;
+use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 
+#[allow(dead_code)]
 pub(crate) trait RuntimeCacheTraits {
     fn per_instruction_cache_enabled() -> bool;
     fn call_tree_cache_enabled() -> bool;
@@ -30,9 +28,11 @@ impl RuntimeCacheTraits for NoRuntimeCaches {
     fn per_instruction_cache_enabled() -> bool {
         false
     }
+
     fn call_tree_cache_enabled() -> bool {
         false
     }
+
     fn global_instantiated_functions_cache_enabled() -> bool {
         false
     }
@@ -42,15 +42,18 @@ impl RuntimeCacheTraits for AllRuntimeCaches {
     fn per_instruction_cache_enabled() -> bool {
         true
     }
+
     fn call_tree_cache_enabled() -> bool {
         true
     }
+
     fn global_instantiated_functions_cache_enabled() -> bool {
         true
     }
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub(crate) enum PerInstructionCache {
     Nothing,
     PackGeneric,

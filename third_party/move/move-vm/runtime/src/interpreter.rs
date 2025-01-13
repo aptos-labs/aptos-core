@@ -1519,11 +1519,6 @@ impl CallStack {
         self.0.pop()
     }
 
-    /// Retunrs a reference to the top `Frame`
-    fn top(&mut self) -> Option<&mut Frame> {
-        self.0.last_mut()
-    }
-
     fn current_location(&self) -> Location {
         let location_opt = self.0.last().map(|frame| frame.location());
         location_opt.unwrap_or(Location::Undefined)
