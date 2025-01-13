@@ -50,6 +50,7 @@ impl AccountsApi {
         operation_id = "get_account",
         tag = "ApiTags::Accounts"
     )]
+    // Question: How should this API respond when the account is stateless and there is no 0x1::Account resource?
     async fn get_account(
         &self,
         accept_type: AcceptType,

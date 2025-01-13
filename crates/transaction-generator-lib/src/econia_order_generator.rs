@@ -826,7 +826,7 @@ impl UserModuleTransactionGenerator for EconiaDepositCoinsTransactionGenerator {
                       txn_factory,
                       _rng,
                       _txn_counter,
-                      _prev_orders,
+                      _prev_orders: &[String],
                       _market_maker| {
                     let market_id = account.address().into_bytes()[0] as u64 % *num_markets + 1;
                     let builder = txn_factory.payload(deposit_coins(

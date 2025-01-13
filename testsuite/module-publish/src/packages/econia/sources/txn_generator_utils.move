@@ -364,8 +364,8 @@ module econia::txn_generator_utils {
     }
 
     public entry fun deposit_coins<BaseCoinType, QuoteCoinType>(user: &signer, publisher: &signer, market_id: u64) {
-        user::deposit_coins<QuoteCoinType>(signer::address_of(user), market_id, NO_CUSTODIAN, assets::mint<QuoteCoinType>(publisher, 10000000000));
-        user::deposit_coins<BaseCoinType>(signer::address_of(user), market_id, NO_CUSTODIAN, assets::mint<BaseCoinType>(publisher, 10000000000));
+        user::deposit_coins<QuoteCoinType>(signer::address_of(user), market_id, NO_CUSTODIAN, assets::mint<QuoteCoinType>(publisher, 100000000000));
+        user::deposit_coins<BaseCoinType>(signer::address_of(user), market_id, NO_CUSTODIAN, assets::mint<BaseCoinType>(publisher, 100000000000));
     }
 
     public entry fun place_bid_limit_order<BaseCoinType, QuoteCoinType>(user: &signer, size: u64, price: u64, market_id: u64) {

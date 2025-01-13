@@ -83,7 +83,7 @@ impl Default for ExecutionConfig {
             paranoid_type_verification: true,
             paranoid_hot_potato_verification: true,
             discard_failed_blocks: false,
-            processed_transactions_detailed_counters: false,
+            processed_transactions_detailed_counters: true,
             transaction_filter: Filter::empty(),
             genesis_waypoint: None,
         }
