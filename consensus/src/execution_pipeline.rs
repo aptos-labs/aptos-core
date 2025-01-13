@@ -252,6 +252,7 @@ impl ExecutionPipeline {
 
             counters::EXECUTE_BLOCK_WAIT_TIME.observe_duration(command_creation_time.elapsed());
             let block_id = block.block_id;
+            let round = pipelined_block.round();
             info!("execute_stage received block {}.", block_id);
 
             let mut committed_transactions = HashSet::new();
@@ -386,7 +387,10 @@ impl ExecutionPipeline {
                     })
                 });
                 let start = Instant::now();
-                info!("execute_and_state_checkpoint start. {}", block_id);
+                info!(
+                    "execute_and_state_checkpoint start. {}, {}",
+                    round, block_id
+                );
                 executor
                     .execute_and_state_checkpoint(
                         block,
@@ -394,7 +398,12 @@ impl ExecutionPipeline {
                         block_executor_onchain_config,
                     )
                     .map(|output| {
-                        info!("execute_and_state_checkpoint end. {}", block_id);
+                        info!(
+                            "execute_and_state_checkpoint end. elapsed = {}ms, {}, {}",
+                            start.elapsed().as_millis(),
+                            round,
+                            block_id
+                        );
                         (output, start.elapsed())
                     })
             });

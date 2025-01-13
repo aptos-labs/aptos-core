@@ -406,8 +406,8 @@ fn consensus_stress_test() -> ForgeConfig {
 fn background_emit_request() -> EmitJobRequest {
     EmitJobRequest::default()
         .num_accounts_mode(NumAccountsMode::TransactionsPerAccount(1))
-        .mode(EmitJobMode::ConstTps { tps: 10 })
-        .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+        .mode(EmitJobMode::ConstTps { tps: 1000 })
+        .gas_price(aptos_global_constants::GAS_UNIT_PRICE)
 }
 
 pub fn background_traffic_for_sweep(num_cases: usize) -> Option<BackgroundTraffic> {
