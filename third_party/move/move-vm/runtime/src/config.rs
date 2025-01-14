@@ -46,7 +46,7 @@ impl Default for VMConfig {
             disallow_dispatch_for_native: true,
             use_compatibility_checker_v2: true,
             use_loader_v2: true,
-            use_call_tree_and_instruction_cache: false,
+            use_call_tree_and_instruction_cache: true,
         }
     }
 }

@@ -52,6 +52,9 @@ impl RuntimeCacheTraits for AllRuntimeCaches {
     }
 }
 
+/// Variants for each individual instruction cache. Should make sure
+/// that the memory footprint of each variant is small. This is an
+/// enum that is expected to grow in the future.
 #[derive(Clone)]
 #[allow(dead_code)]
 pub(crate) enum PerInstructionCache {
@@ -78,10 +81,18 @@ pub(crate) struct FrameTypeCache {
     variant_field_instantiation:
         BTreeMap<VariantFieldInstantiationIndex, ((Type, NumTypeNodes), (Type, NumTypeNodes))>,
     single_sig_token_type: BTreeMap<SignatureIndex, (Type, NumTypeNodes)>,
+    /// Recursive frame cache for a function that is called from the
+    /// current frame. It is indexed by FunctionInstantiationindex or
+    /// FunctionHandleIndex for non-generic functions. Note that
+    /// whenever a function with the same `index` is called, the
+    /// structures stored in that function's frame cache do not change.
     pub(crate) generic_sub_frame_cache:
         BTreeMap<FunctionInstantiationIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
     pub(crate) sub_frame_cache:
         BTreeMap<FunctionHandleIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
+    /// Stores a variant for each individual instruction in the
+    /// function's bytecode. We keep the size of the variant to be
+    /// small.
     pub(crate) per_instruction_cache: Vec<PerInstructionCache>,
 }
 
