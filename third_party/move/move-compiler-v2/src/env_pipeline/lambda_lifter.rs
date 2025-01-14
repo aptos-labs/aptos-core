@@ -42,7 +42,8 @@
 //! ```
 
 use itertools::Itertools;
-use move_binary_format::file_format::{AbilitySet, Visibility};
+use move_binary_format::file_format::Visibility;
+use move_core_types::ability::AbilitySet;
 use move_model::{
     ast::{self, Exp, ExpData, LambdaCaptureKind, Operation, Pattern, TempIndex},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},

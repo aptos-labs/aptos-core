@@ -8,14 +8,16 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        AbilitySet, Bytecode, CodeOffset, CompiledModule, CompiledScript, FunctionDefinitionIndex,
+        Bytecode, CodeOffset, CompiledModule, CompiledScript, FunctionDefinitionIndex,
         FunctionHandleIndex, ModuleHandleIndex, SignatureToken, StructHandleIndex,
         StructTypeParameter, TableIndex, Visibility,
     },
     file_format_common::VERSION_5,
     safe_unwrap, IndexKind,
 };
-use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
+use move_core_types::{
+    ability::AbilitySet, identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode,
+};
 use std::collections::{BTreeMap, BTreeSet};
 
 struct Context<'a, 'b> {

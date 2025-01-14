@@ -18,7 +18,8 @@
 use crate::{file_format::*, file_format_common::*};
 use anyhow::{anyhow, bail, Result};
 use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, metadata::Metadata,
+    ability::AbilitySet, account_address::AccountAddress, function::ClosureMask,
+    identifier::Identifier, metadata::Metadata,
 };
 
 impl CompiledScript {
@@ -161,7 +162,7 @@ fn serialize_struct_def_inst_index(
 }
 
 fn serialize_closure_mask(binary: &mut BinaryData, mask: &ClosureMask) -> Result<()> {
-    write_as_uleb128(binary, mask.mask, u64::MAX)
+    write_as_uleb128(binary, mask.bits(), u64::MAX)
 }
 
 fn seiralize_table_offset(binary: &mut BinaryData, offset: u32) -> Result<()> {

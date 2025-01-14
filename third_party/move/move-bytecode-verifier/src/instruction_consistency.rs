@@ -11,12 +11,12 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        Bytecode, ClosureMask, CodeOffset, CodeUnit, CompiledModule, CompiledScript,
-        FieldHandleIndex, FunctionDefinitionIndex, FunctionHandleIndex, StructDefinitionIndex,
+        Bytecode, CodeOffset, CodeUnit, CompiledModule, CompiledScript, FieldHandleIndex,
+        FunctionDefinitionIndex, FunctionHandleIndex, StructDefinitionIndex,
         StructVariantHandleIndex, TableIndex, VariantFieldHandleIndex,
     },
 };
-use move_core_types::vm_status::StatusCode;
+use move_core_types::{function::ClosureMask, vm_status::StatusCode};
 
 pub struct InstructionConsistency<'a> {
     resolver: BinaryIndexedView<'a>,

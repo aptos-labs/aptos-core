@@ -4,7 +4,7 @@
 use crate::VerifierConfig;
 use move_binary_format::{
     file_format::{
-        empty_module, AbilitySet, AddressIdentifierIndex,
+        empty_module, AddressIdentifierIndex,
         Bytecode::{self, *},
         CodeUnit, Constant, FieldDefinition, FunctionDefinition, FunctionHandle,
         FunctionHandleIndex, IdentifierIndex, ModuleHandle, ModuleHandleIndex, Signature,
@@ -17,7 +17,8 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
-    account_address::AccountAddress, ident_str, identifier::Identifier, vm_status::StatusCode,
+    ability::AbilitySet, account_address::AccountAddress, ident_str, identifier::Identifier,
+    vm_status::StatusCode,
 };
 
 #[test]

@@ -8,7 +8,7 @@ use crate::absint::{AbstractDomain, JoinResult};
 use move_binary_format::{
     binary_views::{BinaryIndexedView, FunctionView},
     errors::{PartialVMError, PartialVMResult},
-    file_format::{AbilitySet, CodeOffset, FunctionDefinitionIndex, LocalIndex},
+    file_format::{CodeOffset, FunctionDefinitionIndex, LocalIndex},
 };
 use move_core_types::vm_status::StatusCode;
 
@@ -24,6 +24,7 @@ pub(crate) enum LocalState {
     Available,
 }
 use crate::meter::{Meter, Scope};
+use move_core_types::ability::AbilitySet;
 use LocalState::*;
 
 pub(crate) const STEP_BASE_COST: u128 = 15;

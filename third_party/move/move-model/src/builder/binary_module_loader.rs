@@ -18,7 +18,7 @@ use crate::{
 use itertools::Itertools;
 use move_binary_format::{
     file_format::{
-        AbilitySet, FunctionDefinitionIndex, FunctionHandleIndex, MemberCount, SignatureToken,
+        FunctionDefinitionIndex, FunctionHandleIndex, MemberCount, SignatureToken,
         StructDefinitionIndex, StructHandleIndex, TableIndex, VariantIndex, Visibility,
     },
     internals::ModuleIndex,
@@ -29,7 +29,7 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_bytecode_source_map::source_map::{SourceMap, SourceName};
-use move_core_types::{account_address::AccountAddress, language_storage};
+use move_core_types::{ability::AbilitySet, account_address::AccountAddress, language_storage};
 use std::collections::BTreeMap;
 
 impl GlobalEnv {

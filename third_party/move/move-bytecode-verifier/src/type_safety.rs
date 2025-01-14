@@ -11,15 +11,18 @@ use move_binary_format::{
     control_flow_graph::ControlFlowGraph,
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        Ability, AbilitySet, Bytecode, ClosureMask, CodeOffset, FunctionDefinitionIndex,
-        FunctionHandle, FunctionHandleIndex, LocalIndex, Signature, SignatureToken,
-        SignatureToken as ST, StructDefinition, StructDefinitionIndex, StructFieldInformation,
-        StructHandleIndex, VariantIndex, Visibility,
+        Bytecode, CodeOffset, FunctionDefinitionIndex, FunctionHandle, FunctionHandleIndex,
+        LocalIndex, Signature, SignatureToken, SignatureToken as ST, StructDefinition,
+        StructDefinitionIndex, StructFieldInformation, StructHandleIndex, VariantIndex, Visibility,
     },
     safe_assert, safe_unwrap,
     views::FieldOrVariantIndex,
 };
-use move_core_types::vm_status::StatusCode;
+use move_core_types::{
+    ability::{Ability, AbilitySet},
+    function::ClosureMask,
+    vm_status::StatusCode,
+};
 
 struct Locals<'a> {
     param_count: usize,
@@ -360,7 +363,7 @@ fn clos_pack(
     let param_sgn = verifier.resolver.signature_at(func_handle.parameters);
     let captured_param_tys = mask.extract(&param_sgn.0, true);
     let mut abilities = AbilitySet::ALL;
-    for ty in captured_param_tys.iter().rev() {
+    for ty in captured_param_tys.into_iter().rev() {
         abilities = abilities.intersect(verifier.abilities(ty)?);
         let arg = safe_unwrap!(verifier.stack.pop());
         if (type_actuals.is_empty() && &arg != ty)
@@ -407,7 +410,11 @@ fn clos_pack(
     verifier.push(
         meter,
         instantiate(
-            &SignatureToken::Function(not_captured_param_tys, ret_sign.0.to_vec(), abilities),
+            &SignatureToken::Function(
+                not_captured_param_tys.into_iter().cloned().collect(),
+                ret_sign.0.to_vec(),
+                abilities,
+            ),
             type_actuals,
         ),
     )
