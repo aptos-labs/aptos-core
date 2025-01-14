@@ -11,7 +11,7 @@ This module provides a solution for unsorted maps, that is it has the properties
 5) Adds and removals take O(N) time
 
 DEPRECATED: since it's implementation is inneficient, it
-has been deprecated in favor of <code><a href="ordered_map.md#0x1_ordered_map">ordered_map</a>.<b>move</b></code>.
+has been deprecated in favor of <code>ordered_map.<b>move</b></code>.
 
 
 -  [Struct `SimpleMap`](#0x1_simple_map_SimpleMap)
@@ -66,7 +66,7 @@ has been deprecated in favor of <code><a href="ordered_map.md#0x1_ordered_map">o
 ## Struct `SimpleMap`
 
 DEPRECATED: since it's implementation is inneficient, it
-has been deprecated in favor of <code><a href="ordered_map.md#0x1_ordered_map">ordered_map</a>.<b>move</b></code>.
+has been deprecated in favor of <code>ordered_map.<b>move</b></code>.
 
 
 <pre><code><b>struct</b> <a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;Key, Value&gt; <b>has</b> <b>copy</b>, drop, store

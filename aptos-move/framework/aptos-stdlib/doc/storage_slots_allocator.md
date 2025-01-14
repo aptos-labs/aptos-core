@@ -33,7 +33,7 @@ for example:
 -  [Function `new_config`](#0x1_storage_slots_allocator_new_config)
 -  [Function `add`](#0x1_storage_slots_allocator_add)
 -  [Function `remove`](#0x1_storage_slots_allocator_remove)
--  [Function `destroy_known_empty_unsafe`](#0x1_storage_slots_allocator_destroy_known_empty_unsafe)
+-  [Function `destroy_empty`](#0x1_storage_slots_allocator_destroy_empty)
 -  [Function `borrow`](#0x1_storage_slots_allocator_borrow)
 -  [Function `borrow_mut`](#0x1_storage_slots_allocator_borrow_mut)
 -  [Function `reserve_slot`](#0x1_storage_slots_allocator_reserve_slot)
@@ -53,7 +53,7 @@ for example:
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
-<b>use</b> <a href="table.md#0x1_table">0x1::table</a>;
+<b>use</b> <a href="table_with_length.md#0x1_table_with_length">0x1::table_with_length</a>;
 </code></pre>
 
 
@@ -190,7 +190,7 @@ Data stored in an individual slot
 
 <dl>
 <dt>
-<code>slots: <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="table.md#0x1_table_Table">table::Table</a>&lt;u64, <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_Link">storage_slots_allocator::Link</a>&lt;T&gt;&gt;&gt;</code>
+<code>slots: <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;u64, <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_Link">storage_slots_allocator::Link</a>&lt;T&gt;&gt;&gt;</code>
 </dt>
 <dd>
 
@@ -472,15 +472,13 @@ and there is unique owner for each slot.
 
 </details>
 
-<a id="0x1_storage_slots_allocator_destroy_known_empty_unsafe"></a>
+<a id="0x1_storage_slots_allocator_destroy_empty"></a>
 
-## Function `destroy_known_empty_unsafe`
-
-We cannot know if allocator is empty or not, so this method is not public,
-and can be used only in modules that know by themselves that allocator is empty.
+## Function `destroy_empty`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_destroy_known_empty_unsafe">destroy_known_empty_unsafe</a>&lt;T: store&gt;(self: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;)
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_destroy_empty">destroy_empty</a>&lt;T: store&gt;(self: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;)
 </code></pre>
 
 
@@ -489,7 +487,7 @@ and can be used only in modules that know by themselves that allocator is empty.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_destroy_known_empty_unsafe">destroy_known_empty_unsafe</a>&lt;T: store&gt;(self: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt;) {
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_destroy_empty">destroy_empty</a>&lt;T: store&gt;(self: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">StorageSlotsAllocator</a>&lt;T&gt;) {
     <b>loop</b> {
         <b>let</b> reuse_index = self.<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_maybe_pop_from_reuse_queue">maybe_pop_from_reuse_queue</a>();
         <b>if</b> (reuse_index == <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_NULL_INDEX">NULL_INDEX</a>) {
@@ -506,7 +504,7 @@ and can be used only in modules that know by themselves that allocator is empty.
         } =&gt; {
             <b>assert</b>!(reuse_head_index == <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_NULL_INDEX">NULL_INDEX</a>, <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>);
             <b>if</b> (slots.is_some()) {
-                slots.destroy_some().<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_destroy_known_empty_unsafe">destroy_known_empty_unsafe</a>();
+                slots.destroy_some().<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_destroy_empty">destroy_empty</a>();
             } <b>else</b> {
                 slots.destroy_none();
             }
@@ -851,7 +849,7 @@ Remove storage slot, but reserve it for later.
     <b>let</b> slot_index = self.new_slot_index;
     self.new_slot_index = self.new_slot_index + 1;
     <b>if</b> (self.slots.is_none()) {
-        self.slots.fill(<a href="table.md#0x1_table_new">table::new</a>&lt;u64, <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_Link">Link</a>&lt;T&gt;&gt;());
+        self.slots.fill(<a href="table_with_length.md#0x1_table_with_length_new">table_with_length::new</a>&lt;u64, <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_Link">Link</a>&lt;T&gt;&gt;());
     };
     slot_index
 }

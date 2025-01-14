@@ -14,7 +14,6 @@ This is the reference documentation of the Aptos standard library.
 
 -  [`0x1::any`](any.md#0x1_any)
 -  [`0x1::aptos_hash`](hash.md#0x1_aptos_hash)
--  [`0x1::big_ordered_map`](big_ordered_map.md#0x1_big_ordered_map)
 -  [`0x1::big_vector`](big_vector.md#0x1_big_vector)
 -  [`0x1::bls12381`](bls12381.md#0x1_bls12381)
 -  [`0x1::bls12381_algebra`](bls12381_algebra.md#0x1_bls12381_algebra)
@@ -32,7 +31,6 @@ This is the reference documentation of the Aptos standard library.
 -  [`0x1::math_fixed`](math_fixed.md#0x1_math_fixed)
 -  [`0x1::math_fixed64`](math_fixed64.md#0x1_math_fixed64)
 -  [`0x1::multi_ed25519`](multi_ed25519.md#0x1_multi_ed25519)
--  [`0x1::ordered_map`](ordered_map.md#0x1_ordered_map)
 -  [`0x1::pool_u64`](pool_u64.md#0x1_pool_u64)
 -  [`0x1::pool_u64_unbound`](pool_u64_unbound.md#0x1_pool_u64_unbound)
 -  [`0x1::ristretto255`](ristretto255.md#0x1_ristretto255)

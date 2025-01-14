@@ -201,7 +201,7 @@ module aptos_std::big_ordered_map {
         root.destroy_empty_node();
         // If root node is empty, then we know that no storage slots are used,
         // and so we can safely destroy all nodes.
-        nodes.destroy_known_empty_unsafe();
+        nodes.destroy_empty();
     }
 
     // ======================= Section with Modifiers =========================
@@ -310,7 +310,13 @@ module aptos_std::big_ordered_map {
     public fun borrow<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): &V {
         let iter = self.find(key);
         assert!(!iter.iter_is_end(self), error::invalid_argument(EKEY_NOT_FOUND));
-        iter.iter_borrow(self)
+
+        // TODO cannot call iter_borrow, because reference checks assume return has reference to iter that is being destroyed
+        // iter.iter_borrow(self)
+
+        assert!(!iter.iter_is_end(self), error::invalid_argument(EITER_OUT_OF_BOUNDS));
+        let children = &self.borrow_node(iter.node_index).children;
+        &iter.child_iter.iter_borrow(children).value
     }
 
     /// Returns a mutable reference to the element with its key at the given index, aborts if the key is not found.
@@ -365,7 +371,7 @@ module aptos_std::big_ordered_map {
     /// Borrows the value given iterator points to.
     /// Aborts with EITER_OUT_OF_BOUNDS if iterator is pointing to the end.
     /// Note: Requires that the map is not changed after the input iterator is generated.
-    public(friend) fun iter_borrow<K: drop + copy + store, V: store>(self: IteratorPtr<K>, map: &BigOrderedMap<K, V>): &V {
+    public(friend) fun iter_borrow<K: store, V: store>(self: &IteratorPtr<K>, map: &BigOrderedMap<K, V>): &V {
         assert!(!self.iter_is_end(map), error::invalid_argument(EITER_OUT_OF_BOUNDS));
         let children = &map.borrow_node(self.node_index).children;
         &self.child_iter.iter_borrow(children).value
@@ -376,7 +382,7 @@ module aptos_std::big_ordered_map {
     /// Aborts with EBORROW_MUT_REQUIRES_CONSTANT_KV_SIZE if KV size doesn't have constant size,
     /// because if it doesn't - we need to call `upsert` to be able to check size invariants after modification.
     /// Note: Requires that the map is not changed after the input iterator is generated.
-    public(friend) fun iter_borrow_mut<K: drop + copy + store, V: store>(self: IteratorPtr<K>, map: &mut BigOrderedMap<K, V>): &mut V {
+    public(friend) fun iter_borrow_mut<K: store, V: store>(self: &IteratorPtr<K>, map: &mut BigOrderedMap<K, V>): &mut V {
         assert!(map.constant_kv_size, error::invalid_argument(EBORROW_MUT_REQUIRES_CONSTANT_KV_SIZE));
         assert!(!self.iter_is_end(map), error::invalid_argument(EITER_OUT_OF_BOUNDS));
         let children = &mut map.borrow_node_mut(self.node_index).children;
@@ -441,6 +447,36 @@ module aptos_std::big_ordered_map {
         let child_iter = prev_children.new_end_iter().iter_prev(prev_children);
         let iter_key = *child_iter.iter_borrow_key(prev_children);
         new_iter(prev_index, child_iter, iter_key)
+    }
+
+    /// Apply the function to each element in the vector, consuming it.
+    public(friend) inline fun for_each<K: drop + copy + store, V: store>(self: BigOrderedMap<K, V>, f: |K, V|) {
+        // TODO - this can be done more efficiently, by destroying the leaves directly
+        // but that requires more complicated code and testing.
+        let it = self.new_begin_iter();
+        while (!it.iter_is_end(&self)) {
+            let k = *it.iter_borrow_key();
+            let v = self.remove(&k);
+            f(k, v);
+            it = self.new_begin_iter();
+        };
+        destroy_empty(self)
+    }
+
+    /// Apply the function to a reference of each element in the vector.
+    public(friend) inline fun for_each_ref<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, f: |&K, &V|) {
+        let it = self.new_begin_iter();
+        while (!it.iter_is_end(self)) {
+            f(it.iter_borrow_key(), it.iter_borrow(self));
+            it = it.iter_next(self);
+        };
+    }
+
+    /// Destroy a map, by destroying elements individually.
+    public(friend) inline fun destroy<K: drop + copy + store, V: store>(self: BigOrderedMap<K, V>, dv: |V|) {
+        for_each(self, |_k, v| {
+            dv(v);
+        });
     }
 
     // ====================== Internal Implementations ========================
@@ -1118,7 +1154,7 @@ module aptos_std::big_ordered_map {
     }
 
     #[test_only]
-    fun destroy<K: drop + copy + store, V: drop + store>(self: BigOrderedMap<K, V>) {
+    fun destroy_and_validate<K: drop + copy + store, V: drop + store>(self: BigOrderedMap<K, V>) {
         let it = new_begin_iter(&self);
         while (!it.iter_is_end(&self)) {
             remove(&mut self, it.iter_borrow_key());
@@ -1213,9 +1249,19 @@ module aptos_std::big_ordered_map {
         add(&mut map, 5, 5); map.print_map(); map.validate_map();
         add(&mut map, 6, 6); map.print_map(); map.validate_map();
 
-        vector::zip(vector[1, 2, 3, 4, 5, 6], vector[1, 2, 3, 8, 5, 6], |key, value| {
-            assert!(map.borrow(&key) == &value, key + 100);
-            assert!(map.borrow_mut(&key) == &value, key + 200);
+        let expected_keys = vector[1, 2, 3, 4, 5, 6];
+        let expected_values = vector[1, 2, 3, 8, 5, 6];
+
+        let index = 0;
+        map.for_each_ref(|k, v| {
+            assert!(k == expected_keys.borrow(index), *k + 100);
+            assert!(v == expected_values.borrow(index), *k + 200);
+            index += 1;
+        });
+
+        vector::zip(expected_keys, expected_values, |key, value| {
+            assert!(map.borrow(&key) == &value, key + 300);
+            assert!(map.borrow_mut(&key) == &value, key + 400);
         });
 
         remove(&mut map, &5); map.print_map(); map.validate_map();
@@ -1226,6 +1272,20 @@ module aptos_std::big_ordered_map {
         remove(&mut map, &6); map.print_map(); map.validate_map();
 
         destroy_empty(map);
+    }
+
+    #[test]
+    fun test_for_each() {
+        let map = new_with_config<u64, u64>(4, 3, false, 0);
+        map.add_all(vector[1, 3, 6, 2, 9, 5, 7, 4, 8], vector[1, 3, 6, 2, 9, 5, 7, 4, 8]);
+
+        let expected = vector[1, 2, 3, 4, 5, 6, 7, 8, 9];
+        let index = 0;
+        map.for_each(|k, v| {
+            assert!(k == expected[index], k + 100);
+            assert!(v == expected[index], k + 200);
+            index += 1;
+        });
     }
 
     #[test]
@@ -1323,7 +1383,7 @@ module aptos_std::big_ordered_map {
             it = it.iter_next(&map);
         };
 
-        destroy(map);
+        map.destroy(|_v| {});
     }
 
     #[test]
@@ -1345,7 +1405,7 @@ module aptos_std::big_ordered_map {
         assert!(find(&map, &4).iter_is_end(&map), 0);
         assert!(find(&map, &9).iter_is_end(&map), 1);
 
-        destroy(map);
+        map.destroy(|_v| {});
     }
 
     #[test]
@@ -1375,7 +1435,7 @@ module aptos_std::big_ordered_map {
         assert!(lower_bound(&map, &3).key == 6, 5);
         assert!(lower_bound(&map, &4).key == 6, 6);
 
-        map.destroy();
+        map.destroy(|_v| {});
     }
 
     #[test]
@@ -1389,28 +1449,28 @@ module aptos_std::big_ordered_map {
         let missing = vector[0, 2, 4, 6, 8, 10];
         missing.for_each_ref(|i| assert!(!map.contains(i), *i));
 
-        map.destroy();
+        map.destroy(|_v| {});
     }
 
     #[test]
     #[expected_failure(abort_code = 0x1000B, location = Self)] /// EINVALID_CONFIG_PARAMETER
     fun test_inner_max_degree_too_large() {
         let map = new_with_config<u8, u8>(4097, 0, false, 0);
-        map.destroy();
+        map.destroy_and_validate();
     }
 
     #[test]
     #[expected_failure(abort_code = 0x1000B, location = Self)] /// EINVALID_CONFIG_PARAMETER
     fun test_inner_max_degree_too_small() {
         let map = new_with_config<u8, u8>(3, 0, false, 0);
-        map.destroy();
+        map.destroy_and_validate();
     }
 
     #[test]
     #[expected_failure(abort_code = 0x1000B, location = Self)] /// EINVALID_CONFIG_PARAMETER
     fun test_leaf_max_degree_too_small() {
         let map = new_with_config<u8, u8>(0, 2, false, 0);
-        map.destroy();
+        map.destroy_and_validate();
     }
 
     #[test]
@@ -1418,7 +1478,7 @@ module aptos_std::big_ordered_map {
     fun test_abort_add_existing_value() {
         let map = new_from(vector[1], vector[1]);
         map.add(1, 2);
-        map.destroy();
+        map.destroy_and_validate();
     }
 
     #[test_only]
@@ -1436,7 +1496,7 @@ module aptos_std::big_ordered_map {
         let map = new_with_config(4, 4, false, 0);
         map.add_all(vector_range(1, 10), vector_range(1, 10));
         map.add(3, 3);
-        map.destroy();
+        map.destroy_and_validate();
     }
 
     #[test]
@@ -1444,7 +1504,7 @@ module aptos_std::big_ordered_map {
     fun test_abort_remove_missing_value() {
         let map = new_from(vector[1], vector[1]);
         map.remove(&2);
-        map.destroy();
+        map.destroy_and_validate();
     }
 
     #[test]
@@ -1454,7 +1514,7 @@ module aptos_std::big_ordered_map {
         map.add_all(vector_range(1, 10), vector_range(1, 10));
         map.remove(&4);
         map.remove(&4);
-        map.destroy();
+        map.destroy_and_validate();
     }
 
     #[test]
@@ -1463,7 +1523,7 @@ module aptos_std::big_ordered_map {
         let map = new_with_config(4, 4, false, 0);
         map.add_all(vector_range(1, 10), vector_range(1, 10));
         map.remove(&11);
-        map.destroy();
+        map.destroy_and_validate();
     }
 
     #[test]
@@ -1471,7 +1531,7 @@ module aptos_std::big_ordered_map {
     fun test_abort_borrow_missing() {
         let map = new_from(vector[1], vector[1]);
         map.borrow(&2);
-        map.destroy();
+        map.destroy_and_validate();
     }
 
     #[test]
@@ -1479,7 +1539,7 @@ module aptos_std::big_ordered_map {
     fun test_abort_borrow_mut_missing() {
         let map = new_from(vector[1], vector[1]);
         map.borrow_mut(&2);
-        map.destroy();
+        map.destroy_and_validate();
     }
 
     #[test]
@@ -1488,7 +1548,7 @@ module aptos_std::big_ordered_map {
         let map = new_with_config(0, 0, false, 0);
         map.add(1, vector[1]);
         map.borrow_mut(&1);
-        map.destroy();
+        map.destroy_and_validate();
     }
 
     #[test]
@@ -1496,7 +1556,7 @@ module aptos_std::big_ordered_map {
     fun test_abort_iter_borrow_key_missing() {
         let map = new_from(vector[1], vector[1]);
         map.new_end_iter().iter_borrow_key();
-        map.destroy();
+        map.destroy_and_validate();
     }
 
     #[test]
@@ -1504,7 +1564,7 @@ module aptos_std::big_ordered_map {
     fun test_abort_iter_borrow_missing() {
         let map = new_from(vector[1], vector[1]);
         map.new_end_iter().iter_borrow(&map);
-        map.destroy();
+        map.destroy_and_validate();
     }
 
     #[test]
@@ -1512,7 +1572,7 @@ module aptos_std::big_ordered_map {
     fun test_abort_iter_borrow_mut_missing() {
         let map = new_from(vector[1], vector[1]);
         map.new_end_iter().iter_borrow_mut(&mut map);
-        map.destroy();
+        map.destroy_and_validate();
     }
 
     #[test]
@@ -1521,7 +1581,7 @@ module aptos_std::big_ordered_map {
         let map = new_with_config(0, 0, false, 0);
         map.add(1, vector[1]);
         map.new_begin_iter().iter_borrow_mut(&mut map);
-        map.destroy();
+        map.destroy_and_validate();
     }
 
     #[test]
@@ -1529,7 +1589,7 @@ module aptos_std::big_ordered_map {
     fun test_abort_end_iter_next() {
         let map = new_from(vector[1, 2, 3], vector[1, 2, 3]);
         map.new_end_iter().iter_next(&map);
-        map.destroy();
+        map.destroy_and_validate();
     }
 
     #[test]
@@ -1537,7 +1597,7 @@ module aptos_std::big_ordered_map {
     fun test_abort_begin_iter_prev() {
         let map = new_from(vector[1, 2, 3], vector[1, 2, 3]);
         map.new_begin_iter().iter_prev(&map);
-        map.destroy();
+        map.destroy_and_validate();
     }
 
     #[test]
@@ -1553,7 +1613,7 @@ module aptos_std::big_ordered_map {
         let map = new_with_config(0, 0, false, 0);
         map.add(vector[1], 1);
         map.add(vector_range(0, 57), 1);
-        map.destroy();
+        map.destroy_and_validate();
     }
 
     #[test]
@@ -1562,7 +1622,7 @@ module aptos_std::big_ordered_map {
         let map = new_with_config(0, 0, false, 0);
         map.add(1, vector[1]);
         map.add(2, vector_range(0, 107));
-        map.destroy();
+        map.destroy_and_validate();
     }
 
     #[test_only]
@@ -1595,7 +1655,7 @@ module aptos_std::big_ordered_map {
                 };
             };
         };
-        big_map.destroy();
+        big_map.destroy_and_validate();
     }
 
     #[test_only]
