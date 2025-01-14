@@ -201,7 +201,7 @@ module aptos_std::big_ordered_map {
         root.destroy_empty_node();
         // If root node is empty, then we know that no storage slots are used,
         // and so we can safely destroy all nodes.
-        nodes.destroy_known_empty_unsafe();
+        nodes.destroy_empty();
     }
 
     // ======================= Section with Modifiers =========================
@@ -311,7 +311,7 @@ module aptos_std::big_ordered_map {
         let iter = self.find(key);
         assert!(!iter.iter_is_end(self), error::invalid_argument(EKEY_NOT_FOUND));
 
-        /// TODO cannot call iter_borrow, because reference checks assume return has reference to iter that is being destroyed
+        // TODO cannot call iter_borrow, because reference checks assume return has reference to iter that is being destroyed
         // iter.iter_borrow(self)
 
         assert!(!iter.iter_is_end(self), error::invalid_argument(EITER_OUT_OF_BOUNDS));

@@ -16,9 +16,7 @@
 /// * inlining some nodes
 /// * having a fee-payer for any storage creation operations
 module aptos_std::storage_slots_allocator {
-    friend aptos_std::big_ordered_map;
-
-    use aptos_std::table::{Self, Table};
+    use aptos_std::table_with_length::{Self, TableWithLength};
     use std::option::{Self, Option};
 
     const EINVALID_ARGUMENT: u64 = 1;
@@ -48,8 +46,11 @@ module aptos_std::storage_slots_allocator {
     }
 
     enum StorageSlotsAllocator<T: store> has store {
+        // V1 is sequential - any two operations on the StorageSlotsAllocator will conflict.
+        // In general, StorageSlotsAllocator is invoked on less frequent operations, so
+        // that shouldn't be a big issue.
         V1 {
-            slots: Option<Table<u64, Link<T>>>, // Lazily create slots table only when needed
+            slots: Option<TableWithLength<u64, Link<T>>>, // Lazily create slots table only when needed
             new_slot_index: u64,
             should_reuse: bool,
             reuse_head_index: u64,
@@ -114,9 +115,7 @@ module aptos_std::storage_slots_allocator {
         value
     }
 
-    /// We cannot know if allocator is empty or not, so this method is not public,
-    /// and can be used only in modules that know by themselves that allocator is empty.
-    public(friend) fun destroy_known_empty_unsafe<T: store>(self: StorageSlotsAllocator<T>) {
+    public fun destroy_empty<T: store>(self: StorageSlotsAllocator<T>) {
         loop {
             let reuse_index = self.maybe_pop_from_reuse_queue();
             if (reuse_index == NULL_INDEX) {
@@ -133,7 +132,7 @@ module aptos_std::storage_slots_allocator {
             } => {
                 assert!(reuse_head_index == NULL_INDEX, EINTERNAL_INVARIANT_BROKEN);
                 if (slots.is_some()) {
-                    slots.destroy_some().destroy_known_empty_unsafe();
+                    slots.destroy_some().destroy_empty();
                 } else {
                     slots.destroy_none();
                 }
@@ -227,7 +226,7 @@ module aptos_std::storage_slots_allocator {
         let slot_index = self.new_slot_index;
         self.new_slot_index = self.new_slot_index + 1;
         if (self.slots.is_none()) {
-            self.slots.fill(table::new<u64, Link<T>>());
+            self.slots.fill(table_with_length::new<u64, Link<T>>());
         };
         slot_index
     }
