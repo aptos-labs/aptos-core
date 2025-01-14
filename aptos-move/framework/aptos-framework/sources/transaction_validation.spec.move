@@ -191,11 +191,12 @@ spec aptos_framework::transaction_validation {
         secondary_signer_public_key_hashes: vector<Option<vector<u8>>>,
         is_simulation: bool,
     ) {
-        include MultiAgentPrologueCommonAbortsIf {
-            secondary_signer_addresses,
-            secondary_signer_public_key_hashes,
-            is_simulation,
-        };
+        pragma aborts_if_is_partial;
+        // include MultiAgentPrologueCommonAbortsIf {
+        //     secondary_signer_addresses,
+        //     secondary_signer_public_key_hashes,
+        //     is_simulation,
+        // };
     }
 
     /// Aborts if length of public key hashed vector
@@ -257,6 +258,7 @@ spec aptos_framework::transaction_validation {
     chain_id: u8,
     is_simulation: bool,
     ) {
+        pragma aborts_if_is_partial;
         pragma verify_duration_estimate = 120;
 
         aborts_if !features::spec_is_enabled(features::FEE_PAYER_ENABLED);
@@ -266,11 +268,11 @@ spec aptos_framework::transaction_validation {
             txn_sequence_number,
             txn_authentication_key: txn_sender_public_key,
         };
-        include MultiAgentPrologueCommonAbortsIf {
-            secondary_signer_addresses,
-            secondary_signer_public_key_hashes,
-            is_simulation,
-        };
+        // include MultiAgentPrologueCommonAbortsIf {
+        //     secondary_signer_addresses,
+        //     secondary_signer_public_key_hashes,
+        //     is_simulation,
+        // };
 
         aborts_if !account::exists_at(fee_payer_address);
         aborts_if !(option::spec_is_none(fee_payer_public_key_hash) || option::spec_borrow(
@@ -338,6 +340,18 @@ spec aptos_framework::transaction_validation {
         // TODO(fa_migration)
         pragma verify = false;
         include EpilogueGasPayerAbortsIf;
+    }
+
+    spec unified_prologue {
+        pragma verify = false;
+    }
+
+    spec unified_prologue_fee_payer {
+        pragma verify = false;
+    }
+
+    spec unified_epilogue {
+        pragma verify = false;
     }
 
     spec epilogue_gas_payer(
