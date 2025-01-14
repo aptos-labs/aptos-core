@@ -48,6 +48,7 @@ mod change_set;
 mod module;
 mod multisig;
 mod script;
+pub mod sender_aware;
 pub mod signature_verified_transaction;
 pub mod use_case;
 pub mod user_transaction_context;
