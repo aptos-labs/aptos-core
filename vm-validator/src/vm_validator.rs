@@ -179,6 +179,9 @@ impl<S: StateView> ModuleCache for ValidationState<S> {
         // If hash is the same - we can use the same module from cache. If the hash is different,
         // then the state contains a newer version of the code. We deserialize the state value and
         // replace the old cache entry with the new code.
+        // TODO(loader_v2):
+        //   Ideally, commit notification should specify if new modules should be added to the
+        //   cache instead of checking the state view bytes. Revisit.
         Ok(if module.extension().hash() == &hash {
             Some((module, version))
         } else {
@@ -268,9 +271,7 @@ impl VMValidator {
     fn notify_commit(&mut self) {
         let db_state_view = self.db_state_view();
 
-        // On commit, we need to update the state view, but not the configs or module caches. If
-        // configs change, validator will be restarted, and for module caches we ensure that read
-        // modules are up-to-date.
+        // On commit, we need to update the state view so that we can see the latest resources.
         self.state.reset_state_view(db_state_view.into());
     }
 }
@@ -398,7 +399,7 @@ mod tests {
         assert_eq!(
             &a,
             state
-                .fetch_deserialized_module(&a.self_addr(), a.self_name())
+                .fetch_deserialized_module(a.self_addr(), a.self_name())
                 .unwrap()
                 .unwrap()
                 .as_ref()
@@ -406,7 +407,7 @@ mod tests {
         assert_eq!(
             &c,
             state
-                .fetch_deserialized_module(&c.self_addr(), c.self_name())
+                .fetch_deserialized_module(c.self_addr(), c.self_name())
                 .unwrap()
                 .unwrap()
                 .as_ref()
@@ -448,7 +449,7 @@ mod tests {
         assert_eq!(
             &a_new,
             state
-                .fetch_deserialized_module(&a_new.self_addr(), a_new.self_name())
+                .fetch_deserialized_module(a_new.self_addr(), a_new.self_name())
                 .unwrap()
                 .unwrap()
                 .as_ref()
@@ -456,7 +457,7 @@ mod tests {
         assert_eq!(
             &d,
             state
-                .fetch_deserialized_module(&d.self_addr(), d.self_name())
+                .fetch_deserialized_module(d.self_addr(), d.self_name())
                 .unwrap()
                 .unwrap()
                 .as_ref()
@@ -469,7 +470,7 @@ mod tests {
 
         // Get verified module, to load the transitive closure (modules "b" and "c") as well.
         assert!(state
-            .fetch_verified_module(&a_new.self_addr(), a_new.self_name())
+            .fetch_verified_module(a_new.self_addr(), a_new.self_name())
             .unwrap()
             .is_some());
         assert_eq!(state.module_cache.num_modules(), 4);
