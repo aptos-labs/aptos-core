@@ -353,7 +353,7 @@ dependencies = [
  "open",
  "pathsearch",
  "poem",
- "processor",
+ "processor 1.0.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=27d9d66ab512cd325f06ac20c61ac7cc0a4c383c)",
  "rand 0.7.3",
  "regex",
  "reqwest 0.11.23",
@@ -361,7 +361,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
- "server-framework",
+ "server-framework 1.0.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=27d9d66ab512cd325f06ac20c61ac7cc0a4c383c)",
  "set_env",
  "shadow-rs",
  "tempfile",
@@ -2747,7 +2747,7 @@ dependencies = [
  "diesel-async",
  "dirs 5.0.1",
  "futures",
- "processor",
+ "processor 1.0.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=51a34901b40d7f75767ac907b4d2478104d6a515)",
  "reqwest 0.11.23",
  "serde",
  "serde_json",
@@ -2956,6 +2956,14 @@ dependencies = [
  "sha3 0.9.1",
  "smallvec",
  "tempfile",
+]
+
+[[package]]
+name = "aptos-moving-average"
+version = "0.1.0"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=27d9d66ab512cd325f06ac20c61ac7cc0a4c383c#27d9d66ab512cd325f06ac20c61ac7cc0a4c383c"
+dependencies = [
+ "chrono",
 ]
 
 [[package]]
@@ -3502,6 +3510,17 @@ dependencies = [
  "prost 0.12.3",
  "serde",
  "tonic 0.11.0",
+]
+
+[[package]]
+name = "aptos-protos"
+version = "1.3.1"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=6116af69aa173ca49e1761daabd6fe103fe2c65e#6116af69aa173ca49e1761daabd6fe103fe2c65e"
+dependencies = [
+ "pbjson",
+ "prost 0.13.4",
+ "serde",
+ "tonic 0.12.3",
 ]
 
 [[package]]
@@ -4777,9 +4796,9 @@ dependencies = [
  "diesel-async",
  "futures",
  "maplit",
- "processor",
+ "processor 1.0.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=51a34901b40d7f75767ac907b4d2478104d6a515)",
  "rand 0.7.3",
- "server-framework",
+ "server-framework 1.0.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=51a34901b40d7f75767ac907b4d2478104d6a515)",
  "tempfile",
  "tokio",
  "tokio-util 0.7.10",
@@ -6602,18 +6621,18 @@ checksum = "fbdcdcb6d86f71c5e97409ad45898af11cbc995b4ee8112d59095a28d376c935"
 
 [[package]]
 name = "const_format"
-version = "0.2.32"
+version = "0.2.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3a214c7af3d04997541b18d432afaff4c455e79e2029079647e72fc2bd27673"
+checksum = "126f97965c8ad46d6d9163268ff28432e8f6a1196a55578867832e3049df63dd"
 dependencies = [
  "const_format_proc_macros",
 ]
 
 [[package]]
 name = "const_format_proc_macros"
-version = "0.2.32"
+version = "0.2.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7f6ff08fd20f4f299298a28e2dfa8a8ba1036e6cd2460ac1de7b425d76f2500"
+checksum = "1d57c2eccfb16dbac1f4e61e206105db5820c9d26c3c472bc17c774259ef7744"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -13733,6 +13752,66 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "1.0.0"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=27d9d66ab512cd325f06ac20c61ac7cc0a4c383c#27d9d66ab512cd325f06ac20c61ac7cc0a4c383c"
+dependencies = [
+ "ahash 0.8.11",
+ "allocative",
+ "allocative_derive",
+ "anyhow",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=27d9d66ab512cd325f06ac20c61ac7cc0a4c383c)",
+ "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=6116af69aa173ca49e1761daabd6fe103fe2c65e)",
+ "async-trait",
+ "bcs 0.1.4",
+ "bigdecimal",
+ "bitflags 2.6.0",
+ "canonical_json",
+ "chrono",
+ "clap 4.5.21",
+ "const_format",
+ "diesel",
+ "diesel-async",
+ "diesel_migrations",
+ "enum_dispatch",
+ "field_count",
+ "futures",
+ "futures-util",
+ "google-cloud-googleapis",
+ "google-cloud-pubsub",
+ "google-cloud-storage",
+ "hex",
+ "hyper 0.14.28",
+ "itertools 0.12.1",
+ "jemallocator",
+ "kanal",
+ "lazy_static",
+ "native-tls",
+ "num_cpus",
+ "once_cell",
+ "parquet",
+ "parquet_derive",
+ "postgres-native-tls",
+ "prometheus",
+ "prost 0.13.4",
+ "rayon",
+ "regex",
+ "serde",
+ "serde_json",
+ "server-framework 1.0.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=27d9d66ab512cd325f06ac20c61ac7cc0a4c383c)",
+ "sha2 0.10.8",
+ "sha3 0.10.8",
+ "strum 0.24.1",
+ "tiny-keccak",
+ "tokio",
+ "tokio-postgres",
+ "tonic 0.12.3",
+ "tracing",
+ "unescape",
+ "url",
+]
+
+[[package]]
+name = "processor"
+version = "1.0.0"
 source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=51a34901b40d7f75767ac907b4d2478104d6a515#51a34901b40d7f75767ac907b4d2478104d6a515"
 dependencies = [
  "ahash 0.8.11",
@@ -13778,7 +13857,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "server-framework",
+ "server-framework 1.0.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=51a34901b40d7f75767ac907b4d2478104d6a515)",
  "sha2 0.10.8",
  "sha3 0.10.8",
  "strum 0.24.1",
@@ -15560,6 +15639,27 @@ dependencies = [
  "move-core-types",
  "proptest",
  "proptest-derive",
+]
+
+[[package]]
+name = "server-framework"
+version = "1.0.0"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=27d9d66ab512cd325f06ac20c61ac7cc0a4c383c#27d9d66ab512cd325f06ac20c61ac7cc0a4c383c"
+dependencies = [
+ "anyhow",
+ "aptos-system-utils 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=202bdccff2b2d333a385ae86a4fcf23e89da9f62)",
+ "async-trait",
+ "backtrace",
+ "clap 4.5.21",
+ "prometheus",
+ "serde",
+ "serde_yaml 0.8.26",
+ "tempfile",
+ "tokio",
+ "toml 0.7.8",
+ "tracing",
+ "tracing-subscriber 0.3.18",
+ "warp",
 ]
 
 [[package]]
@@ -17637,7 +17737,7 @@ dependencies = [
  "errno",
  "js-sys",
  "libc",
- "rustix 0.38.28",
+ "rustix 0.37.27",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "wasm-bindgen",
  "winapi 0.3.9",
