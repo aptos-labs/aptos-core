@@ -43,6 +43,9 @@ pub enum Cmd {
          /// Sampling rate (1-10)
         #[clap(long, default_value_t = SAMPLING_RATE)]
         rate: u32,
+        /// Branch of framework
+        #[clap(long)]
+        branch: Option<String>,
     },
     /// Collect and execute txns without dumping the state data
     Online {
@@ -124,7 +127,8 @@ async fn main() -> Result<()> {
             skip_source_code_check: skip_source_code,
             dump_write_set,
             target_account,
-            rate
+            rate,
+            branch
         } => {
             let batch_size = BATCH_SIZE;
             let output = if let Some(path) = output_path {
@@ -136,7 +140,7 @@ async fn main() -> Result<()> {
                 std::fs::create_dir_all(output.as_path()).unwrap();
             }
             if !skip_source_code {
-                prepare_aptos_packages(output.join(APTOS_COMMONS), None).await;
+                prepare_aptos_packages(output.join(APTOS_COMMONS), branch).await;
             }
             let data_collector = DataCollection::new_with_rest_client(
                 Client::new(Url::parse(&endpoint)?),

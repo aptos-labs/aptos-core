@@ -32,7 +32,7 @@ pub use data_collection::*;
 pub use execution::*;
 use move_compiler::compiled_unit::CompiledUnitEnum;
 use move_core_types::language_storage::ModuleId;
-use move_model::metadata::CompilerVersion;
+use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{
     compilation::compiled_package::CompiledPackage,
     source_package::{
@@ -449,6 +449,7 @@ fn compile_package(
     let mut build_options = aptos_framework::BuildOptions {
         compiler_version,
         bytecode_version: Some(7),
+        language_version: Some(CompilerVersion::infer_stable_language_version(&compiler_version.unwrap_or_default())),
         ..Default::default()
     };
     build_options
