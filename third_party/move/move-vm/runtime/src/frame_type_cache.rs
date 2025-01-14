@@ -41,8 +41,8 @@ impl RuntimeCacheTraits for AllRuntimeCaches {
 #[allow(dead_code)]
 pub(crate) enum PerInstructionCache {
     Nothing,
-    PackGeneric,
     Pack(u16),
+    PackGeneric(u16),
 }
 
 #[derive(Default)]
@@ -74,7 +74,14 @@ pub(crate) struct FrameTypeCache {
         BTreeMap<FunctionHandleIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
     /// Stores a variant for each individual instruction in the
     /// function's bytecode. We keep the size of the variant to be
-    /// small.
+    /// small. The caches are indexed by the index of the given
+    /// bytecode instruction in the function body.
+    ///
+    /// Important! - If entry is present for a given instruction, then
+    /// we do NOT need to re-check for any errors that only depend on
+    /// the argument of the bytecode instructions, for which it is
+    /// guaranteed that everything will be exactly the same as when we
+    /// did the insertion.
     pub(crate) per_instruction_cache: Vec<PerInstructionCache>,
 }
 
@@ -236,5 +243,19 @@ impl FrameTypeCache {
             Ok((ty, ty_count))
         })?;
         Ok((ty, *ty_count))
+    }
+
+    pub(crate) fn make_rc() -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::<Self>::new(Default::default()))
+    }
+
+    pub(crate) fn make_rc_for_function(function: &LoadedFunction) -> Rc<RefCell<Self>> {
+        let frame_cache = Rc::new(RefCell::<Self>::new(Default::default()));
+
+        frame_cache
+            .borrow_mut()
+            .per_instruction_cache
+            .resize(function.code_size(), PerInstructionCache::Nothing);
+        frame_cache
     }
 }
