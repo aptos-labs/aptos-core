@@ -84,13 +84,11 @@ impl SenderAwareShuffler {
 impl TransactionShuffler for SenderAwareShuffler {
     fn shuffle(&self, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
         // Early return for performance reason if there are no transactions to shuffle
-        // TODO make sure this is handled in iterator
         if txns.is_empty() {
             return txns;
         }
 
         // handle the corner case of conflict window being 0, in which case we don't do any shuffling
-        // TODO make sure this is handled in iterator
         if self.config.conflict_window_size == 0 {
             return txns;
         }
@@ -102,6 +100,16 @@ impl TransactionShuffler for SenderAwareShuffler {
         &self,
         txns: Vec<SignedTransaction>,
     ) -> Box<dyn Iterator<Item = SignedTransaction> + 'static> {
+        // Early return for performance reason if there are no transactions to shuffle
+        if txns.is_empty() {
+            return Box::new(txns.into_iter());
+        }
+
+        // handle the corner case of conflict window being 0, in which case we don't do any shuffling
+        if self.config.conflict_window_size == 0 {
+            return Box::new(txns.into_iter());
+        }
+
         let iterator = ShuffledTransactionIterator::new(self.config.clone(), txns);
         Box::new(iterator)
     }
@@ -110,6 +118,16 @@ impl TransactionShuffler for SenderAwareShuffler {
         &self,
         txns: Vec<SignatureVerifiedTransaction>,
     ) -> Box<dyn Iterator<Item = SignatureVerifiedTransaction> + 'static> {
+        // Early return for performance reason if there are no transactions to shuffle
+        if txns.is_empty() {
+            return Box::new(txns.into_iter());
+        }
+
+        // handle the corner case of conflict window being 0, in which case we don't do any shuffling
+        if self.config.conflict_window_size == 0 {
+            return Box::new(txns.into_iter());
+        }
+
         let iterator = ShuffledTransactionIterator::new(self.config.clone(), txns);
         Box::new(iterator)
     }
@@ -442,5 +460,62 @@ mod tests {
         assert_eq!(orig_txns.len(), optimized_txns.len());
         // Assert that the ordering is unchanged in case of unique senders txns.
         assert_eq!(orig_txns, optimized_txns);
+    }
+
+    #[test]
+    fn test_shuffling_iterator_zero_conflict_window() {
+        let conflict_window_size = 0usize;
+        let mut rng = OsRng;
+        let max_senders = 50;
+        let max_txn_per_sender = 100;
+        let num_senders = rng.gen_range(1, max_senders);
+        let mut orig_txns = Vec::new();
+        let mut senders = Vec::new();
+        for _ in 0..num_senders {
+            let mut sender_txns = create_signed_transaction(rng.gen_range(1, max_txn_per_sender));
+            senders.push(sender_txns.first().unwrap().parse_sender());
+            orig_txns.append(&mut sender_txns);
+        }
+
+        let txn_shuffler = SenderAwareShuffler::new(conflict_window_size);
+
+        // Shuffled Transaction checks
+        let shuffled_txns = txn_shuffler.shuffle(orig_txns.clone());
+        assert_eq!(orig_txns.len(), shuffled_txns.len());
+        assert_eq!(orig_txns, shuffled_txns);
+
+        // Shuffled Transaction Iterator checks
+        let txn_shuffler = SenderAwareShuffler::new(conflict_window_size);
+        let mut shuffled_iterator_txns: Vec<SignedTransaction> = Vec::new();
+        for transaction in txn_shuffler.signed_transaction_iterator(orig_txns.clone()) {
+            shuffled_iterator_txns.push(transaction)
+        }
+
+        assert_eq!(orig_txns.len(), shuffled_iterator_txns.len());
+        assert_eq!(orig_txns, shuffled_iterator_txns)
+    }
+
+    /// Confirming that shuffle() and shuffle iterator return the same result for an empty
+    /// vector of transactions
+    #[test]
+    fn test_shuffling_iterator_empty_vec() {
+        let conflict_window_size = 10usize;
+        let orig_txns = Vec::new();
+        let txn_shuffler = SenderAwareShuffler::new(conflict_window_size);
+
+        // Shuffled Transaction checks
+        let shuffled_txns = txn_shuffler.shuffle(orig_txns.clone());
+        assert_eq!(orig_txns.len(), shuffled_txns.len());
+        assert_eq!(orig_txns, shuffled_txns);
+
+        // Shuffled Transaction Iterator checks
+        let txn_shuffler = SenderAwareShuffler::new(conflict_window_size);
+        let mut shuffled_iterator_txns: Vec<SignedTransaction> = Vec::new();
+        for transaction in txn_shuffler.signed_transaction_iterator(orig_txns.clone()) {
+            shuffled_iterator_txns.push(transaction)
+        }
+
+        assert_eq!(orig_txns.len(), shuffled_iterator_txns.len());
+        assert_eq!(orig_txns, shuffled_iterator_txns)
     }
 }
