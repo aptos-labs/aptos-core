@@ -101,10 +101,11 @@ impl LazyLoadedFunction {
 
     #[allow(unused)]
     pub(crate) fn new_resolved(
-        converter: &dyn TypeConverter,
+        module_storage: &dyn ModuleStorage,
         fun: LoadedFunction,
         mask: ClosureMask,
     ) -> PartialVMResult<Self> {
+        let converter = ModuleStorageTypeConverter::new(module_storage);
         let fun_inst = fun
             .ty_args
             .iter()
