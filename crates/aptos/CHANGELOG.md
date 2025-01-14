@@ -3,11 +3,13 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # Unreleased
+
+## [6.0.0] - 2025/01/14
+- Set Compiler v2 as the default compiler and Move 2 as the default language version.
+- Add new `--move-1` flag to use Compiler v1 and Move 1.
 - Add flag `--benchmark` to `aptos move prove`, which allows to benchmark verification times of individual functions in a package.
 - Add flag `--only <name>` to `aptos move prove`, which allows to scope verification to a function.
 - Fix `aptos init` to show the explorer link for accounts when account is already created on chain instead of prompting to fund the account.
-- Set Compiler v2 as the default compiler and Move 2 as the default language version.
-- Add new `--move-1` flag to use Compiler v1 and Move 1.
 
 ## [5.1.0] - 2024/12/13
 - More optimizations are now default for compiler v2.
