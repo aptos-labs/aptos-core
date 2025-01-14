@@ -206,9 +206,21 @@ module aptos_framework::coin {
     }
 
 
+    #[deprecated]
     #[event]
     /// Module event emitted when the event handles related to coin store is deleted.
+    ///
+    /// Deprecated: replaced with CoinStoreDeletion
     struct CoinEventHandleDeletion has drop, store {
+        event_handle_creation_address: address,
+        deleted_deposit_event_handle_creation_number: u64,
+        deleted_withdraw_event_handle_creation_number: u64,
+    }
+
+    #[event]
+    /// Module event emitted when the event handles related to coin store is deleted.
+    struct CoinStoreDeletion has drop, store {
+        coin_type: String,
         event_handle_creation_address: address,
         deleted_deposit_event_handle_creation_number: u64,
         deleted_withdraw_event_handle_creation_number: u64,
@@ -573,7 +585,8 @@ module aptos_framework::coin {
                 account
             );
             event::emit(
-                CoinEventHandleDeletion {
+                CoinStoreDeletion {
+                    coin_type: type_info::type_name<CoinType>(),
                     event_handle_creation_address: guid::creator_address(
                         event::guid(&deposit_events)
                     ),

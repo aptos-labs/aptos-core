@@ -18,6 +18,7 @@ This module provides the foundation for typesafe Coins.
 -  [Struct `DepositEvent`](#0x1_coin_DepositEvent)
 -  [Struct `WithdrawEvent`](#0x1_coin_WithdrawEvent)
 -  [Struct `CoinEventHandleDeletion`](#0x1_coin_CoinEventHandleDeletion)
+-  [Struct `CoinStoreDeletion`](#0x1_coin_CoinStoreDeletion)
 -  [Struct `PairCreation`](#0x1_coin_PairCreation)
 -  [Struct `MintCapability`](#0x1_coin_MintCapability)
 -  [Struct `FreezeCapability`](#0x1_coin_FreezeCapability)
@@ -555,8 +556,11 @@ Event emitted when some amount of a coin is withdrawn from an account.
 
 Module event emitted when the event handles related to coin store is deleted.
 
+Deprecated: replaced with CoinStoreDeletion
+
 
 <pre><code>#[<a href="event.md#0x1_event">event</a>]
+#[deprecated]
 <b>struct</b> <a href="coin.md#0x1_coin_CoinEventHandleDeletion">CoinEventHandleDeletion</a> <b>has</b> drop, store
 </code></pre>
 
@@ -567,6 +571,53 @@ Module event emitted when the event handles related to coin store is deleted.
 
 
 <dl>
+<dt>
+<code>event_handle_creation_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>deleted_deposit_event_handle_creation_number: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>deleted_withdraw_event_handle_creation_number: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_coin_CoinStoreDeletion"></a>
+
+## Struct `CoinStoreDeletion`
+
+Module event emitted when the event handles related to coin store is deleted.
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="coin.md#0x1_coin_CoinStoreDeletion">CoinStoreDeletion</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>coin_type: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+</dt>
+<dd>
+
+</dd>
 <dt>
 <code>event_handle_creation_address: <b>address</b></code>
 </dt>
@@ -2046,7 +2097,8 @@ or disallow upgradability of total supply.
             <a href="account.md#0x1_account">account</a>
         );
         <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="coin.md#0x1_coin_CoinEventHandleDeletion">CoinEventHandleDeletion</a> {
+            <a href="coin.md#0x1_coin_CoinStoreDeletion">CoinStoreDeletion</a> {
+                coin_type: <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;CoinType&gt;(),
                 event_handle_creation_address: <a href="guid.md#0x1_guid_creator_address">guid::creator_address</a>(
                     <a href="event.md#0x1_event_guid">event::guid</a>(&deposit_events)
                 ),
@@ -4225,6 +4277,27 @@ The creator of <code>CoinType</code> must be <code>@aptos_framework</code>.
     symbol: symbol.bytes
 };
 <b>ensures</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(addr);
+</code></pre>
+
+
+Make sure <code>name</code> and <code>symbol</code> are legal length.
+Only the creator of <code>CoinType</code> can initialize.
+
+
+<a id="0x1_coin_InitializeInternalSchema"></a>
+
+
+<pre><code><b>schema</b> <a href="coin.md#0x1_coin_InitializeInternalSchema">InitializeInternalSchema</a>&lt;CoinType&gt; {
+    <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+    symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+    <b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>let</b> coin_address = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
+    <b>aborts_if</b> coin_address != account_addr;
+    <b>aborts_if</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(account_addr);
+    <b>aborts_if</b> len(name) &gt; <a href="coin.md#0x1_coin_MAX_COIN_NAME_LENGTH">MAX_COIN_NAME_LENGTH</a>;
+    <b>aborts_if</b> len(symbol) &gt; <a href="coin.md#0x1_coin_MAX_COIN_SYMBOL_LENGTH">MAX_COIN_SYMBOL_LENGTH</a>;
+}
 </code></pre>
 
 
