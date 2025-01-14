@@ -59,7 +59,10 @@ use crate::{
     },
 };
 pub use function::{Function, LoadedFunction};
-pub(crate) use function::{FunctionHandle, FunctionInstantiation, LoadedFunctionOwner};
+pub(crate) use function::{
+    FunctionHandle, FunctionInstantiation, LazyLoadedFunction, LazyLoadedFunctionState,
+    LoadedFunctionOwner,
+};
 pub use modules::Module;
 pub(crate) use modules::{LegacyModuleCache, LegacyModuleStorage, LegacyModuleStorageAdapter};
 use move_binary_format::file_format::{
@@ -70,6 +73,7 @@ use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     loaded_data::runtime_types::{StructLayout, TypeBuilder},
     value_serde::FunctionValueExtension,
+    values::{AbstractFunction, SerializedFunctionData},
 };
 pub use script::Script;
 pub(crate) use script::ScriptCache;
@@ -1662,6 +1666,26 @@ impl<'a> FunctionValueExtension for Resolver<'a> {
         };
         function_value_extension.get_function_arg_tys(module_id, function_name, ty_arg_tags)
     }
+
+    fn create_from_serialization_data(
+        &self,
+        data: SerializedFunctionData,
+    ) -> PartialVMResult<Box<dyn AbstractFunction>> {
+        let function_value_extension = FunctionValueExtensionAdapter {
+            module_storage: self.module_storage,
+        };
+        function_value_extension.create_from_serialization_data(data)
+    }
+
+    fn get_serialization_data(
+        &self,
+        fun: &dyn AbstractFunction,
+    ) -> PartialVMResult<SerializedFunctionData> {
+        let function_value_extension = FunctionValueExtensionAdapter {
+            module_storage: self.module_storage,
+        };
+        function_value_extension.get_serialization_data(fun)
+    }
 }
 
 /// Maximal depth of a value in terms of type depth.
@@ -1783,6 +1807,18 @@ impl Loader {
                 subst_struct_formula.scale(1);
                 subst_struct_formula
             },
+            Type::Function {
+                args,
+                results,
+                abilities: _,
+            } => DepthFormula::normalize(
+                args.iter()
+                    .chain(results)
+                    .map(|rc| {
+                        self.calculate_depth_of_type(rc.as_ref(), module_store, module_storage)
+                    })
+                    .collect::<PartialVMResult<Vec<_>>>()?,
+            ),
         })
     }
 
@@ -1865,6 +1901,8 @@ impl Loader {
 // Matches the actual returned type to the expected type, binding any type args to the
 // necessary type as stored in the map. The expected type must be a concrete type (no TyParam).
 // Returns true if a successful match is made.
+// TODO: is this really needed in presence of paranoid mode? This does a deep structural
+//   comparison and is expensive.
 fn match_return_type<'a>(
     returned: &Type,
     expected: &'a Type,
@@ -1886,6 +1924,30 @@ fn match_return_type<'a>(
         },
         (Type::Vector(ret_inner), Type::Vector(expected_inner)) => {
             match_return_type(ret_inner, expected_inner, map)
+        },
+        // Function types, the expected abilities need to be a subset of the provided ones,
+        // and recursively argument and result types need to match.
+        (
+            Type::Function {
+                args,
+                results,
+                abilities,
+            },
+            Type::Function {
+                args: exp_args,
+                results: exp_results,
+                abilities: exp_abilities,
+            },
+        ) => {
+            exp_abilities.is_subset(*abilities)
+                && args
+                    .iter()
+                    .zip(exp_args)
+                    .all(|(t, e)| match_return_type(t, e, map))
+                && results
+                    .iter()
+                    .zip(exp_results)
+                    .all(|(t, e)| match_return_type(t, e, map))
         },
         // Abilities should not contribute to the equality check as they just serve for caching computations.
         // For structs the both need to be the same struct.
@@ -1939,6 +2001,7 @@ fn match_return_type<'a>(
         | (Type::Signer, _)
         | (Type::Struct { .. }, _)
         | (Type::StructInstantiation { .. }, _)
+        | (Type::Function { .. }, _)
         | (Type::Vector(_), _)
         | (Type::MutableReference(_), _)
         | (Type::Reference(_), _) => false,

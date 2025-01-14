@@ -263,11 +263,9 @@ impl InterpreterImpl {
 
                     // Charge gas
                     let module_id = function.module_id().ok_or_else(|| {
-                        let err =
-                            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                                .with_message(
-                                    "Failed to get native function module id".to_string(),
-                                );
+                        let err = PartialVMError::new_invariant_violation(
+                            "Failed to get native function module id".to_string(),
+                        );
                         set_err_info!(current_frame, err)
                     })?;
                     gas_meter
@@ -320,8 +318,9 @@ impl InterpreterImpl {
                     let module_id = function
                         .module_id()
                         .ok_or_else(|| {
-                            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                                .with_message("Failed to get native function module id".to_string())
+                            PartialVMError::new_invariant_violation(
+                                "Failed to get native function module id",
+                            )
                         })
                         .map_err(|e| set_err_info!(current_frame, e))?;
                     gas_meter
@@ -589,13 +588,9 @@ impl InterpreterImpl {
                 // Paranoid check to protect us against incorrect native function implementations. A native function that
                 // returns a different number of values than its declared types will trigger this check.
                 if return_values.len() != function.return_tys().len() {
-                    return Err(
-                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                            .with_message(
-                            "Arity mismatch: return value count does not match return type count"
-                                .to_string(),
-                        ),
-                    );
+                    return Err(PartialVMError::new_invariant_violation(
+                        "Arity mismatch: return value count does not match return type count",
+                    ));
                 }
                 // Put return values on the top of the operand stack, where the caller will find them.
                 // This is one of only two times the operand stack is shared across call stack frames; the other is in handling
@@ -619,13 +614,14 @@ impl InterpreterImpl {
                 Err(PartialVMError::new(StatusCode::ABORTED).with_sub_status(abort_code))
             },
             NativeResult::OutOfGas { partial_cost } => {
-                let err = match gas_meter.charge_native_function(
-                    partial_cost,
-                    Option::<std::iter::Empty<&Value>>::None,
-                ) {
+                let err = match gas_meter
+                    .charge_native_function(partial_cost, Option::<std::iter::Empty<&Value>>::None)
+                {
                     Err(err) if err.major_status() == StatusCode::OUT_OF_GAS => err,
-                    Ok(_) | Err(_) => PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
-                        "The partial cost returned by the native function did not cause the gas meter to trigger an OutOfGas error, at least one of them is violating the contract".to_string()
+                    Ok(_) | Err(_) => PartialVMError::new_invariant_violation(
+                        "The partial cost returned by the native function did \
+                        not cause the gas meter to trigger an OutOfGas error, at least \
+                        one of them is violating the contract",
                     ),
                 };
 
@@ -1420,6 +1416,18 @@ fn check_depth_of_type_impl(
             )?;
             check_depth!(formula.solve(&ty_arg_depths))
         },
+        Type::Function { args, results, .. } => {
+            let mut ty_max = depth;
+            for ty in args.iter().chain(results.iter()).map(|rc| rc.as_ref()) {
+                ty_max = ty_max.max(check_depth_of_type_impl(
+                    resolver,
+                    ty,
+                    max_depth,
+                    check_depth!(1),
+                )?);
+            }
+            ty_max
+        },
         Type::TyParam(_) => {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -1537,7 +1545,7 @@ impl Frame {
                 )?;
 
                 match instruction {
-                    // TODO: implement closures
+                    // TODO(#15664): implement closures
                     Bytecode::PackClosure(..)
                     | Bytecode::PackClosureGeneric(..)
                     | Bytecode::CallClosure(..) => {

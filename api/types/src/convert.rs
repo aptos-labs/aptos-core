@@ -892,6 +892,11 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             MoveTypeLayout::Struct(struct_layout) => {
                 self.try_into_vm_value_struct(struct_layout, val)?
             },
+            MoveTypeLayout::Function(..) => {
+                // TODO(#15664): do we actually need this? It appears the code here is dead and
+                //   nowhere used
+                bail!("unexpected move type {:?} for value {:?}", layout, val)
+            },
 
             // Some values, e.g., signer or ones with custom serialization
             // (native), are not stored to storage and so we do not expect
