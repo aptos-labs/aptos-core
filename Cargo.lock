@@ -4737,9 +4737,11 @@ dependencies = [
  "aptos-vm-environment",
  "aptos-vm-genesis",
  "aptos-vm-logging",
- "aptos-vm-types",
  "fail",
+ "move-binary-format",
  "move-core-types",
+ "move-vm-runtime",
+ "move-vm-types",
  "rand 0.7.3",
 ]
 

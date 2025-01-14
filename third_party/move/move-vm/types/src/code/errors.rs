@@ -14,7 +14,7 @@ macro_rules! panic_error {
 
 #[macro_export]
 macro_rules! module_storage_error {
-    ($addr:ident, $name:ident, $err:ident) => {
+    ($addr:expr, $name:expr, $err:ident) => {
         move_binary_format::errors::PartialVMError::new(
             move_core_types::vm_status::StatusCode::STORAGE_ERROR,
         )

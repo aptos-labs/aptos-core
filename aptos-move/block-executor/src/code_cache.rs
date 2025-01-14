@@ -75,7 +75,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView
         deserialized_code: Self::Deserialized,
         extension: Arc<Self::Extension>,
         version: Self::Version,
-    ) -> VMResult<()> {
+    ) -> VMResult<Arc<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
         self.as_module_cache().insert_deserialized_module(
             key,
             deserialized_code,
