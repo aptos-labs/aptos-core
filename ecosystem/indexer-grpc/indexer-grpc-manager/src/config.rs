@@ -20,6 +20,9 @@ pub(crate) struct ServiceConfig {
 pub struct IndexerGrpcManagerConfig {
     pub(crate) chain_id: u64,
     pub(crate) service_config: ServiceConfig,
+    pub(crate) self_advertised_address: String,
+    pub(crate) grpc_manager_addresses: Vec<String>,
+    pub(crate) fullnode_addresses: Vec<String>,
 }
 
 #[async_trait::async_trait]

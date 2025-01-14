@@ -176,7 +176,7 @@ impl serde::Serialize for FullnodeInfo {
     {
         use serde::ser::SerializeStruct;
         let mut len = 0;
-        if self.chain_id.is_some() {
+        if self.chain_id != 0 {
             len += 1;
         }
         if self.timestamp.is_some() {
@@ -186,8 +186,8 @@ impl serde::Serialize for FullnodeInfo {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("aptos.indexer.v1.FullnodeInfo", len)?;
-        if let Some(v) = self.chain_id.as_ref() {
-            struct_ser.serialize_field("chainId", ToString::to_string(&v).as_str())?;
+        if self.chain_id != 0 {
+            struct_ser.serialize_field("chainId", ToString::to_string(&self.chain_id).as_str())?;
         }
         if let Some(v) = self.timestamp.as_ref() {
             struct_ser.serialize_field("timestamp", v)?;
@@ -270,7 +270,7 @@ impl<'de> serde::Deserialize<'de> for FullnodeInfo {
                                 return Err(serde::de::Error::duplicate_field("chainId"));
                             }
                             chain_id__ =
-                                map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
+                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
                         GeneratedField::Timestamp => {
@@ -290,7 +290,7 @@ impl<'de> serde::Deserialize<'de> for FullnodeInfo {
                     }
                 }
                 Ok(FullnodeInfo {
-                    chain_id: chain_id__,
+                    chain_id: chain_id__.unwrap_or_default(),
                     timestamp: timestamp__,
                     known_latest_version: known_latest_version__,
                 })
@@ -625,7 +625,7 @@ impl serde::Serialize for GrpcManagerInfo {
     {
         use serde::ser::SerializeStruct;
         let mut len = 0;
-        if self.chain_id.is_some() {
+        if self.chain_id != 0 {
             len += 1;
         }
         if self.timestamp.is_some() {
@@ -638,8 +638,8 @@ impl serde::Serialize for GrpcManagerInfo {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("aptos.indexer.v1.GrpcManagerInfo", len)?;
-        if let Some(v) = self.chain_id.as_ref() {
-            struct_ser.serialize_field("chainId", ToString::to_string(&v).as_str())?;
+        if self.chain_id != 0 {
+            struct_ser.serialize_field("chainId", ToString::to_string(&self.chain_id).as_str())?;
         }
         if let Some(v) = self.timestamp.as_ref() {
             struct_ser.serialize_field("timestamp", v)?;
@@ -730,7 +730,7 @@ impl<'de> serde::Deserialize<'de> for GrpcManagerInfo {
                                 return Err(serde::de::Error::duplicate_field("chainId"));
                             }
                             chain_id__ =
-                                map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
+                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
                         GeneratedField::Timestamp => {
@@ -756,7 +756,7 @@ impl<'de> serde::Deserialize<'de> for GrpcManagerInfo {
                     }
                 }
                 Ok(GrpcManagerInfo {
-                    chain_id: chain_id__,
+                    chain_id: chain_id__.unwrap_or_default(),
                     timestamp: timestamp__,
                     known_latest_version: known_latest_version__,
                     master_address: master_address__,
@@ -960,7 +960,7 @@ impl serde::Serialize for HistoricalDataServiceInfo {
     {
         use serde::ser::SerializeStruct;
         let mut len = 0;
-        if self.chain_id.is_some() {
+        if self.chain_id != 0 {
             len += 1;
         }
         if self.timestamp.is_some() {
@@ -973,8 +973,8 @@ impl serde::Serialize for HistoricalDataServiceInfo {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("aptos.indexer.v1.HistoricalDataServiceInfo", len)?;
-        if let Some(v) = self.chain_id.as_ref() {
-            struct_ser.serialize_field("chainId", ToString::to_string(&v).as_str())?;
+        if self.chain_id != 0 {
+            struct_ser.serialize_field("chainId", ToString::to_string(&self.chain_id).as_str())?;
         }
         if let Some(v) = self.timestamp.as_ref() {
             struct_ser.serialize_field("timestamp", v)?;
@@ -1065,7 +1065,7 @@ impl<'de> serde::Deserialize<'de> for HistoricalDataServiceInfo {
                                 return Err(serde::de::Error::duplicate_field("chainId"));
                             }
                             chain_id__ =
-                                map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
+                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
                         GeneratedField::Timestamp => {
@@ -1091,7 +1091,7 @@ impl<'de> serde::Deserialize<'de> for HistoricalDataServiceInfo {
                     }
                 }
                 Ok(HistoricalDataServiceInfo {
-                    chain_id: chain_id__,
+                    chain_id: chain_id__.unwrap_or_default(),
                     timestamp: timestamp__,
                     known_latest_version: known_latest_version__,
                     stream_info: stream_info__,
@@ -1109,7 +1109,7 @@ impl serde::Serialize for LiveDataServiceInfo {
     {
         use serde::ser::SerializeStruct;
         let mut len = 0;
-        if self.chain_id.is_some() {
+        if self.chain_id != 0 {
             len += 1;
         }
         if self.timestamp.is_some() {
@@ -1125,8 +1125,8 @@ impl serde::Serialize for LiveDataServiceInfo {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("aptos.indexer.v1.LiveDataServiceInfo", len)?;
-        if let Some(v) = self.chain_id.as_ref() {
-            struct_ser.serialize_field("chainId", ToString::to_string(&v).as_str())?;
+        if self.chain_id != 0 {
+            struct_ser.serialize_field("chainId", ToString::to_string(&self.chain_id).as_str())?;
         }
         if let Some(v) = self.timestamp.as_ref() {
             struct_ser.serialize_field("timestamp", v)?;
@@ -1225,7 +1225,7 @@ impl<'de> serde::Deserialize<'de> for LiveDataServiceInfo {
                                 return Err(serde::de::Error::duplicate_field("chainId"));
                             }
                             chain_id__ =
-                                map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
+                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
                         GeneratedField::Timestamp => {
@@ -1259,7 +1259,7 @@ impl<'de> serde::Deserialize<'de> for LiveDataServiceInfo {
                     }
                 }
                 Ok(LiveDataServiceInfo {
-                    chain_id: chain_id__,
+                    chain_id: chain_id__.unwrap_or_default(),
                     timestamp: timestamp__,
                     known_latest_version: known_latest_version__,
                     stream_info: stream_info__,
