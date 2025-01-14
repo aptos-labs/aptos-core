@@ -45,7 +45,7 @@ use move_vm_types::{
 use std::{
     cell::RefCell,
     cmp::min,
-    collections::{BTreeSet, VecDeque},
+    collections::{btree_map, BTreeSet, VecDeque},
     fmt::Write,
     rc::Rc,
 };
@@ -284,11 +284,11 @@ impl InterpreterImpl {
             self.active_modules.insert(module_id.clone());
         }
 
-        let frame_cache = Rc::new(RefCell::new(Default::default()));
+        let frame_cache = Rc::new(RefCell::<FrameTypeCache>::new(Default::default()));
 
-        if RTCaches::per_instruction_cache_enabled() && !function.is_native() {
-            let f_cache: &mut FrameTypeCache = &mut frame_cache.borrow_mut();
-            f_cache
+        if RTCaches::caches_enabled() && !function.is_native() {
+            frame_cache
+                .borrow_mut()
                 .per_instruction_cache
                 .resize(function.code_size(), PerInstructionCache::Nothing);
         }
@@ -344,28 +344,26 @@ impl InterpreterImpl {
                     }
                 },
                 ExitCode::Call(fh_idx) => {
-                    let (function, frame_cache) = if RTCaches::call_tree_cache_enabled() {
+                    let (function, frame_cache) = if RTCaches::caches_enabled() {
                         let current_frame_cache = &mut *current_frame.ty_cache.borrow_mut();
 
                         match current_frame_cache.sub_frame_cache.entry(fh_idx) {
-                            std::collections::btree_map::Entry::Occupied(entry) => {
+                            btree_map::Entry::Occupied(entry) => {
                                 let entry = entry.get();
                                 (Rc::clone(&entry.0), Rc::clone(&entry.1))
                             },
-                            std::collections::btree_map::Entry::Vacant(entry) => {
-                                let function = Rc::<LoadedFunction>::new(self.load_function(
+                            btree_map::Entry::Vacant(entry) => {
+                                let function = Rc::new(self.load_function(
                                     &resolver,
                                     &current_frame,
                                     fh_idx,
                                 )?);
-                                let frame_cache = Rc::new(RefCell::new(Default::default()));
+                                let frame_cache =
+                                    Rc::new(RefCell::<FrameTypeCache>::new(Default::default()));
 
-                                if RTCaches::per_instruction_cache_enabled()
-                                    && !function.is_native()
-                                {
-                                    let f_cache: &mut FrameTypeCache =
-                                        &mut frame_cache.borrow_mut();
-                                    f_cache
+                                if !function.is_native() {
+                                    frame_cache
+                                        .borrow_mut()
                                         .per_instruction_cache
                                         .resize(function.code_size(), PerInstructionCache::Nothing);
                                 }
@@ -426,15 +424,15 @@ impl InterpreterImpl {
                     )?;
                 },
                 ExitCode::CallGeneric(idx) => {
-                    let (function, frame_cache) = if RTCaches::call_tree_cache_enabled() {
+                    let (function, frame_cache) = if RTCaches::caches_enabled() {
                         let current_frame_cache = &mut *current_frame.ty_cache.borrow_mut();
 
                         match current_frame_cache.generic_sub_frame_cache.entry(idx) {
-                            std::collections::btree_map::Entry::Occupied(entry) => {
+                            btree_map::Entry::Occupied(entry) => {
                                 let entry = entry.get();
                                 (Rc::clone(&entry.0), Rc::clone(&entry.1))
                             },
-                            std::collections::btree_map::Entry::Vacant(entry) => {
+                            btree_map::Entry::Vacant(entry) => {
                                 let function =
                                     Rc::<LoadedFunction>::new(self.load_generic_function(
                                         &resolver,
@@ -442,14 +440,12 @@ impl InterpreterImpl {
                                         gas_meter,
                                         idx,
                                     )?);
-                                let frame_cache = Rc::new(RefCell::new(Default::default()));
+                                let frame_cache =
+                                    Rc::new(RefCell::<FrameTypeCache>::new(Default::default()));
 
-                                if RTCaches::per_instruction_cache_enabled()
-                                    && !function.is_native()
-                                {
-                                    let f_cache: &mut FrameTypeCache =
-                                        &mut frame_cache.borrow_mut();
-                                    f_cache
+                                if !function.is_native() {
+                                    frame_cache
+                                        .borrow_mut()
                                         .per_instruction_cache
                                         .resize(function.code_size(), PerInstructionCache::Nothing);
                                 }
@@ -469,7 +465,6 @@ impl InterpreterImpl {
                         (function, frame_cache)
                     };
 
-                    // Charge gas?
                     let module_id = function
                         .module_id()
                         .ok_or_else(|| {
@@ -477,6 +472,7 @@ impl InterpreterImpl {
                                 .with_message("Failed to get native function module id".to_string())
                         })
                         .map_err(|e| set_err_info!(current_frame, e))?;
+                    // Charge gas
                     gas_meter
                         .charge_call_generic(
                             module_id,
@@ -864,11 +860,11 @@ impl InterpreterImpl {
                     }
                 }
 
-                let frame_cache = Rc::new(RefCell::new(Default::default()));
+                let frame_cache = Rc::new(RefCell::<FrameTypeCache>::new(Default::default()));
 
-                if RTCaches::per_instruction_cache_enabled() && !target_func.is_native() {
-                    let f_cache: &mut FrameTypeCache = &mut frame_cache.borrow_mut();
-                    f_cache
+                if RTCaches::caches_enabled() && !target_func.is_native() {
+                    frame_cache
+                        .borrow_mut()
                         .per_instruction_cache
                         .resize(target_func.code_size(), PerInstructionCache::Nothing);
                 }
@@ -1938,7 +1934,7 @@ impl Frame {
                         interpreter.operand_stack.push(field_ref)?;
                     },
                     Bytecode::Pack(sd_idx) => {
-                        let field_count = if RTCaches::per_instruction_cache_enabled() {
+                        let field_count = if RTCaches::caches_enabled() {
                             let cached_field_count =
                                 &ty_cache.per_instruction_cache[self.pc as usize];
                             if let PerInstructionCache::Pack(ref field_count) = cached_field_count {

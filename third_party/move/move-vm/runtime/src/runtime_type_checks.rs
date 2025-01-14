@@ -535,13 +535,13 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             | Bytecode::And => {
                 let rhs_ty = operand_stack.pop_ty()?;
                 rhs_ty.paranoid_check_eq(operand_stack.top_ty()?)?;
+                // NO-OP, same as the two lines below when the types are indeed the same:
                 // let lhs_ty = operand_stack.pop_ty()?;
-                // rhs_ty.paranoid_check_eq(&lhs_ty)?;
                 // operand_stack.push_ty(rhs_ty)?;
             },
             Bytecode::Shl | Bytecode::Shr => {
                 let _rhs = operand_stack.pop_ty()?;
-                // NO-OP, same as the two lines below
+                // NO-OP, same as the two lines below:
                 // let lhs = operand_stack.pop_ty()?;
                 // operand_stack.push_ty(lhs)?;
             },
@@ -632,6 +632,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             Bytecode::Nop => (),
             Bytecode::Not => {
                 operand_stack.top_ty()?.paranoid_check_is_bool_ty()?;
+                // NO-OP,  same as the two lines below:
                 // let bool_ty = ty_builder.create_bool_ty();
                 // operand_stack.push_ty(bool_ty)?;
             },
