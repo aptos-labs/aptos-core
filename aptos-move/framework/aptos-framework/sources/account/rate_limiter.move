@@ -47,12 +47,8 @@ module aptos_framework::rate_limiter {
         // Calculate the full tokens that can be added
         let accumulated_amount = time_passed * limiter.capacity + limiter.fractional_accumulated;
         let new_tokens = accumulated_amount / limiter.refill_interval;
-        // Calculate the remaining fractional amount.
-
-        if (new_tokens > 0) {
-            limiter.current_amount = math64::min(limiter.current_amount + new_tokens, limiter.capacity);
-            limiter.last_refill_timestamp = current_time;
-        };
+        limiter.current_amount = math64::min(limiter.current_amount + new_tokens, limiter.capacity);
+        limiter.last_refill_timestamp = current_time;
 
         // Update the fractional amount accumulated for the next refill cycle
         limiter.fractional_accumulated = accumulated_amount % limiter.refill_interval;
