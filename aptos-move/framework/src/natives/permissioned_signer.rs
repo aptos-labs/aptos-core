@@ -17,13 +17,13 @@ use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
 /***************************************************************************************************
- * native fun is_permissioned_signer
+ * native fun is_permissioned_signer_impl
  *
  *   Returns true if the signer passed in is a permissioned signer
  *   gas cost: base_cost
  *
  **************************************************************************************************/
-fn native_is_permissioned_signer(
+fn native_is_permissioned_signer_impl(
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -95,8 +95,12 @@ pub fn make_all(
 ) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let natives = [
         (
+            "is_permissioned_signer_impl",
+            native_is_permissioned_signer_impl as RawSafeNative,
+        ),
+        (
             "is_permissioned_signer",
-            native_is_permissioned_signer as RawSafeNative,
+            native_is_permissioned_signer_impl as RawSafeNative,
         ),
         ("permission_address", native_permission_address),
         (
