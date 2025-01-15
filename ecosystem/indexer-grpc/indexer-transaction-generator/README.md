@@ -26,10 +26,10 @@ cargo run -p aptos-indexer-transaction-generator -- \
   * One file called `testing_accounts.yaml`, which contains testing accounts used.
       ```yaml
       accounts:
-        - private_key: "0x99978d48e7b2d50d0a7a3273db0929447ae59635e71118fa256af654c0ce56c9"
+        a531b7fdd7917f73ca216d89a8d9ce0cf7e7cfb9086ca6f6cbf9521532748d16:
+          private_key: "0x99978d48e7b2d50d0a7a3273db0929447ae59635e71118fa256af654c0ce56c9"
           public_key: "0x39b4acc85e026dc056464a5ea00b98f858260eaad2b74dd30b86ae0d4d94ddf5"
           account: a531b7fdd7917f73ca216d89a8d9ce0cf7e7cfb9086ca6f6cbf9521532748d16
-        - ...
       ```
   * One file called `imported_transactions.yaml`, which is used for importing transactions.
     
@@ -47,15 +47,12 @@ cargo run -p aptos-indexer-transaction-generator -- \
       ```
   * One folder called `move_fixtures`, which contains move scripts and configs.
     * An example script transaction config looks like:
-      ```yaml
+    ```yaml
       transactions:
-        - output_name: simple_user_script1
-          script_path: simple_user_script
-          sender_address: __ACCOUNT_A__
-        - output_name: simple_user_script2
-          script_path: simple_user_script2
-          sender_address: __ACCOUNT_A__
-      ``` 
+        - output_name: fa_mint_transfer_burn
+          script_path: fa_mint_transfer_burn
+          sender_address: REPLACE_WITH_ACCOUNT_ADDRESS
+    ``` 
 
 
 You can check the example [here](imported_transactions).
