@@ -40,6 +40,14 @@ async fn handle_request(req: Request<Body>) -> Result<Response<Body>, Infallible
         (&Method::GET, "/about") => {
             build_response(origin, StatusCode::OK, ABOUT_JSON.deref().clone())
         },
+        (&Method::GET, "/cached/keyless-config") => build_response_for_optional_resource(
+            origin,
+            ONCHAIN_KEYLESS_CONFIG.read().as_ref().cloned(),
+        ),
+        (&Method::GET, "/cached/training-wheel-pub-key") => build_response_for_optional_resource(
+            origin,
+            ONCHAIN_GROTH16_VK.read().as_ref().cloned(),
+        ),
         (&Method::GET, "/v0/vuf-pub-key") => build_response(
             origin,
             StatusCode::OK,
@@ -77,16 +85,20 @@ async fn main() {
     }
     aptos_logger::Logger::new().init();
     start_metric_server();
-    start_external_resource_refresh_loop(
-        &std::env::var("ONCHAIN_GROTH16_VK_URL").unwrap(),
-        Duration::from_secs(10),
-        ONCHAIN_GROTH16_VK.clone(),
-    );
-    start_external_resource_refresh_loop(
-        &std::env::var("ONCHAIN_KEYLESS_CONFIG_URL").unwrap(),
-        Duration::from_secs(10),
-        ONCHAIN_KEYLESS_CONFIG.clone(),
-    );
+    if let Ok(url) = std::env::var("ONCHAIN_GROTH16_VK_URL") {
+        start_external_resource_refresh_loop(
+            &url,
+            Duration::from_secs(10),
+            ONCHAIN_GROTH16_VK.clone(),
+        );
+    }
+    if let Ok(url) = std::env::var("ONCHAIN_KEYLESS_CONFIG_URL") {
+        start_external_resource_refresh_loop(
+            &url,
+            Duration::from_secs(10),
+            ONCHAIN_KEYLESS_CONFIG.clone(),
+        );
+    }
 
     // TODO: JWKs should be from on-chain states?
     jwk::start_jwk_refresh_loop(
@@ -184,4 +196,17 @@ fn build_response(origin: String, status_code: StatusCode, body_str: String) -> 
         .header(CONTENT_TYPE, "application/json")
         .body(Body::from(body_str))
         .expect("Response should build")
+}
+
+fn build_response_for_optional_resource<T: Serialize>(
+    origin: String,
+    res: Option<T>,
+) -> Response<Body> {
+    match res {
+        None => build_response(origin, StatusCode::NOT_FOUND, "".to_string()),
+        Some(val) => match serde_json::to_string(&val) {
+            Ok(s) => build_response(origin, StatusCode::OK, s),
+            Err(e) => build_response(origin, StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        },
+    }
 }

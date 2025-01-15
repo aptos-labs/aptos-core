@@ -61,3 +61,17 @@ pub fn unhexlify_api_bytes(api_output: &str) -> Result<Vec<u8>> {
         .map_err(|e| anyhow!("unhexlify_api_bytes() failed at decoding: {e}"))?;
     Ok(bytes)
 }
+
+#[test]
+fn test_unhexlify_api_bytes() {
+    assert_eq!(
+        vec![0x00_u8, 0x01, 0xFF],
+        unhexlify_api_bytes("0x0001ff").unwrap()
+    );
+    assert!(unhexlify_api_bytes("0x").unwrap().is_empty());
+    assert!(unhexlify_api_bytes("0001ff").is_err());
+    assert!(unhexlify_api_bytes("0x0001fg").is_err());
+    assert!(unhexlify_api_bytes("000").is_err());
+    assert!(unhexlify_api_bytes("0").is_err());
+    assert!(unhexlify_api_bytes("").is_err());
+}
