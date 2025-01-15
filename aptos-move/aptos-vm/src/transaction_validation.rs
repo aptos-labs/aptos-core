@@ -127,7 +127,7 @@ pub(crate) fn run_script_prologue(
                     serialized_signers.sender(),
                     serialized_signers
                         .fee_payer()
-                        .expect("fee_payer signer must exist"),
+                        .ok_or_else(|| VMStatus::error(StatusCode::UNREACHABLE, None))?,
                     txn_authentication_key
                         .as_move_value()
                         .simple_serialize()

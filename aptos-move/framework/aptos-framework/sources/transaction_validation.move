@@ -531,10 +531,10 @@ module aptos_framework::transaction_validation {
 
             if (transaction_fee_amount > storage_fee_refunded) {
                 let burn_amount = transaction_fee_amount - storage_fee_refunded;
-                transaction_fee::burn_fee(&create_signer::create_signer(gas_payer), burn_amount);
+                transaction_fee::burn_fee(gas_payer, burn_amount);
             } else if (transaction_fee_amount < storage_fee_refunded) {
                 let mint_amount = storage_fee_refunded - transaction_fee_amount;
-                transaction_fee::mint_and_refund(&create_signer::create_signer(gas_payer), mint_amount)
+                transaction_fee::mint_and_refund(gas_payer, mint_amount)
             };
         };
 
@@ -666,10 +666,10 @@ module aptos_framework::transaction_validation {
 
             if (transaction_fee_amount > storage_fee_refunded) {
                 let burn_amount = transaction_fee_amount - storage_fee_refunded;
-                transaction_fee::burn_fee(&gas_payer, burn_amount);
+                transaction_fee::burn_fee(gas_payer_address, burn_amount);
             } else if (transaction_fee_amount < storage_fee_refunded) {
                 let mint_amount = storage_fee_refunded - transaction_fee_amount;
-                transaction_fee::mint_and_refund(&gas_payer, mint_amount)
+                transaction_fee::mint_and_refund(gas_payer_address, mint_amount)
             };
         };
 
