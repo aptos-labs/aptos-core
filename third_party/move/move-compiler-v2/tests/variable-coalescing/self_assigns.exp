@@ -383,8 +383,7 @@ public fun m::test1($t0: u64) {
 [variant baseline]
 public fun m::test2($t0: u64): u64 {
      var $t1: u64 [unused]
-  0: $t0 := move($t0)
-  1: return $t0
+  0: return $t0
 }
 
 
@@ -413,8 +412,7 @@ public fun m::test3(): u64 {
  11: $t1 := move($t4)
  12: goto 2
  13: label L3
- 14: $t2 := move($t2)
- 15: return $t2
+ 14: return $t2
 }
 
 
@@ -441,8 +439,7 @@ public fun m::test4($t0: u64): u64 {
  10: $t2 := move($t4)
  11: goto 1
  12: label L3
- 13: $t0 := move($t0)
- 14: return $t0
+ 13: return $t0
 }
 
 

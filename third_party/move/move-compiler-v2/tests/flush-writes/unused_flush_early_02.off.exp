@@ -16,27 +16,26 @@ B0:
 public test(): u64 * u64 /* def_idx: 2 */ {
 L0:	loc0: u64
 L1:	loc1: u64
-L2:	loc2: u64
-L3:	loc3: bool
-L4:	loc4: u64
+L2:	loc2: bool
+L3:	loc3: u64
 B0:
 	0: Call one(): u64
 	1: Call one(): u64
 	2: Call one(): u64
-	3: StLoc[1](loc1: u64)
+	3: StLoc[0](loc0: u64)
 	4: LdU64(0)
 	5: Eq
-	6: StLoc[3](loc3: bool)
-	7: StLoc[4](loc4: u64)
-	8: MoveLoc[3](loc3: bool)
+	6: StLoc[2](loc2: bool)
+	7: StLoc[3](loc3: u64)
+	8: MoveLoc[2](loc2: bool)
 	9: BrTrue(11)
 B1:
 	10: Branch(12)
 B2:
 	11: Call bar()
 B3:
-	12: MoveLoc[4](loc4: u64)
-	13: MoveLoc[1](loc1: u64)
+	12: MoveLoc[3](loc3: u64)
+	13: MoveLoc[0](loc0: u64)
 	14: Ret
 }
 }

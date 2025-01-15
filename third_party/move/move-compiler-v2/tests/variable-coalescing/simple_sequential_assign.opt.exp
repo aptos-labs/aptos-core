@@ -98,8 +98,7 @@ fun m::sequential($t0: u64): u64 {
      var $t4: u64 [unused]
      var $t5: u64 [unused]
      var $t6: u64 [unused]
-  0: $t0 := move($t0)
-  1: return $t0
+  0: return $t0
 }
 
 

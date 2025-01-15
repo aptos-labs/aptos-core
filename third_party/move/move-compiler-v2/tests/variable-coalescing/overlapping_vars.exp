@@ -101,9 +101,10 @@ fun m::test(): u64 {
   0: $t1 := 1
   1: $t2 := 2
   2: $t3 := 3
-  3: $t1 := +($t1, $t2)
-  4: $t1 := +($t1, $t3)
-  5: return $t1
+  3: $t1 := move($t1)
+  4: $t1 := +($t1, $t2)
+  5: $t1 := +($t1, $t3)
+  6: return $t1
 }
 
 
@@ -114,6 +115,8 @@ module c0ffee.m {
 
 test(): u64 /* def_idx: 0 */ {
 L0:	loc0: u64
+L1:	loc1: u64
+L2:	loc2: u64
 B0:
 	0: LdU64(1)
 	1: LdU64(2)

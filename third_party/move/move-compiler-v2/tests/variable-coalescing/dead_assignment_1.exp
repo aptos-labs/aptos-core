@@ -65,8 +65,7 @@ fun m::dead($t0: u64): u64 {
      var $t1: u64 [unused]
      var $t2: u64 [unused]
      var $t3: u64 [unused]
-  0: $t0 := move($t0)
-  1: return $t0
+  0: return $t0
 }
 
 
