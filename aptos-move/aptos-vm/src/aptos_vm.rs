@@ -39,7 +39,10 @@ use aptos_framework::{
 };
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
-use aptos_gas_schedule::{AptosGasParameters, VMGasParameters};
+use aptos_gas_schedule::{
+    gas_feature_versions::{RELEASE_V1_10, RELEASE_V1_26},
+    AptosGasParameters, VMGasParameters,
+};
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_metrics_core::TimerHelper;
 #[cfg(any(test, feature = "testing"))]
@@ -776,7 +779,7 @@ impl AptosVM {
         Ok((VMStatus::Executed, output))
     }
 
-    fn validate_and_execute_script(
+    fn validate_and_execute_script<'a>(
         &self,
         session: &mut SessionExt,
         serialized_signers: &SerializedSigners,
@@ -784,8 +787,9 @@ impl AptosVM {
         // Note: cannot use AptosGasMeter because it is not implemented for
         //       UnmeteredGasMeter.
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        script: &Script,
+        traversal_context: &mut TraversalContext<'a>,
+        senders: Vec<AccountAddress>,
+        script: &'a Script,
     ) -> Result<(), VMStatus> {
         if !self
             .features()
@@ -803,12 +807,20 @@ impl AptosVM {
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
-        if self.gas_feature_version() >= 15 {
+        if self.gas_feature_version() >= RELEASE_V1_10 {
             session.check_script_dependencies_and_check_gas(
                 code_storage,
                 gas_meter,
                 traversal_context,
                 script.code(),
+            )?;
+        }
+        if self.gas_feature_version() >= RELEASE_V1_26 {
+            session.check_type_tag_dependencies_and_charge_gas(
+                code_storage,
+                gas_meter,
+                traversal_context,
+                script.ty_args(),
             )?;
         }
 
@@ -873,7 +885,7 @@ impl AptosVM {
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
-        if self.gas_feature_version() >= 15 {
+        if self.gas_feature_version() >= RELEASE_V1_10 {
             let module_id = traversal_context
                 .referenced_module_ids
                 .alloc(entry_fn.module().clone());
@@ -882,6 +894,15 @@ impl AptosVM {
                 gas_meter,
                 traversal_context,
                 [(module_id.address(), module_id.name())],
+            )?;
+        }
+
+        if self.gas_feature_version() >= RELEASE_V1_26 {
+            session.check_type_tag_dependencies_and_charge_gas(
+                module_storage,
+                gas_meter,
+                traversal_context,
+                entry_fn.ty_args(),
             )?;
         }
 
@@ -1596,7 +1617,7 @@ impl AptosVM {
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
-        if self.gas_feature_version() >= 15 {
+        if self.gas_feature_version() >= RELEASE_V1_10 {
             // Charge old versions of existing modules, in case of upgrades.
             for module in modules.iter() {
                 let addr = module.self_addr();
