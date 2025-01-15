@@ -36,11 +36,6 @@ module aptos_framework::randomness {
         seed: Option<vector<u8>>,
     }
 
-    struct Hahaha has key {
-        hihi: vector<u8>,
-        hihihi: vector<u8>,
-    }
-
     #[event]
     /// Event emitted every time a public randomness API in this module is called.
     struct RandomnessGeneratedEvent has store, drop {
@@ -56,7 +51,6 @@ module aptos_framework::randomness {
                 round: 0,
                 seed: option::none(),
             });
-            move_to(framework, Hahaha { hihi: vector[], hihihi: vector[1] });
         }
     }
 

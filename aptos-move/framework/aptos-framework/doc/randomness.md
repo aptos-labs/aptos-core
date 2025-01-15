@@ -13,7 +13,6 @@ Security holds under the same proof-of-stake assumption that secures the Aptos n
 
 
 -  [Resource `PerBlockRandomness`](#0x1_randomness_PerBlockRandomness)
--  [Resource `Hahaha`](#0x1_randomness_Hahaha)
 -  [Struct `RandomnessGeneratedEvent`](#0x1_randomness_RandomnessGeneratedEvent)
 -  [Resource `Ghost$var`](#0x1_randomness_Ghost$var)
 -  [Constants](#@Constants_0)
@@ -101,39 +100,6 @@ This resource is updated in every block prologue.
 </dd>
 <dt>
 <code>seed: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-<a id="0x1_randomness_Hahaha"></a>
-
-## Resource `Hahaha`
-
-
-
-<pre><code><b>struct</b> <a href="randomness.md#0x1_randomness_Hahaha">Hahaha</a> <b>has</b> key
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>hihi: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>hihihi: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
 <dd>
 
@@ -258,7 +224,6 @@ Must be called in tests to initialize the <code><a href="randomness.md#0x1_rando
             round: 0,
             seed: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
         });
-        <b>move_to</b>(framework, <a href="randomness.md#0x1_randomness_Hahaha">Hahaha</a> { hihi: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[], hihihi: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[1] });
     }
 }
 </code></pre>
@@ -1023,21 +988,6 @@ function as its payload.
 
 
 
-
-<a id="0x1_randomness_spec_safe_add_mod"></a>
-
-
-<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_spec_safe_add_mod">spec_safe_add_mod</a>(a: u256, b: u256, m: u256): u256 {
-   <b>if</b> (a &lt; m - b) {
-       a + b
-   } <b>else</b> {
-       a - (m - b)
-   }
-}
-</code></pre>
-
-
-
 <a id="@Specification_1_initialize"></a>
 
 ### Function `initialize`
@@ -1311,6 +1261,21 @@ function as its payload.
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
+</code></pre>
+
+
+
+
+<a id="0x1_randomness_spec_safe_add_mod"></a>
+
+
+<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_spec_safe_add_mod">spec_safe_add_mod</a>(a: u256, b: u256, m: u256): u256 {
+   <b>if</b> (a &lt; m - b) {
+       a + b
+   } <b>else</b> {
+       a - (m - b)
+   }
+}
 </code></pre>
 
 
