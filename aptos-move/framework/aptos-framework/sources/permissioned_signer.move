@@ -509,6 +509,24 @@ module aptos_framework::permissioned_signer {
         )
     }
 
+    /// Grant an unlimited permission to a permissioned signer **without** master signer's approvoal.
+    public(package) fun grant_unlimited_with_permissioned_signer<PermKey: copy + drop + store>(
+        permissioned: &signer,
+        perm: PermKey
+    ) acquires PermissionStorage {
+        if(!is_permissioned_signer(permissioned)) {
+            return;
+        };
+        insert_or(
+            permissioned,
+            perm,
+            |stored_permission| {
+                *stored_permission = StoredPermission::Unlimited;
+            },
+            StoredPermission::Unlimited,
+        )
+    }
+
     /// Increase the `capacity` of a permissioned signer **without** master signer's approvoal.
     ///
     /// The caller of the module will need to make sure the witness type `PermKey` can only be

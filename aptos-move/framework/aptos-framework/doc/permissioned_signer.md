@@ -49,6 +49,7 @@ for blind signing.
 -  [Function `insert_or`](#0x1_permissioned_signer_insert_or)
 -  [Function `authorize_increase`](#0x1_permissioned_signer_authorize_increase)
 -  [Function `authorize_unlimited`](#0x1_permissioned_signer_authorize_unlimited)
+-  [Function `grant_unlimited_with_permissioned_signer`](#0x1_permissioned_signer_grant_unlimited_with_permissioned_signer)
 -  [Function `increase_limit`](#0x1_permissioned_signer_increase_limit)
 -  [Function `check_permission_exists`](#0x1_permissioned_signer_check_permission_exists)
 -  [Function `check_permission_capacity_above`](#0x1_permissioned_signer_check_permission_capacity_above)
@@ -1273,6 +1274,44 @@ Unlimited permission can be consumed however many times.
             && <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(master) == <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(permissioned),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_ECANNOT_AUTHORIZE">ECANNOT_AUTHORIZE</a>)
     );
+    <a href="permissioned_signer.md#0x1_permissioned_signer_insert_or">insert_or</a>(
+        permissioned,
+        perm,
+        |stored_permission| {
+            *stored_permission = StoredPermission::Unlimited;
+        },
+        StoredPermission::Unlimited,
+    )
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_permissioned_signer_grant_unlimited_with_permissioned_signer"></a>
+
+## Function `grant_unlimited_with_permissioned_signer`
+
+Grant an unlimited permission to a permissioned signer **without** master signer's approvoal.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_grant_unlimited_with_permissioned_signer">grant_unlimited_with_permissioned_signer</a>&lt;PermKey: <b>copy</b>, drop, store&gt;(permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, perm: PermKey)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>package</b>) <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_grant_unlimited_with_permissioned_signer">grant_unlimited_with_permissioned_signer</a>&lt;PermKey: <b>copy</b> + drop + store&gt;(
+    permissioned: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    perm: PermKey
+) <b>acquires</b> <a href="permissioned_signer.md#0x1_permissioned_signer_PermissionStorage">PermissionStorage</a> {
+    <b>if</b>(!<a href="permissioned_signer.md#0x1_permissioned_signer_is_permissioned_signer">is_permissioned_signer</a>(permissioned)) {
+        <b>return</b>;
+    };
     <a href="permissioned_signer.md#0x1_permissioned_signer_insert_or">insert_or</a>(
         permissioned,
         perm,

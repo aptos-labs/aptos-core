@@ -91,6 +91,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `owns`](#0x1_object_owns)
 -  [Function `root_owner`](#0x1_object_root_owner)
 -  [Function `grant_permission`](#0x1_object_grant_permission)
+-  [Function `grant_permission_with_transfer_ref`](#0x1_object_grant_permission_with_transfer_ref)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
@@ -2407,6 +2408,7 @@ to determine the identity of the starting point of ownership.
 
 ## Function `grant_permission`
 
+Master signer offers a transfer permission of an object to a permissioned signer.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_grant_permission">grant_permission</a>&lt;T&gt;(master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
@@ -2427,6 +2429,37 @@ to determine the identity of the starting point of ownership.
         master,
         <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>,
         <a href="object.md#0x1_object_TransferPermission">TransferPermission</a> { <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object">object</a>.inner }
+    )
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_object_grant_permission_with_transfer_ref"></a>
+
+## Function `grant_permission_with_transfer_ref`
+
+Grant a transfer permission to the permissioned signer using TransferRef.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_grant_permission_with_transfer_ref">grant_permission_with_transfer_ref</a>(<a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, ref: &<a href="object.md#0x1_object_TransferRef">object::TransferRef</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_grant_permission_with_transfer_ref">grant_permission_with_transfer_ref</a>(
+    <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    ref: &<a href="object.md#0x1_object_TransferRef">TransferRef</a>,
+) {
+    <a href="permissioned_signer.md#0x1_permissioned_signer_grant_unlimited_with_permissioned_signer">permissioned_signer::grant_unlimited_with_permissioned_signer</a>(
+        <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a>,
+        <a href="object.md#0x1_object_TransferPermission">TransferPermission</a> { <a href="object.md#0x1_object">object</a>: ref.self }
     )
 }
 </code></pre>
