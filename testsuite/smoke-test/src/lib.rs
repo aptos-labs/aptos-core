@@ -35,6 +35,8 @@ mod keyless;
 #[cfg(test)]
 mod network;
 #[cfg(test)]
+mod permissioned_delegation;
+#[cfg(test)]
 mod randomness;
 #[cfg(test)]
 mod rest_api;
