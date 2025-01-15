@@ -4,24 +4,42 @@
 
 ---
 
-[![License](https://img.shields.io/badge/license-Apache-green.svg)](LICENSE)
-[![Lint+Test](https://github.com/aptos-labs/aptos-core/actions/workflows/lint-test.yaml/badge.svg)](https://github.com/aptos-labs/aptos-core/actions/workflows/lint-test.yaml)
-[![codecov](https://codecov.io/gh/aptos-labs/aptos-core/branch/main/graph/badge.svg?token=X01RKXSGDE)](https://codecov.io/gh/aptos-labs/aptos-core)
-[![Discord chat](https://img.shields.io/discord/945856774056083548?style=flat-square)](https://discord.gg/aptosnetwork)
+# Horizontally Sharding Executor Benchmark
+This repo contains the benchmarking code for the horizontally sharded executor. The benchmarking code is written in Rust and requires one coordinator node and multiple shards nodes.
 
-Aptos is a layer 1 blockchain bringing a paradigm shift to Web3 through better technology and user experience. Built with Move to create a home for developers building next-gen applications.
+It evaluates the performance of the horizontally sharded executor by measuring the time taken to distribute blocks of transactions to shards for execution and collecting back the results.
 
-## Getting Started
+## Pre-requisites
+One coordinator node and multiple shards nodes (depending on the desired degree of scale-out) are needed to run the benchmark. And the nodes must be on the same data center.
 
-* [Aptos Foundation](https://aptosfoundation.org/)
-* [Aptos Developer Network](https://aptos.dev)
-* [Guide - Integrate with the Aptos Blockchain](https://aptos.dev/guides/system-integrators-guide)
-* [Tutorials](https://aptos.dev/tutorials)
-* Follow us on [Twitter](https://twitter.com/Aptos).
-* Join us on the [Aptos Discord](https://discord.gg/aptosnetwork).
+## Specs in our experiments
+We spun up the nodes on a GCP data center. The specs are for the nodes are
+* Executor Shard Nodes: T2d-60 with 32 Gbps bandwidth, 60 vCPUs (physical cores) running at 2.45 GHz on AMD Milan, 240 GB RAM, and 2 TB SSD persistent disks.
+* Coordinator Node: A NUMA machine with 360 vCPUs (180 vCPUs on a single NUMA node used), 100 Gbps bandwidth, AMD Genoa processor, 708 GB RAM, and 2 TB SSD persistent disks.
 
-## Contributing
-
-You can learn more about contributing to the Aptos project by reading our [Contribution Guide](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md) and by viewing our [Code of Conduct](https://github.com/aptos-labs/aptos-core/blob/main/CODE_OF_CONDUCT.md).
-
-Aptos Core is licensed under [Apache 2.0](https://github.com/aptos-labs/aptos-core/blob/main/LICENSE).
+## Setup
+* Decide on the degree of scale-out <NUM_SHARDS> you want to test.
+* Clone repo on coordinator and all executor shard nodes
+```
+  git clone https://github.com/aptos-labs/aptos-core.git && cd aptos-core/ && ./scripts/dev_setup.sh -b > dev_setup.log
+```
+* On the coordinator, create sufficient user accounts needed for the benchmark
+```
+  cargo run --profile performance -p aptos-executor-benchmark -- --enable-storage-sharding create-db --data-dir ~/workspace/db_dirs/db/ --num-accounts 2000000
+```
+* On each of shard nodes, run the following command
+```
+  cargo run --profile performance -p aptos-executor-service --manifest-path ./execution/executor-service/Cargo.toml -- --shard-id <id> --num-shards NUM_SHARDS --coordinator-address <coord_ip>:<coord_port> --remote-executor-addresses <shard_0_ip>:<shard_0_port> <shard_1_ip>:<shard_1_port> <shard_NUM_SHARDS-1_ip>:<shard_NUM_SHARDS-1_port> --num-executor-threads 48 > > executor-{id}.log
+```
+  Shard ids start from 0 and go to num_shards - 1. For example, for 2 shards, the shard ids are 0 and 1.
+* On the coordinator node, run the relevant benchmark command.
+  * Foundational txns workload:
+  ```
+     taskset -c 0-89,180-269 cargo run --profile performance -p aptos-executor-benchmark -- --block-size 500000 --enable-storage-sharding --foundational-txns --num-executor-shards NUM_SHARDS --connected-tx-grps 500000 --partitioner-version v3-fanout --remote-executor-addresses <shard_0_ip>:<shard_0_port> <shard_1_ip>:<shard_1_port> <shard_NUM_SHARDS-1_ip>:<shard_NUM_SHARDS-1_port> --coordinator-address <coord_ip>:<coord_port> --generate-then-execute --split-stages run-executor --data-dir ~/workspace/db_dirs/db --checkpoint-dir ~/workspace/db_dirs/chk --blocks 50 --main-signer-accounts 500001
+  ```
+  * Multi DApp workload:
+  ```
+     taskset -c 0-89,180-269 cargo run --profile performance -p aptos-executor-benchmark -- --block-size 500000 --enable-storage-sharding --num-executor-shards NUM_SHARDS --partitioner-version v3-fanout --fanout-num-iterations 40 --num-clusters 400 --num-resource-addresses-per-cluster 5 --cluster-size-relative-std-dev 0.05 --mean-txns-per-user 5 --txns-per-user-relative-std-dev 0.5 --fraction-of-external-txns 0.001 --remote-executor-addresses <shard_0_ip>:<shard_0_port> <shard_1_ip>:<shard_1_port> <shard_NUM_SHARDS-1_ip>:<shard_NUM_SHARDS-1_port> --coordinator-address <coord_ip>:<coord_port> --generate-then-execute --split-stages run-executor --data-dir ~/workspace/db_dirs/db --checkpoint-dir ~/workspace/db_dirs/chk --blocks 50 --main-signer-accounts 1000001
+  ```
+  
+## Results

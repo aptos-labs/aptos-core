@@ -12,9 +12,10 @@ use aptos_types::{
 use ordered_float::NotNan;
 use rand::Rng;
 use std::{cmp::Reverse, collections::{BinaryHeap, HashMap, VecDeque}, mem, ops::Range};
+use std::cmp::min;
 use aptos_block_partitioner::v3::build_partitioning_result;
 use itertools::Itertools;
-use aptos_logger::info;
+use aptos_logger::{debug, info};
 use aptos_types::account_address::AccountAddress;
 
 #[derive(Clone, Debug)]
@@ -71,6 +72,22 @@ impl BlockPartitioner for FanoutPartitioner {
 
         if self.print_debug_stats {
             println!("Senders: {}, accesses: {}", compressed_graph.sender_to_idx.len(), compressed_graph.access_to_idx.len());
+        }
+
+        if compressed_graph.are_all_txns_independent() {
+            if self.print_debug_stats {
+                info!("All transactions are independent, assigning round robin.");
+            }
+            let num_txns = transactions.len();
+            let stop_round_robin_threshold = min(num_txns / num_shards / 10, 800);
+            let shard_idxs = (0..transactions.len()).map(|i| {
+                if i >= num_txns - stop_round_robin_threshold {
+                    0
+                } else {
+                    i % num_shards
+                }
+            }).collect();
+            return PartitionedTransactions::V3(build_partitioning_result(num_shards, transactions, shard_idxs, self.print_debug_stats, self.print_detailed_debug_stats));
         }
 
         let sender_to_shard_idxs = match self.init_strategy {
@@ -140,7 +157,7 @@ impl<T: std::cmp::Ord> Edges<T> {
 
         starts.push(destinations.len() as u32);
 
-        println!("Created edges, went from {} to {}, after dedup", num_with_duplicates, num_deduped);
+        debug!("Created edges, went from {} to {}, after dedup", num_with_duplicates, num_deduped);
         Self {
             starts,
             destinations,
@@ -244,6 +261,10 @@ impl CompressedGraph {
 
     fn sender_range(&self) -> Range<u32> {
         self.sender_start_idx..self.sender_end_idx
+    }
+
+    fn are_all_txns_independent(&self) -> bool {
+        self.num_accesses() == 0 && self.sender_weights.iter().all(|&w| w == 1)
     }
 }
 
@@ -364,7 +385,9 @@ impl FanoutPartitioner {
         let mut sender_shard_weights = self.compute_sender_shard_weights(graph, num_shards, &access_shards, &fanout_formula);
 
         let mut prev_fanout = self.print_fanout_stats(&access_shards, graph, "init", &fanout_formula);
-        self.print_weight_stats(&shard_weights);
+        if self.print_debug_stats {
+            self.print_weight_stats(&shard_weights);
+        }
         for iter in 0..self.num_iterations {
             let num_moves = self.optimize_probabilistic_fanout_iteration(&mut sender_shard, &mut shard_weights, &mut access_shards, &mut sender_shard_weights, graph, num_shards, &fanout_formula);
             let cur_fanout = self.print_fanout_stats(&access_shards, graph, format!("iter {} with {} moves", iter, num_moves).as_str(), &fanout_formula);
@@ -375,7 +398,9 @@ impl FanoutPartitioner {
                 sender_shard_weights = self.compute_sender_shard_weights(graph, num_shards, &access_shards, &fanout_formula);
             }
             prev_fanout = cur_fanout;
-            self.print_weight_stats(&shard_weights);
+            if self.print_debug_stats {
+                self.print_weight_stats(&shard_weights);
+            }
         }
 
         sender_shard
@@ -614,7 +639,7 @@ impl FanoutPartitioner {
         let min = *shard_weights.iter().min().unwrap();
         let sum = shard_weights.iter().sum::<u32>();
         let avg = sum / shard_weights.len() as u32;
-        println!("Shard weights: avg={}, min={}, max={}, min_ratio={}, max_ratio={} ", avg, min, max, min as f32 / avg as f32, max as f32 / avg as f32);
+        info!("Shard weights: avg={}, min={}, max={}, min_ratio={}, max_ratio={} ", avg, min, max, min as f32 / avg as f32, max as f32 / avg as f32);
     }
 
     fn print_fanout_stats(&self, access_shards: &[Vec<u32>], graph: &CompressedGraph, desc: &str, fanout_formula: &FanoutFormula) -> f32 {
@@ -635,7 +660,9 @@ impl FanoutPartitioner {
             in_max += max;
             in_total += total;
         }
-        println!("{}: fanuot: {}, prob fanout: {}, avg degree in max: {}, avg degree in rest {}", desc, fanout as f32 / num_accesses, prob_fanout / num_accesses, in_max as f32 / num_accesses, (in_total - in_max) as f32 / num_accesses);
+        if self.print_debug_stats {
+            info!("{}: fanuot: {}, prob fanout: {}, avg degree in max: {}, avg degree in rest {}", desc, fanout as f32 / num_accesses, prob_fanout / num_accesses, in_max as f32 / num_accesses, (in_total - in_max) as f32 / num_accesses);
+        }
         fanout as f32 / num_accesses
     }
 
@@ -843,7 +870,9 @@ impl FanoutPartitioner {
             shard_to_unconstrained[shard as usize].push_back(txn);
         }
 
-        println!("Starting unconstrained counts {:?}", shard_to_unconstrained.iter().map(|v| v.len()).collect::<Vec<_>>());
+        if self.print_debug_stats {
+            info!("Starting constrained counts {:?}", shard_to_unconstrained.iter().map(|v| v.len()).collect::<Vec<_>>());
+        }
 
         // transactions.sort_by_key(|txn| {
         //     let sender = *graph.sender_to_idx.get(&txn.sender().unwrap()).unwrap() as usize;
@@ -930,13 +959,17 @@ impl FanoutPartitioner {
             for (idx, seqno) in idxs_and_seqnos.iter() {
                 if *seqno < prev_seqno {
                     count_non_monotonic_sender_txns += 1;
-                    println!("Non-monotonic sender txns: sender {:?}", idxs_and_seqnos);
+                    if self.print_detailed_debug_stats {
+                        info!("Non-monotonic sender txns: sender {:?}", idxs_and_seqnos);
+                    }
                     transactions.swap(*idx, prev_idx);
                 }
                 prev_seqno = *seqno;
                 prev_idx = *idx;
             }
         }
-        println!("Non-monotonic senders txns count: {}", count_non_monotonic_sender_txns);
+        if self.print_debug_stats {
+            info!("Non-monotonic senders txns count: {}", count_non_monotonic_sender_txns);
+        }
     }
 }

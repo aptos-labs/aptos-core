@@ -14,9 +14,7 @@ use rayon::prelude::*;
 use std::{net::SocketAddr, sync::Arc,};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize};
 use aptos_block_executor::txn_provider::sharded::{BlockingTransaction, CrossShardClientForV3, ShardedTransaction, ShardedTxnProvider};
-use rand::prelude::StdRng;
-use rand::{Rng, SeedableRng, thread_rng};
-use aptos_logger::info;
+use rand::{Rng, thread_rng};
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::{get_delta_time, REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER};
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
@@ -87,35 +85,6 @@ impl RemoteCoordinatorClient {
             result_tx_thread_pool,
             outbound_rpc_scheduler,
         }
-    }
-
-    // Extract all the state keys from the execute block command. It is possible that there are duplicate state keys.
-    // We are not de-duplicating them here to avoid the overhead of deduplication. The state view server will deduplicate
-    // the state keys.
-    fn extract_state_keys(command: &ExecuteBlockCommand) -> Vec<StateKey> {
-        command
-            .sub_blocks
-            .sub_block_iter()
-            .flat_map(|sub_block| {
-                sub_block
-                    .transactions
-                    .iter()
-                    .map(|txn| {
-                        let mut state_keys = vec![];
-                        for storage_location in txn
-                            .txn()
-                            .read_hints()
-                            .iter()
-                            .chain(txn.txn().write_hints().iter())
-                        {
-                            state_keys.push(storage_location.state_key().clone());
-                        }
-                        state_keys
-                    })
-                    .flatten()
-                    .collect::<Vec<StateKey>>()
-            })
-            .collect::<Vec<StateKey>>()
     }
 
     fn extract_state_keys_from_txns(txns: &Vec<AnalyzedTransaction>) -> Vec<StateKey> {
