@@ -287,9 +287,9 @@ impl InterpreterImpl {
         }
 
         let frame_cache = if RTCaches::caches_enabled() {
-            FrameTypeCache::make_rc()
-        } else {
             FrameTypeCache::make_rc_for_function(&function)
+        } else {
+            FrameTypeCache::make_rc()
         };
 
         let mut current_frame = self
@@ -844,9 +844,9 @@ impl InterpreterImpl {
                 }
 
                 let frame_cache = if RTCaches::caches_enabled() {
-                    FrameTypeCache::make_rc()
-                } else {
                     FrameTypeCache::make_rc_for_function(&target_func)
+                } else {
+                    FrameTypeCache::make_rc()
                 };
 
                 self.set_new_call_frame::<RTTCheck, RTCaches>(
