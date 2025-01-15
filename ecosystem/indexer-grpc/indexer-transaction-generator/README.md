@@ -8,8 +8,8 @@ Under root folder, i.e., `aptos-core`, run
 
 ```bash
 cargo run -p aptos-indexer-transaction-generator -- \
-  --testing-folder ecosystem/indexer-grpc/indexer-transaction-generator/example_tests \ 
-  --output-folder ecosystem/indexer-grpc/indexer-transaction-generator/example_tests
+  --testing-folder ecosystem/indexer-grpc/indexer-transaction-generator/imported_transactions \ 
+  --output-folder ecosystem/indexer-grpc/indexer-test-transactions/src
 ```
 
 **You can also use absolute path, run(using binary as an example)**
@@ -63,7 +63,7 @@ Each sender_address specified in script transaction config is a place holder str
 the actual account address will be allocated by account manager.
 
 The accounts in `testing_accounts.yaml` will be used to run scripted transaction. 
-They are persistedin config so each scripted transaction's generated output stays consistent between 
+They are persisted in config so each scripted transaction's generated output stays consistent between 
 `aptos-indexer-transaction-generator` runs. You can generate more testing accounts using 
 Aptos CLI by running `aptos init --profile local`. 
 

@@ -38,7 +38,7 @@ impl TransactionCodeBuilder {
         let mut all_constants = String::new();
         // Iterates over all files in the directory
         if !json_dir.exists() {
-            let _ = fs::create_dir_all(&json_dir);
+            let _ = fs::create_dir_all(json_dir);
         }
 
         for entry in fs::read_dir(json_dir).expect("Failed to read directory") {
