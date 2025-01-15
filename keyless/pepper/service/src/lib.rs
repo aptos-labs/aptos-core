@@ -32,8 +32,7 @@ use aptos_types::{
     account_address::AccountAddress,
     keyless::{
         get_public_inputs_hash, Configuration, EphemeralCertificate, Groth16ProofAndStatement,
-        IdCommitment, KeylessPublicKey, KeylessSignature, OpenIdSig, VERIFICATION_KEY_FOR_TESTING,
-        ZKP,
+        IdCommitment, KeylessPublicKey, KeylessSignature, OpenIdSig, ZKP,
     },
     transaction::authenticator::{
         AnyPublicKey, AnySignature, AuthenticationKey, EphemeralPublicKey,
