@@ -133,6 +133,8 @@ pub enum FeatureFlag {
     CollectionOwner,
     NativeMemoryOperations,
     EnableLoaderV2,
+    DisallowInitModuleToPublishModules,
+    EnableCallTreeAndInstructionVMCache,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -353,6 +355,12 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::CollectionOwner => AptosFeatureFlag::COLLECTION_OWNER,
             FeatureFlag::NativeMemoryOperations => AptosFeatureFlag::NATIVE_MEMORY_OPERATIONS,
             FeatureFlag::EnableLoaderV2 => AptosFeatureFlag::ENABLE_LOADER_V2,
+            FeatureFlag::DisallowInitModuleToPublishModules => {
+                AptosFeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES
+            },
+            FeatureFlag::EnableCallTreeAndInstructionVMCache => {
+                AptosFeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE
+            },
         }
     }
 }
@@ -500,6 +508,12 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::COLLECTION_OWNER => FeatureFlag::CollectionOwner,
             AptosFeatureFlag::NATIVE_MEMORY_OPERATIONS => FeatureFlag::NativeMemoryOperations,
             AptosFeatureFlag::ENABLE_LOADER_V2 => FeatureFlag::EnableLoaderV2,
+            AptosFeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES => {
+                FeatureFlag::DisallowInitModuleToPublishModules
+            },
+            AptosFeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE => {
+                FeatureFlag::EnableCallTreeAndInstructionVMCache
+            },
         }
     }
 }

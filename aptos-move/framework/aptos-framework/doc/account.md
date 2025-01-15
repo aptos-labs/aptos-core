@@ -1428,7 +1428,7 @@ to rotate his address to Alice's address in the first place.
 ) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a>, <a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a> {
     <b>assert</b>!(<a href="account.md#0x1_account_exists_at">exists_at</a>(rotation_cap_offerer_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EOFFERER_ADDRESS_DOES_NOT_EXIST">EOFFERER_ADDRESS_DOES_NOT_EXIST</a>));
 
-    // Check that there <b>exists</b> a rotation capability offer at the offerer's <a href="account.md#0x1_account">account</a> resource for the delegate.
+    // Check that there <b>exists</b> a rotation <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> offer at the offerer's <a href="account.md#0x1_account">account</a> resource for the delegate.
     <b>let</b> delegate_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegate_signer);
     <b>let</b> offerer_account_resource = <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(rotation_cap_offerer_address);
     <b>assert</b>!(
@@ -1508,7 +1508,7 @@ offer, calling this function will replace the previous <code>recipient_address</
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
     <b>assert</b>!(<a href="account.md#0x1_account_exists_at">exists_at</a>(recipient_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>));
 
-    // proof that this <a href="account.md#0x1_account">account</a> intends <b>to</b> delegate its rotation capability <b>to</b> another <a href="account.md#0x1_account">account</a>
+    // proof that this <a href="account.md#0x1_account">account</a> intends <b>to</b> delegate its rotation <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> <b>to</b> another <a href="account.md#0x1_account">account</a>
     <b>let</b> account_resource = <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
     <b>let</b> proof_challenge = <a href="account.md#0x1_account_RotationCapabilityOfferProofChallengeV2">RotationCapabilityOfferProofChallengeV2</a> {
         <a href="chain_id.md#0x1_chain_id">chain_id</a>: <a href="chain_id.md#0x1_chain_id_get">chain_id::get</a>(),
@@ -1548,7 +1548,7 @@ offer, calling this function will replace the previous <code>recipient_address</
         <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_EINVALID_SCHEME">EINVALID_SCHEME</a>)
     };
 
-    // <b>update</b> the existing rotation capability offer or put in a new rotation capability offer for the current <a href="account.md#0x1_account">account</a>
+    // <b>update</b> the existing rotation <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> offer or put in a new rotation <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> offer for the current <a href="account.md#0x1_account">account</a>
     <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_swap_or_fill">option::swap_or_fill</a>(&<b>mut</b> account_resource.rotation_capability_offer.for, recipient_address);
 }
 </code></pre>
@@ -1757,7 +1757,7 @@ to the account owner's signer capability).
     <b>let</b> source_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
     <b>assert</b>!(<a href="account.md#0x1_account_exists_at">exists_at</a>(recipient_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>));
 
-    // Proof that this <a href="account.md#0x1_account">account</a> intends <b>to</b> delegate its <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> capability <b>to</b> another <a href="account.md#0x1_account">account</a>.
+    // Proof that this <a href="account.md#0x1_account">account</a> intends <b>to</b> delegate its <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> <b>to</b> another <a href="account.md#0x1_account">account</a>.
     <b>let</b> proof_challenge = <a href="account.md#0x1_account_SignerCapabilityOfferProofChallengeV2">SignerCapabilityOfferProofChallengeV2</a> {
         sequence_number: <a href="account.md#0x1_account_get_sequence_number">get_sequence_number</a>(source_address),
         source_address,
@@ -1766,7 +1766,7 @@ to the account owner's signer capability).
     <a href="account.md#0x1_account_verify_signed_message">verify_signed_message</a>(
         source_address, account_scheme, account_public_key_bytes, signer_capability_sig_bytes, proof_challenge);
 
-    // Update the existing <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> capability offer or put in a new <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> capability offer for the recipient.
+    // Update the existing <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> offer or put in a new <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> offer for the recipient.
     <b>let</b> account_resource = <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(source_address);
     <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_swap_or_fill">option::swap_or_fill</a>(&<b>mut</b> account_resource.signer_capability_offer.for, recipient_address);
 }
@@ -1913,7 +1913,7 @@ at the offerer's address.
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_create_authorized_signer">create_authorized_signer</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, offerer_address: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
     <b>assert</b>!(<a href="account.md#0x1_account_exists_at">exists_at</a>(offerer_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EOFFERER_ADDRESS_DOES_NOT_EXIST">EOFFERER_ADDRESS_DOES_NOT_EXIST</a>));
 
-    // Check <b>if</b> there's an existing <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> capability offer from the offerer.
+    // Check <b>if</b> there's an existing <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> offer from the offerer.
     <b>let</b> account_resource = <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(offerer_address);
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
     <b>assert</b>!(
@@ -2289,7 +2289,7 @@ Coin management methods.
 Capability based functions for efficient use.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_create_signer_with_capability">create_signer_with_capability</a>(capability: &<a href="account.md#0x1_account_SignerCapability">account::SignerCapability</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_create_signer_with_capability">create_signer_with_capability</a>(<a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a>: &<a href="account.md#0x1_account_SignerCapability">account::SignerCapability</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
 </code></pre>
 
 
@@ -2298,8 +2298,8 @@ Capability based functions for efficient use.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_create_signer_with_capability">create_signer_with_capability</a>(capability: &<a href="account.md#0x1_account_SignerCapability">SignerCapability</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
-    <b>let</b> addr = &capability.<a href="account.md#0x1_account">account</a>;
+<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_create_signer_with_capability">create_signer_with_capability</a>(<a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a>: &<a href="account.md#0x1_account_SignerCapability">SignerCapability</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
+    <b>let</b> addr = &<a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a>.<a href="account.md#0x1_account">account</a>;
     <a href="create_signer.md#0x1_create_signer">create_signer</a>(*addr)
 }
 </code></pre>
@@ -2314,7 +2314,7 @@ Capability based functions for efficient use.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_signer_capability_address">get_signer_capability_address</a>(capability: &<a href="account.md#0x1_account_SignerCapability">account::SignerCapability</a>): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_signer_capability_address">get_signer_capability_address</a>(<a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a>: &<a href="account.md#0x1_account_SignerCapability">account::SignerCapability</a>): <b>address</b>
 </code></pre>
 
 
@@ -2323,8 +2323,8 @@ Capability based functions for efficient use.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_signer_capability_address">get_signer_capability_address</a>(capability: &<a href="account.md#0x1_account_SignerCapability">SignerCapability</a>): <b>address</b> {
-    capability.<a href="account.md#0x1_account">account</a>
+<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_signer_capability_address">get_signer_capability_address</a>(<a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a>: &<a href="account.md#0x1_account_SignerCapability">SignerCapability</a>): <b>address</b> {
+    <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a>.<a href="account.md#0x1_account">account</a>
 }
 </code></pre>
 
@@ -3506,13 +3506,13 @@ The guid_creation_num of the Account is up to MAX_U64.
 ### Function `create_signer_with_capability`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_create_signer_with_capability">create_signer_with_capability</a>(capability: &<a href="account.md#0x1_account_SignerCapability">account::SignerCapability</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_create_signer_with_capability">create_signer_with_capability</a>(<a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a>: &<a href="account.md#0x1_account_SignerCapability">account::SignerCapability</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
 </code></pre>
 
 
 
 
-<pre><code><b>let</b> addr = capability.<a href="account.md#0x1_account">account</a>;
+<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a>.<a href="account.md#0x1_account">account</a>;
 <b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(result) == addr;
 </code></pre>
 

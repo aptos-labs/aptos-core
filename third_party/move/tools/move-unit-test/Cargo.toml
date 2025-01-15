@@ -43,6 +43,10 @@ regex = { workspace = true }
 [dev-dependencies]
 datatest-stable = { workspace = true }
 difference = { workspace = true }
+move-cli = { path = "../move-cli" }
+move-model = { path = "../../move-model" }
+move-package = { path = "../move-package" }
+tempfile = { workspace = true }
 
 [[bin]]
 name = "move-unit-test"

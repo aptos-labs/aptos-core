@@ -29,6 +29,7 @@ pub(crate) fn get_land_blocking_test(
 
 pub(crate) fn compat() -> ForgeConfig {
     ForgeConfig::default()
+        .with_suite_name("compat".into())
         .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
         .add_network_test(SimpleValidatorUpgrade)
         .with_success_criteria(SuccessCriteria::new(5000).add_wait_for_catchup_s(240))

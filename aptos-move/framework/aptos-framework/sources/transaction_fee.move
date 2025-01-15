@@ -80,12 +80,12 @@ module aptos_framework::transaction_fee {
     public(friend) fun burn_fee(account: address, fee: u64) acquires AptosFABurnCapabilities, AptosCoinCapabilities {
         if (exists<AptosFABurnCapabilities>(@aptos_framework)) {
             let burn_ref = &borrow_global<AptosFABurnCapabilities>(@aptos_framework).burn_ref;
-            aptos_account::burn_from_fungible_store(burn_ref, account, fee);
+            aptos_account::burn_from_fungible_store_for_gas(burn_ref, account, fee);
         } else {
             let burn_cap = &borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap;
             if (features::operations_default_to_fa_apt_store_enabled()) {
                 let (burn_ref, burn_receipt) = coin::get_paired_burn_ref(burn_cap);
-                aptos_account::burn_from_fungible_store(&burn_ref, account, fee);
+                aptos_account::burn_from_fungible_store_for_gas(&burn_ref, account, fee);
                 coin::return_paired_burn_ref(burn_ref, burn_receipt);
             } else {
                 coin::burn_from<AptosCoin>(

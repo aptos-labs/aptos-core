@@ -25,9 +25,17 @@ pub trait ArcAsyncDrop: Send + Sync + 'static {}
 
 impl<T: Send + Sync + 'static> ArcAsyncDrop for T {}
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DropHelper<T: Send + 'static> {
     inner: Option<T>,
+}
+
+impl<T: Default + Send + 'static> Default for DropHelper<T> {
+    fn default() -> Self {
+        Self {
+            inner: Some(T::default()),
+        }
+    }
 }
 
 impl<T: Send + 'static> DropHelper<T> {

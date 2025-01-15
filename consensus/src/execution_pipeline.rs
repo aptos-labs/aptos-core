@@ -226,7 +226,7 @@ impl ExecutionPipeline {
                     });
                     let start = Instant::now();
                     executor
-                        .execute_and_state_checkpoint(
+                        .execute_and_update_state(
                             block,
                             parent_block_id,
                             block_executor_onchain_config,

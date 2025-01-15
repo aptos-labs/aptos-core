@@ -272,9 +272,9 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(false),
         },
         Experiment {
-            name: Experiment::AVOID_STORE_IN_ASSIGNS.to_string(),
-            description: "Avoid storing to a local during assigns".to_string(),
-            default: Inherited(Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string()),
+            name: Experiment::MESSAGE_FORMAT_JSON.to_string(),
+            description: "Enable json format for compiler messages".to_string(),
+            default: Given(false),
         },
     ];
     experiments
@@ -291,7 +291,6 @@ impl Experiment {
     pub const AST_SIMPLIFY: &'static str = "ast-simplify";
     pub const AST_SIMPLIFY_FULL: &'static str = "ast-simplify-full";
     pub const ATTACH_COMPILED_MODULE: &'static str = "attach-compiled-module";
-    pub const AVOID_STORE_IN_ASSIGNS: &'static str = "avoid-store-in-assigns";
     pub const CFG_SIMPLIFICATION: &'static str = "cfg-simplification";
     pub const CHECKS: &'static str = "checks";
     pub const COPY_PROPAGATION: &'static str = "copy-propagation";
@@ -308,6 +307,7 @@ impl Experiment {
     pub const LAMBDA_LIFTING: &'static str = "lambda-lifting";
     pub const LAMBDA_VALUES: &'static str = "lambda-values";
     pub const LINT_CHECKS: &'static str = "lint-checks";
+    pub const MESSAGE_FORMAT_JSON: &'static str = "compiler-message-format-json";
     pub const OPTIMIZE: &'static str = "optimize";
     pub const OPTIMIZE_EXTRA: &'static str = "optimize-extra";
     pub const OPTIMIZE_WAITING_FOR_COMPARE_TESTS: &'static str =

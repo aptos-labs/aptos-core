@@ -20,7 +20,6 @@ error: unknown assertion failed
    =     at tests/sources/functional/specs_in_fun.move:49: simple2_incorrect
    =         x = <redacted>
    =     at tests/sources/functional/specs_in_fun.move:51: simple2_incorrect
-   =         <redacted> = <redacted>
    =         y = <redacted>
    =     at tests/sources/functional/specs_in_fun.move:53: simple2_incorrect
 

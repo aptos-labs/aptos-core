@@ -12,11 +12,9 @@ use aptos_logger::{enabled, Level};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_types::on_chain_config::Features;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_log, speculative_warn};
-use aptos_vm_types::{
-    module_and_script_storage::module_storage::AptosModuleStorage,
-    storage::{space_pricing::DiskSpacePricing, StorageGasParameters},
-};
+use aptos_vm_types::storage::{space_pricing::DiskSpacePricing, StorageGasParameters};
 use move_core_types::vm_status::{StatusCode, VMStatus};
+use move_vm_runtime::ModuleStorage;
 
 /// This is used until gas version 18, which introduces a configurable entry for this.
 const MAXIMUM_APPROVED_TRANSACTION_SIZE_LEGACY: u64 = 1024 * 1024;
@@ -47,7 +45,7 @@ pub(crate) fn check_gas(
     gas_params: &AptosGasParameters,
     gas_feature_version: u64,
     resolver: &impl AptosMoveResolver,
-    module_storage: &impl AptosModuleStorage,
+    module_storage: &impl ModuleStorage,
     txn_metadata: &TransactionMetadata,
     features: &Features,
     is_approved_gov_script: bool,

@@ -11,7 +11,7 @@ use aptos_db_indexer_schemas::{
 };
 use aptos_logger::info;
 use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_schemadb::{batch::SchemaBatch, DB};
 use aptos_storage_interface::{
     db_other_bail as bail, state_store::state_view::db_state_view::DbStateViewAtVersion,
     AptosDbError, DbReader, Result,

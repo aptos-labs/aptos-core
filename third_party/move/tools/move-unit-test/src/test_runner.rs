@@ -13,7 +13,9 @@ use anyhow::Result;
 use colored::*;
 use move_binary_format::{errors::VMResult, file_format::CompiledModule};
 use move_bytecode_utils::Modules;
-use move_compiler::unit_test::{ExpectedFailure, ModuleTestPlan, TestCase, TestPlan};
+use move_compiler::unit_test::{
+    ExpectedFailure, ModuleTestPlan, NamedOrBytecodeModule, TestCase, TestPlan,
+};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Op},
@@ -27,7 +29,7 @@ use move_vm_runtime::{
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunctionTable,
-    AsUnsyncModuleStorage, RuntimeEnvironment,
+    AsFunctionValueExtension, AsUnsyncModuleStorage, RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use rayon::prelude::*;
@@ -86,6 +88,7 @@ fn print_resources_and_extensions(
     cs: &ChangeSet,
     extensions: &mut NativeContextExtensions,
     storage: &InMemoryStorage,
+    natives: &NativeFunctionTable,
 ) -> Result<String> {
     use std::fmt::Write;
     let mut buf = String::new();
@@ -104,7 +107,10 @@ fn print_resources_and_extensions(
         }
     }
 
-    extensions::print_change_sets(&mut buf, extensions);
+    let runtime_environment = RuntimeEnvironment::new(natives.clone());
+    let module_storage = storage.as_unsync_module_storage(runtime_environment);
+    let function_value_extension = module_storage.as_function_value_extension();
+    extensions::print_change_sets(&mut buf, extensions, &function_value_extension);
 
     Ok(buf)
 }
@@ -127,7 +133,10 @@ impl TestRunner {
             .values()
             .map(|(filepath, _)| filepath.to_string())
             .collect();
-        let modules = tests.module_info.values().map(|info| &info.module);
+        let modules = tests.module_info.values().map(|info| match info {
+            NamedOrBytecodeModule::Named(named_compiled_module) => &named_compiled_module.module,
+            NamedOrBytecodeModule::Bytecode(compiled_module) => compiled_module,
+        });
         let mut starting_storage_state = setup_test_storage(modules)?;
         if let Some(genesis_state) = genesis_state {
             starting_storage_state.apply(genesis_state)?;
@@ -339,6 +348,7 @@ impl SharedTestingConfig {
                                 &changeset,
                                 &mut extensions,
                                 &self.starting_storage_state,
+                                &self.native_function_table,
                             )
                             .ok()
                         })

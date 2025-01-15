@@ -1,5 +1,5 @@
 [package]
-name = "prover-lab"
+name = "move-prover-lab"
 version = "0.1.0"
 authors = ["Diem Association <opensource@diem.com>"]
 publish = false
@@ -12,13 +12,9 @@ chrono = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 codespan-reporting = { workspace = true }
 itertools = { workspace = true }
-log = { workspace = true, features = ["serde"] }
-move-compiler = { workspace = true }
-move-compiler-v2 = { workspace = true }
 move-model = { workspace = true }
 move-prover = { workspace = true }
 move-prover-boogie-backend = { workspace = true }
 move-prover-bytecode-pipeline = { workspace = true }
 plotters = { workspace = true, features = ["evcxr", "line_series", "histogram"] }
 z3tracer = { workspace = true }
-

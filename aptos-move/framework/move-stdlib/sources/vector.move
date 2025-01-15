@@ -9,7 +9,7 @@
 /// Move functions here because many have loops, requiring loop invariants to prove, and
 /// the return on investment didn't seem worth it for these simple functions.
 module std::vector {
-    // use std::mem;
+    use std::mem;
 
     /// The index into the vector is out of bounds
     const EINDEX_OUT_OF_BOUNDS: u64 = 0x20000;
@@ -68,11 +68,6 @@ module std::vector {
     /// Aborts if `i` or `j` is out of bounds.
     native public fun swap<Element>(self: &mut vector<Element>, i: u64, j: u64);
 
-    // TODO - function `move_range` here is `public(friend)` for one release,
-    // and to be changed to `public` one release later.
-    #[test_only]
-    friend std::vector_tests;
-
     /// Moves range of elements `[removal_position, removal_position + length)` from vector `from`,
     /// to vector `to`, inserting them starting at the `insert_position`.
     /// In the `from` vector, elements after the selected range are moved left to fill the hole
@@ -82,7 +77,7 @@ module std::vector {
     ///  elements is kept).
     /// Move prevents from having two mutable references to the same value, so `from` and `to`
     /// vectors are always distinct.
-    native public(friend) fun move_range<T>(
+    native public fun move_range<T>(
         from: &mut vector<T>,
         removal_position: u64,
         length: u64,
@@ -357,14 +352,13 @@ module std::vector {
     public fun replace<Element>(self: &mut vector<Element>, i: u64, val: Element): Element {
         let last_idx = length(self);
         assert!(i < last_idx, EINDEX_OUT_OF_BOUNDS);
-        // TODO: Enable after tests are fixed.
-        // if (USE_MOVE_RANGE) {
-        //     mem::replace(borrow_mut(self, i), val)
-        // } else {
-        push_back(self, val);
-        swap(self, i, last_idx);
-        pop_back(self)
-        // }
+        if (USE_MOVE_RANGE) {
+            mem::replace(borrow_mut(self, i), val)
+        } else {
+            push_back(self, val);
+            swap(self, i, last_idx);
+            pop_back(self)
+        }
     }
 
     /// Apply the function to each element in the vector, consuming it.

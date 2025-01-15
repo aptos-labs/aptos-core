@@ -13,7 +13,7 @@ use move_command_line_common::{env::read_bool_env_var, files::FileHash};
 pub use move_compiler::unit_test::ExpectedMoveError as MoveError;
 use move_compiler::{
     diagnostics::{self, Diagnostic, Diagnostics},
-    unit_test::{ModuleTestPlan, TestName, TestPlan},
+    unit_test::{ModuleTestPlan, NamedOrBytecodeModule, TestName, TestPlan},
 };
 use move_core_types::{effects::ChangeSet, language_storage::ModuleId, vm_status::StatusType};
 use move_ir_types::location::Loc;
@@ -357,7 +357,10 @@ impl TestFailure {
                     None => return "\tmalformed stack trace (no module ID)".to_string(),
                 };
                 let named_module = match test_plan.module_info.get(module_id) {
-                    Some(v) => v,
+                    Some(NamedOrBytecodeModule::Named(v)) => v,
+                    Some(NamedOrBytecodeModule::Bytecode(_)) => {
+                        return "\tno source map for bytecode module".to_string()
+                    },
                     None => return "\tmalformed stack trace (no module)".to_string(),
                 };
                 let function_source_map =
@@ -408,12 +411,15 @@ impl TestFailure {
         let mut diags = match vm_error.location() {
             Location::Module(module_id) => {
                 let diag_opt = vm_error.offsets().first().and_then(|(fdef_idx, offset)| {
-                    let function_source_map = test_plan
-                        .module_info
-                        .get(module_id)?
-                        .source_map
-                        .get_function_source_map(*fdef_idx)
-                        .ok()?;
+                    let function_source_map = match test_plan.module_info.get(module_id)? {
+                        NamedOrBytecodeModule::Named(named_compiled_module) => {
+                            named_compiled_module
+                                .source_map
+                                .get_function_source_map(*fdef_idx)
+                                .ok()?
+                        },
+                        NamedOrBytecodeModule::Bytecode(_compiled_module) => return None,
+                    };
                     let loc = function_source_map.get_code_location(*offset).unwrap();
                     let msg = format!("In this function in {}", format_module_id(module_id));
                     // TODO(tzakian) maybe migrate off of move-langs diagnostics?

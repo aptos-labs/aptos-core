@@ -7,6 +7,7 @@ use crate::{
     diagnostics::FilesSourceText,
     shared::NumericalAddress,
 };
+use move_binary_format::CompiledModule;
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     value::MoveValue, vm_status::StatusCode,
@@ -19,10 +20,20 @@ pub mod plan_builder;
 pub type TestName = String;
 
 #[derive(Debug, Clone)]
+pub enum NamedOrBytecodeModule {
+    // Compiled from source
+    Named(NamedCompiledModule),
+    // Bytecode dependency
+    Bytecode(CompiledModule),
+}
+
+#[derive(Debug, Clone)]
 pub struct TestPlan {
     pub files: FilesSourceText,
     pub module_tests: BTreeMap<ModuleId, ModuleTestPlan>,
-    pub module_info: BTreeMap<ModuleId, NamedCompiledModule>,
+    // `NamedCompiledModule` for compiled modules with source,
+    // `CompiledModule` for modules with bytecode only
+    pub module_info: BTreeMap<ModuleId, NamedOrBytecodeModule>,
 }
 
 #[derive(Debug, Clone)]
@@ -85,6 +96,7 @@ impl TestPlan {
         tests: Vec<ModuleTestPlan>,
         files: FilesSourceText,
         units: Vec<AnnotatedCompiledUnit>,
+        bytecode_modules: Vec<CompiledModule>,
     ) -> Self {
         let module_tests: BTreeMap<_, _> = tests
             .into_iter()
@@ -97,12 +109,17 @@ impl TestPlan {
                 if let AnnotatedCompiledUnit::Module(annot_module) = unit {
                     Some((
                         annot_module.named_module.module.self_id(),
-                        annot_module.named_module,
+                        NamedOrBytecodeModule::Named(annot_module.named_module),
                     ))
                 } else {
                     None
                 }
             })
+            .chain(
+                bytecode_modules
+                    .into_iter()
+                    .map(|module| (module.self_id(), NamedOrBytecodeModule::Bytecode(module))),
+            )
             .collect();
 
         Self {

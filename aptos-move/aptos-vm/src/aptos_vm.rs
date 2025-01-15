@@ -119,7 +119,7 @@ use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_runtime::{
     logging::expect_no_verification_errors,
     module_traversal::{TraversalContext, TraversalStorage},
-    RuntimeEnvironment, WithRuntimeEnvironment,
+    ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 use num_cpus;
@@ -1511,7 +1511,12 @@ impl AptosVM {
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<UserSessionChangeSet, VMStatus> {
-        let maybe_publish_request = session.execute(|session| session.extract_publish_request());
+        let maybe_publish_request = session.execute(|session| {
+            let disable_publishing = self
+                .features()
+                .is_disallow_init_module_to_publish_modules_enabled();
+            session.extract_publish_request(disable_publishing)
+        });
         if maybe_publish_request.is_none() {
             let user_change_set = session.finish(change_set_configs, module_storage)?;
 
@@ -1819,7 +1824,7 @@ impl AptosVM {
         &self,
         session: &mut SessionExt,
         resolver: &impl AptosMoveResolver,
-        module_storage: &impl AptosModuleStorage,
+        module_storage: &impl ModuleStorage,
         transaction: &SignedTransaction,
         transaction_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
@@ -2548,7 +2553,7 @@ impl AptosVM {
         &self,
         session: &mut SessionExt,
         resolver: &impl AptosMoveResolver,
-        module_storage: &impl AptosModuleStorage,
+        module_storage: &impl ModuleStorage,
         payload: &TransactionPayload,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
@@ -2894,7 +2899,7 @@ impl VMValidator for AptosVM {
         &self,
         transaction: SignedTransaction,
         state_view: &impl StateView,
-        module_storage: &impl AptosCodeStorage,
+        module_storage: &impl ModuleStorage,
     ) -> VMValidatorResult {
         let _timer = TXN_VALIDATION_SECONDS.start_timer();
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
@@ -3052,7 +3057,7 @@ pub(crate) fn is_account_init_for_sponsored_transaction(
     txn_data: &TransactionMetadata,
     features: &Features,
     resolver: &impl AptosMoveResolver,
-    module_storage: &impl AptosModuleStorage,
+    module_storage: &impl ModuleStorage,
 ) -> VMResult<bool> {
     if features.is_enabled(FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION)
         && txn_data.fee_payer.is_some()
@@ -3079,7 +3084,7 @@ pub(crate) fn is_account_init_for_sponsored_transaction(
 pub(crate) fn fetch_module_metadata_for_struct_tag(
     struct_tag: &StructTag,
     resolver: &impl AptosMoveResolver,
-    module_storage: &impl AptosModuleStorage,
+    module_storage: &impl ModuleStorage,
 ) -> VMResult<Vec<Metadata>> {
     if module_storage.is_enabled() {
         module_storage.fetch_existing_module_metadata(&struct_tag.address, &struct_tag.module)

@@ -67,6 +67,7 @@ impl IndexerCliArgs {
         // Scan all yaml files in the move folder path.
         let mut script_transactions_vec: Vec<(String, ScriptTransactions)> = vec![];
         let move_files = std::fs::read_dir(&move_folder_path)?;
+        let mut used_sender_addresses: HashSet<String> = HashSet::new();
         for entry in move_files {
             let entry = entry?;
             // entry has to be a file.
@@ -79,6 +80,23 @@ impl IndexerCliArgs {
                 let script_transactions_raw: String = tokio::fs::read_to_string(&path).await?;
                 let script_transactions: ScriptTransactions =
                     serde_yaml::from_str(&script_transactions_raw)?;
+
+                let new_senders: HashSet<String> = script_transactions
+                    .transactions
+                    .iter()
+                    .map(|txn| txn.sender_address.clone())
+                    .collect();
+                // Check if any new sender is already used
+                if new_senders
+                    .iter()
+                    .any(|sender| used_sender_addresses.contains(sender))
+                {
+                    return Err(anyhow::anyhow!(
+                        "[Script Transaction Generator] Sender address in file `{}` is already being used",
+                        file_name
+                    ));
+                }
+                used_sender_addresses.extend(new_senders);
                 script_transactions_vec.push((file_name.to_string(), script_transactions));
             }
         }

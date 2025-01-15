@@ -230,7 +230,7 @@ fn test_compilation_metadata_internal(
     let path = builder.write_to_temp().unwrap();
 
     let compiler_version = if v2_flag {
-        CompilerVersion::V2_1
+        CompilerVersion::latest()
     } else {
         CompilerVersion::V1
     };
@@ -298,7 +298,7 @@ fn test_compilation_metadata_script_internal(
     let path = builder.write_to_temp().unwrap();
 
     let compiler_version = if v2_flag {
-        CompilerVersion::V2_1
+        CompilerVersion::latest()
     } else {
         CompilerVersion::V1
     };

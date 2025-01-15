@@ -16,6 +16,7 @@ use move_coverage::{
     summary::summarize_inst_cov,
 };
 use move_disassembler::disassembler::Disassembler;
+use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{compilation::compiled_package::CompiledPackage, BuildConfig, CompilerConfig};
 
 /// Display a coverage summary for all modules in a package
@@ -175,8 +176,12 @@ fn compile_coverage(
                 move_options.bytecode_version,
                 move_options.language_version,
             ),
-            compiler_version: move_options.compiler_version,
-            language_version: move_options.language_version,
+            compiler_version: move_options
+                .compiler_version
+                .or_else(|| Some(CompilerVersion::latest_stable())),
+            language_version: move_options
+                .language_version
+                .or_else(|| Some(LanguageVersion::latest_stable())),
             experiments: experiments_from_opt_level(&move_options.optimize),
         },
         ..Default::default()

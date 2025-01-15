@@ -40,9 +40,9 @@ pub(crate) fn individual_workload_tests(test_name: String) -> ForgeConfig {
                     creation_balance: 200_000_000,
                 };
                 let write_type = TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::BytesMakeOrChange {
+                    entry_point: Box::new(EntryPoints::BytesMakeOrChange {
                         data_length: Some(32),
-                    },
+                    }),
                     num_modules: 1,
                     use_account_pool: true,
                 };

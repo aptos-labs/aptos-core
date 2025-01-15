@@ -18,6 +18,7 @@ This module provides the foundation for typesafe Coins.
 -  [Struct `DepositEvent`](#0x1_coin_DepositEvent)
 -  [Struct `WithdrawEvent`](#0x1_coin_WithdrawEvent)
 -  [Struct `CoinEventHandleDeletion`](#0x1_coin_CoinEventHandleDeletion)
+-  [Struct `CoinStoreDeletion`](#0x1_coin_CoinStoreDeletion)
 -  [Struct `PairCreation`](#0x1_coin_PairCreation)
 -  [Struct `MintCapability`](#0x1_coin_MintCapability)
 -  [Struct `FreezeCapability`](#0x1_coin_FreezeCapability)
@@ -555,8 +556,11 @@ Event emitted when some amount of a coin is withdrawn from an account.
 
 Module event emitted when the event handles related to coin store is deleted.
 
+Deprecated: replaced with CoinStoreDeletion
+
 
 <pre><code>#[<a href="event.md#0x1_event">event</a>]
+#[deprecated]
 <b>struct</b> <a href="coin.md#0x1_coin_CoinEventHandleDeletion">CoinEventHandleDeletion</a> <b>has</b> drop, store
 </code></pre>
 
@@ -567,6 +571,53 @@ Module event emitted when the event handles related to coin store is deleted.
 
 
 <dl>
+<dt>
+<code>event_handle_creation_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>deleted_deposit_event_handle_creation_number: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>deleted_withdraw_event_handle_creation_number: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_coin_CoinStoreDeletion"></a>
+
+## Struct `CoinStoreDeletion`
+
+Module event emitted when the event handles related to coin store is deleted.
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="coin.md#0x1_coin_CoinStoreDeletion">CoinStoreDeletion</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>coin_type: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+</dt>
+<dd>
+
+</dd>
 <dt>
 <code>event_handle_creation_address: <b>address</b></code>
 </dt>
@@ -2046,7 +2097,8 @@ or disallow upgradability of total supply.
             <a href="account.md#0x1_account">account</a>
         );
         <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="coin.md#0x1_coin_CoinEventHandleDeletion">CoinEventHandleDeletion</a> {
+            <a href="coin.md#0x1_coin_CoinStoreDeletion">CoinStoreDeletion</a> {
+                coin_type: <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;CoinType&gt;(),
                 event_handle_creation_address: <a href="guid.md#0x1_guid_creator_address">guid::creator_address</a>(
                     <a href="event.md#0x1_event_guid">event::guid</a>(&deposit_events)
                 ),
@@ -2057,15 +2109,7 @@ or disallow upgradability of total supply.
         <b>if</b> (<a href="coin.md#0x1_coin">coin</a>.value == 0) {
             <a href="coin.md#0x1_coin_destroy_zero">destroy_zero</a>(<a href="coin.md#0x1_coin">coin</a>);
         } <b>else</b> {
-            <b>if</b> (std::features::module_event_migration_enabled()) {
-                <a href="event.md#0x1_event_emit">event::emit</a>(<a href="coin.md#0x1_coin_CoinWithdraw">CoinWithdraw</a> { coin_type: type_name&lt;CoinType&gt;(), <a href="account.md#0x1_account">account</a>, amount: <a href="coin.md#0x1_coin">coin</a>.value });
-            } <b>else</b> {
-                <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="coin.md#0x1_coin_WithdrawEvent">WithdrawEvent</a>&gt;(
-                    &<b>mut</b> withdraw_events,
-                    <a href="coin.md#0x1_coin_WithdrawEvent">WithdrawEvent</a> { amount: <a href="coin.md#0x1_coin">coin</a>.value },
-                );
-            };
-            <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">fungible_asset::deposit_internal</a>(object_address(&store), <a href="coin.md#0x1_coin_coin_to_fungible_asset">coin_to_fungible_asset</a>(<a href="coin.md#0x1_coin">coin</a>));
+            <a href="fungible_asset.md#0x1_fungible_asset_unchecked_deposit_with_no_events">fungible_asset::unchecked_deposit_with_no_events</a>(object_address(&store), <a href="coin.md#0x1_coin_coin_to_fungible_asset">coin_to_fungible_asset</a>(<a href="coin.md#0x1_coin">coin</a>));
         };
         <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(deposit_events);
         <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(withdraw_events);
@@ -2710,7 +2754,7 @@ This is for internal use only and doesn't emit an DepositEvent.
             <b>let</b> fa = <a href="coin.md#0x1_coin_coin_to_fungible_asset">coin_to_fungible_asset</a>(<a href="coin.md#0x1_coin">coin</a>);
             <b>let</b> metadata = <a href="fungible_asset.md#0x1_fungible_asset_asset_metadata">fungible_asset::asset_metadata</a>(&fa);
             <b>let</b> store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">primary_fungible_store::ensure_primary_store_exists</a>(account_addr, metadata);
-            <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">fungible_asset::deposit_internal</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store), fa);
+            <a href="fungible_asset.md#0x1_fungible_asset_unchecked_deposit_with_no_events">fungible_asset::unchecked_deposit_with_no_events</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store), fa);
         } <b>else</b> {
             <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="coin.md#0x1_coin_ECOIN_STORE_NOT_PUBLISHED">ECOIN_STORE_NOT_PUBLISHED</a>)
         }
@@ -4233,6 +4277,27 @@ The creator of <code>CoinType</code> must be <code>@aptos_framework</code>.
     symbol: symbol.bytes
 };
 <b>ensures</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(addr);
+</code></pre>
+
+
+Make sure <code>name</code> and <code>symbol</code> are legal length.
+Only the creator of <code>CoinType</code> can initialize.
+
+
+<a id="0x1_coin_InitializeInternalSchema"></a>
+
+
+<pre><code><b>schema</b> <a href="coin.md#0x1_coin_InitializeInternalSchema">InitializeInternalSchema</a>&lt;CoinType&gt; {
+    <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+    symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+    <b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>let</b> coin_address = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
+    <b>aborts_if</b> coin_address != account_addr;
+    <b>aborts_if</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(account_addr);
+    <b>aborts_if</b> len(name) &gt; <a href="coin.md#0x1_coin_MAX_COIN_NAME_LENGTH">MAX_COIN_NAME_LENGTH</a>;
+    <b>aborts_if</b> len(symbol) &gt; <a href="coin.md#0x1_coin_MAX_COIN_SYMBOL_LENGTH">MAX_COIN_SYMBOL_LENGTH</a>;
+}
 </code></pre>
 
 
