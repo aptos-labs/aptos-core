@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{loader::PseudoGasContext, RuntimeEnvironment};
+use hashbrown::{hash_map::Entry, HashMap};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     language_storage::{StructTag, TypeTag},
@@ -9,7 +10,58 @@ use move_core_types::{
 };
 use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndex};
 use parking_lot::RwLock;
-use std::collections::{hash_map::Entry, HashMap};
+use std::hash::{Hash, Hasher};
+
+/// Key type for [TypeTagCache] that corresponds to a fully-instantiated struct.
+#[derive(Clone, Eq, PartialEq)]
+struct StructKey {
+    idx: StructNameIndex,
+    ty_args: Vec<Type>,
+}
+
+#[derive(Eq, PartialEq)]
+struct StructKeyRef<'a> {
+    idx: &'a StructNameIndex,
+    ty_args: &'a [Type],
+}
+
+impl StructKey {
+    #[cfg(test)]
+    fn as_ref(&self) -> StructKeyRef {
+        StructKeyRef {
+            idx: &self.idx,
+            ty_args: self.ty_args.as_slice(),
+        }
+    }
+}
+
+impl<'a> hashbrown::Equivalent<StructKeyRef<'a>> for StructKey {
+    fn equivalent(&self, other: &StructKeyRef<'a>) -> bool {
+        &self.idx == other.idx && self.ty_args.as_slice() == other.ty_args
+    }
+}
+
+impl<'a> hashbrown::Equivalent<StructKey> for StructKeyRef<'a> {
+    fn equivalent(&self, other: &StructKey) -> bool {
+        self.idx == &other.idx && self.ty_args == other.ty_args.as_slice()
+    }
+}
+
+// Ensure hash is the same as for StructKeyRef.
+impl Hash for StructKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.idx.hash(state);
+        self.ty_args.hash(state);
+    }
+}
+
+// Ensure hash is the same as for StructKey.
+impl<'a> Hash for StructKeyRef<'a> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.idx.hash(state);
+        self.ty_args.hash(state);
+    }
+}
 
 /// An entry in [TypeTagCache] that also stores a "cost" of the tag. The cost is proportional to
 /// the size of the tag, which includes the number of inner nodes and the sum of the sizes in bytes
@@ -46,7 +98,7 @@ pub(crate) struct PricedStructTag {
 /// If thread 3 reads the tag of this enum, the read result is always **deterministic** for the
 /// fixed type parameters used by thread 3.
 pub(crate) struct TypeTagCache {
-    cache: RwLock<HashMap<StructNameIndex, HashMap<Vec<Type>, PricedStructTag>>>,
+    cache: RwLock<HashMap<StructKey, PricedStructTag>>,
 }
 
 impl TypeTagCache {
@@ -68,7 +120,10 @@ impl TypeTagCache {
         idx: &StructNameIndex,
         ty_args: &[Type],
     ) -> Option<PricedStructTag> {
-        self.cache.read().get(idx)?.get(ty_args).cloned()
+        self.cache
+            .read()
+            .get(&StructKeyRef { idx, ty_args })
+            .cloned()
     }
 
     /// Inserts the struct tag and its pseudo-gas cost ([PricedStructTag]) into the cache. Returns
@@ -80,19 +135,24 @@ impl TypeTagCache {
         priced_struct_tag: &PricedStructTag,
     ) -> bool {
         // Check if already cached.
-        if let Some(inner_cache) = self.cache.read().get(idx) {
-            if inner_cache.contains_key(ty_args) {
-                return false;
-            }
+        if self
+            .cache
+            .read()
+            .contains_key(&StructKeyRef { idx, ty_args })
+        {
+            return false;
         }
 
+        let key = StructKey {
+            idx: *idx,
+            ty_args: ty_args.to_vec(),
+        };
         let priced_struct_tag = priced_struct_tag.clone();
-        let ty_args = ty_args.to_vec();
 
         // Otherwise, we need to insert. We did the clones outside the lock, and also avoid the
         // double insertion.
         let mut cache = self.cache.write();
-        if let Entry::Vacant(entry) = cache.entry(*idx).or_default().entry(ty_args) {
+        if let Entry::Vacant(entry) = cache.entry(key) {
             entry.insert(priced_struct_tag);
             true
         } else {
@@ -225,14 +285,68 @@ mod tests {
     use super::*;
     use crate::config::VMConfig;
     use claims::{assert_err, assert_none, assert_ok, assert_ok_eq, assert_some};
-    use move_binary_format::file_format::{AbilitySet, StructTypeParameter};
+    use hashbrown::Equivalent;
+    use move_binary_format::file_format::{Ability, AbilitySet, StructTypeParameter};
     use move_core_types::{
         account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     };
     use move_vm_types::loaded_data::runtime_types::{
         AbilityInfo, StructIdentifier, StructLayout, StructType, TypeBuilder,
     };
-    use std::str::FromStr;
+    use smallbitvec::SmallBitVec;
+    use std::{collections::hash_map::DefaultHasher, str::FromStr};
+    use triomphe::Arc;
+
+    fn calculate_hash<T: Hash>(t: &T) -> u64 {
+        let mut s = DefaultHasher::new();
+        t.hash(&mut s);
+        s.finish()
+    }
+
+    #[test]
+    fn test_struct_key_equivalence_and_hash() {
+        let struct_keys = [
+            StructKey {
+                idx: StructNameIndex::new(0),
+                ty_args: vec![],
+            },
+            StructKey {
+                idx: StructNameIndex::new(1),
+                ty_args: vec![Type::U8],
+            },
+            StructKey {
+                idx: StructNameIndex::new(2),
+                ty_args: vec![Type::Bool, Type::Vector(Arc::new(Type::Bool))],
+            },
+            StructKey {
+                idx: StructNameIndex::new(3),
+                ty_args: vec![
+                    Type::Struct {
+                        idx: StructNameIndex::new(0),
+                        ability: AbilityInfo::struct_(AbilitySet::singleton(Ability::Key)),
+                    },
+                    Type::StructInstantiation {
+                        idx: StructNameIndex::new(1),
+                        ty_args: Arc::new(vec![Type::Address, Type::Struct {
+                            idx: StructNameIndex::new(2),
+                            ability: AbilityInfo::struct_(AbilitySet::singleton(Ability::Copy)),
+                        }]),
+                        ability: AbilityInfo::generic_struct(
+                            AbilitySet::singleton(Ability::Drop),
+                            SmallBitVec::new(),
+                        ),
+                    },
+                ],
+            },
+        ];
+
+        for struct_key in struct_keys {
+            let struct_key_ref = struct_key.as_ref();
+            assert!(struct_key.equivalent(&struct_key_ref));
+            assert!(struct_key_ref.equivalent(&struct_key));
+            assert_eq!(calculate_hash(&struct_key), calculate_hash(&struct_key_ref));
+        }
+    }
 
     #[test]
     fn test_type_tag_cache() {
