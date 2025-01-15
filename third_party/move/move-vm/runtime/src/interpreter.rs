@@ -5,7 +5,9 @@
 use crate::{
     access_control::AccessControlState,
     data_cache::TransactionDataCache,
-    frame_type_cache::FrameTypeCache,
+    frame_type_cache::{
+        AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, PerInstructionCache, RuntimeCacheTraits,
+    },
     loader::{LegacyModuleStorageAdapter, Loader, Resolver},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
@@ -41,9 +43,11 @@ use move_vm_types::{
     views::TypeView,
 };
 use std::{
+    cell::RefCell,
     cmp::min,
-    collections::{HashSet, VecDeque},
+    collections::{btree_map, BTreeSet, VecDeque},
     fmt::Write,
+    rc::Rc,
 };
 
 macro_rules! set_err_info {
@@ -79,7 +83,7 @@ pub(crate) struct InterpreterImpl {
     /// The access control state.
     access_control: AccessControlState,
     /// Set of modules that exists on call stack.
-    active_modules: HashSet<ModuleId>,
+    active_modules: BTreeSet<ModuleId>,
 }
 
 struct TypeWithLoader<'a, 'b, 'c> {
@@ -143,11 +147,14 @@ impl InterpreterImpl {
             call_stack: CallStack::new(),
             paranoid_type_checks: loader.vm_config().paranoid_type_checks,
             access_control: AccessControlState::default(),
-            active_modules: HashSet::new(),
+            active_modules: BTreeSet::new(),
         };
 
-        if interpreter.paranoid_type_checks {
-            interpreter.execute_main::<FullRuntimeTypeCheck>(
+        let function = Rc::new(function);
+        // TODO: remove Self::paranoid_type_cheks fully to be replaced
+        // with the static RuntimeTypeCheck trait
+        if loader.vm_config().paranoid_type_checks {
+            interpreter.dispatch_execute_main::<FullRuntimeTypeCheck>(
                 loader,
                 data_store,
                 module_store,
@@ -159,7 +166,84 @@ impl InterpreterImpl {
                 args,
             )
         } else {
-            interpreter.execute_main::<NoRuntimeTypeCheck>(
+            interpreter.dispatch_execute_main::<NoRuntimeTypeCheck>(
+                loader,
+                data_store,
+                module_store,
+                module_storage,
+                gas_meter,
+                traversal_context,
+                extensions,
+                function,
+                args,
+            )
+        }
+    }
+
+    fn load_generic_function(
+        &mut self,
+        resolver: &Resolver,
+        current_frame: &Frame,
+        gas_meter: &mut impl GasMeter,
+        idx: FunctionInstantiationIndex,
+    ) -> VMResult<LoadedFunction> {
+        let ty_args = resolver
+            .instantiate_generic_function(Some(gas_meter), idx, current_frame.function.ty_args())
+            .map_err(|e| set_err_info!(current_frame, e))?;
+        let function = resolver
+            .build_loaded_function_from_instantiation_and_ty_args(idx, ty_args)
+            .map_err(|e| self.set_location(e))?;
+
+        if self.paranoid_type_checks {
+            self.check_friend_or_private_call(&current_frame.function, &function)?;
+        }
+
+        Ok(function)
+    }
+
+    fn load_function(
+        &mut self,
+        resolver: &Resolver,
+        current_frame: &Frame,
+        fh_idx: FunctionHandleIndex,
+    ) -> VMResult<LoadedFunction> {
+        let function = resolver
+            .build_loaded_function_from_handle_and_ty_args(fh_idx, vec![])
+            .map_err(|e| self.set_location(e))?;
+
+        if self.paranoid_type_checks {
+            self.check_friend_or_private_call(&current_frame.function, &function)?;
+        }
+
+        Ok(function)
+    }
+
+    fn dispatch_execute_main<RTTCheck: RuntimeTypeCheck>(
+        self,
+        loader: &Loader,
+        data_store: &mut TransactionDataCache,
+        module_store: &LegacyModuleStorageAdapter,
+        module_storage: &impl ModuleStorage,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+        extensions: &mut NativeContextExtensions,
+        function: Rc<LoadedFunction>,
+        args: Vec<Value>,
+    ) -> VMResult<Vec<Value>> {
+        if loader.vm_config().use_call_tree_and_instruction_cache {
+            self.execute_main::<RTTCheck, AllRuntimeCaches>(
+                loader,
+                data_store,
+                module_store,
+                module_storage,
+                gas_meter,
+                traversal_context,
+                extensions,
+                function,
+                args,
+            )
+        } else {
+            self.execute_main::<RTTCheck, NoRuntimeCaches>(
                 loader,
                 data_store,
                 module_store,
@@ -179,7 +263,7 @@ impl InterpreterImpl {
     /// function represented by the frame. Control comes back to this function on return or
     /// on call. When that happens the frame is changes to a new one (call) or to the one
     /// at the top of the stack (return). If the call stack is empty execution is completed.
-    fn execute_main<RTTCheck: RuntimeTypeCheck>(
+    fn execute_main<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         mut self,
         loader: &Loader,
         data_store: &mut TransactionDataCache,
@@ -188,7 +272,7 @@ impl InterpreterImpl {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
-        function: LoadedFunction,
+        function: Rc<LoadedFunction>,
         args: Vec<Value>,
     ) -> VMResult<Vec<Value>> {
         let mut locals = Locals::new(function.local_tys().len());
@@ -202,8 +286,14 @@ impl InterpreterImpl {
             self.active_modules.insert(module_id.clone());
         }
 
+        let frame_cache = if RTCaches::caches_enabled() {
+            FrameTypeCache::make_rc_for_function(&function)
+        } else {
+            FrameTypeCache::make_rc()
+        };
+
         let mut current_frame = self
-            .make_new_frame(gas_meter, loader, function, locals)
+            .make_new_frame(gas_meter, loader, function, locals, frame_cache)
             .map_err(|err| self.set_location(err))?;
 
         // Access control for the new frame.
@@ -214,7 +304,7 @@ impl InterpreterImpl {
         loop {
             let resolver = current_frame.resolver(loader, module_store, module_storage);
             let exit_code = current_frame
-                .execute_code::<RTTCheck>(&resolver, &mut self, data_store, gas_meter)
+                .execute_code::<RTTCheck, RTCaches>(&resolver, &mut self, data_store, gas_meter)
                 .map_err(|err| self.attach_state_if_invariant_violation(err, &current_frame))?;
 
             match exit_code {
@@ -253,13 +343,35 @@ impl InterpreterImpl {
                     }
                 },
                 ExitCode::Call(fh_idx) => {
-                    let function = resolver
-                        .build_loaded_function_from_handle_and_ty_args(fh_idx, vec![])
-                        .map_err(|e| self.set_location(e))?;
+                    let (function, frame_cache) = if RTCaches::caches_enabled() {
+                        let current_frame_cache = &mut *current_frame.frame_cache.borrow_mut();
 
-                    if RTTCheck::should_perform_checks() {
-                        self.check_friend_or_private_call(&current_frame.function, &function)?;
-                    }
+                        match current_frame_cache.sub_frame_cache.entry(fh_idx) {
+                            btree_map::Entry::Occupied(entry) => {
+                                let entry = entry.get();
+                                (Rc::clone(&entry.0), Rc::clone(&entry.1))
+                            },
+                            btree_map::Entry::Vacant(entry) => {
+                                let function = Rc::new(self.load_function(
+                                    &resolver,
+                                    &current_frame,
+                                    fh_idx,
+                                )?);
+                                let frame_cache = FrameTypeCache::make_rc_for_function(&function);
+
+                                entry.insert((Rc::clone(&function), Rc::clone(&frame_cache)));
+                                (function, frame_cache)
+                            },
+                        }
+                    } else {
+                        let function = Rc::<LoadedFunction>::new(self.load_function(
+                            &resolver,
+                            &current_frame,
+                            fh_idx,
+                        )?);
+                        let frame_cache = FrameTypeCache::make_rc();
+                        (function, frame_cache)
+                    };
 
                     // Charge gas
                     let module_id = function.module_id().ok_or_else(|| {
@@ -282,7 +394,7 @@ impl InterpreterImpl {
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
                     if function.is_native() {
-                        self.call_native::<RTTCheck>(
+                        self.call_native::<RTTCheck, RTCaches>(
                             &mut current_frame,
                             &resolver,
                             data_store,
@@ -293,30 +405,49 @@ impl InterpreterImpl {
                         )?;
                         continue;
                     }
-                    self.set_new_call_frame::<RTTCheck>(
+
+                    self.set_new_call_frame::<RTTCheck, RTCaches>(
                         &mut current_frame,
                         gas_meter,
                         loader,
                         function,
+                        frame_cache,
                     )?;
                 },
                 ExitCode::CallGeneric(idx) => {
-                    let ty_args = resolver
-                        .instantiate_generic_function(
-                            Some(gas_meter),
+                    let (function, frame_cache) = if RTCaches::caches_enabled() {
+                        let current_frame_cache = &mut *current_frame.frame_cache.borrow_mut();
+
+                        match current_frame_cache.generic_sub_frame_cache.entry(idx) {
+                            btree_map::Entry::Occupied(entry) => {
+                                let entry = entry.get();
+                                (Rc::clone(&entry.0), Rc::clone(&entry.1))
+                            },
+                            btree_map::Entry::Vacant(entry) => {
+                                let function =
+                                    Rc::<LoadedFunction>::new(self.load_generic_function(
+                                        &resolver,
+                                        &current_frame,
+                                        gas_meter,
+                                        idx,
+                                    )?);
+                                let frame_cache = FrameTypeCache::make_rc_for_function(&function);
+
+                                entry.insert((Rc::clone(&function), Rc::clone(&frame_cache)));
+                                (function, frame_cache)
+                            },
+                        }
+                    } else {
+                        let function = Rc::<LoadedFunction>::new(self.load_generic_function(
+                            &resolver,
+                            &current_frame,
+                            gas_meter,
                             idx,
-                            current_frame.function.ty_args(),
-                        )
-                        .map_err(|e| set_err_info!(current_frame, e))?;
-                    let function = resolver
-                        .build_loaded_function_from_instantiation_and_ty_args(idx, ty_args)
-                        .map_err(|e| self.set_location(e))?;
+                        )?);
+                        let frame_cache = FrameTypeCache::make_rc();
+                        (function, frame_cache)
+                    };
 
-                    if RTTCheck::should_perform_checks() {
-                        self.check_friend_or_private_call(&current_frame.function, &function)?;
-                    }
-
-                    // Charge gas
                     let module_id = function
                         .module_id()
                         .ok_or_else(|| {
@@ -324,6 +455,7 @@ impl InterpreterImpl {
                                 .with_message("Failed to get native function module id".to_string())
                         })
                         .map_err(|e| set_err_info!(current_frame, e))?;
+                    // Charge gas
                     gas_meter
                         .charge_call_generic(
                             module_id,
@@ -340,7 +472,7 @@ impl InterpreterImpl {
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
                     if function.is_native() {
-                        self.call_native::<RTTCheck>(
+                        self.call_native::<RTTCheck, RTCaches>(
                             &mut current_frame,
                             &resolver,
                             data_store,
@@ -351,23 +483,26 @@ impl InterpreterImpl {
                         )?;
                         continue;
                     }
-                    self.set_new_call_frame::<RTTCheck>(
+
+                    self.set_new_call_frame::<RTTCheck, RTCaches>(
                         &mut current_frame,
                         gas_meter,
                         loader,
                         function,
+                        frame_cache,
                     )?;
                 },
             }
         }
     }
 
-    fn set_new_call_frame<RTTCheck: RuntimeTypeCheck>(
+    fn set_new_call_frame<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         current_frame: &mut Frame,
         gas_meter: &mut impl GasMeter,
         loader: &Loader,
-        function: LoadedFunction,
+        function: Rc<LoadedFunction>,
+        frame_cache: Rc<RefCell<FrameTypeCache>>,
     ) -> VMResult<()> {
         match (function.module_id(), current_frame.function.module_id()) {
             (Some(module_id), Some(current_module_id)) if module_id != current_module_id => {
@@ -390,7 +525,7 @@ impl InterpreterImpl {
         }
 
         let mut frame = self
-            .make_call_frame::<RTTCheck>(gas_meter, loader, function)
+            .make_call_frame::<RTTCheck, RTCaches>(gas_meter, loader, function, frame_cache)
             .map_err(|err| {
                 self.attach_state_if_invariant_violation(self.set_location(err), current_frame)
             })?;
@@ -414,11 +549,12 @@ impl InterpreterImpl {
     ///
     /// Native functions do not push a frame at the moment and as such errors from a native
     /// function are incorrectly attributed to the caller.
-    fn make_call_frame<RTTCheck: RuntimeTypeCheck>(
+    fn make_call_frame<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         gas_meter: &mut impl GasMeter,
         loader: &Loader,
-        function: LoadedFunction,
+        function: Rc<LoadedFunction>,
+        frame_cache: Rc<RefCell<FrameTypeCache>>,
     ) -> PartialVMResult<Frame> {
         let mut locals = Locals::new(function.local_tys().len());
         let num_param_tys = function.param_tys().len();
@@ -445,7 +581,7 @@ impl InterpreterImpl {
                 }
             }
         }
-        self.make_new_frame(gas_meter, loader, function, locals)
+        self.make_new_frame(gas_meter, loader, function, locals, frame_cache)
     }
 
     /// Create a new `Frame` given a function and its locals.
@@ -455,8 +591,9 @@ impl InterpreterImpl {
         &self,
         gas_meter: &mut impl GasMeter,
         loader: &Loader,
-        function: LoadedFunction,
+        function: Rc<LoadedFunction>,
         locals: Locals,
+        frame_cache: Rc<RefCell<FrameTypeCache>>,
     ) -> PartialVMResult<Frame> {
         let ty_args = function.ty_args();
         for ty in function.local_tys() {
@@ -484,12 +621,12 @@ impl InterpreterImpl {
             locals,
             function,
             local_tys,
-            ty_cache: FrameTypeCache::default(),
+            frame_cache,
         })
     }
 
     /// Call a native functions.
-    fn call_native<RTTCheck: RuntimeTypeCheck>(
+    fn call_native<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         current_frame: &mut Frame,
         resolver: &Resolver,
@@ -500,7 +637,7 @@ impl InterpreterImpl {
         function: &LoadedFunction,
     ) -> VMResult<()> {
         // Note: refactor if native functions push a frame on the stack
-        self.call_native_impl::<RTTCheck>(
+        self.call_native_impl::<RTTCheck, RTCaches>(
             current_frame,
             resolver,
             data_store,
@@ -527,7 +664,7 @@ impl InterpreterImpl {
         })
     }
 
-    fn call_native_impl<RTTCheck: RuntimeTypeCheck>(
+    fn call_native_impl<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         current_frame: &mut Frame,
         resolver: &Resolver,
@@ -706,11 +843,18 @@ impl InterpreterImpl {
                     }
                 }
 
-                self.set_new_call_frame::<RTTCheck>(
+                let frame_cache = if RTCaches::caches_enabled() {
+                    FrameTypeCache::make_rc_for_function(&target_func)
+                } else {
+                    FrameTypeCache::make_rc()
+                };
+
+                self.set_new_call_frame::<RTTCheck, RTCaches>(
                     current_frame,
                     gas_meter,
                     resolver.loader(),
-                    target_func,
+                    Rc::new(target_func),
+                    frame_cache,
                 )
                 .map_err(|err| err.to_partial())
             },
@@ -1297,6 +1441,12 @@ impl Stack {
             .ok_or_else(|| PartialVMError::new(StatusCode::EMPTY_VALUE_STACK))
     }
 
+    pub(crate) fn top_ty(&mut self) -> PartialVMResult<&Type> {
+        self.types
+            .last()
+            .ok_or_else(|| PartialVMError::new(StatusCode::EMPTY_VALUE_STACK))
+    }
+
     /// Pop n types off the stack.
     pub(crate) fn popn_tys(&mut self, n: u16) -> PartialVMResult<Vec<Type>> {
         let remaining_stack_size = self
@@ -1436,13 +1586,13 @@ fn check_depth_of_type_impl(
 struct Frame {
     pc: u16,
     // Currently being executed function.
-    function: LoadedFunction,
+    function: Rc<LoadedFunction>,
     // Locals for this execution context and their instantiated types.
     locals: Locals,
     local_tys: Vec<Type>,
     // Cache of types accessed in this frame, to improve performance when accessing
     // and constructing types.
-    ty_cache: FrameTypeCache,
+    pub(crate) frame_cache: Rc<RefCell<FrameTypeCache>>,
 }
 
 /// An `ExitCode` from `execute_code_unit`.
@@ -1465,14 +1615,14 @@ impl AccessSpecifierEnv for Frame {
 
 impl Frame {
     /// Execute a Move function until a return or a call opcode is found.
-    fn execute_code<RTTCheck: RuntimeTypeCheck>(
+    fn execute_code<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         resolver: &Resolver,
         interpreter: &mut InterpreterImpl,
         data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
     ) -> VMResult<ExitCode> {
-        self.execute_code_impl::<RTTCheck>(resolver, interpreter, data_store, gas_meter)
+        self.execute_code_impl::<RTTCheck, RTCaches>(resolver, interpreter, data_store, gas_meter)
             .map_err(|e| {
                 let e = if cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
                     e.with_exec_state(interpreter.get_internal_state())
@@ -1483,7 +1633,7 @@ impl Frame {
             })
     }
 
-    fn execute_code_impl<RTTCheck: RuntimeTypeCheck>(
+    fn execute_code_impl<RTTCheck: RuntimeTypeCheck, RTCaches: RuntimeCacheTraits>(
         &mut self,
         resolver: &Resolver,
         interpreter: &mut InterpreterImpl,
@@ -1497,6 +1647,8 @@ impl Frame {
                 TypeWithLoader { ty: $ty, resolver }
             };
         }
+
+        let frame_cache = &mut *self.frame_cache.borrow_mut();
 
         let code = self.function.code();
         loop {
@@ -1681,8 +1833,8 @@ impl Frame {
                         //
                         //       This is a bit wasteful since the newly created types are
                         //       dropped immediately.
-                        let ((_, field_ty_count), (_, struct_ty_count)) =
-                            self.ty_cache.get_field_type_and_struct_type(
+                        let ((_, field_ty_count), (_, struct_ty_count)) = frame_cache
+                            .get_field_type_and_struct_type(
                                 *fi_idx,
                                 resolver,
                                 self.function.ty_args(),
@@ -1731,8 +1883,8 @@ impl Frame {
                         //
                         //       This is a bit wasteful since the newly created types are
                         //       dropped immediately.
-                        let ((_, field_ty_count), (_, struct_ty_count)) =
-                            self.ty_cache.get_variant_field_type_and_struct_type(
+                        let ((_, field_ty_count), (_, struct_ty_count)) = frame_cache
+                            .get_variant_field_type_and_struct_type(
                                 *fi_idx,
                                 resolver,
                                 self.function.ty_args(),
@@ -1762,9 +1914,29 @@ impl Frame {
                         interpreter.operand_stack.push(field_ref)?;
                     },
                     Bytecode::Pack(sd_idx) => {
-                        let field_count = resolver.field_count(*sd_idx);
-                        let struct_type = resolver.get_struct_ty(*sd_idx);
-                        check_depth_of_type(resolver, &struct_type)?;
+                        let get_field_count_charge_gas_and_check_depth =
+                            || -> PartialVMResult<u16> {
+                                let field_count = resolver.field_count(*sd_idx);
+                                let struct_type = resolver.get_struct_ty(*sd_idx);
+                                check_depth_of_type(resolver, &struct_type)?;
+                                Ok(field_count)
+                            };
+
+                        let field_count = if RTCaches::caches_enabled() {
+                            let cached_field_count =
+                                &frame_cache.per_instruction_cache[self.pc as usize];
+                            if let PerInstructionCache::Pack(ref field_count) = cached_field_count {
+                                *field_count
+                            } else {
+                                let field_count = get_field_count_charge_gas_and_check_depth()?;
+                                frame_cache.per_instruction_cache[self.pc as usize] =
+                                    PerInstructionCache::Pack(field_count);
+                                field_count
+                            }
+                        } else {
+                            get_field_count_charge_gas_and_check_depth()?
+                        };
+
                         gas_meter.charge_pack(
                             false,
                             interpreter.operand_stack.last_n(field_count as usize)?,
@@ -1795,21 +1967,43 @@ impl Frame {
                         //
                         //       This is a bit wasteful since the newly created types are
                         //       dropped immediately.
-                        let ty_args = self.function.ty_args();
-                        let field_tys = self
-                            .ty_cache
-                            .get_struct_fields_types(*si_idx, resolver, ty_args)?;
 
-                        for (_, ty_count) in field_tys {
-                            gas_meter.charge_create_ty(*ty_count)?;
-                        }
+                        let mut get_field_count_charge_gas_and_check_depth =
+                            |frame_cache: &mut FrameTypeCache| -> PartialVMResult<u16> {
+                                let ty_args = self.function.ty_args();
+                                let field_tys = frame_cache
+                                    .get_struct_fields_types(*si_idx, resolver, ty_args)?;
 
-                        let (ty, ty_count) =
-                            self.ty_cache.get_struct_type(*si_idx, resolver, ty_args)?;
-                        gas_meter.charge_create_ty(ty_count)?;
-                        check_depth_of_type(resolver, ty)?;
+                                for (_, ty_count) in field_tys {
+                                    gas_meter.charge_create_ty(*ty_count)?;
+                                }
 
-                        let field_count = resolver.field_instantiation_count(*si_idx);
+                                let (ty, ty_count) =
+                                    frame_cache.get_struct_type(*si_idx, resolver, ty_args)?;
+                                gas_meter.charge_create_ty(ty_count)?;
+                                check_depth_of_type(resolver, ty)?;
+                                Ok(resolver.field_instantiation_count(*si_idx))
+                            };
+
+                        let field_count = if RTCaches::caches_enabled() {
+                            let cached_field_count =
+                                &frame_cache.per_instruction_cache[self.pc as usize];
+
+                            if let PerInstructionCache::PackGeneric(ref field_count) =
+                                cached_field_count
+                            {
+                                *field_count
+                            } else {
+                                let field_count =
+                                    get_field_count_charge_gas_and_check_depth(frame_cache)?;
+                                frame_cache.per_instruction_cache[self.pc as usize] =
+                                    PerInstructionCache::PackGeneric(field_count);
+                                field_count
+                            }
+                        } else {
+                            get_field_count_charge_gas_and_check_depth(frame_cache)?
+                        };
+
                         gas_meter.charge_pack(
                             true,
                             interpreter.operand_stack.last_n(field_count as usize)?,
@@ -1821,17 +2015,15 @@ impl Frame {
                     },
                     Bytecode::PackVariantGeneric(si_idx) => {
                         let ty_args = self.function.ty_args();
-                        let field_tys = self
-                            .ty_cache
+                        let field_tys = frame_cache
                             .get_struct_variant_fields_types(*si_idx, resolver, ty_args)?;
 
                         for (_, ty_count) in field_tys {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
 
-                        let (ty, ty_count) = self
-                            .ty_cache
-                            .get_struct_variant_type(*si_idx, resolver, ty_args)?;
+                        let (ty, ty_count) =
+                            frame_cache.get_struct_variant_type(*si_idx, resolver, ty_args)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         check_depth_of_type(resolver, ty)?;
 
@@ -1875,15 +2067,14 @@ impl Frame {
                         //       This is a bit wasteful since the newly created types are
                         //       dropped immediately.
                         let ty_args = self.function.ty_args();
-                        let ty_and_field_counts = self
-                            .ty_cache
-                            .get_struct_fields_types(*si_idx, resolver, ty_args)?;
+                        let ty_and_field_counts =
+                            frame_cache.get_struct_fields_types(*si_idx, resolver, ty_args)?;
                         for (_, ty_count) in ty_and_field_counts {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
 
                         let (ty, ty_count) =
-                            self.ty_cache.get_struct_type(*si_idx, resolver, ty_args)?;
+                            frame_cache.get_struct_type(*si_idx, resolver, ty_args)?;
                         gas_meter.charge_create_ty(ty_count)?;
 
                         check_depth_of_type(resolver, ty)?;
@@ -1901,16 +2092,14 @@ impl Frame {
                     },
                     Bytecode::UnpackVariantGeneric(si_idx) => {
                         let ty_args = self.function.ty_args();
-                        let ty_and_field_counts = self
-                            .ty_cache
+                        let ty_and_field_counts = frame_cache
                             .get_struct_variant_fields_types(*si_idx, resolver, ty_args)?;
                         for (_, ty_count) in ty_and_field_counts {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
 
-                        let (ty, ty_count) = self
-                            .ty_cache
-                            .get_struct_variant_type(*si_idx, resolver, ty_args)?;
+                        let (ty, ty_count) =
+                            frame_cache.get_struct_variant_type(*si_idx, resolver, ty_args)?;
                         gas_meter.charge_create_ty(ty_count)?;
 
                         check_depth_of_type(resolver, ty)?;
@@ -1940,7 +2129,7 @@ impl Frame {
                         //
                         //       This is a bit wasteful since the newly created types are
                         //       dropped immediately.
-                        let (_, struct_ty_count) = self.ty_cache.get_struct_variant_type(
+                        let (_, struct_ty_count) = frame_cache.get_struct_variant_type(
                             *sd_idx,
                             resolver,
                             self.function.ty_args(),
@@ -2121,7 +2310,7 @@ impl Frame {
                     | Bytecode::ImmBorrowGlobalGeneric(si_idx) => {
                         let is_mut = matches!(instruction, Bytecode::MutBorrowGlobalGeneric(_));
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let (ty, ty_count) = self.ty_cache.get_struct_type(
+                        let (ty, ty_count) = frame_cache.get_struct_type(
                             *si_idx,
                             resolver,
                             self.function.ty_args(),
@@ -2138,7 +2327,7 @@ impl Frame {
                     },
                     Bytecode::ExistsGeneric(si_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let (ty, ty_count) = self.ty_cache.get_struct_type(
+                        let (ty, ty_count) = frame_cache.get_struct_type(
                             *si_idx,
                             resolver,
                             self.function.ty_args(),
@@ -2153,7 +2342,7 @@ impl Frame {
                     },
                     Bytecode::MoveFromGeneric(si_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let (ty, ty_count) = self.ty_cache.get_struct_type(
+                        let (ty, ty_count) = frame_cache.get_struct_type(
                             *si_idx,
                             resolver,
                             self.function.ty_args(),
@@ -2181,7 +2370,7 @@ impl Frame {
                             .value_as::<Reference>()?
                             .read_ref()?
                             .value_as::<AccountAddress>()?;
-                        let (ty, ty_count) = self.ty_cache.get_struct_type(
+                        let (ty, ty_count) = frame_cache.get_struct_type(
                             *si_idx,
                             resolver,
                             self.function.ty_args(),
@@ -2204,7 +2393,7 @@ impl Frame {
                         gas_meter.charge_simple_instr(S::Nop)?;
                     },
                     Bytecode::VecPack(si, num) => {
-                        let (ty, ty_count) = self.ty_cache.get_signature_index_type(
+                        let (ty, ty_count) = frame_cache.get_signature_index_type(
                             *si,
                             resolver,
                             self.function.ty_args(),
@@ -2221,7 +2410,7 @@ impl Frame {
                     },
                     Bytecode::VecLen(si) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) = self.ty_cache.get_signature_index_type(
+                        let (ty, ty_count) = frame_cache.get_signature_index_type(
                             *si,
                             resolver,
                             self.function.ty_args(),
@@ -2234,7 +2423,7 @@ impl Frame {
                     Bytecode::VecImmBorrow(si) => {
                         let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) = self.ty_cache.get_signature_index_type(
+                        let (ty, ty_count) = frame_cache.get_signature_index_type(
                             *si,
                             resolver,
                             self.function.ty_args(),
@@ -2247,7 +2436,7 @@ impl Frame {
                     Bytecode::VecMutBorrow(si) => {
                         let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) = self.ty_cache.get_signature_index_type(
+                        let (ty, ty_count) = frame_cache.get_signature_index_type(
                             *si,
                             resolver,
                             self.function.ty_args(),
@@ -2260,7 +2449,7 @@ impl Frame {
                     Bytecode::VecPushBack(si) => {
                         let elem = interpreter.operand_stack.pop()?;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) = self.ty_cache.get_signature_index_type(
+                        let (ty, ty_count) = frame_cache.get_signature_index_type(
                             *si,
                             resolver,
                             self.function.ty_args(),
@@ -2271,7 +2460,7 @@ impl Frame {
                     },
                     Bytecode::VecPopBack(si) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) = self.ty_cache.get_signature_index_type(
+                        let (ty, ty_count) = frame_cache.get_signature_index_type(
                             *si,
                             resolver,
                             self.function.ty_args(),
@@ -2283,7 +2472,7 @@ impl Frame {
                     },
                     Bytecode::VecUnpack(si, num) => {
                         let vec_val = interpreter.operand_stack.pop_as::<Vector>()?;
-                        let (ty, ty_count) = self.ty_cache.get_signature_index_type(
+                        let (ty, ty_count) = frame_cache.get_signature_index_type(
                             *si,
                             resolver,
                             self.function.ty_args(),
@@ -2303,7 +2492,7 @@ impl Frame {
                         let idx2 = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let idx1 = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (ty, ty_count) = self.ty_cache.get_signature_index_type(
+                        let (ty, ty_count) = frame_cache.get_signature_index_type(
                             *si,
                             resolver,
                             self.function.ty_args(),
@@ -2313,12 +2502,13 @@ impl Frame {
                         vec_ref.swap(idx1, idx2, ty)?;
                     },
                 }
+
                 RTTCheck::post_execution_type_stack_transition(
                     &self.local_tys,
                     self.function.ty_args(),
                     resolver,
                     &mut interpreter.operand_stack,
-                    &mut self.ty_cache,
+                    frame_cache,
                     instruction,
                 )?;
                 RTTCheck::check_operand_stack_balance(&interpreter.operand_stack)?;
