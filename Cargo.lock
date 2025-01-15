@@ -11919,6 +11919,7 @@ dependencies = [
  "proptest",
  "serde",
  "sha3 0.9.1",
+ "smallbitvec",
  "triomphe",
  "typed-arena",
 ]

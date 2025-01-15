@@ -38,7 +38,9 @@ move-binary-format = { workspace = true, features = ["fuzzing"] }
 move-compiler = { workspace = true }
 move-ir-compiler = { workspace = true }
 move-vm-test-utils ={ workspace = true }
+move-vm-types ={ workspace = true, features = ["testing"] }
 proptest = { workspace = true }
+smallbitvec = { workspace = true }
 
 [features]
 default = []
