@@ -889,10 +889,9 @@ module aptos_framework::coin {
     /// Deposit the coin balance into the recipient's account without checking if the account is frozen.
     /// This is for internal use only and doesn't emit an DepositEvent.
     public(friend) fun force_deposit<CoinType>(
-        account: &signer,
+        account_addr: address,
         coin: Coin<CoinType>
     ) acquires CoinStore, CoinConversionMap, CoinInfo {
-        let account_addr = signer::address_of(account);
         if (exists<CoinStore<CoinType>>(account_addr)) {
             let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
             merge(&mut coin_store.coin, coin);
@@ -1989,14 +1988,14 @@ module aptos_framework::coin {
         maybe_convert_to_fungible_store<FakeMoney>(aaron_addr);
         deposit(aaron_addr, mint<FakeMoney>(1, &mint_cap));
 
-        force_deposit(account, mint<FakeMoney>(100, &mint_cap));
-        force_deposit(aaron, mint<FakeMoney>(50, &mint_cap));
+        force_deposit(account_addr, mint<FakeMoney>(100, &mint_cap));
+        force_deposit(aaron_addr, mint<FakeMoney>(50, &mint_cap));
         assert!(
             primary_fungible_store::balance(aaron_addr, option::extract(&mut paired_metadata<FakeMoney>())) == 51,
             0
         );
         assert!(coin_balance<FakeMoney>(account_addr) == 100, 0);
-        force_deposit(bob, mint<FakeMoney>(1, &mint_cap));
+        force_deposit(bob_addr, mint<FakeMoney>(1, &mint_cap));
         move_to(account, FakeMoneyCapabilities {
             burn_cap,
             freeze_cap,
