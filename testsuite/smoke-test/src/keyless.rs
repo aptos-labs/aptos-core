@@ -31,7 +31,7 @@ use aptos_types::{
         },
         AnyKeylessPublicKey, Configuration, EphemeralCertificate, Groth16ProofAndStatement,
         Groth16VerificationKey, KeylessPublicKey, KeylessSignature, TransactionAndProof,
-        VERIFICATION_KEY_FOR_TESTING, KEYLESS_ACCOUNT_MODULE_NAME,
+        KEYLESS_ACCOUNT_MODULE_NAME, VERIFICATION_KEY_FOR_TESTING,
     },
     on_chain_config::{FeatureFlag, Features},
     transaction::{
