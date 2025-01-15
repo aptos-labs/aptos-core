@@ -509,7 +509,6 @@ module aptos_framework::permissioned_signer {
         )
     }
 
-    /// Grant an unlimited permission to a permissioned signer **without** master signer's approval.
     /// Grant an unlimited permission to a permissioned signer **without** master signer's approvoal.
     public(package) fun grant_unlimited_with_permissioned_signer<PermKey: copy + drop + store>(
         permissioned: &signer,
