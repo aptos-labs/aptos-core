@@ -11,7 +11,7 @@ use anyhow::Result;
 use aptos_consensus_types::{block::Block, quorum_cert::QuorumCert};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
-use aptos_schemadb::{schema::Schema, Options, SchemaBatch, DB, DEFAULT_COLUMN_FAMILY_NAME};
+use aptos_schemadb::{batch::SchemaBatch, schema::Schema, Options, DB, DEFAULT_COLUMN_FAMILY_NAME};
 use aptos_storage_interface::AptosDbError;
 pub use schema::{
     block::BlockSchema,
@@ -107,14 +107,14 @@ impl ConsensusDB {
     }
 
     pub fn save_highest_2chain_timeout_certificate(&self, tc: Vec<u8>) -> Result<(), DbError> {
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         batch.put::<SingleEntrySchema>(&SingleEntryKey::Highest2ChainTimeoutCert, &tc)?;
         self.commit(batch)?;
         Ok(())
     }
 
     pub fn save_vote(&self, last_vote: Vec<u8>) -> Result<(), DbError> {
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         batch.put::<SingleEntrySchema>(&SingleEntryKey::LastVote, &last_vote)?;
         self.commit(batch)
     }
@@ -127,7 +127,7 @@ impl ConsensusDB {
         if block_data.is_empty() && qc_data.is_empty() {
             return Err(anyhow::anyhow!("Consensus block and qc data is empty!").into());
         }
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         block_data
             .iter()
             .try_for_each(|block| batch.put::<BlockSchema>(&block.id(), block))?;
@@ -144,7 +144,7 @@ impl ConsensusDB {
         if block_ids.is_empty() {
             return Err(anyhow::anyhow!("Consensus block ids is empty!").into());
         }
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         block_ids.iter().try_for_each(|hash| {
             batch.delete::<BlockSchema>(hash)?;
             batch.delete::<QCSchema>(hash)
@@ -167,7 +167,7 @@ impl ConsensusDB {
     }
 
     pub fn delete_highest_2chain_timeout_certificate(&self) -> Result<(), DbError> {
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         batch.delete::<SingleEntrySchema>(&SingleEntryKey::Highest2ChainTimeoutCert)?;
         self.commit(batch)
     }
@@ -180,21 +180,21 @@ impl ConsensusDB {
     }
 
     pub fn delete_last_vote_msg(&self) -> Result<(), DbError> {
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         batch.delete::<SingleEntrySchema>(&SingleEntryKey::LastVote)?;
         self.commit(batch)?;
         Ok(())
     }
 
     pub fn put<S: Schema>(&self, key: &S::Key, value: &S::Value) -> Result<(), DbError> {
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         batch.put::<S>(key, value)?;
         self.commit(batch)?;
         Ok(())
     }
 
     pub fn delete<S: Schema>(&self, keys: Vec<S::Key>) -> Result<(), DbError> {
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         keys.iter().try_for_each(|key| batch.delete::<S>(key))?;
         self.commit(batch)
     }

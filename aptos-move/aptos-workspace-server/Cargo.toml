@@ -38,5 +38,5 @@ url = { workspace = true }
 uuid = { workspace = true }
 
 # indexer deps
-processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "51a34901b40d7f75767ac907b4d2478104d6a515", default-features = false }
-server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "51a34901b40d7f75767ac907b4d2478104d6a515" }
+processor = { workspace = true }
+server-framework = { workspace = true }

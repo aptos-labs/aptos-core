@@ -306,6 +306,8 @@ Note that this function does not put any constraint on <code>T</code>. If code u
 deserialize a linear value, its their responsibility that the data they deserialize is
 owned.
 
+Function would abort if T has signer in it.
+
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T
 </code></pre>

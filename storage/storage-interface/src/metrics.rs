@@ -6,7 +6,7 @@
 use aptos_metrics_core::{exponential_buckets, register_histogram_vec, HistogramVec};
 use once_cell::sync::Lazy;
 
-pub static TIMER: Lazy<HistogramVec> = Lazy::new(|| {
+pub(crate) static TIMER: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_storage_interface_timer_seconds",
         "Various timers for performance analysis.",

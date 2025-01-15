@@ -19,7 +19,6 @@ aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-db-indexer = { workspace = true }
 aptos-db-indexer-schemas = { workspace = true, features = ["fuzzing"] }
-aptos-executor = { workspace = true }
 aptos-executor-types = { workspace = true }
 aptos-experimental-runtimes = { workspace = true }
 aptos-infallible = { workspace = true }
@@ -42,14 +41,12 @@ claims = { workspace = true }
 clap = { workspace = true, optional = true }
 crossbeam-channel = { workspace = true, optional = true }
 dashmap = { workspace = true }
-derive_more = { workspace = true }
 either = { workspace = true }
 hex = { workspace = true }
 indicatif = { workspace = true, optional = true }
 itertools = { workspace = true }
 lru = { workspace = true }
 move-core-types = { workspace = true }
-num-derive = { workspace = true }
 once_cell = { workspace = true }
 owo-colors = { workspace = true, optional = true }
 proptest = { workspace = true, optional = true }

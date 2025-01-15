@@ -4,6 +4,7 @@
 pub(crate) mod loader;
 pub(crate) mod struct_name_index_map;
 pub(crate) mod ty_cache;
+pub(crate) mod ty_tag_cache;
 mod verified_module_cache;
 
 pub mod code_storage;

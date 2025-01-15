@@ -33,6 +33,8 @@ class Flow(Flag):
     RESOURCE_GROUPS = auto()
     # Test different executor types
     EXECUTORS = auto()
+    # For when testing locally, quick inclusion of specific cases
+    ADHOC = auto()
 
 
 # Tests that are run on LAND_BLOCKING and continuously on main
@@ -77,7 +79,7 @@ SKIP_PERF_IMPROVEMENT_NOTICE = IS_MAINNET
 
 # bump after a bigger test or perf change, so you can easily distinguish runs
 # that are on top of this commit
-CODE_PERF_VERSION = "v9"
+CODE_PERF_VERSION = "v10"
 
 # default to using production number of execution threads for assertions
 NUMBER_OF_EXECUTION_THREADS = int(
@@ -135,6 +137,7 @@ class RunGroupKeyExtra:
     skip_commit_override: bool = field(default=False)
     single_block_dst_working_set: bool = field(default=False)
     execution_sharding: bool = field(default=False)
+    block_size_override: Optional[float] = field(default=None)
 
 
 @dataclass
@@ -216,7 +219,7 @@ TESTS = [
     RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-write-and-read-tag1-kb", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.RESOURCE_GROUPS, waived=True),
     RunGroupConfig(key=RunGroupKey("resource-groups-sender-write-tag1-kb"), included_in=Flow.CONTINUOUS | Flow.RESOURCE_GROUPS),
     RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-write-tag1-kb", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.RESOURCE_GROUPS, waived=True),
-    RunGroupConfig(key=RunGroupKey("resource-groups-sender-multi-change1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS),
+    RunGroupConfig(key=RunGroupKey("resource-groups-sender-multi-change1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS | Flow.ADHOC),
     RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-multi-change1-kb", module_working_set_size=DEFAULT_MODULE_WORKING_SET_SIZE), included_in=Flow.RESOURCE_GROUPS, waived=True),
 
     RunGroupConfig(key=RunGroupKey("token-v1ft-mint-and-transfer"), included_in=Flow.CONTINUOUS),
@@ -269,7 +272,6 @@ TESTS = [
 ] + [ 
     # no-commit throughput of different executor, used on continuous flow
     RunGroupConfig(
-        expected_tps=40000,
         key=RunGroupKey(
             "no_commit_{}{}".format(
                 transaction_type:="apt-fa-transfer" if FA_MIGRATION_COMPLETE else "coin-transfer", 
@@ -282,6 +284,7 @@ TESTS = [
             sig_verify_num_threads_override=16,
             skip_commit_override=True,
             execution_sharding=executor_sharding,
+            block_size_override=10000,
         ), 
         included_in=Flow.CONTINUOUS, 
         waived=True,
@@ -295,7 +298,7 @@ TESTS = [
 ] + [
     # sweep of all executors for the extensive EXECUTORS flow
     RunGroupConfig(
-        expected_tps=10000 if sequential else 30000, 
+        expected_tps=10000 if sequential else 30000,
         key=RunGroupKey(
             "{}_{}_by_stages".format(
                 transaction_type:="apt-fa-transfer" if FA_MIGRATION_COMPLETE else "coin-transfer", 
@@ -656,7 +659,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
 
     execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")
-    create_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-executor-type aptos-vm-with-block-stm --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db {FEATURE_FLAGS} --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
+    create_db_command = f"PUSH_METRICS_NAMESPACE=benchmark-create-db RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-executor-type aptos-vm-with-block-stm --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db {FEATURE_FLAGS} --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
 
     results = []
@@ -713,7 +716,12 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             )
 
         # target 250ms blocks, a bit larger than prod
-        cur_block_size = max(4, int(min([criteria.expected_tps / 4, MAX_BLOCK_SIZE])))
+        if test.key_extra.block_size_override is not None:
+            cur_block_size = test.key_extra.block_size_override
+        else:
+            cur_block_size = max(
+                4, int(min([criteria.expected_tps / 4, MAX_BLOCK_SIZE]))
+            )
 
         print(f"Testing {test.key}")
         if test.key_extra.transaction_type_override == "":

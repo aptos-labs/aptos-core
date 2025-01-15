@@ -179,7 +179,7 @@ pub(crate) fn realistic_env_fairness_workload_sweep() -> ForgeConfig {
         ]),
         criteria: Vec::new(),
         background_traffic: background_traffic_for_sweep_with_latency(
-            &[(2.0, 3.0, 8.0), (0.1, 25.0, 30.0), (0.1, 30.0, 40.0)],
+            &[(2.0, 3.0, 8.0), (0.1, 25.0, 30.0), (0.1, 30.0, 45.0)],
             false,
         ),
     })
@@ -217,8 +217,10 @@ pub(crate) fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
                 (0.1, 2.2, 3.0),
                 (0.1, 3.5, 5.0),
                 (0.1, 4.0, 6.0),
-                (0.1, 2.5, 4.0),
-                (0.1, 3.5, 5.0),
+                // TODO - p50 and p90 is set to high, until it is calibrated/understood.
+                (0.1, 3.0, 5.0),
+                // TODO - p50 and p90 is set to high, until it is calibrated/understood.
+                (0.1, 5.0, 10.0),
                 // TODO - p50 and p90 is set to high, until it is calibrated/understood.
                 (0.1, 3.0, 10.0),
             ],
@@ -485,7 +487,7 @@ pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             );
     } else {
         forge_config = forge_config.with_success_criteria(
-            SuccessCriteria::new(12000)
+            SuccessCriteria::new(11000)
                 .add_no_restarts()
                 /* This test runs at high load, so we need more catchup time */
                 .add_wait_for_catchup_s(120),

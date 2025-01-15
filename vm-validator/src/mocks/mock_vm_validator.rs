@@ -11,7 +11,7 @@ use aptos_types::{
     vm_status::StatusCode,
 };
 use aptos_vm::VMValidator;
-use aptos_vm_types::module_and_script_storage::code_storage::AptosCodeStorage;
+use move_vm_runtime::ModuleStorage;
 
 pub const ACCOUNT_DNE_TEST_ADD: AccountAddress =
     AccountAddress::new([0_u8; AccountAddress::LENGTH]);
@@ -36,7 +36,7 @@ impl VMValidator for MockVMValidator {
         &self,
         _transaction: SignedTransaction,
         _state_view: &impl StateView,
-        _module_storage: &impl AptosCodeStorage,
+        _module_storage: &impl ModuleStorage,
     ) -> VMValidatorResult {
         VMValidatorResult::new(None, 0)
     }

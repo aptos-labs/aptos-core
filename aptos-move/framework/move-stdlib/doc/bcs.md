@@ -14,6 +14,7 @@ details on BCS.
 -  [Function `constant_serialized_size`](#0x1_bcs_constant_serialized_size)
 -  [Specification](#@Specification_0)
     -  [Function `serialized_size`](#@Specification_0_serialized_size)
+    -  [Function `constant_serialized_size`](#@Specification_0_constant_serialized_size)
 
 
 <pre><code><b>use</b> <a href="option.md#0x1_option">0x1::option</a>;
@@ -25,6 +26,7 @@ details on BCS.
 
 ## Function `to_bytes`
 
+Note: all natives would fail if the MoveValue contains a permissioned signer in it.
 Returns the binary representation of <code>v</code> in BCS (Binary Canonical Serialization) format.
 Aborts with <code>0x1c5</code> error code if serialization fails.
 
@@ -131,6 +133,22 @@ Native function which is defined in the prover's prelude.
 
 <pre><code><b>pragma</b> opaque;
 <b>ensures</b> result == len(<a href="bcs.md#0x1_bcs_serialize">serialize</a>(v));
+</code></pre>
+
+
+
+<a id="@Specification_0_constant_serialized_size"></a>
+
+### Function `constant_serialized_size`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bcs.md#0x1_bcs_constant_serialized_size">constant_serialized_size</a>&lt;MoveValue&gt;(): <a href="option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
 </code></pre>
 
 

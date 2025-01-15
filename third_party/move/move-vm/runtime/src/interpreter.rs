@@ -37,8 +37,8 @@ use move_vm_types::{
     },
     natives::function::NativeResult,
     values::{
-        self, GlobalValue, IntegerValue, Locals, Reference, Struct, StructRef, VMValueCast, Value,
-        Vector, VectorRef,
+        self, GlobalValue, IntegerValue, Locals, Reference, SignerRef, Struct, StructRef,
+        VMValueCast, Value, Vector, VectorRef,
     },
     views::TypeView,
 };
@@ -2352,9 +2352,9 @@ impl Frame {
                     },
                     Bytecode::MoveTo(sd_idx) => {
                         let resource = interpreter.operand_stack.pop()?;
-                        let signer_reference = interpreter.operand_stack.pop_as::<StructRef>()?;
+                        let signer_reference = interpreter.operand_stack.pop_as::<SignerRef>()?;
                         let addr = signer_reference
-                            .borrow_field(0)?
+                            .borrow_signer()?
                             .value_as::<Reference>()?
                             .read_ref()?
                             .value_as::<AccountAddress>()?;
@@ -2364,9 +2364,9 @@ impl Frame {
                     },
                     Bytecode::MoveToGeneric(si_idx) => {
                         let resource = interpreter.operand_stack.pop()?;
-                        let signer_reference = interpreter.operand_stack.pop_as::<StructRef>()?;
+                        let signer_reference = interpreter.operand_stack.pop_as::<SignerRef>()?;
                         let addr = signer_reference
-                            .borrow_field(0)?
+                            .borrow_signer()?
                             .value_as::<Reference>()?
                             .read_ref()?
                             .value_as::<AccountAddress>()?;

@@ -95,6 +95,33 @@ pub mod fullnode_data_client {
             self
         }
         ///
+        pub async fn ping(
+            &mut self,
+            request: impl tonic::IntoRequest<super::PingFullnodeRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::PingFullnodeResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/aptos.internal.fullnode.v1.FullnodeData/Ping",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("aptos.internal.fullnode.v1.FullnodeData", "Ping"),
+                );
+            self.inner.unary(req, path, codec).await
+        }
+        ///
         pub async fn get_transactions_from_node(
             &mut self,
             request: impl tonic::IntoRequest<super::GetTransactionsFromNodeRequest>,
@@ -141,6 +168,14 @@ pub mod fullnode_data_server {
     /// Generated trait containing gRPC methods that should be implemented for use with FullnodeDataServer.
     #[async_trait]
     pub trait FullnodeData: std::marker::Send + std::marker::Sync + 'static {
+        ///
+        async fn ping(
+            &self,
+            request: tonic::Request<super::PingFullnodeRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::PingFullnodeResponse>,
+            tonic::Status,
+        >;
         /// Server streaming response type for the GetTransactionsFromNode method.
         type GetTransactionsFromNodeStream: tonic::codegen::tokio_stream::Stream<
                 Item = std::result::Result<
@@ -236,6 +271,51 @@ pub mod fullnode_data_server {
         }
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             match req.uri().path() {
+                "/aptos.internal.fullnode.v1.FullnodeData/Ping" => {
+                    #[allow(non_camel_case_types)]
+                    struct PingSvc<T: FullnodeData>(pub Arc<T>);
+                    impl<
+                        T: FullnodeData,
+                    > tonic::server::UnaryService<super::PingFullnodeRequest>
+                    for PingSvc<T> {
+                        type Response = super::PingFullnodeResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::PingFullnodeRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as FullnodeData>::ping(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = PingSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
                 "/aptos.internal.fullnode.v1.FullnodeData/GetTransactionsFromNode" => {
                     #[allow(non_camel_case_types)]
                     struct GetTransactionsFromNodeSvc<T: FullnodeData>(pub Arc<T>);
