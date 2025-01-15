@@ -24,9 +24,10 @@ macro_rules! maybe_debug_panic {
     ($major_status:expr, $message:expr) => {{
         if let Ok(debug_statuses) = std::env::var("DEBUG_VM_STATUS") {
             let status_strings: Vec<&str> = debug_statuses.split(',').collect();
-            if status_strings.iter().any(|s| {
-                s.trim() == format!("{:?}", $major_status)
-            }) {
+            if status_strings
+                .iter()
+                .any(|s| s.trim() == format!("{:?}", $major_status))
+            {
                 panic!("PartialVMError: {:?} {:?}", $major_status, $message);
             }
         }
