@@ -31,16 +31,17 @@ impl OnChainKeylessConfiguration {
             .map(|v| unhexlify_api_bytes(v.as_str()))
             .transpose()
             .map_err(|e| anyhow!("to_rust_repr() failed with unhexlify err: {e}"))?;
-        // We so far only consume `training_wheels_pubkey`.
         let ret = Configuration {
-            override_aud_vals: vec![],
-            max_signatures_per_txn: 0,
-            max_exp_horizon_secs: 0,
+            override_aud_vals: self.data.override_aud_vals.clone(),
+            max_signatures_per_txn: self.data.max_signatures_per_txn,
+            max_exp_horizon_secs: self.data.max_exp_horizon_secs.parse().map_err(|e| {
+                anyhow!("to_rust_repr() failed at max_exp_horizon_secs convert: {e}")
+            })?,
             training_wheels_pubkey,
-            max_commited_epk_bytes: 0,
-            max_iss_val_bytes: 0,
-            max_extra_field_bytes: 0,
-            max_jwt_header_b64_bytes: 0,
+            max_commited_epk_bytes: self.data.max_commited_epk_bytes,
+            max_iss_val_bytes: self.data.max_iss_val_bytes,
+            max_extra_field_bytes: self.data.max_extra_field_bytes,
+            max_jwt_header_b64_bytes: self.data.max_jwt_header_b64_bytes,
         };
         Ok(ret)
     }

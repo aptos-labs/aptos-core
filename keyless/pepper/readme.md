@@ -74,7 +74,7 @@ cargo run -p aptos-keyless-pepper-service
 
 In terminal 1, peek the cached resources, they should currently give 404.
 ```
-curl -v http://localhost:8000/cached/training-wheel-pub-key
+curl -v http://localhost:8000/cached/groth16-vk
 curl -v http://localhost:8000/cached/keyless-config
 ```
 

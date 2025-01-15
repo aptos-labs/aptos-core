@@ -44,7 +44,7 @@ async fn handle_request(req: Request<Body>) -> Result<Response<Body>, Infallible
             origin,
             ONCHAIN_KEYLESS_CONFIG.read().as_ref().cloned(),
         ),
-        (&Method::GET, "/cached/training-wheel-pub-key") => build_response_for_optional_resource(
+        (&Method::GET, "/cached/groth16-vk") => build_response_for_optional_resource(
             origin,
             ONCHAIN_GROTH16_VK.read().as_ref().cloned(),
         ),
