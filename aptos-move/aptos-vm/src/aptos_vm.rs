@@ -145,7 +145,7 @@ static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new(
 macro_rules! deprecated_module_bundle {
     () => {
         VMStatus::error(
-            StatusCode::FEATURE_UNDER_GATING,
+            StatusCode::FEATURE_NOT_ENABLED,
             Some("Module bundle payload has been removed".to_string()),
         )
     };
@@ -793,7 +793,7 @@ impl AptosVM {
         {
             for arg in script.args() {
                 if let TransactionArgument::Serialized(_) = arg {
-                    return Err(PartialVMError::new(StatusCode::FEATURE_UNDER_GATING)
+                    return Err(PartialVMError::new(StatusCode::FEATURE_NOT_ENABLED)
                         .finish(Location::Script)
                         .into_vm_status());
                 }
@@ -1931,7 +1931,7 @@ impl AptosVM {
                             vm_error.into_vm_status()
                         })
                     } else {
-                        return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+                        return Err(VMStatus::error(StatusCode::FEATURE_NOT_ENABLED, None));
                     }
                 },
                 _ => Ok(serialized_signer(&fee_payer)),
@@ -1963,7 +1963,7 @@ impl AptosVM {
                             vm_error.into_vm_status()
                         })
                     } else {
-                        Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None))
+                        Err(VMStatus::error(StatusCode::FEATURE_NOT_ENABLED, None))
                     }
                 },
                 _ => Ok(serialized_signer(&sender)),
@@ -2063,9 +2063,10 @@ impl AptosVM {
 
         if !self.features().is_account_abstraction_enabled() {
             assert_eq!(initial_gas, gas_meter.balance());
+        } else {
+            // Reset initial gas after validation with max_aa_gas.
+            unwrap_or_discard!(gas_meter.adjust_initial_gas(txn_data.max_gas_amount()));
         }
-        // Reset initial gas after validation with max_aa_gas.
-        unwrap_or_discard!(gas_meter.adjust_initial_gas(txn_data.max_gas_amount()));
 
         let storage_gas_params = unwrap_or_discard!(self.storage_gas_params(log_context));
         let change_set_configs = &storage_gas_params.change_set_configs;
@@ -3050,7 +3051,7 @@ impl VMValidator for AptosVM {
             .is_enabled(FeatureFlag::SINGLE_SENDER_AUTHENTICATOR)
         {
             if let aptos_types::transaction::authenticator::TransactionAuthenticator::SingleSender{ .. } = transaction.authenticator_ref() {
-                return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+                return VMValidatorResult::error(StatusCode::FEATURE_NOT_ENABLED);
             }
         }
 
@@ -3061,7 +3062,7 @@ impl VMValidator for AptosVM {
             {
                 for authenticator in sk_authenticators {
                     if let AnySignature::WebAuthn { .. } = authenticator.signature() {
-                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+                        return VMValidatorResult::error(StatusCode::FEATURE_NOT_ENABLED);
                     }
                 }
             } else {
@@ -3076,7 +3077,7 @@ impl VMValidator for AptosVM {
             if let TransactionPayload::Script(script) = transaction.payload() {
                 for arg in script.args() {
                     if let TransactionArgument::Serialized(_) = arg {
-                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+                        return VMValidatorResult::error(StatusCode::FEATURE_NOT_ENABLED);
                     }
                 }
             }

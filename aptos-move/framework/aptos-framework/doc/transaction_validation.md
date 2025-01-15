@@ -962,10 +962,10 @@ Called by the Adapter
 
         <b>if</b> (transaction_fee_amount &gt; storage_fee_refunded) {
             <b>let</b> burn_amount = transaction_fee_amount - storage_fee_refunded;
-            <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(&<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(gas_payer), burn_amount);
+            <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(gas_payer, burn_amount);
         } <b>else</b> <b>if</b> (transaction_fee_amount &lt; storage_fee_refunded) {
             <b>let</b> mint_amount = storage_fee_refunded - transaction_fee_amount;
-            <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(&<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(gas_payer), mint_amount)
+            <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(gas_payer, mint_amount)
         };
     };
 
@@ -1194,10 +1194,10 @@ If there is no fee_payer, fee_payer = sender
 
         <b>if</b> (transaction_fee_amount &gt; storage_fee_refunded) {
             <b>let</b> burn_amount = transaction_fee_amount - storage_fee_refunded;
-            <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(&gas_payer, burn_amount);
+            <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(gas_payer_address, burn_amount);
         } <b>else</b> <b>if</b> (transaction_fee_amount &lt; storage_fee_refunded) {
             <b>let</b> mint_amount = storage_fee_refunded - transaction_fee_amount;
-            <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(&gas_payer, mint_amount)
+            <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(gas_payer_address, mint_amount)
         };
     };
 

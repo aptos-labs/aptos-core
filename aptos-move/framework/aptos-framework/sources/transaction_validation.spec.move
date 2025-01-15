@@ -245,18 +245,18 @@ spec aptos_framework::transaction_validation {
     }
 
     spec fee_payer_script_prologue_extended(
-    sender: signer,
-    txn_sequence_number: u64,
+        sender: signer,
+        txn_sequence_number: u64,
         txn_sender_public_key: vector<u8>,
         secondary_signer_addresses: vector<address>,
         secondary_signer_public_key_hashes: vector<vector<u8>>,
-    fee_payer_address: address,
+        fee_payer_address: address,
         fee_payer_public_key_hash: vector<u8>,
-    txn_gas_price: u64,
-    txn_max_gas_units: u64,
-    txn_expiration_time: u64,
-    chain_id: u8,
-    is_simulation: bool,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
+        chain_id: u8,
+        is_simulation: bool,
     ) {
         pragma aborts_if_is_partial;
         pragma verify_duration_estimate = 120;
