@@ -321,7 +321,7 @@ module aptos_framework::permissioned_signer {
     /// check if StoredPermission has at least `threshold` capacity.
     fun is_above(perm: &StoredPermission, threshold: u256): bool {
         match (perm) {
-            StoredPermission::Capacity(capacity) => *capacity > threshold,
+            StoredPermission::Capacity(capacity) => *capacity >= threshold,
             StoredPermission::Unlimited => true,
         }
     }
@@ -491,7 +491,8 @@ module aptos_framework::permissioned_signer {
     public(package) fun check_permission_exists<PermKey: copy + drop + store>(
         s: &signer, perm: PermKey
     ): bool acquires PermissionStorage {
-        check_permission_capacity_above(s, 0, perm)
+        // 0 capacity permissions will be treated as non-existant.
+        check_permission_capacity_above(s, 1, perm)
     }
 
     public(package) fun check_permission_capacity_above<PermKey: copy + drop + store>(

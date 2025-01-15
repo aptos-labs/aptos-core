@@ -949,7 +949,7 @@ check if StoredPermission has at least <code>threshold</code> capacity.
 
 <pre><code><b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_is_above">is_above</a>(perm: &<a href="permissioned_signer.md#0x1_permissioned_signer_StoredPermission">StoredPermission</a>, threshold: u256): bool {
     match (perm) {
-        StoredPermission::Capacity(capacity) =&gt; *capacity &gt; threshold,
+        StoredPermission::Capacity(capacity) =&gt; *capacity &gt;= threshold,
         StoredPermission::Unlimited =&gt; <b>true</b>,
     }
 }
@@ -1298,7 +1298,8 @@ to bypass the checks.
 <pre><code><b>public</b>(<b>package</b>) <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_exists">check_permission_exists</a>&lt;PermKey: <b>copy</b> + drop + store&gt;(
     s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, perm: PermKey
 ): bool <b>acquires</b> <a href="permissioned_signer.md#0x1_permissioned_signer_PermissionStorage">PermissionStorage</a> {
-    <a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_capacity_above">check_permission_capacity_above</a>(s, 0, perm)
+    // 0 capacity permissions will be treated <b>as</b> non-existant.
+    <a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_capacity_above">check_permission_capacity_above</a>(s, 1, perm)
 }
 </code></pre>
 
