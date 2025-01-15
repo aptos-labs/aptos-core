@@ -305,6 +305,7 @@ impl GasAlgebra for StandardGasAlgebra {
         self.storage_fee_used
     }
 
+    // Reset the initial gas balance to reflect the new balance with the change carried over.
     fn adjust_initial_gas(&mut self, new_initial_gas: impl Into<Gas>) -> PartialVMResult<()> {
         self.adjust_initial_balance(new_initial_gas)
     }
