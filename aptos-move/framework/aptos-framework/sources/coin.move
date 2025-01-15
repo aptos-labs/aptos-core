@@ -613,12 +613,26 @@ module aptos_framework::coin {
         };
     }
 
+    inline fun assert_signer_has_permission<CoinType>(account: &signer) {
+        if(permissioned_signer::is_permissioned_signer(account)) {
+            fungible_asset::withdraw_permission_check_by_address(
+                account,
+                primary_fungible_store::primary_store_address(
+                    signer::address_of(account),
+                    ensure_paired_metadata<CoinType>()
+                ),
+                0
+            );
+        }
+    }
+
     /// Voluntarily migrate to fungible store for `CoinType` if not yet.
     public entry fun migrate_to_fungible_store<CoinType>(
         account: &signer
     ) acquires CoinStore, CoinConversionMap, CoinInfo {
-        permissioned_signer::assert_master_signer(account);
-        maybe_convert_to_fungible_store<CoinType>(signer::address_of(account));
+        let account_addr = signer::address_of(account);
+        assert_signer_has_permission<CoinType>(account);
+        maybe_convert_to_fungible_store<CoinType>(account_addr);
     }
 
     /// Migrate to fungible store for `CoinType` if not yet.
@@ -967,7 +981,7 @@ module aptos_framework::coin {
         symbol: string::String,
         decimals: u8,
         monitor_supply: bool,
-    ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
+    ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) acquires CoinInfo, CoinConversionMap {
         initialize_internal(account, name, symbol, decimals, monitor_supply, false)
     }
 
@@ -978,7 +992,7 @@ module aptos_framework::coin {
         symbol: string::String,
         decimals: u8,
         monitor_supply: bool,
-    ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
+    ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) acquires CoinInfo, CoinConversionMap {
         system_addresses::assert_aptos_framework(account);
         initialize_internal(account, name, symbol, decimals, monitor_supply, true)
     }
@@ -990,9 +1004,9 @@ module aptos_framework::coin {
         decimals: u8,
         monitor_supply: bool,
         parallelizable: bool,
-    ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
-        permissioned_signer::assert_master_signer(account);
+    ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) acquires CoinInfo, CoinConversionMap {
         let account_addr = signer::address_of(account);
+        assert_signer_has_permission<CoinType>(account);
 
         assert!(
             coin_address<CoinType>() == account_addr,
@@ -1048,9 +1062,9 @@ module aptos_framework::coin {
         mint_internal<CoinType>(amount)
     }
 
-    public fun register<CoinType>(account: &signer) acquires CoinConversionMap {
-        permissioned_signer::assert_master_signer(account);
+    public fun register<CoinType>(account: &signer) acquires CoinInfo, CoinConversionMap {
         let account_addr = signer::address_of(account);
+        assert_signer_has_permission<CoinType>(account);
         // Short-circuit and do nothing if account is already registered for CoinType.
         if (is_account_registered<CoinType>(account_addr)) {
             return
@@ -1244,7 +1258,7 @@ module aptos_framework::coin {
         account: &signer,
         decimals: u8,
         monitor_supply: bool,
-    ): (BurnCapability<FakeMoney>, FreezeCapability<FakeMoney>, MintCapability<FakeMoney>) {
+    ): (BurnCapability<FakeMoney>, FreezeCapability<FakeMoney>, MintCapability<FakeMoney>) acquires CoinInfo, CoinConversionMap {
         aggregator_factory::initialize_aggregator_factory_for_test(account);
         initialize<FakeMoney>(
             account,
@@ -1260,7 +1274,7 @@ module aptos_framework::coin {
         account: &signer,
         decimals: u8,
         monitor_supply: bool,
-    ): (BurnCapability<FakeMoney>, FreezeCapability<FakeMoney>, MintCapability<FakeMoney>) {
+    ): (BurnCapability<FakeMoney>, FreezeCapability<FakeMoney>, MintCapability<FakeMoney>) acquires CoinInfo, CoinConversionMap {
         let (burn_cap, freeze_cap, mint_cap) = initialize_fake_money(
             account,
             decimals,
@@ -1377,7 +1391,7 @@ module aptos_framework::coin {
 
     #[test(source = @0x2, framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10001, location = Self)]
-    public fun fail_initialize(source: signer, framework: signer) {
+    public fun fail_initialize(source: signer, framework: signer) acquires CoinInfo, CoinConversionMap {
         aggregator_factory::initialize_aggregator_factory_for_test(&framework);
         let (burn_cap, freeze_cap, mint_cap) = initialize<FakeMoney>(
             &source,
@@ -1474,7 +1488,7 @@ module aptos_framework::coin {
     #[expected_failure(abort_code = 0x10007, location = Self)]
     public fun test_destroy_non_zero(
         source: signer,
-    ) acquires CoinInfo {
+    ) acquires CoinInfo, CoinConversionMap  {
         account::create_account_for_test(signer::address_of(&source));
         let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(&source, 1, true);
         let coins_minted = mint<FakeMoney>(100, &mint_cap);
@@ -1514,7 +1528,7 @@ module aptos_framework::coin {
     }
 
     #[test(source = @0x1)]
-    public fun test_is_coin_initialized(source: signer) {
+    public fun test_is_coin_initialized(source: signer) acquires CoinInfo, CoinConversionMap {
         assert!(!is_coin_initialized<FakeMoney>(), 0);
 
         let (burn_cap, freeze_cap, mint_cap) = initialize_fake_money(&source, 1, true);
@@ -1640,7 +1654,7 @@ module aptos_framework::coin {
     }
 
     #[test_only]
-    fun initialize_with_aggregator(account: &signer) {
+    fun initialize_with_aggregator(account: &signer) acquires CoinInfo, CoinConversionMap {
         let (burn_cap, freeze_cap, mint_cap) = initialize_with_parallelizable_supply<FakeMoney>(
             account,
             string::utf8(b"Fake money"),
@@ -1656,7 +1670,7 @@ module aptos_framework::coin {
     }
 
     #[test_only]
-    fun initialize_with_integer(account: &signer) {
+    fun initialize_with_integer(account: &signer) acquires CoinInfo, CoinConversionMap {
         let (burn_cap, freeze_cap, mint_cap) = initialize<FakeMoney>(
             account,
             string::utf8(b"Fake money"),
@@ -1674,14 +1688,14 @@ module aptos_framework::coin {
 
     #[test(framework = @aptos_framework, other = @0x123)]
     #[expected_failure(abort_code = 0x50003, location = aptos_framework::system_addresses)]
-    fun test_supply_initialize_fails(framework: signer, other: signer) {
+    fun test_supply_initialize_fails(framework: signer, other: signer) acquires CoinInfo, CoinConversionMap {
         aggregator_factory::initialize_aggregator_factory_for_test(&framework);
         initialize_with_aggregator(&other);
     }
 
     #[test(other = @0x123)]
     #[expected_failure(abort_code = 0x10003, location = Self)]
-    fun test_create_coin_store_with_non_coin_type(other: signer) acquires CoinConversionMap {
+    fun test_create_coin_store_with_non_coin_type(other: signer) acquires CoinInfo, CoinConversionMap {
         register<String>(&other);
     }
 
@@ -1692,7 +1706,7 @@ module aptos_framework::coin {
     }
 
     #[test(framework = @aptos_framework)]
-    fun test_supply_initialize(framework: signer) acquires CoinInfo {
+    fun test_supply_initialize(framework: signer) acquires CoinInfo, CoinConversionMap  {
         aggregator_factory::initialize_aggregator_factory_for_test(&framework);
         initialize_with_aggregator(&framework);
 
@@ -1714,7 +1728,7 @@ module aptos_framework::coin {
 
     #[test(framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x20001, location = aptos_framework::aggregator)]
-    fun test_supply_overflow(framework: signer) acquires CoinInfo {
+    fun test_supply_overflow(framework: signer) acquires CoinInfo, CoinConversionMap {
         aggregator_factory::initialize_aggregator_factory_for_test(&framework);
         initialize_with_aggregator(&framework);
 
