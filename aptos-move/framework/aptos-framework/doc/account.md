@@ -2699,7 +2699,6 @@ Capability based functions for efficient use.
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
-<b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 
