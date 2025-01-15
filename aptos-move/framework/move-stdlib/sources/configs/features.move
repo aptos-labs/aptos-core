@@ -615,6 +615,17 @@ module std::features {
         is_enabled(NATIVE_MEMORY_OPERATIONS)
     }
 
+    /// Whether converting staking contracts to delegation pools is enabled.
+    /// Lifetime: transient
+    const STAKING_CONTRACT_TO_DELEGATION_POOL_CONVERSION: u64 = 81;
+
+    public fun get_staking_contract_to_delegation_pool_conversion_feature(
+    ): u64 { STAKING_CONTRACT_TO_DELEGATION_POOL_CONVERSION }
+
+    public fun staking_contract_to_delegation_pool_conversion_enabled(): bool acquires Features {
+        is_enabled(STAKING_CONTRACT_TO_DELEGATION_POOL_CONVERSION)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
