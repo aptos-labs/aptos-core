@@ -161,12 +161,8 @@
     // Calculate the full tokens that can be added
     <b>let</b> accumulated_amount = time_passed * limiter.capacity + limiter.fractional_accumulated;
     <b>let</b> new_tokens = accumulated_amount / limiter.refill_interval;
-    // Calculate the remaining fractional amount.
-
-    <b>if</b> (new_tokens &gt; 0) {
-        limiter.current_amount = <a href="../../aptos-stdlib/doc/math64.md#0x1_math64_min">math64::min</a>(limiter.current_amount + new_tokens, limiter.capacity);
-        limiter.last_refill_timestamp = current_time;
-    };
+    limiter.current_amount = <a href="../../aptos-stdlib/doc/math64.md#0x1_math64_min">math64::min</a>(limiter.current_amount + new_tokens, limiter.capacity);
+    limiter.last_refill_timestamp = current_time;
 
     // Update the fractional amount accumulated for the next refill cycle
     limiter.fractional_accumulated = accumulated_amount % limiter.refill_interval;
