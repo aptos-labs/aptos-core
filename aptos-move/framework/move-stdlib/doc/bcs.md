@@ -26,6 +26,7 @@ details on BCS.
 
 ## Function `to_bytes`
 
+Note: all natives would fail if the MoveValue contains a permissioned signer in it.
 Returns the binary representation of <code>v</code> in BCS (Binary Canonical Serialization) format.
 Aborts with <code>0x1c5</code> error code if serialization fails.
 
