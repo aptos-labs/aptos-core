@@ -14,6 +14,7 @@
 /// After introducing the core functionality, examples are provided for withdraw limit on accounts, and
 /// for blind signing.
 module aptos_framework::permissioned_signer {
+    use std::features;
     use std::signer;
     use std::error;
     use std::vector;
@@ -48,6 +49,9 @@ module aptos_framework::permissioned_signer {
     /// destroying permission handle that has already been revoked or not owned by the
     /// given master signer.
     const E_NOT_ACTIVE: u64 = 8;
+
+    /// Permissioned signer feature is not activated.
+    const EPERMISSION_SIGNER_DISABLED: u64 = 9;
 
     const U256_MAX: u256 =
         115792089237316195423570985008687907853269984665640564039457584007913129639935;
@@ -113,6 +117,11 @@ module aptos_framework::permissioned_signer {
     /// This handle can be used to derive a signer that can be used in the context of
     /// the current transaction.
     public fun create_permissioned_handle(master: &signer): PermissionedHandle {
+        assert!(
+            features::is_permissioned_signer_enabled(),
+            error::permission_denied(EPERMISSION_SIGNER_DISABLED)
+        );
+
         assert_master_signer(master);
         let permissions_storage_addr = generate_auid_address();
         let master_account_addr = signer::address_of(master);
@@ -124,6 +133,10 @@ module aptos_framework::permissioned_signer {
 
     /// Destroys an ephermeral permission handle. Clean up the permission stored in that handle
     public fun destroy_permissioned_handle(p: PermissionedHandle) acquires PermissionStorage {
+        assert!(
+            features::is_permissioned_signer_enabled(),
+            error::permission_denied(EPERMISSION_SIGNER_DISABLED)
+        );
         let PermissionedHandle::V1 { master_account_addr: _, permissions_storage_addr } =
             p;
         destroy_permissions_storage_address(permissions_storage_addr);
@@ -135,6 +148,10 @@ module aptos_framework::permissioned_signer {
     /// signer interacts with various framework functions, it would subject to permission checks
     /// and would abort if check fails.
     public fun signer_from_permissioned_handle(p: &PermissionedHandle): signer {
+        assert!(
+            features::is_permissioned_signer_enabled(),
+            error::permission_denied(EPERMISSION_SIGNER_DISABLED)
+        );
         signer_from_permissioned_handle_impl(
             p.master_account_addr, p.permissions_storage_addr
         )
@@ -142,6 +159,12 @@ module aptos_framework::permissioned_signer {
 
     /// Returns true if `s` is a permissioned signer.
     public fun is_permissioned_signer(s: &signer): bool {
+        // When the permissioned signer is disabled, no one is able to construct a permissioned
+        // signer. Thus we should return false here, as other on chain permission checks will
+        // depend on this checks.
+        if(!features::is_permissioned_signer_enabled()) {
+            return false;
+        };
         is_permissioned_signer_impl(s)
     }
 
@@ -151,6 +174,10 @@ module aptos_framework::permissioned_signer {
         master: &signer,
         permissioned: &signer,
     ) acquires PermissionStorage {
+        assert!(
+            features::is_permissioned_signer_enabled(),
+            error::permission_denied(EPERMISSION_SIGNER_DISABLED)
+        );
         authorize_unlimited(master, permissioned, RevokePermissionHandlePermission {});
     }
 
@@ -159,6 +186,10 @@ module aptos_framework::permissioned_signer {
     public entry fun revoke_permission_storage_address(
         s: &signer, permissions_storage_addr: address
     ) acquires GrantedPermissionHandles, PermissionStorage {
+        assert!(
+            features::is_permissioned_signer_enabled(),
+            error::permission_denied(EPERMISSION_SIGNER_DISABLED)
+        );
         assert!(
             check_permission_exists(s, RevokePermissionHandlePermission {}),
             error::permission_denied(ENOT_MASTER_SIGNER)
@@ -180,6 +211,10 @@ module aptos_framework::permissioned_signer {
 
     /// Revoke all storable permission handle of the signer immediately.
     public entry fun revoke_all_handles(s: &signer) acquires GrantedPermissionHandles, PermissionStorage {
+        assert!(
+            features::is_permissioned_signer_enabled(),
+            error::permission_denied(EPERMISSION_SIGNER_DISABLED)
+        );
         assert!(
             check_permission_exists(s, RevokePermissionHandlePermission {}),
             error::permission_denied(ENOT_MASTER_SIGNER)
@@ -218,6 +253,11 @@ module aptos_framework::permissioned_signer {
     public(package) fun create_storable_permissioned_handle(
         master: &signer, expiration_time: u64
     ): StorablePermissionedHandle acquires GrantedPermissionHandles {
+        assert!(
+            features::is_permissioned_signer_enabled(),
+            error::permission_denied(EPERMISSION_SIGNER_DISABLED)
+        );
+
         assert_master_signer(master);
         let permissions_storage_addr = generate_auid_address();
         let master_account_addr = signer::address_of(master);
@@ -288,6 +328,10 @@ module aptos_framework::permissioned_signer {
     public(package) fun signer_from_storable_permissioned_handle(
         p: &StorablePermissionedHandle
     ): signer {
+        assert!(
+            features::is_permissioned_signer_enabled(),
+            error::permission_denied(EPERMISSION_SIGNER_DISABLED)
+        );
         assert!(
             timestamp::now_seconds() < p.expiration_time,
             error::permission_denied(E_PERMISSION_EXPIRED)

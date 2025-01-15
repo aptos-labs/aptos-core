@@ -615,6 +615,14 @@ module std::features {
         is_enabled(NATIVE_MEMORY_OPERATIONS)
     }
 
+    const PERMISSIONED_SIGNER: u64 = 84;
+
+    public fun get_permissioned_signer_feature(): u64 { PERMISSIONED_SIGNER }
+
+    public fun is_permissioned_signer_enabled(): bool acquires Features {
+        is_enabled(PERMISSIONED_SIGNER)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

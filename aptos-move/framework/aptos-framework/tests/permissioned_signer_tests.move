@@ -1,6 +1,7 @@
 #[test_only]
 module aptos_framework::permissioned_signer_tests {
     use std::bcs;
+    use std::features;
     use aptos_framework::account::create_signer_for_test;
     use aptos_framework::permissioned_signer;
     use aptos_framework::timestamp;
@@ -239,6 +240,28 @@ module aptos_framework::permissioned_signer_tests {
                 == option::some(
                     115792089237316195423570985008687907853269984665640564039457584007913129639935
                 ),
+            1
+        );
+    }
+
+    // Making sure master signer always have all permissions even when feature is disabled.
+    #[test(creator = @aptos_framework)]
+    fun test_master_signer_permission(creator: &signer) {
+        assert!(
+            permissioned_signer::check_permission_exists(creator, OnePermission {}),
+            1
+        );
+
+        // Disable the permissioned signer feature.
+        features::change_feature_flags_for_testing(
+            creator,
+            vector[],
+            vector[features::get_permissioned_signer_feature()]
+        );
+
+        // Master signer should still have permission after feature is disabled.
+        assert!(
+            permissioned_signer::check_permission_exists(creator, OnePermission {}),
             1
         );
     }
