@@ -8,10 +8,10 @@ set -e
 set -x
 
 # For generating Rust code
-cargo install --locked --version 0.2.3 protoc-gen-prost
+cargo install --locked --version 0.4.0 protoc-gen-prost
 cargo install --locked --version 0.2.3 protoc-gen-prost-serde
 cargo install --locked --version 0.3.1 protoc-gen-prost-crate
-cargo install --locked --version 0.3.0 protoc-gen-tonic
+cargo install --locked --version 0.4.1 protoc-gen-tonic
 
 # For generating Python code
 cd python

@@ -145,16 +145,16 @@ pub fn decode_key<T: DeserializeOwned + ValidCryptoMaterial>(
     T::from_encoded_string(str).map_err(|_| ApiError::deserialization_failed(type_name))
 }
 
-const DEFAULT_COIN: &str = "APT";
-const DEFAULT_DECIMALS: u8 = 8;
+const APT_SYMBOL: &str = "APT";
+const APT_DECIMALS: u8 = 8;
 
 /// Provides the [Currency] for 0x1::aptos_coin::AptosCoin aka APT
 ///
 /// Note that 0xA is the address for FA, but it has to be skipped in order to have backwards compatibility
 pub fn native_coin() -> Currency {
     Currency {
-        symbol: DEFAULT_COIN.to_string(),
-        decimals: DEFAULT_DECIMALS,
+        symbol: APT_SYMBOL.to_string(),
+        decimals: APT_DECIMALS,
         metadata: Some(CurrencyMetadata {
             move_type: Some(native_coin_tag().to_string()),
             fa_address: None,
@@ -175,6 +175,33 @@ pub fn native_coin_tag() -> TypeTag {
 #[inline]
 pub fn is_native_coin(fa_address: AccountAddress) -> bool {
     fa_address == AccountAddress::TEN
+}
+
+const USDC_SYMBOL: &str = "USDC";
+const USDC_DECIMALS: u8 = 6;
+const USDC_ADDRESS: &str = "0xbae207659db88bea0cbead6da0ed00aac12edcdda169e591cd41c94180b46f3b";
+const USDC_TESTNET_ADDRESS: &str =
+    "0x69091fbab5f7d635ee7ac5098cf0c1efbe31d68fec0f2cd565e8d168daf52832";
+pub fn usdc_currency() -> Currency {
+    Currency {
+        symbol: USDC_SYMBOL.to_string(),
+        decimals: USDC_DECIMALS,
+        metadata: Some(CurrencyMetadata {
+            move_type: None,
+            fa_address: Some(USDC_ADDRESS.to_string()),
+        }),
+    }
+}
+
+pub fn usdc_testnet_currency() -> Currency {
+    Currency {
+        symbol: USDC_SYMBOL.to_string(),
+        decimals: USDC_DECIMALS,
+        metadata: Some(CurrencyMetadata {
+            move_type: None,
+            fa_address: Some(USDC_TESTNET_ADDRESS.to_string()),
+        }),
+    }
 }
 
 pub fn find_coin_currency(currencies: &HashSet<Currency>, type_tag: &TypeTag) -> Option<Currency> {

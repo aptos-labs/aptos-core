@@ -135,6 +135,10 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
         Arc::ptr_eq(&self.inner, &other.inner)
     }
 
+    pub fn is_descendant_of(&self, other: &Self) -> bool {
+        self.is_family(other) && self.inner.layer >= other.inner.layer
+    }
+
     pub(crate) fn layer(&self) -> u64 {
         self.inner.layer
     }

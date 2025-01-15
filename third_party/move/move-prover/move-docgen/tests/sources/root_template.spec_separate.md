@@ -7,22 +7,18 @@
 
 This document contains the description of multiple move scripts.
 
-The script <code><a href="root_template_script3.md#yet_another">yet_another</a></code> is documented in its own file.
+The script <code>yet_another</code> is documented in its own file.
 
 -  [Some Scripts](#@Some_Scripts_1)
-    -  [Script `some`](#some)
-        -  [Specification](#@Specification_2)
--  [Other Scripts](#@Other_Scripts_3)
-    -  [Script `other`](#other)
-        -  [Specification](#@Specification_4)
--  [Some other scripts from a module](#@Some_other_scripts_from_a_module_5)
+-  [Other Scripts](#@Other_Scripts_2)
+-  [Some other scripts from a module](#@Some_other_scripts_from_a_module_3)
     -  [Module `0x1::OneTypeOfScript`](#0x1_OneTypeOfScript)
         -  [Function `script1`](#0x1_OneTypeOfScript_script1)
         -  [Function `script2`](#0x1_OneTypeOfScript_script2)
     -  [Module `0x1::AnotherTypeOfScript`](#0x1_AnotherTypeOfScript)
         -  [Function `script3`](#0x1_AnotherTypeOfScript_script3)
         -  [Function `script4`](#0x1_AnotherTypeOfScript_script4)
--  [Index](#@Index_6)
+-  [Index](#@Index_4)
 
 
 
@@ -31,120 +27,20 @@ The script <code><a href="root_template_script3.md#yet_another">yet_another</a><
 ## Some Scripts
 
 
-
-<a id="some"></a>
-
-### Script `some`
+> undefined move-include `some`
 
 
 
-<pre><code></code></pre>
-
-
-This script does really nothing but just aborts.
-
-
-<pre><code><b>fun</b> <a href="root.md#some">some</a>&lt;T&gt;(_account: signer)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="root.md#some">some</a>&lt;T&gt;(_account: signer) {
-    <b>abort</b> 1
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="@Specification_2"></a>
-
-#### Specification
-
-
-<a id="@Specification_2_some"></a>
-
-##### Function `some`
-
-
-<pre><code><b>fun</b> <a href="root.md#some">some</a>&lt;T&gt;(_account: signer)
-</code></pre>
-
-
-
-
-<pre><code><b>aborts_if</b> <b>true</b> <b>with</b> 1;
-</code></pre>
-
-
-
-
-
-<a id="@Other_Scripts_3"></a>
+<a id="@Other_Scripts_2"></a>
 
 ## Other Scripts
 
 
-
-<a id="other"></a>
-
-### Script `other`
+> undefined move-include `other`
 
 
 
-<pre><code></code></pre>
-
-
-This script does also abort.
-
-
-<pre><code><b>fun</b> <a href="root.md#other">other</a>&lt;T&gt;(_account: signer)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="root.md#other">other</a>&lt;T&gt;(_account: signer) {
-    <b>abort</b> 2
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="@Specification_4"></a>
-
-#### Specification
-
-
-<a id="@Specification_4_other"></a>
-
-##### Function `other`
-
-
-<pre><code><b>fun</b> <a href="root.md#other">other</a>&lt;T&gt;(_account: signer)
-</code></pre>
-
-
-
-
-<pre><code><b>aborts_if</b> <b>true</b> <b>with</b> 2;
-</code></pre>
-
-
-
-
-
-<a id="@Some_other_scripts_from_a_module_5"></a>
+<a id="@Some_other_scripts_from_a_module_3"></a>
 
 ## Some other scripts from a module
 
@@ -268,13 +164,13 @@ This is another script
 
 
 
-<a id="@Index_6"></a>
+<a id="@Index_4"></a>
 
 ## Index
 
 
+-  [`<SELF>_0`](root_template_script2.md#<SELF>_0)
+-  [`<SELF>_1`](root_template_script1.md#<SELF>_1)
+-  [`<SELF>_2`](root_template_script3.md#<SELF>_2)
 -  [`0x1::AnotherTypeOfScript`](root.md#0x1_AnotherTypeOfScript)
 -  [`0x1::OneTypeOfScript`](root.md#0x1_OneTypeOfScript)
--  [`other`](root.md#other)
--  [`some`](root.md#some)
--  [`yet_another`](root_template_script3.md#yet_another)

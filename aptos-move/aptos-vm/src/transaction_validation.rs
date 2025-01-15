@@ -17,7 +17,6 @@ use aptos_types::{
     on_chain_config::Features, transaction::Multisig,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use fail::fail_point;
 use move_binary_format::errors::VMResult;
 use move_core_types::{
@@ -28,7 +27,9 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
-use move_vm_runtime::{logging::expect_no_verification_errors, module_traversal::TraversalContext};
+use move_vm_runtime::{
+    logging::expect_no_verification_errors, module_traversal::TraversalContext, ModuleStorage,
+};
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 
@@ -85,7 +86,7 @@ impl TransactionValidation {
 
 pub(crate) fn run_script_prologue(
     session: &mut SessionExt,
-    module_storage: &impl AptosModuleStorage,
+    module_storage: &impl ModuleStorage,
     txn_data: &TransactionMetadata,
     features: &Features,
     log_context: &AdapterLogSchema,
@@ -232,7 +233,7 @@ pub(crate) fn run_script_prologue(
 /// match that hash.
 pub(crate) fn run_multisig_prologue(
     session: &mut SessionExt,
-    module_storage: &impl AptosModuleStorage,
+    module_storage: &impl ModuleStorage,
     txn_data: &TransactionMetadata,
     payload: &Multisig,
     features: &Features,
@@ -272,7 +273,7 @@ pub(crate) fn run_multisig_prologue(
 
 fn run_epilogue(
     session: &mut SessionExt,
-    module_storage: &impl AptosModuleStorage,
+    module_storage: &impl ModuleStorage,
     gas_remaining: Gas,
     fee_statement: FeeStatement,
     txn_data: &TransactionMetadata,
@@ -377,7 +378,7 @@ fn run_epilogue(
 
 fn emit_fee_statement(
     session: &mut SessionExt,
-    module_storage: &impl AptosModuleStorage,
+    module_storage: &impl ModuleStorage,
     fee_statement: FeeStatement,
     traversal_context: &mut TraversalContext,
 ) -> VMResult<()> {
@@ -398,7 +399,7 @@ fn emit_fee_statement(
 /// in the `ACCOUNT_MODULE` on chain.
 pub(crate) fn run_success_epilogue(
     session: &mut SessionExt,
-    module_storage: &impl AptosModuleStorage,
+    module_storage: &impl ModuleStorage,
     gas_remaining: Gas,
     fee_statement: FeeStatement,
     features: &Features,
@@ -431,7 +432,7 @@ pub(crate) fn run_success_epilogue(
 /// stored in the `ACCOUNT_MODULE` on chain.
 pub(crate) fn run_failure_epilogue(
     session: &mut SessionExt,
-    module_storage: &impl AptosModuleStorage,
+    module_storage: &impl ModuleStorage,
     gas_remaining: Gas,
     fee_statement: FeeStatement,
     features: &Features,

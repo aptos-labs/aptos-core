@@ -2,11 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_generator::AccountGeneratorCreator, accounts_pool_wrapper::AccountsPoolWrapperCreator,
-    call_custom_modules::CustomModulesDelegationGeneratorCreator,
-    entry_points::EntryPointTransactionGenerator, EntryPoints, ObjectPool,
-    ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator,
-    TransactionGeneratorCreator, WorkflowKind, WorkflowProgress,
+    ObjectPool, ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator,
+    TransactionGeneratorCreator, WorkflowProgress,
 };
 use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_sdk::{
@@ -22,8 +19,40 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+#[async_trait::async_trait]
+pub trait WorkflowKind: std::fmt::Debug + Sync + Send + CloneWorkflowKind {
+    async fn construct_workflow(
+        &self,
+        txn_factory: TransactionFactory,
+        init_txn_factory: TransactionFactory,
+        root_account: &dyn RootAccountHandle,
+        txn_executor: &dyn ReliableTransactionSubmitter,
+        num_modules: usize,
+        stage_tracking: StageTracking,
+    ) -> WorkflowTxnGeneratorCreator;
+}
+
+pub trait CloneWorkflowKind {
+    fn clone_workflow_kind(&self) -> Box<dyn WorkflowKind>;
+}
+
+impl<T> CloneWorkflowKind for T
+where
+    T: WorkflowKind + Clone + 'static,
+{
+    fn clone_workflow_kind(&self) -> Box<dyn WorkflowKind> {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<dyn WorkflowKind> {
+    fn clone(&self) -> Box<dyn WorkflowKind> {
+        self.clone_workflow_kind()
+    }
+}
+
 #[derive(Clone)]
-enum StageTracking {
+pub enum StageTracking {
     // Stage is externally modified. This is used by executor benchmark tests
     ExternallySet(Arc<AtomicUsize>),
     // We move to a next stage when all accounts have finished with the current stage
@@ -182,12 +211,16 @@ impl TransactionGenerator for WorkflowTxnGenerator {
 }
 
 #[derive(Clone)]
-enum StageSwitchCondition {
+pub enum StageSwitchCondition {
     WhenPoolBecomesEmpty(Arc<ObjectPool<LocalAccount>>),
     MaxTransactions(Arc<AtomicUsize>),
 }
 
 impl StageSwitchCondition {
+    pub fn new_max_transactions(max_transactions: usize) -> Self {
+        Self::MaxTransactions(Arc::new(AtomicUsize::new(max_transactions)))
+    }
+
     fn should_switch(&self) -> bool {
         match self {
             StageSwitchCondition::WhenPoolBecomesEmpty(pool) => pool.len() == 0,
@@ -229,7 +262,7 @@ pub struct WorkflowTxnGeneratorCreator {
 }
 
 impl WorkflowTxnGeneratorCreator {
-    fn new(
+    pub fn new(
         stage: StageTracking,
         creators: Vec<Box<dyn TransactionGeneratorCreator>>,
         stage_switch_conditions: Vec<StageSwitchCondition>,
@@ -242,7 +275,7 @@ impl WorkflowTxnGeneratorCreator {
     }
 
     pub async fn create_workload(
-        workflow_kind: WorkflowKind,
+        workflow_kind: Box<dyn WorkflowKind>,
         txn_factory: TransactionFactory,
         init_txn_factory: TransactionFactory,
         root_account: &dyn RootAccountHandle,
@@ -271,81 +304,16 @@ impl WorkflowTxnGeneratorCreator {
                 StageTracking::WhenDone { .. } => "WhenDone",
             }
         );
-        match workflow_kind {
-            WorkflowKind::CreateMintBurn {
-                count,
-                creation_balance,
-            } => {
-                let created_pool = Arc::new(ObjectPool::new());
-                let minted_pool = Arc::new(ObjectPool::new());
-                let burnt_pool = Arc::new(ObjectPool::new());
-
-                let mint_entry_point = EntryPoints::TokenV2AmbassadorMint { numbered: false };
-                let burn_entry_point = EntryPoints::TokenV2AmbassadorBurn;
-
-                let mut packages = CustomModulesDelegationGeneratorCreator::publish_package(
-                    init_txn_factory.clone(),
-                    root_account,
-                    txn_executor,
-                    num_modules,
-                    mint_entry_point.package_name(),
-                    Some(40_0000_0000),
-                )
-                .await;
-
-                let mint_worker = CustomModulesDelegationGeneratorCreator::create_worker(
-                    init_txn_factory.clone(),
-                    root_account,
-                    txn_executor,
-                    &mut packages,
-                    &mut EntryPointTransactionGenerator::new_singleton(mint_entry_point),
-                )
-                .await;
-                let burn_worker = CustomModulesDelegationGeneratorCreator::create_worker(
-                    init_txn_factory.clone(),
-                    root_account,
-                    txn_executor,
-                    &mut packages,
-                    &mut EntryPointTransactionGenerator::new_singleton(burn_entry_point),
-                )
-                .await;
-
-                let packages = Arc::new(packages);
-
-                let creators: Vec<Box<dyn TransactionGeneratorCreator>> = vec![
-                    Box::new(AccountGeneratorCreator::new(
-                        txn_factory.clone(),
-                        None,
-                        Some(created_pool.clone()),
-                        count,
-                        creation_balance,
-                    )),
-                    Box::new(AccountsPoolWrapperCreator::new(
-                        Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
-                            txn_factory.clone(),
-                            packages.clone(),
-                            mint_worker,
-                        )),
-                        created_pool.clone(),
-                        Some(minted_pool.clone()),
-                    )),
-                    Box::new(AccountsPoolWrapperCreator::new(
-                        Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
-                            txn_factory.clone(),
-                            packages.clone(),
-                            burn_worker,
-                        )),
-                        minted_pool.clone(),
-                        Some(burnt_pool.clone()),
-                    )),
-                ];
-                Self::new(stage_tracking, creators, vec![
-                    StageSwitchCondition::MaxTransactions(Arc::new(AtomicUsize::new(count))),
-                    StageSwitchCondition::WhenPoolBecomesEmpty(created_pool),
-                    StageSwitchCondition::WhenPoolBecomesEmpty(minted_pool),
-                ])
-            },
-        }
+        workflow_kind
+            .construct_workflow(
+                txn_factory,
+                init_txn_factory,
+                root_account,
+                txn_executor,
+                num_modules,
+                stage_tracking,
+            )
+            .await
     }
 }
 

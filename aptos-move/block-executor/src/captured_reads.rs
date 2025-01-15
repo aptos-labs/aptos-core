@@ -18,7 +18,7 @@ use aptos_mvhashmap::{
 };
 use aptos_types::{
     error::{code_invariant_error, PanicError, PanicOr},
-    executable::{Executable, ModulePath},
+    executable::ModulePath,
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
     write_set::TransactionWrite,
@@ -359,12 +359,9 @@ where
     S: WithSize,
 {
     // Return an iterator over the captured reads.
-    pub(crate) fn get_read_values_with_delayed_fields<
-        SV: TStateView<Key = T::Key>,
-        X: Executable,
-    >(
+    pub(crate) fn get_read_values_with_delayed_fields<SV: TStateView<Key = T::Key>>(
         &self,
-        view: &LatestView<T, SV, X>,
+        view: &LatestView<T, SV>,
         delayed_write_set_ids: &HashSet<DelayedFieldID>,
         skip: &HashSet<T::Key>,
     ) -> Result<BTreeMap<T::Key, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>, PanicError> {
@@ -879,7 +876,6 @@ mod test {
         proptest_types::types::{raw_metadata, KeyType, MockEvent, ValueType},
     };
     use aptos_mvhashmap::{types::StorageVersion, MVHashMap};
-    use aptos_types::executable::ExecutableTestType;
     use claims::{
         assert_err, assert_gt, assert_matches, assert_none, assert_ok, assert_ok_eq, assert_some_eq,
     };
@@ -1458,8 +1454,7 @@ mod test {
         assert!(captured_reads.non_delayed_field_speculative_failure);
         assert!(!captured_reads.delayed_field_speculative_failure);
 
-        let mvhashmap =
-            MVHashMap::<KeyType<u32>, u32, ValueType, ExecutableTestType, DelayedFieldID>::new();
+        let mvhashmap = MVHashMap::<KeyType<u32>, u32, ValueType, DelayedFieldID>::new();
 
         captured_reads.non_delayed_field_speculative_failure = false;
         captured_reads.delayed_field_speculative_failure = false;

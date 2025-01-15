@@ -38,7 +38,7 @@ pub mod cli;
 
 pub fn run_move_prover_errors_to_stderr(options: Options) -> anyhow::Result<()> {
     let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
-    run_move_prover(&mut error_writer, options)
+    run_move_prover_v2(&mut error_writer, options)
 }
 
 pub fn run_move_prover<W: WriteColor>(

@@ -1,15 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{
-    publishing::{module_simple::EntryPoints, publish_util::Package},
-    ReliableTransactionSubmitter,
-};
 use crate::{
     call_custom_modules::{TransactionGeneratorWorker, UserModuleTransactionGenerator},
     create_account_transaction,
-    publishing::module_simple::MultiSigConfig,
-    RootAccountHandle,
+    entry_point_trait::MultiSigConfig,
+    publishing::{entry_point_trait::EntryPointTrait, publish_util::Package},
+    ReliableTransactionSubmitter, RootAccountHandle,
 };
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
@@ -20,26 +17,26 @@ use rand::{rngs::StdRng, Rng};
 use std::{borrow::Borrow, sync::Arc};
 
 pub struct EntryPointTransactionGenerator {
-    entry_points: Vec<(EntryPoints, usize)>,
+    entry_points: Arc<Vec<(Box<dyn EntryPointTrait>, usize)>>,
     total_weight: usize,
 }
 
 impl EntryPointTransactionGenerator {
-    pub fn new_singleton(entry_point: EntryPoints) -> Self {
+    pub fn new_singleton(entry_point: Box<dyn EntryPointTrait>) -> Self {
         Self::new(vec![(entry_point, 1)])
     }
 
-    pub fn new(entry_points: Vec<(EntryPoints, usize)>) -> Self {
+    pub fn new(entry_points: Vec<(Box<dyn EntryPointTrait>, usize)>) -> Self {
         let total_weight = entry_points.iter().map(|(_, weight)| weight).sum();
 
         Self {
-            entry_points,
+            entry_points: Arc::new(entry_points),
             total_weight,
         }
     }
 
     fn pick_random(
-        entry_points: &[(EntryPoints, usize)],
+        entry_points: &[(Box<dyn EntryPointTrait>, usize)],
         total_weight: usize,
         rng: &mut StdRng,
     ) -> usize {
@@ -69,7 +66,7 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
     ) -> Vec<SignedTransaction> {
         let mut result = vec![];
 
-        for (entry_point, _) in &self.entry_points {
+        for (entry_point, _) in self.entry_points.as_ref() {
             if let Some(initial_entry_point) = entry_point.initialize_entry_point() {
                 let payload = initial_entry_point.create_payload(
                     package,
@@ -94,7 +91,7 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
         let total_weight = self.total_weight;
 
         let mut additional_signers = vec![];
-        for (entry_point, _) in &entry_points {
+        for (entry_point, _) in entry_points.as_ref() {
             additional_signers.push(match entry_point.multi_sig_additional_num() {
                 MultiSigConfig::Random(num) => {
                     root_account
@@ -135,7 +132,7 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
 
         Arc::new(move |account, package, publisher, txn_factory, rng| {
             let entry_point_idx = Self::pick_random(&entry_points, total_weight, rng);
-            let entry_point = entry_points[entry_point_idx].0;
+            let entry_point = &entry_points[entry_point_idx].0;
 
             let payload = entry_point.create_payload(
                 package,

@@ -116,3 +116,13 @@ pub static APTOS_SCHEMADB_DELETES_SAMPLED: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static TIMER: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_schema_db_timer_seconds",
+        "Various timers for performance analysis.",
+        &["name", "sub_name"],
+        exponential_buckets(/*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 32).unwrap(),
+    )
+    .unwrap()
+});

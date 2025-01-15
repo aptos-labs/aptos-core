@@ -1,35 +1,38 @@
-Loop { loop_count: Some(100000), loop_type: NoOp }	60	0.960	1.119	42122.6
-Loop { loop_count: Some(10000), loop_type: Arithmetic }	60	0.956	1.074	26240.7
-CreateObjects { num_objects: 10, object_payload_size: 0 }	60	0.938	1.168	156.6
-CreateObjects { num_objects: 10, object_payload_size: 10240 }	60	0.924	1.086	9713.2
-CreateObjects { num_objects: 100, object_payload_size: 0 }	60	0.922	1.275	1577.0
-CreateObjects { num_objects: 100, object_payload_size: 10240 }	60	0.935	1.070	11728.7
-InitializeVectorPicture { length: 128 }	60	0.926	1.069	169.4
-VectorPicture { length: 128 }	60	0.908	1.075	50.2
-VectorPictureRead { length: 128 }	60	0.919	1.059	48.0
-InitializeVectorPicture { length: 30720 }	60	0.939	1.127	28404.4
-VectorPicture { length: 30720 }	60	0.936	1.095	6935.6
-VectorPictureRead { length: 30720 }	60	0.939	1.093	6948.2
-SmartTablePicture { length: 30720, num_points_per_txn: 200 }	60	0.947	1.080	43673.3
-SmartTablePicture { length: 1048576, num_points_per_txn: 300 }	60	0.947	1.111	74145.8
-ResourceGroupsSenderWriteTag { string_length: 1024 }	60	0.918	1.075	15.8
-ResourceGroupsSenderMultiChange { string_length: 1024 }	60	0.909	1.169	32.9
-TokenV1MintAndTransferFT	60	0.953	1.069	384.6
-TokenV1MintAndTransferNFTSequential	60	0.938	1.064	600.3
-TokenV2AmbassadorMint { numbered: true }	60	0.951	1.057	516.6
-LiquidityPoolSwap { is_stable: true }	60	0.961	1.139	582.6
-LiquidityPoolSwap { is_stable: false }	60	0.929	1.099	563.0
-CoinInitAndMint	60	0.928	1.130	205.0
-FungibleAssetMint	60	0.930	1.098	235.8
-IncGlobalMilestoneAggV2 { milestone_every: 1 }	60	0.914	1.051	33.5
-IncGlobalMilestoneAggV2 { milestone_every: 2 }	60	0.914	1.105	19.0
-EmitEvents { count: 1000 }	60	0.937	1.158	8818.7
-VectorTrimAppend { vec_len: 3000, element_len: 1, index: 0, repeats: 0 }	6	0.925	1.001	6058.1
-VectorTrimAppend { vec_len: 3000, element_len: 1, index: 100, repeats: 1000 }	6	0.925	1.001	34000.0
-VectorTrimAppend { vec_len: 3000, element_len: 1, index: 2990, repeats: 1000 }	6	0.925	1.001	17626.5
-VectorRemoveInsert { vec_len: 3000, element_len: 1, index: 100, repeats: 1000 }	6	0.925	1.001	30870.3
-VectorRemoveInsert { vec_len: 3000, element_len: 1, index: 2998, repeats: 1000 }	6	0.925	1.001	20343.2
-VectorRangeMove { vec_len: 3000, element_len: 1, index: 1000, move_len: 500, repeats: 1000 }	6	0.925	1.001	65311
-VectorTrimAppend { vec_len: 100, element_len: 100, index: 0, repeats: 0 }	6	0.925	1.001	277.0
-VectorTrimAppend { vec_len: 100, element_len: 100, index: 10, repeats: 1000 }	6	0.925	1.001	12146.6
-VectorRangeMove { vec_len: 100, element_len: 100, index: 50, move_len: 10, repeats: 1000 }	6	0.925	1.001	7098
+Loop { loop_count: Some(100000), loop_type: NoOp }	34	0.951	1.044	43359.7
+Loop { loop_count: Some(10000), loop_type: Arithmetic }	34	0.941	1.042	26954.7
+CreateObjects { num_objects: 10, object_payload_size: 0 }	34	0.921	1.049	158.6
+CreateObjects { num_objects: 10, object_payload_size: 10240 }	34	0.936	1.041	9822.0
+CreateObjects { num_objects: 100, object_payload_size: 0 }	34	0.940	1.068	1554.7
+CreateObjects { num_objects: 100, object_payload_size: 10240 }	34	0.946	1.054	11939.3
+InitializeVectorPicture { length: 128 }	34	0.942	1.061	169.4
+VectorPicture { length: 128 }	34	0.917	1.058	47.6
+VectorPictureRead { length: 128 }	34	0.909	1.075	46.3
+InitializeVectorPicture { length: 30720 }	34	0.942	1.057	28928.4
+VectorPicture { length: 30720 }	34	0.924	1.081	6409.9
+VectorPictureRead { length: 30720 }	34	0.938	1.089	6409.9
+SmartTablePicture { length: 30720, num_points_per_txn: 200 }	34	0.972	1.074	42970.1
+SmartTablePicture { length: 1048576, num_points_per_txn: 300 }	34	0.960	1.066	73865.4
+ResourceGroupsSenderWriteTag { string_length: 1024 }	34	0.898	1.062	16.2
+ResourceGroupsSenderMultiChange { string_length: 1024 }	34	0.923	1.101	33.4
+TokenV1MintAndTransferFT	34	0.947	1.073	390.1
+TokenV1MintAndTransferNFTSequential	34	0.925	1.063	600.3
+TokenV2AmbassadorMint { numbered: true }	34	0.927	1.076	466.4
+LiquidityPoolSwap { is_stable: true }	34	0.920	1.043	689.8
+LiquidityPoolSwap { is_stable: false }	34	0.929	1.061	628.8
+CoinInitAndMint	34	0.945	1.072	207.6
+FungibleAssetMint	34	0.934	1.063	236.7
+IncGlobalMilestoneAggV2 { milestone_every: 1 }	34	0.913	1.040	33.7
+IncGlobalMilestoneAggV2 { milestone_every: 2 }	34	0.915	1.050	19.1
+EmitEvents { count: 1000 }	34	0.946	1.091	8887.0
+VectorTrimAppend { vec_len: 3000, element_len: 1, index: 0, repeats: 0 }	34	0.939	1.049	6421.3
+VectorTrimAppend { vec_len: 3000, element_len: 1, index: 100, repeats: 1000 }	34	0.949	1.282	31116.2
+VectorTrimAppend { vec_len: 3000, element_len: 1, index: 2990, repeats: 1000 }	34	0.948	1.040	18677.1
+VectorRemoveInsert { vec_len: 3000, element_len: 1, index: 100, repeats: 1000 }	34	0.955	1.116	26810.1
+VectorRemoveInsert { vec_len: 3000, element_len: 1, index: 2998, repeats: 1000 }	34	0.937	1.146	17980.1
+VectorRangeMove { vec_len: 3000, element_len: 1, index: 1000, move_len: 500, repeats: 1000 }	34	0.900	1.288	32476.1
+VectorTrimAppend { vec_len: 100, element_len: 100, index: 0, repeats: 0 }	34	0.950	1.063	289.6
+VectorTrimAppend { vec_len: 100, element_len: 100, index: 10, repeats: 1000 }	34	0.900	1.043	13746.6
+VectorRangeMove { vec_len: 100, element_len: 100, index: 50, move_len: 10, repeats: 1000 }	34	0.937	1.028	5578.1
+MapInsertRemove { len: 100, repeats: 100, map_type: OrderedMap }	15	0.962	1.052	15352.2
+MapInsertRemove { len: 100, repeats: 100, map_type: SimpleMap }	15	0.939	1.053	37213.4
+MapInsertRemove { len: 1000, repeats: 100, map_type: OrderedMap }	15	0.965	1.055	74286.2

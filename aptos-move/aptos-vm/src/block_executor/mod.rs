@@ -24,7 +24,6 @@ use aptos_types::{
     },
     contract_event::ContractEvent,
     error::PanicError,
-    executable::ExecutableTestType,
     fee_statement::FeeStatement,
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView, StateViewId},
     transaction::{
@@ -438,12 +437,11 @@ impl<
             transaction_slice_metadata,
         )?;
 
-        let executor =
-            BlockExecutor::<SignatureVerifiedTransaction, E, S, L, ExecutableTestType, TP>::new(
-                config,
-                executor_thread_pool,
-                transaction_commit_listener,
-            );
+        let executor = BlockExecutor::<SignatureVerifiedTransaction, E, S, L, TP>::new(
+            config,
+            executor_thread_pool,
+            transaction_commit_listener,
+        );
 
         let ret = executor.execute_block(
             signature_verified_block,

@@ -134,12 +134,35 @@ module std::bcs_tests {
         assert!(option::none() == bcs::constant_serialized_size<Box63<option::Option<bool>>>(), 3);
     }
 
-    // enum Singleton {
-    //     V1(u64),
-    // }
+    enum Singleton {
+        V1(u64),
+    }
 
-    // fun encode_enum() {
-    //     assert!(option::none() == bcs::constant_serialized_size<Singleton>());
-    //     assert!(option::none() == bcs::constant_serialized_size<Box3<Singleton>>());
-    // }
+    fun encode_enum() {
+        assert!(option::none() == bcs::constant_serialized_size<Singleton>());
+        assert!(option::none() == bcs::constant_serialized_size<Box3<Singleton>>());
+    }
+
+    // test that serialization is little-endian, and so produces different
+    // ordering than "expected" natural ordering.
+    #[test]
+    fun bcs_comparison() {
+        let val = 256 * 4 + 2;
+        let other = 256 * 2 + 4;
+
+        assert!(std::cmp::compare(&val, &other).is_gt());
+
+        let bytes_val = bcs::to_bytes(&val);
+        let bytes_other = bcs::to_bytes(&other);
+
+        assert!(std::cmp::compare(&bytes_val, &bytes_other).is_lt());
+    }
+
+    #[test(s1 = @0x123)]
+    fun test_signer_serialization(s1: signer) {
+        assert!(
+            bcs::to_bytes(&s1) == bcs::to_bytes(&@0x123),
+            1
+        );
+    }
 }

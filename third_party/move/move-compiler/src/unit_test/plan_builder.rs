@@ -8,6 +8,7 @@ use crate::{
     expansion::ast::{
         self as E, Address, Attribute, AttributeValue, ModuleAccess_, ModuleIdent, ModuleIdent_,
     },
+    hlir::ast::{BaseType_, SingleType_},
     parser::ast::ConstantName,
     shared::{
         known_attributes::{AttributeKind, KnownAttribute, TestingAttribute},
@@ -159,10 +160,19 @@ fn build_test_info<'func>(
 
     let test_annotation_params = parse_test_attribute(context, test_attribute, 0);
     let mut arguments = Vec::new();
-    for (var, _) in &function.signature.parameters {
+    for (var, ty) in &function.signature.parameters {
         match test_annotation_params.get(&var.value()) {
-            Some(value) => arguments.push(value.clone()),
-            None => {
+            Some(MoveValue::Address(addr)) => match &ty.value {
+                SingleType_::Base(ty) => arguments.push(
+                    if ty == &BaseType_::address(ty.loc) {
+                        MoveValue::Address(*addr)
+                    } else {
+                        MoveValue::Signer(*addr)
+                    },
+                ),
+                SingleType_::Ref(_, _) => arguments.push(MoveValue::Signer(*addr)),
+            },
+            _ => {
                 let missing_param_msg = "Missing test parameter assignment in test. Expected a \
                                          parameter to be assigned in this attribute";
                 context.env.add_diag(diag!(

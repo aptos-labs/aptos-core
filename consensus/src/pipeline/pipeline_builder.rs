@@ -480,7 +480,7 @@ impl PipelineBuilder {
         let start = Instant::now();
         tokio::task::spawn_blocking(move || {
             executor
-                .execute_and_state_checkpoint(
+                .execute_and_update_state(
                     (block.id(), txns).into(),
                     block.parent_id(),
                     onchain_execution_config,

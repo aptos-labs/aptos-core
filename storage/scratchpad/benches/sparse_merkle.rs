@@ -85,10 +85,7 @@ impl Benches {
             blocks: block_sizes
                 .iter()
                 .map(|block_size| Block {
-                    smt: SparseMerkleTree::new(
-                        *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                        StateStorageUsage::new_untracked(),
-                    ),
+                    smt: SparseMerkleTree::new(*SPARSE_MERKLE_PLACEHOLDER_HASH),
                     updates: Self::gen_updates(&mut rng, &keys, *block_size),
                     proof_reader: ProofReader::new(Vec::new()),
                 })
@@ -113,10 +110,7 @@ impl Benches {
                     let updates = Self::gen_updates(&mut rng, &keys, *block_size);
                     let proof_reader = Self::gen_proof_reader(&mut naive_base_smt, &updates);
                     Block {
-                        smt: SparseMerkleTree::new(
-                            naive_base_smt.get_root_hash(),
-                            StateStorageUsage::new_untracked(),
-                        ),
+                        smt: SparseMerkleTree::new(naive_base_smt.get_root_hash()),
                         updates,
                         proof_reader,
                     }

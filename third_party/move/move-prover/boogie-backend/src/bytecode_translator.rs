@@ -573,6 +573,9 @@ impl<'env> StructTranslator<'env> {
                 struct_variant_name, struct_variant_name
             );
             emitln!(writer, "{} if {} then", else_symbol, match_condition);
+            if equal_statement.is_empty() {
+                equal_statement = "true".to_string();
+            }
             emitln!(writer, "{}", equal_statement);
             if else_symbol.is_empty() {
                 else_symbol = "else";

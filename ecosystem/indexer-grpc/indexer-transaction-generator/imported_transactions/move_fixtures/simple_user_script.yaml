@@ -1,8 +1,8 @@
 transactions:
   - output_name: simple_user_script1
     script_path: simple_user_script
-    sender_address: __ACCOUNT_A__
+    sender_address: 765d8c8d4d5859f43a56e2756fbf5f3d2483dbaa14f3fb62872df820d6e64eff
   - output_name: simple_user_script2
     script_path: simple_user_script2
-    sender_address: __ACCOUNT_A__
+    sender_address: 765d8c8d4d5859f43a56e2756fbf5f3d2483dbaa14f3fb62872df820d6e64eff
     

@@ -164,6 +164,7 @@ impl MetricsPusher {
             "metrics_source=unknown".into(),
             "kubernetes_pod_name=unknown".into(),
             "role=unknown".into(),
+            format!("run_uuid={:x}", rand::random::<u64>()),
             format!("namespace={}", namespace),
         ]
     }

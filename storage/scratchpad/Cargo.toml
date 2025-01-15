@@ -15,10 +15,10 @@ rust-version = { workspace = true }
 [dependencies]
 aptos-crypto = { workspace = true }
 aptos-drop-helper = { workspace = true }
-aptos-experimental-runtimes = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-types = { workspace = true }
+aptos-vm = { workspace = true }
 bitvec = { workspace = true }
 criterion = { workspace = true, optional = true }
 itertools = { workspace = true }

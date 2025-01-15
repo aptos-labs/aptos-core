@@ -92,6 +92,7 @@ impl Signature {
                     None,
                 ))
             },
+            APITransactionSignature::NoAccountSignature(_) => Ok(vec![]),
         }
     }
 
@@ -106,6 +107,7 @@ impl Signature {
             },
             APITransactionSignature::FeePayerSignature(_) => String::from("fee_payer_signature"),
             APITransactionSignature::SingleSender(_sig) => String::from("single_sender"),
+            APITransactionSignature::NoAccountSignature(_) => String::from("no_account_signature"),
         }
     }
 

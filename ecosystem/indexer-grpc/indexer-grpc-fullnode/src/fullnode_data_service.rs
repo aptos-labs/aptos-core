@@ -7,7 +7,8 @@ use aptos_logger::{error, info};
 use aptos_moving_average::MovingAverage;
 use aptos_protos::internal::fullnode::v1::{
     fullnode_data_server::FullnodeData, stream_status::StatusType, transactions_from_node_response,
-    GetTransactionsFromNodeRequest, StreamStatus, TransactionsFromNodeResponse,
+    GetTransactionsFromNodeRequest, PingFullnodeRequest, PingFullnodeResponse, StreamStatus,
+    TransactionsFromNodeResponse,
 };
 use futures::Stream;
 use std::pin::Pin;
@@ -155,6 +156,13 @@ impl FullnodeData for FullnodeDataService {
         Ok(Response::new(
             Box::pin(output_stream) as Self::GetTransactionsFromNodeStream
         ))
+    }
+
+    async fn ping(
+        &self,
+        _request: Request<PingFullnodeRequest>,
+    ) -> Result<Response<PingFullnodeResponse>, Status> {
+        unimplemented!()
     }
 }
 

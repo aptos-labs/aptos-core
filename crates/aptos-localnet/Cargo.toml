@@ -26,7 +26,7 @@ diesel = { workspace = true, features = [
     "postgres_backend",
 ] }
 diesel-async = { workspace = true }
-processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "51a34901b40d7f75767ac907b4d2478104d6a515", default-features = false }
+processor = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

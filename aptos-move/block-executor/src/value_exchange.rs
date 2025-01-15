@@ -9,7 +9,6 @@ use aptos_aggregator::{
 use aptos_mvhashmap::{types::TxnIndex, versioned_delayed_fields::TVersionedDelayedFieldView};
 use aptos_types::{
     error::{code_invariant_error, PanicError},
-    executable::Executable,
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
     write_set::TransactionWrite,
@@ -26,23 +25,17 @@ use move_vm_types::{
 };
 use std::{cell::RefCell, collections::HashSet, sync::Arc};
 
-pub(crate) struct TemporaryValueToIdentifierMapping<
-    'a,
-    T: Transaction,
-    S: TStateView<Key = T::Key>,
-    X: Executable,
-> {
-    latest_view: &'a LatestView<'a, T, S, X>,
+pub(crate) struct TemporaryValueToIdentifierMapping<'a, T: Transaction, S: TStateView<Key = T::Key>>
+{
+    latest_view: &'a LatestView<'a, T, S>,
     txn_idx: TxnIndex,
     // These are the delayed field keys that were touched when utilizing this mapping
     // to replace ids with values or values with ids
     delayed_field_ids: RefCell<HashSet<DelayedFieldID>>,
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
-    TemporaryValueToIdentifierMapping<'a, T, S, X>
-{
-    pub fn new(latest_view: &'a LatestView<'a, T, S, X>, txn_idx: TxnIndex) -> Self {
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TemporaryValueToIdentifierMapping<'a, T, S> {
+    pub fn new(latest_view: &'a LatestView<'a, T, S>, txn_idx: TxnIndex) -> Self {
         Self {
             latest_view,
             txn_idx,
@@ -62,8 +55,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
 // For aggregators V2, values are replaced with identifiers at deserialization time,
 // and are replaced back when the value is serialized. The "lifted" values are cached
 // by the `LatestView` in the aggregators multi-version data structure.
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIdentifierMapping
-    for TemporaryValueToIdentifierMapping<'a, T, S, X>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>> ValueToIdentifierMapping
+    for TemporaryValueToIdentifierMapping<'a, T, S>
 {
     fn value_to_identifier(
         &self,
@@ -105,11 +98,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
     }
 }
 
-impl<'a, T, S, X> LatestView<'a, T, S, X>
+impl<'a, T, S> LatestView<'a, T, S>
 where
     T: Transaction,
     S: TStateView<Key = T::Key>,
-    X: Executable,
 {
     /// Given bytes, where values were already exchanged with identifiers, returns a list of
     /// identifiers present in it.

@@ -254,18 +254,15 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         let start_version = transactions.first().unwrap().version;
         let end_version = transactions.last().unwrap().version;
         let num_transactions = transactions.len();
-        let start_txn_timestamp = transactions.first().unwrap().timestamp.clone();
-        let end_txn_timestamp = transactions.last().unwrap().timestamp.clone();
+        let start_txn_timestamp = transactions.first().unwrap().timestamp;
+        let end_txn_timestamp = transactions.last().unwrap().timestamp;
         let mut size_in_bytes = 0;
         let mut redis_pipeline = redis::pipe();
         let start_time = std::time::Instant::now();
         for transaction in transactions {
             let version = transaction.version;
             let cache_key = CacheEntry::build_key(version, self.storage_format).to_string();
-            let timestamp_in_seconds = transaction
-                .timestamp
-                .clone()
-                .map_or(0, |t| t.seconds as u64);
+            let timestamp_in_seconds = transaction.timestamp.map_or(0, |t| t.seconds as u64);
             let cache_entry: CacheEntry =
                 CacheEntry::from_transaction(transaction, self.storage_format);
             let bytes = cache_entry.into_inner();

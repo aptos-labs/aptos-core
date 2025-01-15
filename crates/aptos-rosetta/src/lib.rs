@@ -7,7 +7,7 @@
 
 use crate::{
     block::BlockRetriever,
-    common::{handle_request, native_coin, with_context},
+    common::{handle_request, native_coin, usdc_currency, usdc_testnet_currency, with_context},
     error::{ApiError, ApiResult},
     types::Currency,
 };
@@ -60,6 +60,13 @@ impl RosettaContext {
     ) -> Self {
         // Always add APT
         currencies.insert(native_coin());
+
+        // Depending on the chain add appropriate USDC
+        if chain_id.is_mainnet() {
+            currencies.insert(usdc_currency());
+        } else if chain_id.is_testnet() {
+            currencies.insert(usdc_testnet_currency());
+        }
 
         RosettaContext {
             rest_client,

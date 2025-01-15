@@ -3,10 +3,7 @@
 
 use anyhow::bail;
 use move_binary_format::file_format_common::{VERSION_DEFAULT, VERSION_DEFAULT_LANG_V2};
-use move_command_line_common::{
-    env,
-    env::{get_move_compiler_v2_from_env, read_bool_env_var},
-};
+use move_command_line_common::{env, env::get_move_compiler_v1_from_env};
 use move_compiler::shared::LanguageVersion as CompilerLanguageVersion;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -93,11 +90,11 @@ pub enum CompilerVersion {
 impl Default for CompilerVersion {
     /// We allow the default to be set via an environment variable.
     fn default() -> Self {
-        static MOVE_COMPILER_V2: Lazy<bool> = Lazy::new(get_move_compiler_v2_from_env);
-        if *MOVE_COMPILER_V2 {
-            Self::V2_0
-        } else {
+        static MOVE_COMPILER_V1: Lazy<bool> = Lazy::new(get_move_compiler_v1_from_env);
+        if *MOVE_COMPILER_V1 {
             Self::V1
+        } else {
+            Self::latest_stable()
         }
     }
 }
@@ -224,11 +221,11 @@ impl LanguageVersion {
 
 impl Default for LanguageVersion {
     fn default() -> Self {
-        static MOVE_LANGUAGE_V2: Lazy<bool> = Lazy::new(|| read_bool_env_var("MOVE_LANGUAGE_V2"));
-        if *MOVE_LANGUAGE_V2 {
-            Self::latest_stable()
-        } else {
+        static MOVE_COMPILER_V1: Lazy<bool> = Lazy::new(get_move_compiler_v1_from_env);
+        if *MOVE_COMPILER_V1 {
             Self::V1
+        } else {
+            Self::latest_stable()
         }
     }
 }
