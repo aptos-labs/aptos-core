@@ -102,7 +102,7 @@ pub fn run_benchmark<V>(
     connected_tx_grps: usize,
     clustered_txns_gen_config: Option<ClusteredTxnsGenConfig>,
     shuffle_connected_txns: bool,
-    self_transfer_txns: bool,
+    foundational_txns: bool,
     hotspot_probability: Option<f32>,
     num_main_signer_accounts: usize,
     num_additional_dst_pool_accounts: usize,
@@ -216,7 +216,7 @@ pub fn run_benchmark<V>(
             connected_tx_grps,
             clustered_txns_gen_config,
             shuffle_connected_txns,
-            self_transfer_txns,
+            foundational_txns,
             hotspot_probability,
         )
     };
@@ -609,21 +609,7 @@ impl OverallMeasuring {
         let delta_gas = self.start_gas.elapsed_delta();
 
         info!(
-            "{} TPS: {} txn/s (over {} txns, in {} s)",
-            prefix,
-            num_txns / elapsed,
-            num_txns,
-            elapsed
-        );
-        info!(
-            "{} VM execution TPS {} txn/s; ({} / {})",
-            prefix,
-            (num_txns / delta_execution.vm_time) as usize,
-            num_txns,
-            delta_execution.vm_time
-        );
-        info!(
-            "{} VM execution TPS {} txn/s excluding flattening; ({} / {})",
+            "{} execution TPS {} txn/s; ({} / {})",
             prefix,
             (num_txns / delta_execution.vm_time_no_flatten) as usize,
             num_txns,
@@ -664,53 +650,6 @@ impl OverallMeasuring {
             "{} output: {} bytes/s",
             prefix,
             delta_execution.output_size / elapsed
-        );
-
-        info!(
-            "{} fraction of total: {:.3} in partitioning (component TPS: {})",
-            prefix,
-            delta_execution.partitioning_total / elapsed,
-            num_txns / delta_execution.partitioning_total
-        );
-
-        info!(
-            "{} fraction of total: {:.3} in execution (component TPS: {})",
-            prefix,
-            delta_execution.execution_total / elapsed,
-            num_txns / delta_execution.execution_total
-        );
-        info!(
-            "{} fraction of execution {:.3} in VM (component TPS: {})",
-            prefix,
-            delta_execution.vm_only / delta_execution.execution_total,
-            num_txns / delta_execution.vm_only
-        );
-        for (prefix, top_level, other_label) in OTHER_LABELS {
-            let time_in_label = delta_execution.by_other.get(other_label).unwrap();
-            if *top_level || time_in_label / delta_execution.execution_total > 0.01 {
-                info!(
-                    "{} fraction of execution {:.3} in {} {} (component TPS: {})",
-                    prefix,
-                    time_in_label / delta_execution.execution_total,
-                    prefix,
-                    other_label,
-                    num_txns / time_in_label
-                );
-            }
-        }
-
-        info!(
-            "{} fraction of total: {:.3} in ledger update (component TPS: {})",
-            prefix,
-            delta_execution.ledger_update_total / elapsed,
-            num_txns / delta_execution.ledger_update_total
-        );
-
-        info!(
-            "{} fraction of total: {:.4} in commit (component TPS: {})",
-            prefix,
-            delta_execution.commit_total / elapsed,
-            num_txns / delta_execution.commit_total
         );
     }
 }
@@ -766,7 +705,7 @@ mod tests {
             0,     /* connected txn groups in a block */
             None,
             false, /* shuffle the connected txns in a block */
-            false, /* is self_transfer_txns */
+            false, /* is foundational_txns */
             None,  /* maybe_hotspot_probability */
             25,    /* num_main_signer_accounts */
             30,    /* num_dst_pool_accounts */

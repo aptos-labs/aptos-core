@@ -368,7 +368,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
         trace!("RemoteExecutorClient Sending block to shards");
         let total_supply_base_val: u128 = get_state_value(&TOTAL_SUPPLY_STATE_KEY, state_view.as_ref()).unwrap();
         let current_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-        info!("Executing block started at time {}", current_time);
+        trace!("Executing block started at time {}", current_time);
         self.state_view_service.set_state_view(state_view);
         let partitions = &transactions.as_v3_ref().partitions;
 

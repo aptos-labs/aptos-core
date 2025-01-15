@@ -192,7 +192,7 @@ where
                     );
                 }
 
-                overall_measuring.print_end("Overall execution", executed);
+                overall_measuring.print_end("Execution stage", executed);
                 start_commit_tx.map(|tx| tx.send(()));
             })
             .expect("Failed to spawn transaction executor thread.");

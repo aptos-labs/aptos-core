@@ -432,7 +432,6 @@ impl BlockAptosVM {
             >::new(config, executor_thread_pool, transaction_commit_listener);
             executor.execute_block((), txn_provider.clone(), state_view)
         } else {
-            info!("Using Move VM for block execution; num txns: {}", num_txns);
             let executor = BlockExecutor::<
                 SignatureVerifiedTransaction,
                 AptosExecutorTask<S>,

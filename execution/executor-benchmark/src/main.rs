@@ -317,7 +317,7 @@ struct Opt {
     shuffle_connected_txns: bool,
 
     #[clap(long)]
-    self_transfer_txns: bool,
+    foundational_txns: bool,
 
     #[clap(long, conflicts_with_all = &["connected_tx_grps", "transactions_per_sender"])]
     hotspot_probability: Option<f32>,
@@ -491,7 +491,7 @@ where
                 opt.connected_tx_grps,
                 Some(opt.clustered_txns_gen_opt.clustered_txns_gen_config(opt.pipeline_opt.sharding_opt.v3_debug_logs)),
                 opt.shuffle_connected_txns,
-                opt.self_transfer_txns,
+                opt.foundational_txns,
                 opt.hotspot_probability,
                 main_signer_accounts,
                 additional_dst_pool_accounts,
