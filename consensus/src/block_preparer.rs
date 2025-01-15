@@ -13,6 +13,7 @@ use aptos_executor_types::ExecutorResult;
 use aptos_types::transaction::SignedTransaction;
 use fail::fail_point;
 use std::{sync::Arc, time::Instant};
+use aptos_logger::info;
 
 pub struct BlockPreparer {
     payload_manager: Arc<dyn TPayloadManager>,
@@ -46,6 +47,10 @@ impl BlockPreparer {
         let start_time = Instant::now();
         let (txns, max_txns_from_block_to_execute) =
             self.payload_manager.get_transactions(block).await?;
+        info!("prepare_block block_id {:?} txns: {:?}", block.id(), txns.len());
+        for txn in &txns {
+            info!("prepare_block block_id {:?} (address: {:?}, replay_protector: {:?}, expiration_timestamp_secs: {:?})", block.id(), txn.sender(), txn.sequence_number(), txn.expiration_timestamp_secs());
+        }
         let txn_filter = self.txn_filter.clone();
         let txn_deduper = self.txn_deduper.clone();
         let txn_shuffler = self.txn_shuffler.clone();
