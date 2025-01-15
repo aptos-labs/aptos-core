@@ -250,6 +250,10 @@ impl ForgeConfig {
                 helm_values["fullnode"]["config"]["consensus_observer"]["enable_pipeline"] =
                     true.into();
             }
+
+            // enable optqs
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["enable_opt_quorum_store"] = true.into();
         }))
     }
 

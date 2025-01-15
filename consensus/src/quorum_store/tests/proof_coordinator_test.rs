@@ -13,6 +13,7 @@ use crate::{
 use aptos_consensus_types::proof_of_store::{BatchId, SignedBatchInfo, SignedBatchInfoMsg};
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
+use aptos_infallible::Mutex;
 use aptos_types::{
     transaction::SignedTransaction, validator_verifier::random_validator_verifier, PeerId,
 };
@@ -33,7 +34,7 @@ impl BatchReader for MockBatchReader {
         &self,
         _digest: HashValue,
         _expiration: u64,
-        _signers: Vec<PeerId>,
+        _signers: Arc<Mutex<Vec<PeerId>>>,
     ) -> tokio::sync::oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>> {
         unimplemented!()
     }

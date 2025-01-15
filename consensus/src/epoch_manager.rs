@@ -699,7 +699,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 network_sender,
                 epoch_state.verifier.clone(),
                 self.proof_cache.clone(),
-                self.config.safety_rules.backend.clone(),
                 self.quorum_store_storage.clone(),
                 !consensus_config.is_dag_enabled(),
                 consensus_key,
