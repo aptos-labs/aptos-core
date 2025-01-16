@@ -3126,10 +3126,7 @@ impl VMValidator for AptosVM {
         };
 
         let initial_balance = if self.features().is_account_abstraction_enabled() {
-            vm_params
-                .txn
-                .max_aa_gas
-                .min(txn_data.max_gas_amount().into())
+            vm_params.txn.max_aa_gas.min(txn_data.max_gas_amount())
         } else {
             txn_data.max_gas_amount()
         };
