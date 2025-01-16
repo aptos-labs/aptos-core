@@ -1067,6 +1067,10 @@ impl BytecodeGen {
             StructInstantiation(_, type_arguments) => type_arguments
                 .iter()
                 .all(BytecodeGen::check_signature_token),
+            Function(params, results, _) => params
+                .iter()
+                .chain(results)
+                .all(BytecodeGen::check_signature_token),
             Reference(_) | MutableReference(_) => false,
         }
     }
