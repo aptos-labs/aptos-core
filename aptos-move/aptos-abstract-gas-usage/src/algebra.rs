@@ -101,7 +101,7 @@ impl<A: GasAlgebra> GasAlgebra for CalibrationAlgebra<A> {
         self.base.storage_fee_used()
     }
 
-    fn adjust_initial_gas(&mut self, new_initial_gas: impl Into<Gas>) -> PartialVMResult<()> {
-        self.base.adjust_initial_gas(new_initial_gas)
+    fn inject_balance(&mut self, new_initial_gas: impl Into<Gas>) -> PartialVMResult<()> {
+        self.base.inject_balance(new_initial_gas)
     }
 }

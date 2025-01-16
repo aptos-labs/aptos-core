@@ -2062,16 +2062,10 @@ impl AptosVM {
         }));
 
         if self.features().is_account_abstraction_enabled() {
-            let max_aa_gas = match self.gas_params(&log_context) {
-                Ok(vm_params) => vm_params.vm.txn.max_aa_gas,
-                Err(err) => {
-                    panic!("TODO: what to do here");
-                    // return VMValidatorResult::new(Some(err.status_code()), 0);
-                },
-            };
+            let max_aa_gas = unwrap_or_discard!(self.gas_params(log_context)).vm.txn.max_aa_gas;
             if max_aa_gas < txn_data.max_gas_amount() {
                 // Reset initial gas after validation with max_aa_gas.
-                unwrap_or_discard!(gas_meter.adjust_initial_gas(txn_data.max_gas_amount()));
+                unwrap_or_discard!(gas_meter.inject_balance(txn_data.max_gas_amount().checked_sub(max_aa_gas).unwrap()));
             }
         } else {
             assert_eq!(initial_gas, gas_meter.balance());
@@ -3055,9 +3049,8 @@ impl VMValidator for AptosVM {
         &self,
         transaction: SignedTransaction,
         state_view: &impl StateView,
-        _module_storage: &impl ModuleStorage,
+        module_storage: &impl ModuleStorage,
     ) -> VMValidatorResult {
-        let module_storage = &state_view.as_aptos_code_storage(self.environment());
         let _timer = TXN_VALIDATION_SECONDS.start_timer();
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 

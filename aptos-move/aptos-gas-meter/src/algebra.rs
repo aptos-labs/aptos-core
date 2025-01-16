@@ -14,6 +14,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use std::fmt::Debug;
+use std::ops::AddAssign;
 
 /// Base gas algebra implementation that tracks the gas usage using its internal counters.
 ///
@@ -103,20 +104,6 @@ impl StandardGasAlgebra {
                 )
             },
         }
-    }
-
-    fn adjust_initial_balance(
-        &mut self,
-        reset_initial_balance_to: impl Into<Gas>,
-    ) -> PartialVMResult<()> {
-        self.initial_balance = reset_initial_balance_to
-            .into()
-            .to_unit_with_params(&self.vm_gas_params.txn);
-        self.balance = self.initial_balance;
-        let total_calculated =
-            self.execution_gas_used + self.io_gas_used + self.storage_fee_in_internal_units;
-        let (_actual, res) = self.charge(total_calculated);
-        res
     }
 }
 
@@ -306,7 +293,12 @@ impl GasAlgebra for StandardGasAlgebra {
     }
 
     // Reset the initial gas balance to reflect the new balance with the change carried over.
-    fn adjust_initial_gas(&mut self, new_initial_gas: impl Into<Gas>) -> PartialVMResult<()> {
-        self.adjust_initial_balance(new_initial_gas)
+    fn inject_balance(&mut self, extra_balance: impl Into<Gas>) -> PartialVMResult<()> {
+        let extra_unit = extra_balance
+            .into()
+            .to_unit_with_params(&self.vm_gas_params.txn);
+        self.initial_balance.add_assign(extra_unit);
+        self.balance.add_assign(extra_unit);
+        Ok(())
     }
 }
