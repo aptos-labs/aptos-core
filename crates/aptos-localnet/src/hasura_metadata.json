@@ -2327,6 +2327,9 @@
                   "columns": [
                     "block_height",
                     "entry_function_id_str",
+                    "entry_function_contract_address",
+                    "entry_function_module_name",
+                    "entry_function_function_name",
                     "epoch",
                     "expiration_timestamp_secs",
                     "gas_unit_price",
