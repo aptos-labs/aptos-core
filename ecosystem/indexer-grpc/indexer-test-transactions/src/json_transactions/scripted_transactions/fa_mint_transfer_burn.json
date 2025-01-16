@@ -1,17 +1,17 @@
 {
   "timestamp": {
-    "seconds": "1736971132",
-    "nanos": 928468000
+    "seconds": "1737064501",
+    "nanos": 903460000
   },
-  "version": "49",
+  "version": "53",
   "info": {
-    "hash": "pnJoIkgBGlO6mGCGKEDMZgNhTLUY1/Xf/nl4td0pgdc=",
-    "stateChangeHash": "XKYC8ynGyWI9xMIcVupWBC8H9xim7qS9IEarWwh5gB0=",
+    "hash": "NUjEd4fE2wqjM8r3rN50izKN4rjDKNXDH16Ie5iwUPc=",
+    "stateChangeHash": "iJ0OTUI3wtrBSMOjR2T75iRNFjxNYUdeXK5DN949eow=",
     "eventRootHash": "zguCQh0yktZ64gFcK3ArJOOrDjHPVhTjf/pYU5fhJdc=",
     "gasUsed": "1161",
     "success": true,
     "vmStatus": "Executed successfully",
-    "accumulatorRootHash": "wHVIS7618vYzPSpKSVP8nMF2EWMm7WtfSC84uQ/n8ns=",
+    "accumulatorRootHash": "93phBJ70b4Uamv/WYTWO4e8x8eSWpqoE5uCrkb+4y6U=",
     "changes": [
       {
         "type": "TYPE_WRITE_RESOURCE",
@@ -144,7 +144,7 @@
           "data": {
             "key": "\"0x619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935\"",
             "keyType": "address",
-            "value": "\"18446744073709335625\"",
+            "value": "\"18446744073709335525\"",
             "valueType": "u128"
           }
         }
@@ -152,7 +152,7 @@
     ]
   },
   "epoch": "2",
-  "blockHeight": "24",
+  "blockHeight": "26",
   "type": "TRANSACTION_TYPE_USER",
   "sizeInfo": {
     "transactionBytes": 1198,
@@ -199,7 +199,7 @@
       "maxGasAmount": "1741",
       "gasUnitPrice": "100",
       "expirationTimestampSecs": {
-        "seconds": "1736971163"
+        "seconds": "1737064531"
       },
       "payload": {
         "type": "TYPE_SCRIPT_PAYLOAD",
@@ -228,7 +228,7 @@
         "type": "TYPE_ED25519",
         "ed25519": {
           "publicKey": "KU08yl94iErSCo4VhF6tGWQYqvSaK1IjTD/4i/uoPSI=",
-          "signature": "KLcoprFJv0WBfK9R4cBv/fv0XtBxwy4jUhVWglkENKv40Wn8hlRPqHDAKVJ/STK14Kv1SJnBZ67Yps7Q9cSeCg=="
+          "signature": "Mk7QW4J1+RcAz61QMThGjn4sI6kbHXdvmEOPBXGhx8NtyL0jC+IFIfkiERIkK3ZYVLs5Lqiqnsw5jTIRwRApCg=="
         }
       }
     },
