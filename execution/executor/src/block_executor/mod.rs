@@ -50,16 +50,18 @@ pub mod block_tree;
 pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,
     inner: RwLock<Option<BlockExecutorInner<V>>>,
+    sender: Option<mpsc::Sender<CommitBatches>>,
 }
 
 impl<V> BlockExecutor<V>
 where
     V: VMBlockExecutor,
 {
-    pub fn new(db: DbReaderWriter) -> Self {
+    pub fn new(db: DbReaderWriter, sender: Option<mpsc::Sender<CommitBatches>>) -> Self {
         Self {
             db,
             inner: RwLock::new(None),
+            sender,
         }
     }
 
@@ -124,7 +126,7 @@ where
             .ledger_update(block_id, parent_block_id)
     }
 
-    fn pre_commit_block(&self, block_id: HashValue) -> ExecutorResult<()> {
+    fn pre_commit_block(&self, block_id: HashValue, sender:) -> ExecutorResult<()> {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "pre_commit_block"]);
 
         self.inner
