@@ -8,5 +8,5 @@ proposals:
       description: "keyless_circuit_update_202501"
     execution_mode: MultiStep
     update_sequence:
-      - RawScript: data/proposals/vk_rotation_proposal_id.move
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/vk_rotation_proposal_id.move
 
