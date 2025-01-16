@@ -1,12 +1,20 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{accont_manager::AccountManager, managed_node::ManagedNode};
+use crate::{
+    accont_manager::AccountManager,
+    managed_node::ManagedNode,
+    transaction_code_builder::{
+        TransactionCodeBuilder, IMPORTED_DEVNET_TXNS, IMPORTED_MAINNET_TXNS, IMPORTED_TESTNET_TXNS,
+        SCRIPTED_TRANSACTIONS_TXNS,
+    },
+};
 use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
+    fs,
     path::{Path, PathBuf},
 };
 use url::Url;
@@ -32,7 +40,11 @@ pub struct IndexerCliArgs {
 
 impl IndexerCliArgs {
     pub async fn run(&self) -> anyhow::Result<()> {
-        let output_folder = convert_relative_path_to_absolute_path(&self.output_folder);
+        let output_folder =
+            convert_relative_path_to_absolute_path(&self.output_folder).join("json_transactions");
+        if !output_folder.exists() {
+            tokio::fs::create_dir_all(&output_folder).await?;
+        }
         let testing_folder = convert_relative_path_to_absolute_path(&self.testing_folder);
 
         // Run the transaction importer.
@@ -140,7 +152,47 @@ impl IndexerCliArgs {
                 ))?;
         }
         // Stop the localnet.
-        managed_node.stop().await
+        managed_node.stop().await?;
+
+        // Using the builder pattern to construct the code
+        let code = TransactionCodeBuilder::new()
+            .add_license_in_comments()
+            .add_directory(
+                output_folder.join(IMPORTED_MAINNET_TXNS).as_path(),
+                IMPORTED_MAINNET_TXNS,
+                false,
+            )
+            .add_directory(
+                output_folder.join(IMPORTED_TESTNET_TXNS).as_path(),
+                IMPORTED_TESTNET_TXNS,
+                false,
+            )
+            .add_directory(
+                output_folder.join(IMPORTED_DEVNET_TXNS).as_path(),
+                IMPORTED_DEVNET_TXNS,
+                false,
+            )
+            .add_directory(
+                output_folder.join(SCRIPTED_TRANSACTIONS_TXNS).as_path(),
+                SCRIPTED_TRANSACTIONS_TXNS,
+                true,
+            )
+            .add_transaction_name_function()
+            .build();
+
+        let dest_path = output_folder.join("generated_transactions.rs");
+
+        match fs::write(dest_path.clone(), code) {
+            Ok(_) => {
+                println!("Successfully generated the transactions code.");
+                Ok(())
+            },
+            Err(e) => Err(anyhow::anyhow!(
+                "Failed to generate the transactions code for dest_path:{:?}, {:?}",
+                dest_path,
+                e
+            )),
+        }
     }
 }
 
@@ -177,9 +229,9 @@ impl TransactionImporterConfig {
         for (network_name, network_config) in self.configs.iter() {
             // Modify the output path by appending the network name to the base path
             let modified_output_path = match network_name.as_str() {
-                "mainnet" => output_path.join("imported_mainnet_txns"),
-                "testnet" => output_path.join("imported_testnet_txns"),
-                "devnet" => output_path.join("imported_devnet_txns"),
+                "mainnet" => output_path.join(IMPORTED_MAINNET_TXNS),
+                "testnet" => output_path.join(IMPORTED_TESTNET_TXNS),
+                "devnet" => output_path.join(IMPORTED_DEVNET_TXNS),
                 _ => {
                     return Err(anyhow::anyhow!(
                         "[Transaction Importer] Unknown network: {}",
