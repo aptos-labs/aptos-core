@@ -43,6 +43,8 @@ pub(crate) enum PerInstructionCache {
     Nothing,
     Pack(u16),
     PackGeneric(u16),
+    Call(Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>),
+    CallGeneric(Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>),
 }
 
 #[derive(Default)]
