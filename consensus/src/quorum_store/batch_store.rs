@@ -15,6 +15,7 @@ use anyhow::bail;
 use aptos_consensus_types::proof_of_store::{BatchInfo, SignedBatchInfo};
 use aptos_crypto::{CryptoMaterialError, HashValue};
 use aptos_executor_types::{ExecutorError, ExecutorResult};
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, validator_signer::ValidatorSigner, PeerId};
 use dashmap::{
@@ -26,7 +27,7 @@ use once_cell::sync::OnceCell;
 use std::{
     sync::{
         atomic::{AtomicU64, Ordering},
-        Arc, Mutex,
+        Arc,
     },
     time::Duration,
 };
@@ -309,10 +310,7 @@ impl BatchStore {
         // Add expiration for the inserted entry, no need to be atomic w. insertion.
         #[allow(clippy::unwrap_used)]
         {
-            self.expirations
-                .lock()
-                .unwrap()
-                .add_item(digest, expiration_time);
+            self.expirations.lock().add_item(digest, expiration_time);
         }
         Ok(true)
     }
@@ -346,7 +344,7 @@ impl BatchStore {
         // after the expiration time. This will help remote peers fetch batches that just expired but are within their
         // execution window.
         let expiration_time = certified_time.saturating_sub(self.expiration_buffer_usecs);
-        let expired_digests = self.expirations.lock().unwrap().expire(expiration_time);
+        let expired_digests = self.expirations.lock().expire(expiration_time);
         let mut ret = Vec::new();
         for h in expired_digests {
             let removed_value = match self.db_cache.entry(h) {
@@ -497,7 +495,7 @@ pub trait BatchReader: Send + Sync {
         &self,
         digest: HashValue,
         expiration: u64,
-        signers: Vec<PeerId>,
+        signers: Arc<Mutex<Vec<PeerId>>>,
     ) -> oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>;
 
     fn update_certified_timestamp(&self, certified_time: u64);
@@ -529,7 +527,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for Batch
         &self,
         digest: HashValue,
         expiration: u64,
-        signers: Vec<PeerId>,
+        signers: Arc<Mutex<Vec<PeerId>>>,
     ) -> oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>> {
         let (tx, rx) = oneshot::channel();
         let batch_store = self.batch_store.clone();

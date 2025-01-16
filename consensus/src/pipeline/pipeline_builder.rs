@@ -4,8 +4,7 @@
 use crate::{
     block_preparer::BlockPreparer,
     block_storage::tracing::{observe_block, BlockStage},
-    counters,
-    counters::{update_counters_for_block, update_counters_for_compute_result},
+    counters::{self, update_counters_for_block, update_counters_for_compute_result},
     execution_pipeline::SIG_VERIFY_POOL,
     monitor,
     payload_manager::TPayloadManager,
@@ -23,6 +22,7 @@ use aptos_consensus_types::{
         PipelineInputRx, PipelineInputTx, PipelinedBlock, PostCommitResult, PostLedgerUpdateResult,
         PostPreCommitResult, PreCommitResult, PrepareResult, TaskError, TaskFuture, TaskResult,
     },
+    quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
@@ -194,6 +194,7 @@ impl PipelineBuilder {
     }
 
     fn channel(abort_handles: &mut Vec<AbortHandle>) -> (PipelineInputTx, PipelineInputRx) {
+        let (qc_tx, qc_rx) = oneshot::channel();
         let (rand_tx, rand_rx) = oneshot::channel();
         let (order_vote_tx, order_vote_rx) = oneshot::channel();
         let (order_proof_tx, order_proof_fut) = oneshot::channel();
@@ -216,12 +217,14 @@ impl PipelineBuilder {
         );
         (
             PipelineInputTx {
+                qc_tx: Some(qc_tx),
                 rand_tx: Some(rand_tx),
                 order_vote_tx: Some(order_vote_tx),
                 order_proof_tx: Some(order_proof_tx),
                 commit_proof_tx: Some(commit_proof_tx),
             },
             PipelineInputRx {
+                qc_rx,
                 rand_rx,
                 order_vote_rx,
                 order_proof_fut,
@@ -289,6 +292,7 @@ impl PipelineBuilder {
         let mut abort_handles = vec![];
         let (tx, rx) = Self::channel(&mut abort_handles);
         let PipelineInputRx {
+            qc_rx,
             rand_rx,
             order_vote_rx,
             order_proof_fut,
@@ -296,7 +300,7 @@ impl PipelineBuilder {
         } = rx;
 
         let prepare_fut = spawn_shared_fut(
-            Self::prepare(self.block_preparer.clone(), block.clone()),
+            Self::prepare(self.block_preparer.clone(), block.clone(), qc_rx),
             &mut abort_handles,
         );
         let execute_fut = spawn_shared_fut(
@@ -406,12 +410,27 @@ impl PipelineBuilder {
 
     /// Precondition: Block is inserted into block tree (all ancestors are available)
     /// What it does: Wait for all data becomes available and verify transaction signatures
-    async fn prepare(preparer: Arc<BlockPreparer>, block: Arc<Block>) -> TaskResult<PrepareResult> {
+    async fn prepare(
+        preparer: Arc<BlockPreparer>,
+        block: Arc<Block>,
+        qc_rx: oneshot::Receiver<Arc<QuorumCert>>,
+    ) -> TaskResult<PrepareResult> {
         let mut tracker = Tracker::start_waiting("prepare", &block);
         tracker.start_working();
+
+        let qc_rx = async {
+            match qc_rx.await {
+                Ok(qc) => Some(qc),
+                Err(_) => {
+                    warn!("[BlockPreparer] qc tx cancelled for block {}", block.id());
+                    None
+                },
+            }
+        }
+        .shared();
         // the loop can only be abort by the caller
         let input_txns = loop {
-            match preparer.prepare_block(&block).await {
+            match preparer.prepare_block(&block, qc_rx.clone()).await {
                 Ok(input_txns) => break input_txns,
                 Err(e) => {
                     warn!(

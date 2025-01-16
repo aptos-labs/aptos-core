@@ -3,18 +3,23 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # Unreleased
+
+## [6.0.0] - 2025/01/14
+- Set Compiler v2 as the default compiler and Move 2 as the default language version.
+- Add new `--move-1` flag to use Compiler v1 and Move 1.
 - Add flag `--benchmark` to `aptos move prove`, which allows to benchmark verification times of individual functions in a package.
 - Add flag `--only <name>` to `aptos move prove`, which allows to scope verification to a function.
 - Fix `aptos init` to show the explorer link for accounts when account is already created on chain instead of prompting to fund the account.
 - Set Compiler v2 as the default compiler and Move 2 as the default language version.
 - Add new `--move-1` flag to use Compiler v1 and Move 1.
+- Upgrade indexer processors for localnet from 51a34901b40d7f75767ac907b4d2478104d6a515 to 3064a075e1abc06c60363f3f2551cc41f5c091de. Upgrade Hasura metadata accordingly.
 
 ## [5.1.0] - 2024/12/13
 - More optimizations are now default for compiler v2.
 - Downgrade bytecode version to v6 before calling the Revela decompiler, if possible, i.e. no enum types are used. This allows to continue to use Revela until the new decompiler is ready.
 
 ## [5.0.0] - 2024/12/11
-- [**Breaking Change**] `aptos init` and `aptos account fund-with-faucet` no longer work directly with testnet, you must now use the minting page at the [Aptos dev docs](https://aptos.dev/network/faucet). 
+- [**Breaking Change**] `aptos init` and `aptos account fund-with-faucet` no longer work directly with testnet, you must now use the minting page at the [Aptos dev docs](https://aptos.dev/network/faucet).
 ## [4.7.0] - 2024/12/10
 - [`Fix`] CLI config should not always require a private key field to be present.
 
@@ -70,7 +75,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## [4.1.0] - 2024/08/30
 - Marks Move 2 and compiler v2 as stable.
-- Adds new `--move-2` flag to work with Move 2 without need for multiple other flags. 
+- Adds new `--move-2` flag to work with Move 2 without need for multiple other flags.
 - Adds `aptos move lint` to produce lint warnings for the current package. Only a few lint rules are implemented for now,
   but more are coming.
 - Adds `aptos move fmt`, which runs the Move formatter, `movefmt`, on the current package. Also adds

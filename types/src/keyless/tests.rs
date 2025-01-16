@@ -9,7 +9,7 @@ use crate::keyless::{
         get_sample_openid_sig_and_pk,
     },
     Configuration, EphemeralCertificate, KeylessPublicKey, KeylessSignature,
-    DEVNET_VERIFICATION_KEY,
+    VERIFICATION_KEY_FOR_TESTING,
 };
 use aptos_crypto::poseidon_bn254::keyless::fr_to_bytes_le;
 use std::ops::{AddAssign, Deref};
@@ -74,7 +74,7 @@ fn test_keyless_groth16_proof_verification() {
     );
 
     proof
-        .verify_groth16_proof(public_inputs_hash, DEVNET_VERIFICATION_KEY.deref())
+        .verify_groth16_proof(public_inputs_hash, VERIFICATION_KEY_FOR_TESTING.deref())
         .unwrap();
 }
 

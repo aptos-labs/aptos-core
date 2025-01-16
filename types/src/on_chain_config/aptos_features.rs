@@ -104,6 +104,19 @@ pub enum FeatureFlag {
     /// that results in a new package created but without any code. With this feature, it is no
     /// longer possible and an explicit error is returned if publishing is attempted.
     DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES = 82,
+    /// We keep the Call Tree cache and instruction (per-instruction)
+    /// cache together here.  Generally, we could allow Call Tree
+    /// cache and disallow instruction cache, however there's little
+    /// benefit of such approach: First, instruction cache requires
+    /// call-tree cache to be enabled, and provides relatively little
+    /// overhead in terms of memory footprint. On the other side,
+    /// providing separate choices could lead to code bloat, as the
+    /// dynamic config is converted into multiple different
+    /// implementations. If required in the future, we can add a flag
+    /// to explicitly disable the instruction cache.
+    ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE = 83,
+    /// AIP-103 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-103.md)
+    PERMISSIONED_SIGNER = 84,
 }
 
 impl FeatureFlag {
@@ -186,6 +199,8 @@ impl FeatureFlag {
             FeatureFlag::COLLECTION_OWNER,
             FeatureFlag::ENABLE_LOADER_V2,
             FeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES,
+            FeatureFlag::PERMISSIONED_SIGNER,
+            // FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE,
         ]
     }
 }
@@ -336,6 +351,10 @@ impl Features {
 
     pub fn is_disallow_init_module_to_publish_modules_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES)
+    }
+
+    pub fn is_call_tree_and_instruction_vm_cache_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

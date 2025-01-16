@@ -38,8 +38,7 @@ use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::Protoc
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_address::AccountAddress, epoch_change::EpochChangeProof, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
+    account_address::AccountAddress, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
 };
 use bytes::Bytes;
 use fail::fail_point;
@@ -544,12 +543,6 @@ impl BufferManager {
                     }))
                     .await
                     .expect("Failed to send persist request");
-                // this needs to be done after creating the persisting request to avoid it being lost
-                if commit_proof.ledger_info().ends_epoch() {
-                    self.commit_msg_tx
-                        .send_epoch_change(EpochChangeProof::new(vec![commit_proof], false))
-                        .await;
-                }
                 info!("Advance head to {:?}", self.buffer.head_cursor());
                 self.previous_commit_time = Instant::now();
                 return;

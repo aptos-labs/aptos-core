@@ -27,6 +27,7 @@ pub struct VMConfig {
     pub disallow_dispatch_for_native: bool,
     pub use_compatibility_checker_v2: bool,
     pub use_loader_v2: bool,
+    pub use_call_tree_and_instruction_cache: bool,
 }
 
 impl Default for VMConfig {
@@ -45,6 +46,7 @@ impl Default for VMConfig {
             disallow_dispatch_for_native: true,
             use_compatibility_checker_v2: true,
             use_loader_v2: true,
+            use_call_tree_and_instruction_cache: true,
         }
     }
 }

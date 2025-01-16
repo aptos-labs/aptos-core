@@ -13,6 +13,9 @@ module aptos_framework::code {
     use std::string;
     use aptos_framework::event;
     use aptos_framework::object::{Self, Object};
+    use aptos_framework::permissioned_signer;
+
+    friend aptos_framework::object_code_deployment;
 
     // ----------------------------------------------------------------------
     // Code Publishing
@@ -105,6 +108,24 @@ module aptos_framework::code {
     /// `code_object` does not exist.
     const ECODE_OBJECT_DOES_NOT_EXIST: u64 = 0xA;
 
+    /// Current permissioned signer cannot publish codes.
+    const ENO_CODE_PERMISSION: u64 = 0xB;
+
+    struct CodePublishingPermission has copy, drop, store {}
+
+    /// Permissions
+    public(friend) fun check_code_publishing_permission(s: &signer) {
+        assert!(
+            permissioned_signer::check_permission_exists(s, CodePublishingPermission {}),
+            error::permission_denied(ENO_CODE_PERMISSION),
+        );
+    }
+
+    /// Grant permission to publish code on behalf of the master signer.
+    public fun grant_permission(master: &signer, permissioned_signer: &signer) {
+        permissioned_signer::authorize_unlimited(master, permissioned_signer, CodePublishingPermission {})
+    }
+
     /// Whether unconditional code upgrade with no compatibility check is allowed. This
     /// publication mode should only be used for modules which aren't shared with user others.
     /// The developer is responsible for not breaking memory layout of any resources he already
@@ -145,6 +166,7 @@ module aptos_framework::code {
     /// Publishes a package at the given signer's address. The caller must provide package metadata describing the
     /// package.
     public fun publish_package(owner: &signer, pack: PackageMetadata, code: vector<vector<u8>>) acquires PackageRegistry {
+        check_code_publishing_permission(owner);
         // Disallow incompatible upgrade mode. Governance can decide later if this should be reconsidered.
         assert!(
             pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy,
@@ -206,6 +228,7 @@ module aptos_framework::code {
     }
 
     public fun freeze_code_object(publisher: &signer, code_object: Object<PackageRegistry>) acquires PackageRegistry {
+        check_code_publishing_permission(publisher);
         let code_object_addr = object::object_address(&code_object);
         assert!(exists<PackageRegistry>(code_object_addr), error::not_found(ECODE_OBJECT_DOES_NOT_EXIST));
         assert!(
