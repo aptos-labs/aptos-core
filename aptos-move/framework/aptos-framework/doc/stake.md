@@ -5517,7 +5517,8 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<pre><code><b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">ResourceRequirement</a>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">ResourceRequirement</a>;
 <b>requires</b> rewards_rate &lt;= <a href="stake.md#0x1_stake_MAX_REWARDS_RATE">MAX_REWARDS_RATE</a>;
 <b>requires</b> rewards_rate_denominator &gt; 0;
 <b>requires</b> rewards_rate &lt;= rewards_rate_denominator;

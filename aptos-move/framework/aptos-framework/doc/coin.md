@@ -57,6 +57,7 @@ This module provides the foundation for typesafe Coins.
 -  [Function `allow_supply_upgrades`](#0x1_coin_allow_supply_upgrades)
 -  [Function `calculate_amount_to_withdraw`](#0x1_coin_calculate_amount_to_withdraw)
 -  [Function `maybe_convert_to_fungible_store`](#0x1_coin_maybe_convert_to_fungible_store)
+-  [Function `assert_signer_has_permission`](#0x1_coin_assert_signer_has_permission)
 -  [Function `migrate_to_fungible_store`](#0x1_coin_migrate_to_fungible_store)
 -  [Function `migrate_coin_store_to_fungible_store`](#0x1_coin_migrate_coin_store_to_fungible_store)
 -  [Function `coin_address`](#0x1_coin_coin_address)
@@ -74,6 +75,7 @@ This module provides the foundation for typesafe Coins.
 -  [Function `burn`](#0x1_coin_burn)
 -  [Function `burn_from`](#0x1_coin_burn_from)
 -  [Function `deposit`](#0x1_coin_deposit)
+-  [Function `deposit_with_signer`](#0x1_coin_deposit_with_signer)
 -  [Function `can_receive_paired_fungible_asset`](#0x1_coin_can_receive_paired_fungible_asset)
 -  [Function `force_deposit`](#0x1_coin_force_deposit)
 -  [Function `destroy_zero`](#0x1_coin_destroy_zero)
@@ -147,6 +149,7 @@ This module provides the foundation for typesafe Coins.
 <b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="optional_aggregator.md#0x1_optional_aggregator">0x1::optional_aggregator</a>;
+<b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
 <b>use</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store">0x1::primary_fungible_store</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
@@ -2132,6 +2135,39 @@ or disallow upgradability of total supply.
 
 </details>
 
+<a id="0x1_coin_assert_signer_has_permission"></a>
+
+## Function `assert_signer_has_permission`
+
+
+
+<pre><code><b>fun</b> <a href="coin.md#0x1_coin_assert_signer_has_permission">assert_signer_has_permission</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="coin.md#0x1_coin_assert_signer_has_permission">assert_signer_has_permission</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <b>if</b>(<a href="permissioned_signer.md#0x1_permissioned_signer_is_permissioned_signer">permissioned_signer::is_permissioned_signer</a>(<a href="account.md#0x1_account">account</a>)) {
+        <a href="fungible_asset.md#0x1_fungible_asset_withdraw_permission_check_by_address">fungible_asset::withdraw_permission_check_by_address</a>(
+            <a href="account.md#0x1_account">account</a>,
+            <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address">primary_fungible_store::primary_store_address</a>(
+                <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>),
+                <a href="coin.md#0x1_coin_ensure_paired_metadata">ensure_paired_metadata</a>&lt;CoinType&gt;()
+            ),
+            0
+        );
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_coin_migrate_to_fungible_store"></a>
 
 ## Function `migrate_to_fungible_store`
@@ -2151,7 +2187,9 @@ Voluntarily migrate to fungible store for <code>CoinType</code> if not yet.
 <pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_migrate_to_fungible_store">migrate_to_fungible_store</a>&lt;CoinType&gt;(
     <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
 ) <b>acquires</b> <a href="coin.md#0x1_coin_CoinStore">CoinStore</a>, <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>, <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a> {
-    <a href="coin.md#0x1_coin_maybe_convert_to_fungible_store">maybe_convert_to_fungible_store</a>&lt;CoinType&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));
+    <b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <a href="coin.md#0x1_coin_assert_signer_has_permission">assert_signer_has_permission</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>);
+    <a href="coin.md#0x1_coin_maybe_convert_to_fungible_store">maybe_convert_to_fungible_store</a>&lt;CoinType&gt;(account_addr);
 }
 </code></pre>
 
@@ -2691,6 +2729,43 @@ Deposit the coin balance into the recipient's account and emit an event.
 
 </details>
 
+<a id="0x1_coin_deposit_with_signer"></a>
+
+## Function `deposit_with_signer`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_deposit_with_signer">deposit_with_signer</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_deposit_with_signer">deposit_with_signer</a>&lt;CoinType&gt;(
+    <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;
+) <b>acquires</b> <a href="coin.md#0x1_coin_CoinStore">CoinStore</a>, <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>, <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a> {
+    <b>let</b> metadata = <a href="coin.md#0x1_coin_ensure_paired_metadata">ensure_paired_metadata</a>&lt;CoinType&gt;();
+    <b>let</b> account_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <a href="fungible_asset.md#0x1_fungible_asset_refill_permission">fungible_asset::refill_permission</a>(
+        <a href="account.md#0x1_account">account</a>,
+        <a href="coin.md#0x1_coin">coin</a>.value,
+        <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address_inlined">primary_fungible_store::primary_store_address_inlined</a>(
+            account_address,
+            metadata,
+        )
+    );
+    <a href="coin.md#0x1_coin_deposit">deposit</a>(account_address, <a href="coin.md#0x1_coin">coin</a>);
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_coin_can_receive_paired_fungible_asset"></a>
 
 ## Function `can_receive_paired_fungible_asset`
@@ -2974,7 +3049,7 @@ The given signer also becomes the account hosting the information  about the coi
     symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>,
     decimals: u8,
     monitor_supply: bool,
-): (<a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a>&lt;CoinType&gt;, <a href="coin.md#0x1_coin_FreezeCapability">FreezeCapability</a>&lt;CoinType&gt;, <a href="coin.md#0x1_coin_MintCapability">MintCapability</a>&lt;CoinType&gt;) {
+): (<a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a>&lt;CoinType&gt;, <a href="coin.md#0x1_coin_FreezeCapability">FreezeCapability</a>&lt;CoinType&gt;, <a href="coin.md#0x1_coin_MintCapability">MintCapability</a>&lt;CoinType&gt;) <b>acquires</b> <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>, <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a> {
     <a href="coin.md#0x1_coin_initialize_internal">initialize_internal</a>(<a href="account.md#0x1_account">account</a>, name, symbol, decimals, monitor_supply, <b>false</b>)
 }
 </code></pre>
@@ -3005,7 +3080,7 @@ Same as <code>initialize</code> but supply can be initialized to parallelizable 
     symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>,
     decimals: u8,
     monitor_supply: bool,
-): (<a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a>&lt;CoinType&gt;, <a href="coin.md#0x1_coin_FreezeCapability">FreezeCapability</a>&lt;CoinType&gt;, <a href="coin.md#0x1_coin_MintCapability">MintCapability</a>&lt;CoinType&gt;) {
+): (<a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a>&lt;CoinType&gt;, <a href="coin.md#0x1_coin_FreezeCapability">FreezeCapability</a>&lt;CoinType&gt;, <a href="coin.md#0x1_coin_MintCapability">MintCapability</a>&lt;CoinType&gt;) <b>acquires</b> <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>, <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(<a href="account.md#0x1_account">account</a>);
     <a href="coin.md#0x1_coin_initialize_internal">initialize_internal</a>(<a href="account.md#0x1_account">account</a>, name, symbol, decimals, monitor_supply, <b>true</b>)
 }
@@ -3037,8 +3112,9 @@ Same as <code>initialize</code> but supply can be initialized to parallelizable 
     decimals: u8,
     monitor_supply: bool,
     parallelizable: bool,
-): (<a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a>&lt;CoinType&gt;, <a href="coin.md#0x1_coin_FreezeCapability">FreezeCapability</a>&lt;CoinType&gt;, <a href="coin.md#0x1_coin_MintCapability">MintCapability</a>&lt;CoinType&gt;) {
+): (<a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a>&lt;CoinType&gt;, <a href="coin.md#0x1_coin_FreezeCapability">FreezeCapability</a>&lt;CoinType&gt;, <a href="coin.md#0x1_coin_MintCapability">MintCapability</a>&lt;CoinType&gt;) <b>acquires</b> <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>, <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a> {
     <b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <a href="coin.md#0x1_coin_assert_signer_has_permission">assert_signer_has_permission</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>);
 
     <b>assert</b>!(
         <a href="coin.md#0x1_coin_coin_address">coin_address</a>&lt;CoinType&gt;() == account_addr,
@@ -3154,8 +3230,9 @@ Returns minted <code><a href="coin.md#0x1_coin_Coin">Coin</a></code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_register">register</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_register">register</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>, <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a> {
     <b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <a href="coin.md#0x1_coin_assert_signer_has_permission">assert_signer_has_permission</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>);
     // Short-circuit and do nothing <b>if</b> <a href="account.md#0x1_account">account</a> is already registered for CoinType.
     <b>if</b> (<a href="coin.md#0x1_coin_is_account_registered">is_account_registered</a>&lt;CoinType&gt;(account_addr)) {
         <b>return</b>
@@ -3258,6 +3335,17 @@ Withdraw specified <code>amount</code> of coin <code>CoinType</code> from the si
         amount
     );
     <b>let</b> withdrawn_coin = <b>if</b> (coin_amount_to_withdraw &gt; 0) {
+        <b>let</b> metadata = <a href="coin.md#0x1_coin_ensure_paired_metadata">ensure_paired_metadata</a>&lt;CoinType&gt;();
+        <b>if</b>(<a href="permissioned_signer.md#0x1_permissioned_signer_is_permissioned_signer">permissioned_signer::is_permissioned_signer</a>(<a href="account.md#0x1_account">account</a>)) {
+            // Perform the check only <b>if</b> the <a href="account.md#0x1_account">account</a> is a permissioned <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>to</b> save the cost of
+            // computing the primary store location.
+            <a href="fungible_asset.md#0x1_fungible_asset_withdraw_permission_check_by_address">fungible_asset::withdraw_permission_check_by_address</a>(
+                <a href="account.md#0x1_account">account</a>,
+                <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address">primary_fungible_store::primary_store_address</a>(account_addr, metadata),
+                coin_amount_to_withdraw
+            );
+        };
+
         <b>let</b> coin_store = <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
         <b>assert</b>!(
             !coin_store.frozen,
@@ -3582,6 +3670,7 @@ Destroy a burn capability.
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> aborts_if_is_partial;
 <a id="0x1_coin_supply"></a>
 <b>global</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt;: num;
 <a id="0x1_coin_aggregate_supply"></a>
