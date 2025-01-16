@@ -137,7 +137,7 @@ module aptos_framework::dispatchable_fungible_asset {
     }
 
     /// Transfer an `amount` of fungible asset from `from_store`, which should be owned by `sender`, to `receiver`.
-    /// The recipient is guranteed to receive asset greater than the expected amount.
+    /// The recipient is guaranteed to receive asset greater than the expected amount.
     /// Note: it does not move the underlying object.
     public entry fun transfer_assert_minimum_deposit<T: key>(
         sender: &signer,
