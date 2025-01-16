@@ -284,7 +284,7 @@ function run() {
         fi
     fi
     info "Running $fuzz_target"
-    cargo_fuzz run --sanitizer none -O $fuzz_target $testcase -- -fork=15 #-ignore_crashes=1
+    cargo_fuzz run --sanitizer address -O $fuzz_target $testcase -- -fork=15 #-ignore_crashes=1
 }
 
 function test() {

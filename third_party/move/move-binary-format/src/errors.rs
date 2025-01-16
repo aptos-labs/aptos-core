@@ -20,12 +20,11 @@ pub type PartialVMResult<T> = ::std::result::Result<T, PartialVMError>;
 /// e.g. DEBUG_VM_STATUS=ABORTED,UNKNOWN_INVARIANT_VIOLATION_ERROR ./fuzz.sh run move_aptosvm_publish_and_run <testcase>
 /// third_party/move/move-core/types/src/vm_status.rs:506 for the list of status codes.
 #[cfg(feature = "fuzzing")]
-macro_rules! maybe_debug_panic {
+macro_rules! fuzzing_maybe_panic {
     ($major_status:expr, $message:expr) => {{
         if let Ok(debug_statuses) = std::env::var("DEBUG_VM_STATUS") {
-            let status_strings: Vec<&str> = debug_statuses.split(',').collect();
-            if status_strings
-                .iter()
+            if debug_statuses
+                .split(',')
                 .any(|s| s.trim() == format!("{:?}", $major_status))
             {
                 panic!("PartialVMError: {:?} {:?}", $major_status, $message);
@@ -458,7 +457,7 @@ impl PartialVMError {
         };
 
         #[cfg(feature = "fuzzing")]
-        maybe_debug_panic!(major_status, message);
+        fuzzing_maybe_panic!(major_status, message);
 
         Self(Box::new(PartialVMError_ {
             major_status,
