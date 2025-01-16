@@ -117,6 +117,8 @@ pub enum FeatureFlag {
     ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE = 83,
     /// AIP-103 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-103.md)
     PERMISSIONED_SIGNER = 84,
+    TRANSACTION_PAYLOAD_V2 = 85,
+    ORDERLESS_TRANSACTIONS = 86,
 }
 
 impl FeatureFlag {
@@ -200,6 +202,9 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_LOADER_V2,
             FeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES,
             FeatureFlag::PERMISSIONED_SIGNER,
+            // TODO: Remove these from deafult features before landing the PR.
+            FeatureFlag::TRANSACTION_PAYLOAD_V2,
+            FeatureFlag::ORDERLESS_TRANSACTIONS,
         ]
     }
 }
@@ -354,6 +359,14 @@ impl Features {
 
     pub fn is_call_tree_and_instruction_vm_cache_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE)
+    }
+
+    pub fn is_transaction_payload_v2_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::TRANSACTION_PAYLOAD_V2)
+    }
+
+    pub fn is_orderless_txns_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ORDERLESS_TRANSACTIONS)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

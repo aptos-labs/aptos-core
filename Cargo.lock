@@ -1235,6 +1235,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-config",
+ "aptos-crypto",
  "aptos-db-indexer-schemas",
  "aptos-logger",
  "aptos-metrics-core",

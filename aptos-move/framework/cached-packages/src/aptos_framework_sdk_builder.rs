@@ -17,7 +17,7 @@
 #![allow(clippy::get_first)]
 use aptos_types::{
     account_address::AccountAddress,
-    transaction::{EntryFunction, TransactionPayload},
+    transaction::{EntryFunction, TransactionPayloadWrapper},
 };
 use move_core_types::{
     ident_str,
@@ -29,8 +29,8 @@ type Bytes = Vec<u8>;
 /// Structured representation of a call into a known Move entry function.
 /// ```ignore
 /// impl EntryFunctionCall {
-///     pub fn encode(self) -> TransactionPayload { .. }
-///     pub fn decode(&TransactionPayload) -> Option<EntryFunctionCall> { .. }
+///     pub fn encode(self) -> TransactionPayloadWrapper { .. }
+///     pub fn decode(&TransactionPayloadWrapper) -> Option<EntryFunctionCall> { .. }
 /// }
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1161,8 +1161,8 @@ pub enum EntryFunctionCall {
 }
 
 impl EntryFunctionCall {
-    /// Build an Aptos `TransactionPayload` from a structured object `EntryFunctionCall`.
-    pub fn encode(self) -> TransactionPayload {
+    /// Build an Aptos `TransactionPayloadWrapper` from a structured object `EntryFunctionCall`.
+    pub fn encode(self) -> TransactionPayloadWrapper {
         use EntryFunctionCall::*;
         match self {
             AccountOfferRotationCapability {
@@ -1811,9 +1811,9 @@ impl EntryFunctionCall {
         }
     }
 
-    /// Try to recognize an Aptos `TransactionPayload` and convert it into a structured object `EntryFunctionCall`.
-    pub fn decode(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    /// Try to recognize an Aptos `TransactionPayloadWrapper` and convert it into a structured object `EntryFunctionCall`.
+    pub fn decode(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             match SCRIPT_FUNCTION_DECODER_MAP.get(&format!(
                 "{}_{}",
                 script.module().name(),
@@ -1850,8 +1850,8 @@ pub fn account_offer_rotation_capability(
     account_scheme: u8,
     account_public_key_bytes: Vec<u8>,
     recipient_address: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -1884,8 +1884,8 @@ pub fn account_offer_signer_capability(
     account_scheme: u8,
     account_public_key_bytes: Vec<u8>,
     recipient_address: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -1905,8 +1905,8 @@ pub fn account_offer_signer_capability(
 }
 
 /// Revoke any rotation capability offer in the specified account.
-pub fn account_revoke_any_rotation_capability() -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn account_revoke_any_rotation_capability() -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -1921,8 +1921,8 @@ pub fn account_revoke_any_rotation_capability() -> TransactionPayload {
 }
 
 /// Revoke any signer capability offer in the specified account.
-pub fn account_revoke_any_signer_capability() -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn account_revoke_any_signer_capability() -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -1939,8 +1939,8 @@ pub fn account_revoke_any_signer_capability() -> TransactionPayload {
 /// Revoke the rotation capability offer given to `to_be_revoked_recipient_address` from `account`
 pub fn account_revoke_rotation_capability(
     to_be_revoked_address: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -1958,8 +1958,8 @@ pub fn account_revoke_rotation_capability(
 /// has a signer capability offer from `account` but will be revoked in this function).
 pub fn account_revoke_signer_capability(
     to_be_revoked_address: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2008,8 +2008,8 @@ pub fn account_rotate_authentication_key(
     to_public_key_bytes: Vec<u8>,
     cap_rotate_key: Vec<u8>,
     cap_update_table: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2038,8 +2038,8 @@ pub fn account_rotate_authentication_key(
 ///
 /// If you'd like to followup with updating the `OriginatingAddress` table, you can call
 /// `set_originating_address()`.
-pub fn account_rotate_authentication_key_call(new_auth_key: Vec<u8>) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn account_rotate_authentication_key_call(new_auth_key: Vec<u8>) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2058,8 +2058,8 @@ pub fn account_rotate_authentication_key_with_rotation_capability(
     new_scheme: u8,
     new_public_key_bytes: Vec<u8>,
     cap_update_table: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2091,8 +2091,8 @@ pub fn account_rotate_authentication_key_with_rotation_capability(
 /// Kept as a private entry function to ensure that after an unproven rotation via
 /// `rotate_authentication_key_call()`, the `OriginatingAddress` table is only updated under the
 /// authority of the new authentication key.
-pub fn account_set_originating_address() -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn account_set_originating_address() -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2110,8 +2110,8 @@ pub fn account_set_originating_address() -> TransactionPayload {
 pub fn aptos_account_batch_transfer(
     recipients: Vec<AccountAddress>,
     amounts: Vec<u64>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2133,8 +2133,8 @@ pub fn aptos_account_batch_transfer_coins(
     coin_type: TypeTag,
     recipients: Vec<AccountAddress>,
     amounts: Vec<u64>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2152,8 +2152,8 @@ pub fn aptos_account_batch_transfer_coins(
 }
 
 /// Basic account creation methods.
-pub fn aptos_account_create_account(auth_key: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn aptos_account_create_account(auth_key: AccountAddress) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2173,8 +2173,11 @@ pub fn aptos_account_create_account(auth_key: AccountAddress) -> TransactionPayl
 /// This would create the recipient APT PFS first, which also registers it to receive APT, before transferring.
 /// TODO: once migration is complete, rename to just "transfer_only" and make it an entry function (for cheapest way
 /// to transfer APT) - if we want to allow APT PFS without account itself
-pub fn aptos_account_fungible_transfer_only(to: AccountAddress, amount: u64) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn aptos_account_fungible_transfer_only(
+    to: AccountAddress,
+    amount: u64,
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2189,8 +2192,8 @@ pub fn aptos_account_fungible_transfer_only(to: AccountAddress, amount: u64) -> 
 }
 
 /// Set whether `account` can receive direct transfers of coins that they have not explicitly registered to receive.
-pub fn aptos_account_set_allow_direct_coin_transfers(allow: bool) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn aptos_account_set_allow_direct_coin_transfers(allow: bool) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2206,8 +2209,8 @@ pub fn aptos_account_set_allow_direct_coin_transfers(allow: bool) -> Transaction
 
 /// Convenient function to transfer APT to a recipient account that might not exist.
 /// This would create the recipient account first, which also registers it to receive APT, before transferring.
-pub fn aptos_account_transfer(to: AccountAddress, amount: u64) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn aptos_account_transfer(to: AccountAddress, amount: u64) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2227,8 +2230,8 @@ pub fn aptos_account_transfer_coins(
     coin_type: TypeTag,
     to: AccountAddress,
     amount: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2244,8 +2247,8 @@ pub fn aptos_account_transfer_coins(
 
 /// Only callable in tests and testnets where the core resources account exists.
 /// Claim the delegated mint capability and destroy the delegated token.
-pub fn aptos_coin_claim_mint_capability() -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn aptos_coin_claim_mint_capability() -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2261,8 +2264,8 @@ pub fn aptos_coin_claim_mint_capability() -> TransactionPayload {
 
 /// Only callable in tests and testnets where the core resources account exists.
 /// Create delegated token for the address so the account could claim MintCapability later.
-pub fn aptos_coin_delegate_mint_capability(to: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn aptos_coin_delegate_mint_capability(to: AccountAddress) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2278,8 +2281,8 @@ pub fn aptos_coin_delegate_mint_capability(to: AccountAddress) -> TransactionPay
 
 /// Only callable in tests and testnets where the core resources account exists.
 /// Create new coins and deposit them into dst_addr's account.
-pub fn aptos_coin_mint(dst_addr: AccountAddress, amount: u64) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn aptos_coin_mint(dst_addr: AccountAddress, amount: u64) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2296,8 +2299,10 @@ pub fn aptos_coin_mint(dst_addr: AccountAddress, amount: u64) -> TransactionPayl
     ))
 }
 
-pub fn aptos_governance_add_approved_script_hash_script(proposal_id: u64) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn aptos_governance_add_approved_script_hash_script(
+    proposal_id: u64,
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2317,8 +2322,8 @@ pub fn aptos_governance_batch_partial_vote(
     proposal_id: u64,
     voting_power: u64,
     should_pass: bool,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2342,8 +2347,8 @@ pub fn aptos_governance_batch_vote(
     stake_pools: Vec<AccountAddress>,
     proposal_id: u64,
     should_pass: bool,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2369,8 +2374,8 @@ pub fn aptos_governance_create_proposal(
     execution_hash: Vec<u8>,
     metadata_location: Vec<u8>,
     metadata_hash: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2398,8 +2403,8 @@ pub fn aptos_governance_create_proposal_v2(
     metadata_location: Vec<u8>,
     metadata_hash: Vec<u8>,
     is_multi_step_proposal: bool,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2425,8 +2430,8 @@ pub fn aptos_governance_create_proposal_v2(
 ///
 /// WARNING: currently only used by tests. In most cases you should use `reconfigure()` instead.
 /// TODO: migrate these tests to be aware of async reconfiguration.
-pub fn aptos_governance_force_end_epoch() -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn aptos_governance_force_end_epoch() -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2442,8 +2447,8 @@ pub fn aptos_governance_force_end_epoch() -> TransactionPayload {
 
 /// `force_end_epoch()` equivalent but only called in testnet,
 /// where the core resources account exists and has been granted power to mint Aptos coins.
-pub fn aptos_governance_force_end_epoch_test_only() -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn aptos_governance_force_end_epoch_test_only() -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2463,8 +2468,8 @@ pub fn aptos_governance_partial_vote(
     proposal_id: u64,
     voting_power: u64,
     should_pass: bool,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2492,8 +2497,8 @@ pub fn aptos_governance_partial_vote(
 ///
 /// This behavior affects when an update of an on-chain config (e.g. `ConsensusConfig`, `Features`) takes effect,
 /// since such updates are applied whenever we enter an new epoch.
-pub fn aptos_governance_reconfigure() -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn aptos_governance_reconfigure() -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2512,8 +2517,8 @@ pub fn aptos_governance_vote(
     stake_pool: AccountAddress,
     proposal_id: u64,
     should_pass: bool,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2536,8 +2541,8 @@ pub fn aptos_governance_vote(
 pub fn code_publish_package_txn(
     metadata_serialized: Vec<u8>,
     code: Vec<Vec<u8>>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2554,8 +2559,8 @@ pub fn code_publish_package_txn(
     ))
 }
 
-pub fn coin_create_coin_conversion_map() -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn coin_create_coin_conversion_map() -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2570,8 +2575,8 @@ pub fn coin_create_coin_conversion_map() -> TransactionPayload {
 }
 
 /// Create APT pairing by passing `AptosCoin`.
-pub fn coin_create_pairing(coin_type: TypeTag) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn coin_create_pairing(coin_type: TypeTag) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2589,8 +2594,8 @@ pub fn coin_create_pairing(coin_type: TypeTag) -> TransactionPayload {
 pub fn coin_migrate_coin_store_to_fungible_store(
     coin_type: TypeTag,
     accounts: Vec<AccountAddress>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2605,8 +2610,8 @@ pub fn coin_migrate_coin_store_to_fungible_store(
 }
 
 /// Voluntarily migrate to fungible store for `CoinType` if not yet.
-pub fn coin_migrate_to_fungible_store(coin_type: TypeTag) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn coin_migrate_to_fungible_store(coin_type: TypeTag) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2621,8 +2626,12 @@ pub fn coin_migrate_to_fungible_store(coin_type: TypeTag) -> TransactionPayload 
 }
 
 /// Transfers `amount` of coins `CoinType` from `from` to `to`.
-pub fn coin_transfer(coin_type: TypeTag, to: AccountAddress, amount: u64) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn coin_transfer(
+    coin_type: TypeTag,
+    to: AccountAddress,
+    amount: u64,
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2638,8 +2647,8 @@ pub fn coin_transfer(coin_type: TypeTag, to: AccountAddress, amount: u64) -> Tra
 
 /// Upgrade total supply to use a parallelizable implementation if it is
 /// available.
-pub fn coin_upgrade_supply(coin_type: TypeTag) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn coin_upgrade_supply(coin_type: TypeTag) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2654,8 +2663,11 @@ pub fn coin_upgrade_supply(coin_type: TypeTag) -> TransactionPayload {
 }
 
 /// Add `amount` of coins to the delegation pool `pool_address`.
-pub fn delegation_pool_add_stake(pool_address: AccountAddress, amount: u64) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn delegation_pool_add_stake(
+    pool_address: AccountAddress,
+    amount: u64,
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2675,8 +2687,8 @@ pub fn delegation_pool_add_stake(pool_address: AccountAddress, amount: u64) -> T
 /// Allowlist a delegator as the pool owner.
 pub fn delegation_pool_allowlist_delegator(
     delegator_address: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2699,8 +2711,8 @@ pub fn delegation_pool_create_proposal(
     metadata_location: Vec<u8>,
     metadata_hash: Vec<u8>,
     is_multi_step_proposal: bool,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2725,8 +2737,8 @@ pub fn delegation_pool_create_proposal(
 pub fn delegation_pool_delegate_voting_power(
     pool_address: AccountAddress,
     new_voter: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2744,8 +2756,8 @@ pub fn delegation_pool_delegate_voting_power(
 }
 
 /// Disable delegators allowlisting as the pool owner. The existing allowlist will be emptied.
-pub fn delegation_pool_disable_delegators_allowlisting() -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn delegation_pool_disable_delegators_allowlisting() -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2760,8 +2772,8 @@ pub fn delegation_pool_disable_delegators_allowlisting() -> TransactionPayload {
 }
 
 /// Enable delegators allowlisting as the pool owner.
-pub fn delegation_pool_enable_delegators_allowlisting() -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn delegation_pool_enable_delegators_allowlisting() -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2779,8 +2791,8 @@ pub fn delegation_pool_enable_delegators_allowlisting() -> TransactionPayload {
 /// The existing voter will be replaced. The function is permissionless.
 pub fn delegation_pool_enable_partial_governance_voting(
     pool_address: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2795,8 +2807,10 @@ pub fn delegation_pool_enable_partial_governance_voting(
 }
 
 /// Evict a delegator that is not allowlisted by unlocking their entire stake.
-pub fn delegation_pool_evict_delegator(delegator_address: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn delegation_pool_evict_delegator(
+    delegator_address: AccountAddress,
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2817,8 +2831,8 @@ pub fn delegation_pool_evict_delegator(delegator_address: AccountAddress) -> Tra
 pub fn delegation_pool_initialize_delegation_pool(
     operator_commission_percentage: u64,
     delegation_pool_creation_seed: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2839,8 +2853,8 @@ pub fn delegation_pool_initialize_delegation_pool(
 pub fn delegation_pool_reactivate_stake(
     pool_address: AccountAddress,
     amount: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2860,8 +2874,8 @@ pub fn delegation_pool_reactivate_stake(
 /// Remove a delegator from the allowlist as the pool owner, but do not unlock their stake.
 pub fn delegation_pool_remove_delegator_from_allowlist(
     delegator_address: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2881,8 +2895,8 @@ pub fn delegation_pool_remove_delegator_from_allowlist(
 /// one for each pool.
 pub fn delegation_pool_set_beneficiary_for_operator(
     new_beneficiary: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2897,8 +2911,8 @@ pub fn delegation_pool_set_beneficiary_for_operator(
 }
 
 /// Allows an owner to change the delegated voter of the underlying stake pool.
-pub fn delegation_pool_set_delegated_voter(new_voter: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn delegation_pool_set_delegated_voter(new_voter: AccountAddress) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2913,8 +2927,8 @@ pub fn delegation_pool_set_delegated_voter(new_voter: AccountAddress) -> Transac
 }
 
 /// Allows an owner to change the operator of the underlying stake pool.
-pub fn delegation_pool_set_operator(new_operator: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn delegation_pool_set_operator(new_operator: AccountAddress) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2932,8 +2946,8 @@ pub fn delegation_pool_set_operator(new_operator: AccountAddress) -> Transaction
 /// shares pools, assign commission to operator and eventually prepare delegation pool for a new lockup cycle.
 pub fn delegation_pool_synchronize_delegation_pool(
     pool_address: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2949,8 +2963,11 @@ pub fn delegation_pool_synchronize_delegation_pool(
 
 /// Unlock `amount` from the active + pending_active stake of `delegator` or
 /// at most how much active stake there is on the stake pool.
-pub fn delegation_pool_unlock(pool_address: AccountAddress, amount: u64) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn delegation_pool_unlock(
+    pool_address: AccountAddress,
+    amount: u64,
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2970,8 +2987,8 @@ pub fn delegation_pool_unlock(pool_address: AccountAddress, amount: u64) -> Tran
 /// Allows an owner to update the commission percentage for the operator of the underlying stake pool.
 pub fn delegation_pool_update_commission_percentage(
     new_commission_percentage: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2995,8 +3012,8 @@ pub fn delegation_pool_vote(
     proposal_id: u64,
     voting_power: u64,
     should_pass: bool,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3016,8 +3033,11 @@ pub fn delegation_pool_vote(
 }
 
 /// Withdraw `amount` of owned inactive stake from the delegation pool at `pool_address`.
-pub fn delegation_pool_withdraw(pool_address: AccountAddress, amount: u64) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn delegation_pool_withdraw(
+    pool_address: AccountAddress,
+    amount: u64,
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3093,8 +3113,8 @@ pub fn jwks_update_federated_jwk_set(
     alg_vec: Vec<Vec<u8>>,
     e_vec: Vec<Vec<u8>>,
     n_vec: Vec<Vec<u8>>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3115,8 +3135,8 @@ pub fn jwks_update_federated_jwk_set(
 }
 
 /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
-pub fn managed_coin_burn(coin_type: TypeTag, amount: u64) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn managed_coin_burn(coin_type: TypeTag, amount: u64) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3131,8 +3151,8 @@ pub fn managed_coin_burn(coin_type: TypeTag, amount: u64) -> TransactionPayload 
 }
 
 /// Destroys capabilities from the account, so that the user no longer has access to mint or burn.
-pub fn managed_coin_destroy_caps(coin_type: TypeTag) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn managed_coin_destroy_caps(coin_type: TypeTag) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3154,8 +3174,8 @@ pub fn managed_coin_initialize(
     symbol: Vec<u8>,
     decimals: u8,
     monitor_supply: bool,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3179,8 +3199,8 @@ pub fn managed_coin_mint(
     coin_type: TypeTag,
     dst_addr: AccountAddress,
     amount: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3199,8 +3219,8 @@ pub fn managed_coin_mint(
 
 /// Creating a resource that stores balance of `CoinType` on user's account, withdraw and deposit event handlers.
 /// Required if user wants to start accepting deposits of `CoinType` in his account.
-pub fn managed_coin_register(coin_type: TypeTag) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn managed_coin_register(coin_type: TypeTag) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3215,8 +3235,8 @@ pub fn managed_coin_register(coin_type: TypeTag) -> TransactionPayload {
 }
 
 /// Similar to add_owners, but only allow adding one owner.
-pub fn multisig_account_add_owner(new_owner: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn multisig_account_add_owner(new_owner: AccountAddress) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3236,8 +3256,8 @@ pub fn multisig_account_add_owner(new_owner: AccountAddress) -> TransactionPaylo
 /// Note that this function is not public so it can only be invoked directly instead of via a module or script. This
 /// ensures that a multisig transaction cannot lead to another module obtaining the multisig signer and using it to
 /// maliciously alter the owners list.
-pub fn multisig_account_add_owners(new_owners: Vec<AccountAddress>) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn multisig_account_add_owners(new_owners: Vec<AccountAddress>) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3255,8 +3275,8 @@ pub fn multisig_account_add_owners(new_owners: Vec<AccountAddress>) -> Transacti
 pub fn multisig_account_add_owners_and_update_signatures_required(
     new_owners: Vec<AccountAddress>,
     new_num_signatures_required: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3277,8 +3297,8 @@ pub fn multisig_account_add_owners_and_update_signatures_required(
 pub fn multisig_account_approve_transaction(
     multisig_account: AccountAddress,
     sequence_number: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3300,8 +3320,8 @@ pub fn multisig_account_create(
     num_signatures_required: u64,
     metadata_keys: Vec<Vec<u8>>,
     metadata_values: Vec<Vec<u8>>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3323,8 +3343,8 @@ pub fn multisig_account_create(
 pub fn multisig_account_create_transaction(
     multisig_account: AccountAddress,
     payload: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3347,8 +3367,8 @@ pub fn multisig_account_create_transaction(
 pub fn multisig_account_create_transaction_with_hash(
     multisig_account: AccountAddress,
     payload_hash: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3383,8 +3403,8 @@ pub fn multisig_account_create_with_existing_account(
     create_multisig_account_signed_message: Vec<u8>,
     metadata_keys: Vec<Vec<u8>>,
     metadata_values: Vec<Vec<u8>>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3421,8 +3441,8 @@ pub fn multisig_account_create_with_existing_account_and_revoke_auth_key(
     create_multisig_account_signed_message: Vec<u8>,
     metadata_keys: Vec<Vec<u8>>,
     metadata_values: Vec<Vec<u8>>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3456,8 +3476,8 @@ pub fn multisig_account_create_with_existing_account_and_revoke_auth_key_call(
     num_signatures_required: u64,
     metadata_keys: Vec<Vec<u8>>,
     metadata_values: Vec<Vec<u8>>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3488,8 +3508,8 @@ pub fn multisig_account_create_with_existing_account_call(
     num_signatures_required: u64,
     metadata_keys: Vec<Vec<u8>>,
     metadata_values: Vec<Vec<u8>>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3519,8 +3539,8 @@ pub fn multisig_account_create_with_owners(
     num_signatures_required: u64,
     metadata_keys: Vec<Vec<u8>>,
     metadata_values: Vec<Vec<u8>>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3548,8 +3568,8 @@ pub fn multisig_account_create_with_owners_then_remove_bootstrapper(
     num_signatures_required: u64,
     metadata_keys: Vec<Vec<u8>>,
     metadata_values: Vec<Vec<u8>>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3571,8 +3591,8 @@ pub fn multisig_account_create_with_owners_then_remove_bootstrapper(
 /// Remove the next transaction if it has sufficient owner rejections.
 pub fn multisig_account_execute_rejected_transaction(
     multisig_account: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3590,8 +3610,8 @@ pub fn multisig_account_execute_rejected_transaction(
 pub fn multisig_account_execute_rejected_transactions(
     multisig_account: AccountAddress,
     final_sequence_number: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3612,8 +3632,8 @@ pub fn multisig_account_execute_rejected_transactions(
 pub fn multisig_account_reject_transaction(
     multisig_account: AccountAddress,
     sequence_number: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3631,8 +3651,8 @@ pub fn multisig_account_reject_transaction(
 }
 
 /// Similar to remove_owners, but only allow removing one owner.
-pub fn multisig_account_remove_owner(owner_to_remove: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn multisig_account_remove_owner(owner_to_remove: AccountAddress) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3653,8 +3673,10 @@ pub fn multisig_account_remove_owner(owner_to_remove: AccountAddress) -> Transac
 /// Note that this function is not public so it can only be invoked directly instead of via a module or script. This
 /// ensures that a multisig transaction cannot lead to another module obtaining the multisig signer and using it to
 /// maliciously alter the owners list.
-pub fn multisig_account_remove_owners(owners_to_remove: Vec<AccountAddress>) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn multisig_account_remove_owners(
+    owners_to_remove: Vec<AccountAddress>,
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3672,8 +3694,8 @@ pub fn multisig_account_remove_owners(owners_to_remove: Vec<AccountAddress>) -> 
 pub fn multisig_account_swap_owner(
     to_swap_in: AccountAddress,
     to_swap_out: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3694,8 +3716,8 @@ pub fn multisig_account_swap_owner(
 pub fn multisig_account_swap_owners(
     to_swap_in: Vec<AccountAddress>,
     to_swap_out: Vec<AccountAddress>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3717,8 +3739,8 @@ pub fn multisig_account_swap_owners_and_update_signatures_required(
     new_owners: Vec<AccountAddress>,
     owners_to_remove: Vec<AccountAddress>,
     new_num_signatures_required: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3746,8 +3768,8 @@ pub fn multisig_account_swap_owners_and_update_signatures_required(
 pub fn multisig_account_update_metadata(
     keys: Vec<Vec<u8>>,
     values: Vec<Vec<u8>>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3772,8 +3794,8 @@ pub fn multisig_account_update_metadata(
 /// maliciously alter the number of signatures required.
 pub fn multisig_account_update_signatures_required(
     new_num_signatures_required: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3792,8 +3814,8 @@ pub fn multisig_account_vote_transaction(
     multisig_account: AccountAddress,
     sequence_number: u64,
     approved: bool,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3817,8 +3839,8 @@ pub fn multisig_account_vote_transactions(
     starting_sequence_number: u64,
     final_sequence_number: u64,
     approved: bool,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3844,8 +3866,8 @@ pub fn multisig_account_vote_transanction(
     multisig_account: AccountAddress,
     sequence_number: u64,
     approved: bool,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3864,8 +3886,11 @@ pub fn multisig_account_vote_transanction(
 }
 
 /// Entry function that can be used to transfer, if allow_ungated_transfer is set true.
-pub fn object_transfer_call(object: AccountAddress, to: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn object_transfer_call(
+    object: AccountAddress,
+    to: AccountAddress,
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3886,8 +3911,8 @@ pub fn object_transfer_call(object: AccountAddress, to: AccountAddress) -> Trans
 pub fn object_code_deployment_publish(
     metadata_serialized: Vec<u8>,
     code: Vec<Vec<u8>>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3905,8 +3930,8 @@ pub fn object_code_deployment_publish(
 }
 
 /// Revoke all storable permission handle of the signer immediately.
-pub fn permissioned_signer_revoke_all_handles() -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn permissioned_signer_revoke_all_handles() -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3924,8 +3949,8 @@ pub fn permissioned_signer_revoke_all_handles() -> TransactionPayload {
 /// the storable permission handle to derive signer from it anymore.
 pub fn permissioned_signer_revoke_permission_storage_address(
     permissions_storage_addr: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3945,8 +3970,8 @@ pub fn permissioned_signer_revoke_permission_storage_address(
 pub fn resource_account_create_resource_account(
     seed: Vec<u8>,
     optional_auth_key: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3972,8 +3997,8 @@ pub fn resource_account_create_resource_account_and_fund(
     seed: Vec<u8>,
     optional_auth_key: Vec<u8>,
     fund_amount: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -3997,8 +4022,8 @@ pub fn resource_account_create_resource_account_and_publish_package(
     seed: Vec<u8>,
     metadata_serialized: Vec<u8>,
     code: Vec<Vec<u8>>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4017,8 +4042,8 @@ pub fn resource_account_create_resource_account_and_publish_package(
 }
 
 /// Add `amount` of coins from the `account` owning the StakePool.
-pub fn stake_add_stake(amount: u64) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn stake_add_stake(amount: u64) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4033,8 +4058,8 @@ pub fn stake_add_stake(amount: u64) -> TransactionPayload {
 }
 
 /// Similar to increase_lockup_with_cap but will use ownership capability from the signing account.
-pub fn stake_increase_lockup() -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn stake_increase_lockup() -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4056,8 +4081,8 @@ pub fn stake_initialize_stake_owner(
     initial_stake_amount: u64,
     operator: AccountAddress,
     voter: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4081,8 +4106,8 @@ pub fn stake_initialize_validator(
     proof_of_possession: Vec<u8>,
     network_addresses: Vec<u8>,
     fullnode_addresses: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4102,8 +4127,8 @@ pub fn stake_initialize_validator(
 }
 
 /// This can only called by the operator of the validator/staking pool.
-pub fn stake_join_validator_set(pool_address: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn stake_join_validator_set(pool_address: AccountAddress) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4123,8 +4148,8 @@ pub fn stake_join_validator_set(pool_address: AccountAddress) -> TransactionPayl
 /// is still operational.
 ///
 /// Can only be called by the operator of the validator/staking pool.
-pub fn stake_leave_validator_set(pool_address: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn stake_leave_validator_set(pool_address: AccountAddress) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4139,8 +4164,8 @@ pub fn stake_leave_validator_set(pool_address: AccountAddress) -> TransactionPay
 }
 
 /// Move `amount` of coins from pending_inactive to active.
-pub fn stake_reactivate_stake(amount: u64) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn stake_reactivate_stake(amount: u64) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4159,8 +4184,8 @@ pub fn stake_rotate_consensus_key(
     pool_address: AccountAddress,
     new_consensus_pubkey: Vec<u8>,
     proof_of_possession: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4179,8 +4204,8 @@ pub fn stake_rotate_consensus_key(
 }
 
 /// Allows an owner to change the delegated voter of the stake pool.
-pub fn stake_set_delegated_voter(new_voter: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn stake_set_delegated_voter(new_voter: AccountAddress) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4195,8 +4220,8 @@ pub fn stake_set_delegated_voter(new_voter: AccountAddress) -> TransactionPayloa
 }
 
 /// Allows an owner to change the operator of the stake pool.
-pub fn stake_set_operator(new_operator: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn stake_set_operator(new_operator: AccountAddress) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4211,8 +4236,8 @@ pub fn stake_set_operator(new_operator: AccountAddress) -> TransactionPayload {
 }
 
 /// Similar to unlock_with_cap but will use ownership capability from the signing account.
-pub fn stake_unlock(amount: u64) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn stake_unlock(amount: u64) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4231,8 +4256,8 @@ pub fn stake_update_network_and_fullnode_addresses(
     pool_address: AccountAddress,
     new_network_addresses: Vec<u8>,
     new_fullnode_addresses: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4251,8 +4276,8 @@ pub fn stake_update_network_and_fullnode_addresses(
 }
 
 /// Withdraw from `account`'s inactive stake.
-pub fn stake_withdraw(withdraw_amount: u64) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn stake_withdraw(withdraw_amount: u64) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4267,8 +4292,11 @@ pub fn stake_withdraw(withdraw_amount: u64) -> TransactionPayload {
 }
 
 /// Add more stake to an existing staking contract.
-pub fn staking_contract_add_stake(operator: AccountAddress, amount: u64) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn staking_contract_add_stake(
+    operator: AccountAddress,
+    amount: u64,
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4292,8 +4320,8 @@ pub fn staking_contract_create_staking_contract(
     amount: u64,
     commission_percentage: u64,
     contract_creation_seed: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4318,8 +4346,8 @@ pub fn staking_contract_create_staking_contract(
 pub fn staking_contract_distribute(
     staker: AccountAddress,
     operator: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4343,8 +4371,8 @@ pub fn staking_contract_distribute(
 pub fn staking_contract_request_commission(
     staker: AccountAddress,
     operator: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4362,8 +4390,8 @@ pub fn staking_contract_request_commission(
 }
 
 /// Convenient function to allow the staker to reset their stake pool's lockup period to start now.
-pub fn staking_contract_reset_lockup(operator: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn staking_contract_reset_lockup(operator: AccountAddress) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4382,8 +4410,8 @@ pub fn staking_contract_reset_lockup(operator: AccountAddress) -> TransactionPay
 /// the beneficiary. An operator can set one beneficiary for staking contract pools, not a separate one for each pool.
 pub fn staking_contract_set_beneficiary_for_operator(
     new_beneficiary: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4402,8 +4430,8 @@ pub fn staking_contract_switch_operator(
     old_operator: AccountAddress,
     new_operator: AccountAddress,
     new_commission_percentage: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4425,8 +4453,8 @@ pub fn staking_contract_switch_operator(
 pub fn staking_contract_switch_operator_with_same_commission(
     old_operator: AccountAddress,
     new_operator: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4444,8 +4472,8 @@ pub fn staking_contract_switch_operator_with_same_commission(
 }
 
 /// Unlock all accumulated rewards since the last recorded principals.
-pub fn staking_contract_unlock_rewards(operator: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn staking_contract_unlock_rewards(operator: AccountAddress) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4461,8 +4489,11 @@ pub fn staking_contract_unlock_rewards(operator: AccountAddress) -> TransactionP
 
 /// Staker can call this to request withdrawal of part or all of their staking_contract.
 /// This also triggers paying commission to the operator for accounting simplicity.
-pub fn staking_contract_unlock_stake(operator: AccountAddress, amount: u64) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn staking_contract_unlock_stake(
+    operator: AccountAddress,
+    amount: u64,
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4484,8 +4515,8 @@ pub fn staking_contract_unlock_stake(operator: AccountAddress, amount: u64) -> T
 pub fn staking_contract_update_commision(
     operator: AccountAddress,
     new_commission_percentage: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4506,8 +4537,8 @@ pub fn staking_contract_update_commision(
 pub fn staking_contract_update_voter(
     operator: AccountAddress,
     new_voter: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4527,8 +4558,8 @@ pub fn staking_contract_update_voter(
 pub fn staking_proxy_set_operator(
     old_operator: AccountAddress,
     new_operator: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4545,8 +4576,10 @@ pub fn staking_proxy_set_operator(
     ))
 }
 
-pub fn staking_proxy_set_stake_pool_operator(new_operator: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn staking_proxy_set_stake_pool_operator(
+    new_operator: AccountAddress,
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4560,8 +4593,8 @@ pub fn staking_proxy_set_stake_pool_operator(new_operator: AccountAddress) -> Tr
     ))
 }
 
-pub fn staking_proxy_set_stake_pool_voter(new_voter: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn staking_proxy_set_stake_pool_voter(new_voter: AccountAddress) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4578,8 +4611,8 @@ pub fn staking_proxy_set_stake_pool_voter(new_voter: AccountAddress) -> Transact
 pub fn staking_proxy_set_staking_contract_operator(
     old_operator: AccountAddress,
     new_operator: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4599,8 +4632,8 @@ pub fn staking_proxy_set_staking_contract_operator(
 pub fn staking_proxy_set_staking_contract_voter(
     operator: AccountAddress,
     new_voter: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4620,8 +4653,8 @@ pub fn staking_proxy_set_staking_contract_voter(
 pub fn staking_proxy_set_vesting_contract_operator(
     old_operator: AccountAddress,
     new_operator: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4641,8 +4674,8 @@ pub fn staking_proxy_set_vesting_contract_operator(
 pub fn staking_proxy_set_vesting_contract_voter(
     operator: AccountAddress,
     new_voter: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4662,8 +4695,8 @@ pub fn staking_proxy_set_vesting_contract_voter(
 pub fn staking_proxy_set_voter(
     operator: AccountAddress,
     new_voter: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4680,8 +4713,8 @@ pub fn staking_proxy_set_voter(
     ))
 }
 
-pub fn transaction_fee_convert_to_aptos_fa_burn_ref() -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn transaction_fee_convert_to_aptos_fa_burn_ref() -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4699,8 +4732,8 @@ pub fn transaction_fee_convert_to_aptos_fa_burn_ref() -> TransactionPayload {
 /// Example usage:
 /// - `aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);`
 /// - `aptos_framework::aptos_governance::reconfigure(&framework_signer);`
-pub fn version_set_for_next_epoch(major: u64) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn version_set_for_next_epoch(major: u64) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4719,8 +4752,8 @@ pub fn version_set_for_next_epoch(major: u64) -> TransactionPayload {
 /// WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
 ///
 /// TODO: update all the tests that reference this function, then disable this function.
-pub fn version_set_version(major: u64) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn version_set_version(major: u64) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4736,8 +4769,8 @@ pub fn version_set_version(major: u64) -> TransactionPayload {
 
 /// Withdraw all funds to the preset vesting contract's withdrawal address. This can only be called if the contract
 /// has already been terminated.
-pub fn vesting_admin_withdraw(contract_address: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn vesting_admin_withdraw(contract_address: AccountAddress) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4752,8 +4785,8 @@ pub fn vesting_admin_withdraw(contract_address: AccountAddress) -> TransactionPa
 }
 
 /// Distribute any withdrawable stake from the stake pool.
-pub fn vesting_distribute(contract_address: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn vesting_distribute(contract_address: AccountAddress) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4768,8 +4801,10 @@ pub fn vesting_distribute(contract_address: AccountAddress) -> TransactionPayloa
 }
 
 /// Call `distribute` for many vesting contracts.
-pub fn vesting_distribute_many(contract_addresses: Vec<AccountAddress>) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn vesting_distribute_many(
+    contract_addresses: Vec<AccountAddress>,
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4788,8 +4823,8 @@ pub fn vesting_distribute_many(contract_addresses: Vec<AccountAddress>) -> Trans
 pub fn vesting_reset_beneficiary(
     contract_address: AccountAddress,
     shareholder: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4806,8 +4841,8 @@ pub fn vesting_reset_beneficiary(
     ))
 }
 
-pub fn vesting_reset_lockup(contract_address: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn vesting_reset_lockup(contract_address: AccountAddress) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4825,8 +4860,8 @@ pub fn vesting_set_beneficiary(
     contract_address: AccountAddress,
     shareholder: AccountAddress,
     new_beneficiary: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4845,8 +4880,10 @@ pub fn vesting_set_beneficiary(
 }
 
 /// Set the beneficiary for the operator.
-pub fn vesting_set_beneficiary_for_operator(new_beneficiary: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn vesting_set_beneficiary_for_operator(
+    new_beneficiary: AccountAddress,
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4863,8 +4900,8 @@ pub fn vesting_set_beneficiary_for_operator(new_beneficiary: AccountAddress) -> 
 pub fn vesting_set_beneficiary_resetter(
     contract_address: AccountAddress,
     beneficiary_resetter: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4885,8 +4922,8 @@ pub fn vesting_set_management_role(
     contract_address: AccountAddress,
     role: Vec<u8>,
     role_holder: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4905,8 +4942,10 @@ pub fn vesting_set_management_role(
 }
 
 /// Terminate the vesting contract and send all funds back to the withdrawal address.
-pub fn vesting_terminate_vesting_contract(contract_address: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn vesting_terminate_vesting_contract(
+    contract_address: AccountAddress,
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4921,8 +4960,8 @@ pub fn vesting_terminate_vesting_contract(contract_address: AccountAddress) -> T
 }
 
 /// Unlock any accumulated rewards.
-pub fn vesting_unlock_rewards(contract_address: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn vesting_unlock_rewards(contract_address: AccountAddress) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4937,8 +4976,10 @@ pub fn vesting_unlock_rewards(contract_address: AccountAddress) -> TransactionPa
 }
 
 /// Call `unlock_rewards` for many vesting contracts.
-pub fn vesting_unlock_rewards_many(contract_addresses: Vec<AccountAddress>) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn vesting_unlock_rewards_many(
+    contract_addresses: Vec<AccountAddress>,
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4955,8 +4996,8 @@ pub fn vesting_unlock_rewards_many(contract_addresses: Vec<AccountAddress>) -> T
 pub fn vesting_update_commission_percentage(
     contract_address: AccountAddress,
     new_commission_percentage: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4977,8 +5018,8 @@ pub fn vesting_update_operator(
     contract_address: AccountAddress,
     new_operator: AccountAddress,
     commission_percentage: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -4999,8 +5040,8 @@ pub fn vesting_update_operator(
 pub fn vesting_update_operator_with_same_commission(
     contract_address: AccountAddress,
     new_operator: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -5020,8 +5061,8 @@ pub fn vesting_update_operator_with_same_commission(
 pub fn vesting_update_voter(
     contract_address: AccountAddress,
     new_voter: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -5039,8 +5080,8 @@ pub fn vesting_update_voter(
 }
 
 /// Unlock any vested portion of the grant.
-pub fn vesting_vest(contract_address: AccountAddress) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn vesting_vest(contract_address: AccountAddress) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -5055,8 +5096,8 @@ pub fn vesting_vest(contract_address: AccountAddress) -> TransactionPayload {
 }
 
 /// Call `vest` for many vesting contracts.
-pub fn vesting_vest_many(contract_addresses: Vec<AccountAddress>) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn vesting_vest_many(contract_addresses: Vec<AccountAddress>) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -5072,9 +5113,9 @@ pub fn vesting_vest_many(contract_addresses: Vec<AccountAddress>) -> Transaction
 mod decoder {
     use super::*;
     pub fn account_offer_rotation_capability(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AccountOfferRotationCapability {
                 rotation_capability_sig_bytes: bcs::from_bytes(script.args().get(0)?).ok()?,
                 account_scheme: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5087,9 +5128,9 @@ mod decoder {
     }
 
     pub fn account_offer_signer_capability(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AccountOfferSignerCapability {
                 signer_capability_sig_bytes: bcs::from_bytes(script.args().get(0)?).ok()?,
                 account_scheme: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5102,9 +5143,9 @@ mod decoder {
     }
 
     pub fn account_revoke_any_rotation_capability(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(_script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(_script) = payload {
             Some(EntryFunctionCall::AccountRevokeAnyRotationCapability {})
         } else {
             None
@@ -5112,9 +5153,9 @@ mod decoder {
     }
 
     pub fn account_revoke_any_signer_capability(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(_script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(_script) = payload {
             Some(EntryFunctionCall::AccountRevokeAnySignerCapability {})
         } else {
             None
@@ -5122,9 +5163,9 @@ mod decoder {
     }
 
     pub fn account_revoke_rotation_capability(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AccountRevokeRotationCapability {
                 to_be_revoked_address: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -5134,9 +5175,9 @@ mod decoder {
     }
 
     pub fn account_revoke_signer_capability(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AccountRevokeSignerCapability {
                 to_be_revoked_address: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -5146,9 +5187,9 @@ mod decoder {
     }
 
     pub fn account_rotate_authentication_key(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AccountRotateAuthenticationKey {
                 from_scheme: bcs::from_bytes(script.args().get(0)?).ok()?,
                 from_public_key_bytes: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5163,9 +5204,9 @@ mod decoder {
     }
 
     pub fn account_rotate_authentication_key_call(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AccountRotateAuthenticationKeyCall {
                 new_auth_key: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -5175,9 +5216,9 @@ mod decoder {
     }
 
     pub fn account_rotate_authentication_key_with_rotation_capability(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::AccountRotateAuthenticationKeyWithRotationCapability {
                     rotation_cap_offerer_address: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -5192,17 +5233,19 @@ mod decoder {
     }
 
     pub fn account_set_originating_address(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(_script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(_script) = payload {
             Some(EntryFunctionCall::AccountSetOriginatingAddress {})
         } else {
             None
         }
     }
 
-    pub fn aptos_account_batch_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn aptos_account_batch_transfer(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosAccountBatchTransfer {
                 recipients: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amounts: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5213,9 +5256,9 @@ mod decoder {
     }
 
     pub fn aptos_account_batch_transfer_coins(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosAccountBatchTransferCoins {
                 coin_type: script.ty_args().get(0)?.clone(),
                 recipients: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -5226,8 +5269,10 @@ mod decoder {
         }
     }
 
-    pub fn aptos_account_create_account(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn aptos_account_create_account(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosAccountCreateAccount {
                 auth_key: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -5237,9 +5282,9 @@ mod decoder {
     }
 
     pub fn aptos_account_fungible_transfer_only(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosAccountFungibleTransferOnly {
                 to: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5250,9 +5295,9 @@ mod decoder {
     }
 
     pub fn aptos_account_set_allow_direct_coin_transfers(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosAccountSetAllowDirectCoinTransfers {
                 allow: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -5261,8 +5306,10 @@ mod decoder {
         }
     }
 
-    pub fn aptos_account_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn aptos_account_transfer(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosAccountTransfer {
                 to: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5272,8 +5319,10 @@ mod decoder {
         }
     }
 
-    pub fn aptos_account_transfer_coins(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn aptos_account_transfer_coins(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosAccountTransferCoins {
                 coin_type: script.ty_args().get(0)?.clone(),
                 to: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -5285,9 +5334,9 @@ mod decoder {
     }
 
     pub fn aptos_coin_claim_mint_capability(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(_script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(_script) = payload {
             Some(EntryFunctionCall::AptosCoinClaimMintCapability {})
         } else {
             None
@@ -5295,9 +5344,9 @@ mod decoder {
     }
 
     pub fn aptos_coin_delegate_mint_capability(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosCoinDelegateMintCapability {
                 to: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -5306,8 +5355,8 @@ mod decoder {
         }
     }
 
-    pub fn aptos_coin_mint(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn aptos_coin_mint(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosCoinMint {
                 dst_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5318,9 +5367,9 @@ mod decoder {
     }
 
     pub fn aptos_governance_add_approved_script_hash_script(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::AptosGovernanceAddApprovedScriptHashScript {
                     proposal_id: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -5332,9 +5381,9 @@ mod decoder {
     }
 
     pub fn aptos_governance_batch_partial_vote(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosGovernanceBatchPartialVote {
                 stake_pools: bcs::from_bytes(script.args().get(0)?).ok()?,
                 proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5346,8 +5395,10 @@ mod decoder {
         }
     }
 
-    pub fn aptos_governance_batch_vote(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn aptos_governance_batch_vote(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosGovernanceBatchVote {
                 stake_pools: bcs::from_bytes(script.args().get(0)?).ok()?,
                 proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5359,9 +5410,9 @@ mod decoder {
     }
 
     pub fn aptos_governance_create_proposal(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosGovernanceCreateProposal {
                 stake_pool: bcs::from_bytes(script.args().get(0)?).ok()?,
                 execution_hash: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5374,9 +5425,9 @@ mod decoder {
     }
 
     pub fn aptos_governance_create_proposal_v2(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosGovernanceCreateProposalV2 {
                 stake_pool: bcs::from_bytes(script.args().get(0)?).ok()?,
                 execution_hash: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5390,9 +5441,9 @@ mod decoder {
     }
 
     pub fn aptos_governance_force_end_epoch(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(_script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(_script) = payload {
             Some(EntryFunctionCall::AptosGovernanceForceEndEpoch {})
         } else {
             None
@@ -5400,9 +5451,9 @@ mod decoder {
     }
 
     pub fn aptos_governance_force_end_epoch_test_only(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(_script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(_script) = payload {
             Some(EntryFunctionCall::AptosGovernanceForceEndEpochTestOnly {})
         } else {
             None
@@ -5410,9 +5461,9 @@ mod decoder {
     }
 
     pub fn aptos_governance_partial_vote(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosGovernancePartialVote {
                 stake_pool: bcs::from_bytes(script.args().get(0)?).ok()?,
                 proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5424,16 +5475,18 @@ mod decoder {
         }
     }
 
-    pub fn aptos_governance_reconfigure(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(_script) = payload {
+    pub fn aptos_governance_reconfigure(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(_script) = payload {
             Some(EntryFunctionCall::AptosGovernanceReconfigure {})
         } else {
             None
         }
     }
 
-    pub fn aptos_governance_vote(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn aptos_governance_vote(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosGovernanceVote {
                 stake_pool: bcs::from_bytes(script.args().get(0)?).ok()?,
                 proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5444,8 +5497,10 @@ mod decoder {
         }
     }
 
-    pub fn code_publish_package_txn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn code_publish_package_txn(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CodePublishPackageTxn {
                 metadata_serialized: bcs::from_bytes(script.args().get(0)?).ok()?,
                 code: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5456,17 +5511,17 @@ mod decoder {
     }
 
     pub fn coin_create_coin_conversion_map(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(_script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(_script) = payload {
             Some(EntryFunctionCall::CoinCreateCoinConversionMap {})
         } else {
             None
         }
     }
 
-    pub fn coin_create_pairing(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn coin_create_pairing(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CoinCreatePairing {
                 coin_type: script.ty_args().get(0)?.clone(),
             })
@@ -5476,9 +5531,9 @@ mod decoder {
     }
 
     pub fn coin_migrate_coin_store_to_fungible_store(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CoinMigrateCoinStoreToFungibleStore {
                 coin_type: script.ty_args().get(0)?.clone(),
                 accounts: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -5489,9 +5544,9 @@ mod decoder {
     }
 
     pub fn coin_migrate_to_fungible_store(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CoinMigrateToFungibleStore {
                 coin_type: script.ty_args().get(0)?.clone(),
             })
@@ -5500,8 +5555,8 @@ mod decoder {
         }
     }
 
-    pub fn coin_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn coin_transfer(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CoinTransfer {
                 coin_type: script.ty_args().get(0)?.clone(),
                 to: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -5512,8 +5567,8 @@ mod decoder {
         }
     }
 
-    pub fn coin_upgrade_supply(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn coin_upgrade_supply(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CoinUpgradeSupply {
                 coin_type: script.ty_args().get(0)?.clone(),
             })
@@ -5522,8 +5577,10 @@ mod decoder {
         }
     }
 
-    pub fn delegation_pool_add_stake(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn delegation_pool_add_stake(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolAddStake {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5534,9 +5591,9 @@ mod decoder {
     }
 
     pub fn delegation_pool_allowlist_delegator(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolAllowlistDelegator {
                 delegator_address: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -5546,9 +5603,9 @@ mod decoder {
     }
 
     pub fn delegation_pool_create_proposal(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolCreateProposal {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 execution_hash: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5562,9 +5619,9 @@ mod decoder {
     }
 
     pub fn delegation_pool_delegate_voting_power(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolDelegateVotingPower {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_voter: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5575,9 +5632,9 @@ mod decoder {
     }
 
     pub fn delegation_pool_disable_delegators_allowlisting(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(_script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(_script) = payload {
             Some(EntryFunctionCall::DelegationPoolDisableDelegatorsAllowlisting {})
         } else {
             None
@@ -5585,9 +5642,9 @@ mod decoder {
     }
 
     pub fn delegation_pool_enable_delegators_allowlisting(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(_script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(_script) = payload {
             Some(EntryFunctionCall::DelegationPoolEnableDelegatorsAllowlisting {})
         } else {
             None
@@ -5595,9 +5652,9 @@ mod decoder {
     }
 
     pub fn delegation_pool_enable_partial_governance_voting(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::DelegationPoolEnablePartialGovernanceVoting {
                     pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -5609,9 +5666,9 @@ mod decoder {
     }
 
     pub fn delegation_pool_evict_delegator(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolEvictDelegator {
                 delegator_address: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -5621,9 +5678,9 @@ mod decoder {
     }
 
     pub fn delegation_pool_initialize_delegation_pool(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolInitializeDelegationPool {
                 operator_commission_percentage: bcs::from_bytes(script.args().get(0)?).ok()?,
                 delegation_pool_creation_seed: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5634,9 +5691,9 @@ mod decoder {
     }
 
     pub fn delegation_pool_reactivate_stake(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolReactivateStake {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5647,9 +5704,9 @@ mod decoder {
     }
 
     pub fn delegation_pool_remove_delegator_from_allowlist(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::DelegationPoolRemoveDelegatorFromAllowlist {
                     delegator_address: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -5661,9 +5718,9 @@ mod decoder {
     }
 
     pub fn delegation_pool_set_beneficiary_for_operator(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolSetBeneficiaryForOperator {
                 new_beneficiary: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -5673,9 +5730,9 @@ mod decoder {
     }
 
     pub fn delegation_pool_set_delegated_voter(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolSetDelegatedVoter {
                 new_voter: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -5684,8 +5741,10 @@ mod decoder {
         }
     }
 
-    pub fn delegation_pool_set_operator(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn delegation_pool_set_operator(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolSetOperator {
                 new_operator: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -5695,9 +5754,9 @@ mod decoder {
     }
 
     pub fn delegation_pool_synchronize_delegation_pool(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolSynchronizeDelegationPool {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -5706,8 +5765,10 @@ mod decoder {
         }
     }
 
-    pub fn delegation_pool_unlock(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn delegation_pool_unlock(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolUnlock {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5718,9 +5779,9 @@ mod decoder {
     }
 
     pub fn delegation_pool_update_commission_percentage(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::DelegationPoolUpdateCommissionPercentage {
                     new_commission_percentage: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -5731,8 +5792,8 @@ mod decoder {
         }
     }
 
-    pub fn delegation_pool_vote(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn delegation_pool_vote(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolVote {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5744,8 +5805,10 @@ mod decoder {
         }
     }
 
-    pub fn delegation_pool_withdraw(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn delegation_pool_withdraw(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolWithdraw {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5756,9 +5819,9 @@ mod decoder {
     }
 
     pub fn jwks_update_federated_jwk_set(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::JwksUpdateFederatedJwkSet {
                 iss: bcs::from_bytes(script.args().get(0)?).ok()?,
                 kid_vec: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5771,8 +5834,8 @@ mod decoder {
         }
     }
 
-    pub fn managed_coin_burn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn managed_coin_burn(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ManagedCoinBurn {
                 coin_type: script.ty_args().get(0)?.clone(),
                 amount: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -5782,8 +5845,10 @@ mod decoder {
         }
     }
 
-    pub fn managed_coin_destroy_caps(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn managed_coin_destroy_caps(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ManagedCoinDestroyCaps {
                 coin_type: script.ty_args().get(0)?.clone(),
             })
@@ -5792,8 +5857,10 @@ mod decoder {
         }
     }
 
-    pub fn managed_coin_initialize(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn managed_coin_initialize(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ManagedCoinInitialize {
                 coin_type: script.ty_args().get(0)?.clone(),
                 name: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -5806,8 +5873,8 @@ mod decoder {
         }
     }
 
-    pub fn managed_coin_mint(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn managed_coin_mint(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ManagedCoinMint {
                 coin_type: script.ty_args().get(0)?.clone(),
                 dst_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -5818,8 +5885,8 @@ mod decoder {
         }
     }
 
-    pub fn managed_coin_register(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn managed_coin_register(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ManagedCoinRegister {
                 coin_type: script.ty_args().get(0)?.clone(),
             })
@@ -5828,8 +5895,10 @@ mod decoder {
         }
     }
 
-    pub fn multisig_account_add_owner(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn multisig_account_add_owner(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountAddOwner {
                 new_owner: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -5838,8 +5907,10 @@ mod decoder {
         }
     }
 
-    pub fn multisig_account_add_owners(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn multisig_account_add_owners(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountAddOwners {
                 new_owners: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -5849,9 +5920,9 @@ mod decoder {
     }
 
     pub fn multisig_account_add_owners_and_update_signatures_required(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::MultisigAccountAddOwnersAndUpdateSignaturesRequired {
                     new_owners: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -5864,9 +5935,9 @@ mod decoder {
     }
 
     pub fn multisig_account_approve_transaction(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountApproveTransaction {
                 multisig_account: bcs::from_bytes(script.args().get(0)?).ok()?,
                 sequence_number: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5876,8 +5947,10 @@ mod decoder {
         }
     }
 
-    pub fn multisig_account_create(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn multisig_account_create(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountCreate {
                 num_signatures_required: bcs::from_bytes(script.args().get(0)?).ok()?,
                 metadata_keys: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5889,9 +5962,9 @@ mod decoder {
     }
 
     pub fn multisig_account_create_transaction(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountCreateTransaction {
                 multisig_account: bcs::from_bytes(script.args().get(0)?).ok()?,
                 payload: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -5902,9 +5975,9 @@ mod decoder {
     }
 
     pub fn multisig_account_create_transaction_with_hash(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::MultisigAccountCreateTransactionWithHash {
                     multisig_account: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -5917,9 +5990,9 @@ mod decoder {
     }
 
     pub fn multisig_account_create_with_existing_account(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::MultisigAccountCreateWithExistingAccount {
                     multisig_address: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -5939,9 +6012,9 @@ mod decoder {
     }
 
     pub fn multisig_account_create_with_existing_account_and_revoke_auth_key(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::MultisigAccountCreateWithExistingAccountAndRevokeAuthKey {
                     multisig_address: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -5961,9 +6034,9 @@ mod decoder {
     }
 
     pub fn multisig_account_create_with_existing_account_and_revoke_auth_key_call(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::MultisigAccountCreateWithExistingAccountAndRevokeAuthKeyCall {
                     owners: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -5978,9 +6051,9 @@ mod decoder {
     }
 
     pub fn multisig_account_create_with_existing_account_call(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::MultisigAccountCreateWithExistingAccountCall {
                     owners: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -5995,9 +6068,9 @@ mod decoder {
     }
 
     pub fn multisig_account_create_with_owners(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountCreateWithOwners {
                 additional_owners: bcs::from_bytes(script.args().get(0)?).ok()?,
                 num_signatures_required: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6010,9 +6083,9 @@ mod decoder {
     }
 
     pub fn multisig_account_create_with_owners_then_remove_bootstrapper(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::MultisigAccountCreateWithOwnersThenRemoveBootstrapper {
                     owners: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -6027,9 +6100,9 @@ mod decoder {
     }
 
     pub fn multisig_account_execute_rejected_transaction(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::MultisigAccountExecuteRejectedTransaction {
                     multisig_account: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -6041,9 +6114,9 @@ mod decoder {
     }
 
     pub fn multisig_account_execute_rejected_transactions(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::MultisigAccountExecuteRejectedTransactions {
                     multisig_account: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -6056,9 +6129,9 @@ mod decoder {
     }
 
     pub fn multisig_account_reject_transaction(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountRejectTransaction {
                 multisig_account: bcs::from_bytes(script.args().get(0)?).ok()?,
                 sequence_number: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6069,9 +6142,9 @@ mod decoder {
     }
 
     pub fn multisig_account_remove_owner(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountRemoveOwner {
                 owner_to_remove: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6081,9 +6154,9 @@ mod decoder {
     }
 
     pub fn multisig_account_remove_owners(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountRemoveOwners {
                 owners_to_remove: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6092,8 +6165,10 @@ mod decoder {
         }
     }
 
-    pub fn multisig_account_swap_owner(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn multisig_account_swap_owner(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountSwapOwner {
                 to_swap_in: bcs::from_bytes(script.args().get(0)?).ok()?,
                 to_swap_out: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6103,8 +6178,10 @@ mod decoder {
         }
     }
 
-    pub fn multisig_account_swap_owners(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn multisig_account_swap_owners(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountSwapOwners {
                 to_swap_in: bcs::from_bytes(script.args().get(0)?).ok()?,
                 to_swap_out: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6115,9 +6192,9 @@ mod decoder {
     }
 
     pub fn multisig_account_swap_owners_and_update_signatures_required(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::MultisigAccountSwapOwnersAndUpdateSignaturesRequired {
                     new_owners: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -6131,9 +6208,9 @@ mod decoder {
     }
 
     pub fn multisig_account_update_metadata(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountUpdateMetadata {
                 keys: bcs::from_bytes(script.args().get(0)?).ok()?,
                 values: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6144,9 +6221,9 @@ mod decoder {
     }
 
     pub fn multisig_account_update_signatures_required(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountUpdateSignaturesRequired {
                 new_num_signatures_required: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6156,9 +6233,9 @@ mod decoder {
     }
 
     pub fn multisig_account_vote_transaction(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountVoteTransaction {
                 multisig_account: bcs::from_bytes(script.args().get(0)?).ok()?,
                 sequence_number: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6170,9 +6247,9 @@ mod decoder {
     }
 
     pub fn multisig_account_vote_transactions(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountVoteTransactions {
                 multisig_account: bcs::from_bytes(script.args().get(0)?).ok()?,
                 starting_sequence_number: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6185,9 +6262,9 @@ mod decoder {
     }
 
     pub fn multisig_account_vote_transanction(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountVoteTransanction {
                 multisig_account: bcs::from_bytes(script.args().get(0)?).ok()?,
                 sequence_number: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6198,8 +6275,8 @@ mod decoder {
         }
     }
 
-    pub fn object_transfer_call(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn object_transfer_call(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ObjectTransferCall {
                 object: bcs::from_bytes(script.args().get(0)?).ok()?,
                 to: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6210,9 +6287,9 @@ mod decoder {
     }
 
     pub fn object_code_deployment_publish(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ObjectCodeDeploymentPublish {
                 metadata_serialized: bcs::from_bytes(script.args().get(0)?).ok()?,
                 code: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6223,9 +6300,9 @@ mod decoder {
     }
 
     pub fn permissioned_signer_revoke_all_handles(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(_script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(_script) = payload {
             Some(EntryFunctionCall::PermissionedSignerRevokeAllHandles {})
         } else {
             None
@@ -6233,9 +6310,9 @@ mod decoder {
     }
 
     pub fn permissioned_signer_revoke_permission_storage_address(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::PermissionedSignerRevokePermissionStorageAddress {
                     permissions_storage_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -6247,9 +6324,9 @@ mod decoder {
     }
 
     pub fn resource_account_create_resource_account(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ResourceAccountCreateResourceAccount {
                 seed: bcs::from_bytes(script.args().get(0)?).ok()?,
                 optional_auth_key: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6260,9 +6337,9 @@ mod decoder {
     }
 
     pub fn resource_account_create_resource_account_and_fund(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::ResourceAccountCreateResourceAccountAndFund {
                     seed: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -6276,9 +6353,9 @@ mod decoder {
     }
 
     pub fn resource_account_create_resource_account_and_publish_package(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::ResourceAccountCreateResourceAccountAndPublishPackage {
                     seed: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -6291,8 +6368,8 @@ mod decoder {
         }
     }
 
-    pub fn stake_add_stake(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn stake_add_stake(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeAddStake {
                 amount: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6301,16 +6378,18 @@ mod decoder {
         }
     }
 
-    pub fn stake_increase_lockup(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(_script) = payload {
+    pub fn stake_increase_lockup(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(_script) = payload {
             Some(EntryFunctionCall::StakeIncreaseLockup {})
         } else {
             None
         }
     }
 
-    pub fn stake_initialize_stake_owner(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn stake_initialize_stake_owner(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeInitializeStakeOwner {
                 initial_stake_amount: bcs::from_bytes(script.args().get(0)?).ok()?,
                 operator: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6321,8 +6400,10 @@ mod decoder {
         }
     }
 
-    pub fn stake_initialize_validator(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn stake_initialize_validator(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeInitializeValidator {
                 consensus_pubkey: bcs::from_bytes(script.args().get(0)?).ok()?,
                 proof_of_possession: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6334,8 +6415,10 @@ mod decoder {
         }
     }
 
-    pub fn stake_join_validator_set(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn stake_join_validator_set(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeJoinValidatorSet {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6344,8 +6427,10 @@ mod decoder {
         }
     }
 
-    pub fn stake_leave_validator_set(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn stake_leave_validator_set(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeLeaveValidatorSet {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6354,8 +6439,10 @@ mod decoder {
         }
     }
 
-    pub fn stake_reactivate_stake(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn stake_reactivate_stake(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeReactivateStake {
                 amount: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6364,8 +6451,10 @@ mod decoder {
         }
     }
 
-    pub fn stake_rotate_consensus_key(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn stake_rotate_consensus_key(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeRotateConsensusKey {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_consensus_pubkey: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6376,8 +6465,10 @@ mod decoder {
         }
     }
 
-    pub fn stake_set_delegated_voter(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn stake_set_delegated_voter(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeSetDelegatedVoter {
                 new_voter: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6386,8 +6477,8 @@ mod decoder {
         }
     }
 
-    pub fn stake_set_operator(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn stake_set_operator(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeSetOperator {
                 new_operator: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6396,8 +6487,8 @@ mod decoder {
         }
     }
 
-    pub fn stake_unlock(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn stake_unlock(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeUnlock {
                 amount: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6407,9 +6498,9 @@ mod decoder {
     }
 
     pub fn stake_update_network_and_fullnode_addresses(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeUpdateNetworkAndFullnodeAddresses {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_network_addresses: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6420,8 +6511,8 @@ mod decoder {
         }
     }
 
-    pub fn stake_withdraw(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn stake_withdraw(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeWithdraw {
                 withdraw_amount: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6430,8 +6521,10 @@ mod decoder {
         }
     }
 
-    pub fn staking_contract_add_stake(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn staking_contract_add_stake(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakingContractAddStake {
                 operator: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6442,9 +6535,9 @@ mod decoder {
     }
 
     pub fn staking_contract_create_staking_contract(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakingContractCreateStakingContract {
                 operator: bcs::from_bytes(script.args().get(0)?).ok()?,
                 voter: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6457,8 +6550,10 @@ mod decoder {
         }
     }
 
-    pub fn staking_contract_distribute(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn staking_contract_distribute(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakingContractDistribute {
                 staker: bcs::from_bytes(script.args().get(0)?).ok()?,
                 operator: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6469,9 +6564,9 @@ mod decoder {
     }
 
     pub fn staking_contract_request_commission(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakingContractRequestCommission {
                 staker: bcs::from_bytes(script.args().get(0)?).ok()?,
                 operator: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6482,9 +6577,9 @@ mod decoder {
     }
 
     pub fn staking_contract_reset_lockup(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakingContractResetLockup {
                 operator: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6494,9 +6589,9 @@ mod decoder {
     }
 
     pub fn staking_contract_set_beneficiary_for_operator(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::StakingContractSetBeneficiaryForOperator {
                     new_beneficiary: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -6508,9 +6603,9 @@ mod decoder {
     }
 
     pub fn staking_contract_switch_operator(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakingContractSwitchOperator {
                 old_operator: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_operator: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6522,9 +6617,9 @@ mod decoder {
     }
 
     pub fn staking_contract_switch_operator_with_same_commission(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(
                 EntryFunctionCall::StakingContractSwitchOperatorWithSameCommission {
                     old_operator: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -6537,9 +6632,9 @@ mod decoder {
     }
 
     pub fn staking_contract_unlock_rewards(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakingContractUnlockRewards {
                 operator: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6549,9 +6644,9 @@ mod decoder {
     }
 
     pub fn staking_contract_unlock_stake(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakingContractUnlockStake {
                 operator: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6562,9 +6657,9 @@ mod decoder {
     }
 
     pub fn staking_contract_update_commision(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakingContractUpdateCommision {
                 operator: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_commission_percentage: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6575,9 +6670,9 @@ mod decoder {
     }
 
     pub fn staking_contract_update_voter(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakingContractUpdateVoter {
                 operator: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_voter: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6587,8 +6682,10 @@ mod decoder {
         }
     }
 
-    pub fn staking_proxy_set_operator(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn staking_proxy_set_operator(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakingProxySetOperator {
                 old_operator: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_operator: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6599,9 +6696,9 @@ mod decoder {
     }
 
     pub fn staking_proxy_set_stake_pool_operator(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakingProxySetStakePoolOperator {
                 new_operator: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6611,9 +6708,9 @@ mod decoder {
     }
 
     pub fn staking_proxy_set_stake_pool_voter(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakingProxySetStakePoolVoter {
                 new_voter: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6623,9 +6720,9 @@ mod decoder {
     }
 
     pub fn staking_proxy_set_staking_contract_operator(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakingProxySetStakingContractOperator {
                 old_operator: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_operator: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6636,9 +6733,9 @@ mod decoder {
     }
 
     pub fn staking_proxy_set_staking_contract_voter(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakingProxySetStakingContractVoter {
                 operator: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_voter: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6649,9 +6746,9 @@ mod decoder {
     }
 
     pub fn staking_proxy_set_vesting_contract_operator(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakingProxySetVestingContractOperator {
                 old_operator: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_operator: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6662,9 +6759,9 @@ mod decoder {
     }
 
     pub fn staking_proxy_set_vesting_contract_voter(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakingProxySetVestingContractVoter {
                 operator: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_voter: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6674,8 +6771,10 @@ mod decoder {
         }
     }
 
-    pub fn staking_proxy_set_voter(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn staking_proxy_set_voter(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakingProxySetVoter {
                 operator: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_voter: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6686,17 +6785,19 @@ mod decoder {
     }
 
     pub fn transaction_fee_convert_to_aptos_fa_burn_ref(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(_script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(_script) = payload {
             Some(EntryFunctionCall::TransactionFeeConvertToAptosFaBurnRef {})
         } else {
             None
         }
     }
 
-    pub fn version_set_for_next_epoch(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn version_set_for_next_epoch(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VersionSetForNextEpoch {
                 major: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6705,8 +6806,8 @@ mod decoder {
         }
     }
 
-    pub fn version_set_version(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn version_set_version(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VersionSetVersion {
                 major: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6715,8 +6816,10 @@ mod decoder {
         }
     }
 
-    pub fn vesting_admin_withdraw(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn vesting_admin_withdraw(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingAdminWithdraw {
                 contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6725,8 +6828,8 @@ mod decoder {
         }
     }
 
-    pub fn vesting_distribute(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn vesting_distribute(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingDistribute {
                 contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6735,8 +6838,10 @@ mod decoder {
         }
     }
 
-    pub fn vesting_distribute_many(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn vesting_distribute_many(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingDistributeMany {
                 contract_addresses: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6745,8 +6850,10 @@ mod decoder {
         }
     }
 
-    pub fn vesting_reset_beneficiary(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn vesting_reset_beneficiary(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingResetBeneficiary {
                 contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 shareholder: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6756,8 +6863,8 @@ mod decoder {
         }
     }
 
-    pub fn vesting_reset_lockup(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn vesting_reset_lockup(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingResetLockup {
                 contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6766,8 +6873,10 @@ mod decoder {
         }
     }
 
-    pub fn vesting_set_beneficiary(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn vesting_set_beneficiary(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingSetBeneficiary {
                 contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 shareholder: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6779,9 +6888,9 @@ mod decoder {
     }
 
     pub fn vesting_set_beneficiary_for_operator(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingSetBeneficiaryForOperator {
                 new_beneficiary: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6791,9 +6900,9 @@ mod decoder {
     }
 
     pub fn vesting_set_beneficiary_resetter(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingSetBeneficiaryResetter {
                 contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 beneficiary_resetter: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6803,8 +6912,10 @@ mod decoder {
         }
     }
 
-    pub fn vesting_set_management_role(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn vesting_set_management_role(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingSetManagementRole {
                 contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 role: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6816,9 +6927,9 @@ mod decoder {
     }
 
     pub fn vesting_terminate_vesting_contract(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingTerminateVestingContract {
                 contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6827,8 +6938,10 @@ mod decoder {
         }
     }
 
-    pub fn vesting_unlock_rewards(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn vesting_unlock_rewards(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingUnlockRewards {
                 contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6837,8 +6950,10 @@ mod decoder {
         }
     }
 
-    pub fn vesting_unlock_rewards_many(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn vesting_unlock_rewards_many(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingUnlockRewardsMany {
                 contract_addresses: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6848,9 +6963,9 @@ mod decoder {
     }
 
     pub fn vesting_update_commission_percentage(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingUpdateCommissionPercentage {
                 contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_commission_percentage: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6860,8 +6975,10 @@ mod decoder {
         }
     }
 
-    pub fn vesting_update_operator(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn vesting_update_operator(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingUpdateOperator {
                 contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_operator: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6873,9 +6990,9 @@ mod decoder {
     }
 
     pub fn vesting_update_operator_with_same_commission(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingUpdateOperatorWithSameCommission {
                 contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_operator: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6885,8 +7002,8 @@ mod decoder {
         }
     }
 
-    pub fn vesting_update_voter(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn vesting_update_voter(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingUpdateVoter {
                 contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_voter: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -6896,8 +7013,8 @@ mod decoder {
         }
     }
 
-    pub fn vesting_vest(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn vesting_vest(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingVest {
                 contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6906,8 +7023,8 @@ mod decoder {
         }
     }
 
-    pub fn vesting_vest_many(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn vesting_vest_many(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VestingVestMany {
                 contract_addresses: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -6920,7 +7037,7 @@ mod decoder {
 type EntryFunctionDecoderMap = std::collections::HashMap<
     String,
     Box<
-        dyn Fn(&TransactionPayload) -> Option<EntryFunctionCall>
+        dyn Fn(&TransactionPayloadWrapper) -> Option<EntryFunctionCall>
             + std::marker::Sync
             + std::marker::Send,
     >,

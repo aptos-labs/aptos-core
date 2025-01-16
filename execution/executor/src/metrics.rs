@@ -12,7 +12,8 @@ use aptos_types::{
     contract_event::ContractEvent,
     transaction::{
         authenticator::AccountAuthenticator, signature_verified_transaction::TransactionProvider,
-        ExecutionStatus, Transaction, TransactionOutput, TransactionStatus,
+        ExecutionStatus, Transaction, TransactionExecutable, TransactionExtraConfig,
+        TransactionOutput, TransactionPayloadInner, TransactionStatus,
     },
 };
 use aptos_vm::AptosVM;
@@ -324,6 +325,8 @@ pub fn update_counters_for_processed_chunk<T>(
                         "discard_sequence_number_too_new"
                     } else if *discard_status_code == StatusCode::TRANSACTION_EXPIRED {
                         "discard_transaction_expired"
+                    } else if *discard_status_code == StatusCode::NONCE_ALREADY_USED {
+                        "discard_nonce_already_used"
                     } else {
                         // Only log if it is an interesting discard
                         sample!(
@@ -331,7 +334,7 @@ pub fn update_counters_for_processed_chunk<T>(
                             warn!(
                                 "[sampled] Txn being discarded is {:?} with status code {:?}",
                                 txn, discard_status_code
-                            )
+                            );
                         );
                         "discard"
                     },
@@ -426,12 +429,12 @@ pub fn update_counters_for_processed_chunk<T>(
             }
 
             match user_txn.payload() {
-                aptos_types::transaction::TransactionPayload::Script(_script) => {
+                aptos_types::transaction::TransactionPayloadWrapper::Script(_script) => {
                     PROCESSED_USER_TXNS_BY_PAYLOAD
                         .with_label_values(&[process_type, "script", state])
                         .inc();
                 },
-                aptos_types::transaction::TransactionPayload::EntryFunction(function) => {
+                aptos_types::transaction::TransactionPayloadWrapper::EntryFunction(function) => {
                     PROCESSED_USER_TXNS_BY_PAYLOAD
                         .with_label_values(&[process_type, "function", state])
                         .inc();
@@ -463,16 +466,47 @@ pub fn update_counters_for_processed_chunk<T>(
                             .inc();
                     }
                 },
-                aptos_types::transaction::TransactionPayload::Multisig(_) => {
+                aptos_types::transaction::TransactionPayloadWrapper::Multisig(_) => {
                     PROCESSED_USER_TXNS_BY_PAYLOAD
                         .with_label_values(&[process_type, "multisig", state])
                         .inc();
                 },
 
                 // Deprecated.
-                aptos_types::transaction::TransactionPayload::ModuleBundle(_) => {
+                aptos_types::transaction::TransactionPayloadWrapper::ModuleBundle(_) => {
                     PROCESSED_USER_TXNS_BY_PAYLOAD
                         .with_label_values(&[process_type, "deprecated_module_bundle", state])
+                        .inc();
+                },
+
+                aptos_types::transaction::TransactionPayloadWrapper::Payload(
+                    TransactionPayloadInner::V1 {
+                        executable,
+                        extra_config:
+                            TransactionExtraConfig::V1 {
+                                multisig_address,
+                                replay_protection_nonce,
+                            },
+                    },
+                ) => {
+                    let mut metric_name = String::from("nested");
+                    metric_name += match executable {
+                        TransactionExecutable::EntryFunction(_) => "_function",
+                        TransactionExecutable::Script(_) => "_script",
+                        TransactionExecutable::Empty => "_empty",
+                    };
+                    metric_name += if multisig_address.is_some() {
+                        "_multisig"
+                    } else {
+                        ""
+                    };
+                    metric_name += if replay_protection_nonce.is_some() {
+                        "_orderless"
+                    } else {
+                        ""
+                    };
+                    PROCESSED_USER_TXNS_BY_PAYLOAD
+                        .with_label_values(&[process_type, metric_name.as_str(), state])
                         .inc();
                 },
             }

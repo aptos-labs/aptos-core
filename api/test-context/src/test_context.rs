@@ -46,7 +46,7 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::{
         signature_verified_transaction::into_signature_verified_block, Transaction,
-        TransactionPayload, TransactionStatus, Version,
+        TransactionPayloadWrapper, TransactionStatus, Version,
     },
 };
 use aptos_vm::aptos_vm::AptosVMBlockExecutor;
@@ -735,7 +735,7 @@ impl TestContext {
     pub fn build_package(
         path: PathBuf,
         named_addresses: Vec<(String, AccountAddress)>,
-    ) -> TransactionPayload {
+    ) -> TransactionPayloadWrapper {
         let mut build_options = aptos_framework::BuildOptions::default();
         named_addresses.into_iter().for_each(|(name, address)| {
             build_options.named_addresses.insert(name, address);
@@ -751,7 +751,7 @@ impl TestContext {
     pub async fn publish_package(
         &mut self,
         publisher: &mut LocalAccount,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> SignedTransaction {
         let txn =
             publisher.sign_with_transaction_builder(self.transaction_factory().payload(payload));

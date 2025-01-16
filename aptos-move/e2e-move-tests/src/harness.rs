@@ -28,9 +28,7 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
     },
     transaction::{
-        EntryFunction, Multisig, MultisigTransactionPayload, Script, SignedTransaction,
-        TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
-        ViewFunctionOutput,
+        EntryFunction, Multisig, MultisigTransactionPayload, Script, SignedTransaction, TransactionArgument, TransactionExecutable, TransactionExtraConfig, TransactionOutput, TransactionPayloadInner, TransactionPayloadWrapper, TransactionStatus, ViewFunctionOutput
     },
     AptosCoinType,
 };
@@ -50,6 +48,11 @@ use std::{
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
+
+pub enum ReplayProtectiontype {
+    SequenceNumber,
+    Nonce,
+}
 
 // Code representing successful transaction, used for run_block_in_parts_and_check
 pub const SUCCESS: u64 = 0;
@@ -82,6 +85,9 @@ pub struct MoveHarness {
 
     pub default_gas_unit_price: u64,
     pub max_gas_per_txn: u64,
+    // Uses the new transaction format with TransactionPayloadWrapper
+    pub use_payload_v2_format: bool,
+    pub enable_orderless_transactions: bool,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -102,6 +108,9 @@ impl MoveHarness {
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+            // TODO: After the new TransactionPayload format is fully rolled, set this flag to true by default.
+            use_payload_v2_format: false,
+            enable_orderless_transactions: true,
         }
     }
 
@@ -112,6 +121,8 @@ impl MoveHarness {
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+            use_payload_v2_format: false,
+            enable_orderless_transactions: true,
         }
     }
 
@@ -122,6 +133,8 @@ impl MoveHarness {
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+            use_payload_v2_format: false,
+            enable_orderless_transactions: true,
         }
     }
 
@@ -132,6 +145,8 @@ impl MoveHarness {
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+            use_payload_v2_format: false,
+            enable_orderless_transactions: true,
         }
     }
 
@@ -151,6 +166,8 @@ impl MoveHarness {
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+            use_payload_v2_format: false,
+            enable_orderless_transactions: true,
         }
     }
 
@@ -251,18 +268,27 @@ impl MoveHarness {
     pub fn create_transaction_without_sign(
         &mut self,
         account: &Account,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> TransactionBuilder {
-        let on_chain_seq_no = self.sequence_number_opt(account.address()).unwrap_or(0);
-        let seq_no_ref = self.txn_seq_no.entry(*account.address()).or_insert(0);
-        let seq_no = std::cmp::max(on_chain_seq_no, *seq_no_ref);
-        *seq_no_ref = seq_no + 1;
-        account
-            .transaction()
-            .sequence_number(seq_no)
-            .max_gas_amount(self.max_gas_per_txn)
-            .gas_unit_price(self.default_gas_unit_price)
-            .payload(payload)
+        if payload.has_nonce() {
+            account
+                .transaction()
+                .sequence_number(u64::MAX)
+                .max_gas_amount(self.max_gas_per_txn)
+                .gas_unit_price(self.default_gas_unit_price)
+                .payload(payload)
+        } else {
+            let on_chain_seq_no = self.sequence_number_opt(account.address()).unwrap_or(0);
+            let seq_no_ref = self.txn_seq_no.entry(*account.address()).or_insert(0);
+            let seq_no = std::cmp::max(on_chain_seq_no, *seq_no_ref);
+            *seq_no_ref = seq_no + 1;
+            account
+                .transaction()
+                .sequence_number(seq_no)
+                .max_gas_amount(self.max_gas_per_txn)
+                .gas_unit_price(self.default_gas_unit_price)
+                .payload(payload)
+        }
     }
 
     /// Creates a transaction, based on provided payload.
@@ -270,7 +296,7 @@ impl MoveHarness {
     pub fn create_transaction_payload(
         &mut self,
         account: &Account,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> SignedTransaction {
         self.create_transaction_without_sign(account, payload)
             .sign()
@@ -280,7 +306,7 @@ impl MoveHarness {
     pub fn create_transaction_payload_mainnet(
         &mut self,
         account: &Account,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> SignedTransaction {
         self.create_transaction_without_sign(account, payload)
             .chain_id(ChainId::mainnet())
@@ -292,7 +318,7 @@ impl MoveHarness {
     pub fn run_transaction_payload(
         &mut self,
         account: &Account,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> TransactionStatus {
         let txn = self.create_transaction_payload(account, payload);
         self.run(txn)
@@ -302,7 +328,7 @@ impl MoveHarness {
     pub fn run_transaction_payload_mainnet(
         &mut self,
         account: &Account,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> TransactionStatus {
         let txn = self.create_transaction_payload_mainnet(account, payload);
         assert!(self.chain_id_is_mainnet(&CORE_CODE_ADDRESS));
@@ -310,7 +336,7 @@ impl MoveHarness {
     }
 
     /// Runs a transaction and return gas used.
-    pub fn evaluate_gas(&mut self, account: &Account, payload: TransactionPayload) -> u64 {
+    pub fn evaluate_gas(&mut self, account: &Account, payload: TransactionPayloadWrapper) -> u64 {
         let txn = self.create_transaction_payload(account, payload);
         let output = self.run_raw(txn);
         assert_success!(output.status().to_owned());
@@ -321,7 +347,7 @@ impl MoveHarness {
     pub fn evaluate_gas_with_profiler(
         &mut self,
         account: &Account,
-        payload: TransactionPayload,
+        payload: TransactionPayloadWrapper,
     ) -> (TransactionGasLog, u64, Option<FeeStatement>) {
         let txn = self.create_transaction_payload(account, payload);
         let (output, gas_log) = self
@@ -346,19 +372,37 @@ impl MoveHarness {
         fun: MemberId,
         ty_args: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
+        replay_protection_type: ReplayProtectiontype,
     ) -> SignedTransaction {
         let MemberId {
             module_id,
             member_id: function_id,
         } = fun;
+        let entry_function = EntryFunction::new(
+            module_id,
+            function_id,
+            ty_args,
+            args,
+        );
+        let payload = if self.use_payload_v2_format {
+            TransactionPayloadWrapper::Payload(
+                TransactionPayloadInner::V1 {
+                    executable: TransactionExecutable::EntryFunction(entry_function),
+                    extra_config: TransactionExtraConfig::V1 {
+                        multisig_address: None,
+                        replay_protection_nonce: match replay_protection_type {
+                            ReplayProtectiontype::SequenceNumber => None,
+                            ReplayProtectiontype::Nonce => Some(rand::random::<u64>()),
+                        },
+                    }
+                }
+            )
+        } else {
+            TransactionPayloadWrapper::EntryFunction(entry_function)
+        };
         self.create_transaction_payload(
             account,
-            TransactionPayload::EntryFunction(EntryFunction::new(
-                module_id,
-                function_id,
-                ty_args,
-                args,
-            )),
+            payload,
         )
     }
 
@@ -368,13 +412,37 @@ impl MoveHarness {
         account: &Account,
         multisig_address: AccountAddress,
         transaction_payload: Option<MultisigTransactionPayload>,
+        replay_protection_type: ReplayProtectiontype,
     ) -> SignedTransaction {
-        self.create_transaction_payload(
-            account,
-            TransactionPayload::Multisig(Multisig {
+        let payload = if self.use_payload_v2_format {
+            let executable = if let Some(payload) = transaction_payload {
+                match payload {
+                    MultisigTransactionPayload::EntryFunction(entry) => TransactionExecutable::EntryFunction(entry),
+                }
+            } else {
+                TransactionExecutable::Empty
+            };
+            TransactionPayloadWrapper::Payload(
+                TransactionPayloadInner::V1 { 
+                    executable, 
+                    extra_config: TransactionExtraConfig::V1 { 
+                        multisig_address: Some(multisig_address),
+                        replay_protection_nonce: match replay_protection_type {
+                            ReplayProtectiontype::SequenceNumber => None,
+                            ReplayProtectiontype::Nonce => Some(rand::random::<u64>()),
+                        },
+                    }
+                }
+            )
+        } else {
+            TransactionPayloadWrapper::Multisig(Multisig {
                 multisig_address,
                 transaction_payload,
-            }),
+            })
+        };
+        self.create_transaction_payload(
+            account,
+            payload,
         )
     }
 
@@ -384,10 +452,28 @@ impl MoveHarness {
         code: Vec<u8>,
         ty_args: Vec<TypeTag>,
         args: Vec<TransactionArgument>,
+        replay_protection_type: ReplayProtectiontype,
     ) -> SignedTransaction {
+        let script = Script::new(code, ty_args, args);
+        let payload = if self.use_payload_v2_format {
+            TransactionPayloadWrapper::Payload(
+                TransactionPayloadInner::V1 {
+                    executable: TransactionExecutable::Script(script),
+                    extra_config: TransactionExtraConfig::V1 {
+                        multisig_address: None,
+                        replay_protection_nonce: match replay_protection_type {
+                            ReplayProtectiontype::SequenceNumber => None,
+                            ReplayProtectiontype::Nonce => Some(rand::random::<u64>()),
+                        },
+                    }
+                }
+            )
+        } else {
+           TransactionPayloadWrapper::Script(script)
+        };
         self.create_transaction_payload(
             account,
-            TransactionPayload::Script(Script::new(code, ty_args, args)),
+            payload,
         )
     }
 
@@ -398,8 +484,9 @@ impl MoveHarness {
         fun: MemberId,
         ty_args: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
+        replay_protection_type: ReplayProtectiontype,
     ) -> TransactionStatus {
-        let txn = self.create_entry_function(account, fun, ty_args, args);
+        let txn = self.create_entry_function(account, fun, ty_args, args, replay_protection_type);
         self.run(txn)
     }
 
@@ -409,8 +496,9 @@ impl MoveHarness {
         account: &Account,
         multisig_address: AccountAddress,
         transaction_payload: Option<MultisigTransactionPayload>,
+        replay_protection_type: ReplayProtectiontype,
     ) -> TransactionStatus {
-        let txn = self.create_multisig(account, multisig_address, transaction_payload);
+        let txn = self.create_multisig(account, multisig_address, transaction_payload, replay_protection_type);
         self.run(txn)
     }
 
@@ -421,8 +509,9 @@ impl MoveHarness {
         fun: MemberId,
         ty_args: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
+        replay_protection_type: ReplayProtectiontype,
     ) -> u64 {
-        let txn = self.create_entry_function(account, fun, ty_args, args);
+        let txn = self.create_entry_function(account, fun, ty_args, args, replay_protection_type);
         let output = self.run_raw(txn);
         assert_success!(output.status().to_owned());
         output.gas_used()

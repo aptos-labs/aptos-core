@@ -136,6 +136,8 @@ pub enum FeatureFlag {
     DisallowInitModuleToPublishModules,
     EnableCallTreeAndInstructionVMCache,
     PermissionedSigner,
+    TransactionPayloadV2,
+    OrderlessTransactions,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -363,6 +365,8 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE
             },
             FeatureFlag::PermissionedSigner => AptosFeatureFlag::PERMISSIONED_SIGNER,
+            FeatureFlag::TransactionPayloadV2 => AptosFeatureFlag::TRANSACTION_PAYLOAD_V2,
+            FeatureFlag::OrderlessTransactions => AptosFeatureFlag::ORDERLESS_TRANSACTIONS,
         }
     }
 }
@@ -517,6 +521,8 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::EnableCallTreeAndInstructionVMCache
             },
             AptosFeatureFlag::PERMISSIONED_SIGNER => FeatureFlag::PermissionedSigner,
+            AptosFeatureFlag::TRANSACTION_PAYLOAD_V2 => FeatureFlag::TransactionPayloadV2,
+            AptosFeatureFlag::ORDERLESS_TRANSACTIONS => FeatureFlag::OrderlessTransactions,
         }
     }
 }

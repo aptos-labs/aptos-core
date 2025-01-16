@@ -6,22 +6,26 @@ use crate::{
     utils::PrefixedStateValueIterator,
 };
 use aptos_config::config::internal_indexer_db_config::InternalIndexerDBConfig;
+use aptos_crypto::hash::CryptoHash;
 use aptos_db_indexer_schemas::{
     metadata::{MetadataKey, MetadataValue, StateSnapshotProgress},
     schema::{
         event_by_key::EventByKeySchema, event_by_version::EventByVersionSchema,
         event_sequence_number::EventSequenceNumberSchema,
-        indexer_metadata::InternalIndexerMetadataSchema, state_keys::StateKeysSchema,
-        transaction_by_account::TransactionByAccountSchema,
+        indexer_metadata::InternalIndexerMetadataSchema,
+        ordered_transaction_by_account::OrderedTransactionByAccountSchema,
+        orderless_transaction_by_account::OrderlessTransactionByAccountSchema,
+        state_keys::StateKeysSchema,
+        transaction_summaries_by_account::TransactionSummariesByAccountSchema,
         translated_v1_event::TranslatedV1EventSchema,
     },
     utils::{
-        error_if_too_many_requested, get_first_seq_num_and_limit, AccountTransactionVersionIter,
-        MAX_REQUEST_LIMIT,
+        error_if_too_many_requested, get_first_seq_num_and_limit, AccountOrderedTransactionsIter,
+        AccountTransactionSummariesIter, MAX_REQUEST_LIMIT,
     },
 };
 use aptos_logger::warn;
-use aptos_schemadb::{batch::SchemaBatch, DB};
+use aptos_schemadb::{iterator::ScanDirection, batch::SchemaBatch, DB};
 use aptos_storage_interface::{
     db_ensure as ensure, db_other_bail as bail, AptosDbError, DbReader, Result,
 };
@@ -30,12 +34,12 @@ use aptos_types::{
     account_config::{BURN_TYPE, MINT_TYPE},
     contract_event::{ContractEvent, ContractEventV1, ContractEventV2, EventWithVersion},
     event::EventKey,
-    indexer::indexer_db_reader::Order,
+    indexer::indexer_db_reader::{IndexedTransactionSummary, Order},
     state_store::{
         state_key::{prefix::StateKeyPrefix, StateKey},
         state_value::StateValue,
     },
-    transaction::{AccountTransactionsWithProof, Transaction, Version},
+    transaction::{AccountTransactionsWithProof, ReplayProtector, Transaction, Version},
     write_set::{TransactionWrite, WriteSet},
 };
 use std::{
@@ -138,6 +142,10 @@ impl InternalIndexerDB {
         self.config.enable_transaction
     }
 
+    pub fn transaction_summaries_enabled(&self) -> bool {
+        self.config.enable_transaction_summaries
+    }
+
     pub fn statekeys_enabled(&self) -> bool {
         self.config.enable_statekeys
     }
@@ -170,16 +178,16 @@ impl InternalIndexerDB {
         bail!("ledger version too new")
     }
 
-    pub fn get_account_transaction_version_iter(
+    pub fn get_account_ordered_transactions_iter(
         &self,
         address: AccountAddress,
         min_seq_num: u64,
         num_versions: u64,
         ledger_version: Version,
-    ) -> Result<AccountTransactionVersionIter> {
-        let mut iter = self.db.iter::<TransactionByAccountSchema>()?;
+    ) -> Result<AccountOrderedTransactionsIter> {
+        let mut iter = self.db.iter::<OrderedTransactionByAccountSchema>()?;
         iter.seek(&(address, min_seq_num))?;
-        Ok(AccountTransactionVersionIter::new(
+        Ok(AccountOrderedTransactionsIter::new(
             iter,
             address,
             min_seq_num
@@ -187,6 +195,54 @@ impl InternalIndexerDB {
                 .ok_or(AptosDbError::TooManyRequested(min_seq_num, num_versions))?,
             ledger_version,
         ))
+    }
+
+    // TODO: Update this so that the user can specify even the range of chaintimestamps
+    pub fn get_account_transaction_summaries_iter(
+        &self,
+        address: AccountAddress,
+        start_version: Option<u64>,
+        end_version: Option<u64>,
+        limit: u64,
+        ledger_version: Version,
+    ) -> Result<AccountTransactionSummariesIter> {
+        if start_version.is_some() {
+            let mut iter = self.db.iter::<TransactionSummariesByAccountSchema>()?;
+            iter.seek(&(address, start_version.unwrap()))?;
+            Ok(AccountTransactionSummariesIter::new(
+                iter,
+                address,
+                start_version,
+                end_version,
+                limit,
+                ScanDirection::Forward,
+                ledger_version,
+            ))
+        } else if end_version.is_some() {
+            let mut iter = self.db.rev_iter::<TransactionSummariesByAccountSchema>()?;
+            iter.seek_for_prev(&(address, end_version.unwrap()))?;
+            Ok(AccountTransactionSummariesIter::new(
+                iter,
+                address,
+                start_version,
+                end_version,
+                limit,
+                ScanDirection::Backward,
+                ledger_version,
+            ))
+        } else {
+            let mut iter = self.db.rev_iter::<TransactionSummariesByAccountSchema>()?;
+            iter.seek_for_prev(&(address, u64::MAX))?;
+            Ok(AccountTransactionSummariesIter::new(
+                iter,
+                address,
+                start_version,
+                Some(u64::MAX),
+                limit,
+                ScanDirection::Backward,
+                ledger_version,
+            ))
+        }
     }
 
     pub fn get_latest_sequence_number(
@@ -402,11 +458,34 @@ impl DBIndexer {
         let mut event_keys: HashSet<EventKey> = HashSet::new();
         db_iter.try_for_each(|res| {
             let (txn, events, writeset) = res?;
-            if let Some(txn) = txn.try_as_signed_user_txn() {
+            if let Some(signed_txn) = txn.try_as_signed_user_txn() {
                 if self.indexer_db.transaction_enabled() {
-                    batch.put::<TransactionByAccountSchema>(
-                        &(txn.sender(), txn.sequence_number()),
-                        &version,
+                    match signed_txn.replay_protector() {
+                        ReplayProtector::SequenceNumber(seq_num) => {
+                            batch.put::<OrderedTransactionByAccountSchema>(
+                                &(signed_txn.sender(), seq_num),
+                                &version,
+                            )?;
+                        },
+                        ReplayProtector::Nonce(nonce) => {
+                            batch.put::<OrderlessTransactionByAccountSchema>(
+                                &(signed_txn.sender(), nonce),
+                                &version,
+                            )?;
+                        },
+                    }
+                }
+                if self.indexer_db.transaction_summaries_enabled() {
+                    let txn_summary = IndexedTransactionSummary {
+                        sender: signed_txn.sender(),
+                        replay_protector: signed_txn.replay_protector(),
+                        version,
+                        // Question: Is there anyway to get the hash without recomputing it?
+                        transaction_hash: txn.hash(),
+                    };
+                    batch.put::<TransactionSummariesByAccountSchema>(
+                        &(signed_txn.sender(), version),
+                        &txn_summary,
                     )?;
                 }
             }
@@ -567,7 +646,7 @@ impl DBIndexer {
         }
     }
 
-    pub fn get_account_transactions(
+    pub fn get_ordered_account_transactions(
         &self,
         address: AccountAddress,
         start_seq_num: u64,
@@ -581,7 +660,7 @@ impl DBIndexer {
 
         let txns_with_proofs = self
             .indexer_db
-            .get_account_transaction_version_iter(address, start_seq_num, limit, ledger_version)?
+            .get_account_ordered_transactions_iter(address, start_seq_num, limit, ledger_version)?
             .map(|result| {
                 let (_seq_num, txn_version) = result?;
                 self.main_db_reader.get_transaction_by_version(
@@ -593,6 +672,32 @@ impl DBIndexer {
             .collect::<Result<Vec<_>>>()?;
 
         Ok(AccountTransactionsWithProof::new(txns_with_proofs))
+    }
+
+    pub fn get_account_all_transaction_summaries(
+        &self,
+        address: AccountAddress,
+        start_version: Option<u64>,
+        end_version: Option<u64>,
+        limit: u64,
+        ledger_version: Version,
+    ) -> Result<Vec<IndexedTransactionSummary>> {
+        self.indexer_db
+            .ensure_cover_ledger_version(ledger_version)?;
+        error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
+        self.indexer_db
+            .get_account_transaction_summaries_iter(
+                address,
+                start_version,
+                end_version,
+                limit,
+                ledger_version,
+            )?
+            .map(|result| {
+                let (_version, txn_summary) = result?;
+                Ok(txn_summary)
+            })
+            .collect::<Result<Vec<_>>>()
     }
 
     pub fn get_prefixed_state_value_iterator(

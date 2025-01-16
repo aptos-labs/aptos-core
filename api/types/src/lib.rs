@@ -52,8 +52,8 @@ pub use transaction::{
     MultisigTransactionPayload, NoAccountSignature, PendingTransaction, PublicKey, ScriptPayload,
     ScriptWriteSet, Signature, SingleKeySignature, SubmitTransactionRequest, Transaction,
     TransactionData, TransactionId, TransactionInfo, TransactionOnChainData, TransactionPayload,
-    TransactionSignature, TransactionSigningMessage, TransactionsBatchSingleSubmissionFailure,
-    TransactionsBatchSubmissionResult, UserCreateSigningMessageRequest, UserTransaction,
+    TransactionSignature, TransactionSigningMessage, TransactionSummary,
+    TransactionsBatchSingleSubmissionFailure, TransactionsBatchSubmissionResult, UserTransaction,
     UserTransactionRequest, VersionedEvent, WriteModule, WriteResource, WriteSet, WriteSetChange,
     WriteSetPayload, WriteTableItem,
 };

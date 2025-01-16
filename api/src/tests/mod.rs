@@ -37,7 +37,8 @@ fn new_test_context_with_config(test_name: String, node_config: NodeConfig) -> T
 fn new_test_context_with_db_sharding_and_internal_indexer(test_name: String) -> TestContext {
     let mut node_config = NodeConfig::default();
     node_config.storage.rocksdb_configs.enable_storage_sharding = true;
-    node_config.indexer_db_config = InternalIndexerDBConfig::new(true, true, true, 0, true, 10);
+    node_config.indexer_db_config =
+        InternalIndexerDBConfig::new(true, true, true, true, 0, true, 10);
     let test_context = super_new_test_context(test_name, node_config, false, None);
     let _ = test_context
         .get_indexer_reader()
@@ -52,6 +53,7 @@ fn new_test_context_with_sharding_and_delayed_internal_indexer(
 ) -> TestContext {
     let mut node_config = NodeConfig::default();
     node_config.storage.rocksdb_configs.enable_storage_sharding = true;
-    node_config.indexer_db_config = InternalIndexerDBConfig::new(true, true, true, 0, true, 1);
+    node_config.indexer_db_config =
+        InternalIndexerDBConfig::new(true, true, true, true, 0, true, 1);
     super_new_test_context(test_name, node_config, false, end_version)
 }

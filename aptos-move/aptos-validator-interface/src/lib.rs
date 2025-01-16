@@ -14,7 +14,7 @@ use aptos_types::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
         StateViewId, StateViewResult, TStateView,
     },
-    transaction::{Transaction, TransactionInfo, Version},
+    transaction::{ReplayProtector, Transaction, TransactionInfo, Version},
 };
 use lru::LruCache;
 use move_core_types::language_storage::ModuleId;
@@ -75,10 +75,17 @@ pub trait AptosValidatorInterface: Sync {
 
     async fn get_latest_ledger_info_version(&self) -> Result<Version>;
 
+    // TODO: Should a similar function be added which takes a replay protector as input?
     async fn get_version_by_account_sequence(
         &self,
         account: AccountAddress,
         seq: u64,
+    ) -> Result<Option<Version>>;
+
+    async fn get_version_by_replay_protector(
+        &self,
+        account: AccountAddress,
+        replay_protector: ReplayProtector,
     ) -> Result<Option<Version>>;
 }
 

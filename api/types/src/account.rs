@@ -14,6 +14,10 @@ use serde::{Deserialize, Serialize};
 pub struct AccountData {
     pub sequence_number: U64,
     pub authentication_key: HexEncodedBytes,
+    // Stateless accounts donot have `0x1::Account` resource.
+    // If the `0x1::Account` resource doesn't exist, the above sequence_number is set to 0,
+    // and the below state_exists is set to false. 
+    pub state_exists: bool,
 }
 
 impl From<AccountResource> for AccountData {
@@ -22,6 +26,7 @@ impl From<AccountResource> for AccountData {
         Self {
             sequence_number: ar.sequence_number().into(),
             authentication_key,
+            state_exists: true,
         }
     }
 }

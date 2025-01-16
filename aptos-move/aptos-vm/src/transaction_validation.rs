@@ -12,9 +12,12 @@ use crate::{
     transaction_metadata::TransactionMetadata,
 };
 use aptos_gas_algebra::Gas;
+use aptos_logger::info;
 use aptos_types::{
-    account_config::constants::CORE_CODE_ADDRESS, fee_statement::FeeStatement,
-    on_chain_config::Features, transaction::Multisig,
+    account_config::constants::CORE_CODE_ADDRESS,
+    fee_statement::FeeStatement,
+    on_chain_config::Features,
+    transaction::{MultisigTransactionPayload, ReplayProtector, TransactionExecutable},
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
@@ -44,17 +47,36 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
         user_epilogue_gas_payer_name: Identifier::new("epilogue_gas_payer").unwrap(),
         fee_payer_prologue_extended_name: Identifier::new("fee_payer_script_prologue_extended")
             .unwrap(),
+        fee_payer_prologue_payload_v2_extension_name: Identifier::new(
+            "fee_payer_script_prologue_payload_v2_extension",
+        )
+        .unwrap(),
         script_prologue_extended_name: Identifier::new("script_prologue_extended").unwrap(),
+        script_prologue_payload_v2_extension_name: Identifier::new(
+            "script_prologue_payload_v2_extension",
+        )
+        .unwrap(),
         multi_agent_prologue_extended_name: Identifier::new("multi_agent_script_prologue_extended")
             .unwrap(),
+        multi_agent_prologue_payload_v2_extension_name: Identifier::new(
+            "multi_agent_script_prologue_payload_v2_extension",
+        )
+        .unwrap(),
         user_epilogue_extended_name: Identifier::new("epilogue_extended").unwrap(),
+        user_epilogue_payload_v2_extension_name: Identifier::new("epilogue_payload_v2_extension")
+            .unwrap(),
         user_epilogue_gas_payer_extended_name: Identifier::new("epilogue_gas_payer_extended")
             .unwrap(),
+        user_epilogue_gas_payer_payload_v2_extension_name: Identifier::new(
+            "epilogue_gas_payer_payload_v2_extension",
+        )
+        .unwrap(),
     });
 
 /// On-chain functions used to validate transactions
 #[derive(Clone, Debug)]
 pub struct TransactionValidation {
+    // TODO: After the `is_transaction_simulation_enhancement_enabled` feature flag is cleaned up, clean up these.
     pub module_addr: AccountAddress,
     pub module_name: Identifier,
     pub fee_payer_prologue_name: Identifier,
@@ -62,11 +84,16 @@ pub struct TransactionValidation {
     pub multi_agent_prologue_name: Identifier,
     pub user_epilogue_name: Identifier,
     pub user_epilogue_gas_payer_name: Identifier,
+    pub user_epilogue_payload_v2_extension_name: Identifier,
     pub fee_payer_prologue_extended_name: Identifier,
+    pub fee_payer_prologue_payload_v2_extension_name: Identifier,
     pub script_prologue_extended_name: Identifier,
+    pub script_prologue_payload_v2_extension_name: Identifier,
     pub multi_agent_prologue_extended_name: Identifier,
+    pub multi_agent_prologue_payload_v2_extension_name: Identifier,
     pub user_epilogue_extended_name: Identifier,
     pub user_epilogue_gas_payer_extended_name: Identifier,
+    pub user_epilogue_gas_payer_payload_v2_extension_name: Identifier,
 }
 
 impl TransactionValidation {
@@ -93,7 +120,8 @@ pub(crate) fn run_script_prologue(
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> Result<(), VMStatus> {
-    let txn_sequence_number = txn_data.sequence_number();
+    info!("prologue is_simulation {:?} (address: {:?}, replay_protector: {:?}, expiration_timestamp_secs: {:?})", is_simulation, txn_data.sender, txn_data.replay_protector(), txn_data.expiration_timestamp_secs());
+    let txn_replay_protector = txn_data.replay_protector();
     let txn_authentication_key = txn_data.authentication_key().to_vec();
     let txn_gas_price = txn_data.gas_unit_price();
     let txn_max_gas_units = txn_data.max_gas_amount();
@@ -105,11 +133,47 @@ pub(crate) fn run_script_prologue(
         .iter()
         .map(|auth_key| MoveValue::vector_u8(auth_key.to_vec()))
         .collect();
+    if !features.is_orderless_txns_enabled() {
+        if let ReplayProtector::Nonce(_) = txn_replay_protector {
+            return Err(VMStatus::error(
+                StatusCode::FEATURE_NOT_ENABLED,
+                Some("Orderless transactions not yet supported".to_string()),
+            ));
+        }
+    }
     let (prologue_function_name, args) = if let (Some(fee_payer), Some(fee_payer_auth_key)) = (
         txn_data.fee_payer(),
         txn_data.fee_payer_authentication_key.as_ref(),
     ) {
-        if features.is_transaction_simulation_enhancement_enabled() {
+        if features.is_transaction_payload_v2_enabled() {
+            let args = vec![
+                MoveValue::Signer(txn_data.sender),
+                txn_replay_protector.to_move_value(),
+                MoveValue::vector_u8(txn_authentication_key),
+                MoveValue::vector_address(txn_data.secondary_signers()),
+                MoveValue::Vector(secondary_auth_keys),
+                MoveValue::Address(fee_payer),
+                MoveValue::vector_u8(fee_payer_auth_key.to_vec()),
+                MoveValue::U64(txn_gas_price.into()),
+                MoveValue::U64(txn_max_gas_units.into()),
+                MoveValue::U64(txn_expiration_timestamp_secs),
+                MoveValue::U8(chain_id.id()),
+                MoveValue::Bool(is_simulation),
+            ];
+            (
+                &APTOS_TRANSACTION_VALIDATION.fee_payer_prologue_payload_v2_extension_name,
+                args,
+            )
+        } else if features.is_transaction_simulation_enhancement_enabled() {
+            // If the orderless transactions feature is not enabled, simply discard the orderless transactions.
+            let txn_sequence_number = match txn_replay_protector {
+                ReplayProtector::SequenceNumber(sequence_number) => Ok(sequence_number),
+                // TODO: Make sure this VMStatus code discards the transaction
+                ReplayProtector::Nonce(_) => Err(VMStatus::error(
+                    StatusCode::FEATURE_NOT_ENABLED,
+                    Some("Orderless transactions not yet supported".to_string()),
+                )),
+            }?;
             let args = vec![
                 MoveValue::Signer(txn_data.sender),
                 MoveValue::U64(txn_sequence_number),
@@ -129,6 +193,14 @@ pub(crate) fn run_script_prologue(
                 args,
             )
         } else {
+            // If the orderless transactions feature is not enabled, simply discard the orderless transactions.
+            let txn_sequence_number = match txn_replay_protector {
+                ReplayProtector::SequenceNumber(sequence_number) => Ok(sequence_number),
+                ReplayProtector::Nonce(_) => Err(VMStatus::error(
+                    StatusCode::FEATURE_NOT_ENABLED,
+                    Some("Orderless transactions not yet supported".to_string()),
+                )),
+            }?;
             let args = vec![
                 MoveValue::Signer(txn_data.sender),
                 MoveValue::U64(txn_sequence_number),
@@ -145,7 +217,31 @@ pub(crate) fn run_script_prologue(
             (&APTOS_TRANSACTION_VALIDATION.fee_payer_prologue_name, args)
         }
     } else if txn_data.is_multi_agent() {
-        if features.is_transaction_simulation_enhancement_enabled() {
+        if features.is_transaction_payload_v2_enabled() {
+            let args = vec![
+                MoveValue::Signer(txn_data.sender),
+                txn_replay_protector.to_move_value(),
+                MoveValue::vector_u8(txn_authentication_key),
+                MoveValue::vector_address(txn_data.secondary_signers()),
+                MoveValue::Vector(secondary_auth_keys),
+                MoveValue::U64(txn_gas_price.into()),
+                MoveValue::U64(txn_max_gas_units.into()),
+                MoveValue::U64(txn_expiration_timestamp_secs),
+                MoveValue::U8(chain_id.id()),
+                MoveValue::Bool(is_simulation),
+            ];
+            (
+                &APTOS_TRANSACTION_VALIDATION.multi_agent_prologue_payload_v2_extension_name,
+                args,
+            )
+        } else if features.is_transaction_simulation_enhancement_enabled() {
+            let txn_sequence_number = match txn_replay_protector {
+                ReplayProtector::SequenceNumber(sequence_number) => Ok(sequence_number),
+                ReplayProtector::Nonce(_) => Err(VMStatus::error(
+                    StatusCode::FEATURE_NOT_ENABLED,
+                    Some("Orderless transactions not yet supported".to_string()),
+                )),
+            }?;
             let args = vec![
                 MoveValue::Signer(txn_data.sender),
                 MoveValue::U64(txn_sequence_number),
@@ -163,6 +259,13 @@ pub(crate) fn run_script_prologue(
                 args,
             )
         } else {
+            let txn_sequence_number = match txn_replay_protector {
+                ReplayProtector::SequenceNumber(sequence_number) => Ok(sequence_number),
+                ReplayProtector::Nonce(_) => Err(VMStatus::error(
+                    StatusCode::FEATURE_NOT_ENABLED,
+                    Some("Orderless transactions not yet supported".to_string()),
+                )),
+            }?;
             let args = vec![
                 MoveValue::Signer(txn_data.sender),
                 MoveValue::U64(txn_sequence_number),
@@ -181,7 +284,30 @@ pub(crate) fn run_script_prologue(
         }
     } else {
         #[allow(clippy::collapsible_else_if)]
-        if features.is_transaction_simulation_enhancement_enabled() {
+        if features.is_transaction_payload_v2_enabled() {
+            let args = vec![
+                MoveValue::Signer(txn_data.sender),
+                txn_replay_protector.to_move_value(),
+                MoveValue::vector_u8(txn_authentication_key),
+                MoveValue::U64(txn_gas_price.into()),
+                MoveValue::U64(txn_max_gas_units.into()),
+                MoveValue::U64(txn_expiration_timestamp_secs),
+                MoveValue::U8(chain_id.id()),
+                MoveValue::vector_u8(txn_data.script_hash.clone()),
+                MoveValue::Bool(is_simulation),
+            ];
+            (
+                &APTOS_TRANSACTION_VALIDATION.script_prologue_payload_v2_extension_name,
+                args,
+            )
+        } else if features.is_transaction_simulation_enhancement_enabled() {
+            let txn_sequence_number = match txn_replay_protector {
+                ReplayProtector::SequenceNumber(sequence_number) => Ok(sequence_number),
+                ReplayProtector::Nonce(_) => Err(VMStatus::error(
+                    StatusCode::FEATURE_NOT_ENABLED,
+                    Some("Orderless transactions not yet supported".to_string()),
+                )),
+            }?;
             let args = vec![
                 MoveValue::Signer(txn_data.sender),
                 MoveValue::U64(txn_sequence_number),
@@ -198,6 +324,13 @@ pub(crate) fn run_script_prologue(
                 args,
             )
         } else {
+            let txn_sequence_number = match txn_replay_protector {
+                ReplayProtector::SequenceNumber(sequence_number) => Ok(sequence_number),
+                ReplayProtector::Nonce(_) => Err(VMStatus::error(
+                    StatusCode::FEATURE_NOT_ENABLED,
+                    Some("Orderless transactions not yet supported".to_string()),
+                )),
+            }?;
             let args = vec![
                 MoveValue::Signer(txn_data.sender),
                 MoveValue::U64(txn_sequence_number),
@@ -235,22 +368,50 @@ pub(crate) fn run_multisig_prologue(
     session: &mut SessionExt,
     module_storage: &impl ModuleStorage,
     txn_data: &TransactionMetadata,
-    payload: &Multisig,
+    executable: &TransactionExecutable,
+    multisig_address: AccountAddress,
     features: &Features,
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
 ) -> Result<(), VMStatus> {
     let unreachable_error = VMStatus::error(StatusCode::UNREACHABLE, None);
-    let provided_payload = if let Some(payload) = &payload.transaction_payload {
-        bcs::to_bytes(&payload).map_err(|_| unreachable_error.clone())?
-    } else {
-        // Default to empty bytes if payload is not provided.
-        if features.is_abort_if_multisig_payload_mismatch_enabled() {
-            vec![]
-        } else {
-            bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| unreachable_error)?
-        }
+    // Question: Earlier the `provided_payload` was being calculated as bcs::to_bytes(MultisigTransactionPayload::EntryFunction(entry_function)).
+    // So, converting the executable to this format. Is this correct?
+    let provided_payload = match executable {
+        TransactionExecutable::EntryFunction(entry_function) => {
+            // TODO: See how to avoid cloning the entry function here.
+            bcs::to_bytes(&MultisigTransactionPayload::EntryFunction(
+                entry_function.clone(),
+            ))
+            .map_err(|_| unreachable_error.clone())?
+        },
+        TransactionExecutable::Empty => {
+            if features.is_abort_if_multisig_payload_mismatch_enabled() {
+                vec![]
+            } else {
+                bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| unreachable_error.clone())?
+            }
+        },
+        TransactionExecutable::Script(_) => {
+            // Question: Earlier, multisig transactions only supported EntryFunction payloads.
+            // So, what should we do if the executable for a multisig transaction is a script?
+            return Err(VMStatus::error(
+                StatusCode::FEATURE_NOT_ENABLED,
+                Some("Script payload not supported for multisig transactions".to_string()),
+            ));
+        },
     };
+
+    // let provided_payload = if let Some(payload) = &payload.transaction_payload {
+    //     bcs::to_bytes(&payload).map_err(|_| unreachable_error.clone())?
+    // } else {
+    //     // Default to empty bytes if payload is not provided.
+    //     if features.is_abort_if_multisig_payload_mismatch_enabled() {
+    //         vec![]
+    //     } else {
+    //         bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| unreachable_error)?
+    //     }
+    // };
 
     session
         .execute_function_bypass_visibility(
@@ -259,7 +420,7 @@ pub(crate) fn run_multisig_prologue(
             vec![],
             serialize_values(&vec![
                 MoveValue::Signer(txn_data.sender),
-                MoveValue::Address(payload.multisig_address),
+                MoveValue::Address(multisig_address),
                 MoveValue::vector_u8(provided_payload),
             ]),
             &mut UnmeteredGasMeter,
@@ -283,12 +444,29 @@ fn run_epilogue(
 ) -> VMResult<()> {
     let txn_gas_price = txn_data.gas_unit_price();
     let txn_max_gas_units = txn_data.max_gas_amount();
+    let is_orderless_txn = txn_data.is_orderless();
 
     // We can unconditionally do this as this condition can only be true if the prologue
     // accepted it, in which case the gas payer feature is enabled.
     if let Some(fee_payer) = txn_data.fee_payer() {
         let (func_name, args) = {
-            if features.is_transaction_simulation_enhancement_enabled() {
+            if features.is_transaction_payload_v2_enabled() {
+                // TODO: After the `is_transaction_simulation_enhancement_enabled` feature flag is removed, clean up this if statement.
+                let args = vec![
+                    MoveValue::Signer(txn_data.sender),
+                    MoveValue::Address(fee_payer),
+                    MoveValue::U64(fee_statement.storage_fee_refund()),
+                    MoveValue::U64(txn_gas_price.into()),
+                    MoveValue::U64(txn_max_gas_units.into()),
+                    MoveValue::U64(gas_remaining.into()),
+                    MoveValue::Bool(is_simulation),
+                    MoveValue::Bool(is_orderless_txn),
+                ];
+                (
+                    &APTOS_TRANSACTION_VALIDATION.user_epilogue_gas_payer_payload_v2_extension_name,
+                    args,
+                )
+            } else if features.is_transaction_simulation_enhancement_enabled() {
                 let args = vec![
                     MoveValue::Signer(txn_data.sender),
                     MoveValue::Address(fee_payer),
@@ -329,7 +507,21 @@ fn run_epilogue(
     } else {
         // Regular tx, run the normal epilogue
         let (func_name, args) = {
-            if features.is_transaction_simulation_enhancement_enabled() {
+            if features.is_transaction_payload_v2_enabled() {
+                let args = vec![
+                    MoveValue::Signer(txn_data.sender),
+                    MoveValue::U64(fee_statement.storage_fee_refund()),
+                    MoveValue::U64(txn_gas_price.into()),
+                    MoveValue::U64(txn_max_gas_units.into()),
+                    MoveValue::U64(gas_remaining.into()),
+                    MoveValue::Bool(is_simulation),
+                    MoveValue::Bool(is_orderless_txn),
+                ];
+                (
+                    &APTOS_TRANSACTION_VALIDATION.user_epilogue_payload_v2_extension_name,
+                    args,
+                )
+            } else if features.is_transaction_simulation_enhancement_enabled() {
                 let args = vec![
                     MoveValue::Signer(txn_data.sender),
                     MoveValue::U64(fee_statement.storage_fee_refund()),

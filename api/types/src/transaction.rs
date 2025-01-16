@@ -182,6 +182,23 @@ impl
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+#[serde(tag = "type")]
+pub struct TransactionSummary {
+    pub sender: Address,
+    pub version: U64,
+    pub transaction_hash: HashValue,
+    pub replay_protector: ReplayProtector,
+    // pub timestamp: U64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
+#[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
+pub enum ReplayProtector {
+    Nonce(U64),
+    SequenceNumber(U64),
+}
+
 /// Enum of the different types of transactions in Aptos
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -333,6 +350,7 @@ impl From<(&SignedTransaction, TransactionPayload)> for UserTransactionRequest {
             expiration_timestamp_secs: txn.expiration_timestamp_secs().into(),
             signature: Some(txn.authenticator().into()),
             payload,
+            replay_protection_nonce: txn.replay_protector().get_nonce().map(|nonce| nonce.into()),
         }
     }
 }
@@ -380,7 +398,6 @@ impl From<(SignedTransaction, TransactionPayload)> for PendingTransaction {
         }
     }
 }
-
 /// A transaction submitted by a user to change the state of the blockchain
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct UserTransaction {
@@ -466,6 +483,8 @@ pub struct UserTransactionRequestInner {
     pub gas_unit_price: U64,
     pub expiration_timestamp_secs: U64,
     pub payload: TransactionPayload,
+    // For orderless transactions, we include the nonce here, instead of inside the TransactionPayload.
+    pub replay_protection_nonce: Option<U64>,
 }
 
 impl VerifyInput for UserTransactionRequestInner {
@@ -494,17 +513,8 @@ pub struct UserTransactionRequest {
     pub payload: TransactionPayload,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature: Option<TransactionSignature>,
-}
-
-/// Request to create signing messages
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
-pub struct UserCreateSigningMessageRequest {
-    #[serde(flatten)]
-    #[oai(flatten)]
-    pub transaction: UserTransactionRequest,
-    /// Secondary signer accounts of the request for Multi-agent
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub secondary_signers: Option<Vec<Address>>,
+    // For orderless transactions, we include the nonce here, instead of inside the TransactionPayload.
+    pub replay_protection_nonce: Option<U64>,
 }
 
 /// Request to encode a submission
@@ -924,11 +934,9 @@ pub enum GenesisPayload {
 pub enum TransactionPayload {
     EntryFunctionPayload(EntryFunctionPayload),
     ScriptPayload(ScriptPayload),
-
     // Deprecated. We cannot remove the enum variant because it breaks the
     // ordering, unfortunately.
     ModuleBundlePayload(DeprecatedModuleBundlePayload),
-
     MultisigPayload(MultisigPayload),
 }
 

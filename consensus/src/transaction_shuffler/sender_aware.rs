@@ -231,7 +231,7 @@ mod tests {
     use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
     use aptos_types::{
         chain_id::ChainId,
-        transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
+        transaction::{RawTransaction, Script, SignedTransaction, TransactionPayloadWrapper},
     };
     use move_core_types::account_address::AccountAddress;
     use rand::{rngs::OsRng, Rng};
@@ -249,7 +249,7 @@ mod tests {
 
         for i in 0..num_transactions {
             let transaction_payload =
-                TransactionPayload::Script(Script::new(vec![], vec![], vec![]));
+                TransactionPayloadWrapper::Script(Script::new(vec![], vec![], vec![]));
             let raw_transaction = RawTransaction::new(
                 sender,
                 i as u64,
