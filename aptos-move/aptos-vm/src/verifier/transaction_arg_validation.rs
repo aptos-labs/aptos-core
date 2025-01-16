@@ -9,7 +9,7 @@
 use crate::{aptos_vm::SerializedSigners, move_vm_ext::SessionExt, VMStatus};
 use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use move_binary_format::{
-    errors::{Location, PartialVMError, PartialVMResult},
+    errors::{Location, PartialVMError},
     file_format::FunctionDefinitionIndex,
     file_format_common::read_uleb128_as_u64,
 };
@@ -140,8 +140,7 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     for ty in func.param_tys()[signer_param_cnt..].iter() {
         let subst_res = ty_builder.create_ty_with_subst(ty, func.ty_args());
         let ty = subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-        let valid = is_valid_txn_arg(session, module_storage, &ty, allowed_structs)
-            .map_err(|err| err.finish(Location::Undefined).into_vm_status())?;
+        let valid = is_valid_txn_arg(session, module_storage, &ty, allowed_structs);
         if !valid {
             return Err(VMStatus::error(
                 StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
@@ -200,28 +199,29 @@ pub(crate) fn is_valid_txn_arg(
     module_storage: &impl AptosModuleStorage,
     ty: &Type,
     allowed_structs: &ConstructorMap,
-) -> PartialVMResult<bool> {
+) -> bool {
     use move_vm_types::loaded_data::runtime_types::Type::*;
 
-    Ok(match ty {
+    match ty {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
-        Vector(inner) => is_valid_txn_arg(session, module_storage, inner, allowed_structs)?,
+        Vector(inner) => is_valid_txn_arg(session, module_storage, inner, allowed_structs),
         Struct { .. } | StructInstantiation { .. } => {
-            let (module_id, identifier) =
-                session
-                    .get_struct_name(ty, module_storage)?
-                    .ok_or_else(|| {
-                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                            .with_message(format!("Expected struct type, but got {:?}", ty))
-                    })?;
-            allowed_structs.contains_key(&format!(
-                "{}::{}",
-                module_id.short_str_lossless(),
-                identifier
-            ))
+            // Note: Original behavior was to return false even if the module loading fails (e.g.,
+            //       if struct does not exist. This preserves it.
+            session
+                .get_struct_name(ty, module_storage)
+                .ok()
+                .flatten()
+                .is_some_and(|(module_id, identifier)| {
+                    allowed_structs.contains_key(&format!(
+                        "{}::{}",
+                        module_id.short_str_lossless(),
+                        identifier
+                    ))
+                })
         },
         Signer | Reference(_) | MutableReference(_) | TyParam(_) => false,
-    })
+    }
 }
 
 // Construct arguments. Walk through the arguments and according to the signature
@@ -355,7 +355,11 @@ pub(crate) fn recursively_construct_arg(
         Struct { .. } | StructInstantiation { .. } => {
             let (module_id, identifier) = session
                 .get_struct_name(ty, module_storage)
-                .map_err(|_| invalid_signature())?
+                .map_err(|_| {
+                    // Note: The original behaviour was to map all errors to an invalid signature
+                    //       error, here we want to preserve it for now.
+                    invalid_signature()
+                })?
                 .ok_or_else(invalid_signature)?;
             let full_name = format!("{}::{}", module_id.short_str_lossless(), identifier);
             let constructor = allowed_structs
