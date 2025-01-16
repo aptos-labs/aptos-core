@@ -271,6 +271,25 @@ impl ConsensusObserver {
             ))
         );
 
+        if self.pipeline_enabled() {
+            for block in ordered_block.blocks() {
+                let commit_callback = self.active_observer_state.create_commit_callback(
+                    self.ordered_block_store.clone(),
+                    self.block_payload_store.clone(),
+                );
+                if let Some(futs) = self.get_parent_pipeline_futs(block) {
+                    self.pipeline_builder().build(block, futs, commit_callback);
+                } else {
+                    warn!(
+                            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                                "Parent block's pipeline futures for ordered block is missing! Ignoring: {:?}",
+                                ordered_block.proof_block_info()
+                            ))
+                        );
+                    return;
+                }
+            }
+        }
         // Create the commit callback (to be called after the execution pipeline)
         let commit_callback = self
             .active_observer_state
@@ -354,17 +373,19 @@ impl ConsensusObserver {
         }
     }
 
-    /// Returns the last block's pipeline futures, should only be called when pipeline is enabled
-    fn get_last_pipeline_futs(&self) -> PipelineFutures {
-        if let Some(last_ordered_block) = self.ordered_block_store.lock().get_last_ordered_block() {
-            last_ordered_block
-                .pipeline_futs()
-                .expect("Pipeline futures should exist when enabled")
+    /// Returns the parent block's pipeline futures, should only be called when pipeline is enabled
+    fn get_parent_pipeline_futs(&self, block: &PipelinedBlock) -> Option<PipelineFutures> {
+        if let Some(last_ordered_block) = self
+            .ordered_block_store
+            .lock()
+            .get_ordered_block(block.epoch(), block.quorum_cert().certified_block().round())
+        {
+            last_ordered_block.last_block().pipeline_futs()
         } else {
-            self.pipeline_builder().build_root(
+            Some(self.pipeline_builder().build_root(
                 StateComputeResult::new_dummy(),
                 self.active_observer_state.root().clone(),
-            )
+            ))
         }
     }
 
@@ -787,28 +808,15 @@ impl ConsensusObserver {
                 metrics::ORDERED_BLOCK_LABEL,
             );
 
-            // If the new pipeline is enabled, build the pipeline for the blocks
-            if self.pipeline_enabled() {
-                for block in ordered_block.blocks() {
-                    let commit_callback = self.active_observer_state.create_commit_callback(
-                        self.ordered_block_store.clone(),
-                        self.block_payload_store.clone(),
-                    );
-                    self.pipeline_builder().build(
-                        block,
-                        self.get_last_pipeline_futs(),
-                        commit_callback,
-                    );
-                }
-            }
-
             // Insert the ordered block into the pending blocks
             self.ordered_block_store
                 .lock()
                 .insert_ordered_block(ordered_block.clone());
 
             // If state sync is not syncing to a commit, finalize the ordered blocks
-            if !self.state_sync_manager.is_syncing_to_commit() {
+            if !self.state_sync_manager.is_syncing_to_commit()
+                && !self.state_sync_manager.in_fallback_mode()
+            {
                 self.finalize_ordered_block(ordered_block).await;
             }
         } else {
