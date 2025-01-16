@@ -13,8 +13,7 @@ use move_core_types::{
     gas_algebra::{InternalGas, InternalGasUnit},
     vm_status::StatusCode,
 };
-use std::fmt::Debug;
-use std::ops::AddAssign;
+use std::{fmt::Debug, ops::AddAssign};
 
 /// Base gas algebra implementation that tracks the gas usage using its internal counters.
 ///

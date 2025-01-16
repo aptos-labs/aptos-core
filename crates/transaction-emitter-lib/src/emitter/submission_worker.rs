@@ -522,7 +522,7 @@ pub async fn submit_transactions(
                                     Some(5),
                                 )
                                 .await
-                                    .ok()
+                                .ok()
                                 .map(|r| r.into_inner())
                         } else {
                             None

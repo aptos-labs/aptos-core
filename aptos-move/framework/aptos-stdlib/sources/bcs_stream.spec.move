@@ -1,4 +1,4 @@
-spec aptos_framework::bcs_stream {
+spec aptos_std::bcs_stream {
     spec module {
         pragma verify = false;
     }

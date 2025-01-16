@@ -2062,10 +2062,14 @@ impl AptosVM {
         }));
 
         if self.features().is_account_abstraction_enabled() {
-            let max_aa_gas = unwrap_or_discard!(self.gas_params(log_context)).vm.txn.max_aa_gas;
+            let max_aa_gas = unwrap_or_discard!(self.gas_params(log_context))
+                .vm
+                .txn
+                .max_aa_gas;
             if max_aa_gas < txn_data.max_gas_amount() {
                 // Reset initial gas after validation with max_aa_gas.
-                unwrap_or_discard!(gas_meter.inject_balance(txn_data.max_gas_amount().checked_sub(max_aa_gas).unwrap()));
+                unwrap_or_discard!(gas_meter
+                    .inject_balance(txn_data.max_gas_amount().checked_sub(max_aa_gas).unwrap()));
             }
         } else {
             assert_eq!(initial_gas, gas_meter.balance());
@@ -3122,7 +3126,10 @@ impl VMValidator for AptosVM {
         };
 
         let initial_balance = if self.features().is_account_abstraction_enabled() {
-            vm_params.txn.max_aa_gas.min(txn_data.max_gas_amount().into())
+            vm_params
+                .txn
+                .max_aa_gas
+                .min(txn_data.max_gas_amount().into())
         } else {
             txn_data.max_gas_amount()
         };

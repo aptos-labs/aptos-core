@@ -8,7 +8,7 @@
 /// Application:
 /// - This deserializer is particularly valuable for processing BCS serialized data within Move modules,
 ///   especially useful for systems requiring cross-chain message interpretation or off-chain data verification.
-module aptos_framework::bcs_stream {
+module aptos_std::bcs_stream {
     use std::error;
     use std::vector;
     use std::option::{Self, Option};
