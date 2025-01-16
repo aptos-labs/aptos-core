@@ -177,17 +177,16 @@ fun m::test($t0: u64, $t1: bool) {
      var $t5: u64 [unused]
      var $t6: u64 [unused]
      var $t7: u64
-  0: $t0 := move($t0)
-  1: if ($t1) goto 2 else goto 6
-  2: label L0
-  3: m::consume($t0)
-  4: label L2
-  5: return ()
-  6: label L1
-  7: $t0 := move($t0)
-  8: $t7 := 1
-  9: $t0 := +($t0, $t7)
- 10: goto 4
+  0: if ($t1) goto 1 else goto 5
+  1: label L0
+  2: m::consume($t0)
+  3: label L2
+  4: return ()
+  5: label L1
+  6: $t0 := move($t0)
+  7: $t7 := 1
+  8: $t0 := +($t0, $t7)
+  9: goto 3
 }
 
 

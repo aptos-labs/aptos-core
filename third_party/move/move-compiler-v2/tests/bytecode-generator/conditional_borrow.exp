@@ -430,8 +430,8 @@ B0:
 }
 test1(Arg0: u64): u64 /* def_idx: 1 */ {
 L1:	loc0: u64
-L2:	loc1: &mut u64
-L3:	loc2: u64
+L2:	loc1: u64
+L3:	loc2: &mut u64
 L4:	loc3: u64
 L5:	loc4: u64
 L6:	loc5: u64
@@ -447,65 +447,65 @@ B1:
 	5: StLoc[1](loc0: u64)
 B2:
 	6: MutBorrowLoc[1](loc0: u64)
-	7: StLoc[2](loc1: &mut u64)
+	7: StLoc[3](loc2: &mut u64)
 	8: LdU64(10)
-	9: MoveLoc[2](loc1: &mut u64)
+	9: MoveLoc[3](loc2: &mut u64)
 	10: WriteRef
 	11: MoveLoc[0](Arg0: u64)
-	12: StLoc[3](loc2: u64)
-	13: MutBorrowLoc[3](loc2: u64)
-	14: StLoc[2](loc1: &mut u64)
-	15: CopyLoc[2](loc1: &mut u64)
+	12: StLoc[4](loc3: u64)
+	13: MutBorrowLoc[4](loc3: u64)
+	14: StLoc[3](loc2: &mut u64)
+	15: CopyLoc[3](loc2: &mut u64)
 	16: ReadRef
 	17: LdU64(1)
 	18: Add
-	19: MoveLoc[2](loc1: &mut u64)
+	19: MoveLoc[3](loc2: &mut u64)
 	20: WriteRef
-	21: MoveLoc[3](loc2: u64)
-	22: StLoc[4](loc3: u64)
-	23: CopyLoc[4](loc3: u64)
+	21: MoveLoc[4](loc3: u64)
+	22: StLoc[2](loc1: u64)
+	23: CopyLoc[2](loc1: u64)
 	24: LdU64(0)
 	25: Add
 	26: StLoc[5](loc4: u64)
 	27: MutBorrowLoc[5](loc4: u64)
-	28: StLoc[2](loc1: &mut u64)
-	29: CopyLoc[2](loc1: &mut u64)
+	28: StLoc[3](loc2: &mut u64)
+	29: CopyLoc[3](loc2: &mut u64)
 	30: ReadRef
 	31: LdU64(2)
 	32: Add
-	33: MoveLoc[2](loc1: &mut u64)
+	33: MoveLoc[3](loc2: &mut u64)
 	34: WriteRef
-	35: CopyLoc[4](loc3: u64)
+	35: CopyLoc[2](loc1: u64)
 	36: StLoc[6](loc5: u64)
 	37: MutBorrowLoc[6](loc5: u64)
-	38: StLoc[2](loc1: &mut u64)
-	39: CopyLoc[2](loc1: &mut u64)
+	38: StLoc[3](loc2: &mut u64)
+	39: CopyLoc[3](loc2: &mut u64)
 	40: ReadRef
 	41: LdU64(4)
 	42: Add
-	43: MoveLoc[2](loc1: &mut u64)
+	43: MoveLoc[3](loc2: &mut u64)
 	44: WriteRef
-	45: CopyLoc[4](loc3: u64)
+	45: CopyLoc[2](loc1: u64)
 	46: StLoc[7](loc6: u64)
 	47: MutBorrowLoc[7](loc6: u64)
-	48: StLoc[2](loc1: &mut u64)
-	49: CopyLoc[2](loc1: &mut u64)
+	48: StLoc[3](loc2: &mut u64)
+	49: CopyLoc[3](loc2: &mut u64)
 	50: ReadRef
 	51: LdU64(8)
 	52: Add
-	53: MoveLoc[2](loc1: &mut u64)
+	53: MoveLoc[3](loc2: &mut u64)
 	54: WriteRef
-	55: CopyLoc[4](loc3: u64)
+	55: CopyLoc[2](loc1: u64)
 	56: StLoc[8](loc7: u64)
 	57: MutBorrowLoc[8](loc7: u64)
-	58: StLoc[2](loc1: &mut u64)
-	59: CopyLoc[2](loc1: &mut u64)
+	58: StLoc[3](loc2: &mut u64)
+	59: CopyLoc[3](loc2: &mut u64)
 	60: ReadRef
 	61: LdU64(16)
 	62: Add
-	63: MoveLoc[2](loc1: &mut u64)
+	63: MoveLoc[3](loc2: &mut u64)
 	64: WriteRef
-	65: MoveLoc[4](loc3: u64)
+	65: MoveLoc[2](loc1: u64)
 	66: Ret
 B3:
 	67: LdU64(3)

@@ -134,8 +134,9 @@ fun m::test($t0: u64): bool {
   2: $t0 := move($t0)
   3: $t7 := 1
   4: $t0 := +($t0, $t7)
-  5: $t1 := ==($t2, $t3)
-  6: return $t1
+  5: $t2 := move($t2)
+  6: $t1 := ==($t2, $t3)
+  7: return $t1
 }
 
 

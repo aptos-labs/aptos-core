@@ -1,0 +1,125 @@
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::consume($t0: u64, $t1: u64, $t2: u64, $t3: u64, $t4: u64, $t5: u64) {
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::multi(): (u64, u64, u64, u64, u64, u64) {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # live vars:
+  0: $t0 := m::one()
+     # live vars: $t0
+  1: $t1 := m::one()
+     # live vars: $t0, $t1
+  2: $t2 := m::one()
+     # live vars: $t0, $t1, $t2
+  3: $t3 := m::one()
+     # live vars: $t0, $t1, $t2, $t3
+  4: $t4 := m::one()
+     # live vars: $t0, $t1, $t2, $t3, $t4
+  5: $t5 := m::one()
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5
+  6: return ($t0, $t1, $t2, $t3, $t4, $t5)
+}
+
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+fun m::test() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64 [unused]
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     # flush: $t0, $t1, $t2, $t3, $t4, $t5
+     # live vars:
+  0: ($t0, $t1, $t2, $t3, $t4, $t5) := m::multi()
+     # live vars: $t0
+  1: $t6 := m::one()
+     # live vars: $t0, $t6
+  2: $t0 := move($t0)
+     # live vars: $t0, $t6
+  3: $t8 := m::one()
+     # live vars: $t0, $t6, $t8
+  4: $t9 := m::one()
+     # live vars: $t0, $t6, $t8, $t9
+  5: $t10 := m::one()
+     # live vars: $t0, $t6, $t8, $t9, $t10
+  6: $t11 := m::one()
+     # live vars: $t0, $t6, $t8, $t9, $t10, $t11
+  7: m::consume($t6, $t0, $t8, $t9, $t10, $t11)
+     # live vars:
+  8: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+consume(Arg0: u64, Arg1: u64, Arg2: u64, Arg3: u64, Arg4: u64, Arg5: u64) /* def_idx: 0 */ {
+B0:
+	0: Ret
+}
+multi(): u64 * u64 * u64 * u64 * u64 * u64 /* def_idx: 1 */ {
+B0:
+	0: Call one(): u64
+	1: Call one(): u64
+	2: Call one(): u64
+	3: Call one(): u64
+	4: Call one(): u64
+	5: Call one(): u64
+	6: Ret
+}
+one(): u64 /* def_idx: 2 */ {
+B0:
+	0: LdU64(1)
+	1: Ret
+}
+test() /* def_idx: 3 */ {
+L0:	loc0: u64
+B0:
+	0: Call multi(): u64 * u64 * u64 * u64 * u64 * u64
+	1: Pop
+	2: Pop
+	3: Pop
+	4: Pop
+	5: Pop
+	6: StLoc[0](loc0: u64)
+	7: Call one(): u64
+	8: MoveLoc[0](loc0: u64)
+	9: Call one(): u64
+	10: Call one(): u64
+	11: Call one(): u64
+	12: Call one(): u64
+	13: Call consume(u64, u64, u64, u64, u64, u64)
+	14: Ret
+}
+}
+============ bytecode verification succeeded ========
