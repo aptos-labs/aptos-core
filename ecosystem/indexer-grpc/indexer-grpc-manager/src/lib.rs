@@ -3,6 +3,7 @@
 
 pub mod config;
 mod grpc_manager;
+mod metadata_manager;
 mod service;
 #[cfg(test)]
 mod test;
