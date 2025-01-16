@@ -272,7 +272,7 @@ impl BuiltPackage {
 
             if let Some(model_options) = model.get_extension::<Options>() {
                 if model_options.experiment_on(Experiment::STOP_BEFORE_EXTENDED_CHECKS) {
-                    std::process::exit(0)
+                    std::process::exit(if model.has_warnings() { 1 } else { 0 })
                 }
             }
 
@@ -287,7 +287,7 @@ impl BuiltPackage {
 
             if let Some(model_options) = model.get_extension::<Options>() {
                 if model_options.experiment_on(Experiment::STOP_AFTER_EXTENDED_CHECKS) {
-                    std::process::exit(0)
+                    std::process::exit(if model.has_warnings() { 1 } else { 0 })
                 }
             }
 
