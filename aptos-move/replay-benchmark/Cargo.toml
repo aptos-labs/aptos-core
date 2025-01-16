@@ -24,7 +24,13 @@ aptos-vm = { workspace = true }
 bcs = { workspace = true }
 claims = { workspace = true }
 clap = { workspace = true }
+colored = { workspace = true }
+move-core-types = { workspace = true }
 parking_lot = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
+
+[dev-dependencies]
+aptos-crypto = { workspace = true }
+rand = { workspace = true }
