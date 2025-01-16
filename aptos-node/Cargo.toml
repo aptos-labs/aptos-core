@@ -68,6 +68,7 @@ bcs = { workspace = true }
 clap = { workspace = true }
 either = { workspace = true }
 fail = { workspace = true }
+fullnode-sync = { path = "../fullnode-sync" }
 futures = { workspace = true }
 hex = { workspace = true }
 num_cpus = { workspace = true }
