@@ -346,22 +346,41 @@ impl InterpreterImpl {
                     let (function, frame_cache) = if RTCaches::caches_enabled() {
                         let current_frame_cache = &mut *current_frame.frame_cache.borrow_mut();
 
-                        match current_frame_cache.sub_frame_cache.entry(fh_idx) {
-                            btree_map::Entry::Occupied(entry) => {
-                                let entry = entry.get();
-                                (Rc::clone(&entry.0), Rc::clone(&entry.1))
-                            },
-                            btree_map::Entry::Vacant(entry) => {
-                                let function = Rc::new(self.load_function(
-                                    &resolver,
-                                    &current_frame,
-                                    fh_idx,
-                                )?);
-                                let frame_cache = FrameTypeCache::make_rc_for_function(&function);
+                        if let PerInstructionCache::Call(ref function, ref frame_cache) =
+                            current_frame_cache.per_instruction_cache[current_frame.pc as usize]
+                        {
+                            (Rc::clone(function), Rc::clone(frame_cache))
+                        } else {
+                            match current_frame_cache.sub_frame_cache.entry(fh_idx) {
+                                btree_map::Entry::Occupied(entry) => {
+                                    let entry = entry.get();
+                                    current_frame_cache.per_instruction_cache
+                                        [current_frame.pc as usize] = PerInstructionCache::Call(
+                                        Rc::clone(&entry.0),
+                                        Rc::clone(&entry.1),
+                                    );
 
-                                entry.insert((Rc::clone(&function), Rc::clone(&frame_cache)));
-                                (function, frame_cache)
-                            },
+                                    (Rc::clone(&entry.0), Rc::clone(&entry.1))
+                                },
+                                btree_map::Entry::Vacant(entry) => {
+                                    let function = Rc::new(self.load_function(
+                                        &resolver,
+                                        &current_frame,
+                                        fh_idx,
+                                    )?);
+                                    let frame_cache =
+                                        FrameTypeCache::make_rc_for_function(&function);
+
+                                    entry.insert((Rc::clone(&function), Rc::clone(&frame_cache)));
+                                    current_frame_cache.per_instruction_cache
+                                        [current_frame.pc as usize] = PerInstructionCache::Call(
+                                        Rc::clone(&function),
+                                        Rc::clone(&frame_cache),
+                                    );
+
+                                    (function, frame_cache)
+                                },
+                            }
                         }
                     } else {
                         let function = Rc::<LoadedFunction>::new(self.load_function(
@@ -418,24 +437,44 @@ impl InterpreterImpl {
                     let (function, frame_cache) = if RTCaches::caches_enabled() {
                         let current_frame_cache = &mut *current_frame.frame_cache.borrow_mut();
 
-                        match current_frame_cache.generic_sub_frame_cache.entry(idx) {
-                            btree_map::Entry::Occupied(entry) => {
-                                let entry = entry.get();
-                                (Rc::clone(&entry.0), Rc::clone(&entry.1))
-                            },
-                            btree_map::Entry::Vacant(entry) => {
-                                let function =
-                                    Rc::<LoadedFunction>::new(self.load_generic_function(
-                                        &resolver,
-                                        &current_frame,
-                                        gas_meter,
-                                        idx,
-                                    )?);
-                                let frame_cache = FrameTypeCache::make_rc_for_function(&function);
+                        if let PerInstructionCache::CallGeneric(ref function, ref frame_cache) =
+                            current_frame_cache.per_instruction_cache[current_frame.pc as usize]
+                        {
+                            (Rc::clone(function), Rc::clone(frame_cache))
+                        } else {
+                            match current_frame_cache.generic_sub_frame_cache.entry(idx) {
+                                btree_map::Entry::Occupied(entry) => {
+                                    let entry = entry.get();
+                                    current_frame_cache.per_instruction_cache
+                                        [current_frame.pc as usize] =
+                                        PerInstructionCache::CallGeneric(
+                                            Rc::clone(&entry.0),
+                                            Rc::clone(&entry.1),
+                                        );
 
-                                entry.insert((Rc::clone(&function), Rc::clone(&frame_cache)));
-                                (function, frame_cache)
-                            },
+                                    (Rc::clone(&entry.0), Rc::clone(&entry.1))
+                                },
+                                btree_map::Entry::Vacant(entry) => {
+                                    let function =
+                                        Rc::<LoadedFunction>::new(self.load_generic_function(
+                                            &resolver,
+                                            &current_frame,
+                                            gas_meter,
+                                            idx,
+                                        )?);
+                                    let frame_cache =
+                                        FrameTypeCache::make_rc_for_function(&function);
+
+                                    entry.insert((Rc::clone(&function), Rc::clone(&frame_cache)));
+                                    current_frame_cache.per_instruction_cache
+                                        [current_frame.pc as usize] =
+                                        PerInstructionCache::CallGeneric(
+                                            Rc::clone(&function),
+                                            Rc::clone(&frame_cache),
+                                        );
+                                    (function, frame_cache)
+                                },
+                            }
                         }
                     } else {
                         let function = Rc::<LoadedFunction>::new(self.load_generic_function(
