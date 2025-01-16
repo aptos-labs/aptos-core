@@ -1,0 +1,13 @@
+---
+remote_endpoint: ~
+name: "v1.25-disable-v2-loader"
+proposals:
+  - name: feature_flags
+    metadata:
+      title: "Disable loader V2 feature flag"
+      description: "Disable using V2 loader for MoveVM and AptosVM"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          disabled:
+            - enable_loader_v2
