@@ -16,9 +16,8 @@ use aptos_types::{
     transaction::{TransactionOutputListWithProof, Version},
 };
 use either::Either;
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 use tokio::sync::watch::Sender;
-
 pub const SECONDARY_DB_DIR: &str = "fast_sync_secondary";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -44,7 +43,7 @@ impl FastSyncStorageWrapper {
     pub fn initialize_dbs(
         config: &NodeConfig,
         internal_indexer_db: Option<InternalIndexerDB>,
-        update_sender: Option<Sender<Version>>,
+        update_sender: Option<Sender<(Instant, Version)>>,
     ) -> Result<Either<AptosDB, Self>> {
         let mut db_main = AptosDB::open(
             config.storage.get_dir_paths(),

@@ -378,8 +378,8 @@ impl DBIndexer {
         Ok(zipped)
     }
 
-    fn get_num_of_transactions(&self, version: Version) -> Result<u64> {
-        let highest_version = self.main_db_reader.ensure_synced_version()?;
+    fn get_num_of_transactions(&self, version: Version, end_version: Version) -> Result<u64> {
+        let highest_version = min(self.main_db_reader.ensure_synced_version()?, end_version);
         if version > highest_version {
             // In case main db is not synced yet or recreated
             return Ok(0);
@@ -392,10 +392,25 @@ impl DBIndexer {
         Ok(num_of_transaction)
     }
 
-    pub fn process_a_batch(&self, start_version: Version) -> Result<Version> {
-        let _timer = TIMER.with_label_values(&["process_a_batch"]).start_timer();
+    /// Process all transactions from `start_version` to `end_version`. Left inclusive, right exclusive.
+    pub fn process(&self, start_version: Version, end_version: Version) -> Result<Version> {
         let mut version = start_version;
-        let num_transactions = self.get_num_of_transactions(version)?;
+        while version < end_version {
+            let next_version = self.process_a_batch(version, end_version)?;
+            if next_version == version {
+                break;
+            }
+            version = next_version;
+        }
+        Ok(version)
+    }
+
+    /// Process a batch of transactions that is within the range of  `start_version` to `end_version`. Left inclusive, right exclusive.
+    pub fn process_a_batch(&self, start_version: Version, end_version: Version) -> Result<Version> {
+        let _timer: aptos_metrics_core::HistogramTimer =
+            TIMER.with_label_values(&["process_a_batch"]).start_timer();
+        let mut version = start_version;
+        let num_transactions = self.get_num_of_transactions(version, end_version)?;
         // This promises num_transactions should be readable from main db
         let mut db_iter = self.get_main_db_iter(version, num_transactions)?;
         let mut batch = SchemaBatch::new();
