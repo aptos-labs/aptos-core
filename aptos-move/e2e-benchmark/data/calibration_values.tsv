@@ -8,8 +8,8 @@ InitializeVectorPicture { length: 128 }	34	0.942	1.061	169.4
 VectorPicture { length: 128 }	34	0.917	1.058	47.6
 VectorPictureRead { length: 128 }	34	0.909	1.075	46.3
 InitializeVectorPicture { length: 30720 }	34	0.942	1.057	28928.4
-VectorPicture { length: 30720 }	34	0.924	1.081	6409.9
-VectorPictureRead { length: 30720 }	34	0.938	1.089	6409.9
+VectorPicture { length: 30720 }	34	0.924	1.081	6900.0
+VectorPictureRead { length: 30720 }	34	0.938	1.089	6900.0
 SmartTablePicture { length: 30720, num_points_per_txn: 200 }	34	0.972	1.074	42970.1
 SmartTablePicture { length: 1048576, num_points_per_txn: 300 }	34	0.960	1.066	73865.4
 ResourceGroupsSenderWriteTag { string_length: 1024 }	34	0.898	1.062	16.2
