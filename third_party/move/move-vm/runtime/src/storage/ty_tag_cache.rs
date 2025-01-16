@@ -7,7 +7,7 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     vm_status::StatusCode,
 };
-use move_vm_types::loaded_data::runtime_types::{StructNameIndex, Type};
+use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndex};
 use parking_lot::RwLock;
 use std::collections::{hash_map::Entry, HashMap};
 
@@ -238,24 +238,26 @@ mod tests {
     fn test_type_tag_cache() {
         let cache = TypeTagCache::empty();
         assert!(cache.cache.read().is_empty());
-        assert!(cache.get_struct_tag(&StructNameIndex(0), &[]).is_none());
+        assert!(cache
+            .get_struct_tag(&StructNameIndex::new(0), &[])
+            .is_none());
 
         let tag = PricedStructTag {
             struct_tag: StructTag::from_str("0x1::foo::Foo").unwrap(),
             pseudo_gas_cost: 10,
         };
-        assert!(cache.insert_struct_tag(&StructNameIndex(0), &[], &tag));
+        assert!(cache.insert_struct_tag(&StructNameIndex::new(0), &[], &tag));
 
         let tag = PricedStructTag {
             struct_tag: StructTag::from_str("0x1::foo::Foo").unwrap(),
             // Set different cost to check.
             pseudo_gas_cost: 100,
         };
-        assert!(!cache.insert_struct_tag(&StructNameIndex(0), &[], &tag));
+        assert!(!cache.insert_struct_tag(&StructNameIndex::new(0), &[], &tag));
 
         assert_eq!(cache.cache.read().len(), 1);
         let cost = cache
-            .get_struct_tag(&StructNameIndex(0), &[])
+            .get_struct_tag(&StructNameIndex::new(0), &[])
             .unwrap()
             .pseudo_gas_cost;
         assert_eq!(cost, 10);
@@ -343,8 +345,6 @@ mod tests {
                 constraints: AbilitySet::EMPTY,
                 is_phantom: false,
             }],
-            name: Identifier::new("Foo").unwrap(),
-            module: ModuleId::new(AccountAddress::TWO, Identifier::new("foo").unwrap()),
         };
         let generic_struct_ty = ty_builder
             .create_struct_instantiation_ty(&struct_ty, &[Type::TyParam(0)], &[bool_vec_ty])

@@ -18,17 +18,17 @@ use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Changes},
     gas_algebra::NumBytes,
-    identifier::IdentStr,
+    identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::runtime_types::{StructNameIndex, StructType, Type, TypeBuilder},
+    loaded_data::runtime_types::{Type, TypeBuilder},
     values::{GlobalValue, Value},
 };
-use std::{borrow::Borrow, sync::Arc};
+use std::borrow::Borrow;
 
 pub struct Session<'r, 'l> {
     pub(crate) move_vm: &'l MoveVM,
@@ -523,16 +523,28 @@ impl<'r, 'l> Session<'r, 'l> {
         self.move_vm.runtime.loader().ty_builder()
     }
 
-    pub fn fetch_struct_ty_by_idx(
+    /// If type is a (generic or non-generic) struct or enum, returns its name. Otherwise, returns
+    /// [None].
+    pub fn get_struct_name(
         &self,
-        idx: StructNameIndex,
-        module_storage: &impl ModuleStorage,
-    ) -> Option<Arc<StructType>> {
-        self.move_vm
-            .runtime
-            .loader()
-            .fetch_struct_ty_by_idx(idx, &self.module_store, module_storage)
-            .ok()
+        ty: &Type,
+        module_storage: &dyn ModuleStorage,
+    ) -> PartialVMResult<Option<(ModuleId, Identifier)>> {
+        use Type::*;
+
+        Ok(match ty {
+            Struct { idx, .. } | StructInstantiation { idx, .. } => {
+                let struct_identifier = self
+                    .move_vm
+                    .runtime
+                    .loader()
+                    .struct_name_index_map(module_storage)
+                    .idx_to_struct_name(*idx)?;
+                Some((struct_identifier.module, struct_identifier.name))
+            },
+            Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | TyParam(_)
+            | Vector(_) | Reference(_) | MutableReference(_) => None,
+        })
     }
 
     pub fn check_dependencies_and_charge_gas<'a, I>(

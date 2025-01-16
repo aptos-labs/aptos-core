@@ -3,8 +3,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::VMConfig, data_cache::TransactionDataCache, logging::expect_no_verification_errors,
-    module_traversal::TraversalContext, storage::module_storage::ModuleStorage, CodeStorage,
+    config::VMConfig,
+    data_cache::TransactionDataCache,
+    loader::modules::{StructVariantInfo, VariantFieldInfo},
+    logging::expect_no_verification_errors,
+    module_traversal::TraversalContext,
+    native_functions::NativeFunctions,
+    storage::{
+        loader::LoaderV2,
+        module_storage::{FunctionValueExtensionAdapter, ModuleStorage},
+        ty_cache::StructInfoCache,
+        ty_tag_cache::TypeTagBuilder,
+    },
+    CodeStorage,
 };
 use hashbrown::Equivalent;
 use lazy_static::lazy_static;
@@ -14,8 +25,9 @@ use move_binary_format::{
     file_format::{
         CompiledModule, CompiledScript, Constant, ConstantPoolIndex, FieldHandleIndex,
         FieldInstantiationIndex, FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex,
-        StructDefInstantiationIndex, StructDefinitionIndex, StructFieldInformation, TableIndex,
-        TypeParameterIndex,
+        StructDefInstantiationIndex, StructDefinitionIndex, StructFieldInformation,
+        StructVariantHandleIndex, StructVariantInstantiationIndex, TableIndex, TypeParameterIndex,
+        VariantFieldHandleIndex, VariantFieldInstantiationIndex, VariantIndex,
     },
     IndexKind,
 };
@@ -29,12 +41,18 @@ use move_core_types::{
     value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
+use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::runtime_types::{
-        AbilityInfo, DepthFormula, StructIdentifier, StructNameIndex, StructType, Type,
+    loaded_data::{
+        runtime_types::{
+            AbilityInfo, DepthFormula, StructIdentifier, StructLayout, StructType, Type,
+            TypeBuilder,
+        },
+        struct_name_indexing::{StructNameIndex, StructNameIndexMap},
     },
     sha3_256,
+    value_serde::FunctionValueExtension,
 };
 use parking_lot::{Mutex, RwLock};
 use std::{
@@ -42,6 +60,7 @@ use std::{
     hash::Hash,
     sync::Arc,
 };
+use type_loader::intern_type;
 use typed_arena::Arena;
 
 mod access_specifier_loader;
@@ -50,31 +69,12 @@ mod modules;
 mod script;
 mod type_loader;
 
-use crate::{
-    loader::modules::{StructVariantInfo, VariantFieldInfo},
-    native_functions::NativeFunctions,
-    storage::{
-        loader::LoaderV2, module_storage::FunctionValueExtensionAdapter,
-        struct_name_index_map::StructNameIndexMap, ty_cache::StructInfoCache,
-        ty_tag_cache::TypeTagBuilder,
-    },
-};
 pub use function::{Function, LoadedFunction};
 pub(crate) use function::{FunctionHandle, FunctionInstantiation, LoadedFunctionOwner};
 pub use modules::Module;
 pub(crate) use modules::{LegacyModuleCache, LegacyModuleStorage, LegacyModuleStorageAdapter};
-use move_binary_format::file_format::{
-    StructVariantHandleIndex, StructVariantInstantiationIndex, VariantFieldHandleIndex,
-    VariantFieldInstantiationIndex, VariantIndex,
-};
-use move_vm_metrics::{Timer, VM_TIMER};
-use move_vm_types::{
-    loaded_data::runtime_types::{StructLayout, TypeBuilder},
-    value_serde::FunctionValueExtension,
-};
 pub use script::Script;
 pub(crate) use script::ScriptCache;
-use type_loader::intern_type;
 
 type ScriptHash = [u8; 32];
 

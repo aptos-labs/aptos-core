@@ -4,7 +4,10 @@
 use move_binary_format::{
     binary_views::BinaryIndexedView, errors::PartialVMResult, file_format::SignatureToken,
 };
-use move_vm_types::loaded_data::runtime_types::{AbilityInfo, StructNameIndex, Type};
+use move_vm_types::loaded_data::{
+    runtime_types::{AbilityInfo, Type},
+    struct_name_indexing::StructNameIndex,
+};
 use triomphe::Arc as TriompheArc;
 
 /// Converts a signature token into the in memory type representation used by the MoveVM.

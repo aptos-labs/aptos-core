@@ -1,10 +1,12 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::storage::struct_name_index_map::StructNameIndexMap;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_types::loaded_data::runtime_types::{DepthFormula, StructNameIndex, Type};
+use move_vm_types::loaded_data::{
+    runtime_types::{DepthFormula, Type},
+    struct_name_indexing::{StructNameIndex, StructNameIndexMap},
+};
 use parking_lot::RwLock;
 
 /// Layout information of a single struct instantiation.

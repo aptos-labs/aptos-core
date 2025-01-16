@@ -6,8 +6,8 @@ use crate::{
     loader::check_natives,
     native_functions::{NativeFunction, NativeFunctions},
     storage::{
-        struct_name_index_map::StructNameIndexMap, ty_cache::StructInfoCache,
-        ty_tag_cache::TypeTagCache, verified_module_cache::VERIFIED_MODULES_V2,
+        ty_cache::StructInfoCache, ty_tag_cache::TypeTagCache,
+        verified_module_cache::VERIFIED_MODULES_V2,
     },
     Module, Script,
 };
@@ -26,8 +26,11 @@ use move_core_types::{
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
 use move_vm_metrics::{Timer, VM_TIMER};
+use move_vm_types::loaded_data::struct_name_indexing::StructNameIndexMap;
 #[cfg(any(test, feature = "testing"))]
-use move_vm_types::loaded_data::runtime_types::{StructIdentifier, StructNameIndex};
+use move_vm_types::loaded_data::{
+    runtime_types::StructIdentifier, struct_name_indexing::StructNameIndex,
+};
 use std::sync::Arc;
 
 /// [MoveVM] runtime environment encapsulating different configurations. Shared between the VM and
