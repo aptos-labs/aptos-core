@@ -16,10 +16,7 @@ use aptos_network::{
     application::{interface::NetworkServiceEvents, storage::PeersAndMetadata},
     protocols::{
         network::{NetworkEvents, NewNetworkEvents, ReceivedMessage},
-        wire::{
-            handshake::v1::ProtocolId,
-            messaging::v1::{NetworkMessage, RpcRequest},
-        },
+        wire::{handshake::v1::ProtocolId, messaging::v1::NetworkMessage},
     },
 };
 use aptos_storage_interface::{DbReader, LedgerSummary, Order};
@@ -162,23 +159,18 @@ impl MockClient {
             .to_bytes(&StorageServiceMessage::Request(request))
             .unwrap();
         let (res_tx, res_rx) = oneshot::channel();
-        let notification = ReceivedMessage {
-            message: NetworkMessage::RpcRequest(RpcRequest {
-                protocol_id,
-                request_id: 0,
-                priority: 0,
-                raw_request: data,
-            }),
-            sender: PeerNetworkId::new(network_id, peer_id),
-            receive_timestamp_micros: 0,
-            rpc_replier: Some(Arc::new(res_tx)),
-        };
+        let network_message = NetworkMessage::rpc_request_for_testing(protocol_id, data);
+        let received_message = ReceivedMessage::new_for_testing(
+            network_message,
+            PeerNetworkId::new(network_id, peer_id),
+            Some(Arc::new(res_tx)),
+        );
 
         // Push the request up to the storage service
         self.peer_manager_notifiers
             .get(&network_id)
             .unwrap()
-            .push((peer_id, protocol_id), notification)
+            .push((peer_id, protocol_id), received_message)
             .unwrap();
 
         res_rx
