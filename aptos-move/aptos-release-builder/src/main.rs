@@ -128,6 +128,7 @@ pub enum Commands {
         #[clap(long)]
         mint_to_validator: bool,
     },
+    /// Lets test shit
     /// Generate a gas schedule using the current values and store it to a file.
     GenerateGasSchedule {
         /// The version of the gas schedule to generate.
