@@ -10438,6 +10438,16 @@ paths:
       operationId: view
 components:
   schemas:
+    AbstractionSignature:
+      type: object
+      required:
+      - function_info
+      - auth_data
+      properties:
+        function_info:
+          type: string
+        auth_data:
+          $ref: '#/components/schemas/HexEncodedBytes'
     AccountData:
       type: object
       description: |-
@@ -10468,6 +10478,7 @@ components:
       - $ref: '#/components/schemas/AccountSignature_SingleKeySignature'
       - $ref: '#/components/schemas/AccountSignature_MultiKeySignature'
       - $ref: '#/components/schemas/AccountSignature_NoAccountSignature'
+      - $ref: '#/components/schemas/AccountSignature_AbstractionSignature'
       discriminator:
         propertyName: type
         mapping:
@@ -10476,6 +10487,19 @@ components:
           single_key_signature: '#/components/schemas/AccountSignature_SingleKeySignature'
           multi_key_signature: '#/components/schemas/AccountSignature_MultiKeySignature'
           no_account_signature: '#/components/schemas/AccountSignature_NoAccountSignature'
+          abstraction_signature: '#/components/schemas/AccountSignature_AbstractionSignature'
+    AccountSignature_AbstractionSignature:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - abstraction_signature
+            example: abstraction_signature
+      - $ref: '#/components/schemas/AbstractionSignature'
     AccountSignature_Ed25519Signature:
       allOf:
       - type: object
