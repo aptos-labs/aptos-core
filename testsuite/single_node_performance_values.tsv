@@ -7,7 +7,7 @@ account-generation	1	NativeVM	12	0.888	1.095	30075.3
 account-resource32-b	1	VM	12	0.943	1.036	36029.2
 modify-global-resource	1	VM	12	0.973	1.009	2343.5
 modify-global-resource	100	VM	12	0.973	1.021	35070.6
-publish-package	1	VM	12	0.961	1.016	1666.6
+publish-package	1	VM	12	0.961	1.016	1200
 mix_publish_transfer	1	VM	12	0.961	1.017	22960.6
 batch100-transfer	1	VM	12	0.931	1.020	731.7
 batch100-transfer	1	NativeVM	12	0.932	1.113	1387.1
