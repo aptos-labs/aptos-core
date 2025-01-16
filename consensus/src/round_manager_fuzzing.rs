@@ -91,7 +91,6 @@ fn build_empty_store(
         Arc::new(SimulatedTimeService::new()),
         10,
         Arc::from(DirectMempoolPayloadManager::new()),
-        false,
         Arc::new(Mutex::new(PendingBlocks::new())),
         None,
     ))

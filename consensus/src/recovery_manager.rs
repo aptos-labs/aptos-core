@@ -34,7 +34,6 @@ pub struct RecoveryManager {
     last_committed_round: Round,
     max_blocks_to_request: u64,
     payload_manager: Arc<dyn TPayloadManager>,
-    order_vote_enabled: bool,
     pending_blocks: Arc<Mutex<PendingBlocks>>,
 }
 
@@ -47,7 +46,6 @@ impl RecoveryManager {
         last_committed_round: Round,
         max_blocks_to_request: u64,
         payload_manager: Arc<dyn TPayloadManager>,
-        order_vote_enabled: bool,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
     ) -> Self {
         RecoveryManager {
@@ -58,7 +56,6 @@ impl RecoveryManager {
             last_committed_round,
             max_blocks_to_request,
             payload_manager,
-            order_vote_enabled,
             pending_blocks,
         }
     }
@@ -105,7 +102,6 @@ impl RecoveryManager {
             self.storage.clone(),
             self.execution_client.clone(),
             self.payload_manager.clone(),
-            self.order_vote_enabled,
         )
         .await?;
 
