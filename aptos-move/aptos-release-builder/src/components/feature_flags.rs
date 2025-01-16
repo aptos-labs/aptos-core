@@ -136,6 +136,7 @@ pub enum FeatureFlag {
     DisallowInitModuleToPublishModules,
     EnableCallTreeAndInstructionVMCache,
     PermissionedSigner,
+    AccountAbstraction,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -363,6 +364,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE
             },
             FeatureFlag::PermissionedSigner => AptosFeatureFlag::PERMISSIONED_SIGNER,
+            FeatureFlag::AccountAbstraction => AptosFeatureFlag::ACCOUNT_ABSTRACTION,
         }
     }
 }
@@ -517,6 +519,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::EnableCallTreeAndInstructionVMCache
             },
             AptosFeatureFlag::PERMISSIONED_SIGNER => FeatureFlag::PermissionedSigner,
+            AptosFeatureFlag::ACCOUNT_ABSTRACTION => FeatureFlag::AccountAbstraction,
         }
     }
 }

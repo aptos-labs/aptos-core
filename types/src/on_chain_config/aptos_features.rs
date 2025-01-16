@@ -117,6 +117,7 @@ pub enum FeatureFlag {
     ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE = 83,
     /// AIP-103 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-103.md)
     PERMISSIONED_SIGNER = 84,
+    ACCOUNT_ABSTRACTION = 85,
 }
 
 impl FeatureFlag {
@@ -200,6 +201,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_LOADER_V2,
             FeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES,
             FeatureFlag::PERMISSIONED_SIGNER,
+            FeatureFlag::ACCOUNT_ABSTRACTION,
         ]
     }
 }
@@ -273,6 +275,10 @@ impl Features {
 
     pub fn is_storage_slot_metadata_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::STORAGE_SLOT_METADATA)
+    }
+
+    pub fn is_account_abstraction_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ACCOUNT_ABSTRACTION)
     }
 
     pub fn is_module_event_enabled(&self) -> bool {
