@@ -1597,6 +1597,7 @@ impl<'env> FunctionTranslator<'env> {
                                             fun_name,
                                             args_str
                                         );
+                                        return;
                                     } else if callee_name.contains("borrow")
                                         || callee_name.contains("remove")
                                         || callee_name.contains("swap")
@@ -1636,6 +1637,7 @@ impl<'env> FunctionTranslator<'env> {
                                             fun_name,
                                             args_str
                                         );
+                                        return;
                                     }
                                 }
                                 emitln!(writer, "call {} := {}({});", dest_str, fun_name, args_str);
@@ -2473,7 +2475,7 @@ impl<'env> FunctionTranslator<'env> {
                     },
                     TraceReturn(i) => {
                         let oper_map = global_state.get_ret_map();
-                        let bv_flag = self.bv_flag_from_map(&srcs[0], oper_map);
+                        let bv_flag = self.bv_flag_from_map(i, oper_map);
                         self.track_return(*i, srcs[0], bv_flag);
                     },
                     TraceAbort => self.track_abort(&str_local(srcs[0])),

@@ -13,17 +13,18 @@ use crate::{
     },
     options::ProverOptions,
 };
-use itertools::Either;
+use itertools::{all, Either};
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
     ast::{Exp, ExpData, Operation as ASTOperation, TempIndex},
-    model::{FieldId, FunId, GlobalEnv, ModuleId, Parameter, StructId},
+    model::{FieldId, FunId, FunctionEnv, GlobalEnv, ModuleId, Parameter, StructId},
     ty::{PrimitiveType, Type},
 };
 use move_stackless_bytecode::{
     dataflow_analysis::{DataflowAnalysis, TransferFunctions},
     dataflow_domains::{AbstractDomain, JoinResult},
     function_target::FunctionTarget,
+    function_target::FunctionData,
     function_target_pipeline::{
         FunctionTargetPipeline, FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant,
     },
@@ -46,13 +47,13 @@ impl NumberOperationProcessor {
 
     /// Create initial number operation state for expressions
     pub fn create_initial_exp_oper_state(&self, env: &GlobalEnv) {
-        let mut default_exp = BTreeMap::new();
+        let mut global_state = env.get_cloned_extension::<GlobalNumberOperationState>();
         let exp_info_map = env.get_nodes();
         for id in exp_info_map {
-            default_exp.insert(id, Bottom);
+            if !global_state.exp_operation_map.contains_key(&id) {
+                global_state.exp_operation_map.insert(id, Bottom);
+            }
         }
-        let mut global_state = env.get_cloned_extension::<GlobalNumberOperationState>();
-        global_state.exp_operation_map = default_exp;
         env.set_extension(global_state);
     }
 
@@ -60,22 +61,11 @@ impl NumberOperationProcessor {
     fn analyze<'a>(&self, env: &'a GlobalEnv, targets: &'a FunctionTargetsHolder) {
         self.create_initial_exp_oper_state(env);
         let fun_env_vec = FunctionTargetPipeline::sort_in_reverse_topological_order(env, targets);
-        for item in &fun_env_vec {
-            match item {
-                Either::Left(fid) => {
-                    let func_env = env.get_function(*fid);
-                    if func_env.is_inline() {
-                        continue;
-                    }
-                    for (_, target) in targets.get_targets(&func_env) {
-                        if target.data.code.is_empty() {
-                            continue;
-                        }
-                        self.analyze_fun(env, target.clone());
-                    }
-                },
-                Either::Right(scc) => {
-                    for fid in scc {
+        loop {
+            let mut cont = false;
+            for item in &fun_env_vec {
+                match item {
+                    Either::Left(fid) => {
                         let func_env = env.get_function(*fid);
                         if func_env.is_inline() {
                             continue;
@@ -84,27 +74,57 @@ impl NumberOperationProcessor {
                             if target.data.code.is_empty() {
                                 continue;
                             }
-                            self.analyze_fun(env, target.clone());
+                            //println!("fun handling:{}", target.func_env.get_full_name_str());
+                            if self.analyze_fun(env, target.clone()) {
+                                cont = true;
+                            }
                         }
-                    }
-                },
+                    },
+                    Either::Right(scc) => {
+                        for fid in scc {
+                            let func_env = env.get_function(*fid);
+                            if func_env.is_inline() {
+                                continue;
+                            }
+                            for (_, target) in targets.get_targets(&func_env) {
+                                if target.data.code.is_empty() {
+                                    continue;
+                                }
+                                if self.analyze_fun(env, target.clone()) {
+                                    cont = true;
+                                }
+                            }
+                        }
+                    },
+                }
+            }
+            if !cont {
+                break;
             }
         }
+        //println!("finish");
     }
 
-    fn analyze_fun(&self, env: &'_ GlobalEnv, target: FunctionTarget) {
+    fn analyze_fun(&self, env: &'_ GlobalEnv, target: FunctionTarget) -> bool {
         if !target.func_env.is_native_or_intrinsic() {
             let cfg = StacklessControlFlowGraph::one_block(target.get_bytecode());
             let analyzer = NumberOperationAnalysis {
-                func_target: target,
+                func_target: target.clone(),
                 ban_int_2_bv_conversion: ProverOptions::get(env).ban_int_2_bv,
+                bv_default: ProverOptions::get(env).use_bv_by_default,
             };
-            analyzer.analyze_function(
+            let state_map = analyzer.analyze_function(
                 NumberOperationState::create_initial_state(),
                 analyzer.func_target.get_bytecode(),
                 &cfg,
             );
+            for (_, state) in state_map {
+                if state.pre.inter_proc_changed || state.post.inter_proc_changed {
+                    return true;
+                }
+            }
         }
+        false
     }
 }
 
@@ -120,23 +140,37 @@ impl FunctionTargetProcessor for NumberOperationProcessor {
     fn name(&self) -> String {
         "number_operation_analysis".to_string()
     }
+
+    // fn process(
+    //     &self,
+    //     _targets: &mut FunctionTargetsHolder,
+    //     _fun_env: &FunctionEnv,
+    //     _data: FunctionData,
+    //     _scc_opt: Option<&[FunctionEnv]>,
+    // ) -> FunctionData {
+    //     self.analyze(_fun_env.module_env.env, _targets);
+    //     _data
+    // }
+
 }
 
 struct NumberOperationAnalysis<'a> {
     func_target: FunctionTarget<'a>,
     ban_int_2_bv_conversion: bool,
+    bv_default: bool,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
 struct NumberOperationState {
     // Flag to mark whether the global state has been changed in one pass
     pub changed: bool,
+    pub inter_proc_changed: bool,
 }
 
 impl NumberOperationState {
     /// Create a default NumberOperationState
     fn create_initial_state() -> Self {
-        NumberOperationState { changed: false }
+        NumberOperationState { changed: false, inter_proc_changed: false }
     }
 }
 
@@ -225,11 +259,15 @@ impl<'a> NumberOperationAnalysis<'a> {
                         .get_temp_index_oper(cur_mid, cur_fid, *idx, baseline_flag)
                         .unwrap_or(&Bottom);
                     // Update num_oper for the node for the temporary variable
-                    global_state.update_node_oper(*id, *oper, true);
+                    if global_state.update_node_oper(*id, *oper, true) {
+                        state.changed = true;
+                    }
                 },
                 ExpData::Block(id, _, _, exp) => {
                     let exp_oper = global_state.get_node_num_oper(exp.node_id());
-                    global_state.update_node_oper(*id, exp_oper, true);
+                    if global_state.update_node_oper(*id, exp_oper, true) {
+                        state.changed = true;
+                    }
                 },
                 ExpData::IfElse(id, _, true_exp, false_exp) => {
                     let true_oper = global_state.get_node_num_oper(true_exp.node_id());
@@ -240,7 +278,9 @@ impl<'a> NumberOperationAnalysis<'a> {
                             CONFLICT_ERROR_MSG,
                         );
                     }
-                    global_state.update_node_oper(*id, true_oper.merge(&false_oper), true);
+                    if global_state.update_node_oper(*id, true_oper.merge(&false_oper), true) {
+                        state.changed = true;
+                    }
                 },
                 ExpData::Call(id, oper, args) => {
                     let mut arg_oper = vec![];
@@ -253,7 +293,9 @@ impl<'a> NumberOperationAnalysis<'a> {
                             let num_oper_1 = global_state.get_node_num_oper(args[1].node_id());
                             if !num_oper_0.conflict(&num_oper_1) {
                                 let merged = num_oper_0.merge(&num_oper_1);
-                                global_state.update_node_oper(*id, merged, true);
+                                if global_state.update_node_oper(*id, merged, true) {
+                                    state.changed = true;
+                                }
                                 for arg in args {
                                     global_state.update_node_oper(arg.node_id(), merged, true);
                                     update_temporary(arg, &merged, global_state, state);
@@ -262,7 +304,9 @@ impl<'a> NumberOperationAnalysis<'a> {
                         },
                         // Update node for index
                         move_model::ast::Operation::Index => {
-                            global_state.update_node_oper(*id, arg_oper[0], true);
+                            if global_state.update_node_oper(*id, arg_oper[0], true) {
+                                state.changed = true;
+                            }
                         },
                         // Update node for return value
                         move_model::ast::Operation::Result(i) => {
@@ -272,33 +316,47 @@ impl<'a> NumberOperationAnalysis<'a> {
                                 .unwrap()
                                 .get(i)
                                 .unwrap_or(&Bottom);
-                            global_state.update_node_oper(*id, *oper, true);
+                            if global_state.update_node_oper(*id, *oper, true) {
+                                state.changed = true;
+                            }
                         },
                         // Update node for field operation
                         move_model::ast::Operation::Select(mid, sid, field_id)
                         | move_model::ast::Operation::UpdateField(mid, sid, field_id) => {
                             let field_oper =
                                 global_state.get_num_operation_field(mid, sid, field_id);
-                            global_state.update_node_oper(*id, *field_oper, true);
+                            if global_state.update_node_oper(*id, *field_oper, true) {
+                                state.changed = true;
+                                state.inter_proc_changed = true;
+                            }
                         },
                         move_model::ast::Operation::SelectVariants(mid, sid, field_ids) => {
                             for field_id in field_ids {
                                 let field_oper =
                                     global_state.get_num_operation_field(mid, sid, field_id);
-                                global_state.update_node_oper(*id, *field_oper, true);
+                                if global_state.update_node_oper(*id, *field_oper, true) {
+                                    state.changed = true;
+                                    state.inter_proc_changed = true;
+                                }
                             }
                         },
                         move_model::ast::Operation::Cast => {
                             // Obtained the updated num_oper of the expression
                             let num_oper = global_state.get_node_num_oper(args[0].node_id());
                             // Update the node of cast
-                            global_state.update_node_oper(*id, num_oper, true);
+                            if global_state.update_node_oper(*id, num_oper, true) {
+                                state.changed = true;
+                            }
                         },
                         move_model::ast::Operation::Int2Bv => {
-                            global_state.update_node_oper(*id, Bitwise, true);
+                            if global_state.update_node_oper(*id, Bitwise, true) {
+                                state.changed = true;
+                            }
                         },
                         move_model::ast::Operation::Bv2Int => {
-                            global_state.update_node_oper(*id, Arithmetic, true);
+                            if global_state.update_node_oper(*id, Arithmetic, true) {
+                                state.changed = true;
+                            }
                         },
                         move_model::ast::Operation::SpecFunction(mid, sid, _) => {
                             let module_env = &self.func_target.global_env().get_module(*mid);
@@ -313,9 +371,13 @@ impl<'a> NumberOperationAnalysis<'a> {
                                         global_state.get_node_num_oper(args[0].node_id());
                                     // First argument is the target vector and the return type has the same NumberOperation type
                                     if vector_table_funs_name_propogate_to_dest(&callee_name) {
-                                        global_state.update_node_oper(*id, oper_first, true);
+                                        if global_state.update_node_oper(*id, oper_first, true) {
+                                            state.changed = true;
+                                        }
                                     } else {
-                                        global_state.update_node_oper(*id, Bottom, allow_merge);
+                                        if global_state.update_node_oper(*id, Bottom, allow_merge) {
+                                            state.changed = true;
+                                        }
                                     }
                                     // Handle the case of borrow_mut_with_default
                                     if callee_name.contains("borrow_mut_with_default") {
@@ -343,7 +405,8 @@ impl<'a> NumberOperationAnalysis<'a> {
                                     para_vec.append(&mut arg_oper);
                                     ret_vec.push(Bottom);
                                     if callee_spec_fun.body.is_some() {
-                                        let body_exp = callee_spec_fun.body.as_ref().unwrap();
+                                        // println!("callee_spec_fun:{}", callee_spec_fun.name.display(self.func_target.symbol_pool()));
+                                        let body_exp: &Exp = callee_spec_fun.body.as_ref().unwrap();
                                         let local_map = body_exp.bound_local_vars_with_node_id();
                                         for (i, Parameter(sym, _, loc)) in
                                             callee_spec_fun.params.iter().enumerate()
@@ -391,17 +454,21 @@ impl<'a> NumberOperationAnalysis<'a> {
                                             .spec_fun_operation_map
                                             .insert((*mid, *sid), (para_vec, ret_vec));
                                     }
+                                    state.changed = true;
+                                    state.inter_proc_changed = true;
                                 } else {
                                     // Check compatibility between formal and actual arguments
-                                    let para_oper_vec = &global_state
+                                    let para_oper_vec = &mut global_state
                                         .spec_fun_operation_map
-                                        .get(&(*mid, *sid))
+                                        .get_mut(&(*mid, *sid))
                                         .unwrap()
                                         .0;
                                     assert_eq!(para_oper_vec.len(), arg_oper.len());
+                                    let mut new_oper = vec![];
                                     for (formal_oper, actual_oper) in
-                                        para_oper_vec.iter().zip(arg_oper.iter())
+                                        para_oper_vec.iter_mut().zip(arg_oper.iter())
                                     {
+                                        // println!("oper:{:?}, para vec:{:?}", formal_oper, actual_oper);
                                         // For simplicity, only check compatibility
                                         if !allow_merge && formal_oper.conflict(actual_oper) {
                                             self.func_target.global_env().error(
@@ -409,7 +476,66 @@ impl<'a> NumberOperationAnalysis<'a> {
                                                 CONFLICT_ERROR_MSG,
                                             );
                                         }
+                                        *formal_oper = formal_oper.merge(actual_oper);
+                                        new_oper.push(formal_oper.clone());
                                     }
+                                    if callee_spec_fun.body.is_some() {
+                                        //println!("2callee_spec_fun:{}", callee_spec_fun.name.display(self.func_target.symbol_pool()));
+                                        let body_exp: &Exp = callee_spec_fun.body.as_ref().unwrap();
+                                        //println!("body oper:{:?}", global_state.get_node_num_oper(body_exp.node_id()));
+                                        let local_map = body_exp.bound_local_vars_with_node_id();
+                                        for (i, Parameter(sym, _, loc)) in
+                                            callee_spec_fun.params.iter().enumerate()
+                                        {
+                                            if local_map.contains_key(sym) {
+                                                let sym_node_id = local_map.get(sym).unwrap();
+                                                let oper_opt =
+                                                    global_state.exp_operation_map.get(sym_node_id);
+                                                if let Some(oper) = oper_opt {
+                                                    // Still need to check compatibility
+                                                    if !allow_merge && oper.conflict(&new_oper[i]) {
+                                                        self.func_target
+                                                            .global_env()
+                                                            .error(loc, CONFLICT_ERROR_MSG);
+                                                    } else {
+                                                        let merged = oper.merge(&new_oper[i]);
+                                                        new_oper[i] = merged;
+                                                    }
+                                                }
+                                                //println!("new oper{}:{:?}", i, new_oper[i]);
+                                                if global_state.update_node_oper(
+                                                    *sym_node_id,
+                                                    new_oper[i],
+                                                    true,
+                                                ) {
+                                                    state.changed = true;
+                                                    state.inter_proc_changed = true;
+                                                }
+                                            }
+                                        }
+                                        // Check compatibility between formal and actual arguments
+                                        if !self
+                                        .func_target
+                                        .global_env()
+                                        .is_spec_fun_recursive(mid.qualified(*sid)) {
+                                            self.handle_exp(attr_id, body_exp, global_state, state);
+                                        }
+                                        //println!("new body oper:{:?}", global_state.get_node_num_oper(body_exp.node_id()));
+                                        if global_state.update_node_oper(
+                                            *id,
+                                            global_state.get_node_num_oper(body_exp.node_id()),
+                                            allow_merge,
+                                        ) {
+                                            state.changed = true;
+                                            state.inter_proc_changed = true;
+                                        }
+                                        global_state.update_spec_ret(
+                                            mid,
+                                            sid,
+                                            global_state.get_node_num_oper(body_exp.node_id()),
+                                        );
+                                    }
+
                                 }
                                 // Update number oper for this node based on the return value of the spec fun
                                 let ret_num_oper_vec = &global_state
@@ -418,16 +544,20 @@ impl<'a> NumberOperationAnalysis<'a> {
                                     .unwrap()
                                     .1;
                                 if !ret_num_oper_vec.is_empty() {
-                                    global_state.update_node_oper(
+                                    if global_state.update_node_oper(
                                         *id,
                                         ret_num_oper_vec[0],
                                         allow_merge,
-                                    );
+                                    ) {
+                                        state.changed = true;
+                                    }
                                 }
                             }
                         },
                         move_model::ast::Operation::WellFormed => {
-                            global_state.update_node_oper(*id, arg_oper[0], true);
+                            if global_state.update_node_oper(*id, arg_oper[0], true) {
+                                state.changed = true;
+                            }
                         },
                         _ => {
                             // All args must have compatible number operations
@@ -449,7 +579,12 @@ impl<'a> NumberOperationAnalysis<'a> {
                                     }
                                 }
                                 for num_oper in &arg_oper {
+                                    // println!("1oper:{:?}, fun:{}, num_oper:{:?}, merged:{:?}"
+                                    // , oper, self.func_target.func_env.get_full_name_str(), num_oper, merged);
                                     if !allow_merge && num_oper.conflict(&merged) {
+                                        // for arg in args {
+                                        //     println!("arg:{}", arg.display(self.func_target.global_env()));
+                                        // }
                                         self.func_target.global_env().error(
                                             &self.func_target.get_bytecode_loc(attr_id),
                                             CONFLICT_ERROR_MSG,
@@ -496,7 +631,9 @@ impl<'a> NumberOperationAnalysis<'a> {
                                         }
                                     }
                                 }
-                                global_state.update_node_oper(*id, merged, allow_merge);
+                                if global_state.update_node_oper(*id, merged, allow_merge){
+                                    state.changed = true;
+                                }
                             }
                         },
                     }
@@ -565,6 +702,9 @@ impl<'a> NumberOperationAnalysis<'a> {
             let merged_oper = dest_oper.merge(src_oper);
             if merged_oper != *dest_oper || merged_oper != *src_oper {
                 state.changed = true;
+                if fid != self.func_target.func_env.get_id() {
+                    state.inter_proc_changed = true;
+                }
             }
             *global_state
                 .get_mut_temp_index_oper(mid, fid, *dest, baseline_flag)
@@ -612,6 +752,9 @@ impl<'a> NumberOperationAnalysis<'a> {
         }
         if oper != *op_srcs_0 || oper != *op_srcs_1 || oper != *op_dests_0 {
             state.changed = true;
+            if fid != self.func_target.func_env.get_id() {
+                state.inter_proc_changed = true;
+            }
         }
         *global_state
             .get_mut_temp_index_oper(mid, fid, srcs[0], baseline_flag)
@@ -639,6 +782,9 @@ impl<'a> NumberOperationAnalysis<'a> {
             .unwrap();
         if oper != *op_dests_0 {
             state.changed = true;
+            if fid != self.func_target.func_env.get_id() {
+                state.inter_proc_changed = true;
+            }
         }
         *global_state
             .get_mut_temp_index_oper(mid, fid, dests[0], baseline_flag)
@@ -755,6 +901,7 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                             let merged = current_field_oper.merge(pack_oper);
                             if merged != *current_field_oper || merged != *pack_oper {
                                 state.changed = true;
+                                state.inter_proc_changed = true;
                             }
                             *global_state
                                 .get_mut_temp_index_oper(cur_mid, cur_fid, temps[i], baseline_flag)
@@ -793,7 +940,11 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                         );
                     },
                     Add | Sub | Mul | Div | Mod => {
-                        let mut num_oper = Arithmetic;
+                        let mut num_oper = if self.bv_default {
+                            Bitwise
+                        } else {
+                            Arithmetic
+                        };
                         if !self.ban_int_2_bv_conversion {
                             let op_srcs_0 = global_state
                                 .get_temp_index_oper(cur_mid, cur_fid, srcs[0], baseline_flag)
@@ -987,6 +1138,7 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                             let merged_oper = dests_oper.merge(field_oper);
                             if merged_oper != *field_oper || merged_oper != *dests_oper {
                                 state.changed = true;
+                                state.inter_proc_changed = true;
                             }
                             *global_state
                                 .get_mut_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag)
@@ -1042,6 +1194,7 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                             let merged_oper = dests_oper.merge(field_oper);
                             if merged_oper != *field_oper || merged_oper != *dests_oper {
                                 state.changed = true;
+                                state.inter_proc_changed = true;
                             }
                             *global_state
                                 .get_mut_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag)
@@ -1088,6 +1241,9 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                                     let merged = cur_oper.merge(callee_oper);
                                     if merged != *cur_oper || merged != *callee_oper {
                                         state.changed = true;
+                                        if *fsid != cur_fid {
+                                            state.inter_proc_changed = true;
+                                        }
                                     }
                                     *global_state
                                         .get_mut_temp_index_oper(
@@ -1121,6 +1277,9 @@ impl<'a> TransferFunctions for NumberOperationAnalysis<'a> {
                                     let merged = cur_oper.merge(callee_oper);
                                     if merged != *cur_oper || merged != *callee_oper {
                                         state.changed = true;
+                                        if *fsid != cur_fid {
+                                            state.inter_proc_changed = true;
+                                        }
                                     }
                                     *global_state
                                         .get_mut_temp_index_oper(
@@ -1243,7 +1402,11 @@ impl<'a> DataflowAnalysis for NumberOperationAnalysis<'a> {}
 
 impl AbstractDomain for NumberOperationState {
     fn join(&mut self, other: &Self) -> JoinResult {
-        let mut result = JoinResult::Unchanged;
+        let mut result = if self.changed {
+            JoinResult::Changed
+        } else {
+            JoinResult::Unchanged
+        };
         self.changed = false;
         if other.changed {
             result = JoinResult::Changed;
