@@ -2061,12 +2061,21 @@ impl AptosVM {
             )
         }));
 
-        if !self.features().is_account_abstraction_enabled() {
+        if self.features().is_account_abstraction_enabled() {
+            let max_aa_gas = match self.gas_params(&log_context) {
+                Ok(vm_params) => vm_params.vm.txn.max_aa_gas,
+                Err(err) => {
+                    panic!("TODO: what to do here");
+                    // return VMValidatorResult::new(Some(err.status_code()), 0);
+                },
+            };
+            if max_aa_gas < txn_data.max_gas_amount() {
+                // Reset initial gas after validation with max_aa_gas.
+                unwrap_or_discard!(gas_meter.adjust_initial_gas(txn_data.max_gas_amount()));
+            }
+        } else {
             assert_eq!(initial_gas, gas_meter.balance());
         }
-
-        // Reset initial gas after validation with max_aa_gas.
-        unwrap_or_discard!(gas_meter.adjust_initial_gas(txn_data.max_gas_amount()));
 
         let storage_gas_params = unwrap_or_discard!(self.storage_gas_params(log_context));
         let change_set_configs = &storage_gas_params.change_set_configs;
@@ -2191,13 +2200,19 @@ impl AptosVM {
         let is_approved_gov_script = is_approved_gov_script(resolver, txn, &txn_metadata);
 
         let vm_params = self.gas_params(log_context)?.vm.clone();
-        let max_aa_gas = vm_params.txn.max_aa_gas;
+
+        let initial_balance = if self.features().is_account_abstraction_enabled() {
+            vm_params.txn.max_aa_gas.min(txn.max_gas_amount().into())
+        } else {
+            txn.max_gas_amount().into()
+        };
+
         let mut gas_meter = make_gas_meter(
             self.gas_feature_version(),
             vm_params,
             self.storage_gas_params(log_context)?.clone(),
             is_approved_gov_script,
-            max_aa_gas,
+            initial_balance,
         );
 
         let (status, output) = self.execute_user_transaction_impl(
@@ -3113,13 +3128,18 @@ impl VMValidator for AptosVM {
             },
         };
 
-        let max_aa_gas = vm_params.txn.max_aa_gas;
+        let initial_balance = if self.features().is_account_abstraction_enabled() {
+            vm_params.txn.max_aa_gas.min(txn_data.max_gas_amount().into())
+        } else {
+            txn_data.max_gas_amount()
+        };
+
         let mut gas_meter = make_prod_gas_meter(
             self.gas_feature_version(),
             vm_params,
             storage_gas_params,
             is_approved_gov_script,
-            max_aa_gas,
+            initial_balance,
         );
         let storage = TraversalStorage::new();
 
