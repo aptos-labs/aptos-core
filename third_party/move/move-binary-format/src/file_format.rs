@@ -859,7 +859,7 @@ impl AbilitySet {
     pub const PRIMITIVES: AbilitySet =
         Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));
     /// Abilities for `private` user-defined/"primitive" functions (not closures).
-    /// These can be be changed in module upgrades, so should not be stored
+    /// These can be changed in module upgrades, so should not be stored
     pub const PRIVATE_FUNCTIONS: AbilitySet = Self((Ability::Copy as u8) | (Ability::Drop as u8));
     /// Abilities for `public` user-defined/"primitive" functions (not closures)
     pub const PUBLIC_FUNCTIONS: AbilitySet =

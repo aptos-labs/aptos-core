@@ -1013,7 +1013,7 @@ module DiemFramework::Diem {
         assert!(info.preburn_value >= amount, errors::limit_exceeded(EPREBURN));
         info.preburn_value = info.preburn_value - amount;
         // Don't emit cancel burn events for synthetic currencies. cancel_burn
-        // shouldn't be be used for synthetic coins in the first place.
+        // shouldn't be used for synthetic coins in the first place.
         if (!info.is_synthetic) {
             event::emit_event(
                 &mut info.cancel_burn_events,

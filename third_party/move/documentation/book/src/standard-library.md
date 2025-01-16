@@ -177,7 +177,7 @@ couple notable exceptions since the option can contain a value of kind `resource
 Particularly, certain operations such as `get_with_default` and
 `destroy_with_default` require that the element type `T` be of `copyable` kind.
 
-The API for the `option` module is as as follows
+The API for the `option` module is as follows
 
 ### Types
 
@@ -361,7 +361,7 @@ An account did not have the expected  role for this operation. Useful for Role B
 ```
 
 ---------------------------------------------------------------------------
-An account did not not have a required capability. Useful for RBAC error conditions.
+An account did not have a required capability. Useful for RBAC error conditions.
 
 ```move
     const REQUIRES_CAPABILITY: u8 = 4;
