@@ -586,6 +586,9 @@ pub trait DbWriter: Send + Sync {
     ) -> Result<()> {
         unimplemented!()
     }
+
+    /// Flush buffered data to disk, if possible.
+    fn try_flush_buffers(&self) {}
 }
 
 #[derive(Clone)]
