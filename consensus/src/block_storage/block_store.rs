@@ -449,6 +449,7 @@ impl BlockStore {
                     pipelined_block.block().timestamp_usecs(),
                     BlockStage::QC_ADDED,
                 );
+                pipelined_block.set_qc(Arc::new(qc.clone()));
             },
             None => bail!("Insert {} without having the block in store first", qc),
         };
@@ -524,7 +525,8 @@ impl BlockStore {
 
     pub async fn wait_for_payload(&self, block: &Block, deadline: Duration) -> anyhow::Result<()> {
         let duration = deadline.saturating_sub(self.time_service.get_current_timestamp());
-        tokio::time::timeout(duration, self.payload_manager.get_transactions(block)).await??;
+        tokio::time::timeout(duration, self.payload_manager.get_transactions(block, None))
+            .await??;
         Ok(())
     }
 

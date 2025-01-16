@@ -105,6 +105,7 @@ impl PipelineFutures {
 }
 
 pub struct PipelineInputTx {
+    pub qc_tx: Option<oneshot::Sender<Arc<QuorumCert>>>,
     pub rand_tx: Option<oneshot::Sender<Option<Randomness>>>,
     pub order_vote_tx: Option<oneshot::Sender<()>>,
     pub order_proof_tx: Option<oneshot::Sender<()>>,
@@ -112,6 +113,7 @@ pub struct PipelineInputTx {
 }
 
 pub struct PipelineInputRx {
+    pub qc_rx: oneshot::Receiver<Arc<QuorumCert>>,
     pub rand_rx: oneshot::Receiver<Option<Randomness>>,
     pub order_vote_rx: oneshot::Receiver<()>,
     pub order_proof_fut: TaskFuture<()>,
@@ -145,6 +147,8 @@ pub struct PipelinedBlock {
     pipeline_tx: Arc<Mutex<Option<PipelineInputTx>>>,
     #[derivative(PartialEq = "ignore")]
     pipeline_abort_handle: Arc<Mutex<Option<Vec<AbortHandle>>>>,
+    #[derivative(PartialEq = "ignore")]
+    block_qc: Arc<Mutex<Option<Arc<QuorumCert>>>>,
 }
 
 impl Serialize for PipelinedBlock {
@@ -286,6 +290,13 @@ impl PipelinedBlock {
             .take()
             .expect("pre_commit_result_rx missing.")
     }
+
+    pub fn set_qc(&self, qc: Arc<QuorumCert>) {
+        *self.block_qc.lock() = Some(qc.clone());
+        if let Some(tx) = self.pipeline_tx().lock().as_mut() {
+            tx.qc_tx.take().map(|tx| tx.send(qc));
+        }
+    }
 }
 
 impl Debug for PipelinedBlock {
@@ -317,6 +328,7 @@ impl PipelinedBlock {
             pipeline_futs: Arc::new(Mutex::new(None)),
             pipeline_tx: Arc::new(Mutex::new(None)),
             pipeline_abort_handle: Arc::new(Mutex::new(None)),
+            block_qc: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -421,6 +433,10 @@ impl PipelinedBlock {
 
     pub fn get_execution_summary(&self) -> Option<ExecutionSummary> {
         self.execution_summary.get().cloned()
+    }
+
+    pub fn qc(&self) -> Option<Arc<QuorumCert>> {
+        self.block_qc.lock().clone()
     }
 }
 

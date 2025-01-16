@@ -294,6 +294,7 @@ fn test_db_indexer_data() {
         ident_str!("aggregator_factory"),
         ident_str!("governance_proposal"),
         ident_str!("optional_aggregator"),
+        ident_str!("permissioned_signer"),
         ident_str!("transaction_context"),
         ident_str!("jwk_consensus_config"),
         ident_str!("ristretto255_elgamal"),

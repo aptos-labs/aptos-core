@@ -122,3 +122,24 @@ async fn test_cors_on_non_200_responses() {
     let cors_header = resp.headers().get("access-control-allow-origin").unwrap();
     assert_eq!(cors_header, "test");
 }
+
+/// Verifies gzip compression is applied when accept-encoding header is present
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_compression_middleware() {
+    let context = new_test_context(current_function_name!());
+
+    let req = warp::test::request()
+        .header("accept-encoding", "gzip")
+        .method("GET")
+        .path("/v1/info");
+
+    let resp = context.reply(req).await;
+    assert_eq!(resp.status(), 200);
+    let content_encoding = resp.headers().get("content-encoding").unwrap();
+    assert_eq!(content_encoding, "gzip");
+
+    let req = warp::test::request().method("GET").path("/v1/info");
+    let resp = context.reply(req).await;
+    assert_eq!(resp.status(), 200);
+    assert!(resp.headers().get("content-encoding").is_none());
+}

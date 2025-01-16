@@ -33,6 +33,9 @@ pub fn get_processor_config(processor_name: &ProcessorName) -> Result<ProcessorC
         ProcessorName::ParquetDefaultProcessor => {
             bail!("ParquetDefaultProcessor is not supported in the localnet")
         },
+        ProcessorName::ParquetFungibleAssetActivitiesProcessor => {
+            bail!("ParquetFungibleAssetActivitiesProcessor is not supported in the localnet")
+        },
         ProcessorName::ParquetFungibleAssetProcessor => {
             bail!("ParquetFungibleAssetProcessor is not supported in the localnet")
         },
@@ -47,6 +50,9 @@ pub fn get_processor_config(processor_name: &ProcessorName) -> Result<ProcessorC
         },
         ProcessorName::ParquetTokenV2Processor => {
             bail!("ParquetTokenV2Processor is not supported in the localnet")
+        },
+        ProcessorName::ParquetUserTransactionsProcessor => {
+            bail!("ParquetUserTransactionsProcessor is not supported in the localnet")
         },
         ProcessorName::StakeProcessor => ProcessorConfig::StakeProcessor(StakeProcessorConfig {
             query_retries: Default::default(),

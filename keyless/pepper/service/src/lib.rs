@@ -4,6 +4,8 @@
 use crate::{
     account_db::{init_account_db, ACCOUNT_RECOVERY_DB},
     account_managers::ACCOUNT_MANAGERS,
+    groth16_vk::ONCHAIN_GROTH16_VK,
+    keyless_config::ONCHAIN_KEYLESS_CONFIG,
     vuf_keys::VUF_SK,
     ProcessingFailure::{BadRequest, InternalError},
 };
@@ -30,7 +32,7 @@ use aptos_types::{
     account_address::AccountAddress,
     keyless::{
         get_public_inputs_hash, Configuration, EphemeralCertificate, Groth16ProofAndStatement,
-        IdCommitment, KeylessPublicKey, KeylessSignature, OpenIdSig, DEVNET_VERIFICATION_KEY, ZKP,
+        IdCommitment, KeylessPublicKey, KeylessSignature, OpenIdSig, ZKP,
     },
     transaction::authenticator::{
         AnyPublicKey, AnySignature, AuthenticationKey, EphemeralPublicKey,
@@ -47,9 +49,12 @@ use uuid::Uuid;
 pub mod about;
 pub mod account_db;
 pub mod account_managers;
+pub mod groth16_vk;
 pub mod jwk;
+pub mod keyless_config;
 pub mod metrics;
 pub mod vuf_keys;
+pub mod watcher;
 
 pub type Issuer = String;
 pub type KeyID = String;
@@ -182,7 +187,13 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
                 .map_err(|e| BadRequest(format!("JWT header decoding error: {e}")))?;
             let jwk = jwk::cached_decoding_key_as_rsa(iss_val, &jwt_header.kid)
                 .map_err(|e| BadRequest(format!("JWK not found: {e}")))?;
-            let config = Configuration::new_for_devnet();
+            let config_api_repr =
+                { ONCHAIN_KEYLESS_CONFIG.read().as_ref().cloned() }.ok_or_else(|| {
+                    InternalError("API keyless config not cached locally.".to_string())
+                })?;
+            let config = config_api_repr
+                .to_rust_repr()
+                .map_err(|e| InternalError(format!("Could not parse API keyless config: {e}")))?;
             let training_wheels_pk = match &config.training_wheels_pubkey {
                 None => None,
                 // This takes ~4.4 microseconds, so we are not too concerned about speed here.
@@ -247,8 +258,15 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
                                 }
                             }
 
-                            let result = zksig
-                                .verify_groth16_proof(public_inputs_hash, &DEVNET_VERIFICATION_KEY);
+                            let onchain_groth16_vk =
+                                { ONCHAIN_GROTH16_VK.read().as_ref().cloned() }.ok_or_else(
+                                    || InternalError("No Groth16 VK cached locally.".to_string()),
+                                )?;
+                            let ark_groth16_pvk = onchain_groth16_vk.to_ark_pvk().map_err(|e| {
+                                InternalError(format!("Onchain-to-ark convertion err: {e}"))
+                            })?;
+                            let result =
+                                zksig.verify_groth16_proof(public_inputs_hash, &ark_groth16_pvk);
                             result.map_err(|_| {
                                 // println!("[aptos-vm][groth16] ZKP verification failed");
                                 // println!("[aptos-vm][groth16] PIH: {}", public_inputs_hash);

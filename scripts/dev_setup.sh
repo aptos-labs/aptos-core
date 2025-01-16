@@ -45,7 +45,6 @@ function usage {
   echo "-o install operations tooling as well: helm, terraform, yamllint, vault, docker, kubectl, python3"
   echo "-y install or update Move Prover tools: z3, cvc5, dotnet, boogie"
   echo "-d install tools for the Move documentation generator: graphviz"
-  echo "-a install tools for build and test api"
   echo "-P install PostgreSQL"
   echo "-J install js/ts tools"
   echo "-v verbose mode"
@@ -801,13 +800,6 @@ protoc and related plugins (since -r was provided):
 EOF
   fi
 
-  if [[ "$INSTALL_API_BUILD_TOOLS" == "true" ]]; then
-    cat <<EOF
-API build and testing tools (since -a was provided):
-  * Python3 (schemathesis)
-EOF
-  fi
-
   if [[ "$INSTALL_POSTGRES" == "true" ]]; then
     cat <<EOF
 PostgreSQL database (since -P was provided):
@@ -848,7 +840,6 @@ INSTALL_PROFILE=false
 INSTALL_PROVER=false
 INSTALL_DOC=false
 INSTALL_PROTOC=false
-INSTALL_API_BUILD_TOOLS=false
 INSTALL_POSTGRES=false
 INSTALL_JSTS=false
 INSTALL_INDIVIDUAL=false
@@ -884,9 +875,6 @@ while getopts "btoprvydaPJh:i:nk" arg; do
   d)
     INSTALL_DOC="true"
     ;;
-  a)
-    INSTALL_API_BUILD_TOOLS="true"
-    ;;
   P)
     INSTALL_POSTGRES="true"
     ;;
@@ -920,7 +908,6 @@ if [[ "$INSTALL_BUILD_TOOLS" == "false" ]] &&
   [[ "$INSTALL_PROFILE" == "false" ]] &&
   [[ "$INSTALL_PROVER" == "false" ]] &&
   [[ "$INSTALL_DOC" == "false" ]] &&
-  [[ "$INSTALL_API_BUILD_TOOLS" == "false" ]] &&
   [[ "$INSTALL_POSTGRES" == "false" ]] &&
   [[ "$INSTALL_JSTS" == "false" ]] &&
   [[ "$INSTALL_INDIVIDUAL" == "false" ]]; then
@@ -1081,12 +1068,6 @@ fi
 
 if [[ "$INSTALL_DOC" == "true" ]]; then
   install_pkg graphviz "$PACKAGE_MANAGER"
-fi
-
-if [[ "$INSTALL_API_BUILD_TOOLS" == "true" ]]; then
-  # python and tools
-  install_python3
-  "${PRE_COMMAND[@]}" python3 -m pip install schemathesis
 fi
 
 if [[ "$INSTALL_POSTGRES" == "true" ]]; then

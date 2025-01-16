@@ -24,10 +24,12 @@ spec aptos_std::smart_table {
 
     spec destroy<K: drop, V: drop>(self: SmartTable<K, V>) {
         pragma verify = false;
+        pragma opaque;
     }
 
     spec clear<K: drop, V: drop>(self: &mut SmartTable<K, V>) {
         pragma verify = false;
+        pragma opaque;
     }
 
     spec split_one_bucket<K, V>(self: &mut SmartTable<K, V>) {

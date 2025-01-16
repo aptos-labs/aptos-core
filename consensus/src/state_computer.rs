@@ -21,7 +21,7 @@ use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{
     block::Block, common::Round, pipeline_execution_result::PipelineExecutionResult,
-    pipelined_block::PipelinedBlock,
+    pipelined_block::PipelinedBlock, quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
@@ -228,6 +228,7 @@ impl StateComputer for ExecutionProxy {
         // The parent block id.
         parent_block_id: HashValue,
         randomness: Option<Randomness>,
+        block_qc: Option<Arc<QuorumCert>>,
         lifetime_guard: CountedRequest<()>,
     ) -> StateComputeResultFut {
         let block_id = block.id();
@@ -274,6 +275,7 @@ impl StateComputer for ExecutionProxy {
                 block.clone(),
                 metadata.clone(),
                 parent_block_id,
+                block_qc,
                 transaction_generator,
                 block_executor_onchain_config,
                 self.pre_commit_hook(),

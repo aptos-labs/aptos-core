@@ -44,7 +44,7 @@ new_file_found=false
 new_files=""
 modified_files=""
 
-cd ecosystem/indexer-grpc/indexer-test-transactions || exit 1
+cd ecosystem/indexer-grpc/indexer-test-transactions/src || exit 1
 
 echo "Starting comparison between new and original JSON files."
 
@@ -66,7 +66,7 @@ for folder in new_json_transactions/*; do
         if [ -f "$file" ]; then
           echo "Processing imported file: $file"
           base_file=$(basename "$file" .json)
-          original_file="../indexer-test-transactions/json_transactions/$(basename $folder)/${base_file}.json"
+          original_file="../indexer-test-transactions/src/json_transactions/$(basename $folder)/${base_file}.json"
           compare_and_diff "$file" "$original_file"
         fi
       done
@@ -76,7 +76,7 @@ for folder in new_json_transactions/*; do
         if [ -f "$file" ]; then
           echo "Processing scripted file: $file"
           base_file=$(basename "$file" .json)
-          original_file="../indexer-test-transactions/json_transactions/$(basename $folder)/${base_file}.json"
+          original_file="../indexer-test-transactions/src/json_transactions/$(basename $folder)/${base_file}.json"
           compare_and_diff "$file" "$original_file"
         fi
       done

@@ -118,7 +118,7 @@ impl ScriptTransactions {
             .join("build")
             .join(package_name)
             .join("bytecode_scripts")
-            .join("main.mv");
+            .join("main_0.mv");
 
         let cmd = create_run_script_cmd(compiled_build_path);
         let transaction_summary = cmd.execute().await.context(format!(

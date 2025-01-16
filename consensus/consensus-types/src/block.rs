@@ -360,6 +360,11 @@ impl Block {
                 "Reconfiguration suffix should not carry payload"
             );
         }
+
+        if let Some(payload) = self.payload() {
+            payload.verify_epoch(self.epoch())?;
+        }
+
         if let Some(failed_authors) = self.block_data().failed_authors() {
             // when validating for being well formed,
             // allow for missing failed authors,
