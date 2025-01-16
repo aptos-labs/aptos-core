@@ -19,13 +19,15 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, CryptoHasher, BCSCryptoHash, Serialize, Deserialize)]
 pub struct TestAptosCrypto(pub String);
 
+fn random_string(rng: &mut ThreadRng) -> String {
+    rng.sample_iter(&distributions::Alphanumeric)
+        .take(256)
+        .map(char::from)
+        .collect::<String>()
+}
+
 fn random_message(rng: &mut ThreadRng) -> TestAptosCrypto {
-    TestAptosCrypto(
-        rng.sample_iter(&distributions::Alphanumeric)
-            .take(256)
-            .map(char::from)
-            .collect::<String>(),
-    )
+    TestAptosCrypto(random_string(rng))
 }
 
 fn benchmark_groups(c: &mut Criterion) {
@@ -33,6 +35,8 @@ fn benchmark_groups(c: &mut Criterion) {
 
     group.sample_size(1000);
 
+    #[cfg(feature = "fuzzing")]
+    sign_bytes(&mut group);
     sig_verify_struct(&mut group);
     sig_verify_zero_bytes(&mut group);
     pk_deserialize(&mut group);
@@ -40,6 +44,25 @@ fn benchmark_groups(c: &mut Criterion) {
     small_subgroup_check(&mut group);
 
     group.finish();
+}
+
+/// Because PrivateKey::sign_arbitrary_message needs feature = "fuzzing"
+#[cfg(feature = "fuzzing")]
+fn sign_bytes<M: Measurement>(g: &mut BenchmarkGroup<M>) {
+    let mut csprng: ThreadRng = thread_rng();
+
+    let priv_key = Ed25519PrivateKey::generate(&mut csprng);
+
+    g.throughput(Throughput::Elements(1));
+    g.bench_function("sign_bytes", move |b| {
+        b.iter_with_setup(
+            || {
+                let msg = random_string(&mut csprng);
+                msg
+            },
+            |msg| priv_key.sign_arbitrary_message(&msg.into_bytes().as_slice()),
+        )
+    });
 }
 
 fn sig_verify_struct<M: Measurement>(g: &mut BenchmarkGroup<M>) {
