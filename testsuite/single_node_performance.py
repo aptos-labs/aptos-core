@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
