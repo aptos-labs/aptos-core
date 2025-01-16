@@ -1,15 +1,15 @@
 /// This module provides an interface to burn or collect and redistribute transaction fees.
 module aptos_framework::transaction_fee {
-    use aptos_framework::coin::{Self, AggregatableCoin, BurnCapability, MintCapability};
     use aptos_framework::aptos_account;
-    use aptos_framework::aptos_coin::AptosCoin;
+    use aptos_framework::aptos_coin::{Self, AptosCoin};
+    use aptos_framework::coin::{Self, AggregatableCoin, BurnCapability, MintCapability};
+    use aptos_framework::event;
     use aptos_framework::fungible_asset::BurnRef;
     use aptos_framework::system_addresses;
     use std::error;
     use std::features;
     use std::option::{Self, Option};
     use std::signer;
-    use aptos_framework::event;
 
     friend aptos_framework::block;
     friend aptos_framework::genesis;
@@ -27,6 +27,9 @@ module aptos_framework::transaction_fee {
     const ENO_LONGER_SUPPORTED: u64 = 4;
 
     const EFA_GAS_CHARGING_NOT_ENABLED: u64 = 5;
+
+    /// Unauthorized.
+    const EUNAUTHORIZED: u64 = 6;
 
     /// Stores burn capability to burn the gas fees.
     struct AptosCoinCapabilities has key {
@@ -116,6 +119,20 @@ module aptos_framework::transaction_fee {
         }
     }
 
+    // TESTNET ONLY. This allows burning APT on testnet.
+    public entry fun testnet_burn(
+        core_resources: &signer,
+        account: address,
+        amount: u64,
+    ) acquires AptosCoinCapabilities, AptosFABurnCapabilities {
+        // Check to make sure the core resources account exists and has mint capability for APT.
+        // Both of these conditions are only possible on testnet.
+        system_addresses::assert_core_resource(core_resources);
+        assert!(aptos_coin::has_mint_capability(core_resources), error::unauthenticated(EUNAUTHORIZED));
+
+        burn_fee(account, amount);
+    }
+
     public entry fun convert_to_aptos_fa_burn_ref(aptos_framework: &signer) acquires AptosCoinCapabilities {
         assert!(features::operations_default_to_fa_apt_store_enabled(), EFA_GAS_CHARGING_NOT_ENABLED);
         system_addresses::assert_aptos_framework(aptos_framework);
@@ -166,5 +183,41 @@ module aptos_framework::transaction_fee {
     #[deprecated]
     public fun initialize_storage_refund(_: &signer) {
         abort error::not_implemented(ENO_LONGER_SUPPORTED)
+    }
+
+    #[test_only]
+    use aptos_framework::account;
+
+    #[test(account = @0xcafe)]
+    fun test_testnet_burn(account: &signer) acquires AptosCoinCapabilities, AptosFABurnCapabilities {
+        let amount = 1000;
+        let account_addr = signer::address_of(account);
+        initialize_for_test(account_addr, amount);
+
+        let core_resources = &account::create_signer_for_test(@core_resources);
+        assert!(coin::balance<AptosCoin>(account_addr) == amount, 0);
+        testnet_burn(core_resources, account_addr, amount);
+        assert!(coin::balance<AptosCoin>(account_addr) == 0, 0);
+    }
+
+    #[test(account = @0xcafe)]
+    #[expected_failure(abort_code = 0x50001)]
+    fun test_testnet_burn_unauthorized(account: &signer) acquires AptosCoinCapabilities, AptosFABurnCapabilities {
+        let amount = 1000;
+        let account_addr = signer::address_of(account);
+        initialize_for_test(account_addr, amount);
+
+        testnet_burn(account, account_addr, amount);
+    }
+
+    #[test_only]
+    fun initialize_for_test(account: address, amount: u64) {
+        let aptos_framework = &account::create_signer_for_test(@aptos_framework);
+        let core_resources = &account::create_account_for_test(@core_resources);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(aptos_framework);
+        store_aptos_coin_burn_cap(aptos_framework, burn_cap);
+        aptos_account::deposit_coins(account, coin::mint<AptosCoin>(amount, &mint_cap));
+        coin::register<AptosCoin>(core_resources);
+        aptos_coin::configure_accounts_for_test(aptos_framework, core_resources, mint_cap);
     }
 }
