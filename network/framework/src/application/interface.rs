@@ -39,7 +39,6 @@ pub trait NetworkClientInterface<Message: NetworkMessageTrait>: Clone + Send + S
 
     /// Requests that the network connection for the specified peer
     /// is disconnected.
-    // TODO: support disconnect reasons.
     async fn disconnect_from_peer(
         &self,
         _peer: PeerNetworkId,

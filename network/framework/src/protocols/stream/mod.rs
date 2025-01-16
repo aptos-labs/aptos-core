@@ -1,7 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::protocols::wire::messaging::v1::{MultiplexMessage, NetworkMessage};
+use crate::{
+    counters,
+    protocols::wire::messaging::v1::{
+        metadata::{MessageStreamType, MultiplexMessageWithMetadata, NetworkMessageWithMetadata},
+        MultiplexMessage, NetworkMessage,
+    },
+};
 use anyhow::{bail, ensure};
 use aptos_channels::Sender;
 use aptos_id_generator::{IdGenerator, U32IdGenerator};
@@ -151,14 +157,14 @@ pub struct OutboundStream {
     request_id_gen: U32IdGenerator,
     max_frame_size: usize,
     max_message_size: usize,
-    stream_tx: Sender<MultiplexMessage>,
+    stream_tx: Sender<MultiplexMessageWithMetadata>,
 }
 
 impl OutboundStream {
     pub fn new(
         max_frame_size: usize,
         max_message_size: usize,
-        stream_tx: Sender<MultiplexMessage>,
+        stream_tx: Sender<MultiplexMessageWithMetadata>,
     ) -> Self {
         // some buffer for headers
         let max_frame_size = max_frame_size - 64;
@@ -176,11 +182,18 @@ impl OutboundStream {
         }
     }
 
-    pub fn should_stream(&self, message: &NetworkMessage) -> bool {
-        message.data_len() > self.max_frame_size
+    /// Returns true iff the message should be streamed (i.e., broken into chunks)
+    pub fn should_stream(&self, message_with_metadata: &NetworkMessageWithMetadata) -> bool {
+        let message_length = message_with_metadata.network_message().data_len();
+        message_length > self.max_frame_size
     }
 
-    pub async fn stream_message(&mut self, mut message: NetworkMessage) -> anyhow::Result<()> {
+    pub async fn stream_message(
+        &mut self,
+        message_with_metadata: NetworkMessageWithMetadata,
+    ) -> anyhow::Result<()> {
+        let (message_metadata, mut message) = message_with_metadata.into_parts();
+
         ensure!(
             message.data_len() <= self.max_message_size,
             "Message length {} exceed size limit {}",
@@ -209,28 +222,63 @@ impl OutboundStream {
             },
         };
         let chunks = rest.chunks(self.max_frame_size);
+        let num_chunks = chunks.len();
         ensure!(
-            chunks.len() <= u8::MAX as usize,
+            num_chunks <= u8::MAX as usize,
             "Number of fragments overflowed"
         );
-        let header = StreamMessage::Header(StreamHeader {
-            request_id,
-            num_fragments: chunks.len() as u8,
-            message,
-        });
-        self.stream_tx
-            .send(MultiplexMessage::Stream(header))
-            .await?;
-        for (index, chunk) in chunks.enumerate() {
-            let message = StreamMessage::Fragment(StreamFragment {
+
+        // Update the metrics for the number of fragments
+        counters::observe_message_stream_fragment_count(
+            message_metadata.network_id(),
+            message_metadata.protocol_id(),
+            num_chunks,
+        );
+
+        // Create the stream header multiplex message
+        let header_multiplex_message =
+            MultiplexMessage::Stream(StreamMessage::Header(StreamHeader {
                 request_id,
-                fragment_id: index as u8 + 1,
-                raw_data: Vec::from(chunk),
-            });
-            self.stream_tx
-                .send(MultiplexMessage::Stream(message))
-                .await?;
+                num_fragments: num_chunks as u8,
+                message,
+            }));
+
+        // Create the stream header metadata
+        let mut header_message_metadata = message_metadata.clone();
+        header_message_metadata.update_message_stream_type(MessageStreamType::StreamedMessageHead);
+
+        // Send the header of the stream across the wire
+        let message_with_metadata =
+            MultiplexMessageWithMetadata::new(header_message_metadata, header_multiplex_message);
+        self.stream_tx.send(message_with_metadata).await?;
+
+        // Send each of the fragments across the wire
+        for (index, chunk) in chunks.enumerate() {
+            // Create the stream fragment multiplex message
+            let fragment_multiplex_message =
+                MultiplexMessage::Stream(StreamMessage::Fragment(StreamFragment {
+                    request_id,
+                    fragment_id: index as u8 + 1,
+                    raw_data: Vec::from(chunk),
+                }));
+
+            // Create the stream fragment metadata
+            let mut fragment_message_metadata = message_metadata.clone();
+            let message_stream_type = if index == num_chunks - 1 {
+                MessageStreamType::StreamedMessageTail
+            } else {
+                MessageStreamType::StreamedMessageFragment
+            };
+            fragment_message_metadata.update_message_stream_type(message_stream_type);
+
+            // Send the fragment across the wire
+            let message_with_metadata = MultiplexMessageWithMetadata::new(
+                fragment_message_metadata,
+                fragment_multiplex_message,
+            );
+            self.stream_tx.send(message_with_metadata).await?;
         }
+
         Ok(())
     }
 }

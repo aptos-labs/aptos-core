@@ -11,7 +11,7 @@ use crate::{
     peer_manager::TransportNotification,
     protocols::{
         direct_send::Message,
-        network::ReceivedMessage,
+        network::{ReceivedMessage, SerializedRequest},
         rpc::{error::RpcError, OutboundRpcRequest},
         wire::{
             handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
@@ -177,7 +177,7 @@ struct PeerHandle(aptos_channel::Sender<ProtocolId, PeerRequest>);
 impl PeerHandle {
     fn send_direct_send(&mut self, message: Message) {
         self.0
-            .push(message.protocol_id, PeerRequest::SendDirectSend(message))
+            .push(message.protocol_id(), PeerRequest::SendDirectSend(message))
             .unwrap()
     }
 
@@ -188,12 +188,7 @@ impl PeerHandle {
         timeout: Duration,
     ) -> Result<Bytes, RpcError> {
         let (res_tx, res_rx) = oneshot::channel();
-        let request = OutboundRpcRequest {
-            protocol_id,
-            data,
-            res_tx,
-            timeout,
-        };
+        let request = OutboundRpcRequest::new(protocol_id, data, res_tx, timeout);
         self.0.push(protocol_id, PeerRequest::SendRpc(request))?;
         let response_data = res_rx.await??;
         Ok(response_data)
@@ -214,10 +209,7 @@ fn peer_send_message() {
     );
     let (mut client_sink, mut client_stream) = build_network_sink_stream(&mut connection);
 
-    let send_msg = Message {
-        protocol_id: PROTOCOL,
-        mdata: Bytes::from("hello world"),
-    };
+    let send_msg = Message::new(PROTOCOL, Bytes::from("hello world"));
     let recv_msg = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
         protocol_id: PROTOCOL,
         priority: 0,
@@ -328,14 +320,8 @@ fn peers_send_message_concurrent() {
     let remote_peer_id_b = peer_b.remote_peer_id();
 
     let test = async move {
-        let msg_a = Message {
-            protocol_id: PROTOCOL,
-            mdata: Bytes::from("hello world"),
-        };
-        let msg_b = Message {
-            protocol_id: PROTOCOL,
-            mdata: Bytes::from("namaste"),
-        };
+        let msg_a = Message::new(PROTOCOL, Bytes::from("hello world"));
+        let msg_b = Message::new(PROTOCOL, Bytes::from("namaste"));
 
         // Peer A -> msg_a -> Peer B
         peer_handle_a.send_direct_send(msg_a.clone());
@@ -350,7 +336,7 @@ fn peers_send_message_concurrent() {
             NetworkMessage::DirectSendMsg(DirectSendMsg {
                 protocol_id: PROTOCOL,
                 priority: 0,
-                raw_msg: msg_b.mdata.into(),
+                raw_msg: msg_b.data().clone().into(),
             })
         );
         assert_eq!(
@@ -358,7 +344,7 @@ fn peers_send_message_concurrent() {
             NetworkMessage::DirectSendMsg(DirectSendMsg {
                 protocol_id: PROTOCOL,
                 priority: 0,
-                raw_msg: msg_a.mdata.into(),
+                raw_msg: msg_a.data().clone().into(),
             })
         );
 
@@ -778,12 +764,13 @@ fn peer_send_rpc_cancel() {
     let test = async move {
         // Client sends rpc request.
         let (response_tx, mut response_rx) = oneshot::channel();
-        let request = PeerRequest::SendRpc(OutboundRpcRequest {
-            protocol_id: PROTOCOL,
-            data: Bytes::from(&b"hello world"[..]),
-            res_tx: response_tx,
+        let outbound_rpc_request = OutboundRpcRequest::new(
+            PROTOCOL,
+            Bytes::from(&b"hello world"[..]),
+            response_tx,
             timeout,
-        });
+        );
+        let request = PeerRequest::SendRpc(outbound_rpc_request);
         peer_handle.0.push(PROTOCOL, request).unwrap();
 
         // Server receives the rpc request from client.
@@ -840,12 +827,13 @@ fn peer_send_rpc_timeout() {
     let test = async move {
         // Client sends rpc request.
         let (response_tx, mut response_rx) = oneshot::channel();
-        let request = PeerRequest::SendRpc(OutboundRpcRequest {
-            protocol_id: PROTOCOL,
-            data: Bytes::from(&b"hello world"[..]),
-            res_tx: response_tx,
+        let outbound_rpc_request = OutboundRpcRequest::new(
+            PROTOCOL,
+            Bytes::from(&b"hello world"[..]),
+            response_tx,
             timeout,
-        });
+        );
+        let request = PeerRequest::SendRpc(outbound_rpc_request);
         peer_handle.0.push(PROTOCOL, request).unwrap();
 
         // Server receives the rpc request from client.
@@ -979,14 +967,14 @@ fn peers_send_multiplex() {
     let remote_peer_id_b = peer_b.remote_peer_id();
 
     let test = async move {
-        let msg_a = Message {
-            protocol_id: PROTOCOL,
-            mdata: Bytes::from(vec![0; MAX_MESSAGE_SIZE]), // stream message
-        };
-        let msg_b = Message {
-            protocol_id: PROTOCOL,
-            mdata: Bytes::from(vec![1; 1024]), // normal message
-        };
+        let msg_a = Message::new(
+            PROTOCOL,
+            Bytes::from(vec![0; MAX_MESSAGE_SIZE]), // stream message
+        );
+        let msg_b = Message::new(
+            PROTOCOL,
+            Bytes::from(vec![1; 1024]), // normal message
+        );
 
         // Peer A -> msg_a -> Peer B
         peer_handle_a.send_direct_send(msg_a.clone());
@@ -1001,7 +989,7 @@ fn peers_send_multiplex() {
             NetworkMessage::DirectSendMsg(DirectSendMsg {
                 protocol_id: PROTOCOL,
                 priority: 0,
-                raw_msg: msg_b.mdata.into(),
+                raw_msg: msg_b.data().clone().into(),
             })
         );
         assert_eq!(
@@ -1009,7 +997,7 @@ fn peers_send_multiplex() {
             NetworkMessage::DirectSendMsg(DirectSendMsg {
                 protocol_id: PROTOCOL,
                 priority: 0,
-                raw_msg: msg_a.mdata.into(),
+                raw_msg: msg_a.data().clone().into(),
             })
         );
 
