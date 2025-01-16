@@ -253,3 +253,10 @@ module 0xc0ffee::more_struct_tests {
         consume_immut(u);
     }
 }
+
+module 0xc0ffee::p {
+    fun no_warn_01(_x: &mut u64) {
+        let x = 1;
+        let _y = &mut x;
+    }
+}
