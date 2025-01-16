@@ -606,6 +606,8 @@ module std::bn254_algebra {
     }
 
     #[test_only]
+    use std::option;
+    #[test_only]
     use aptos_std::crypto_algebra::{zero, one, from_u64, eq, deserialize, serialize, neg, add, sub, mul, div, inv, rand_insecure, sqr, order, scalar_mul, multi_scalar_mul, double, upcast, enable_cryptography_algebra_natives, pairing, multi_pairing, downcast, Element};
 
     #[test_only]
@@ -852,4 +854,10 @@ module std::bn254_algebra {
     // (Tests end here.)
     //
 
+    #[test(fx = @std)]
+    fun hihi(fx:signer) {
+        enable_cryptography_algebra_natives(&fx);
+        let r = deserialize<G1, FormatG1Compr>(&x"e2f26dbea299f5223b646cb1fb33eadb059d9407559d7441dfd902e3a79a4d2d");
+        assert!(option::is_some(&r), 1);
+    }
 }
