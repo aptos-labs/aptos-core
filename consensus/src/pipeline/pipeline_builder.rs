@@ -151,7 +151,7 @@ impl Tracker {
             .with_label_values(&[self.name, "work_time"])
             .observe(work_time.as_secs_f64());
         info!(
-            "[Pipeline] Block {} {} {} finishes {}, waits {}, takes {}",
+            "[Pipeline] Block {} {} {} finishes {}, waits {}ms, takes {}ms",
             self.block_id,
             self.epoch,
             self.round,
