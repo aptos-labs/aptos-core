@@ -202,6 +202,7 @@ export interface Block {
     | undefined;
   /** Chain ID informs us which chain we're trying to index, this is important to ensure that we're not mixing chains within a single pipeline. */
   chainId?: number | undefined;
+  test?: number | undefined;
 }
 
 /**
@@ -1189,7 +1190,7 @@ export interface WriteOpSizeInfo {
 }
 
 function createBaseBlock(): Block {
-  return { timestamp: undefined, height: BigInt("0"), transactions: [], chainId: 0 };
+  return { timestamp: undefined, height: BigInt("0"), transactions: [], chainId: 0, test: 0 };
 }
 
 export const Block = {
@@ -1210,6 +1211,9 @@ export const Block = {
     }
     if (message.chainId !== undefined && message.chainId !== 0) {
       writer.uint32(32).uint32(message.chainId);
+    }
+    if (message.test !== undefined && message.test !== 0) {
+      writer.uint32(40).uint32(message.test);
     }
     return writer;
   },
@@ -1248,6 +1252,13 @@ export const Block = {
           }
 
           message.chainId = reader.uint32();
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.test = reader.uint32();
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -1298,6 +1309,7 @@ export const Block = {
         ? object.transactions.map((e: any) => Transaction.fromJSON(e))
         : [],
       chainId: isSet(object.chainId) ? globalThis.Number(object.chainId) : 0,
+      test: isSet(object.test) ? globalThis.Number(object.test) : 0,
     };
   },
 
@@ -1315,6 +1327,9 @@ export const Block = {
     if (message.chainId !== undefined && message.chainId !== 0) {
       obj.chainId = Math.round(message.chainId);
     }
+    if (message.test !== undefined && message.test !== 0) {
+      obj.test = Math.round(message.test);
+    }
     return obj;
   },
 
@@ -1329,6 +1344,7 @@ export const Block = {
     message.height = object.height ?? BigInt("0");
     message.transactions = object.transactions?.map((e) => Transaction.fromPartial(e)) || [];
     message.chainId = object.chainId ?? 0;
+    message.test = object.test ?? 0;
     return message;
   },
 };
