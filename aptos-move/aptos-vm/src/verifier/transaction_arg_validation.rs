@@ -6,7 +6,7 @@
 //! TODO: we should not only validate the types but also the actual values, e.g.
 //! for strings whether they consist of correct characters.
 
-use crate::{move_vm_ext::SessionExt, VMStatus};
+use crate::{aptos_vm::SerializedSigners, move_vm_ext::SessionExt, VMStatus};
 use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use move_binary_format::{
     errors::{Location, PartialVMError},
@@ -18,7 +18,6 @@ use move_core_types::{
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::ModuleId,
-    value::MoveValue,
     vm_status::StatusCode,
 };
 use move_vm_metrics::{Timer, VM_TIMER};
@@ -103,10 +102,10 @@ pub(crate) fn get_allowed_structs(
 /// 3. check arg types are allowed after signers
 ///
 /// after validation, add senders and non-signer arguments to generate the final args
-pub fn validate_combine_signer_and_txn_args(
+pub(crate) fn validate_combine_signer_and_txn_args(
     session: &mut SessionExt,
     module_storage: &impl AptosModuleStorage,
-    senders: Vec<AccountAddress>,
+    serialized_signers: &SerializedSigners,
     args: Vec<Vec<u8>>,
     func: &LoadedFunction,
     are_struct_constructors_enabled: bool,
@@ -161,7 +160,8 @@ pub fn validate_combine_signer_and_txn_args(
     // signers actually passed is matching first to maintain backward compatibility before
     // moving on to the validation of non-signer args.
     // the number of txn senders should be the same number of signers
-    if signer_param_cnt > 0 && senders.len() != signer_param_cnt {
+    let sender_signers = serialized_signers.senders();
+    if signer_param_cnt > 0 && sender_signers.len() != signer_param_cnt {
         return Err(VMStatus::error(
             StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
             None,
@@ -185,11 +185,7 @@ pub fn validate_combine_signer_and_txn_args(
     let combined_args = if signer_param_cnt == 0 {
         args
     } else {
-        senders
-            .into_iter()
-            .map(|s| MoveValue::Signer(s).simple_serialize().unwrap())
-            .chain(args)
-            .collect()
+        sender_signers.into_iter().chain(args).collect()
     };
     Ok(combined_args)
 }

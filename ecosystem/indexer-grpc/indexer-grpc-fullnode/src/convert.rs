@@ -675,6 +675,15 @@ pub fn convert_account_signature(
                 "[Indexer Fullnode] Indexer should never see transactions with NoAccountSignature"
             )
         },
+        AccountSignature::AbstractionSignature(s) => (
+            transaction::account_signature::Type::Abstraction,
+            transaction::account_signature::Signature::Abstraction(
+                transaction::AbstractionSignature {
+                    function_info: s.function_info.to_owned(),
+                    signature: s.auth_data.inner().to_owned(),
+                },
+            ),
+        ),
     };
 
     transaction::AccountSignature {

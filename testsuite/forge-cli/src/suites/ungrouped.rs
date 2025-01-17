@@ -543,6 +543,80 @@ pub fn mixed_emit_job() -> EmitJobRequest {
         ])
 }
 
+// framework_usecases can have new features, so might fail publishing.
+pub fn mixed_compatible_emit_job() -> EmitJobRequest {
+    EmitJobRequest::default()
+        .mode(EmitJobMode::MaxLoad {
+            mempool_backlog: 10000,
+        })
+        .transaction_mix(vec![
+            // To test both variants, make module publish with such frequency, so that there are
+            // similar number of sequential and parallel blocks.
+            // For other transactions, make more expensive transactions somewhat rarer.
+            (
+                TransactionTypeArg::AccountGeneration.materialize_default(),
+                10000,
+            ),
+            (
+                TransactionTypeArg::CoinTransfer.materialize_default(),
+                10000,
+            ),
+            (TransactionTypeArg::PublishPackage.materialize_default(), 3),
+            (
+                TransactionTypeArg::Batch100Transfer.materialize_default(),
+                100,
+            ),
+            (
+                TransactionTypeArg::VectorPicture30k.materialize_default(),
+                100,
+            ),
+            (
+                TransactionTypeArg::SmartTablePicture30KWith200Change.materialize(
+                    1,
+                    true,
+                    WorkflowProgress::when_done_default(),
+                ),
+                100,
+            ),
+            (
+                TransactionTypeArg::TokenV2AmbassadorMint.materialize_default(),
+                10000,
+            ),
+            // (
+            //     TransactionTypeArg::ModifyGlobalResource.materialize_default(),
+            //     1000,
+            // ),
+            // (
+            //     TransactionTypeArg::ModifyGlobalResourceAggV2.materialize_default(),
+            //     1000,
+            // ),
+            // (
+            //     TransactionTypeArg::ModifyGlobalFlagAggV2.materialize_default(),
+            //     1000,
+            // ),
+            // (
+            //     TransactionTypeArg::ModifyGlobalBoundedAggV2.materialize_default(),
+            //     1000,
+            // ),
+            // (
+            //     TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB.materialize_default(),
+            //     1000,
+            // ),
+            // (
+            //     TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB.materialize_default(),
+            //     1000,
+            // ),
+            // (
+            //     TransactionTypeArg::TokenV1NFTMintAndTransferSequential.materialize_default(),
+            //     1000,
+            // ),
+            // (
+            //     TransactionTypeArg::TokenV1FTMintAndTransfer.materialize_default(),
+            //     10000,
+            // ),
+        ])
+}
+
 fn fullnode_reboot_stress_test() -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
