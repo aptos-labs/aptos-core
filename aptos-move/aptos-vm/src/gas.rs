@@ -12,7 +12,10 @@ use aptos_logger::{enabled, Level};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_types::on_chain_config::Features;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_log, speculative_warn};
-use aptos_vm_types::storage::{space_pricing::DiskSpacePricing, StorageGasParameters};
+use aptos_vm_types::{
+    resolver::BlockSynchronizationKillSwitch,
+    storage::{space_pricing::DiskSpacePricing, StorageGasParameters},
+};
 use move_core_types::vm_status::{StatusCode, VMStatus};
 use move_vm_runtime::ModuleStorage;
 
@@ -20,7 +23,7 @@ use move_vm_runtime::ModuleStorage;
 const MAXIMUM_APPROVED_TRANSACTION_SIZE_LEGACY: u64 = 1024 * 1024;
 
 /// Gas meter used in the production (validator) setup.
-pub type ProdGasMeter = MemoryTrackedGasMeter<StandardGasMeter<StandardGasAlgebra>>;
+pub type ProdGasMeter<'a> = MemoryTrackedGasMeter<StandardGasMeter<StandardGasAlgebra<'a>>>;
 
 /// Creates a gas meter intended for executing transactions in the production.
 ///
@@ -31,6 +34,7 @@ pub fn make_prod_gas_meter(
     storage_gas_params: StorageGasParameters,
     is_approved_gov_script: bool,
     meter_balance: Gas,
+    block_synchronization_kill_switch: &dyn BlockSynchronizationKillSwitch,
 ) -> ProdGasMeter {
     MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
         gas_feature_version,
@@ -38,6 +42,7 @@ pub fn make_prod_gas_meter(
         storage_gas_params,
         is_approved_gov_script,
         meter_balance,
+        block_synchronization_kill_switch,
     )))
 }
 
