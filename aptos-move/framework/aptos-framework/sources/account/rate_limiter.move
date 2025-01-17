@@ -1,5 +1,4 @@
 module aptos_framework::rate_limiter {
-    use aptos_std::math64;
     use aptos_framework::timestamp;
 
     enum RateLimiter has key, store, copy, drop {
