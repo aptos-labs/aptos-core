@@ -213,6 +213,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                         },
                     }
                 },
+                MockTransaction::InterruptRequested => unreachable!("Not tested with outputs"),
             }
         }
 

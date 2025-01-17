@@ -392,6 +392,7 @@ impl<K, E> MockIncarnation<K, E> {
 /// value determines the index for choosing the read & write sets of the particular execution.
 #[derive(Clone, Debug)]
 pub(crate) enum MockTransaction<K, E> {
+    InterruptRequested,
     Write {
         /// Incarnation counter, increased during each mock (re-)execution. Allows tracking the final
         /// incarnation for each mock transaction, whose behavior should be reproduced for baseline.
@@ -430,6 +431,9 @@ impl<K, E> MockTransaction<K, E> {
             } => incarnation_behaviors,
             Self::SkipRest(_) => unreachable!("SkipRest does not contain incarnation behaviors"),
             Self::Abort => unreachable!("Abort does not contain incarnation behaviors"),
+            Self::InterruptRequested => {
+                unreachable!("InterruptRequested does not contain incarnation behaviors")
+            },
         }
     }
 }
@@ -1038,6 +1042,10 @@ where
                 ExecutionStatus::SkipRest(mock_output)
             },
             MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
+            MockTransaction::InterruptRequested => {
+                while !view.interrupt_requested() {}
+                ExecutionStatus::SkipRest(MockOutput::skip_output())
+            },
         }
     }
 
