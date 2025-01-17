@@ -3585,6 +3585,7 @@ dependencies = [
  "anyhow",
  "aptos-block-executor",
  "aptos-crypto",
+ "aptos-gas-schedule",
  "aptos-logger",
  "aptos-move-debugger",
  "aptos-push-metrics",

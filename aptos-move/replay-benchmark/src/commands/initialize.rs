@@ -8,6 +8,7 @@ use crate::{
     workload::TransactionBlock,
 };
 use anyhow::anyhow;
+use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_logger::Level;
 use aptos_types::on_chain_config::FeatureFlag;
 use clap::Parser;
@@ -45,6 +46,12 @@ pub struct InitializeCommand {
 
     #[clap(
         long,
+        help = "If set, overrides the gas feature version used by the gas schedule"
+    )]
+    gas_feature_version: Option<u64>,
+
+    #[clap(
+        long,
         default_value_t = false,
         help = "If true, when comparing output diffs changes related to gas usage are ignored"
     )]
@@ -67,6 +74,13 @@ impl InitializeCommand {
                 .all(|f| !self.disable_features.contains(f)),
             "Enabled and disabled feature flags cannot overlap",
         );
+        if let Some(gas_feature_version) = self.gas_feature_version {
+            assert!(
+                gas_feature_version <= LATEST_GAS_FEATURE_VERSION,
+                "Gas feature version must be at most the latest one: {}",
+                LATEST_GAS_FEATURE_VERSION
+            );
+        }
 
         let bytes = fs::read(PathBuf::from(&self.transactions_file)).await?;
         let txn_blocks: Vec<TransactionBlock> = bcs::from_bytes(&bytes).map_err(|err| {
@@ -86,7 +100,11 @@ impl InitializeCommand {
         //      2. Gas schedule, to track the costs of charging gas or tracking limits.
         //      3. BlockExecutorConfigFromOnchain to experiment with different block cutting based
         //         on gas limits.
-        let override_config = OverrideConfig::new(self.enable_features, self.disable_features);
+        let override_config = OverrideConfig::new(
+            self.enable_features,
+            self.disable_features,
+            self.gas_feature_version,
+        );
 
         let debugger = build_debugger(self.rest_api.rest_endpoint, self.rest_api.api_key)?;
         let (inputs, diffs) = InputOutputDiffGenerator::generate(
