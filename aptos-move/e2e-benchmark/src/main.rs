@@ -178,6 +178,8 @@ fn main() {
         EntryPoints::IncGlobalMilestoneAggV2 { milestone_every: 1 },
         EntryPoints::IncGlobalMilestoneAggV2 { milestone_every: 2 },
         EntryPoints::EmitEvents { count: 1000 },
+        EntryPoints::APTTransferWithPermissionedSigner,
+        EntryPoints::APTTransferWithMasterSigner,
         // long vectors with small elements
         EntryPoints::VectorTrimAppend {
             // baseline, only vector creation
