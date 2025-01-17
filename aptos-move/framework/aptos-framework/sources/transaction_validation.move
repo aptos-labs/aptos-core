@@ -562,23 +562,12 @@ module aptos_framework::transaction_validation {
                 );
             };
 
-            let gas_payer_signer = &create_signer::create_signer(gas_payer);
             if (transaction_fee_amount > storage_fee_refunded) {
                 let burn_amount = transaction_fee_amount - storage_fee_refunded;
                 transaction_fee::burn_fee(gas_payer, burn_amount);
-                permissioned_signer::check_permission_consume(
-                    gas_payer_signer,
-                    (burn_amount as u256),
-                    GasPermission {}
-                );
             } else if (transaction_fee_amount < storage_fee_refunded) {
                 let mint_amount = storage_fee_refunded - transaction_fee_amount;
                 transaction_fee::mint_and_refund(gas_payer, mint_amount);
-                permissioned_signer::increase_limit(
-                    gas_payer_signer,
-                    (mint_amount as u256),
-                    GasPermission {}
-                );
             };
         };
 

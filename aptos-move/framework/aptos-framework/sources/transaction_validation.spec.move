@@ -28,6 +28,18 @@ spec aptos_framework::transaction_validation {
         pragma aborts_if_is_strict;
     }
 
+    spec grant_gas_permission(
+        master: &signer,
+        permissioned: &signer,
+        gas_amount: u64
+    ) {
+        pragma aborts_if_is_partial;
+    }
+
+    spec revoke_gas_permission(permissioned: &signer) {
+        pragma aborts_if_is_partial;
+    }
+
     /// Ensure caller is `aptos_framework`.
     /// Aborts if TransactionValidation already exists.
     spec initialize(
