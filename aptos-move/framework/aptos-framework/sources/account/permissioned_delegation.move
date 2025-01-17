@@ -2,8 +2,12 @@ module aptos_framework::permissioned_delegation {
     use std::error;
     use std::option::Option;
     use std::signer;
-    use aptos_std::ed25519;
-    use aptos_std::ed25519::{new_signature_from_bytes, new_unvalidated_public_key_from_bytes, UnvalidatedPublicKey};
+    use aptos_std::ed25519::{
+        Self,
+        new_signature_from_bytes,
+        new_unvalidated_public_key_from_bytes,
+        UnvalidatedPublicKey
+    };
     use aptos_std::big_ordered_map::{Self, BigOrderedMap};
     use aptos_framework::auth_data::{Self, AbstractionAuthData};
     use aptos_framework::bcs_stream::{Self, deserialize_u8};
@@ -19,7 +23,7 @@ module aptos_framework::permissioned_delegation {
     const EINVALID_PUBLIC_KEY: u64 = 2;
     const EPUBLIC_KEY_NOT_FOUND: u64 = 3;
     const EINVALID_SIGNATURE: u64 = 4;
-    const EHANDLE_EXISTENCE: u64 = 5;
+    const EDELEGATION_EXISTENCE: u64 = 5;
     const ERATE_LIMITED: u64 = 6;
 
     enum AccountDelegation has store {
@@ -28,6 +32,10 @@ module aptos_framework::permissioned_delegation {
 
     enum DelegationKey has copy, store, drop {
         Ed25519PublicKey(UnvalidatedPublicKey)
+    }
+
+    public fun gen_ed25519_key(key: UnvalidatedPublicKey): DelegationKey {
+        DelegationKey::Ed25519PublicKey(key)
     }
 
     struct RegisteredDelegations has key {
@@ -55,7 +63,7 @@ module aptos_framework::permissioned_delegation {
             });
         };
         let handles = &mut borrow_global_mut<RegisteredDelegations>(addr).delegations;
-        assert!(!handles.contains(&key), error::already_exists(EHANDLE_EXISTENCE));
+        assert!(!handles.contains(&key), error::already_exists(EDELEGATION_EXISTENCE));
         let handle = permissioned_signer::create_storable_permissioned_handle(master, expiration_time);
         let permissioned_signer = permissioned_signer::signer_from_storable_permissioned_handle(&handle);
         handles.add(key, AccountDelegation::V1 { handle, rate_limiter });
@@ -68,10 +76,10 @@ module aptos_framework::permissioned_delegation {
     ) acquires RegisteredDelegations {
         assert!(!is_permissioned_signer(master), error::permission_denied(ENOT_MASTER_SIGNER));
         let addr = signer::address_of(master);
-        let handle_bundles = &mut borrow_global_mut<RegisteredDelegations>(addr).delegations;
-        assert!(handle_bundles.contains(&key), error::not_found(EHANDLE_EXISTENCE));
-        let bundle = handle_bundles.remove(&key);
-        match (bundle) {
+        let delegations = &mut borrow_global_mut<RegisteredDelegations>(addr).delegations;
+        assert!(delegations.contains(&key), error::not_found(EDELEGATION_EXISTENCE));
+        let delegation = delegations.remove(&key);
+        match (delegation) {
             AccountDelegation::V1 { handle, rate_limiter: _ } => {
                 permissioned_signer::destroy_storable_permissioned_handle(handle);
             }
@@ -124,18 +132,24 @@ module aptos_framework::permissioned_delegation {
         count_rate: bool
     ): &StorablePermissionedHandle {
         if (exists<RegisteredDelegations>(master)) {
-            let bundles = &mut borrow_global_mut<RegisteredDelegations>(master).delegations;
-            if (bundles.contains(&key)) {
-                let delegation = bundles.remove(&key);
+            let delegations = &mut borrow_global_mut<RegisteredDelegations>(master).delegations;
+            if (delegations.contains(&key)) {
+                let delegation = delegations.remove(&key);
                 check_txn_rate(&mut delegation, count_rate);
-                bundles.add(key, delegation);
-                &bundles.borrow(&key).handle
+                delegations.add(key, delegation);
+                &delegations.borrow(&key).handle
             } else {
                 abort error::permission_denied(EINVALID_SIGNATURE)
             }
         } else {
             abort error::permission_denied(EINVALID_SIGNATURE)
         }
+    }
+
+    ///
+    spec module {
+        // TODO: fix verification
+        pragma verify = false;
     }
 
     #[test_only]

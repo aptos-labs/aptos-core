@@ -9,6 +9,7 @@
 -  [Enum `DelegationKey`](#0x1_permissioned_delegation_DelegationKey)
 -  [Resource `RegisteredDelegations`](#0x1_permissioned_delegation_RegisteredDelegations)
 -  [Constants](#@Constants_0)
+-  [Function `gen_ed25519_key`](#0x1_permissioned_delegation_gen_ed25519_key)
 -  [Function `check_txn_rate`](#0x1_permissioned_delegation_check_txn_rate)
 -  [Function `add_permissioned_handle`](#0x1_permissioned_delegation_add_permissioned_handle)
 -  [Function `remove_permissioned_handle`](#0x1_permissioned_delegation_remove_permissioned_handle)
@@ -16,6 +17,7 @@
 -  [Function `handle_address_by_key`](#0x1_permissioned_delegation_handle_address_by_key)
 -  [Function `authenticate`](#0x1_permissioned_delegation_authenticate)
 -  [Function `get_storable_permissioned_handle`](#0x1_permissioned_delegation_get_storable_permissioned_handle)
+-  [Specification](#@Specification_1)
 
 
 <pre><code><b>use</b> <a href="auth_data.md#0x1_auth_data">0x1::auth_data</a>;
@@ -165,11 +167,11 @@
 
 
 
-<a id="0x1_permissioned_delegation_EHANDLE_EXISTENCE"></a>
+<a id="0x1_permissioned_delegation_EDELEGATION_EXISTENCE"></a>
 
 
 
-<pre><code><b>const</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_EHANDLE_EXISTENCE">EHANDLE_EXISTENCE</a>: u64 = 5;
+<pre><code><b>const</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_EDELEGATION_EXISTENCE">EDELEGATION_EXISTENCE</a>: u64 = 5;
 </code></pre>
 
 
@@ -200,6 +202,30 @@
 </code></pre>
 
 
+
+<a id="0x1_permissioned_delegation_gen_ed25519_key"></a>
+
+## Function `gen_ed25519_key`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_gen_ed25519_key">gen_ed25519_key</a>(key: <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_UnvalidatedPublicKey">ed25519::UnvalidatedPublicKey</a>): <a href="permissioned_delegation.md#0x1_permissioned_delegation_DelegationKey">permissioned_delegation::DelegationKey</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_gen_ed25519_key">gen_ed25519_key</a>(key: UnvalidatedPublicKey): <a href="permissioned_delegation.md#0x1_permissioned_delegation_DelegationKey">DelegationKey</a> {
+    DelegationKey::Ed25519PublicKey(key)
+}
+</code></pre>
+
+
+
+</details>
 
 <a id="0x1_permissioned_delegation_check_txn_rate"></a>
 
@@ -257,7 +283,7 @@
         });
     };
     <b>let</b> handles = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a>&gt;(addr).delegations;
-    <b>assert</b>!(!handles.contains(&key), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="permissioned_delegation.md#0x1_permissioned_delegation_EHANDLE_EXISTENCE">EHANDLE_EXISTENCE</a>));
+    <b>assert</b>!(!handles.contains(&key), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="permissioned_delegation.md#0x1_permissioned_delegation_EDELEGATION_EXISTENCE">EDELEGATION_EXISTENCE</a>));
     <b>let</b> handle = <a href="permissioned_signer.md#0x1_permissioned_signer_create_storable_permissioned_handle">permissioned_signer::create_storable_permissioned_handle</a>(master, expiration_time);
     <b>let</b> <a href="permissioned_signer.md#0x1_permissioned_signer">permissioned_signer</a> = <a href="permissioned_signer.md#0x1_permissioned_signer_signer_from_storable_permissioned_handle">permissioned_signer::signer_from_storable_permissioned_handle</a>(&handle);
     handles.add(key, AccountDelegation::V1 { handle, <a href="rate_limiter.md#0x1_rate_limiter">rate_limiter</a> });
@@ -290,10 +316,10 @@
 ) <b>acquires</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a> {
     <b>assert</b>!(!is_permissioned_signer(master), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="permissioned_delegation.md#0x1_permissioned_delegation_ENOT_MASTER_SIGNER">ENOT_MASTER_SIGNER</a>));
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(master);
-    <b>let</b> handle_bundles = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a>&gt;(addr).delegations;
-    <b>assert</b>!(handle_bundles.contains(&key), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="permissioned_delegation.md#0x1_permissioned_delegation_EHANDLE_EXISTENCE">EHANDLE_EXISTENCE</a>));
-    <b>let</b> bundle = handle_bundles.remove(&key);
-    match (bundle) {
+    <b>let</b> delegations = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a>&gt;(addr).delegations;
+    <b>assert</b>!(delegations.contains(&key), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="permissioned_delegation.md#0x1_permissioned_delegation_EDELEGATION_EXISTENCE">EDELEGATION_EXISTENCE</a>));
+    <b>let</b> delegation = delegations.remove(&key);
+    match (delegation) {
         AccountDelegation::V1 { handle, <a href="rate_limiter.md#0x1_rate_limiter">rate_limiter</a>: _ } =&gt; {
             <a href="permissioned_signer.md#0x1_permissioned_signer_destroy_storable_permissioned_handle">permissioned_signer::destroy_storable_permissioned_handle</a>(handle);
         }
@@ -426,12 +452,12 @@ Authorization function for account abstraction.
     count_rate: bool
 ): &StorablePermissionedHandle {
     <b>if</b> (<b>exists</b>&lt;<a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a>&gt;(master)) {
-        <b>let</b> bundles = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a>&gt;(master).delegations;
-        <b>if</b> (bundles.contains(&key)) {
-            <b>let</b> delegation = bundles.remove(&key);
+        <b>let</b> delegations = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a>&gt;(master).delegations;
+        <b>if</b> (delegations.contains(&key)) {
+            <b>let</b> delegation = delegations.remove(&key);
             <a href="permissioned_delegation.md#0x1_permissioned_delegation_check_txn_rate">check_txn_rate</a>(&<b>mut</b> delegation, count_rate);
-            bundles.add(key, delegation);
-            &bundles.borrow(&key).handle
+            delegations.add(key, delegation);
+            &delegations.borrow(&key).handle
         } <b>else</b> {
             <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="permissioned_delegation.md#0x1_permissioned_delegation_EINVALID_SIGNATURE">EINVALID_SIGNATURE</a>)
         }
@@ -444,6 +470,15 @@ Authorization function for account abstraction.
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY
