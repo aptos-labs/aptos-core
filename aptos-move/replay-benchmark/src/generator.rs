@@ -118,7 +118,6 @@ impl InputOutputDiffGenerator {
             &state_view_without_override,
             1,
         );
-        let _onchain_inputs = state_view_without_override.into_read_set();
 
         // Check on-chain outputs do not modify the state we override. If so, benchmarking results
         // may not be correct.

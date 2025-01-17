@@ -311,17 +311,34 @@ impl TransactionDiffBuilder {
 mod tests {
     use super::*;
     use aptos_types::{
-        on_chain_config::CurrentTimeMicroseconds, state_store::state_value::StateValueMetadata,
+        on_chain_config::CurrentTimeMicroseconds,
+        state_store::state_value::StateValueMetadata,
+        transaction::{TransactionAuxiliaryData, TransactionStatus},
         write_set::WriteSetMut,
     };
-    use aptos_types::transaction::{TransactionAuxiliaryData, TransactionStatus};
 
     #[test]
     fn test_diff_gas_used() {
-        let output_1 = TransactionOutput::new(WriteSet::new(vec![]).unwrap(), vec![], 1, TransactionStatus::Keep(ExecutionStatus::Success), TransactionAuxiliaryData::None);
-        let output_2 = TransactionOutput::new(WriteSet::new(vec![]).unwrap(), vec![], 2, TransactionStatus::Keep(ExecutionStatus::Success), TransactionAuxiliaryData::None);
+        let output_1 = TransactionOutput::new(
+            WriteSet::new(vec![]).unwrap(),
+            vec![],
+            1,
+            TransactionStatus::Keep(ExecutionStatus::Success),
+            TransactionAuxiliaryData::None,
+        );
+        let output_2 = TransactionOutput::new(
+            WriteSet::new(vec![]).unwrap(),
+            vec![],
+            2,
+            TransactionStatus::Keep(ExecutionStatus::Success),
+            TransactionAuxiliaryData::None,
+        );
 
-        let diff = TransactionDiffBuilder::new(false).build_from_outputs(output_1.clone(), output_2.clone(), None);
+        let diff = TransactionDiffBuilder::new(false).build_from_outputs(
+            output_1.clone(),
+            output_2.clone(),
+            None,
+        );
         assert_eq!(diff.diffs.len(), 1);
         assert!(diff.diffs[0].clone() == Diff::GasUsed { left: 1, right: 2 });
 
@@ -331,12 +348,34 @@ mod tests {
 
     #[test]
     fn test_diff_status() {
-        let output_1 = TransactionOutput::new(WriteSet::new(vec![]).unwrap(), vec![], 1, TransactionStatus::Keep(ExecutionStatus::Success), TransactionAuxiliaryData::None);
-        let output_2 = TransactionOutput::new(WriteSet::new(vec![]).unwrap(), vec![], 1, TransactionStatus::Keep(ExecutionStatus::OutOfGas), TransactionAuxiliaryData::None);
+        let output_1 = TransactionOutput::new(
+            WriteSet::new(vec![]).unwrap(),
+            vec![],
+            1,
+            TransactionStatus::Keep(ExecutionStatus::Success),
+            TransactionAuxiliaryData::None,
+        );
+        let output_2 = TransactionOutput::new(
+            WriteSet::new(vec![]).unwrap(),
+            vec![],
+            1,
+            TransactionStatus::Keep(ExecutionStatus::OutOfGas),
+            TransactionAuxiliaryData::None,
+        );
 
-        let diff = TransactionDiffBuilder::new(false).build_from_outputs(output_1.clone(), output_2.clone(), None);
+        let diff = TransactionDiffBuilder::new(false).build_from_outputs(
+            output_1.clone(),
+            output_2.clone(),
+            None,
+        );
         assert_eq!(diff.diffs.len(), 1);
-        assert!(diff.diffs[0].clone() == Diff::ExecutionStatus { left: ExecutionStatus::Success, right: ExecutionStatus::OutOfGas });
+        assert!(
+            diff.diffs[0].clone()
+                == Diff::ExecutionStatus {
+                    left: ExecutionStatus::Success,
+                    right: ExecutionStatus::OutOfGas
+                }
+        );
     }
 
     #[test]
@@ -389,7 +428,9 @@ mod tests {
     fn test_diff_events_allow_different_gas_usage() {
         let fee_statement_tag = TypeTag::Struct(Box::new(FeeStatement::struct_tag()));
 
-        let events_1 = vec![ContractEvent::new_v2(fee_statement_tag.clone(), vec![0, 1, 2])];
+        let events_1 = vec![ContractEvent::new_v2(fee_statement_tag.clone(), vec![
+            0, 1, 2,
+        ])];
         let events_2 = vec![ContractEvent::new_v2(fee_statement_tag, vec![0, 1, 3])];
 
         let diffs = TransactionDiffBuilder::new(true).diff_events(events_1.clone(), events_2);

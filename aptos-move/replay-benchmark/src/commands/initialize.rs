@@ -81,10 +81,11 @@ impl InitializeCommand {
         let mut diff_version = txn_blocks[0].begin_version;
 
         // TODO:
-        //  Right now, only features can be overridden. In general, this can be allowed for anything:
+        //  Right now, only features can be overridden. In the future, we may want to support:
         //      1. Framework code, e.g., to test performance of new natives or compiler,
         //      2. Gas schedule, to track the costs of charging gas or tracking limits.
-        //  We probably should support at least these.
+        //      3. BlockExecutorConfigFromOnchain to experiment with different block cutting based
+        //         on gas limits.
         let override_config = OverrideConfig::new(self.enable_features, self.disable_features);
 
         let debugger = build_debugger(self.rest_api.rest_endpoint, self.rest_api.api_key)?;

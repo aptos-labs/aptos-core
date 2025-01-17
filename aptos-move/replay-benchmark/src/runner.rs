@@ -7,14 +7,14 @@ use std::time::Instant;
 
 /// Represents a block for benchmarking: a workload consisting of a block of transactions with the
 /// input pre-block state.
-pub struct Block {
+pub struct ReplayBlock {
     /// Stores transactions to execute, corresponding to a single block.
     pub(crate) workload: Workload,
     /// Stores all data corresponding to the pre-block state.
     pub(crate) inputs: ReadSet,
 }
 
-impl Block {
+impl ReplayBlock {
     /// Executes the workload using the specified concurrency level.
     pub(crate) fn run(&self, executor: &AptosVMBlockExecutor, concurrency_level: usize) {
         execute_workload(executor, &self.workload, &self.inputs, concurrency_level);
@@ -25,7 +25,7 @@ impl Block {
 pub struct BenchmarkRunner {
     concurrency_levels: Vec<usize>,
     num_repeats: usize,
-    measure_per_block_instead_of_overall_time: bool,
+    measure_overall_instead_of_per_block_time: bool,
     num_blocks_to_skip: usize,
 }
 
@@ -33,30 +33,30 @@ impl BenchmarkRunner {
     pub fn new(
         concurrency_levels: Vec<usize>,
         num_repeats: usize,
-        measure_per_block_instead_of_overall_time: bool,
+        measure_overall_instead_of_per_block_time: bool,
         num_blocks_to_skip: usize,
     ) -> Self {
         Self {
             concurrency_levels,
             num_repeats,
-            measure_per_block_instead_of_overall_time,
+            measure_overall_instead_of_per_block_time,
             num_blocks_to_skip,
         }
     }
 
     /// Runs a sequence of blocks, measuring the execution time.
-    pub fn measure_execution_time(&self, blocks: &[Block]) {
+    pub fn measure_execution_time(&self, blocks: &[ReplayBlock]) {
         for concurrency_level in &self.concurrency_levels {
-            if self.measure_per_block_instead_of_overall_time {
-                self.measure_block_execution_times(blocks, *concurrency_level);
-            } else {
+            if self.measure_overall_instead_of_per_block_time {
                 self.measure_overall_execution_time(blocks, *concurrency_level);
+            } else {
+                self.measure_block_execution_times(blocks, *concurrency_level);
             }
         }
     }
 
     /// Runs a sequence of blocks, measuring the execution time for each block.
-    fn measure_block_execution_times(&self, blocks: &[Block], concurrency_level: usize) {
+    fn measure_block_execution_times(&self, blocks: &[ReplayBlock], concurrency_level: usize) {
         let mut times = (0..blocks.len())
             .map(|_| Vec::with_capacity(self.num_repeats))
             .collect::<Vec<_>>();
@@ -102,7 +102,7 @@ impl BenchmarkRunner {
     }
 
     /// Runs the sequence of blocks, measuring the end-to-end execution time.
-    fn measure_overall_execution_time(&self, blocks: &[Block], concurrency_level: usize) {
+    fn measure_overall_execution_time(&self, blocks: &[ReplayBlock], concurrency_level: usize) {
         let mut times = Vec::with_capacity(self.num_repeats);
         for i in 0..self.num_repeats {
             let executor = AptosVMBlockExecutor::new();

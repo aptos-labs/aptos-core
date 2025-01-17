@@ -3,7 +3,7 @@
 
 use crate::{
     commands::init_logger_and_metrics,
-    runner::{BenchmarkRunner, Block},
+    runner::{BenchmarkRunner, ReplayBlock},
     state_view::ReadSet,
     workload::TransactionBlock,
 };
@@ -54,10 +54,11 @@ pub struct BenchmarkCommand {
 
     #[clap(
         long,
-        help = "If true, measure time taken to execute each block separately. If false, measure \
+        default_value_t = false,
+        help = "If false, measure time taken to execute each block separately. If true, measure \
                 the overall time to execute all blocks"
     )]
-    measure_block_times: bool,
+    measure_overall_time: bool,
 }
 
 impl BenchmarkCommand {
@@ -79,12 +80,12 @@ impl BenchmarkCommand {
         let txn_blocks: Vec<TransactionBlock> = bcs::from_bytes(&txn_blocks_bytes)
             .map_err(|err| anyhow!("Error when deserializing blocks of transactions: {:?}", err))?;
 
-        let inputs_bytes = fs::read(PathBuf::from(&self.inputs_file)).await?;
-        let inputs: Vec<ReadSet> = bcs::from_bytes(&inputs_bytes)
+        let inputs_read_set_bytes = fs::read(PathBuf::from(&self.inputs_file)).await?;
+        let inputs_read_set: Vec<ReadSet> = bcs::from_bytes(&inputs_read_set_bytes)
             .map_err(|err| anyhow!("Error when deserializing inputs: {:?}", err))?;
 
         // Ensure we have at least one block to benchmark, and that we do not skip all the blocks.
-        assert_eq!(txn_blocks.len(), inputs.len());
+        assert_eq!(txn_blocks.len(), inputs_read_set.len());
         assert!(
             self.num_blocks_to_skip < txn_blocks.len(),
             "There are only {} blocks, but skipping {}",
@@ -92,10 +93,10 @@ impl BenchmarkCommand {
             self.num_blocks_to_skip
         );
 
-        let blocks = inputs
+        let blocks = inputs_read_set
             .into_iter()
             .zip(txn_blocks)
-            .map(|(inputs, txn_block)| Block {
+            .map(|(inputs, txn_block)| ReplayBlock {
                 inputs,
                 workload: txn_block.into(),
             })
@@ -104,7 +105,7 @@ impl BenchmarkCommand {
         BenchmarkRunner::new(
             self.concurrency_levels,
             self.num_repeats,
-            self.measure_block_times,
+            self.measure_overall_time,
             self.num_blocks_to_skip,
         )
         .measure_execution_time(&blocks);
