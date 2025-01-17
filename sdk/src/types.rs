@@ -16,9 +16,9 @@ use crate::{
     },
 };
 use anyhow::{Context, Result};
-use aptos_crypto::{ed25519::Ed25519Signature, secp256r1_ecdsa, PrivateKey, SigningKey};
+use aptos_crypto::{ed25519::Ed25519Signature, secp256r1_ecdsa, HashValue, PrivateKey, SigningKey};
 use aptos_ledger::AptosLedgerError;
-use aptos_rest_client::{Client, PepperRequest, ProverRequest};
+use aptos_rest_client::{aptos_api_types::MoveStructTag, Client, PepperRequest, ProverRequest};
 pub use aptos_types::*;
 use aptos_types::{
     event::EventKey,
@@ -35,6 +35,7 @@ use aptos_types::{
 use bip39::{Language, Mnemonic, Seed};
 use ed25519_dalek_bip32::{DerivationPath, ExtendedSecretKey};
 use keyless::FederatedKeylessPublicKey;
+use lazy_static::lazy_static;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -46,6 +47,15 @@ use std::{
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
+
+pub const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
+lazy_static! {
+    pub static ref APT_METADATA_ADDRESS: AccountAddress = {
+        let mut addr = [0u8; 32];
+        addr[31] = 10u8;
+        AccountAddress::new(addr)
+    };
+}
 
 #[derive(Debug)]
 enum LocalAccountAuthenticator {
@@ -126,6 +136,28 @@ pub fn get_apt_primary_store_address(address: AccountAddress) -> AccountAddress 
     bytes.append(&mut AccountAddress::ONE.to_vec());
     bytes.push(0xFC);
     AccountAddress::from_bytes(aptos_crypto::hash::HashValue::sha3_256_of(&bytes).to_vec()).unwrap()
+}
+
+pub fn get_paired_fa_primary_store_address(
+    address: AccountAddress,
+    fa_metadata_address: AccountAddress,
+) -> AccountAddress {
+    let mut bytes = address.to_vec();
+    bytes.append(&mut fa_metadata_address.to_vec());
+    bytes.push(0xFC);
+    AccountAddress::from_bytes(aptos_crypto::hash::HashValue::sha3_256_of(&bytes).to_vec()).unwrap()
+}
+
+pub fn get_paired_fa_metadata_address(coin_type_name: &MoveStructTag) -> AccountAddress {
+    let coin_type_name = coin_type_name.to_string();
+    if coin_type_name == APTOS_COIN_TYPE_STR {
+        *APT_METADATA_ADDRESS
+    } else {
+        let mut preimage = APT_METADATA_ADDRESS.to_vec();
+        preimage.extend(coin_type_name.as_bytes());
+        preimage.push(0xFE);
+        AccountAddress::from_bytes(HashValue::sha3_256_of(&preimage).to_vec()).unwrap()
+    }
 }
 
 impl LocalAccount {
