@@ -29,9 +29,7 @@ error: post-condition does not hold
    =         s1 = <redacted>
    =         s2 = <redacted>
    =     at tests/sources/functional/choice.move:47: populate_R
-   =         <redacted> = <redacted>
    =     at tests/sources/functional/choice.move:48: populate_R
-   =         <redacted> = <redacted>
    =     at tests/sources/functional/choice.move:49: populate_R
    =     at tests/sources/functional/choice.move:56: populate_R (spec)
 
@@ -129,7 +127,6 @@ error: post-condition does not hold
     =         ballot_account = <redacted>
     =     at tests/sources/functional/choice.move:284: create_ballot
     =     at tests/sources/functional/choice.move:283: create_ballot
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/choice.move:291
     =     at tests/sources/functional/choice.move:286: create_ballot
     =     at tests/sources/functional/choice.move:272: new_ballot_id

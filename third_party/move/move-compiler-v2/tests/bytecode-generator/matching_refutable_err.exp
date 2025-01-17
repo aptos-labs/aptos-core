@@ -40,4 +40,23 @@ fun m::t($t0: 0x815::m::E): u64 {
 }
 
 
+============ disassembled file-format ==================
+// Move bytecode v7
+module 815.m {
+enum E {
+ None{
+
+ },
+ Some{
+	_0: u64
+ }
+}
+
+t(Arg0: E): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: E)
+	1: UnpackVariant[0](E/Some)
+	2: Ret
+}
+}
 ============ bytecode verification succeeded ========
