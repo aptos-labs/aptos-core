@@ -46,7 +46,6 @@ module aptos_framework::rate_limiter {
         // Calculate the full tokens that can be added
         let accumulated_amount = time_passed * limiter.capacity + limiter.fractional_accumulated;
         let new_tokens = accumulated_amount / limiter.refill_interval;
-        limiter.current_amount = limiter.current_amount + new_tokens;
         if (limiter.current_amount + new_tokens >= limiter.capacity) {
             limiter.current_amount = limiter.capacity;
             limiter.fractional_accumulated = 0;
@@ -96,13 +95,16 @@ module aptos_framework::rate_limiter {
         // Refill the bucket
         refill(&mut bucket);
 
-        // Should have refilled 5 tokens (half of the capacity)
-        assert!(bucket.current_amount == 10, 400); // Bucket was already full, so should remain full
+        // Should have refilled 5 tokens (half of the capacity),
+        // but bucket was already full, so should remain full
+        assert!(bucket.current_amount == 10, 400);
+        assert!(bucket.fractional_accumulated == 0, 401);
 
         // Request 5 tokens
         let success = request(&mut bucket, 5);
         assert!(success, 401); // Request should succeed
         assert!(bucket.current_amount == 5, 402); // Remaining tokens should be 5
+        assert!(bucket.fractional_accumulated == 0, 403);
 
         // Simulate another passage of 23 seconds
         timestamp::update_global_time_for_test_secs(timestamp::now_seconds() + 23);
@@ -110,8 +112,10 @@ module aptos_framework::rate_limiter {
         // Refill again
         refill(&mut bucket);
 
-        // Should refill 4 tokens
-        assert!(bucket.current_amount == 9, 403); // Should now be full again
+        // Should refill 3 tokens
+        assert!(bucket.current_amount == 8, 403);
+        // and have 230-180 leftover
+        assert!(bucket.fractional_accumulated == 50, 404);
     }
 
     #[test(aptos_framework= @0x1)]
@@ -120,13 +124,15 @@ module aptos_framework::rate_limiter {
         let bucket = initialize(10, 60);
         assert!(request(&mut bucket, 10), 1); // Request should succeed
 
+        assert!(bucket.current_amount == 0, 500); // No token will be added since it rounds down
+
         // Simulate 10 seconds passing
         timestamp::update_global_time_for_test_secs(timestamp::now_seconds() + 10);
 
         // Refill the bucket
         refill(&mut bucket);
         // Should add 1/6th of the tokens (because 10 seconds is 1/6th of a minute)
-        assert!(bucket.current_amount == 6, 500); // No token will be added since it rounds down
+        assert!(bucket.current_amount == 1, 500); // 1 token will be added since it rounds down
         assert!(bucket.fractional_accumulated == 40, 501); // Accumulate the 4 seconds of fractional amount
 
         // Simulate another 50 seconds passing (total 60 seconds)

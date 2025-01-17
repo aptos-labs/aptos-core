@@ -160,7 +160,6 @@
     // Calculate the full tokens that can be added
     <b>let</b> accumulated_amount = time_passed * limiter.capacity + limiter.fractional_accumulated;
     <b>let</b> new_tokens = accumulated_amount / limiter.refill_interval;
-    limiter.current_amount = limiter.current_amount + new_tokens;
     <b>if</b> (limiter.current_amount + new_tokens &gt;= limiter.capacity) {
         limiter.current_amount = limiter.capacity;
         limiter.fractional_accumulated = 0;
