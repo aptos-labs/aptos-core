@@ -20,12 +20,19 @@ pub const IMPORTED_MAINNET_TXNS_2175935_USER_TXN_MULTI_ED25519: &[u8] = include_
     "/src/json_transactions/imported_mainnet_txns/2175935_user_txn_multi_ed25519.json"
 ));
 
+pub const IMPORTED_MAINNET_TXNS_2200077877_ACCOUNT_RESTORATION_ROTATED_TO_SINGLE_SECP256K1: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/json_transactions/imported_mainnet_txns/2200077877_account_restoration_rotated_to_single_secp256k1.json"));
+
 pub const IMPORTED_MAINNET_TXNS_1831971037_STAKE_DELEGATION_POOL: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/src/json_transactions/imported_mainnet_txns/1831971037_stake_delegation_pool.json"
 ));
 
 pub const IMPORTED_MAINNET_TXNS_527013476_USER_TXN_SINGLE_SENDER_SECP256K1_ECDSA: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/json_transactions/imported_mainnet_txns/527013476_user_txn_single_sender_secp256k1_ecdsa.json"));
+
+pub const IMPORTED_MAINNET_TXNS_118489_PROPOSAL_VOTE: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/src/json_transactions/imported_mainnet_txns/118489_proposal_vote.json"
+));
 
 pub const IMPORTED_MAINNET_TXNS_1058723093_TOKEN_V1_MINT_WITHDRAW_DEPOSIT_EVENTS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/json_transactions/imported_mainnet_txns/1058723093_token_v1_mint_withdraw_deposit_events.json"));
 
@@ -42,6 +49,11 @@ pub const IMPORTED_MAINNET_TXNS_125600867_STAKE_DELEGATION_POOL: &[u8] = include
 
 pub const IMPORTED_MAINNET_TXNS_513424821_DEFAULT_BLOCK_METADATA_TRANSACTIONS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/json_transactions/imported_mainnet_txns/513424821_default_block_metadata_transactions.json"));
 
+pub const IMPORTED_MAINNET_TXNS_103958588_MULTI_AGENTS: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/src/json_transactions/imported_mainnet_txns/103958588_multi_agents.json"
+));
+
 pub const IMPORTED_MAINNET_TXNS_999929475_COIN_AND_FA_TRANSFERS: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/src/json_transactions/imported_mainnet_txns/999929475_coin_and_fa_transfers.json"
@@ -53,6 +65,14 @@ pub const IMPORTED_MAINNET_TXNS_11648867_TOKEN_V1_BURN_EVENT: &[u8] = include_by
 ));
 
 pub const IMPORTED_MAINNET_TXNS_1056780409_ANS_CURRENT_ANS_PRIMARY_NAME_V2: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/json_transactions/imported_mainnet_txns/1056780409_ans_current_ans_primary_name_v2.json"));
+
+pub const IMPORTED_MAINNET_TXNS_2200077591_ACCOUNT_RESTORATION_SINGLE_ED25519: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/json_transactions/imported_mainnet_txns/2200077591_account_restoration_single_ed25519.json"));
+
+pub const IMPORTED_MAINNET_TXNS_2212040150_TRANSACTION_WITHOUT_EVENTS: &[u8] =
+    include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/json_transactions/imported_mainnet_txns/2212040150_transaction_without_events.json"
+    ));
 
 pub const IMPORTED_MAINNET_TXNS_464961735_USER_TXN_SINGLE_KEY_ED25519: &[u8] =
     include_bytes!(concat!(
@@ -76,6 +96,11 @@ pub const IMPORTED_MAINNET_TXNS_999930475_TOKEN_V2_CONCURRENT_MINT: &[u8] =
         env!("CARGO_MANIFEST_DIR"),
         "/src/json_transactions/imported_mainnet_txns/999930475_token_v2_concurrent_mint.json"
     ));
+
+pub const IMPORTED_MAINNET_TXNS_124094774_DELEGATED_POOL_BALANCE: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/src/json_transactions/imported_mainnet_txns/124094774_delegated_pool_balance.json"
+));
 
 pub const IMPORTED_MAINNET_TXNS_97963136_TOKEN_V2_CANCEL_OFFER: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -109,6 +134,8 @@ pub const IMPORTED_MAINNET_TXNS_303690531_ANS_LOOKUP_V2: &[u8] = include_bytes!(
     env!("CARGO_MANIFEST_DIR"),
     "/src/json_transactions/imported_mainnet_txns/303690531_ans_lookup_v2.json"
 ));
+
+pub const IMPORTED_MAINNET_TXNS_2200077800_ACCOUNT_RESTORATION_ROTATED_TO_MULTI_KEY: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/json_transactions/imported_mainnet_txns/2200077800_account_restoration_rotated_to_multi_key.json"));
 
 pub const IMPORTED_MAINNET_TXNS_1803170308_USER_TXN_MULTI_KEY_KEYLESS: &[u8] =
     include_bytes!(concat!(
@@ -146,6 +173,11 @@ pub const IMPORTED_MAINNET_TXNS_141135867_TOKEN_V1_OFFER: &[u8] = include_bytes!
 ));
 
 pub const IMPORTED_MAINNET_TXNS_976087151_USER_TXN_SINGLE_SENDER_KEYLESS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/json_transactions/imported_mainnet_txns/976087151_user_txn_single_sender_keyless.json"));
+
+pub const IMPORTED_MAINNET_TXNS_2080538_ANS_LOOKUP_V1: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/src/json_transactions/imported_mainnet_txns/2080538_ans_lookup_v1.json"
+));
 
 pub const IMPORTED_MAINNET_TXNS_139449359_STAKE_REACTIVATE: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -201,25 +233,32 @@ pub const ALL_IMPORTED_MAINNET_TXNS: &[&[u8]] = &[
     IMPORTED_MAINNET_TXNS_590098441_USER_TXN_SINGLE_SENDER_ED25519,
     IMPORTED_MAINNET_TXNS_145959468_ACCOUNT_TRANSACTION,
     IMPORTED_MAINNET_TXNS_2175935_USER_TXN_MULTI_ED25519,
+    IMPORTED_MAINNET_TXNS_2200077877_ACCOUNT_RESTORATION_ROTATED_TO_SINGLE_SECP256K1,
     IMPORTED_MAINNET_TXNS_1831971037_STAKE_DELEGATION_POOL,
     IMPORTED_MAINNET_TXNS_527013476_USER_TXN_SINGLE_SENDER_SECP256K1_ECDSA,
+    IMPORTED_MAINNET_TXNS_118489_PROPOSAL_VOTE,
     IMPORTED_MAINNET_TXNS_1058723093_TOKEN_V1_MINT_WITHDRAW_DEPOSIT_EVENTS,
     IMPORTED_MAINNET_TXNS_1845035942_DEFAULT_CURRENT_TABLE_ITEMS,
     IMPORTED_MAINNET_TXNS_125600867_STAKE_DELEGATION_POOL,
     IMPORTED_MAINNET_TXNS_513424821_DEFAULT_BLOCK_METADATA_TRANSACTIONS,
+    IMPORTED_MAINNET_TXNS_103958588_MULTI_AGENTS,
     IMPORTED_MAINNET_TXNS_999929475_COIN_AND_FA_TRANSFERS,
     IMPORTED_MAINNET_TXNS_11648867_TOKEN_V1_BURN_EVENT,
     IMPORTED_MAINNET_TXNS_1056780409_ANS_CURRENT_ANS_PRIMARY_NAME_V2,
+    IMPORTED_MAINNET_TXNS_2200077591_ACCOUNT_RESTORATION_SINGLE_ED25519,
+    IMPORTED_MAINNET_TXNS_2212040150_TRANSACTION_WITHOUT_EVENTS,
     IMPORTED_MAINNET_TXNS_464961735_USER_TXN_SINGLE_KEY_ED25519,
     IMPORTED_MAINNET_TXNS_438536688_ANS_CURRENT_ANS_LOOKUP_V2,
     IMPORTED_MAINNET_TXNS_578318306_OBJECTS_WRITE_RESOURCE,
     IMPORTED_MAINNET_TXNS_999930475_TOKEN_V2_CONCURRENT_MINT,
+    IMPORTED_MAINNET_TXNS_124094774_DELEGATED_POOL_BALANCE,
     IMPORTED_MAINNET_TXNS_97963136_TOKEN_V2_CANCEL_OFFER,
     IMPORTED_MAINNET_TXNS_152449628_COIN_INFO_WRITE,
     IMPORTED_MAINNET_TXNS_602320562_TOKEN_V2_APTOS_TOKEN_MINT,
     IMPORTED_MAINNET_TXNS_1830706009_STAKER_GOVERNANCE_RECORD,
     IMPORTED_MAINNET_TXNS_423176063_ACCOUNT_TRANSACTION_DELETE,
     IMPORTED_MAINNET_TXNS_303690531_ANS_LOOKUP_V2,
+    IMPORTED_MAINNET_TXNS_2200077800_ACCOUNT_RESTORATION_ROTATED_TO_MULTI_KEY,
     IMPORTED_MAINNET_TXNS_1803170308_USER_TXN_MULTI_KEY_KEYLESS,
     IMPORTED_MAINNET_TXNS_508365567_FA_V1_EVENTS,
     IMPORTED_MAINNET_TXNS_1806220919_OBJECT_UNTRANSFERABLE,
@@ -229,6 +268,7 @@ pub const ALL_IMPORTED_MAINNET_TXNS: &[&[u8]] = &[
     IMPORTED_MAINNET_TXNS_84023785_TOKEN_V2_CLAIM_OFFER,
     IMPORTED_MAINNET_TXNS_141135867_TOKEN_V1_OFFER,
     IMPORTED_MAINNET_TXNS_976087151_USER_TXN_SINGLE_SENDER_KEYLESS,
+    IMPORTED_MAINNET_TXNS_2080538_ANS_LOOKUP_V1,
     IMPORTED_MAINNET_TXNS_139449359_STAKE_REACTIVATE,
     IMPORTED_MAINNET_TXNS_308783012_FA_TRANSFER,
     IMPORTED_MAINNET_TXNS_453498957_TOKEN_V2_MINT_AND_TRANSFER_EVENT_V1,
@@ -298,6 +338,11 @@ pub const IMPORTED_TESTNET_TXNS_1_GENESIS: &[u8] = include_bytes!(concat!(
     "/src/json_transactions/imported_testnet_txns/1_genesis.json"
 ));
 
+pub const IMPORTED_TESTNET_TXNS_769222973_MULTISIG: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/src/json_transactions/imported_testnet_txns/769222973_multisig.json"
+));
+
 pub const IMPORTED_TESTNET_TXNS_1200394037_FA_V2_FROZEN_EVENT: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/src/json_transactions/imported_testnet_txns/1200394037_fa_v2_frozen_event.json"
@@ -314,6 +359,7 @@ pub const ALL_IMPORTED_TESTNET_TXNS: &[&[u8]] = &[
     IMPORTED_TESTNET_TXNS_5523474016_VALIDATOR_TXN,
     IMPORTED_TESTNET_TXNS_2_NEW_BLOCK_EVENT,
     IMPORTED_TESTNET_TXNS_1_GENESIS,
+    IMPORTED_TESTNET_TXNS_769222973_MULTISIG,
     IMPORTED_TESTNET_TXNS_1200394037_FA_V2_FROZEN_EVENT,
 ];
 
