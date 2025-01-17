@@ -9,7 +9,7 @@
 -  [Enum `DelegationKey`](#0x1_permissioned_delegation_DelegationKey)
 -  [Resource `RegisteredDelegations`](#0x1_permissioned_delegation_RegisteredDelegations)
 -  [Constants](#@Constants_0)
--  [Function `fetch_handle`](#0x1_permissioned_delegation_fetch_handle)
+-  [Function `check_txn_rate`](#0x1_permissioned_delegation_check_txn_rate)
 -  [Function `add_permissioned_handle`](#0x1_permissioned_delegation_add_permissioned_handle)
 -  [Function `remove_permissioned_handle`](#0x1_permissioned_delegation_remove_permissioned_handle)
 -  [Function `permissioned_signer_by_key`](#0x1_permissioned_delegation_permissioned_signer_by_key)
@@ -201,13 +201,13 @@
 
 
 
-<a id="0x1_permissioned_delegation_fetch_handle"></a>
+<a id="0x1_permissioned_delegation_check_txn_rate"></a>
 
-## Function `fetch_handle`
+## Function `check_txn_rate`
 
 
 
-<pre><code><b>fun</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_fetch_handle">fetch_handle</a>(bundle: &<b>mut</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_AccountDelegation">permissioned_delegation::AccountDelegation</a>, check_rate_limit: bool): &<a href="permissioned_signer.md#0x1_permissioned_signer_StorablePermissionedHandle">permissioned_signer::StorablePermissionedHandle</a>
+<pre><code><b>fun</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_check_txn_rate">check_txn_rate</a>(bundle: &<b>mut</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_AccountDelegation">permissioned_delegation::AccountDelegation</a>, check_rate_limit: bool)
 </code></pre>
 
 
@@ -216,12 +216,11 @@
 <summary>Implementation</summary>
 
 
-<pre><code>inline <b>fun</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_fetch_handle">fetch_handle</a>(bundle: &<b>mut</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_AccountDelegation">AccountDelegation</a>, check_rate_limit: bool): &StorablePermissionedHandle {
+<pre><code>inline <b>fun</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_check_txn_rate">check_txn_rate</a>(bundle: &<b>mut</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_AccountDelegation">AccountDelegation</a>, check_rate_limit: bool) {
     <b>let</b> token_bucket = &<b>mut</b> bundle.<a href="rate_limiter.md#0x1_rate_limiter">rate_limiter</a>;
     <b>if</b> (check_rate_limit && token_bucket.is_some()) {
         <b>assert</b>!(<a href="rate_limiter.md#0x1_rate_limiter_request">rate_limiter::request</a>(token_bucket.borrow_mut(), 1), std::error::permission_denied(<a href="permissioned_delegation.md#0x1_permissioned_delegation_ERATE_LIMITED">ERATE_LIMITED</a>));
     };
-    &bundle.handle
 }
 </code></pre>
 
@@ -254,7 +253,7 @@
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(master);
     <b>if</b> (!<b>exists</b>&lt;<a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a>&gt;(addr)) {
         <b>move_to</b>(master, <a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a> {
-            delegations: <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_config">big_ordered_map::new_with_config</a>(50, 20, <b>true</b>, 5)
+            delegations: <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_config">big_ordered_map::new_with_config</a>(50, 20, <b>false</b>, 0)
         });
     };
     <b>let</b> handles = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a>&gt;(addr).delegations;
@@ -429,7 +428,10 @@ Authorization function for account abstraction.
     <b>if</b> (<b>exists</b>&lt;<a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a>&gt;(master)) {
         <b>let</b> bundles = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a>&gt;(master).delegations;
         <b>if</b> (bundles.contains(&key)) {
-            <a href="permissioned_delegation.md#0x1_permissioned_delegation_fetch_handle">fetch_handle</a>(bundles.borrow_mut(&key), count_rate)
+            <b>let</b> delegation = bundles.remove(&key);
+            <a href="permissioned_delegation.md#0x1_permissioned_delegation_check_txn_rate">check_txn_rate</a>(&<b>mut</b> delegation, count_rate);
+            bundles.add(key, delegation);
+            &bundles.borrow(&key).handle
         } <b>else</b> {
             <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="permissioned_delegation.md#0x1_permissioned_delegation_EINVALID_SIGNATURE">EINVALID_SIGNATURE</a>)
         }

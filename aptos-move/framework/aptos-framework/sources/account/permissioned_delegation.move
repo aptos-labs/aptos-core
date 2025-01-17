@@ -34,12 +34,11 @@ module aptos_framework::permissioned_delegation {
         delegations: BigOrderedMap<DelegationKey, AccountDelegation>
     }
 
-    inline fun fetch_handle(bundle: &mut AccountDelegation, check_rate_limit: bool): &StorablePermissionedHandle {
+    inline fun check_txn_rate(bundle: &mut AccountDelegation, check_rate_limit: bool) {
         let token_bucket = &mut bundle.rate_limiter;
         if (check_rate_limit && token_bucket.is_some()) {
             assert!(rate_limiter::request(token_bucket.borrow_mut(), 1), std::error::permission_denied(ERATE_LIMITED));
         };
-        &bundle.handle
     }
 
     public fun add_permissioned_handle(
@@ -52,7 +51,7 @@ module aptos_framework::permissioned_delegation {
         let addr = signer::address_of(master);
         if (!exists<RegisteredDelegations>(addr)) {
             move_to(master, RegisteredDelegations {
-                delegations: big_ordered_map::new_with_config(50, 20, true, 5)
+                delegations: big_ordered_map::new_with_config(50, 20, false, 0)
             });
         };
         let handles = &mut borrow_global_mut<RegisteredDelegations>(addr).delegations;
@@ -127,7 +126,10 @@ module aptos_framework::permissioned_delegation {
         if (exists<RegisteredDelegations>(master)) {
             let bundles = &mut borrow_global_mut<RegisteredDelegations>(master).delegations;
             if (bundles.contains(&key)) {
-                fetch_handle(bundles.borrow_mut(&key), count_rate)
+                let delegation = bundles.remove(&key);
+                check_txn_rate(&mut delegation, count_rate);
+                bundles.add(key, delegation);
+                &bundles.borrow(&key).handle
             } else {
                 abort error::permission_denied(EINVALID_SIGNATURE)
             }
@@ -186,7 +188,7 @@ module aptos_framework::permissioned_delegation {
         };
         let auth_data = auth_data::create_auth_data(vector[1, 2, 3], bcs::to_bytes(&sig_bundle));
         assert!(!is_permissioned_signer(&account), 1);
-        add_permissioned_handle(&account, key, option::none(), 60);
+        add_permissioned_handle(&account, key, option::some(rate_limiter::initialize(1, 10)), 60);
         authenticate(account, auth_data);
         authenticate(account_copy, auth_data);
         remove_permissioned_handle(&account_copy_2, key);
