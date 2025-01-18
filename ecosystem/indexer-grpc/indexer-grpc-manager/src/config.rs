@@ -10,6 +10,8 @@ use tokio::sync::OnceCell;
 
 static GRPC_MANAGER: OnceCell<GrpcManager> = OnceCell::const_new();
 
+pub(crate) type GrpcAddress = String;
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct ServiceConfig {
     pub(crate) listen_address: SocketAddr,
@@ -20,6 +22,9 @@ pub(crate) struct ServiceConfig {
 pub struct IndexerGrpcManagerConfig {
     pub(crate) chain_id: u64,
     pub(crate) service_config: ServiceConfig,
+    pub(crate) self_advertised_address: GrpcAddress,
+    pub(crate) grpc_manager_addresses: Vec<GrpcAddress>,
+    pub(crate) fullnode_addresses: Vec<GrpcAddress>,
 }
 
 #[async_trait::async_trait]

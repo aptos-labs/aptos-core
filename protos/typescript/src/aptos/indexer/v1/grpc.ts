@@ -594,7 +594,7 @@ export const StreamInfo = {
 
 function createBaseLiveDataServiceInfo(): LiveDataServiceInfo {
   return {
-    chainId: undefined,
+    chainId: BigInt("0"),
     timestamp: undefined,
     knownLatestVersion: undefined,
     streamInfo: undefined,
@@ -604,7 +604,7 @@ function createBaseLiveDataServiceInfo(): LiveDataServiceInfo {
 
 export const LiveDataServiceInfo = {
   encode(message: LiveDataServiceInfo, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    if (message.chainId !== undefined) {
+    if (message.chainId !== undefined && message.chainId !== BigInt("0")) {
       if (BigInt.asUintN(64, message.chainId) !== message.chainId) {
         throw new globalThis.Error("value provided for field message.chainId of type uint64 too large");
       }
@@ -718,7 +718,7 @@ export const LiveDataServiceInfo = {
 
   fromJSON(object: any): LiveDataServiceInfo {
     return {
-      chainId: isSet(object.chainId) ? BigInt(object.chainId) : undefined,
+      chainId: isSet(object.chainId) ? BigInt(object.chainId) : BigInt("0"),
       timestamp: isSet(object.timestamp) ? Timestamp.fromJSON(object.timestamp) : undefined,
       knownLatestVersion: isSet(object.knownLatestVersion) ? BigInt(object.knownLatestVersion) : undefined,
       streamInfo: isSet(object.streamInfo) ? StreamInfo.fromJSON(object.streamInfo) : undefined,
@@ -728,7 +728,7 @@ export const LiveDataServiceInfo = {
 
   toJSON(message: LiveDataServiceInfo): unknown {
     const obj: any = {};
-    if (message.chainId !== undefined) {
+    if (message.chainId !== undefined && message.chainId !== BigInt("0")) {
       obj.chainId = message.chainId.toString();
     }
     if (message.timestamp !== undefined) {
@@ -751,7 +751,7 @@ export const LiveDataServiceInfo = {
   },
   fromPartial(object: DeepPartial<LiveDataServiceInfo>): LiveDataServiceInfo {
     const message = createBaseLiveDataServiceInfo();
-    message.chainId = object.chainId ?? undefined;
+    message.chainId = object.chainId ?? BigInt("0");
     message.timestamp = (object.timestamp !== undefined && object.timestamp !== null)
       ? Timestamp.fromPartial(object.timestamp)
       : undefined;
@@ -765,12 +765,12 @@ export const LiveDataServiceInfo = {
 };
 
 function createBaseHistoricalDataServiceInfo(): HistoricalDataServiceInfo {
-  return { chainId: undefined, timestamp: undefined, knownLatestVersion: undefined, streamInfo: undefined };
+  return { chainId: BigInt("0"), timestamp: undefined, knownLatestVersion: undefined, streamInfo: undefined };
 }
 
 export const HistoricalDataServiceInfo = {
   encode(message: HistoricalDataServiceInfo, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    if (message.chainId !== undefined) {
+    if (message.chainId !== undefined && message.chainId !== BigInt("0")) {
       if (BigInt.asUintN(64, message.chainId) !== message.chainId) {
         throw new globalThis.Error("value provided for field message.chainId of type uint64 too large");
       }
@@ -871,7 +871,7 @@ export const HistoricalDataServiceInfo = {
 
   fromJSON(object: any): HistoricalDataServiceInfo {
     return {
-      chainId: isSet(object.chainId) ? BigInt(object.chainId) : undefined,
+      chainId: isSet(object.chainId) ? BigInt(object.chainId) : BigInt("0"),
       timestamp: isSet(object.timestamp) ? Timestamp.fromJSON(object.timestamp) : undefined,
       knownLatestVersion: isSet(object.knownLatestVersion) ? BigInt(object.knownLatestVersion) : undefined,
       streamInfo: isSet(object.streamInfo) ? StreamInfo.fromJSON(object.streamInfo) : undefined,
@@ -880,7 +880,7 @@ export const HistoricalDataServiceInfo = {
 
   toJSON(message: HistoricalDataServiceInfo): unknown {
     const obj: any = {};
-    if (message.chainId !== undefined) {
+    if (message.chainId !== undefined && message.chainId !== BigInt("0")) {
       obj.chainId = message.chainId.toString();
     }
     if (message.timestamp !== undefined) {
@@ -900,7 +900,7 @@ export const HistoricalDataServiceInfo = {
   },
   fromPartial(object: DeepPartial<HistoricalDataServiceInfo>): HistoricalDataServiceInfo {
     const message = createBaseHistoricalDataServiceInfo();
-    message.chainId = object.chainId ?? undefined;
+    message.chainId = object.chainId ?? BigInt("0");
     message.timestamp = (object.timestamp !== undefined && object.timestamp !== null)
       ? Timestamp.fromPartial(object.timestamp)
       : undefined;
@@ -913,12 +913,12 @@ export const HistoricalDataServiceInfo = {
 };
 
 function createBaseFullnodeInfo(): FullnodeInfo {
-  return { chainId: undefined, timestamp: undefined, knownLatestVersion: undefined };
+  return { chainId: BigInt("0"), timestamp: undefined, knownLatestVersion: undefined };
 }
 
 export const FullnodeInfo = {
   encode(message: FullnodeInfo, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    if (message.chainId !== undefined) {
+    if (message.chainId !== undefined && message.chainId !== BigInt("0")) {
       if (BigInt.asUintN(64, message.chainId) !== message.chainId) {
         throw new globalThis.Error("value provided for field message.chainId of type uint64 too large");
       }
@@ -1007,7 +1007,7 @@ export const FullnodeInfo = {
 
   fromJSON(object: any): FullnodeInfo {
     return {
-      chainId: isSet(object.chainId) ? BigInt(object.chainId) : undefined,
+      chainId: isSet(object.chainId) ? BigInt(object.chainId) : BigInt("0"),
       timestamp: isSet(object.timestamp) ? Timestamp.fromJSON(object.timestamp) : undefined,
       knownLatestVersion: isSet(object.knownLatestVersion) ? BigInt(object.knownLatestVersion) : undefined,
     };
@@ -1015,7 +1015,7 @@ export const FullnodeInfo = {
 
   toJSON(message: FullnodeInfo): unknown {
     const obj: any = {};
-    if (message.chainId !== undefined) {
+    if (message.chainId !== undefined && message.chainId !== BigInt("0")) {
       obj.chainId = message.chainId.toString();
     }
     if (message.timestamp !== undefined) {
@@ -1032,7 +1032,7 @@ export const FullnodeInfo = {
   },
   fromPartial(object: DeepPartial<FullnodeInfo>): FullnodeInfo {
     const message = createBaseFullnodeInfo();
-    message.chainId = object.chainId ?? undefined;
+    message.chainId = object.chainId ?? BigInt("0");
     message.timestamp = (object.timestamp !== undefined && object.timestamp !== null)
       ? Timestamp.fromPartial(object.timestamp)
       : undefined;
@@ -1042,12 +1042,12 @@ export const FullnodeInfo = {
 };
 
 function createBaseGrpcManagerInfo(): GrpcManagerInfo {
-  return { chainId: undefined, timestamp: undefined, knownLatestVersion: undefined, masterAddress: undefined };
+  return { chainId: BigInt("0"), timestamp: undefined, knownLatestVersion: undefined, masterAddress: undefined };
 }
 
 export const GrpcManagerInfo = {
   encode(message: GrpcManagerInfo, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    if (message.chainId !== undefined) {
+    if (message.chainId !== undefined && message.chainId !== BigInt("0")) {
       if (BigInt.asUintN(64, message.chainId) !== message.chainId) {
         throw new globalThis.Error("value provided for field message.chainId of type uint64 too large");
       }
@@ -1146,7 +1146,7 @@ export const GrpcManagerInfo = {
 
   fromJSON(object: any): GrpcManagerInfo {
     return {
-      chainId: isSet(object.chainId) ? BigInt(object.chainId) : undefined,
+      chainId: isSet(object.chainId) ? BigInt(object.chainId) : BigInt("0"),
       timestamp: isSet(object.timestamp) ? Timestamp.fromJSON(object.timestamp) : undefined,
       knownLatestVersion: isSet(object.knownLatestVersion) ? BigInt(object.knownLatestVersion) : undefined,
       masterAddress: isSet(object.masterAddress) ? globalThis.String(object.masterAddress) : undefined,
@@ -1155,7 +1155,7 @@ export const GrpcManagerInfo = {
 
   toJSON(message: GrpcManagerInfo): unknown {
     const obj: any = {};
-    if (message.chainId !== undefined) {
+    if (message.chainId !== undefined && message.chainId !== BigInt("0")) {
       obj.chainId = message.chainId.toString();
     }
     if (message.timestamp !== undefined) {
@@ -1175,7 +1175,7 @@ export const GrpcManagerInfo = {
   },
   fromPartial(object: DeepPartial<GrpcManagerInfo>): GrpcManagerInfo {
     const message = createBaseGrpcManagerInfo();
-    message.chainId = object.chainId ?? undefined;
+    message.chainId = object.chainId ?? BigInt("0");
     message.timestamp = (object.timestamp !== undefined && object.timestamp !== null)
       ? Timestamp.fromPartial(object.timestamp)
       : undefined;
