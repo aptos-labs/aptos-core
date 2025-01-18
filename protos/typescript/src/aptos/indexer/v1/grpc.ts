@@ -337,12 +337,12 @@ export const StreamProgress = {
 };
 
 function createBaseActiveStream(): ActiveStream {
-  return { id: undefined, startTime: undefined, startVersion: BigInt("0"), endVersion: undefined, progress: undefined };
+  return { id: "", startTime: undefined, startVersion: BigInt("0"), endVersion: undefined, progress: undefined };
 }
 
 export const ActiveStream = {
   encode(message: ActiveStream, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    if (message.id !== undefined) {
+    if (message.id !== undefined && message.id !== "") {
       writer.uint32(10).string(message.id);
     }
     if (message.startTime !== undefined) {
@@ -451,7 +451,7 @@ export const ActiveStream = {
 
   fromJSON(object: any): ActiveStream {
     return {
-      id: isSet(object.id) ? globalThis.String(object.id) : undefined,
+      id: isSet(object.id) ? globalThis.String(object.id) : "",
       startTime: isSet(object.startTime) ? Timestamp.fromJSON(object.startTime) : undefined,
       startVersion: isSet(object.startVersion) ? BigInt(object.startVersion) : BigInt("0"),
       endVersion: isSet(object.endVersion) ? BigInt(object.endVersion) : undefined,
@@ -461,7 +461,7 @@ export const ActiveStream = {
 
   toJSON(message: ActiveStream): unknown {
     const obj: any = {};
-    if (message.id !== undefined) {
+    if (message.id !== undefined && message.id !== "") {
       obj.id = message.id;
     }
     if (message.startTime !== undefined) {
@@ -484,7 +484,7 @@ export const ActiveStream = {
   },
   fromPartial(object: DeepPartial<ActiveStream>): ActiveStream {
     const message = createBaseActiveStream();
-    message.id = object.id ?? undefined;
+    message.id = object.id ?? "";
     message.startTime = (object.startTime !== undefined && object.startTime !== null)
       ? Timestamp.fromPartial(object.startTime)
       : undefined;

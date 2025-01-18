@@ -10,7 +10,7 @@ impl serde::Serialize for ActiveStream {
     {
         use serde::ser::SerializeStruct;
         let mut len = 0;
-        if self.id.is_some() {
+        if !self.id.is_empty() {
             len += 1;
         }
         if self.start_time.is_some() {
@@ -26,8 +26,8 @@ impl serde::Serialize for ActiveStream {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("aptos.indexer.v1.ActiveStream", len)?;
-        if let Some(v) = self.id.as_ref() {
-            struct_ser.serialize_field("id", v)?;
+        if !self.id.is_empty() {
+            struct_ser.serialize_field("id", &self.id)?;
         }
         if let Some(v) = self.start_time.as_ref() {
             struct_ser.serialize_field("startTime", v)?;
@@ -124,7 +124,7 @@ impl<'de> serde::Deserialize<'de> for ActiveStream {
                             if id__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("id"));
                             }
-                            id__ = map.next_value()?;
+                            id__ = Some(map.next_value()?);
                         }
                         GeneratedField::StartTime => {
                             if start_time__.is_some() {
@@ -157,7 +157,7 @@ impl<'de> serde::Deserialize<'de> for ActiveStream {
                     }
                 }
                 Ok(ActiveStream {
-                    id: id__,
+                    id: id__.unwrap_or_default(),
                     start_time: start_time__,
                     start_version: start_version__.unwrap_or_default(),
                     end_version: end_version__,
