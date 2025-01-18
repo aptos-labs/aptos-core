@@ -25,6 +25,11 @@ impl fmt::Display for ClosureMask {
 }
 
 impl ClosureMask {
+    /// The maximal number of arguments which can be handled by a closure mask.
+    /// A captured argument's position in the argument list must be lower than
+    /// this number. Notice that this property is implicit in the bytecode:
+    /// a PACK_CLOSURE instruction will never pop more arguments from the
+    /// stack than this number.
     pub const MAX_ARGS: usize = 64;
 
     pub fn new(mask: u64) -> Self {
@@ -38,10 +43,14 @@ impl ClosureMask {
     /// Apply a closure mask to a list of elements, returning only those
     /// where position `i` is set in the mask (if `collect_captured` is true) or not
     /// set (otherwise).
-    pub fn extract<'a, T>(&self, values: &'a [T], collect_captured: bool) -> Vec<&'a T> {
+    pub fn extract<'a, T>(
+        &self,
+        values: impl IntoIterator<Item = &'a T>,
+        collect_captured: bool,
+    ) -> Vec<&'a T> {
         let mut mask = self.0;
         values
-            .iter()
+            .into_iter()
             .filter(|_| {
                 let set = mask & 0x1 != 0;
                 mask >>= 1;

@@ -225,9 +225,10 @@ mod tests {
     use super::*;
     use crate::config::VMConfig;
     use claims::{assert_err, assert_none, assert_ok, assert_ok_eq, assert_some};
-    use move_binary_format::file_format::{AbilitySet, StructTypeParameter};
+    use move_binary_format::file_format::StructTypeParameter;
     use move_core_types::{
-        account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+        ability::AbilitySet, account_address::AccountAddress, identifier::Identifier,
+        language_storage::ModuleId,
     };
     use move_vm_types::loaded_data::runtime_types::{
         AbilityInfo, StructIdentifier, StructLayout, StructType, TypeBuilder,
