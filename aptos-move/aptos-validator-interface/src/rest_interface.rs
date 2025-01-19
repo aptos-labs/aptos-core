@@ -274,7 +274,7 @@ impl AptosValidatorInterface for RestDebuggerInterface {
             )>,
         )>,
     > {
-        let sampling = sampling % SAMPLING_BOUND;
+        let sampling = sampling % (SAMPLING_BOUND + 1);
         let mut txns = Vec::with_capacity(limit as usize);
         let (tns, infos) = self.get_committed_transactions(start, limit).await?;
         let temp_txns = tns
