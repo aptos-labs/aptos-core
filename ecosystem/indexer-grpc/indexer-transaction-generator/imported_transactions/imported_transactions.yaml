@@ -14,11 +14,13 @@ testnet:
     5979639459: 5979639459_coin_register
     5992795934: 5992795934_fa_activities
     5523474016: 5523474016_validator_txn
+    1200394037: 1200394037_fa_v2_frozen_event
+    2646510387: 2646510387_concurrent_fa
 
     # fungible asset processor
     4462417704: 4462417704_secondary_store_burnt
     646928741: 646928741_no_events
-
+    769222973: 769222973_multisig
 
 mainnet:
   transaction_stream_endpoint: https://grpc.mainnet.aptoslabs.com:443
@@ -27,6 +29,8 @@ mainnet:
     # fungible asset processor
     308783012: 308783012_fa_transfer
     152449628: 152449628_coin_info_write
+    999929475: 999929475_coin_and_fa_transfers
+    508365567: 508365567_fa_v1_events
 
     # token v2 processor
     1058723093: 1058723093_token_v1_mint_withdraw_deposit_events
@@ -52,14 +56,17 @@ mainnet:
     # account processor
     145959468: 145959468_account_transaction
     423176063: 423176063_account_transaction_delete
+    2212040150: 2212040150_transaction_without_events
 
     # ans processor
     438536688: 438536688_ans_current_ans_lookup_v2
     303690531: 303690531_ans_lookup_v2
     1056780409: 1056780409_ans_current_ans_primary_name_v2
+    2080538: 2080538_ans_lookup_v1
 
     # objects processor
     578318306: 578318306_objects_write_resource
+    1806220919: 1806220919_object_untransferable
 
     # stake processor
     121508544: 121508544_stake_distribute
@@ -67,6 +74,9 @@ mainnet:
     1830706009: 1830706009_staker_governance_record
     125600867: 125600867_stake_delegation_pool
     4827964: 4827964_stake_initialize
+    1831971037: 1831971037_stake_delegation_pool
+    118489: 118489_proposal_vote
+    124094774: 124094774_delegated_pool_balance
 
     # user transactions processor
     685: 685_user_txn_ed25519
@@ -78,3 +88,9 @@ mainnet:
     527013476: 527013476_user_txn_single_sender_secp256k1_ecdsa
     2175935: 2175935_user_txn_multi_ed25519
     976087151: 976087151_user_txn_single_sender_keyless
+    103958588: 103958588_multi_agents
+
+    # account restoration processor
+    2200077591: 2200077591_account_restoration_single_ed25519
+    2200077877: 2200077877_account_restoration_rotated_to_single_secp256k1
+    2200077800: 2200077800_account_restoration_rotated_to_multi_key

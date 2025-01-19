@@ -118,15 +118,3 @@ fn return_u64_bool() {
         MoveTypeLayout::Bool,
     ])
 }
-
-#[test]
-fn return_signer_ref() {
-    expect_success(
-        &[],
-        "(s: &signer): &signer",
-        "s",
-        vec![],
-        vec![MoveValue::Signer(TEST_ADDR)],
-        &[MoveTypeLayout::Signer],
-    )
-}

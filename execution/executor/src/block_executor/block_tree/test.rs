@@ -39,11 +39,7 @@ fn id(index: u64) -> HashValue {
 }
 
 fn empty_block() -> PartialStateComputeResult {
-    let result_view = LedgerSummary::new_empty();
-    PartialStateComputeResult::new_empty(
-        result_view.state().clone(),
-        result_view.transaction_accumulator.clone(),
-    )
+    PartialStateComputeResult::new_empty(LedgerSummary::new_empty())
 }
 
 fn gen_ledger_info(block_id: HashValue, reconfig: bool) -> LedgerInfo {

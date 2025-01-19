@@ -15,7 +15,6 @@ use move_core_types::vm_status::StatusCode;
 use rstest::rstest;
 
 #[rstest(enabled, disabled,
-    case(vec![], vec![FeatureFlag::ENABLE_ENUM_TYPES]),
     case(vec![FeatureFlag::ENABLE_ENUM_TYPES], vec![]),
 )]
 fn enum_types(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {

@@ -28,7 +28,7 @@ pub(crate) fn native_create_signer(
     context.charge(ACCOUNT_CREATE_SIGNER_BASE)?;
 
     let address = safely_pop_arg!(arguments, AccountAddress);
-    Ok(smallvec![Value::signer(address)])
+    Ok(smallvec![Value::master_signer(address)])
 }
 
 /***************************************************************************************************

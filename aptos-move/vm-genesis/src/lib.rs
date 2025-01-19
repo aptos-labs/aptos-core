@@ -27,8 +27,7 @@ use aptos_types::{
         secure_test_rsa_jwk,
     },
     keyless::{
-        self, test_utils::get_sample_iss, Groth16VerificationKey, DEVNET_VERIFICATION_KEY,
-        KEYLESS_ACCOUNT_MODULE_NAME,
+        self, test_utils::get_sample_iss, Groth16VerificationKey, KEYLESS_ACCOUNT_MODULE_NAME,
     },
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
@@ -111,7 +110,7 @@ pub struct GenesisConfiguration {
     pub randomness_config_override: Option<OnChainRandomnessConfig>,
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
     pub initial_jwks: Vec<IssuerJWK>,
-    pub keyless_groth16_vk_override: Option<Groth16VerificationKey>,
+    pub keyless_groth16_vk: Option<Groth16VerificationKey>,
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -312,7 +311,7 @@ pub fn encode_genesis_change_set(
         &module_storage,
         chain_id,
         genesis_config.initial_jwks.clone(),
-        genesis_config.keyless_groth16_vk_override.clone(),
+        genesis_config.keyless_groth16_vk.clone(),
     );
     set_genesis_end(&mut session, &module_storage);
 
@@ -686,7 +685,7 @@ fn initialize_keyless_accounts(
     module_storage: &impl AptosModuleStorage,
     chain_id: ChainId,
     mut initial_jwks: Vec<IssuerJWK>,
-    vk_override: Option<Groth16VerificationKey>,
+    vk: Option<Groth16VerificationKey>,
 ) {
     let config = keyless::Configuration::new_for_devnet();
     exec_function(
@@ -700,9 +699,8 @@ fn initialize_keyless_accounts(
             config.as_move_value(),
         ]),
     );
-    if !chain_id.is_mainnet() {
-        let vk =
-            vk_override.unwrap_or_else(|| Groth16VerificationKey::from(&*DEVNET_VERIFICATION_KEY));
+
+    if vk.is_some() {
         exec_function(
             session,
             module_storage,
@@ -711,10 +709,11 @@ fn initialize_keyless_accounts(
             vec![],
             serialize_values(&vec![
                 MoveValue::Signer(CORE_CODE_ADDRESS),
-                vk.as_move_value(),
+                vk.unwrap().as_move_value(),
             ]),
         );
-
+    }
+    if !chain_id.is_mainnet() {
         let additional_jwk_patch = IssuerJWK {
             issuer: get_sample_iss(),
             jwk: JWK::RSA(secure_test_rsa_jwk()),
@@ -1255,7 +1254,7 @@ pub fn generate_test_genesis(
             randomness_config_override: None,
             jwk_consensus_config_override: None,
             initial_jwks: vec![],
-            keyless_groth16_vk_override: None,
+            keyless_groth16_vk: None,
         },
         &OnChainConsensusConfig::default_for_genesis(),
         &OnChainExecutionConfig::default_for_genesis(),
@@ -1307,7 +1306,7 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         randomness_config_override: None,
         jwk_consensus_config_override: None,
         initial_jwks: vec![],
-        keyless_groth16_vk_override: None,
+        keyless_groth16_vk: None,
     }
 }
 

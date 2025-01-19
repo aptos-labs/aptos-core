@@ -71,7 +71,7 @@ pub fn check_for_function_typed_parameters(env: &mut GlobalEnv) {
     }
 
     for caller_module in env.get_modules() {
-        if caller_module.is_primary_target() {
+        if caller_module.is_target() {
             for caller_func in caller_module.get_functions() {
                 if !lambda_params_ok || !lambda_return_ok {
                     let caller_name = caller_func.get_full_name_str();
@@ -316,6 +316,7 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
     let mut private_funcs: BTreeSet<QualifiedFunId> = BTreeSet::new();
 
     for caller_module in env.get_modules() {
+        // TODO(#13745): fix when we can tell in general if two modules are in the same package
         if caller_module.is_primary_target() {
             let caller_module_id = caller_module.get_id();
             let caller_module_has_friends = !caller_module.has_no_friends();
@@ -383,6 +384,7 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                                             == caller_func.module_env.self_address()
                                         {
                                             // if callee is also a primary target, then they are in the same package
+                                            // TODO(#13745): fix when we can tell in general if two modules are in the same package
                                             if callee_func.module_env.is_primary_target() {
                                                 // we should've inferred the friend declaration
                                                 panic!(

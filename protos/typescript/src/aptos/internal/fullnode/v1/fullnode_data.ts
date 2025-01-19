@@ -7,9 +7,17 @@ import {
   makeGenericClientConstructor,
   Metadata,
 } from "@grpc/grpc-js";
-import type { CallOptions, ClientOptions, UntypedServiceImplementation } from "@grpc/grpc-js";
+import type {
+  CallOptions,
+  ClientOptions,
+  ClientUnaryCall,
+  handleUnaryCall,
+  ServiceError,
+  UntypedServiceImplementation,
+} from "@grpc/grpc-js";
 import Long from "long";
 import _m0 from "protobufjs/minimal";
+import { FullnodeInfo } from "../../../indexer/v1/grpc";
 import { Transaction } from "../../../transaction/v1/transaction";
 
 export interface TransactionsOutput {
@@ -91,6 +99,13 @@ export interface TransactionsFromNodeResponse {
     | undefined;
   /** Making sure that all the responses include a chain id */
   chainId?: number | undefined;
+}
+
+export interface PingFullnodeRequest {
+}
+
+export interface PingFullnodeResponse {
+  info?: FullnodeInfo | undefined;
 }
 
 function createBaseTransactionsOutput(): TransactionsOutput {
@@ -558,8 +573,187 @@ export const TransactionsFromNodeResponse = {
   },
 };
 
+function createBasePingFullnodeRequest(): PingFullnodeRequest {
+  return {};
+}
+
+export const PingFullnodeRequest = {
+  encode(_: PingFullnodeRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): PingFullnodeRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePingFullnodeRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<PingFullnodeRequest, Uint8Array>
+  async *encodeTransform(
+    source:
+      | AsyncIterable<PingFullnodeRequest | PingFullnodeRequest[]>
+      | Iterable<PingFullnodeRequest | PingFullnodeRequest[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [PingFullnodeRequest.encode(p).finish()];
+        }
+      } else {
+        yield* [PingFullnodeRequest.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, PingFullnodeRequest>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<PingFullnodeRequest> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [PingFullnodeRequest.decode(p)];
+        }
+      } else {
+        yield* [PingFullnodeRequest.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(_: any): PingFullnodeRequest {
+    return {};
+  },
+
+  toJSON(_: PingFullnodeRequest): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create(base?: DeepPartial<PingFullnodeRequest>): PingFullnodeRequest {
+    return PingFullnodeRequest.fromPartial(base ?? {});
+  },
+  fromPartial(_: DeepPartial<PingFullnodeRequest>): PingFullnodeRequest {
+    const message = createBasePingFullnodeRequest();
+    return message;
+  },
+};
+
+function createBasePingFullnodeResponse(): PingFullnodeResponse {
+  return { info: undefined };
+}
+
+export const PingFullnodeResponse = {
+  encode(message: PingFullnodeResponse, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.info !== undefined) {
+      FullnodeInfo.encode(message.info, writer.uint32(10).fork()).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): PingFullnodeResponse {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePingFullnodeResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.info = FullnodeInfo.decode(reader, reader.uint32());
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<PingFullnodeResponse, Uint8Array>
+  async *encodeTransform(
+    source:
+      | AsyncIterable<PingFullnodeResponse | PingFullnodeResponse[]>
+      | Iterable<PingFullnodeResponse | PingFullnodeResponse[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [PingFullnodeResponse.encode(p).finish()];
+        }
+      } else {
+        yield* [PingFullnodeResponse.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, PingFullnodeResponse>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<PingFullnodeResponse> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [PingFullnodeResponse.decode(p)];
+        }
+      } else {
+        yield* [PingFullnodeResponse.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): PingFullnodeResponse {
+    return { info: isSet(object.info) ? FullnodeInfo.fromJSON(object.info) : undefined };
+  },
+
+  toJSON(message: PingFullnodeResponse): unknown {
+    const obj: any = {};
+    if (message.info !== undefined) {
+      obj.info = FullnodeInfo.toJSON(message.info);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<PingFullnodeResponse>): PingFullnodeResponse {
+    return PingFullnodeResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<PingFullnodeResponse>): PingFullnodeResponse {
+    const message = createBasePingFullnodeResponse();
+    message.info = (object.info !== undefined && object.info !== null)
+      ? FullnodeInfo.fromPartial(object.info)
+      : undefined;
+    return message;
+  },
+};
+
 export type FullnodeDataService = typeof FullnodeDataService;
 export const FullnodeDataService = {
+  ping: {
+    path: "/aptos.internal.fullnode.v1.FullnodeData/Ping",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: PingFullnodeRequest) => Buffer.from(PingFullnodeRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer) => PingFullnodeRequest.decode(value),
+    responseSerialize: (value: PingFullnodeResponse) => Buffer.from(PingFullnodeResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer) => PingFullnodeResponse.decode(value),
+  },
   getTransactionsFromNode: {
     path: "/aptos.internal.fullnode.v1.FullnodeData/GetTransactionsFromNode",
     requestStream: false,
@@ -574,10 +768,26 @@ export const FullnodeDataService = {
 } as const;
 
 export interface FullnodeDataServer extends UntypedServiceImplementation {
+  ping: handleUnaryCall<PingFullnodeRequest, PingFullnodeResponse>;
   getTransactionsFromNode: handleServerStreamingCall<GetTransactionsFromNodeRequest, TransactionsFromNodeResponse>;
 }
 
 export interface FullnodeDataClient extends Client {
+  ping(
+    request: PingFullnodeRequest,
+    callback: (error: ServiceError | null, response: PingFullnodeResponse) => void,
+  ): ClientUnaryCall;
+  ping(
+    request: PingFullnodeRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: PingFullnodeResponse) => void,
+  ): ClientUnaryCall;
+  ping(
+    request: PingFullnodeRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: PingFullnodeResponse) => void,
+  ): ClientUnaryCall;
   getTransactionsFromNode(
     request: GetTransactionsFromNodeRequest,
     options?: Partial<CallOptions>,

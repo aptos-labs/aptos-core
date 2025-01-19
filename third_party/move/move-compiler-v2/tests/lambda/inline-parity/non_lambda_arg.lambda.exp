@@ -354,16 +354,20 @@ module 0x42::sort {
 public fun sort::incorrect_sort<#0>($t0: &mut vector<#0>, $t1: |(#0, #0)|bool) {
      var $t2: u64
      var $t3: &vector<#0>
-     var $t4: u64
+     var $t4: &mut vector<#0>
      var $t5: u64
      var $t6: u64
+     var $t7: u64
+     var $t8: u64
   0: $t3 := freeze_ref(implicit)($t0)
   1: $t2 := vector::length<#0>($t3)
-  2: $t4 := 0
-  3: $t6 := 1
-  4: $t5 := -($t2, $t6)
-  5: sort::incorrect_sort_recursive<#0>($t0, $t4, $t5, $t1)
-  6: return ()
+  2: $t4 := infer($t0)
+  3: $t5 := 0
+  4: $t7 := infer($t2)
+  5: $t8 := 1
+  6: $t6 := -($t7, $t8)
+  7: sort::incorrect_sort_recursive<#0>($t4, $t5, $t6, $t1)
+  8: return ()
 }
 
 
@@ -376,23 +380,41 @@ public fun sort::incorrect_sort_recursive<#0>($t0: &mut vector<#0>, $t1: u64, $t
      var $t8: u64
      var $t9: u64
      var $t10: u64
-     var $t11: u64
-  0: $t4 := <($t1, $t2)
-  1: if ($t4) goto 2 else goto 13
-  2: label L0
-  3: $t7 := 2
-  4: $t6 := /($t2, $t7)
-  5: $t5 := +($t1, $t6)
-  6: $t9 := 1
-  7: $t8 := -($t5, $t9)
-  8: sort::incorrect_sort_recursive<#0>($t0, $t1, $t8, $t3)
-  9: $t11 := 1
- 10: $t10 := +($t5, $t11)
- 11: sort::incorrect_sort_recursive<#0>($t0, $t10, $t2, $t3)
- 12: goto 14
- 13: label L1
- 14: label L2
- 15: return ()
+     var $t11: &mut vector<#0>
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     var $t15: u64
+     var $t16: &mut vector<#0>
+     var $t17: u64
+     var $t18: u64
+     var $t19: u64
+     var $t20: u64
+  0: $t5 := infer($t1)
+  1: $t4 := <($t5, $t2)
+  2: if ($t4) goto 3 else goto 22
+  3: label L0
+  4: $t7 := infer($t1)
+  5: $t9 := infer($t2)
+  6: $t10 := 2
+  7: $t8 := /($t9, $t10)
+  8: $t6 := +($t7, $t8)
+  9: $t11 := infer($t0)
+ 10: $t12 := infer($t1)
+ 11: $t14 := infer($t6)
+ 12: $t15 := 1
+ 13: $t13 := -($t14, $t15)
+ 14: sort::incorrect_sort_recursive<#0>($t11, $t12, $t13, $t3)
+ 15: $t16 := infer($t0)
+ 16: $t18 := infer($t6)
+ 17: $t19 := 1
+ 18: $t17 := +($t18, $t19)
+ 19: $t20 := infer($t2)
+ 20: sort::incorrect_sort_recursive<#0>($t16, $t17, $t20, $t3)
+ 21: goto 23
+ 22: label L1
+ 23: label L2
+ 24: return ()
 }
 
 

@@ -222,8 +222,8 @@ async fn process_transactions_from_node_response(
                     .context("There were unexpectedly no transactions in the response")?;
                 let last_transaction_version = last_transaction.version;
                 let start_version = first_transaction.version;
-                let first_transaction_pb_timestamp = first_transaction.timestamp.clone();
-                let last_transaction_pb_timestamp = last_transaction.timestamp.clone();
+                let first_transaction_pb_timestamp = first_transaction.timestamp;
+                let last_transaction_pb_timestamp = last_transaction.timestamp;
 
                 log_grpc_step(
                     SERVICE_TYPE,

@@ -675,6 +675,15 @@ pub fn convert_account_signature(
                 "[Indexer Fullnode] Indexer should never see transactions with NoAccountSignature"
             )
         },
+        AccountSignature::AbstractionSignature(s) => (
+            transaction::account_signature::Type::Abstraction,
+            transaction::account_signature::Signature::Abstraction(
+                transaction::AbstractionSignature {
+                    function_info: s.function_info.to_owned(),
+                    signature: s.auth_data.inner().to_owned(),
+                },
+            ),
+        ),
     };
 
     transaction::AccountSignature {
@@ -698,16 +707,19 @@ pub fn convert_transaction_signature(
         TransactionSignature::MultiAgentSignature(_) => transaction::signature::Type::MultiAgent,
         TransactionSignature::FeePayerSignature(_) => transaction::signature::Type::FeePayer,
         TransactionSignature::SingleSender(_) => transaction::signature::Type::SingleSender,
+        TransactionSignature::NoAccountSignature(_) => {
+            unreachable!("No account signature can't be committed onchain")
+        },
     };
 
     let signature = match signature {
-        TransactionSignature::Ed25519Signature(s) => {
-            transaction::signature::Signature::Ed25519(convert_ed25519_signature(s))
-        },
-        TransactionSignature::MultiEd25519Signature(s) => {
-            transaction::signature::Signature::MultiEd25519(convert_multi_ed25519_signature(s))
-        },
-        TransactionSignature::MultiAgentSignature(s) => {
+        TransactionSignature::Ed25519Signature(s) => Some(
+            transaction::signature::Signature::Ed25519(convert_ed25519_signature(s)),
+        ),
+        TransactionSignature::MultiEd25519Signature(s) => Some(
+            transaction::signature::Signature::MultiEd25519(convert_multi_ed25519_signature(s)),
+        ),
+        TransactionSignature::MultiAgentSignature(s) => Some(
             transaction::signature::Signature::MultiAgent(transaction::MultiAgentSignature {
                 sender: Some(convert_account_signature(&s.sender)),
                 secondary_signer_addresses: s
@@ -720,9 +732,9 @@ pub fn convert_transaction_signature(
                     .iter()
                     .map(convert_account_signature)
                     .collect(),
-            })
-        },
-        TransactionSignature::FeePayerSignature(s) => {
+            }),
+        ),
+        TransactionSignature::FeePayerSignature(s) => Some(
             transaction::signature::Signature::FeePayer(transaction::FeePayerSignature {
                 sender: Some(convert_account_signature(&s.sender)),
                 secondary_signer_addresses: s
@@ -737,18 +749,19 @@ pub fn convert_transaction_signature(
                     .collect(),
                 fee_payer_address: s.fee_payer_address.to_string(),
                 fee_payer_signer: Some(convert_account_signature(&s.fee_payer_signer)),
-            })
-        },
-        TransactionSignature::SingleSender(s) => {
+            }),
+        ),
+        TransactionSignature::SingleSender(s) => Some(
             transaction::signature::Signature::SingleSender(transaction::SingleSender {
                 sender: Some(convert_account_signature(s)),
-            })
-        },
+            }),
+        ),
+        TransactionSignature::NoAccountSignature(_) => None,
     };
 
     Some(transaction::Signature {
         r#type: r#type as i32,
-        signature: Some(signature),
+        signature,
     })
 }
 

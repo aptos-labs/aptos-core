@@ -47,10 +47,11 @@ impl Script {
             let struct_name = script.identifier_at(struct_handle.name);
             let module_handle = script.module_handle_at(struct_handle.module);
             let module_id = script.module_id_for_handle(module_handle);
-            struct_names.push(struct_name_index_map.struct_name_to_idx(StructIdentifier {
+            let struct_name = StructIdentifier {
                 module: module_id,
                 name: struct_name.to_owned(),
-            })?);
+            };
+            struct_names.push(struct_name_index_map.struct_name_to_idx(&struct_name)?);
         }
 
         let mut function_refs = vec![];

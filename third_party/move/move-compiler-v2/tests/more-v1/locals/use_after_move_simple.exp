@@ -14,7 +14,7 @@ error: cannot move local `x` since it is still in use
 16 │         move x;
    │         ^^^^^^ attempted to move here
 17 │         let _ = x + 1;
-   │                 ----- used here
+   │                 - used here
 
 error: cannot move local `x` since it is still in use
    ┌─ tests/more-v1/locals/use_after_move_simple.move:26:9

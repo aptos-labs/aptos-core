@@ -97,6 +97,10 @@ impl RestoreHandler {
         )
     }
 
+    pub fn force_state_version_for_kv_restore(&self, version: Option<Version>) -> Result<()> {
+        self.state_store.init_state_ignoring_summary(version)
+    }
+
     pub fn save_transactions_and_replay_kv(
         &self,
         first_version: Version,

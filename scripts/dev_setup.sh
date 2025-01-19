@@ -45,7 +45,6 @@ function usage {
   echo "-o install operations tooling as well: helm, terraform, yamllint, vault, docker, kubectl, python3"
   echo "-y install or update Move Prover tools: z3, cvc5, dotnet, boogie"
   echo "-d install tools for the Move documentation generator: graphviz"
-  echo "-a install tools for build and test api"
   echo "-P install PostgreSQL"
   echo "-J install js/ts tools"
   echo "-v verbose mode"
@@ -461,13 +460,9 @@ function install_toolchain {
 }
 
 function install_rustup_components_and_nightly {
-  echo "Printing the rustup version and toolchain list"
-  rustup --version
-  rustup show
-  rustup toolchain list -v
-
-  echo "Updating rustup and installing rustfmt & clippy"
+  echo "Updating rustup and installing the latest rustc, rustfmt & clippy"
   rustup update
+  rustup toolchain install stable # Install the latest toolchain to ensure that dependencies can always be built (even if aptos-core is behind)
   rustup component add rustfmt
   rustup component add clippy
 
@@ -490,6 +485,11 @@ function install_rustup_components_and_nightly {
   if ! rustup component add rustfmt --toolchain nightly; then
     echo "Failed to install rustfmt nightly using rustup."
   fi
+
+  echo "Printing the rustup version and toolchain list"
+  rustup --version
+  rustup show
+  rustup toolchain list -v
 }
 
 function install_cargo_sort {
@@ -506,7 +506,7 @@ function install_cargo_machete {
 
 function install_cargo_nextest {
   if ! command -v cargo-nextest &>/dev/null; then
-    cargo install cargo-nextest --locked
+    cargo install cargo-nextest --locked --version 0.9.85
   fi
 }
 
@@ -800,13 +800,6 @@ protoc and related plugins (since -r was provided):
 EOF
   fi
 
-  if [[ "$INSTALL_API_BUILD_TOOLS" == "true" ]]; then
-    cat <<EOF
-API build and testing tools (since -a was provided):
-  * Python3 (schemathesis)
-EOF
-  fi
-
   if [[ "$INSTALL_POSTGRES" == "true" ]]; then
     cat <<EOF
 PostgreSQL database (since -P was provided):
@@ -847,7 +840,6 @@ INSTALL_PROFILE=false
 INSTALL_PROVER=false
 INSTALL_DOC=false
 INSTALL_PROTOC=false
-INSTALL_API_BUILD_TOOLS=false
 INSTALL_POSTGRES=false
 INSTALL_JSTS=false
 INSTALL_INDIVIDUAL=false
@@ -883,9 +875,6 @@ while getopts "btoprvydaPJh:i:nk" arg; do
   d)
     INSTALL_DOC="true"
     ;;
-  a)
-    INSTALL_API_BUILD_TOOLS="true"
-    ;;
   P)
     INSTALL_POSTGRES="true"
     ;;
@@ -919,7 +908,6 @@ if [[ "$INSTALL_BUILD_TOOLS" == "false" ]] &&
   [[ "$INSTALL_PROFILE" == "false" ]] &&
   [[ "$INSTALL_PROVER" == "false" ]] &&
   [[ "$INSTALL_DOC" == "false" ]] &&
-  [[ "$INSTALL_API_BUILD_TOOLS" == "false" ]] &&
   [[ "$INSTALL_POSTGRES" == "false" ]] &&
   [[ "$INSTALL_JSTS" == "false" ]] &&
   [[ "$INSTALL_INDIVIDUAL" == "false" ]]; then
@@ -1080,12 +1068,6 @@ fi
 
 if [[ "$INSTALL_DOC" == "true" ]]; then
   install_pkg graphviz "$PACKAGE_MANAGER"
-fi
-
-if [[ "$INSTALL_API_BUILD_TOOLS" == "true" ]]; then
-  # python and tools
-  install_python3
-  "${PRE_COMMAND[@]}" python3 -m pip install schemathesis
 fi
 
 if [[ "$INSTALL_POSTGRES" == "true" ]]; then

@@ -2,25 +2,30 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment, AsUnsyncModuleStorage,
-    Module, ModuleStorage, RuntimeEnvironment, UnsyncModuleStorage, WithRuntimeEnvironment,
+    ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment, loader::Function,
+    AsUnsyncModuleStorage, Module, ModuleStorage, RuntimeEnvironment, UnsyncModuleStorage,
+    WithRuntimeEnvironment,
 };
 use ambassador::Delegate;
 use bytes::Bytes;
 use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
-    errors::{verification_error, Location, PartialVMError, VMResult},
+    errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
     normalized, CompiledModule, IndexKind,
 };
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
-    language_storage::ModuleId,
+    language_storage::{ModuleId, TypeTag},
     metadata::Metadata,
     vm_status::StatusCode,
 };
-use move_vm_types::{code::ModuleBytesStorage, module_linker_error};
+use move_vm_types::{
+    code::ModuleBytesStorage,
+    loaded_data::runtime_types::{StructType, Type},
+    module_linker_error,
+};
 use std::{
     collections::{btree_map, BTreeMap},
     sync::Arc,

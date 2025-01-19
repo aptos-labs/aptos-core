@@ -19,7 +19,11 @@ fail = { workspace = true }
 hashbrown = { workspace = true }
 lazy_static = { workspace = true }
 lru = { workspace = true }
-move-binary-format = { path = "../../move-binary-format" }
+move-binary-format = { workspace = true }
+move-bytecode-verifier = { workspace = true }
+move-core-types = { workspace = true }
+move-vm-metrics = { workspace = true }
+move-vm-types = { workspace = true }
 once_cell = { workspace = true }
 parking_lot = { workspace = true }
 serde = { workspace = true }
@@ -27,18 +31,13 @@ sha3 = { workspace = true }
 triomphe = { workspace = true }
 typed-arena = { workspace = true }
 
-move-bytecode-verifier = { path = "../../move-bytecode-verifier" }
-move-core-types = { path = "../../move-core/types" }
-move-vm-metrics = { workspace = true }
-move-vm-types = { path = "../types" }
-
 [dev-dependencies]
 anyhow = { workspace = true }
 hex = { workspace = true }
-move-binary-format = { path = "../../move-binary-format", features = ["fuzzing"] }
-move-compiler = { path = "../../move-compiler" }
-move-ir-compiler = { path = "../../move-ir-compiler" }
-move-vm-test-utils = { path = "../test-utils" }
+move-binary-format = { workspace = true, features = ["fuzzing"] }
+move-compiler = { workspace = true }
+move-ir-compiler = { workspace = true }
+move-vm-test-utils ={ workspace = true }
 proptest = { workspace = true }
 
 [features]

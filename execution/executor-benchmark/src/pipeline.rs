@@ -42,6 +42,7 @@ pub struct PipelineConfig {
     #[derivative(Default(value = "4"))]
     pub num_generator_workers: usize,
     pub partitioner_config: PartitionerV2Config,
+    #[derivative(Default(value = "8"))]
     pub num_sig_verify_threads: usize,
 }
 
@@ -112,7 +113,7 @@ where
 
         // signature verification and partitioning
         let mut preparation_stage = BlockPreparationStage::new(
-            config.num_sig_verify_threads,
+            std::cmp::min(config.num_sig_verify_threads, num_cpus::get()),
             // Assume the distributed executor and the distributed partitioner share the same worker set.
             config.num_executor_shards,
             &config.partitioner_config,

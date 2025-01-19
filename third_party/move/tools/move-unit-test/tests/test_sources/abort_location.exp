@@ -10,15 +10,12 @@ Failures in 0xc0ffee::Example:
 ┌── test_validate_parameters ──────
 │ error[E11001]: test failure
 │    ┌─ abort_location.move:36:13
-│    │  
-│  9 │       fun validate_parameters(
-│    │           ------------------- In this function in 0xc0ffee::Example
-│    ·  
-│ 36 │ ╭             assert!(
-│ 37 │ │                 is_valid_a,
-│ 38 │ │                 if (is_positive) E_CONDITION_B else E_CONDITION_C
-│ 39 │ │             );
-│    │ ╰─────────────^ Test was not expected to error, but it aborted with code 2 originating in the module 0000000000000000000000000000000000000000000000000000000000c0ffee::Example rooted here
+│    │
+│  9 │     fun validate_parameters(
+│    │         ------------------- In this function in 0xc0ffee::Example
+│    ·
+│ 36 │             assert!(
+│    │             ^^^^^^ Test was not expected to error, but it aborted with code 2 originating in the module 0000000000000000000000000000000000000000000000000000000000c0ffee::Example rooted here
 │ 
 │ 
 │ stack trace

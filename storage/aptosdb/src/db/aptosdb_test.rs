@@ -4,10 +4,7 @@
 use crate::{
     db::{
         get_first_seq_num_and_limit, test_helper,
-        test_helper::{
-            arb_blocks_to_commit, put_as_state_root, put_transaction_auxiliary_data,
-            put_transaction_infos,
-        },
+        test_helper::{arb_blocks_to_commit, put_transaction_auxiliary_data},
         AptosDB,
     },
     pruner::{LedgerPrunerManager, PrunerManager, StateMerklePrunerManager},
@@ -19,19 +16,18 @@ use aptos_config::config::{
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_storage_interface::{DbReader, LedgerSummary, Order};
+use aptos_storage_interface::{DbReader, Order};
 use aptos_temppath::TempPath;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     proof::SparseMerkleLeafNode,
-    state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
-    },
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         ExecutionStatus, TransactionAuxiliaryData, TransactionAuxiliaryDataV1, TransactionInfo,
         TransactionToCommit, VMErrorDetail, Version,
     },
     vm_status::StatusCode,
+    write_set::WriteSet,
 };
 use proptest::prelude::*;
 use std::{collections::HashSet, sync::Arc};
@@ -176,38 +172,51 @@ fn test_get_transaction_auxiliary_data() {
 }
 
 #[test]
-fn test_get_latest_executed_trees() {
+fn test_get_latest_ledger_summary() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
 
+    db.save_transactions_for_test(
+        &[],
+        0,    /* first_version */
+        None, /* ledger_info_with_sigs */
+        true, /* sync_commit */
+    )
+    .unwrap();
+
     // entirely empty db
     let empty = db.get_pre_committed_ledger_summary().unwrap();
-    assert!(empty.is_same_view(&LedgerSummary::new_empty()));
+    assert_eq!(empty.next_version(), 0);
 
     // bootstrapped db (any transaction info is in)
     let key = StateKey::raw(b"test_key");
     let value = StateValue::from(b"test_val".to_vec());
-    let hash = SparseMerkleLeafNode::new(key.hash(), value.hash()).hash();
-    put_as_state_root(&db, 0, key, value);
+    let state_hash = SparseMerkleLeafNode::new(key.hash(), value.hash()).hash();
     let txn_info = TransactionInfo::new(
         HashValue::random(),
         HashValue::random(),
         HashValue::random(),
-        Some(hash),
+        Some(state_hash),
         0,
         ExecutionStatus::MiscellaneousError(None),
     );
-    put_transaction_infos(&db, 0, &[txn_info.clone()]);
+    let root_hash = txn_info.hash();
+    let mut txn_to_commit = TransactionToCommit::dummy();
+    txn_to_commit.transaction_info = txn_info;
+    txn_to_commit.write_set = WriteSet::new_for_test([(key, Some(value))]);
+
+    db.save_transactions_for_test(
+        &[txn_to_commit],
+        0,    /* first_version */
+        None, /* ledger_info_with_sigs */
+        true, /* sync_commit */
+    )
+    .unwrap();
 
     let bootstrapped = db.get_pre_committed_ledger_summary().unwrap();
-    assert!(
-        bootstrapped.is_same_view(&LedgerSummary::new_at_state_checkpoint(
-            txn_info.state_checkpoint_hash().unwrap(),
-            StateStorageUsage::new_untracked(),
-            vec![txn_info.hash()],
-            1,
-        ))
-    );
+    assert_eq!(bootstrapped.next_version(), 1);
+    assert_eq!(bootstrapped.transaction_accumulator.root_hash(), root_hash,);
+    assert_eq!(bootstrapped.state_summary.root_hash(), state_hash);
 }
 
 pub fn test_state_merkle_pruning_impl(
@@ -245,19 +254,14 @@ pub fn test_state_merkle_pruning_impl(
     .unwrap();
 
     // augment DB in blocks
-    let mut in_memory_state = db.state_store.current_state_cloned();
-    let _ancester = in_memory_state.current.clone();
     let mut next_ver: Version = 0;
     let mut snapshot_versions = vec![];
     for (txns_to_commit, ledger_info_with_sigs) in input.iter() {
-        test_helper::update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
         db.save_transactions_for_test(
             txns_to_commit,
-            next_ver,                /* first_version */
-            next_ver.checked_sub(1), /* base_state_version */
+            next_ver, /* first_version */
             Some(ledger_info_with_sigs),
             true, /* sync_commit */
-            &in_memory_state,
         )
         .unwrap();
 

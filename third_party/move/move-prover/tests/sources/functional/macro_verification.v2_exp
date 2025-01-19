@@ -36,8 +36,6 @@ error: post-condition does not hold
    =     at tests/sources/functional/macro_verification.move:26: foreach
    =         `invariant forall j in i..len(v): v[j] == old(v)[j];` = <redacted>
    =     at tests/sources/functional/macro_verification.move:17: foreach
-   =         <redacted> = <redacted>
-   =     at tests/sources/functional/macro_verification.move:17: foreach
    =     at tests/sources/functional/macro_verification.move:15: foreach
    =         v = <redacted>
    =     at tests/sources/functional/macro_verification.move:30: foreach (spec)
@@ -79,9 +77,6 @@ error: post-condition does not hold
    =     at tests/sources/functional/macro_verification.move:50: reduce
    =         `invariant sum == spec_sum(v, i);` = <redacted>
    =     at tests/sources/functional/macro_verification.move:43: reduce
-   =         <redacted> = <redacted>
-   =     at tests/sources/functional/macro_verification.move:52: reduce
-   =         <redacted> = <redacted>
    =     at tests/sources/functional/macro_verification.move:40: reduce
    =         result = <redacted>
    =     at tests/sources/functional/macro_verification.move:55: reduce (spec)
@@ -130,9 +125,6 @@ error: post-condition does not hold
    =     at tests/sources/functional/macro_verification.move:49: reduce
    =     at tests/sources/functional/macro_verification.move:50: reduce
    =     at tests/sources/functional/macro_verification.move:43: reduce
-   =         <redacted> = <redacted>
-   =     at tests/sources/functional/macro_verification.move:52: reduce
-   =         <redacted> = <redacted>
    =     at tests/sources/functional/macro_verification.move:40: reduce
    =         result = <redacted>
    =     at tests/sources/functional/macro_verification.move:53: reduce

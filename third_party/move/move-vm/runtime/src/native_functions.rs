@@ -21,7 +21,8 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
+    loaded_data::runtime_types::Type, natives::function::NativeResult,
+    value_serde::FunctionValueExtension, values::Value,
 };
 use std::{
     collections::{HashMap, VecDeque},
@@ -197,6 +198,10 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         self.traversal_context
     }
 
+    pub fn function_value_extension(&self) -> &dyn FunctionValueExtension {
+        self.resolver
+    }
+
     pub fn load_function(
         &mut self,
         module_id: &ModuleId,
@@ -220,13 +225,10 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
                     .module_store()
                     .resolve_module_and_function_by_name(module_id, function_name)?
             },
-            Loader::V2(loader) => loader
-                .load_function_without_ty_args(
-                    self.resolver.module_storage(),
-                    module_id.address(),
-                    module_id.name(),
-                    function_name,
-                )
+            Loader::V2(_) => self
+                .resolver
+                .module_storage()
+                .fetch_function_definition(module_id.address(), module_id.name(), function_name)
                 // TODO(loader_v2):
                 //   Keeping this consistent with loader V1 implementation which returned that
                 //   error. Check if we can avoid remapping by replaying transactions.

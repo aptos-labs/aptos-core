@@ -24,7 +24,6 @@ use aptos_types::{
     },
     contract_event::ContractEvent,
     error::PanicError,
-    executable::ExecutableTestType,
     fee_statement::FeeStatement,
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView, StateViewId},
     transaction::{
@@ -354,7 +353,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .materialized_size()
     }
 
-    fn get_write_summary(&self) -> HashSet<InputOutputKey<StateKey, StructTag, DelayedFieldID>> {
+    fn get_write_summary(&self) -> HashSet<InputOutputKey<StateKey, StructTag>> {
         let vm_output = self.vm_output.lock();
         let output = vm_output
             .as_ref()
@@ -438,12 +437,11 @@ impl<
             transaction_slice_metadata,
         )?;
 
-        let executor =
-            BlockExecutor::<SignatureVerifiedTransaction, E, S, L, ExecutableTestType, TP>::new(
-                config,
-                executor_thread_pool,
-                transaction_commit_listener,
-            );
+        let executor = BlockExecutor::<SignatureVerifiedTransaction, E, S, L, TP>::new(
+            config,
+            executor_thread_pool,
+            transaction_commit_listener,
+        );
 
         let ret = executor.execute_block(
             signature_verified_block,
@@ -481,7 +479,7 @@ impl<
     }
 
     /// Uses shared thread pool to execute blocks.
-    pub fn execute_block<
+    pub(crate) fn execute_block<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
         TP: TxnProvider<SignatureVerifiedTransaction> + Sync,

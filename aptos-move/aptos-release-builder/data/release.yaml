@@ -11,7 +11,7 @@ proposals:
       - Gas:
           new: current
       - Framework:
-          bytecode_version: 6
+          bytecode_version: 7
           git_hash: ~
       - FeatureFlag:
           enabled:

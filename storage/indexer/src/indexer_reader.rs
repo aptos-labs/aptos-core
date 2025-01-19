@@ -5,7 +5,7 @@ use crate::{db_indexer::DBIndexer, db_v2::IndexerAsyncV2};
 use anyhow::anyhow;
 use aptos_types::{
     account_address::AccountAddress,
-    contract_event::EventWithVersion,
+    contract_event::{ContractEventV1, ContractEventV2, EventWithVersion},
     event::EventKey,
     indexer::indexer_db_reader::{IndexerReader, Order},
     state_store::{
@@ -160,6 +160,37 @@ impl IndexerReader for IndexerReaders {
                     >);
             } else {
                 anyhow::bail!("Internal statekeys index is not enabled")
+            }
+        }
+        anyhow::bail!("DB indexer reader is not available")
+    }
+
+    fn get_translated_v1_event_by_version_and_index(
+        &self,
+        version: Version,
+        index: u64,
+    ) -> anyhow::Result<ContractEventV1> {
+        if let Some(db_indexer_reader) = &self.db_indexer_reader {
+            if db_indexer_reader.indexer_db.event_v2_translation_enabled() {
+                return Ok(db_indexer_reader
+                    .indexer_db
+                    .get_translated_v1_event_by_version_and_index(version, index)?);
+            } else {
+                anyhow::bail!("Event translation is not enabled")
+            }
+        }
+        anyhow::bail!("DB indexer reader is not available")
+    }
+
+    fn translate_event_v2_to_v1(
+        &self,
+        v2: &ContractEventV2,
+    ) -> anyhow::Result<Option<ContractEventV1>> {
+        if let Some(db_indexer_reader) = &self.db_indexer_reader {
+            if db_indexer_reader.indexer_db.event_v2_translation_enabled() {
+                return Ok(db_indexer_reader.translate_event_v2_to_v1(v2)?);
+            } else {
+                anyhow::bail!("Event translation is not enabled")
             }
         }
         anyhow::bail!("DB indexer reader is not available")

@@ -305,12 +305,24 @@ pub fn run_model_builder_with_options_and_compilation_flags<
         },
     };
 
-    // Extract the module/script closure
+    // Extract the module/script dependency closure
     let mut visited_modules = BTreeSet::new();
+    // Extract the module dependency closure for the vector module
+    let mut vector_and_its_dependencies = BTreeSet::new();
+    let mut seen_vector = false;
     for (_, mident, mdef) in &expansion_ast.modules {
         let src_file_hash = mdef.loc.file_hash();
         if !dep_files.contains(&src_file_hash) {
             collect_related_modules_recursive(mident, &expansion_ast.modules, &mut visited_modules);
+        }
+        if !seen_vector && is_vector(*mident) {
+            seen_vector = true;
+            // Collect the vector module and its dependencies.
+            collect_related_modules_recursive(
+                mident,
+                &expansion_ast.modules,
+                &mut vector_and_its_dependencies,
+            );
         }
     }
     for sdef in expansion_ast.scripts.values() {
@@ -330,12 +342,13 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     let mut expansion_ast = {
         let E::Program { modules, scripts } = expansion_ast;
         let modules = modules.filter_map(|mident, mut mdef| {
-            // Always need to include the vector module because it can be implicitly used.
-            // TODO(#12492): we can remove this once this bug is fixed
-            let is_vector = mident.value.address.into_addr_bytes().into_inner()
-                == AccountAddress::ONE
-                && mident.value.module.0.value.as_str() == "vector";
-            (is_vector || visited_modules.contains(&mident.value)).then(|| {
+            // For compiler v2, we need to always include the `vector` module and any of its dependencies,
+            // to handle cases of implicit usage.
+            // E.g., index operation on a vector results in a call to `vector::borrow`.
+            // TODO(#15483): consider refactoring code to avoid this special case.
+            ((compile_via_model && vector_and_its_dependencies.contains(&mident.value))
+                || visited_modules.contains(&mident.value))
+            .then(|| {
                 mdef.is_source_module = true;
                 mdef
             })
@@ -412,6 +425,12 @@ pub fn run_model_builder_with_options_and_compilation_flags<
         run_move_checker(&mut env, expansion_ast);
         Ok(env)
     }
+}
+
+/// Is `module_ident` the `vector` module?
+fn is_vector(module_ident: ModuleIdent_) -> bool {
+    module_ident.address.into_addr_bytes().into_inner() == AccountAddress::ONE
+        && module_ident.module.0.value.as_str() == "vector"
 }
 
 fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {

@@ -66,6 +66,8 @@ use std::{
     vec::Vec,
 };
 
+const DEBUG: bool = false;
+
 /// Run the AST simplification pass on all target functions in the `env`.
 /// Optionally do some aggressive simplifications that may eliminate code.
 pub fn run_simplifier(env: &mut GlobalEnv, eliminate_code: bool) {
@@ -91,10 +93,12 @@ pub fn run_simplifier(env: &mut GlobalEnv, eliminate_code: bool) {
     // Actually do the writing of new definitions.
     for (qfid, def) in new_definitions.into_iter() {
         env.set_function_def(qfid, def);
-        debug!(
-            "After simplifier, function is `{}`",
-            env.dump_fun(&env.get_function(qfid))
-        );
+        if DEBUG {
+            debug!(
+                "After simplifier, function is `{}`",
+                env.dump_fun(&env.get_function(qfid))
+            );
+        }
     }
 }
 

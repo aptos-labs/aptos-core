@@ -1,4 +1,11 @@
 ---
+AbstractionAuthData:
+  ENUM:
+    0:
+      V1:
+        STRUCT:
+          - signing_message_digest: BYTES
+          - authenticator: BYTES
 AccessPath:
   STRUCT:
     - address:
@@ -37,6 +44,13 @@ AccountAuthenticator:
               TYPENAME: MultiKeyAuthenticator
     4:
       NoAccountAuthenticator: UNIT
+    5:
+      Abstraction:
+        STRUCT:
+          - function_info:
+              TYPENAME: FunctionInfo
+          - auth_data:
+              TYPENAME: AbstractionAuthData
 AggregateSignature:
   STRUCT:
     - validator_bitmask:
@@ -540,6 +554,12 @@ FederatedKeylessPublicKey:
         TYPENAME: AccountAddress
     - pk:
         TYPENAME: KeylessPublicKey
+FunctionInfo:
+  STRUCT:
+    - module_address:
+        TYPENAME: AccountAddress
+    - module_name: STR
+    - function_name: STR
 G1Bytes:
   NEWTYPESTRUCT:
     TUPLEARRAY:

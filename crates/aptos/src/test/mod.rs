@@ -559,8 +559,10 @@ impl CliTestFramework {
         InitTool {
             network: Some(Network::Custom),
             rest_url: Some(self.endpoint.clone()),
-            faucet_url: Some(self.faucet_endpoint.clone()),
-            faucet_auth_token: None,
+            faucet_options: FaucetOptions {
+                faucet_url: Some(self.faucet_endpoint.clone()),
+                faucet_auth_token: None,
+            },
             rng_args: RngArgs::from_seed([0; 32]),
             private_key_options: PrivateKeyInputOptions::from_private_key(private_key)?,
             profile_options: Default::default(),
