@@ -5,6 +5,8 @@ use anyhow::Result;
 use aptos_indexer_grpc_server_framework::RunnableConfig;
 use serde::{Deserialize, Serialize};
 
+pub(crate) const MAX_MESSAGE_SIZE: usize = 256 * (1 << 20);
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct IndexerGrpcDataServiceConfig {}
