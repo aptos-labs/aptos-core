@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::build_model;
-use anyhow::bail;
 use codespan_reporting::{
     diagnostic::Severity,
     term::termcolor::{ColorChoice, StandardStream},
@@ -302,36 +301,14 @@ fn run_prover_benchmark(
     info!("starting prover benchmark");
     // Determine sources and dependencies from the env
     let mut sources = BTreeSet::new();
-    let mut deps: Vec<String> = vec![];
     for module in env.get_modules() {
         let file_name = module.get_source_path().to_string_lossy().to_string();
-        if module.is_primary_target() {
-            sources.insert(module.get_source_path().to_string_lossy().to_string());
-        } else if let Some(p) = Path::new(&file_name)
-            .parent()
-            .and_then(|p| p.canonicalize().ok())
-        {
-            // The prover doesn't like to have `p` and `p/s` as dep paths, filter those out
-            let p = p.to_string_lossy().to_string();
-            let mut done = false;
-            for d in &mut deps {
-                if p.starts_with(&*d) {
-                    // p is subsumed
-                    done = true;
-                    break;
-                } else if d.starts_with(&p) {
-                    // p is more general or equal to d, swap it out
-                    *d = p.to_string();
-                    done = true;
-                    break;
-                }
-            }
-            if !done {
-                deps.push(p)
-            }
-        } else {
-            bail!("invalid file path `{}`", file_name)
+        // If there is a `.spec.move` source, add this as well
+        let spec_file_name = Path::new(&file_name).with_extension("spec.move");
+        if spec_file_name.exists() {
+            sources.insert(spec_file_name.to_string_lossy().to_string());
         }
+        sources.insert(file_name);
     }
 
     // Enrich the prover options by the aliases in the env
@@ -359,11 +336,12 @@ fn run_prover_benchmark(
         config_file.to_string_lossy().to_string(),
     ];
 
-    // Add deps and sources to args and run the tool
-    for dep in deps {
-        args.push("-d".to_string());
-        args.push(dep)
+    // Add module filters
+    for target in env.get_target_modules() {
+        args.push("--module-filter".to_string());
+        args.push(target.get_full_name_str())
     }
+
     args.extend(sources);
     move_prover_lab::benchmark::benchmark(&args);
 

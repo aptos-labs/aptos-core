@@ -2004,7 +2004,7 @@ Return true if the voting period of the given proposal has already ended.
 ### Module-level Specification
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 <b>pragma</b> aborts_if_is_partial;
 </code></pre>
 

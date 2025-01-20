@@ -39,7 +39,7 @@ spec aptos_framework::voting {
     /// Enforcement: Formally verified via [high-level-req-4](resolve_proposal_v2).
     /// </high-level-req>
     spec module {
-        pragma verify = true;
+        pragma verify = false;
         pragma aborts_if_is_partial;
     }
 

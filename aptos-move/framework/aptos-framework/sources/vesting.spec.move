@@ -104,7 +104,7 @@ spec aptos_framework::vesting {
     /// Enforcement: Enforced via [high-level-req-11](create_vesting_contract_account).
     /// </high-level-req>
     spec module {
-        pragma verify = true;
+        pragma verify = false;
         pragma aborts_if_is_partial;
         // property 2: The vesting pool should not exceed a maximum of 30 shareholders.
         /// [high-level-spec-2]

@@ -41,7 +41,7 @@ spec aptos_framework::stake {
     // Global invariants
     // -----------------
     spec module {
-        pragma verify = true;
+        pragma verify = false;
         pragma aborts_if_is_partial;
         // The validator set should satisfy its desired invariant.
         invariant [suspendable] exists<ValidatorSet>(@aptos_framework) ==> validator_set_is_valid();

@@ -426,7 +426,7 @@ mod test {
             file_format_common::VERSION_MIN
         );
         assert_eq!(
-            file_format_common::VERSION_7,
+            file_format_common::VERSION_8,
             file_format_common::VERSION_MAX
         );
     }

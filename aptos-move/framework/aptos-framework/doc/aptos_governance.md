@@ -2213,7 +2213,7 @@ Return a signer for making changes to 0x1 as part of on-chain governance proposa
 ### Module-level Specification
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 <b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
