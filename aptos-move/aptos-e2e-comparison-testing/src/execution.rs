@@ -890,6 +890,7 @@ impl Execution {
         let mut features = Features::fetch_config(&state).unwrap_or_default();
         features.enable(FeatureFlag::VM_BINARY_FORMAT_V7);
         features.enable(FeatureFlag::NATIVE_MEMORY_OPERATIONS);
+        features.disable(FeatureFlag::ACCOUNT_ABSTRACTION);
         if v2_flag {
             features.enable(FeatureFlag::FAKE_FEATURE_FOR_COMPARISON_TESTING);
         }
