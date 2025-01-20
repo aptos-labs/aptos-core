@@ -11,12 +11,11 @@ edition = "2021"
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 crossterm = { workspace = true }
-move-binary-format = { path = "../../move-binary-format" }
-move-bytecode-source-map = { path = "../../move-ir-compiler/move-bytecode-source-map" }
+move-binary-format = { workspace = true }
+move-bytecode-source-map = { workspace = true }
+move-disassembler = { workspace = true }
 regex = { workspace = true }
 tui = { workspace = true }
-
-move-disassembler = { path = "../move-disassembler" }
 
 [features]
 default = []

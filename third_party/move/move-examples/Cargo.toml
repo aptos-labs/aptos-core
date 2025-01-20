@@ -10,7 +10,7 @@ publish = false
 [dependencies]
 
 [dev-dependencies]
-move-cli = { path = "../tools/move-cli" }
+move-cli = { workspace = true }
 move-stdlib = { path = "../move-stdlib" }
 
 [features]

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::proof_of_store::{BatchInfo, ProofOfStore};
+use anyhow::ensure;
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
 use aptos_types::{transaction::SignedTransaction, PeerId};
@@ -33,6 +34,7 @@ pub trait TDataInfo {
 
 pub struct DataFetchFut {
     pub iteration: u32,
+    pub responders: Vec<Arc<Mutex<Vec<PeerId>>>>,
     pub fut: Shared<BoxFuture<'static, ExecutorResult<Vec<SignedTransaction>>>>,
 }
 
@@ -186,6 +188,10 @@ impl InlineBatch {
     pub fn info(&self) -> &BatchInfo {
         &self.batch_info
     }
+
+    pub fn transactions(&self) -> &Vec<SignedTransaction> {
+        &self.transactions
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -285,6 +291,26 @@ impl OptQuorumStorePayloadV1 {
             PayloadExecutionLimit::None => None,
             PayloadExecutionLimit::MaxTransactionsToExecute(max) => Some(max),
         }
+    }
+
+    pub fn check_epoch(&self, epoch: u64) -> anyhow::Result<()> {
+        ensure!(
+            self.inline_batches
+                .iter()
+                .all(|b| b.info().epoch() == epoch),
+            "OptQS InlineBatch epoch doesn't match given epoch"
+        );
+        ensure!(
+            self.opt_batches.iter().all(|b| b.info().epoch() == epoch),
+            "OptQS OptBatch epoch doesn't match given epoch"
+        );
+
+        ensure!(
+            self.proofs.iter().all(|b| b.info().epoch() == epoch),
+            "OptQS Proof epoch doesn't match given epoch"
+        );
+
+        Ok(())
     }
 }
 

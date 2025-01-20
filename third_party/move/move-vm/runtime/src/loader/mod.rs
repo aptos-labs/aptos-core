@@ -54,11 +54,13 @@ use crate::{
     loader::modules::{StructVariantInfo, VariantFieldInfo},
     native_functions::NativeFunctions,
     storage::{
-        loader::LoaderV2, struct_name_index_map::StructNameIndexMap, ty_cache::StructInfoCache,
+        loader::LoaderV2, module_storage::FunctionValueExtensionAdapter,
+        struct_name_index_map::StructNameIndexMap, ty_cache::StructInfoCache,
+        ty_tag_cache::TypeTagBuilder,
     },
 };
-pub use function::LoadedFunction;
-pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunctionOwner};
+pub use function::{Function, LoadedFunction};
+pub(crate) use function::{FunctionHandle, FunctionInstantiation, LoadedFunctionOwner};
 pub use modules::Module;
 pub(crate) use modules::{LegacyModuleCache, LegacyModuleStorage, LegacyModuleStorageAdapter};
 use move_binary_format::file_format::{
@@ -66,7 +68,10 @@ use move_binary_format::file_format::{
     VariantFieldInstantiationIndex, VariantIndex,
 };
 use move_vm_metrics::{Timer, VM_TIMER};
-use move_vm_types::loaded_data::runtime_types::{StructLayout, TypeBuilder};
+use move_vm_types::{
+    loaded_data::runtime_types::{StructLayout, TypeBuilder},
+    value_serde::FunctionValueExtension,
+};
 pub use script::Script;
 pub(crate) use script::ScriptCache;
 use type_loader::intern_type;
@@ -308,8 +313,7 @@ impl Loader {
                     .resolve_module_and_function_by_name(module_id, function_name)
                     .map_err(|err| err.finish(Location::Undefined))
             },
-            Loader::V2(loader) => loader.load_function_without_ty_args(
-                module_storage,
+            Loader::V2(_) => module_storage.fetch_function_definition(
                 module_id.address(),
                 module_id.name(),
                 function_name,
@@ -330,8 +334,8 @@ impl Loader {
     ) -> VMResult<Type> {
         match self {
             Self::V1(loader) => loader.load_type(ty_tag, data_store, module_store),
-            Self::V2(loader) => loader
-                .load_ty(module_storage, ty_tag)
+            Self::V2(_) => module_storage
+                .fetch_ty(ty_tag)
                 .map_err(|e| e.finish(Location::Undefined)),
         }
     }
@@ -356,8 +360,7 @@ impl Loader {
             Loader::V1(_) => {
                 module_store.get_struct_type_by_identifier(&struct_name.name, &struct_name.module)
             },
-            Loader::V2(loader) => loader.load_struct_ty(
-                module_storage,
+            Loader::V2(_) => module_storage.fetch_struct_ty(
                 struct_name.module.address(),
                 struct_name.module.name(),
                 struct_name.name.as_ident_str(),
@@ -1295,13 +1298,9 @@ impl<'a> Resolver<'a> {
             Loader::V1(_) => self
                 .module_store
                 .resolve_module_and_function_by_name(module_id, function_name)?,
-            Loader::V2(loader) => loader
-                .load_function_without_ty_args(
-                    self.module_storage,
-                    module_id.address(),
-                    module_id.name(),
-                    function_name,
-                )
+            Loader::V2(_) => self
+                .module_storage
+                .fetch_function_definition(module_id.address(), module_id.name(), function_name)
                 .map_err(|_| {
                     // Note: legacy loader implementation used this error, so we need to remap.
                     PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(
@@ -1652,6 +1651,20 @@ impl<'a> Resolver<'a> {
     }
 }
 
+impl<'a> FunctionValueExtension for Resolver<'a> {
+    fn get_function_arg_tys(
+        &self,
+        module_id: &ModuleId,
+        function_name: &IdentStr,
+        ty_arg_tags: Vec<TypeTag>,
+    ) -> PartialVMResult<Vec<Type>> {
+        let function_value_extension = FunctionValueExtensionAdapter {
+            module_storage: self.module_storage,
+        };
+        function_value_extension.get_function_arg_tys(module_id, function_name, ty_arg_tags)
+    }
+}
+
 /// Maximal depth of a value in terms of type depth.
 pub const VALUE_DEPTH_MAX: u64 = 128;
 
@@ -1659,15 +1672,42 @@ pub const VALUE_DEPTH_MAX: u64 = 128;
 /// fields for struct types.
 const MAX_TYPE_TO_LAYOUT_NODES: u64 = 256;
 
-struct PseudoGasContext {
+pub(crate) struct PseudoGasContext {
+    // Parameters for metering type tag construction:
+    //   - maximum allowed cost,
+    //   - base cost for any type to tag conversion,
+    //   - cost for size of a struct tag.
     max_cost: u64,
-    cost: u64,
+    pub(crate) cost: u64,
     cost_base: u64,
     cost_per_byte: u64,
 }
 
 impl PseudoGasContext {
-    fn charge(&mut self, amount: u64) -> PartialVMResult<()> {
+    pub(crate) fn new(vm_config: &VMConfig) -> Self {
+        Self {
+            max_cost: vm_config.type_max_cost,
+            cost: 0,
+            cost_base: vm_config.type_base_cost,
+            cost_per_byte: vm_config.type_byte_cost,
+        }
+    }
+
+    pub(crate) fn current_cost(&mut self) -> u64 {
+        self.cost
+    }
+
+    pub(crate) fn charge_base(&mut self) -> PartialVMResult<()> {
+        self.charge(self.cost_base)
+    }
+
+    pub(crate) fn charge_struct_tag(&mut self, struct_tag: &StructTag) -> PartialVMResult<()> {
+        let size =
+            (struct_tag.address.len() + struct_tag.module.len() + struct_tag.name.len()) as u64;
+        self.charge(size * self.cost_per_byte)
+    }
+
+    pub(crate) fn charge(&mut self, amount: u64) -> PartialVMResult<()> {
         self.cost += amount;
         if self.cost > self.max_cost {
             Err(
@@ -1682,38 +1722,34 @@ impl PseudoGasContext {
     }
 }
 
-impl Loader {
+impl LoaderV1 {
     fn struct_name_to_type_tag(
         &self,
         struct_name_idx: StructNameIndex,
         ty_args: &[Type],
         gas_context: &mut PseudoGasContext,
-        module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<StructTag> {
-        let ty_cache = self.ty_cache(module_storage);
-        if let Some((struct_tag, gas)) = ty_cache.get_struct_tag(&struct_name_idx, ty_args) {
+        if let Some((struct_tag, gas)) = self.type_cache.get_struct_tag(&struct_name_idx, ty_args) {
             gas_context.charge(gas)?;
             return Ok(struct_tag.clone());
         }
 
-        let cur_cost = gas_context.cost;
+        let cur_cost = gas_context.current_cost();
 
         let type_args = ty_args
             .iter()
-            .map(|ty| self.type_to_type_tag_impl(ty, gas_context, module_storage))
+            .map(|ty| self.type_to_type_tag_impl(ty, gas_context))
             .collect::<PartialVMResult<Vec<_>>>()?;
+        let struct_tag = self
+            .name_cache
+            .idx_to_struct_tag(struct_name_idx, type_args)?;
 
-        let struct_name_index_map = self.struct_name_index_map(module_storage);
-        let struct_tag = struct_name_index_map.idx_to_struct_tag(struct_name_idx, type_args)?;
-
-        let size =
-            (struct_tag.address.len() + struct_tag.module.len() + struct_tag.name.len()) as u64;
-        gas_context.charge(size * gas_context.cost_per_byte)?;
-        ty_cache.store_struct_tag(
+        gas_context.charge_struct_tag(&struct_tag)?;
+        self.type_cache.store_struct_tag(
             struct_name_idx,
             ty_args.to_vec(),
             struct_tag.clone(),
-            gas_context.cost - cur_cost,
+            gas_context.current_cost() - cur_cost,
         );
         Ok(struct_tag)
     }
@@ -1722,9 +1758,8 @@ impl Loader {
         &self,
         ty: &Type,
         gas_context: &mut PseudoGasContext,
-        module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<TypeTag> {
-        gas_context.charge(gas_context.cost_base)?;
+        gas_context.charge_base()?;
         Ok(match ty {
             Type::Bool => TypeTag::Bool,
             Type::U8 => TypeTag::U8,
@@ -1736,17 +1771,16 @@ impl Loader {
             Type::Address => TypeTag::Address,
             Type::Signer => TypeTag::Signer,
             Type::Vector(ty) => {
-                let el_ty_tag = self.type_to_type_tag_impl(ty, gas_context, module_storage)?;
+                let el_ty_tag = self.type_to_type_tag_impl(ty, gas_context)?;
                 TypeTag::Vector(Box::new(el_ty_tag))
             },
             Type::Struct { idx, .. } => TypeTag::Struct(Box::new(self.struct_name_to_type_tag(
                 *idx,
                 &[],
                 gas_context,
-                module_storage,
             )?)),
             Type::StructInstantiation { idx, ty_args, .. } => TypeTag::Struct(Box::new(
-                self.struct_name_to_type_tag(*idx, ty_args, gas_context, module_storage)?,
+                self.struct_name_to_type_tag(*idx, ty_args, gas_context)?,
             )),
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
@@ -1756,7 +1790,9 @@ impl Loader {
             },
         })
     }
+}
 
+impl Loader {
     fn struct_name_to_type_layout(
         &self,
         struct_name_idx: StructNameIndex,
@@ -2045,18 +2081,16 @@ impl Loader {
         }
 
         let count_before = *count;
-        let mut gas_context = PseudoGasContext {
-            cost: 0,
-            max_cost: self.vm_config().type_max_cost,
-            cost_base: self.vm_config().type_base_cost,
-            cost_per_byte: self.vm_config().type_byte_cost,
+        let struct_tag = match self {
+            Loader::V1(loader) => {
+                let mut gas_context = PseudoGasContext::new(loader.vm_config());
+                loader.struct_name_to_type_tag(struct_name_idx, ty_args, &mut gas_context)?
+            },
+            Loader::V2(_) => {
+                let ty_tag_builder = TypeTagBuilder::new(module_storage.runtime_environment());
+                ty_tag_builder.struct_name_idx_to_struct_tag(&struct_name_idx, ty_args)?
+            },
         };
-        let struct_tag = self.struct_name_to_type_tag(
-            struct_name_idx,
-            ty_args,
-            &mut gas_context,
-            module_storage,
-        )?;
         let fields = struct_type.fields(None)?;
 
         let field_layouts = fields
@@ -2251,13 +2285,16 @@ impl Loader {
         ty: &Type,
         module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<TypeTag> {
-        let mut gas_context = PseudoGasContext {
-            cost: 0,
-            max_cost: self.vm_config().type_max_cost,
-            cost_base: self.vm_config().type_base_cost,
-            cost_per_byte: self.vm_config().type_byte_cost,
-        };
-        self.type_to_type_tag_impl(ty, &mut gas_context, module_storage)
+        match self {
+            Loader::V1(loader) => {
+                let mut gas_context = PseudoGasContext::new(self.vm_config());
+                loader.type_to_type_tag_impl(ty, &mut gas_context)
+            },
+            Loader::V2(_) => {
+                let ty_tag_builder = TypeTagBuilder::new(module_storage.runtime_environment());
+                ty_tag_builder.ty_to_ty_tag(ty)
+            },
+        }
     }
 
     pub(crate) fn type_to_type_layout_with_identifier_mappings(

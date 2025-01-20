@@ -18,14 +18,14 @@ use codespan_reporting::{
 use itertools::Itertools;
 use move_binary_format::{file_format_common::VERSION_7, CompiledModule};
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
-use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
+use move_compiler::{
+    compiled_unit::{CompiledUnit, NamedCompiledModule},
+    shared::NumericalAddress,
+};
 use move_compiler_v2::{external_checks::ExternalChecks, options::Options, Experiment};
 use move_core_types::{language_storage::ModuleId, metadata::Metadata};
 use move_model::{
-    metadata::{
-        CompilerVersion, LanguageVersion, LATEST_STABLE_COMPILER_VERSION,
-        LATEST_STABLE_LANGUAGE_VERSION,
-    },
+    metadata::{CompilerVersion, LanguageVersion},
     model::GlobalEnv,
 };
 use move_package::{
@@ -88,13 +88,11 @@ pub struct BuildOptions {
     pub docgen_options: Option<DocgenOptions>,
     #[clap(long)]
     pub skip_fetch_latest_git_deps: bool,
-    #[clap(long, default_value_if("move_2", "true", "7"))]
+    #[clap(long)]
     pub bytecode_version: Option<u32>,
-    #[clap(long, value_parser = clap::value_parser!(CompilerVersion),
-           default_value_if("move_2", "true", LATEST_STABLE_COMPILER_VERSION))]
+    #[clap(long, value_parser = clap::value_parser!(CompilerVersion))]
     pub compiler_version: Option<CompilerVersion>,
-    #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
-           default_value_if("move_2", "true", LATEST_STABLE_LANGUAGE_VERSION))]
+    #[clap(long, value_parser = clap::value_parser!(LanguageVersion))]
     pub language_version: Option<LanguageVersion>,
     #[clap(long)]
     pub skip_attribute_checks: bool,
@@ -104,9 +102,6 @@ pub struct BuildOptions {
     pub known_attributes: BTreeSet<String>,
     #[clap(skip)]
     pub experiments: Vec<String>,
-    /// Select bytecode, language, compiler for Move 2
-    #[clap(long)]
-    pub move_2: bool,
 }
 
 // Because named_addresses has no parser, we can't use clap's default impl. This must be aligned
@@ -134,7 +129,6 @@ impl Default for BuildOptions {
             check_test_code: false,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             experiments: vec![],
-            move_2: false,
         }
     }
 }
@@ -278,7 +272,7 @@ impl BuiltPackage {
 
             if let Some(model_options) = model.get_extension::<Options>() {
                 if model_options.experiment_on(Experiment::STOP_BEFORE_EXTENDED_CHECKS) {
-                    std::process::exit(0)
+                    std::process::exit(if model.has_warnings() { 1 } else { 0 })
                 }
             }
 
@@ -293,7 +287,7 @@ impl BuiltPackage {
 
             if let Some(model_options) = model.get_extension::<Options>() {
                 if model_options.experiment_on(Experiment::STOP_AFTER_EXTENDED_CHECKS) {
-                    std::process::exit(0)
+                    std::process::exit(if model.has_warnings() { 1 } else { 0 })
                 }
             }
 
@@ -507,8 +501,9 @@ impl BuiltPackage {
                 self.package
                     .bytecode_deps
                     .iter()
-                    .map(|(name, address)| PackageDep {
-                        account: address.into_inner(),
+                    .map(|(name, module)| PackageDep {
+                        account: NumericalAddress::from_account_address(*module.self_addr())
+                            .into_inner(),
                         package_name: name.as_str().to_string(),
                     }),
             )

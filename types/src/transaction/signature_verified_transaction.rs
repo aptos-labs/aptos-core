@@ -9,7 +9,6 @@ use crate::{
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
-use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
@@ -61,7 +60,6 @@ impl SignatureVerifiedTransaction {
 
 impl BlockExecutableTransaction for SignatureVerifiedTransaction {
     type Event = ContractEvent;
-    type Identifier = DelayedFieldID;
     type Key = StateKey;
     type Tag = StructTag;
     type Value = WriteOp;

@@ -1,0 +1,61 @@
+
+Diagnostics:
+error: unsupported language construct
+  ┌─ tests/lambda/storable/registry_ok2.move:5:36
+  │
+5 │     struct FunctionValue(|u64| u64 with store+copy) has store, copy, drop;
+  │                                    ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/registry_ok2.move:12:22
+   │
+12 │         f: |u64| u64 with store+copy,
+   │                      ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/registry_ok2.move:21:75
+   │
+21 │     fun get_function(v: &vector<FunctionEntry>, k: u64): Option<|u64| u64 with store+copy> {
+   │                                                                           ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/registry_ok2.move:31:85
+   │
+31 │     fun replace_or_add_function(v: &mut vector<FunctionEntry>, k: u64, f: |u64| u64 with store+copy): Option<|u64| u64 with store+copy> {
+   │                                                                                     ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/registry_ok2.move:31:120
+   │
+31 │     fun replace_or_add_function(v: &mut vector<FunctionEntry>, k: u64, f: |u64| u64 with store+copy): Option<|u64| u64 with store+copy> {
+   │                                                                                                                        ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/registry_ok2.move:52:47
+   │
+52 │     fun register(owner: &signer, f: |u64| u64 with store+copy, k: u64) acquires Registry {
+   │                                               ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/registry_ok2.move:91:42
+   │
+91 │     fun multiply_by_x(x: u64): |u64| u64 with store+copy {
+   │                                          ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/registry_ok2.move:92:9
+   │
+92 │         move |y| multiply(x, y)
+   │         ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/registry_ok2.move:95:43
+   │
+95 │     fun multiply_by_x2(x: u64): |u64| u64 with store+copy {
+   │                                           ^^^^^^^^^^^^^^^ Move 2.2 language construct is not enabled: Ability constraints on function types
+
+error: unsupported language construct
+   ┌─ tests/lambda/storable/registry_ok2.move:96:9
+   │
+96 │         move |y| multiply(x, y)
+   │         ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression

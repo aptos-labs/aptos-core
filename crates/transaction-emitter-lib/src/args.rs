@@ -5,7 +5,7 @@ use anyhow::{bail, format_err, Result};
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, encoding_type::EncodingType};
 use aptos_sdk::types::chain_id::ChainId;
-use aptos_transaction_generator_lib::{args::TransactionTypeArg, AccountType};
+use aptos_transaction_generator_lib::AccountType;
 use clap::{ArgGroup, Parser};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -128,36 +128,6 @@ pub struct EmitArgs {
     /// Time to run --emit-tx for in seconds.
     #[clap(long, default_value_t = 60)]
     pub duration: u64,
-
-    #[clap(
-        long,
-        value_enum,
-        default_value = "coin-transfer",
-        num_args = 1..,
-        ignore_case = true
-    )]
-    pub transaction_type: Vec<TransactionTypeArg>,
-
-    /// Number of copies of the modules that will be published,
-    /// under separate accounts, creating independent contracts,
-    /// removing contention.
-    /// For example for NFT minting, setting to 1 will be equivalent
-    /// to minting from single collection,
-    /// setting to 20 means minting from 20 collections in parallel.
-    #[clap(long)]
-    pub module_working_set_size: Option<usize>,
-
-    /// Whether to use burner accounts for the sender.
-    /// For example when transaction can only be done once per account.
-    /// (pool needs to be populated by account-creation transactions)
-    #[clap(long)]
-    pub sender_use_account_pool: Option<bool>,
-
-    #[clap(long, num_args = 0..)]
-    pub transaction_weights: Vec<usize>,
-
-    #[clap(long, num_args = 0..)]
-    pub transaction_phases: Vec<usize>,
 
     #[clap(long)]
     pub gas_price: Option<u64>,

@@ -20,7 +20,8 @@ use async_trait::async_trait;
 use clap::{Args, Parser};
 use itertools::Itertools;
 use move_binary_format::{
-    binary_views::BinaryIndexedView, file_format::CompiledScript, CompiledModule,
+    binary_views::BinaryIndexedView, file_format::CompiledScript, file_format_common,
+    CompiledModule,
 };
 use move_bytecode_source_map::{mapping::SourceMapping, utils::source_map_from_file};
 use move_command_line_common::files::{
@@ -37,6 +38,7 @@ use std::{
     process::Command,
     str,
 };
+use tempfile::NamedTempFile;
 
 const DISASSEMBLER_EXTENSION: &str = "mv.asm";
 const DECOMPILER_EXTENSION: &str = "mv.move";
@@ -323,7 +325,14 @@ impl BytecodeCommand {
         let exe = get_revela_path()?;
         let to_cli_error = |e| CliError::IO(exe.display().to_string(), e);
         let mut cmd = Command::new(exe.as_path());
-        cmd.arg(format!("--bytecode={}", bytecode_path.display()));
+        // WORKAROUND: if the bytecode is v7, try to downgrade to v6 since Revela
+        // does not support v7
+        let v6_temp_file = self.downgrade_to_v6(bytecode_path)?;
+        if let Some(file) = &v6_temp_file {
+            cmd.arg(format!("--bytecode={}", file.path().display()));
+        } else {
+            cmd.arg(format!("--bytecode={}", bytecode_path.display()));
+        }
         if self.is_script {
             cmd.arg("--script");
         }
@@ -341,6 +350,51 @@ impl BytecodeCommand {
                 out.status,
                 String::from_utf8(out.stderr).unwrap_or_default()
             )))
+        }
+    }
+
+    fn downgrade_to_v6(&self, file_path: &Path) -> Result<Option<NamedTempFile>, CliError> {
+        let error_explanation = || {
+            format!(
+                "{} in `{}` contains Move 2 features (e.g. enum types) \
+                types which are not yet supported by the decompiler",
+                if self.is_script { "script " } else { "module" },
+                file_path.display()
+            )
+        };
+        let create_new_bytecode = |bytes: &[u8]| -> Result<NamedTempFile, CliError> {
+            let temp_file = NamedTempFile::new()
+                .map_err(|e| CliError::IO("creating v6 temp file".to_string(), e))?;
+            fs::write(temp_file.path(), bytes)
+                .map_err(|e| CliError::IO("writing v6 temp file".to_string(), e))?;
+            Ok(temp_file)
+        };
+        let bytes = read_from_file(file_path)?;
+        if self.is_script {
+            let script = CompiledScript::deserialize(&bytes).map_err(|e| {
+                CliError::UnableToParse("script", format!("cannot deserialize: {}", e))
+            })?;
+            if script.version < file_format_common::VERSION_7 {
+                return Ok(None);
+            }
+            let mut new_bytes = vec![];
+            script
+                .serialize_for_version(Some(file_format_common::VERSION_6), &mut new_bytes)
+                // The only reason why this can fail is because of Move 2 features
+                .map_err(|_| CliError::UnexpectedError(error_explanation()))?;
+            Ok(Some(create_new_bytecode(&new_bytes)?))
+        } else {
+            let module = CompiledModule::deserialize(&bytes).map_err(|e| {
+                CliError::UnableToParse("script", format!("cannot deserialize: {}", e))
+            })?;
+            if module.version < file_format_common::VERSION_7 {
+                return Ok(None);
+            }
+            let mut new_bytes = vec![];
+            module
+                .serialize_for_version(Some(file_format_common::VERSION_6), &mut new_bytes)
+                .map_err(|_| CliError::UnexpectedError(error_explanation()))?;
+            Ok(Some(create_new_bytecode(&new_bytes)?))
         }
     }
 }

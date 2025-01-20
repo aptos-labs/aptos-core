@@ -1,9 +1,9 @@
-processed 10 tasks
+processed 9 tasks
 
-task 3 'view'. lines 13-15:
+task 2 'view'. lines 13-15:
 [No Resource Exists]
 
-task 5 'run'. lines 37-37:
+task 4 'run'. lines 37-37:
 Error: Function execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(0),
@@ -12,10 +12,10 @@ Error: Function execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 1)],
 }
 
-task 7 'view'. lines 47-49:
+task 6 'view'. lines 47-49:
 key 0x42::N::R<u64> {
     v: 0
 }
 
-task 9 'view'. lines 60-62:
+task 8 'view'. lines 60-62:
 [No Resource Exists]

@@ -1,23 +1,10 @@
 
 Diagnostics:
-error: function type `|u64|u64 with store` is not allowed as a field type
-  ┌─ tests/lambda/storable/registry_errors.move:9:12
-  │
-9 │         f: |u64| u64 with store,
-  │            ^^^^^^^^^^^^^^^^^^^^
-  │
-  = required by declaration of field `f`
-
-error: function type `|u64|u64 with store` is not allowed as a type argument (type was inferred)
-   ┌─ tests/lambda/storable/registry_errors.move:22:21
+error: cannot return `Option<|u64|u64 with store>` from a function with result type `Option<Function>`
+   ┌─ tests/lambda/storable/registry_errors.move:25:9
    │
-13 │     enum Option<T> {
-   │                 - declaration of type parameter `T`
-   ·
-22 │                 x = Option::Some(f.f)
-   │                     ^^^^^^^^^^^^
-   │
-   = required by instantiating type parameter `T` of struct `Option`
+25 │         x
+   │         ^
 
 error: expected `&mut Function` but found a value of type `|u64|u64 with store`
    ┌─ tests/lambda/storable/registry_errors.move:32:17

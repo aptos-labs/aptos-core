@@ -41,7 +41,14 @@ spec aptos_framework::staking_proxy {
     ///
     spec module {
         pragma verify = true;
-        pragma aborts_if_is_strict;
+        pragma aborts_if_is_partial;
+    }
+
+    spec grant_permission {
+        pragma aborts_if_is_partial;
+        aborts_if !permissioned_signer::spec_is_permissioned_signer(permissioned_signer);
+        aborts_if permissioned_signer::spec_is_permissioned_signer(master);
+        aborts_if signer::address_of(master) != signer::address_of(permissioned_signer);
     }
 
     /// Aborts if conditions of SetStakePoolOperator are not met
@@ -58,6 +65,7 @@ spec aptos_framework::staking_proxy {
     spec set_voter(owner: &signer, operator: address, new_voter: address) {
         // TODO: Can't verify `set_vesting_contract_voter`
         pragma aborts_if_is_partial;
+        pragma verify_duration_estimate = 120;
         include SetStakingContractVoter;
         include SetStakePoolVoterAbortsIf;
     }
@@ -122,12 +130,21 @@ spec aptos_framework::staking_proxy {
     /// One of them are not exists
     spec set_stake_pool_operator(owner: &signer, new_operator: address) {
         include SetStakePoolOperator;
+        include AbortsIfSignerPermissionStakeProxy {
+            s: owner
+        };
+        include exists<stake::StakePool>(signer::address_of(owner)) ==> stake::AbortsIfSignerPermissionStake {
+            s:owner
+        };
     }
 
     spec schema SetStakePoolOperator {
         owner: &signer;
         new_operator: address;
 
+        include AbortsIfSignerPermissionStakeProxy {
+            s: owner
+        };
         let owner_address = signer::address_of(owner);
         let ownership_cap = borrow_global<stake::OwnerCapability>(owner_address);
         let pool_address = ownership_cap.pool_address;
@@ -137,6 +154,9 @@ spec aptos_framework::staking_proxy {
 
     spec set_staking_contract_voter(owner: &signer, operator: address, new_voter: address) {
         include SetStakingContractVoter;
+        include AbortsIfSignerPermissionStakeProxy {
+            s: owner
+        };
     }
 
     /// Make sure staking_contract_exists first
@@ -166,16 +186,32 @@ spec aptos_framework::staking_proxy {
 
     spec set_stake_pool_voter(owner: &signer, new_voter: address) {
         include SetStakePoolVoterAbortsIf;
+        include AbortsIfSignerPermissionStakeProxy {
+            s: owner
+        };
+        include exists<stake::StakePool>(signer::address_of(owner)) ==> stake::AbortsIfSignerPermissionStake {
+            s:owner
+        };
     }
 
     spec schema SetStakePoolVoterAbortsIf {
         owner: &signer;
         new_voter: address;
 
+        include AbortsIfSignerPermissionStakeProxy {
+            s: owner
+        };
         let owner_address = signer::address_of(owner);
         let ownership_cap = global<stake::OwnerCapability>(owner_address);
         let pool_address = ownership_cap.pool_address;
         aborts_if stake::stake_pool_exists(owner_address) && !(exists<stake::OwnerCapability>(owner_address) && stake::stake_pool_exists(pool_address));
         ensures stake::stake_pool_exists(owner_address) ==> global<stake::StakePool>(pool_address).delegated_voter == new_voter;
+    }
+
+    spec schema AbortsIfSignerPermissionStakeProxy {
+        use aptos_framework::permissioned_signer;
+        s: signer;
+        let perm = StakeProxyPermission {};
+        aborts_if !permissioned_signer::spec_check_permission_exists(s, perm);
     }
 }

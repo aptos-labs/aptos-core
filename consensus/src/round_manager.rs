@@ -1135,6 +1135,20 @@ impl RoundManager {
 
     pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
         let proposal_round = proposal.round();
+        let sync_info = self.block_store.sync_info();
+
+        if proposal_round <= sync_info.highest_round() {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(1)),
+                warn!(
+                    sync_info = sync_info,
+                    proposal = proposal,
+                    "Ignoring proposal. SyncInfo round is higher than proposal round."
+                )
+            );
+            return Ok(());
+        }
+
         let vote = self.create_vote(proposal).await?;
         self.round_state.record_vote(vote.clone());
         let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());

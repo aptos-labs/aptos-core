@@ -8,15 +8,12 @@ license = "Apache-2.0"
 
 [dependencies]
 anyhow = { workspace = true }
-# Move dependencies
-move-command-line-common = { path = "../../move-command-line-common" }
-move-core-types = { path = "../../move-core/types" }
-move-model = { path = "../../move-model" }
-
-# external dependencies
+move-command-line-common = { workspace = true }
+move-core-types ={ workspace = true }
+move-model = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
 codespan-reporting = { workspace = true }
 datatest-stable = { workspace = true }
-move-prover = { path = ".." }
+move-prover = { workspace = true }

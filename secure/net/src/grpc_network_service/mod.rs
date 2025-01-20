@@ -62,7 +62,7 @@ impl GRPCNetworkMessageServiceServerWrapper {
     ) {
         let reflection_service = tonic_reflection::server::Builder::configure()
             .register_encoded_file_descriptor_set(FILE_DESCRIPTOR_SET)
-            .build()
+            .build_v1()
             .unwrap();
 
         info!("Starting Server async at {:?}", server_addr);

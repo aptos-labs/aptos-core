@@ -18,6 +18,8 @@ dashmap = { workspace = true }
 derivative = { workspace = true }
 hashbrown = { workspace = true }
 itertools = { workspace = true }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
 proptest = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive", "rc"] }
 sha3 = { workspace = true }
@@ -25,12 +27,9 @@ smallbitvec = { workspace = true }
 smallvec = { workspace = true }
 triomphe = { workspace = true }
 
-move-binary-format = { path = "../../move-binary-format" }
-move-core-types = { path = "../../move-core/types" }
-
 [dev-dependencies]
 claims = { workspace = true }
-move-binary-format = { path = "../../move-binary-format", features = ["fuzzing"] }
+move-binary-format = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }
 rand = { workspace = true }
 

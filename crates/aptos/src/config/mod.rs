@@ -5,7 +5,7 @@ use crate::{
     common::{
         types::{
             CliCommand, CliConfig, CliError, CliResult, CliTypedResult, ConfigSearchMode,
-            ProfileSummary, CONFIG_FOLDER,
+            ProfileSummary, APTOS_FOLDER_GIT_IGNORE, CONFIG_FOLDER, GIT_IGNORE,
         },
         utils::{create_dir_if_not_exist, current_dir, read_from_file, write_to_user_only_file},
     },
@@ -369,6 +369,12 @@ impl GlobalConfig {
             global_folder.join(GLOBAL_CONFIG_FILE).as_path(),
             "Global Config",
             &to_yaml(&self)?.into_bytes(),
+        )?;
+        // Let's also write a .gitignore that ignores this folder
+        write_to_user_only_file(
+            global_folder.join(GIT_IGNORE).as_path(),
+            ".gitignore",
+            APTOS_FOLDER_GIT_IGNORE.as_bytes(),
         )
     }
 }

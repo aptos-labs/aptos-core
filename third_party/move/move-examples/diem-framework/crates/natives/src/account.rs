@@ -20,7 +20,7 @@ pub fn native_create_signer(
     debug_assert!(arguments.len() == 1);
 
     let address = pop_arg!(arguments, AccountAddress);
-    Ok(NativeResult::ok(25.into(), smallvec![Value::signer(
+    Ok(NativeResult::ok(25.into(), smallvec![Value::master_signer(
         address
     )]))
 }

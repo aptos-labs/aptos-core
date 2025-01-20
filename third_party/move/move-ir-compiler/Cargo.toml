@@ -11,15 +11,11 @@ edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
-clap = { workspace = true, features = ["derive"] }
-move-binary-format = { path = "../move-binary-format" }
-move-bytecode-source-map = { path = "move-bytecode-source-map" }
-move-bytecode-verifier = { path = "../move-bytecode-verifier" }
-move-command-line-common = { path = "../move-command-line-common" }
-move-ir-to-bytecode = { path = "move-ir-to-bytecode" }
-serde_json = { workspace = true }
-
 bcs = { workspace = true }
-
-[features]
-default = []
+clap = { workspace = true, features = ["derive"] }
+move-binary-format = { workspace = true }
+move-bytecode-source-map = { workspace = true }
+move-bytecode-verifier = { workspace = true }
+move-command-line-common = { workspace = true }
+move-ir-to-bytecode = { workspace = true }
+serde_json = { workspace = true }

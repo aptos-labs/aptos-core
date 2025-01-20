@@ -15,25 +15,25 @@ error: unsupported language construct
 error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:49:17
    │
-49 │                 move |y| mod3::multiply(y, x)
+49 │                 move |y| mod3::multiply(x, y)
    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
 error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:51:17
    │
-51 │                 move |x| multiply3(x, 3, 2)
+51 │                 move |x| multiply3(3, 2, x)
    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
 error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:53:17
    │
-53 │                 move |x| mod3::multiply(x, 7)
+53 │                 move |x| mod3::multiply(7, x)
    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
 error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:55:17
    │
-55 │                 move |x| multiply3(4, x, 2)
+55 │                 move |x| { multiply3(4, 2, x) }
    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
 error: unsupported language construct
@@ -45,19 +45,19 @@ error: unsupported language construct
 error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:61:17
    │
-61 │                 move |z| multiply3(x, y, z)
+61 │                 move |z| multiply3(x + 1, y, z)
    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
 error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:64:17
    │
-64 │                 move |x| alt_multiply(x, z) with copy
+64 │                 move |x| alt_multiply(z, x) with copy
    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
 error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:64:45
    │
-64 │                 move |x| alt_multiply(x, z) with copy
+64 │                 move |x| alt_multiply(z, x) with copy
    │                                             ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
 
 error: unsupported language construct
@@ -75,19 +75,19 @@ error: unsupported language construct
 error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:67:17
    │
-67 │                 move |x| g(x, 11)
+67 │                 move |x| g(11, x)
    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
 error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:69:25
    │
-69 │                 let h = move |x| mod3::multiply(x, 12) with copy;
+69 │                 let h = move |x| mod3::multiply(12, x) with copy;
    │                         ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
 error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:69:56
    │
-69 │                 let h = move |x| mod3::multiply(x, 12) with copy;
+69 │                 let h = move |x| mod3::multiply(12, x) with copy;
    │                                                        ^^^^^^^^^ Move 2.2 language construct is not enabled: Abilities on function expressions
 
 error: unsupported language construct
@@ -105,7 +105,7 @@ error: unsupported language construct
 error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:72:25
    │
-72 │                 let i = move |x| multiply3(2, x, 2);
+72 │                 let i = move |x| multiply3(2, 2, x);
    │                         ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression
 
 error: unsupported language construct
@@ -123,5 +123,5 @@ error: unsupported language construct
 error: unsupported language construct
    ┌─ tests/lambda/storable/doable_func.move:76:17
    │
-76 │                 move |x| i(x, 15)
+76 │                 move |x| i(15, x)
    │                 ^^^^ Move 2.2 language construct is not enabled: Modifier on lambda expression

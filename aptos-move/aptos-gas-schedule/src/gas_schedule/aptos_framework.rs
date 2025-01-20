@@ -6,7 +6,7 @@
 use crate::{
     gas_feature_versions::{RELEASE_V1_14, RELEASE_V1_8, RELEASE_V1_9_SKIPPED},
     gas_schedule::NativeGasParameters,
-    ver::gas_feature_versions::{RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_23},
+    ver::gas_feature_versions::{RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_23, RELEASE_V1_26},
 };
 use aptos_gas_algebra::{
     InternalGas, InternalGasPerAbstractValueUnit, InternalGasPerArg, InternalGasPerByte,
@@ -19,6 +19,11 @@ crate::gas_schedule::macros::define_gas_parameters!(
     [
         [account_create_address_base: InternalGas, "account.create_address.base", 1102],
         [account_create_signer_base: InternalGas, "account.create_signer.base", 1102],
+
+        // Permissioned signer gas parameters
+        [permission_address_base: InternalGas, { RELEASE_V1_26 => "permissioned_signer.permission_address.base"}, 1102],
+        [is_permissioned_signer_base: InternalGas, { RELEASE_V1_26 => "permissioned_signer.is_permissioned_signer.base"}, 1102],
+        [signer_from_permissioned_handle_base: InternalGas, { RELEASE_V1_26 => "permissioned_signer.signer_from_permissioned_handle.base"}, 1102],
 
         // BN254 algebra gas parameters begin.
         // Generated at time 1701559125.5498126 by `scripts/algebra-gas/update_bn254_algebra_gas_params.py` with gas_per_ns=209.10511688369482.
@@ -251,6 +256,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [function_info_check_dispatch_type_compatibility_impl_base: InternalGas, { RELEASE_V1_13.. => "function_info.check_dispatch_type_compatibility_impl.base" }, 1002],
         [function_info_load_function_base: InternalGas, { RELEASE_V1_13.. => "function_info.load_function.base" }, 551],
         [dispatchable_fungible_asset_dispatch_base: InternalGas, { RELEASE_V1_13.. => "dispatchable_fungible_asset.dispatch.base" }, 551],
+        [dispatchable_authenticate_dispatch_base: InternalGas, { RELEASE_V1_26.. => "dispatchable_authenticate.dispatch.base" }, 551],
 
         // Reusing SHA2-512's cost from Ristretto
         [hash_sha2_512_base: InternalGas, { 4.. => "hash.sha2_512.base" }, 11910],  // 3_240 * 20

@@ -20,6 +20,7 @@ use aptos_release_builder::{
 };
 use aptos_temppath::TempPath;
 use aptos_types::on_chain_config::{FeatureFlag as AptosFeatureFlag, OnChainConsensusConfig};
+use move_binary_format::file_format_common::VERSION_DEFAULT_LANG_V2;
 use std::{fs, path::PathBuf, process::Command, sync::Arc};
 
 // Ignored. This is redundant with the forge compat test but this test is easier to run locally and
@@ -113,7 +114,7 @@ async fn test_upgrade_flow() {
                 name: "framework".to_string(),
                 metadata: ProposalMetadata::default(),
                 update_sequence: vec![ReleaseEntry::Framework(FrameworkReleaseConfig {
-                    bytecode_version: 6, // TODO: remove explicit bytecode version from sources
+                    bytecode_version: VERSION_DEFAULT_LANG_V2, // TODO: remove explicit bytecode version from sources
                     git_hash: None,
                 })],
             },

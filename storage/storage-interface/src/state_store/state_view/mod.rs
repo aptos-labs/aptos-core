@@ -2,6 +2,5 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod async_proof_fetcher;
 pub mod cached_state_view;
 pub mod db_state_view;

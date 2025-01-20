@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::ungrouped::mixed_emit_job;
+use super::ungrouped::mixed_compatible_emit_job;
 use crate::{suites::realistic_environment::realistic_env_max_load_test, TestCommand};
 use aptos_forge::{success_criteria::SuccessCriteria, ForgeConfig};
 use aptos_testcases::{
@@ -29,6 +29,7 @@ pub(crate) fn get_land_blocking_test(
 
 pub(crate) fn compat() -> ForgeConfig {
     ForgeConfig::default()
+        .with_suite_name("compat".into())
         .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
         .add_network_test(SimpleValidatorUpgrade)
         .with_success_criteria(SuccessCriteria::new(5000).add_wait_for_catchup_s(240))
@@ -47,5 +48,5 @@ pub(crate) fn framework_upgrade() -> ForgeConfig {
             helm_values["chain"]["epoch_duration_secs"] =
                 FrameworkUpgrade::EPOCH_DURATION_SECS.into();
         }))
-        .with_emit_job(mixed_emit_job())
+        .with_emit_job(mixed_compatible_emit_job())
 }

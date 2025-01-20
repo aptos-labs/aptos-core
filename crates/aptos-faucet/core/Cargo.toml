@@ -24,6 +24,7 @@ captcha = { version = "0.0.9" }
 clap = { workspace = true }
 deadpool-redis = { version = "0.11.1", features = ["rt_tokio_1"], default-features = false }
 enum_dispatch = { workspace = true }
+firebase-token = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 ipnet = { workspace = true }

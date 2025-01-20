@@ -251,8 +251,8 @@ fn test_mem_swap() -> PartialVMResult<()> {
     // -- Container of container
     locals.store_loc(8, Value::struct_(Struct::pack(vec![Value::u16(4)])), false)?;
     locals.store_loc(9, Value::struct_(Struct::pack(vec![Value::u16(5)])), false)?;
-    locals.store_loc(10, Value::signer(AccountAddress::ZERO), false)?;
-    locals.store_loc(11, Value::signer(AccountAddress::ONE), false)?;
+    locals.store_loc(10, Value::master_signer(AccountAddress::ZERO), false)?;
+    locals.store_loc(11, Value::master_signer(AccountAddress::ONE), false)?;
 
     // -- Container of vector
     locals.store_loc(
@@ -267,12 +267,12 @@ fn test_mem_swap() -> PartialVMResult<()> {
     )?;
     locals.store_loc(
         14,
-        Value::vector_for_testing_only(vec![Value::signer(AccountAddress::ZERO)]),
+        Value::vector_for_testing_only(vec![Value::master_signer(AccountAddress::ZERO)]),
         false,
     )?;
     locals.store_loc(
         15,
-        Value::vector_for_testing_only(vec![Value::signer(AccountAddress::ONE)]),
+        Value::vector_for_testing_only(vec![Value::master_signer(AccountAddress::ONE)]),
         false,
     )?;
 
@@ -334,8 +334,8 @@ mod native_values {
         assert_err!(Value::u256(U256::zero()).equals(&v));
 
         assert_err!(Value::address(AccountAddress::ONE).equals(&v));
-        assert_err!(Value::signer(AccountAddress::ONE).equals(&v));
-        assert_err!(Value::signer_reference(AccountAddress::ONE).equals(&v));
+        assert_err!(Value::master_signer(AccountAddress::ONE).equals(&v));
+        assert_err!(Value::master_signer_reference(AccountAddress::ONE).equals(&v));
 
         assert_err!(Value::vector_bool(vec![true, false]).equals(&v));
 

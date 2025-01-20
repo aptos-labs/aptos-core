@@ -83,6 +83,9 @@ pub trait GasAlgebra {
 
     /// Returns the amount of storage fee used.
     fn storage_fee_used(&self) -> Fee;
+
+    /// Bump the `extra_balance`.
+    fn inject_balance(&mut self, extra_balance: impl Into<Gas>) -> PartialVMResult<()>;
 }
 
 /// Trait representing a gas meter used inside the Aptos VM.
@@ -247,5 +250,12 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// Return the total fee used for storage.
     fn storage_fee_used(&self) -> Fee {
         self.algebra().storage_fee_used()
+    }
+
+    /// Bump the `extra_balance`.
+    fn inject_balance(&mut self, extra_balance: impl Into<Gas>) -> VMResult<()> {
+        self.algebra_mut()
+            .inject_balance(extra_balance)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 }

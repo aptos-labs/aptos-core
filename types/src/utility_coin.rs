@@ -43,3 +43,23 @@ impl MoveStructType for AptosCoinType {
     const MODULE_NAME: &'static IdentStr = ident_str!("aptos_coin");
     const STRUCT_NAME: &'static IdentStr = ident_str!("AptosCoin");
 }
+
+pub static DUMMY_COIN_TYPE: Lazy<TypeTag> = Lazy::new(|| {
+    TypeTag::Struct(Box::new(StructTag {
+        address: AccountAddress::ONE,
+        module: ident_str!("dummy_coin").to_owned(),
+        name: ident_str!("DummyCoin").to_owned(),
+        type_args: vec![],
+    }))
+});
+
+pub struct DummyCoinType;
+impl CoinType for DummyCoinType {
+    fn type_tag() -> TypeTag {
+        DUMMY_COIN_TYPE.clone()
+    }
+
+    fn coin_info_address() -> AccountAddress {
+        AccountAddress::ONE
+    }
+}

@@ -162,9 +162,29 @@ fn build_test_info(
 
     let mut arguments = Vec::new();
     for param in function.get_parameters_ref() {
-        let Parameter(var, _ty, var_loc) = &param;
+        let Parameter(var, ty, var_loc) = &param;
 
         match test_annotation_params.get(var) {
+            Some(MoveValue::Address(addr)) => match ty {
+                Type::Primitive(PrimitiveType::Signer) => arguments.push(MoveValue::Signer(*addr)),
+                Type::Reference(_, inner) if **inner == Type::Primitive(PrimitiveType::Signer) => {
+                    arguments.push(MoveValue::Signer(*addr));
+                },
+                Type::Primitive(PrimitiveType::Address) => {
+                    arguments.push(MoveValue::Address(*addr))
+                },
+                _ => {
+                    let err_msg = "Unexpected argument type: expect an address or a signer";
+                    let invalid_test = "unable to generate test";
+                    env.error_with_labels(&fn_id_loc, invalid_test, vec![
+                        (test_attribute_loc.clone(), err_msg.to_string()),
+                        (
+                            var_loc.clone(),
+                            "Corresponding to this parameter".to_string(),
+                        ),
+                    ]);
+                },
+            },
             Some(value) => arguments.push(value.clone()),
             None => {
                 let missing_param_msg = "Missing test parameter assignment in test. Expected a \

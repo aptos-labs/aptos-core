@@ -13,7 +13,7 @@ use crate::{
     utils::{get_progress, iterators::EpochEndingLedgerInfoIter},
 };
 use anyhow::anyhow;
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_schemadb::{batch::SchemaBatch, DB};
 use aptos_storage_interface::{block_info::BlockInfo, db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
     account_config::NewBlockEvent, block_info::BlockHeight, contract_event::ContractEvent,
@@ -186,7 +186,7 @@ impl LedgerMetadataDb {
     pub(crate) fn put_ledger_info(
         &self,
         ledger_info_with_sigs: &LedgerInfoWithSignatures,
-        batch: &SchemaBatch,
+        batch: &mut SchemaBatch,
     ) -> Result<()> {
         let ledger_info = ledger_info_with_sigs.ledger_info();
 
@@ -296,7 +296,7 @@ impl LedgerMetadataDb {
     pub(crate) fn put_block_info(
         version: Version,
         event: &ContractEvent,
-        batch: &SchemaBatch,
+        batch: &mut SchemaBatch,
     ) -> Result<()> {
         let new_block_event = NewBlockEvent::try_from_bytes(event.event_data())?;
         let block_height = new_block_event.height();

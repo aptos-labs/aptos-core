@@ -132,6 +132,17 @@ module aptos_framework::staking_config {
             rewards_rate_denominator,
             voting_power_increase_limit,
         });
+
+        // Initialize StakingRewardsConfig with the given rewards_rate and rewards_rate_denominator,
+        // while setting min_rewards_rate and rewards_rate_decrease_rate to 0.
+        initialize_rewards(
+            aptos_framework,
+            fixed_point64::create_from_rational((rewards_rate as u128), (rewards_rate_denominator as u128)),
+            fixed_point64::create_from_rational(0, 1000),
+            ONE_YEAR_IN_SECS,
+            0,
+            fixed_point64::create_from_rational(0, 1000),
+        );
     }
 
     #[view]
@@ -395,7 +406,9 @@ module aptos_framework::staking_config {
 
     #[test(aptos_framework = @aptos_framework)]
     public entry fun test_change_staking_configs(aptos_framework: signer) acquires StakingConfig {
-        initialize(&aptos_framework, 0, 1, 1, false, 1, 1, 1);
+        initialize_for_test(&aptos_framework, 0, 1, 1, false, 1, 1, 1);
+        // This test case checks the behavior when the periodical_reward_rate_decrease feature is disabled.
+        features::change_feature_flags_for_testing(&aptos_framework, vector[], vector[features::get_periodical_reward_rate_decrease_feature()]);
 
         update_required_stake(&aptos_framework, 100, 1000);
         update_recurring_lockup_duration_secs(&aptos_framework, 10000);
@@ -501,9 +514,11 @@ module aptos_framework::staking_config {
         update_recurring_lockup_duration_secs(&account, 1);
     }
 
-    #[test(account = @0x123)]
+    #[test(aptos_framework = @0x1, account = @0x123)]
     #[expected_failure(abort_code = 0x50003, location = aptos_framework::system_addresses)]
-    public entry fun test_update_rewards_unauthorized_should_fail(account: signer) acquires StakingConfig {
+    public entry fun test_update_rewards_unauthorized_should_fail(aptos_framework: signer, account: signer) acquires StakingConfig {
+        // This test case checks the behavior when the periodical_reward_rate_decrease feature is disabled.
+        features::change_feature_flags_for_testing(&aptos_framework, vector[], vector[features::get_periodical_reward_rate_decrease_feature()]);
         update_rewards_rate(&account, 1, 10);
     }
 
@@ -547,6 +562,8 @@ module aptos_framework::staking_config {
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10002, location = Self)]
     public entry fun test_update_rewards_invalid_denominator_should_fail(aptos_framework: signer) acquires StakingConfig {
+        // This test case checks the behavior when the periodical_reward_rate_decrease feature is disabled.
+        features::change_feature_flags_for_testing(&aptos_framework, vector[], vector[features::get_periodical_reward_rate_decrease_feature()]);
         update_rewards_rate(&aptos_framework, 1, 0);
     }
 
@@ -625,6 +642,8 @@ module aptos_framework::staking_config {
     public entry fun test_update_voting_power_increase_limit_to_zero_should_fail(
         aptos_framework: signer
     ) acquires StakingConfig {
+        // This test case checks the behavior when the periodical_reward_rate_decrease feature is disabled.
+        features::change_feature_flags_for_testing(&aptos_framework, vector[], vector[features::get_periodical_reward_rate_decrease_feature()]);
         update_voting_power_increase_limit(&aptos_framework, 0);
     }
 

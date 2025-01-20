@@ -5,7 +5,7 @@ use crate::schema::{
     db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     version_data::VersionDataSchema,
 };
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_schemadb::{batch::SchemaBatch, DB};
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::transaction::Version;
 use std::sync::Arc;
@@ -44,7 +44,7 @@ impl LedgerMetadataPruner {
         current_progress: Version,
         target_version: Version,
     ) -> Result<()> {
-        let batch = SchemaBatch::new();
+        let mut batch = SchemaBatch::new();
         for version in current_progress..target_version {
             batch.delete::<VersionDataSchema>(&version)?;
         }

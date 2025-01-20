@@ -47,7 +47,7 @@ error: post-condition does not hold
    │
    = Related Global Memory:
    =         Resource name: TestTracing_R
-   =         Values:  {Address(18467): <redacted>, Default: empty}
+   =         Values:  {Address(6334): <redacted>, Default: empty}
    = Related Bindings:
    =         addr = <redacted>
    =         exists<R>(addr) = <redacted>
@@ -61,7 +61,6 @@ error: post-condition does not hold
    =         s = <redacted>
    =         x = <redacted>
    =     at tests/sources/functional/trace.move:30: publish_invalid
-   =         <redacted> = <redacted>
    =     at tests/sources/functional/trace.move:38
    =     at tests/sources/functional/trace.move:31: publish_invalid
    =     at tests/sources/functional/trace.move:34: publish_invalid (spec)
@@ -83,5 +82,4 @@ error: global memory invariant does not hold
    =         s = <redacted>
    =         x = <redacted>
    =     at tests/sources/functional/trace.move:30: publish_invalid
-   =         <redacted> = <redacted>
    =     at tests/sources/functional/trace.move:38

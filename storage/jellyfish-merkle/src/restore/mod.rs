@@ -259,7 +259,7 @@ where
             // Hack: prevent any chunk to be added.
             Some(HashValue::new([0xFF; HashValue::LENGTH]))
         } else {
-            self.previous_leaf.as_ref().map(|leaf| leaf.account_key())
+            self.previous_leaf.as_ref().map(|leaf| *leaf.account_key())
         }
     }
 
@@ -350,7 +350,7 @@ where
         if let Some(prev_leaf) = &self.previous_leaf {
             let skip_until = chunk
                 .iter()
-                .find_position(|(key, _hash)| key.hash() > prev_leaf.account_key());
+                .find_position(|(key, _hash)| key.hash() > *prev_leaf.account_key());
             chunk = match skip_until {
                 None => {
                     info!("Skipping entire chunk.");
@@ -375,7 +375,7 @@ where
             let hashed_key = key.hash();
             if let Some(ref prev_leaf) = self.previous_leaf {
                 ensure!(
-                    hashed_key > prev_leaf.account_key(),
+                    &hashed_key > prev_leaf.account_key(),
                     "State keys must come in increasing order.",
                 )
             }
@@ -691,7 +691,7 @@ where
         proof
             .verify(
                 self.expected_root_hash,
-                SparseMerkleLeafNode::new(previous_key, previous_leaf.value_hash()),
+                SparseMerkleLeafNode::new(*previous_key, previous_leaf.value_hash()),
                 left_siblings,
             )
             .map_err(Into::into)

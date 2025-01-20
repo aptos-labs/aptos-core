@@ -102,6 +102,7 @@ impl StatelessPipeline for ExecutionSchedulePhase {
                         b.block(),
                         b.parent_id(),
                         b.randomness().cloned(),
+                        b.qc(),
                         lifetime_guard.spawn(()),
                     )
                     .await;

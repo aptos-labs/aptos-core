@@ -110,12 +110,24 @@ module 0x42::test {
        type_info::type_of<A>()
     }
     spec generic_type_info_verification_target {
-        ensures result == generic_type_info_spec_fun<A>();
+        ensures result == generic_type_info_spec_fun<A>()
+            && result == generic_type_info_spec_fun_2<A>();
     }
 
     spec fun generic_type_info_spec_fun<A>(): type_info::TypeInfo {
         type_info::type_of<A>()
     }
+
+    spec fun generic_type_info_spec_fun_2<A>(): type_info::TypeInfo {
+        takes_2<A, A>()
+    }
+
+    spec fun takes_2<A, B>(): type_info::TypeInfo {
+        // Pass on the 2nd type parameter to be sure the instantiation
+        // of B is correctly handled
+        type_info::type_of<B>()
+    }
+
 }
 
 module 0x43::test {

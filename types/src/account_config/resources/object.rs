@@ -61,6 +61,10 @@ impl ObjectCoreResource {
             transfer_events,
         }
     }
+
+    pub fn transfer_events(&self) -> &EventHandle {
+        &self.transfer_events
+    }
 }
 
 impl MoveStructType for ObjectCoreResource {
@@ -69,3 +73,18 @@ impl MoveStructType for ObjectCoreResource {
 }
 
 impl MoveResource for ObjectCoreResource {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Object {
+    inner: AccountAddress,
+}
+
+impl Object {
+    pub fn new(inner: AccountAddress) -> Self {
+        Self { inner }
+    }
+
+    pub fn inner(&self) -> &AccountAddress {
+        &self.inner
+    }
+}

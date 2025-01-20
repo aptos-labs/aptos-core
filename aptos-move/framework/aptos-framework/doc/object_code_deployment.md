@@ -190,6 +190,16 @@ Event emitted when code in an existing object is made immutable.
 
 
 
+<a id="0x1_object_code_deployment_ENO_CODE_PERMISSION"></a>
+
+Current permissioned signer cannot deploy object code.
+
+
+<pre><code><b>const</b> <a href="object_code_deployment.md#0x1_object_code_deployment_ENO_CODE_PERMISSION">ENO_CODE_PERMISSION</a>: u64 = 4;
+</code></pre>
+
+
+
 <a id="0x1_object_code_deployment_ENOT_CODE_OBJECT_OWNER"></a>
 
 Not the owner of the <code>code_object</code>
@@ -243,6 +253,7 @@ the code to be published via <code><a href="code.md#0x1_code">code</a></code>. T
     metadata_serialized: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     <a href="code.md#0x1_code">code</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
 ) {
+    <a href="code.md#0x1_code_check_code_publishing_permission">code::check_code_publishing_permission</a>(publisher);
     <b>assert</b>!(
         <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_object_code_deployment_enabled">features::is_object_code_deployment_enabled</a>(),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_unavailable">error::unavailable</a>(<a href="object_code_deployment.md#0x1_object_code_deployment_EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED">EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED</a>),
@@ -319,6 +330,7 @@ Requires the publisher to be the owner of the <code>code_object</code>.
     <a href="code.md#0x1_code">code</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
     code_object: Object&lt;PackageRegistry&gt;,
 ) <b>acquires</b> <a href="object_code_deployment.md#0x1_object_code_deployment_ManagingRefs">ManagingRefs</a> {
+    <a href="code.md#0x1_code_check_code_publishing_permission">code::check_code_publishing_permission</a>(publisher);
     <b>let</b> publisher_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(publisher);
     <b>assert</b>!(
         <a href="object.md#0x1_object_is_owner">object::is_owner</a>(code_object, publisher_address),

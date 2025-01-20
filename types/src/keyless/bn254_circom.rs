@@ -399,7 +399,7 @@ mod test {
             G1Bytes, G2Bytes, G1_PROJECTIVE_COMPRESSED_NUM_BYTES,
             G2_PROJECTIVE_COMPRESSED_NUM_BYTES,
         },
-        circuit_constants::devnet_prepared_vk,
+        circuit_constants::prepared_vk_for_testing,
         Groth16VerificationKey,
     };
     use ark_bn254::Bn254;
@@ -436,7 +436,7 @@ mod test {
     // Tests conversion between the devnet ark_groth16::PreparedVerificationKey and our Move
     // representation of it.
     fn print_groth16_pvk() {
-        let groth16_vk: Groth16VerificationKey = devnet_prepared_vk().into();
+        let groth16_vk: Groth16VerificationKey = prepared_vk_for_testing().into();
 
         println!("alpha_g1: {:?}", hex::encode(groth16_vk.alpha_g1.clone()));
         println!("beta_g2: {:?}", hex::encode(groth16_vk.beta_g2.clone()));
@@ -448,6 +448,6 @@ mod test {
 
         let same_pvk: PreparedVerifyingKey<Bn254> = groth16_vk.try_into().unwrap();
 
-        assert_eq!(same_pvk, devnet_prepared_vk());
+        assert_eq!(same_pvk, prepared_vk_for_testing());
     }
 }

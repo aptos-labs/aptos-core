@@ -28,7 +28,6 @@ error: caller does not have permission to modify `B::T` at given address
    =     at tests/sources/functional/ModifiesErrorTest.move:51: move_to_test_incorrect
    =         x0 = <redacted>
    =     at tests/sources/functional/ModifiesErrorTest.move:52: move_to_test_incorrect
-   =         <redacted> = <redacted>
 
 error: caller does not have permission to modify `B::T` at given address
    ┌─ tests/sources/functional/ModifiesErrorTest.move:65:17

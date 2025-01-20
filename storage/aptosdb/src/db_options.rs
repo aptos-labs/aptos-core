@@ -221,15 +221,10 @@ pub(super) fn gen_state_merkle_cfds(rocksdb_config: &RocksdbConfig) -> Vec<Colum
     gen_cfds(rocksdb_config, cfs, |_, _| {})
 }
 
-pub(super) fn gen_state_kv_cfds(
+pub(super) fn gen_state_kv_shard_cfds(
     rocksdb_config: &RocksdbConfig,
-    enable_sharding: bool,
 ) -> Vec<ColumnFamilyDescriptor> {
-    let cfs = if enable_sharding {
-        state_kv_db_new_key_column_families()
-    } else {
-        state_kv_db_column_families()
-    };
+    let cfs = state_kv_db_new_key_column_families();
     gen_cfds(rocksdb_config, cfs, with_state_key_extractor_processor)
 }
 

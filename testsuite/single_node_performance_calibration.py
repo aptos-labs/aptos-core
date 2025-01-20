@@ -80,7 +80,6 @@ def main():
         | github.workflow.head_branch = "{branch}"
         | "grep_json_aptos_move_vm_perf"
         | parseJson(message)
-        | code_perf_version = "v1"
         """.format(
                 branch=args.branch
             )
@@ -133,7 +132,6 @@ def main():
         | "grep_json_single_node_perf"
         | parseJson(message)
         | source = "ADHOC"
-        | code_perf_version = "v8"
         """.format(
                 branch=args.branch
             )

@@ -38,10 +38,10 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    move_vm::MoveVM, native_extensions::NativeContextExtensions, session::Session, ModuleStorage,
-    VerifiedModuleBundle,
+    move_vm::MoveVM, native_extensions::NativeContextExtensions, session::Session,
+    AsFunctionValueExtension, ModuleStorage, VerifiedModuleBundle,
 };
-use move_vm_types::{value_serde::serialize_and_allow_delayed_values, values::Value};
+use move_vm_types::{value_serde::ValueSerDeContext, values::Value};
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
@@ -101,7 +101,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             chain_id.id(),
             maybe_user_transaction_context,
         ));
-        extensions.add(NativeCodeContext::default());
+        extensions.add(NativeCodeContext::new());
         extensions.add(NativeStateStorageContext::new(resolver));
         extensions.add(NativeEventContext::default());
         extensions.add(NativeObjectContext::default());
@@ -127,6 +127,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         module_storage: &impl ModuleStorage,
     ) -> VMResult<(VMChangeSet, ModuleWriteSet)> {
         let move_vm = self.inner.get_move_vm();
+        let function_extension = module_storage.as_function_value_extension();
 
         let resource_converter = |value: Value,
                                   layout: MoveTypeLayout,
@@ -136,13 +137,17 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 // We allow serialization of native values here because we want to
                 // temporarily store native values (via encoding to ensure deterministic
                 // gas charging) in block storage.
-                serialize_and_allow_delayed_values(&value, &layout)?
+                ValueSerDeContext::new()
+                    .with_delayed_fields_serde()
+                    .with_func_args_deserialization(&function_extension)
+                    .serialize(&value, &layout)?
                     .map(|bytes| (bytes.into(), Some(Arc::new(layout))))
             } else {
                 // Otherwise, there should be no native values so ensure
                 // serialization fails here if there are any.
-                value
-                    .simple_serialize(&layout)
+                ValueSerDeContext::new()
+                    .with_func_args_deserialization(&function_extension)
+                    .serialize(&value, &layout)?
                     .map(|bytes| (bytes.into(), None))
             };
             serialization_result.ok_or_else(|| {
@@ -165,7 +170,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         let table_context: NativeTableContext = extensions.remove();
         let table_change_set = table_context
-            .into_change_set()
+            .into_change_set(&function_extension)
             .map_err(|e| e.finish(Location::Undefined))?;
 
         let aggregator_context: NativeAggregatorContext = extensions.remove();
@@ -192,9 +197,11 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         Ok((change_set, module_write_set))
     }
 
-    pub fn extract_publish_request(&mut self) -> Option<PublishRequest> {
+    /// Returns the publish request if it exists. If the provided flag is set to true, disables any
+    /// subsequent module publish requests.
+    pub fn extract_publish_request(&mut self, disable: bool) -> Option<PublishRequest> {
         let ctx = self.get_native_extensions().get_mut::<NativeCodeContext>();
-        ctx.requested_module_bundle.take()
+        ctx.extract_publish_request(disable)
     }
 
     fn populate_v0_resource_group_change_set(

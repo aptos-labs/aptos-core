@@ -48,11 +48,3 @@ error: tuple type `()` is not allowed as a type argument (type was inferred)
    │                                     ^
    │
    = required by instantiating type parameter `T` of function `foreach`
-
-error: function type `|u64|u64` is not allowed as a field type
-   ┌─ tests/lambda/lambda.move:81:12
-   │
-81 │         f: |u64|u64, // expected lambda not allowed
-   │            ^^^^^^^^
-   │
-   = required by declaration of field `f`

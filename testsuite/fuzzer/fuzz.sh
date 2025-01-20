@@ -53,6 +53,9 @@ function usage() {
         "build-oss-fuzz")
             echo "Usage: $0 build-oss-fuzz <target_dir>"
             ;;
+        "cmin")
+            echo "Usage: $0 cmin <fuzz_target> [corpus_dir]"
+            ;;
         "coverage")
             echo "Usage: $0 coverage <fuzz_target>"
             ;;
@@ -80,6 +83,7 @@ function usage() {
             echo "    block-builder     runs rust tool to hel build fuzzers"
             echo "    build             builds fuzz targets"
             echo "    build-oss-fuzz    builds fuzz targets for oss-fuzz"
+            echo "    cmin              minimizes a corpus for a target"
             echo "    coverage          generates coverage for a fuzz target"
             echo "    clean-coverage    clean coverage for a fuzz target"
             echo "    debug             debugs a fuzz target with a testcase"
@@ -166,11 +170,31 @@ function build-oss-fuzz() {
     done
 }
 
+function cmin() {
+    if [ -z "$1" ]; then
+        usage cmin
+    fi
+    fuzz_target=$1
+    corpus_dir=${2:-./fuzz/corpus/$fuzz_target}
+    cargo_fuzz cmin $fuzz_target $corpus_dir
+}
+
+function install-coverage-tools() {
+     cargo +$NIGHTLY_VERSION install cargo-binutils
+     cargo +$NIGHTLY_VERSION install rustfilt
+}
+
 function coverage() {
     if [ -z "$1" ]; then
         usage coverage
     fi
     fuzz_target=$1
+
+    if ! cargo +$NIGHTLY_VERSION cov -V &> /dev/null; then
+        install-coverage-tools
+    fi
+
+    clean-coverage $fuzz_target
     local corpus_dir="fuzz/corpus/$fuzz_target"
     local coverage_dir="./fuzz/coverage/$fuzz_target/report"
     mkdir -p $coverage_dir
@@ -184,7 +208,7 @@ function coverage() {
     fuzz_target_bin=$(find ./target/*/coverage -name $fuzz_target -type f -perm /111) #$(find target/*/coverage -name $fuzz_target -type f)
     echo "Found fuzz target binary: $fuzz_target_bin"
     # Generate the coverage report
-    cargo +nightly cov -- show $fuzz_target_bin \
+    cargo +$NIGHTLY_VERSION cov -- show $fuzz_target_bin \
         --format=html \
         --instr-profile=fuzz/coverage/$fuzz_target/coverage.profdata \
         --show-directory-coverage \
@@ -200,12 +224,11 @@ function clean-coverage() {
     fi
 
     local fuzz_target="$1"
-    local coverage_dir="./fuzz/coverage/$fuzz_target/"
-
     if [ "$fuzz_target" == "all" ]; then
-        rm -rf coverage
+        rm -rf ./fuzz/coverage
     else
-        rm -rf $target_dir
+        local coverage_dir="./fuzz/coverage/$fuzz_target/"
+        rm -rf $coverage_dir
     fi
 }
 
@@ -261,7 +284,7 @@ function run() {
         fi
     fi
     info "Running $fuzz_target"
-    cargo_fuzz run --sanitizer none -O $fuzz_target $testcase -- -fork=10
+    cargo_fuzz run --sanitizer address -O $fuzz_target $testcase -- -fork=15 #-ignore_crashes=1
 }
 
 function test() {
@@ -329,6 +352,10 @@ case "$1" in
   "build-oss-fuzz")
     shift
     build-oss-fuzz "$@"
+    ;;
+  "cmin")
+    shift
+    cmin "$@"
     ;;
   "coverage")
     shift

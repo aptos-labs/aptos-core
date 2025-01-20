@@ -81,7 +81,7 @@ pub(crate) fn bootstrap_with_genesis(
                 issuer: get_sample_iss(),
                 jwk: JWK::RSA(get_sample_jwk()),
             }];
-            config.keyless_groth16_vk_override = Some(Groth16VerificationKey::from(
+            config.keyless_groth16_vk = Some(Groth16VerificationKey::from(
                 &TEST_GROTH16_SETUP.prepared_vk,
             ));
         })));

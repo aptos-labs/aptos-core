@@ -138,8 +138,9 @@ module aptos_framework::managed_coin {
     #[test_only]
     struct FakeMoney {}
 
-    #[test(source = @0xa11ce, destination = @0xb0b, mod_account = @0x1)]
+    #[test(framework = @aptos_framework, source = @0xa11ce, destination = @0xb0b, mod_account = @0x1)]
     public entry fun test_end_to_end(
+        framework: signer,
         source: signer,
         destination: signer,
         mod_account: signer
@@ -150,6 +151,7 @@ module aptos_framework::managed_coin {
         aptos_framework::account::create_account_for_test(destination_addr);
         aptos_framework::account::create_account_for_test(signer::address_of(&mod_account));
         aggregator_factory::initialize_aggregator_factory_for_test(&mod_account);
+        aptos_framework::coin::create_coin_conversion_map(&framework);
 
         initialize<FakeMoney>(
             &mod_account,

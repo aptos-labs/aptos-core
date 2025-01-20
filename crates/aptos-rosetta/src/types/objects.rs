@@ -2175,8 +2175,8 @@ fn get_amount_from_event_v2(
 ) -> Vec<u64> {
     filter_v2_events(type_tag, events, |event| {
         if let Ok(event) = bcs::from_bytes::<CoinWithdraw>(event.event_data()) {
-            if event.account == account_address && &event.coin_type == coin_type {
-                Some(event.amount)
+            if event.account() == &account_address && event.coin_type() == coin_type {
+                Some(event.amount())
             } else {
                 None
             }

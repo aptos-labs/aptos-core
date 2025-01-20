@@ -34,7 +34,7 @@ CompiledPackageInfo {
             },
             skip_attribute_checks: false,
             compiler_version: Some(
-                V1,
+                V2_0,
             ),
             language_version: None,
             experiments: [],

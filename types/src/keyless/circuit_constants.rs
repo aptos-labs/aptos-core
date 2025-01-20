@@ -27,7 +27,7 @@ pub(crate) const MAX_COMMITED_EPK_BYTES: u16 =
 
 /// This function uses the decimal uncompressed point serialization which is outputted by circom.
 /// https://github.com/aptos-labs/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
-pub fn devnet_prepared_vk() -> PreparedVerifyingKey<Bn254> {
+pub fn prepared_vk_for_testing() -> PreparedVerifyingKey<Bn254> {
     // Convert the projective points to affine.
     let alpha_g1 = g1_projective_str_to_affine(
         "20491192805390485299153009773594534940189261866228447918068658471970481763042",

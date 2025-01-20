@@ -50,6 +50,7 @@ use move_model::{
 };
 use move_symbol_pool::Symbol;
 use move_vm_runtime::session::SerializedReturnValues;
+use move_vm_types::value_serde::ValueSerDeContext;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::{
@@ -178,7 +179,10 @@ pub trait MoveTestAdapter<'a>: Sized {
     fn default_syntax(&self) -> SyntaxChoice;
     fn known_attributes(&self) -> &BTreeSet<String>;
     fn run_config(&self) -> TestRunConfig {
-        TestRunConfig::CompilerV1
+        TestRunConfig::CompilerV2 {
+            language_version: LanguageVersion::default(),
+            v2_experiments: vec![],
+        }
     }
     fn init(
         default_syntax: SyntaxChoice,
@@ -621,8 +625,7 @@ fn display_return_values(return_values: SerializedReturnValues) -> Option<String
         let values = mutable_reference_outputs
             .iter()
             .map(|(idx, bytes, layout)| {
-                let value =
-                    move_vm_types::values::Value::simple_deserialize(bytes, layout).unwrap();
+                let value = ValueSerDeContext::new().deserialize(bytes, layout).unwrap();
                 (idx, value)
             })
             .collect::<Vec<_>>();
@@ -641,7 +644,8 @@ fn display_return_values(return_values: SerializedReturnValues) -> Option<String
         let values = return_values
             .iter()
             .map(|(bytes, layout)| {
-                move_vm_types::values::Value::simple_deserialize(bytes, layout).unwrap()
+                // TODO: add support for functions.
+                ValueSerDeContext::new().deserialize(bytes, layout).unwrap()
             })
             .collect::<Vec<_>>();
         let printed = values
@@ -824,7 +828,10 @@ fn compile_source_unit_v2(
         options = options.set_experiment(exp, value)
     }
     let mut error_writer = termcolor::Buffer::no_color();
-    let result = move_compiler_v2::run_move_compiler(&mut error_writer, options);
+    let result = {
+        let mut emitter = options.error_emitter(&mut error_writer);
+        move_compiler_v2::run_move_compiler(emitter.as_mut(), options)
+    };
     let error_str = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
     let (model, mut units) =
         result.map_err(|_| anyhow::anyhow!("compilation errors:\n {}", error_str))?;

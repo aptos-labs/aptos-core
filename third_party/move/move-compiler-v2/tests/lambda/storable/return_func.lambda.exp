@@ -29,19 +29,3 @@ error: expected `|integer|_ with copy+store` but found a value of type `u64`
    │
 87 │         vector::push_back(&mut sum, h(6));
    │                                     ^^^^
-
-error: function type `|integer|_` is not allowed as a type argument (type was inferred)
-   ┌─ tests/lambda/storable/return_func.move:89:21
-   │
-89 │         let funcs = vector[choose_function(0), choose_function(1), choose_function(2)];
-   │                     ^^^^^^
-   │
-   = required by instantiating vector type parameter
-
-error: function type `|u64|u64 with store` is not allowed as a type argument (type was inferred)
-   ┌─ tests/lambda/storable/return_func.move:89:21
-   │
-89 │         let funcs = vector[choose_function(0), choose_function(1), choose_function(2)];
-   │                     ^^^^^^
-   │
-   = required by instantiating vector type parameter

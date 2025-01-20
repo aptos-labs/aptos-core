@@ -207,17 +207,21 @@ impl FlushWritesProcessor {
         flush_writes: &mut BTreeMap<CodeOffset, BTreeSet<TempIndex>>,
     ) {
         let upper = *block_range.end();
-        for offset in block_range {
+        // Traverse the block in reverse order: for each definition starting from the
+        // latest in a block, we compute whether is should be flushed away. This
+        // information is available for subsequent definitions processed.
+        for offset in block_range.rev() {
             let instr = &code[offset as usize];
-            // Only `Load` and `Call` instructions push temps to the stack.
+            use Bytecode::{Assign, Call, Load};
+            // Only `Assign`, `Call`, and `Load` instructions push temps to the stack.
             // We need to find if any of these temps are better flushed right away.
-            if matches!(instr, Bytecode::Load(..) | Bytecode::Call(..)) {
-                for (dest_index, dest) in instr.dests().into_iter().enumerate() {
+            if matches!(instr, Assign(..) | Call(..) | Load(..)) {
+                for (dest_index, dest) in instr.dests().into_iter().enumerate().rev() {
                     let def = DefOrUsePoint {
                         offset,
                         index: dest_index,
                     };
-                    if Self::could_flush_right_away(def, upper, use_def_links) {
+                    if Self::could_flush_right_away(def, upper, code, use_def_links, flush_writes) {
                         flush_writes.entry(offset).or_default().insert(dest);
                     }
                 }
@@ -230,7 +234,9 @@ impl FlushWritesProcessor {
     fn could_flush_right_away(
         def: DefOrUsePoint,
         block_end: CodeOffset,
+        code: &[Bytecode],
         use_def_links: &UseDefLinks,
+        flush_writes: &BTreeMap<CodeOffset, BTreeSet<TempIndex>>,
     ) -> bool {
         use_def_links.def_to_use.get(&def).map_or(true, |uses| {
             let exactly_one_use = uses.len() == 1;
@@ -244,8 +250,17 @@ impl FlushWritesProcessor {
                 // If used outside the basic block, flush right away.
                 return true;
             }
-            // If has intervening definition, flush right away.
-            Self::has_intervening_def(def, use_, use_def_links)
+            // If has intervening definitions, flush right away.
+            // The first call checks the definitions of preceding uses in the same instruction.
+            // The second call checks definitions between `def` and `use_`.
+            Self::has_intervening_def(&def, use_, use_def_links)
+                || Self::has_flush_causing_defs_in_between(
+                    &def,
+                    use_,
+                    code,
+                    use_def_links,
+                    flush_writes,
+                )
         })
     }
 
@@ -253,7 +268,7 @@ impl FlushWritesProcessor {
     /// instruction as `use_`, which has a definition after `def` and before
     /// the `use_` instruction?
     fn has_intervening_def(
-        def: DefOrUsePoint,
+        def: &DefOrUsePoint,
         use_: &DefOrUsePoint,
         use_def_links: &UseDefLinks,
     ) -> bool {
@@ -271,10 +286,120 @@ impl FlushWritesProcessor {
                 .get(&prev_use_at_usage_instr)
                 .map_or(false, |defs| {
                     defs.iter().any(|defs_of_prev_use| {
-                        defs_of_prev_use > &def && defs_of_prev_use.offset < *use_offset
+                        defs_of_prev_use > def && defs_of_prev_use.offset < *use_offset
                     })
                 })
         })
+    }
+
+    /// Check for various conditions where between a `def` and its `use_`, there are other
+    /// definitions that could cause `def` to be flushed before its `use_`.
+    fn has_flush_causing_defs_in_between(
+        def: &DefOrUsePoint,
+        use_: &DefOrUsePoint,
+        code: &[Bytecode],
+        use_def_links: &UseDefLinks,
+        flush_writes: &BTreeMap<CodeOffset, BTreeSet<TempIndex>>,
+    ) -> bool {
+        // For each definition in between `def` and `use_`, is there at least one that is:
+        // 1. not marked to be flushed right away?
+        // 2. not consumed before `use_`?
+        // 3. not used in the same offset as `use_`?
+        // If so, `def` could be flushed before its `use_`, so we should suggest flush it
+        // right after definition.
+        // Note that we expect the code in the block to be processed in the reverse order.
+        let defs_in_between = Self::get_defs_between(def, use_, use_def_links);
+        for def_in_between in defs_in_between {
+            if Self::is_def_flushed_away(&def_in_between, code, flush_writes) {
+                continue;
+            }
+            if Self::consumed_before(&def_in_between, use_, use_def_links) {
+                continue;
+            }
+            if Self::consumed_at(&def_in_between, use_, use_def_links) {
+                continue;
+            }
+            return true;
+        }
+        false
+    }
+
+    /// Has `def` been marked to be flushed right away?
+    fn is_def_flushed_away(
+        def: &DefOrUsePoint,
+        code: &[Bytecode],
+        flush_writes: &BTreeMap<CodeOffset, BTreeSet<TempIndex>>,
+    ) -> bool {
+        if let Some(temps) = flush_writes.get(&def.offset) {
+            // Some temps were marked to be flushed right away at `instr`.
+            let instr = &code[def.offset as usize];
+            // Was it this `def`?
+            let def_temp = instr.dests()[def.index];
+            return temps.contains(&def_temp);
+        }
+        false
+    }
+
+    /// Is `def` consumed before `use_`?
+    fn consumed_before(
+        def: &DefOrUsePoint,
+        use_: &DefOrUsePoint,
+        use_def_links: &UseDefLinks,
+    ) -> bool {
+        use_def_links
+            .def_to_use
+            .get(def)
+            .map_or(false, |uses| uses.iter().all(|u| u.offset < use_.offset))
+    }
+
+    /// Is `def` consumed at `use_`'s offset?
+    fn consumed_at(def: &DefOrUsePoint, use_: &DefOrUsePoint, use_def_links: &UseDefLinks) -> bool {
+        let use_offset = use_.offset;
+        use_def_links
+            .def_to_use
+            .get(def)
+            .map_or(false, |uses| uses.iter().all(|u| u.offset == use_offset))
+    }
+
+    /// Get all the definitions between `def` and `use_`.
+    fn get_defs_between(
+        def: &DefOrUsePoint,
+        use_: &DefOrUsePoint,
+        use_def_links: &UseDefLinks,
+    ) -> Vec<DefOrUsePoint> {
+        let DefOrUsePoint {
+            offset: def_offset,
+            index: def_index,
+        } = def;
+        let use_offset = use_.offset;
+        let mut defs = vec![];
+        if *def_offset == use_offset {
+            return defs;
+        }
+        // Are there defs at def_offset with index > def_index?
+        for index in def_index + 1.. {
+            let potential_def = DefOrUsePoint {
+                offset: *def_offset,
+                index,
+            };
+            if use_def_links.def_to_use.contains_key(&potential_def) {
+                defs.push(potential_def);
+            } else {
+                break;
+            }
+        }
+        // Are there defs after def_offset and before use_offset?
+        for offset in (*def_offset + 1)..use_offset {
+            for index in 0.. {
+                let potential_def = DefOrUsePoint { offset, index };
+                if use_def_links.def_to_use.contains_key(&potential_def) {
+                    defs.push(potential_def);
+                } else {
+                    break;
+                }
+            }
+        }
+        defs
     }
 
     /// Registers annotation formatter at the given function target.

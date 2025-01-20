@@ -8,6 +8,6 @@ license = "Apache-2.0"
 
 [dependencies]
 anyhow = { workspace = true }
-move-command-line-common = { path = "../../move-command-line-common" }
+move-command-line-common = { workspace = true }
 prettydiff = { workspace = true }
 regex = { workspace = true }

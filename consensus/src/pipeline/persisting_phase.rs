@@ -3,12 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    network::NetworkSender,
     pipeline::pipeline_phase::StatelessPipeline,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
 };
 use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
 use aptos_executor_types::ExecutorResult;
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use aptos_types::{epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures};
 use async_trait::async_trait;
 use std::{
     fmt::{Debug, Display, Formatter},
@@ -46,11 +47,18 @@ pub type PersistingResponse = ExecutorResult<Round>;
 
 pub struct PersistingPhase {
     persisting_handle: Arc<dyn StateComputer>,
+    commit_msg_tx: Arc<NetworkSender>,
 }
 
 impl PersistingPhase {
-    pub fn new(persisting_handle: Arc<dyn StateComputer>) -> Self {
-        Self { persisting_handle }
+    pub fn new(
+        persisting_handle: Arc<dyn StateComputer>,
+        commit_msg_tx: Arc<NetworkSender>,
+    ) -> Self {
+        Self {
+            persisting_handle,
+            commit_msg_tx,
+        }
     }
 }
 
@@ -68,7 +76,7 @@ impl StatelessPipeline for PersistingPhase {
             callback,
         } = req;
 
-        if blocks
+        let response = if blocks
             .last()
             .expect("Blocks can't be empty")
             .pipeline_enabled()
@@ -86,9 +94,15 @@ impl StatelessPipeline for PersistingPhase {
         } else {
             let round = commit_ledger_info.ledger_info().round();
             self.persisting_handle
-                .commit(&blocks, commit_ledger_info, callback)
+                .commit(&blocks, commit_ledger_info.clone(), callback)
                 .await
                 .map(|_| round)
+        };
+        if commit_ledger_info.ledger_info().ends_epoch() {
+            self.commit_msg_tx
+                .send_epoch_change(EpochChangeProof::new(vec![commit_ledger_info], false))
+                .await;
         }
+        response
     }
 }

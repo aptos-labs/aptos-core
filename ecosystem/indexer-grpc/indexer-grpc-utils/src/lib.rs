@@ -17,7 +17,7 @@ use aptos_protos::{
     util::timestamp::Timestamp,
 };
 use prost::Message;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tonic::codec::CompressionEncoding;
 use url::Url;
 
@@ -95,9 +95,21 @@ pub async fn create_data_service_grpc_client(
     Ok(client)
 }
 
+pub fn timestamp_now_proto() -> Timestamp {
+    system_time_to_proto(SystemTime::now())
+}
+
+pub fn system_time_to_proto(system_time: SystemTime) -> Timestamp {
+    let ts = system_time.duration_since(UNIX_EPOCH).unwrap();
+    Timestamp {
+        seconds: ts.as_secs() as i64,
+        nanos: ts.subsec_nanos() as i32,
+    }
+}
+
 pub fn time_diff_since_pb_timestamp_in_secs(timestamp: &Timestamp) -> f64 {
-    let current_timestamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
+    let current_timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
         .expect("SystemTime before UNIX EPOCH!")
         .as_secs_f64();
     let transaction_time = timestamp.seconds as f64 + timestamp.nanos as f64 * 1e-9;

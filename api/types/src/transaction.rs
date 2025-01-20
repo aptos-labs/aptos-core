@@ -22,6 +22,7 @@ use aptos_types::{
     block_metadata_ext::BlockMetadataExt,
     contract_event::{ContractEvent, EventWithVersion},
     dkg::{DKGTranscript, DKGTranscriptMetadata},
+    function_info::FunctionInfo,
     jwks::{jwk::JWK, ProviderJWKs, QuorumCertifiedUpdate},
     keyless,
     transaction::{
@@ -33,6 +34,7 @@ use aptos_types::{
         Script, SignedTransaction, TransactionOutput, TransactionWithProof,
     },
 };
+use bcs::to_bytes;
 use once_cell::sync::Lazy;
 use poem_openapi::{Object, Union};
 use serde::{Deserialize, Serialize};
@@ -1191,6 +1193,7 @@ pub enum TransactionSignature {
     MultiAgentSignature(MultiAgentSignature),
     FeePayerSignature(FeePayerSignature),
     SingleSender(AccountSignature),
+    NoAccountSignature(NoAccountSignature),
 }
 
 impl VerifyInput for TransactionSignature {
@@ -1201,6 +1204,7 @@ impl VerifyInput for TransactionSignature {
             TransactionSignature::MultiAgentSignature(inner) => inner.verify(),
             TransactionSignature::FeePayerSignature(inner) => inner.verify(),
             TransactionSignature::SingleSender(inner) => inner.verify(),
+            TransactionSignature::NoAccountSignature(inner) => inner.verify(),
         }
     }
 }
@@ -1217,6 +1221,7 @@ impl TryFrom<TransactionSignature> for TransactionAuthenticator {
             TransactionSignature::SingleSender(sig) => {
                 TransactionAuthenticator::single_sender(sig.try_into()?)
             },
+            TransactionSignature::NoAccountSignature(sig) => sig.try_into()?,
         })
     }
 }
@@ -1913,6 +1918,18 @@ impl VerifyInput for NoAccountSignature {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct AbstractionSignature {
+    pub function_info: String,
+    pub auth_data: HexEncodedBytes,
+}
+
+impl VerifyInput for AbstractionSignature {
+    fn verify(&self) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
 impl TryFrom<NoAccountSignature> for TransactionAuthenticator {
     type Error = anyhow::Error;
 
@@ -1927,6 +1944,17 @@ impl TryFrom<NoAccountSignature> for AccountAuthenticator {
 
     fn try_from(_value: NoAccountSignature) -> Result<Self, Self::Error> {
         Ok(AccountAuthenticator::NoAccountAuthenticator)
+    }
+}
+
+impl TryFrom<AbstractionSignature> for AccountAuthenticator {
+    type Error = anyhow::Error;
+
+    fn try_from(value: AbstractionSignature) -> Result<Self, Self::Error> {
+        Ok(AccountAuthenticator::Abstraction {
+            function_info: FunctionInfo::from_str(&value.function_info)?,
+            auth_data: bcs::from_bytes(value.auth_data.inner())?,
+        })
     }
 }
 
@@ -1946,6 +1974,7 @@ pub enum AccountSignature {
     SingleKeySignature(SingleKeySignature),
     MultiKeySignature(MultiKeySignature),
     NoAccountSignature(NoAccountSignature),
+    AbstractionSignature(AbstractionSignature),
 }
 
 impl VerifyInput for AccountSignature {
@@ -1956,6 +1985,7 @@ impl VerifyInput for AccountSignature {
             AccountSignature::SingleKeySignature(inner) => inner.verify(),
             AccountSignature::MultiKeySignature(inner) => inner.verify(),
             AccountSignature::NoAccountSignature(inner) => inner.verify(),
+            AccountSignature::AbstractionSignature(inner) => inner.verify(),
         }
     }
 }
@@ -1970,6 +2000,7 @@ impl TryFrom<AccountSignature> for AccountAuthenticator {
             AccountSignature::SingleKeySignature(s) => s.try_into()?,
             AccountSignature::MultiKeySignature(s) => s.try_into()?,
             AccountSignature::NoAccountSignature(s) => s.try_into()?,
+            AccountSignature::AbstractionSignature(s) => s.try_into()?,
         })
     }
 }
@@ -2131,6 +2162,15 @@ impl From<&AccountAuthenticator> for AccountSignature {
                 })
             },
             NoAccountAuthenticator => AccountSignature::NoAccountSignature(NoAccountSignature),
+            Abstraction {
+                function_info,
+                auth_data,
+            } => Self::AbstractionSignature(AbstractionSignature {
+                function_info: function_info.to_string(),
+                auth_data: to_bytes(auth_data)
+                    .expect("bcs serialization cannot fail")
+                    .into(),
+            }),
         }
     }
 }

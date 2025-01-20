@@ -17,7 +17,7 @@ use aptos_executor_types::{
     state_compute_result::StateComputeResult, ExecutorError, ExecutorResult,
 };
 use aptos_infallible::Mutex;
-use aptos_logger::{error, warn};
+use aptos_logger::{error, info, warn};
 use aptos_types::{
     block_info::BlockInfo,
     contract_event::ContractEvent,
@@ -105,6 +105,7 @@ impl PipelineFutures {
 }
 
 pub struct PipelineInputTx {
+    pub qc_tx: Option<oneshot::Sender<Arc<QuorumCert>>>,
     pub rand_tx: Option<oneshot::Sender<Option<Randomness>>>,
     pub order_vote_tx: Option<oneshot::Sender<()>>,
     pub order_proof_tx: Option<oneshot::Sender<()>>,
@@ -112,6 +113,7 @@ pub struct PipelineInputTx {
 }
 
 pub struct PipelineInputRx {
+    pub qc_rx: oneshot::Receiver<Arc<QuorumCert>>,
     pub rand_rx: oneshot::Receiver<Option<Randomness>>,
     pub order_vote_rx: oneshot::Receiver<()>,
     pub order_proof_fut: TaskFuture<()>,
@@ -145,6 +147,8 @@ pub struct PipelinedBlock {
     pipeline_tx: Arc<Mutex<Option<PipelineInputTx>>>,
     #[derivative(PartialEq = "ignore")]
     pipeline_abort_handle: Arc<Mutex<Option<Vec<AbortHandle>>>>,
+    #[derivative(PartialEq = "ignore")]
+    block_qc: Arc<Mutex<Option<Arc<QuorumCert>>>>,
 }
 
 impl Serialize for PipelinedBlock {
@@ -286,6 +290,13 @@ impl PipelinedBlock {
             .take()
             .expect("pre_commit_result_rx missing.")
     }
+
+    pub fn set_qc(&self, qc: Arc<QuorumCert>) {
+        *self.block_qc.lock() = Some(qc.clone());
+        if let Some(tx) = self.pipeline_tx().lock().as_mut() {
+            tx.qc_tx.take().map(|tx| tx.send(qc));
+        }
+    }
 }
 
 impl Debug for PipelinedBlock {
@@ -317,6 +328,7 @@ impl PipelinedBlock {
             pipeline_futs: Arc::new(Mutex::new(None)),
             pipeline_tx: Arc::new(Mutex::new(None)),
             pipeline_abort_handle: Arc::new(Mutex::new(None)),
+            block_qc: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -422,12 +434,18 @@ impl PipelinedBlock {
     pub fn get_execution_summary(&self) -> Option<ExecutionSummary> {
         self.execution_summary.get().cloned()
     }
+
+    pub fn qc(&self) -> Option<Arc<QuorumCert>> {
+        self.block_qc.lock().clone()
+    }
 }
 
 /// Pipeline related functions
 impl PipelinedBlock {
     pub fn pipeline_enabled(&self) -> bool {
-        self.pipeline_futs.lock().is_some()
+        // if the pipeline_tx is set, the pipeline is enabled,
+        // we don't use pipeline fut here because it can't be taken when abort
+        self.pipeline_tx.lock().is_some()
     }
 
     pub fn pipeline_futs(&self) -> Option<PipelineFutures> {
@@ -451,6 +469,12 @@ impl PipelinedBlock {
     }
 
     pub fn abort_pipeline(&self) -> Option<PipelineFutures> {
+        info!(
+            "[Pipeline] Aborting pipeline for block {} {} {}",
+            self.id(),
+            self.epoch(),
+            self.round()
+        );
         if let Some(abort_handles) = self.pipeline_abort_handle.lock().take() {
             for handle in abort_handles {
                 handle.abort();
@@ -461,7 +485,9 @@ impl PipelinedBlock {
 
     pub async fn wait_for_compute_result(&self) -> ExecutorResult<(StateComputeResult, Duration)> {
         self.pipeline_futs()
-            .expect("Pipeline needs to be enabled")
+            .ok_or(ExecutorError::InternalError {
+                error: "Pipeline aborted".to_string(),
+            })?
             .ledger_update_fut
             .await
             .map(|(compute_result, execution_time, _)| (compute_result, execution_time))
@@ -471,11 +497,11 @@ impl PipelinedBlock {
     }
 
     pub async fn wait_for_commit_ledger(&self) {
-        self.pipeline_futs()
-            .expect("Pipeline needs to be enabled")
-            .commit_ledger_fut
-            .await
-            .expect("Commit ledger should succeed");
+        // may be aborted (e.g. by reset)
+        if let Some(fut) = self.pipeline_futs() {
+            // this may be cancelled
+            let _ = fut.commit_ledger_fut.await;
+        }
     }
 }
 

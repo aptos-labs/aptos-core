@@ -58,3 +58,32 @@ Follow the instruction to manually complete a session with the pepper service.
 Sorry for the missing examples in other programming languages.
 For now please read through `example-client-rust/src/main.rs` implementation and output:
 that is what your frontend needs to do.
+
+## Extra: manual testing for endpoint `v0/verify`.
+NOTE: API `v0/verify` now depends on on-chain resources
+`0x1::keyless_account::Groth16VerificationKey` and `0x1::keyless_account::Configuration`,
+which need to be fetched via HTTP requests.
+
+In terminal 0, run the pepper service.
+```bash
+export VUF_KEY_SEED_HEX=ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+export ONCHAIN_GROTH16_VK_URL=http://localhost:4444/groth16_vk.json
+export ONCHAIN_KEYLESS_CONFIG_URL=http://localhost:4444/keyless_config.json
+cargo run -p aptos-keyless-pepper-service
+```
+
+In terminal 1, peek the cached resources, they should currently give 404.
+```
+curl -v http://localhost:8000/cached/groth16-vk
+curl -v http://localhost:8000/cached/keyless-config
+```
+
+In terminal 2, mock the full node with a naive HTTP server.
+```bash
+cd keyless/pepper/service/resources
+python3 -m http.server 4444
+```
+
+Wait for 10 secs then go back to terminal 1 to retry the curl cmds. The cached data should be available.
+
+TODO: how to generate sample request and interact with `v0/verify` endpoint?

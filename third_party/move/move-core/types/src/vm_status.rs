@@ -565,9 +565,14 @@ pub enum StatusCode {
     SEQUENCE_NUMBER_TOO_BIG = 24,
     // The gas currency is not registered as a TransactionFee currency
     BAD_TRANSACTION_FEE_CURRENCY = 25,
-    // DEPRECATED. The feature requested is intended for a future Diem version instead of the current
-    // This code is deprecated as it is discarded. Use the verification error code
-    // FEATURE_NOT_ENABLED instead.
+    // Discards a transaction, because newly added code path hasn't yet been enabled,
+    // and transactions were discarded before the feature was introduced.
+    // To be used for example when new variants in the transaction - like new payload or authenticator
+    // types are introduced, that wouldn't be deserialized successfully by the previous binary.
+    //
+    // When the feature is "double" gated, i.e. new bytecode version introduces new things,
+    // but we don't want all the be enabled at the same time, such that it is safe to abort,
+    // use the verification error code FEATURE_NOT_ENABLED instead.
     FEATURE_UNDER_GATING = 26,
     // The number of secondary signer addresses is different from the number of secondary
     // public keys provided.
@@ -589,9 +594,8 @@ pub enum StatusCode {
     GAS_PARAMS_MISSING = 38,
     REQUIRED_DEPOSIT_INCONSISTENT_WITH_TXN_MAX_GAS = 39,
     MULTISIG_TRANSACTION_PAYLOAD_DOES_NOT_MATCH = 40,
-
+    ACCOUNT_AUTHENTICATION_GAS_LIMIT_EXCEEDED = 41,
     // Reserved error code for future use
-    RESERVED_VALIDATION_ERROR_6 = 41,
     RESERVED_VALIDATION_ERROR_7 = 42,
     RESERVED_VALIDATION_ERROR_8 = 43,
     RESERVED_VALIDATION_ERROR_9 = 44,
@@ -732,7 +736,13 @@ pub enum StatusCode {
     TEST_VARIANT_TYPE_MISMATCH_ERROR = 1129,
     // A variant list is empty
     ZERO_VARIANTS_ERROR = 1130,
-    // A feature is not enabled.
+    // A feature is not enabled, and transaction will abort and be committed on chain.
+    // Use only when there is no backward incompatibility concern - as it is
+    // double-gated by an additional flag, i.e. new bytecode version introduces new things,
+    // but we don't want all the be enabled at the same time, such that it is safe to abort.
+    //
+    // If we are introducing code, that previous binary would discard such a transaction,
+    // you need to use FEATURE_UNDER_GATING flag instead.
     FEATURE_NOT_ENABLED = 1131,
 
     // Reserved error code for future use

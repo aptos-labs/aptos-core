@@ -79,7 +79,7 @@ pub struct GenesisInfo {
     pub randomness_config_override: Option<OnChainRandomnessConfig>,
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
     pub initial_jwks: Vec<IssuerJWK>,
-    pub keyless_groth16_vk_override: Option<Groth16VerificationKey>,
+    pub keyless_groth16_vk: Option<Groth16VerificationKey>,
 }
 
 impl GenesisInfo {
@@ -120,7 +120,7 @@ impl GenesisInfo {
             randomness_config_override: genesis_config.randomness_config_override.clone(),
             jwk_consensus_config_override: genesis_config.jwk_consensus_config_override.clone(),
             initial_jwks: genesis_config.initial_jwks.clone(),
-            keyless_groth16_vk_override: genesis_config.keyless_groth16_vk_override.clone(),
+            keyless_groth16_vk: genesis_config.keyless_groth16_vk.clone(),
         })
     }
 
@@ -157,7 +157,7 @@ impl GenesisInfo {
                 randomness_config_override: self.randomness_config_override.clone(),
                 jwk_consensus_config_override: self.jwk_consensus_config_override.clone(),
                 initial_jwks: self.initial_jwks.clone(),
-                keyless_groth16_vk_override: self.keyless_groth16_vk_override.clone(),
+                keyless_groth16_vk: self.keyless_groth16_vk.clone(),
             },
             &self.consensus_config,
             &self.execution_config,

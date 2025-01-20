@@ -23,8 +23,10 @@ aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-types = { workspace = true }
 ark-bls12-381 = { workspace = true }
+ark-bn254 = { workspace = true }
 ark-ec = { workspace = true }
 ark-ff = { workspace = true }
+ark-groth16 = { workspace = true }
 ark-serialize = { workspace = true }
 bcs = { workspace = true }
 dashmap = { workspace = true }

@@ -15,17 +15,20 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
+    account_address::AccountAddress,
+    identifier::IdentStr,
+    language_storage::{ModuleId, TypeTag},
     metadata::Metadata,
 };
 use move_vm_runtime::{
     ambassador_impl_CodeStorage, ambassador_impl_ModuleStorage,
     ambassador_impl_WithRuntimeEnvironment, AsUnsyncCodeStorage, BorrowedOrOwned, CodeStorage,
-    Module, ModuleStorage, RuntimeEnvironment, Script, UnsyncCodeStorage, UnsyncModuleStorage,
-    WithRuntimeEnvironment,
+    Function, Module, ModuleStorage, RuntimeEnvironment, Script, UnsyncCodeStorage,
+    UnsyncModuleStorage, WithRuntimeEnvironment,
 };
 use move_vm_types::{
     code::{ModuleBytesStorage, ModuleCode},
+    loaded_data::runtime_types::{StructType, Type},
     module_storage_error,
 };
 use std::{ops::Deref, sync::Arc};

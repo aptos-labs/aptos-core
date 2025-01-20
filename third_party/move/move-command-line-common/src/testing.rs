@@ -2,21 +2,15 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::env::{get_move_compiler_v2_from_env, read_bool_env_var};
+use crate::env::read_bool_env_var;
 
 /// Extension for raw output files
 pub const OUT_EXT: &str = "out";
 /// Extension for expected output files
 pub const EXP_EXT: &str = "exp";
-/// Extension for expected output files compiled by v2
-pub const EXP_EXT_V2: &str = "v2_exp";
 
 pub fn get_compiler_exp_extension() -> &'static str {
-    if get_move_compiler_v2_from_env() {
-        EXP_EXT_V2
-    } else {
-        EXP_EXT
-    }
+    EXP_EXT
 }
 
 /// If any of these env vars is set, the test harness should overwrite

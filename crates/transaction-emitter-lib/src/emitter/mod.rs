@@ -827,7 +827,7 @@ impl TxnEmitter {
             prompt_before_spending: req.prompt_before_spending,
         };
         let (txn_generator_creator, _, _) = create_txn_generator_creator(
-            &req.transaction_mix_per_phase,
+            req.transaction_mix_per_phase,
             source_account_manager,
             &mut all_accounts,
             vec![],

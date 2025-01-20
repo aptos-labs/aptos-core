@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{experiments::Experiment, Options};
 use codespan_reporting::diagnostic::Severity;
 use ethnum::U256;
 use itertools::Itertools;
@@ -324,6 +325,14 @@ impl<'env> Generator<'env> {
         let loc = env.get_node_loc(id);
         env.diag(severity, &loc, msg.as_ref())
     }
+
+    fn check_if_lambdas_enabled(&self) -> bool {
+        let options = self
+            .env()
+            .get_extension::<Options>()
+            .expect("Options is available");
+        options.experiment_on(Experiment::LAMBDA_VALUES)
+    }
 }
 
 // ======================================================================================
@@ -480,14 +489,23 @@ impl<'env> Generator<'env> {
                 self.emit_with(*id, |attr| Bytecode::SpecBlock(attr, spec));
             },
             // TODO(LAMBDA)
-            ExpData::Lambda(id, _, _, _, _) => self.error(
+            ExpData::Lambda(id, _, _, _, _) =>
+                self.error(
                 *id,
-                "Function-typed values not yet supported except as parameters to calls to inline functions",
+                if self.check_if_lambdas_enabled() {
+                    "Function-typed values not yet implemented except as parameters to calls to inline functions"
+                } else {
+                    "Function-typed values not yet supported except as parameters to calls to inline functions"
+                }
             ),
             // TODO(LAMBDA)
             ExpData::Invoke(id, _exp, _) => self.error(
                 *id,
-                "Calls to function values other than inline function parameters not yet supported",
+                if self.check_if_lambdas_enabled() {
+                    "Calls to function values other than inline function parameters not yet implemented"
+                } else {
+                    "Calls to function values other than inline function parameters not yet supported"
+                }
             ),
             ExpData::Quant(id, _, _, _, _, _) => {
                 self.internal_error(*id, "unsupported specification construct")
@@ -564,10 +582,16 @@ impl<'env> Generator<'env> {
                     Constant::Bool(false)
                 }
             },
+            // TODO(LAMBDA)
             Value::Function(_mid, _fid) => {
                 self.error(
                     id,
-                    "Function-typed values not yet supported except as parameters to calls to inline functions");
+                    if self.check_if_lambdas_enabled() {
+                        "Function-typed values not yet implemented except as parameters to calls to inline functions"
+                    } else {
+                        "Function-typed values not yet supported except as parameters to calls to inline functions"
+                    }
+                );
                 Constant::Bool(false)
             },
         }
@@ -794,7 +818,11 @@ impl<'env> Generator<'env> {
             // TODO(LAMBDA)
             Operation::EarlyBind => self.error(
                 id,
-                "Function-typed values not yet supported except as parameters to calls to inline functions",
+                if self.check_if_lambdas_enabled() {
+                    "Function-typed values not yet implemented except as parameters to calls to inline functions"
+                } else {
+                    "Function-typed values not yet supported except as parameters to calls to inline functions"
+                },
             ),
             Operation::TestVariants(mid, sid, variants) => {
                 self.gen_test_variants(targets, id, mid.qualified(*sid), variants, args)
@@ -1080,15 +1108,12 @@ impl<'env> Generator<'env> {
     /// Generate the code for a list of arguments.
     /// Note that the arguments are evaluated in left-to-right order.
     fn gen_arg_list(&mut self, exps: &[Exp]) -> Vec<TempIndex> {
-        // If all args are side-effect free, we don't need to force temporary generation
-        // to get left-to-right evaluation.
-        let with_forced_temp = !exps.iter().all(is_definitely_pure);
         let len = exps.len();
-        // Generate code with (potentially) forced creation of temporaries for all except last arg.
+        // Generate code with forced creation of temporaries for all except last arg.
         let mut args = exps
             .iter()
             .take(if len == 0 { 0 } else { len - 1 })
-            .map(|exp| self.gen_escape_auto_ref_arg(exp, with_forced_temp))
+            .map(|exp| self.gen_escape_auto_ref_arg(exp, true))
             .collect::<Vec<_>>();
         // If there is a last arg, we don't need to force create a temporary for it.
         if let Some(last_arg) = exps
@@ -2410,6 +2435,7 @@ impl<'a> fmt::Display for ValueShapeDisplay<'a> {
 // Helpers
 
 /// Is this a leaf expression which cannot contain another expression?
+#[allow(dead_code)]
 fn is_leaf_exp(exp: &Exp) -> bool {
     matches!(
         exp.as_ref(),
@@ -2418,6 +2444,7 @@ fn is_leaf_exp(exp: &Exp) -> bool {
 }
 
 /// Can we be certain that this expression is side-effect free?
+#[allow(dead_code)]
 fn is_definitely_pure(exp: &Exp) -> bool {
     is_leaf_exp(exp) // A leaf expression is pure.
         || match exp.as_ref() {

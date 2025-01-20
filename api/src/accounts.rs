@@ -15,11 +15,15 @@ use crate::{
 };
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    AccountData, Address, AptosErrorCode, AsConverter, LedgerInfo, MoveModuleBytecode,
+    AccountData, Address, AptosErrorCode, AsConverter, AssetType, LedgerInfo, MoveModuleBytecode,
     MoveModuleId, MoveResource, MoveStructTag, StateKeyWrapper, U64,
 };
+use aptos_sdk::types::{get_paired_fa_metadata_address, get_paired_fa_primary_store_address};
 use aptos_types::{
-    account_config::{AccountResource, ObjectGroupResource},
+    account_config::{
+        AccountResource, CoinStoreResourceUntyped, ConcurrentFungibleBalanceResource,
+        FungibleStoreResource, ObjectGroupResource,
+    },
     event::{EventHandle, EventKey},
     state_store::state_key::StateKey,
 };
@@ -30,7 +34,7 @@ use poem_openapi::{
     param::{Path, Query},
     OpenApi,
 };
-use std::{collections::BTreeMap, convert::TryInto, sync::Arc};
+use std::{collections::BTreeMap, convert::TryInto, str::FromStr, sync::Arc};
 
 /// API for accounts, their associated resources, and modules
 pub struct AccountsApi {
@@ -120,6 +124,42 @@ impl AccountsApi {
                 limit.0,
             )?;
             account.resources(&accept_type)
+        })
+        .await
+    }
+
+    /// Get account resources
+    ///
+    /// Retrieves all account resources for a given account and a specific ledger version.  If the
+    /// ledger version is not specified in the request, the latest ledger version is used.
+    ///
+    /// The Aptos nodes prune account state history, via a configurable time window.
+    /// If the requested ledger version has been pruned, the server responds with a 410.
+    #[oai(
+        path = "/accounts/:address/balance/:asset_type",
+        method = "get",
+        operation_id = "get_account_balance",
+        tag = "ApiTags::Accounts"
+    )]
+    async fn get_account_balance(
+        &self,
+        accept_type: AcceptType,
+        /// Address of account with or without a `0x` prefix
+        address: Path<Address>,
+        asset_type: Path<AssetType>,
+        /// Ledger version to get state of account
+        ///
+        /// If not provided, it will be the latest version
+        ledger_version: Query<Option<U64>>,
+    ) -> BasicResultWith404<u64> {
+        fail_point_poem("endpoint_get_account_balance")?;
+        self.context
+            .check_api_output_enabled("Get account balance", &accept_type)?;
+
+        let context = self.context.clone();
+        api_spawn_blocking(move || {
+            let account = Account::new(context, address.0, ledger_version.0, None, None)?;
+            account.balance(asset_type.0, &accept_type)
         })
         .await
     }
@@ -245,6 +285,113 @@ impl Account {
             )),
             AcceptType::Bcs => BasicResponse::try_from_encoded((
                 state_value,
+                &self.latest_ledger_info,
+                BasicResponseStatus::Ok,
+            )),
+        }
+    }
+
+    pub fn balance(
+        &self,
+        asset_type: AssetType,
+        accept_type: &AcceptType,
+    ) -> BasicResultWith404<u64> {
+        let (fa_metadata_address, mut balance) = match asset_type {
+            AssetType::Coin(move_struct_tag) => {
+                let coin_store_type_tag =
+                    StructTag::from_str(&format!("0x1::coin::CoinStore<{}>", move_struct_tag))
+                        .map_err(|err| {
+                            BasicErrorWith404::internal_with_code(
+                                err,
+                                AptosErrorCode::InternalError,
+                                &self.latest_ledger_info,
+                            )
+                        })?;
+                // query coin balance
+                let state_value = self.context.get_state_value_poem(
+                    &StateKey::resource(&self.address.into(), &coin_store_type_tag).map_err(
+                        |err| {
+                            BasicErrorWith404::internal_with_code(
+                                err,
+                                AptosErrorCode::InternalError,
+                                &self.latest_ledger_info,
+                            )
+                        },
+                    )?,
+                    self.ledger_version,
+                    &self.latest_ledger_info,
+                )?;
+                let coin_balance = match state_value {
+                    None => 0,
+                    Some(bytes) => bcs::from_bytes::<CoinStoreResourceUntyped>(&bytes)
+                        .map_err(|err| {
+                            BasicErrorWith404::internal_with_code(
+                                err,
+                                AptosErrorCode::InternalError,
+                                &self.latest_ledger_info,
+                            )
+                        })?
+                        .coin(),
+                };
+                (
+                    get_paired_fa_metadata_address(&move_struct_tag),
+                    coin_balance,
+                )
+            },
+            AssetType::FungibleAsset(fa_metadata_adddress) => (fa_metadata_adddress.into(), 0),
+        };
+        let primary_fungible_store_address =
+            get_paired_fa_primary_store_address(self.address.into(), fa_metadata_address);
+        if let Some(data_blob) = self.context.get_state_value_poem(
+            &StateKey::resource_group(
+                &primary_fungible_store_address,
+                &ObjectGroupResource::struct_tag(),
+            ),
+            self.ledger_version,
+            &self.latest_ledger_info,
+        )? {
+            if let Ok(object_group) = bcs::from_bytes::<ObjectGroupResource>(&data_blob) {
+                if let Some(fa_store) = object_group.group.get(&FungibleStoreResource::struct_tag())
+                {
+                    let fa_store_resource = bcs::from_bytes::<FungibleStoreResource>(fa_store)
+                        .map_err(|err| {
+                            BasicErrorWith404::internal_with_code(
+                                err,
+                                AptosErrorCode::InternalError,
+                                &self.latest_ledger_info,
+                            )
+                        })?;
+                    if fa_store_resource.balance != 0 {
+                        balance += fa_store_resource.balance();
+                    } else if let Some(concurrent_fa_balance) = object_group
+                        .group
+                        .get(&ConcurrentFungibleBalanceResource::struct_tag())
+                    {
+                        // query potential concurrent fa balance
+                        let concurrent_fa_balance_resource =
+                            bcs::from_bytes::<ConcurrentFungibleBalanceResource>(
+                                concurrent_fa_balance,
+                            )
+                            .map_err(|err| {
+                                BasicErrorWith404::internal_with_code(
+                                    err,
+                                    AptosErrorCode::InternalError,
+                                    &self.latest_ledger_info,
+                                )
+                            })?;
+                        balance += concurrent_fa_balance_resource.balance();
+                    }
+                }
+            }
+        }
+        match accept_type {
+            AcceptType::Json => BasicResponse::try_from_json((
+                balance,
+                &self.latest_ledger_info,
+                BasicResponseStatus::Ok,
+            )),
+            AcceptType::Bcs => BasicResponse::try_from_encoded((
+                bcs::to_bytes(&balance).unwrap(),
                 &self.latest_ledger_info,
                 BasicResponseStatus::Ok,
             )),

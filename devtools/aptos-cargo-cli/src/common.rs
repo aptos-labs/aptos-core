@@ -45,7 +45,7 @@ const IGNORED_DETERMINATOR_PATHS: [&str; 8] = [
     "terraform/*",
 ];
 
-// The maximum number of days allowed since the merge-base commit for the branch
+// The maximum number of days allowed since the merge-base commit for the branch.
 const MAX_NUM_DAYS_SINCE_MERGE_BASE: u64 = 7;
 
 // The delimiter used to separate the package path and the package name.

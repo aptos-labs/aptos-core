@@ -169,6 +169,7 @@ impl ContractEvent {
 
 /// Entry produced via a call to the `emit_event` builtin.
 #[derive(Hash, Clone, Eq, PartialEq, Serialize, Deserialize, CryptoHasher)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct ContractEventV1 {
     /// The unique key that the event was emitted to
     key: EventKey,

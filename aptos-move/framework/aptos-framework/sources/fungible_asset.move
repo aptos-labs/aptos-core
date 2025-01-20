@@ -6,6 +6,7 @@ module aptos_framework::fungible_asset {
     use aptos_framework::event;
     use aptos_framework::function_info::{Self, FunctionInfo};
     use aptos_framework::object::{Self, Object, ConstructorRef, DeleteRef, ExtendRef};
+    use aptos_framework::permissioned_signer;
     use std::string;
     use std::features;
 
@@ -87,7 +88,13 @@ module aptos_framework::fungible_asset {
     const ECONCURRENT_BALANCE_NOT_ENABLED: u64 = 32;
     /// Provided derived_supply function type doesn't meet the signature requirement.
     const EDERIVED_SUPPLY_FUNCTION_SIGNATURE_MISMATCH: u64 = 33;
+    /// The balance ref and the fungible asset do not match.
+    const ERAW_BALANCE_REF_AND_FUNGIBLE_ASSET_MISMATCH: u64 = 34;
+    /// The supply ref and the fungible asset do not match.
+    const ERAW_SUPPLY_REF_AND_FUNGIBLE_ASSET_MISMATCH: u64 = 35;
 
+    /// signer don't have the permission to perform withdraw operation
+    const EWITHDRAW_PERMISSION_DENIED: u64 = 36;
     //
     // Constants
     //
@@ -184,6 +191,16 @@ module aptos_framework::fungible_asset {
         metadata: Object<Metadata>
     }
 
+    /// RawBalanceRef will be used to access the raw balance for FAs that registered `derived_balance` hook.
+    struct RawBalanceRef has drop, store {
+        metadata: Object<Metadata>
+    }
+
+    /// RawSupplyRef will be used to access the raw supply for FAs that registered `derived_supply` hook.
+    struct RawSupplyRef has drop, store {
+        metadata: Object<Metadata>
+    }
+
     /// BurnRef can be used to burn fungible assets from a given holder account.
     struct BurnRef has drop, store {
         metadata: Object<Metadata>
@@ -192,6 +209,10 @@ module aptos_framework::fungible_asset {
     /// MutateMetadataRef can be used to directly modify the fungible asset's Metadata.
     struct MutateMetadataRef has drop, store {
         metadata: Object<Metadata>
+    }
+
+    enum WithdrawPermission has copy, drop, store {
+        ByStore { store_address: address }
     }
 
     #[event]
@@ -462,6 +483,22 @@ module aptos_framework::fungible_asset {
         TransferRef { metadata }
     }
 
+    /// Creates a balance ref that can be used to access raw balance of fungible assets from the given fungible
+    /// object's constructor ref.
+    /// This can only be called at object creation time as constructor_ref is only available then.
+    public fun generate_raw_balance_ref(constructor_ref: &ConstructorRef): RawBalanceRef {
+        let metadata = object::object_from_constructor_ref<Metadata>(constructor_ref);
+        RawBalanceRef { metadata }
+    }
+
+    /// Creates a supply ref that can be used to access raw supply of fungible assets from the given fungible
+    /// object's constructor ref.
+    /// This can only be called at object creation time as constructor_ref is only available then.
+    public fun generate_raw_supply_ref(constructor_ref: &ConstructorRef): RawSupplyRef {
+        let metadata = object::object_from_constructor_ref<Metadata>(constructor_ref);
+        RawSupplyRef { metadata }
+    }
+
     /// Creates a mutate metadata ref that can be used to change the metadata information of fungible assets from the
     /// given fungible object's constructor ref.
     /// This can only be called at object creation time as constructor_ref is only available then.
@@ -472,7 +509,18 @@ module aptos_framework::fungible_asset {
 
     #[view]
     /// Get the current supply from the `metadata` object.
+    ///
+    /// Note: This function will abort on FAs with `derived_supply` hook set up.
+    ///       Use `dispatchable_fungible_asset::supply` instead if you intend to work with those FAs.
     public fun supply<T: key>(metadata: Object<T>): Option<u128> acquires Supply, ConcurrentSupply {
+        assert!(
+            !has_supply_dispatch_function(object::object_address(&metadata)),
+            error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS)
+        );
+        supply_impl(metadata)
+    }
+
+    fun supply_impl<T: key>(metadata: Object<T>): Option<u128> acquires Supply, ConcurrentSupply {
         let metadata_address = object::object_address(&metadata);
         if (exists<ConcurrentSupply>(metadata_address)) {
             let supply = borrow_global<ConcurrentSupply>(metadata_address);
@@ -577,7 +625,19 @@ module aptos_framework::fungible_asset {
 
     #[view]
     /// Get the balance of a given store.
-    public fun balance<T: key>(store: Object<T>): u64 acquires FungibleStore, ConcurrentFungibleBalance {
+    ///
+    /// Note: This function will abort on FAs with `derived_balance` hook set up.
+    ///       Use `dispatchable_fungible_asset::balance` instead if you intend to work with those FAs.
+    public fun balance<T: key>(store: Object<T>): u64 acquires FungibleStore, ConcurrentFungibleBalance, DispatchFunctionStore {
+        let fa_store = borrow_store_resource(&store);
+        assert!(
+            !has_balance_dispatch_function(fa_store.metadata),
+            error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS)
+        );
+        balance_impl(store)
+    }
+
+    fun balance_impl<T: key>(store: Object<T>): u64 acquires FungibleStore, ConcurrentFungibleBalance {
         let store_addr = object::object_address(&store);
         if (store_exists_inline(store_addr)) {
             let store_balance = borrow_store_resource(&store).balance;
@@ -671,6 +731,25 @@ module aptos_framework::fungible_asset {
         }
     }
 
+    fun has_balance_dispatch_function(metadata: Object<Metadata>): bool acquires DispatchFunctionStore {
+        let metadata_addr = object::object_address(&metadata);
+        // Short circuit on APT for better perf
+        if (metadata_addr != @aptos_fungible_asset && exists<DispatchFunctionStore>(metadata_addr)) {
+            option::is_some(&borrow_global<DispatchFunctionStore>(metadata_addr).derived_balance_function)
+        } else {
+            false
+        }
+    }
+
+    fun has_supply_dispatch_function(metadata_addr: address): bool {
+        // Short circuit on APT for better perf
+        if (metadata_addr != @aptos_fungible_asset) {
+            exists<DeriveSupply>(metadata_addr)
+        } else {
+            false
+        }
+    }
+
     public(friend) fun derived_balance_dispatch_function<T: key>(store: Object<T>): Option<FunctionInfo> acquires FungibleStore, DispatchFunctionStore {
         let fa_store = borrow_store_resource(&store);
         let metadata_addr = object::object_address(&fa_store.metadata);
@@ -716,6 +795,9 @@ module aptos_framework::fungible_asset {
 
     /// Transfer an `amount` of fungible asset from `from_store`, which should be owned by `sender`, to `receiver`.
     /// Note: it does not move the underlying object.
+    ///
+    ///       This function can be in-place replaced by `dispatchable_fungible_asset::transfer`. You should use
+    ///       that function unless you DO NOT want to support fungible assets with dispatchable hooks.
     public entry fun transfer<T: key>(
         sender: &signer,
         from: Object<T>,
@@ -779,13 +861,39 @@ module aptos_framework::fungible_asset {
     }
 
     /// Withdraw `amount` of the fungible asset from `store` by the owner.
+    ///
+    /// Note: This function can be in-place replaced by `dispatchable_fungible_asset::withdraw`. You should use
+    ///       that function unless you DO NOT want to support fungible assets with dispatchable hooks.
     public fun withdraw<T: key>(
         owner: &signer,
         store: Object<T>,
         amount: u64,
     ): FungibleAsset acquires FungibleStore, DispatchFunctionStore, ConcurrentFungibleBalance {
         withdraw_sanity_check(owner, store, true);
-        withdraw_internal(object::object_address(&store), amount)
+        withdraw_permission_check(owner, store, amount);
+        unchecked_withdraw(object::object_address(&store), amount)
+    }
+
+    /// Check the permission for withdraw operation.
+    public(friend) fun withdraw_permission_check<T: key>(
+        owner: &signer,
+        store: Object<T>,
+        amount: u64,
+    ) {
+        assert!(permissioned_signer::check_permission_consume(owner, amount as u256, WithdrawPermission::ByStore {
+            store_address: object::object_address(&store),
+        }), error::permission_denied(EWITHDRAW_PERMISSION_DENIED));
+    }
+
+    /// Check the permission for withdraw operation.
+    public(friend) fun withdraw_permission_check_by_address(
+        owner: &signer,
+        store_address: address,
+        amount: u64,
+    ) {
+        assert!(permissioned_signer::check_permission_consume(owner, amount as u256, WithdrawPermission::ByStore {
+            store_address,
+        }), error::permission_denied(EWITHDRAW_PERMISSION_DENIED));
     }
 
     /// Check the permission for withdraw operation.
@@ -794,7 +902,19 @@ module aptos_framework::fungible_asset {
         store: Object<T>,
         abort_on_dispatch: bool,
     ) acquires FungibleStore, DispatchFunctionStore {
-        assert!(object::owns(store, signer::address_of(owner)), error::permission_denied(ENOT_STORE_OWNER));
+        withdraw_sanity_check_impl(
+            signer::address_of(owner),
+            store,
+            abort_on_dispatch,
+        )
+    }
+
+    inline fun withdraw_sanity_check_impl<T: key>(
+        owner_address: address,
+        store: Object<T>,
+        abort_on_dispatch: bool,
+    ) acquires FungibleStore, DispatchFunctionStore {
+        assert!(object::owns(store, owner_address), error::permission_denied(ENOT_STORE_OWNER));
         let fa_store = borrow_store_resource(&store);
         assert!(
             !abort_on_dispatch || !has_withdraw_dispatch_function(fa_store.metadata),
@@ -817,9 +937,12 @@ module aptos_framework::fungible_asset {
     }
 
     /// Deposit `amount` of the fungible asset to `store`.
+    ///
+    /// Note: This function can be in-place replaced by `dispatchable_fungible_asset::deposit`. You should use
+    ///       that function unless you DO NOT want to support fungible assets with dispatchable hooks.
     public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore, DispatchFunctionStore, ConcurrentFungibleBalance {
         deposit_sanity_check(store, true);
-        deposit_internal(object::object_address(&store), fa);
+        unchecked_deposit(object::object_address(&store), fa);
     }
 
     /// Mint the specified `amount` of the fungible asset.
@@ -844,7 +967,7 @@ module aptos_framework::fungible_asset {
     public fun mint_to<T: key>(ref: &MintRef, store: Object<T>, amount: u64)
     acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance {
         deposit_sanity_check(store, false);
-        deposit_internal(object::object_address(&store), mint(ref, amount));
+        unchecked_deposit(object::object_address(&store), mint(ref, amount));
     }
 
     /// Enable/disable a store's ability to do direct transfers of the fungible asset.
@@ -898,16 +1021,17 @@ module aptos_framework::fungible_asset {
         amount: u64
     ) acquires FungibleStore, Supply, ConcurrentSupply, ConcurrentFungibleBalance {
         // ref metadata match is checked in burn() call
-        burn(ref, withdraw_internal(object::object_address(&store), amount));
+        burn(ref, unchecked_withdraw(object::object_address(&store), amount));
     }
 
-    public(friend) fun address_burn_from(
+    /// Burn the `amount` of the fungible asset from the given store for gas charge.
+    public(friend) fun address_burn_from_for_gas(
         ref: &BurnRef,
         store_addr: address,
         amount: u64
     ) acquires FungibleStore, Supply, ConcurrentSupply, ConcurrentFungibleBalance {
         // ref metadata match is checked in burn() call
-        burn(ref, withdraw_internal(store_addr, amount));
+        burn(ref, unchecked_withdraw_with_no_events(store_addr, amount));
     }
 
     /// Withdraw `amount` of the fungible asset from the `store` ignoring `frozen`.
@@ -920,7 +1044,7 @@ module aptos_framework::fungible_asset {
             ref.metadata == store_metadata(store),
             error::invalid_argument(ETRANSFER_REF_AND_STORE_MISMATCH),
         );
-        withdraw_internal(object::object_address(&store), amount)
+        unchecked_withdraw(object::object_address(&store), amount)
     }
 
     /// Deposit the fungible asset into the `store` ignoring `frozen`.
@@ -933,7 +1057,7 @@ module aptos_framework::fungible_asset {
             ref.metadata == fa.metadata,
             error::invalid_argument(ETRANSFER_REF_AND_FUNGIBLE_ASSET_MISMATCH)
         );
-        deposit_internal(object::object_address(&store), fa);
+        unchecked_deposit(object::object_address(&store), fa);
     }
 
     /// Transfer `amount` of the fungible asset with `TransferRef` even it is frozen.
@@ -945,6 +1069,30 @@ module aptos_framework::fungible_asset {
     ) acquires FungibleStore, ConcurrentFungibleBalance {
         let fa = withdraw_with_ref(transfer_ref, from, amount);
         deposit_with_ref(transfer_ref, to, fa);
+    }
+
+    /// Access raw balance of a store using `RawBalanceRef`
+    public fun balance_with_ref<T: key>(
+        ref: &RawBalanceRef,
+        store: Object<T>,
+    ): u64 acquires FungibleStore, ConcurrentFungibleBalance {
+        assert!(
+            ref.metadata == store_metadata(store),
+            error::invalid_argument(ERAW_BALANCE_REF_AND_FUNGIBLE_ASSET_MISMATCH)
+        );
+        balance_impl(store)
+    }
+
+    /// Access raw supply of a FA using `RawSupplyRef`
+    public fun supply_with_ref<T: key>(
+        ref: &RawSupplyRef,
+        metadata: Object<T>,
+    ): Option<u128> acquires Supply, ConcurrentSupply {
+        assert!(
+            object::object_address(&ref.metadata) == object::object_address(&metadata),
+            error::invalid_argument(ERAW_BALANCE_REF_AND_FUNGIBLE_ASSET_MISMATCH)
+        );
+        supply_impl(metadata)
     }
 
     /// Mutate specified fields of the fungible asset's `Metadata`.
@@ -1019,26 +1167,57 @@ module aptos_framework::fungible_asset {
         assert!(amount == 0, error::invalid_argument(EAMOUNT_IS_NOT_ZERO));
     }
 
-    public(friend) fun deposit_internal(store_addr: address, fa: FungibleAsset) acquires FungibleStore, ConcurrentFungibleBalance {
+    inline fun unchecked_deposit_with_no_events_inline(
+        store_addr: address,
+        fa: FungibleAsset
+    ): u64 acquires FungibleStore, ConcurrentFungibleBalance {
         let FungibleAsset { metadata, amount } = fa;
         assert!(exists<FungibleStore>(store_addr), error::not_found(EFUNGIBLE_STORE_EXISTENCE));
         let store = borrow_global_mut<FungibleStore>(store_addr);
         assert!(metadata == store.metadata, error::invalid_argument(EFUNGIBLE_ASSET_AND_STORE_MISMATCH));
 
-        if (amount == 0) return;
-
-        if (store.balance == 0 && concurrent_fungible_balance_exists_inline(store_addr)) {
-            let balance_resource = borrow_global_mut<ConcurrentFungibleBalance>(store_addr);
-            aggregator_v2::add(&mut balance_resource.balance, amount);
-        } else {
-            store.balance = store.balance + amount;
+        if (amount != 0) {
+            if (store.balance == 0 && concurrent_fungible_balance_exists_inline(store_addr)) {
+                let balance_resource = borrow_global_mut<ConcurrentFungibleBalance>(store_addr);
+                aggregator_v2::add(&mut balance_resource.balance, amount);
+            } else {
+                store.balance = store.balance + amount;
+            };
         };
-
-        event::emit(Deposit { store: store_addr, amount });
+        amount
     }
 
-    /// Extract `amount` of the fungible asset from `store`.
-    public(friend) fun withdraw_internal(
+    public(friend) fun unchecked_deposit(
+        store_addr: address,
+        fa: FungibleAsset
+    ) acquires FungibleStore, ConcurrentFungibleBalance {
+        let amount = unchecked_deposit_with_no_events_inline(store_addr, fa);
+        if (amount != 0) {
+            event::emit(Deposit { store: store_addr, amount });
+        }
+    }
+
+    public(friend) fun unchecked_deposit_with_no_events(
+        store_addr: address,
+        fa: FungibleAsset
+    ) acquires FungibleStore, ConcurrentFungibleBalance {
+        unchecked_deposit_with_no_events_inline(store_addr, fa);
+    }
+
+    /// Extract `amount` of the fungible asset from `store` emitting event.
+    public(friend) fun unchecked_withdraw(
+        store_addr: address,
+        amount: u64
+    ): FungibleAsset acquires FungibleStore, ConcurrentFungibleBalance {
+        let fa = unchecked_withdraw_with_no_events(store_addr, amount);
+        if (amount != 0) {
+            event::emit<Withdraw>(Withdraw { store: store_addr, amount });
+        };
+        fa
+    }
+
+    /// Extract `amount` of the fungible asset from `store` w/o emitting event.
+    inline fun unchecked_withdraw_with_no_events(
         store_addr: address,
         amount: u64,
     ): FungibleAsset acquires FungibleStore, ConcurrentFungibleBalance {
@@ -1057,8 +1236,6 @@ module aptos_framework::fungible_asset {
                 assert!(store.balance >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
                 store.balance = store.balance - amount;
             };
-
-            event::emit<Withdraw>(Withdraw { store: store_addr, amount });
         };
         FungibleAsset { metadata, amount }
     }
@@ -1189,6 +1366,58 @@ module aptos_framework::fungible_asset {
         move_to(&object_signer, ConcurrentFungibleBalance { balance });
     }
 
+    /// Permission management
+    ///
+    /// Master signer grant permissioned signer ability to withdraw a given amount of fungible asset.
+    public fun grant_permission_by_store<T: key>(
+        master: &signer,
+        permissioned: &signer,
+        store: Object<T>,
+        amount: u64
+    ) {
+        permissioned_signer::authorize_increase(
+            master,
+            permissioned,
+            amount as u256,
+            WithdrawPermission::ByStore {
+                store_address: object::object_address(&store),
+            }
+        )
+    }
+
+    public(friend) fun grant_permission_by_address(
+        master: &signer,
+        permissioned: &signer,
+        store_address: address,
+        amount: u64
+    ) {
+        permissioned_signer::authorize_increase(
+            master,
+            permissioned,
+            amount as u256,
+            WithdrawPermission::ByStore { store_address }
+        )
+    }
+
+    public(friend) fun refill_permission(
+        permissioned: &signer,
+        amount: u64,
+        store_address: address,
+    ) {
+        permissioned_signer::increase_limit(
+            permissioned,
+            amount as u256,
+            WithdrawPermission::ByStore { store_address }
+        )
+    }
+
+    /// Removing permissions from permissioned signer.
+    public fun revoke_permission(permissioned: &signer, token_type: Object<Metadata>) {
+        permissioned_signer::revoke_permission(permissioned, WithdrawPermission::ByStore {
+            store_address: object::object_address(&token_type),
+        })
+    }
+
     #[test_only]
     use aptos_framework::account;
 
@@ -1243,6 +1472,9 @@ module aptos_framework::fungible_asset {
         };
         create_store(&object::create_object_from_account(owner), metadata)
     }
+
+    #[test_only]
+    use aptos_framework::timestamp;
 
     #[test(creator = @0xcafe)]
     fun test_metadata_basic_flow(creator: &signer) acquires Metadata, Supply, ConcurrentSupply {
@@ -1375,7 +1607,7 @@ module aptos_framework::fungible_asset {
     fun test_transfer_with_ref(
         creator: &signer,
         aaron: &signer,
-    ) acquires FungibleStore, Supply, ConcurrentSupply, ConcurrentFungibleBalance {
+    ) acquires FungibleStore, Supply, ConcurrentSupply, ConcurrentFungibleBalance, DispatchFunctionStore {
         let (mint_ref, transfer_ref, _burn_ref, _mutate_metadata_ref, _) = create_fungible_asset(creator);
         let metadata = mint_ref.metadata;
         let creator_store = create_test_store(creator, metadata);
@@ -1646,6 +1878,89 @@ module aptos_framework::fungible_asset {
         assert!(borrow_store_resource(&creator_store).balance == 0, 10);
         assert!(exists<ConcurrentFungibleBalance>(object::object_address(&creator_store)), 11);
         assert!(aggregator_v2::read(&borrow_global<ConcurrentFungibleBalance>(object::object_address(&creator_store)).balance) == 30, 12);
+    }
+
+    #[test(creator = @0xcafe, aaron = @0xface)]
+    fun test_e2e_withdraw_limit(
+        creator: &signer,
+        aaron: &signer,
+    ) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance {
+        let aptos_framework = account::create_signer_for_test(@0x1);
+        timestamp::set_time_has_started_for_testing(&aptos_framework);
+
+        let (mint_ref, _, _, _, test_token) = create_fungible_asset(creator);
+        let metadata = mint_ref.metadata;
+        let creator_store = create_test_store(creator, metadata);
+        let aaron_store = create_test_store(aaron, metadata);
+
+        assert!(supply(test_token) == option::some(0), 1);
+        // Mint
+        let fa = mint(&mint_ref, 100);
+        assert!(supply(test_token) == option::some(100), 2);
+        // Deposit
+        deposit(creator_store, fa);
+        // Withdraw
+        let fa = withdraw(creator, creator_store, 80);
+        assert!(supply(test_token) == option::some(100), 3);
+        deposit(aaron_store, fa);
+
+        // Create a permissioned signer
+        let aaron_permission_handle = permissioned_signer::create_permissioned_handle(aaron);
+        let aaron_permission_signer = permissioned_signer::signer_from_permissioned_handle(&aaron_permission_handle);
+
+        // Grant aaron_permission_signer permission to withdraw 10 FA
+        grant_permission_by_store(aaron, &aaron_permission_signer, aaron_store, 10);
+
+        let fa = withdraw(&aaron_permission_signer, aaron_store, 5);
+        deposit(aaron_store, fa);
+
+        let fa = withdraw(&aaron_permission_signer, aaron_store, 5);
+        deposit(aaron_store, fa);
+
+        // aaron signer don't abide to the same limit
+        let fa = withdraw(aaron, aaron_store, 5);
+        deposit(aaron_store, fa);
+
+        permissioned_signer::destroy_permissioned_handle(aaron_permission_handle);
+    }
+
+    #[test(creator = @0xcafe, aaron = @0xface)]
+    #[expected_failure(abort_code = 0x50024, location = Self)]
+    fun test_e2e_withdraw_limit_exceeds(
+        creator: &signer,
+        aaron: &signer,
+    ) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance {
+        let aptos_framework = account::create_signer_for_test(@0x1);
+        timestamp::set_time_has_started_for_testing(&aptos_framework);
+
+        let (mint_ref, _, _, _, test_token) = create_fungible_asset(creator);
+        let metadata = mint_ref.metadata;
+        let creator_store = create_test_store(creator, metadata);
+        let aaron_store = create_test_store(aaron, metadata);
+
+        assert!(supply(test_token) == option::some(0), 1);
+        // Mint
+        let fa = mint(&mint_ref, 100);
+        assert!(supply(test_token) == option::some(100), 2);
+        // Deposit
+        deposit(creator_store, fa);
+        // Withdraw
+        let fa = withdraw(creator, creator_store, 80);
+        assert!(supply(test_token) == option::some(100), 3);
+        deposit(aaron_store, fa);
+
+        // Create a permissioned signer
+        let aaron_permission_handle = permissioned_signer::create_permissioned_handle(aaron);
+        let aaron_permission_signer = permissioned_signer::signer_from_permissioned_handle(&aaron_permission_handle);
+
+        // Grant aaron_permission_signer permission to withdraw 10 FA
+        grant_permission_by_store(aaron, &aaron_permission_signer, aaron_store, 10);
+
+        // Withdrawing more than 10 FA yield an error.
+        let fa = withdraw(&aaron_permission_signer, aaron_store, 11);
+        deposit(aaron_store, fa);
+
+        permissioned_signer::destroy_permissioned_handle(aaron_permission_handle);
     }
 
     #[deprecated]
