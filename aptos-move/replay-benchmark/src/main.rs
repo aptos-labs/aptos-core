@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_replay_benchmark::commands::{BenchmarkCommand, DownloadCommand, InitializeCommand};
+use aptos_replay_benchmark::commands::{
+    BenchmarkCommand, DiffCommand, DownloadCommand, InitializeCommand,
+};
 use clap::Parser;
 
 #[derive(Parser)]
@@ -9,6 +11,7 @@ use clap::Parser;
 pub enum Command {
     Download(DownloadCommand),
     Initialize(InitializeCommand),
+    Diff(DiffCommand),
     Benchmark(BenchmarkCommand),
 }
 
@@ -16,8 +19,9 @@ pub enum Command {
 async fn main() -> anyhow::Result<()> {
     let command = Command::parse();
     match command {
-        Command::Download(command) => command.download_and_save_transactions().await,
-        Command::Initialize(command) => command.initialize_inputs_for_workloads().await,
+        Command::Download(command) => command.download_transactions().await,
+        Command::Initialize(command) => command.initialize_inputs().await,
+        Command::Diff(command) => command.diff_outputs().await,
         Command::Benchmark(command) => command.benchmark().await,
     }
 }

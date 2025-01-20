@@ -166,7 +166,7 @@ impl TransactionDiffBuilder {
         &self,
         left: TransactionOutput,
         right: TransactionOutput,
-        maybe_fee_payer: Option<AccountAddress>,
+        fee_payer: Option<AccountAddress>,
     ) -> TransactionDiff {
         let (left_write_set, left_events, left_gas_used, left_transaction_status, _) =
             left.unpack();
@@ -193,7 +193,7 @@ impl TransactionDiffBuilder {
         }
 
         diffs.extend(self.diff_events(left_events, right_events));
-        diffs.extend(self.diff_write_sets(left_write_set, right_write_set, maybe_fee_payer));
+        diffs.extend(self.diff_write_sets(left_write_set, right_write_set, fee_payer));
 
         TransactionDiff { diffs }
     }
@@ -249,7 +249,7 @@ impl TransactionDiffBuilder {
         &self,
         left: WriteSet,
         right: WriteSet,
-        maybe_fee_payer: Option<AccountAddress>,
+        fee_payer: Option<AccountAddress>,
     ) -> Vec<Diff> {
         let left = left.into_mut().into_inner();
         let mut right = right.into_mut().into_inner();
@@ -273,7 +273,7 @@ impl TransactionDiffBuilder {
                 }
 
                 // Skip changes to fee payer's balance.
-                if let Some(fee_payer) = maybe_fee_payer {
+                if let Some(fee_payer) = fee_payer {
                     if state_key
                         == StateKey::resource(
                             &fee_payer,

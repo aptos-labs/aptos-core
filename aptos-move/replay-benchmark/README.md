@@ -1,19 +1,20 @@
-## A tool to replay and benchmark past Aptos transactions
+## A tool to replay, benchmark and analyze past Aptos transactions
 
 This tool allows to benchmark an ordered sequence of past transactions.
-The tool supports three commands:
+The tool supports four commands:
 
   1. `download`: Downloads transactions from the REST client and saves them locally into a single 
      file.
   2. `initialize`: Initializes the state for benchmarking, and saves it locally into a single file.
-  3. `benchmark`: Executes saved transactions on top of the saved state, measuring the time taken.
+  3. `diff`: Compares execution outputs on two different input states.
+  4. `benchmark`: Executes saved transactions on top of the saved state, measuring the time taken.
 
 
-### Downloading pst transactions
+### Downloading past transactions
 
 Users can download the past transactions using `download` command, specifying the first version
 (`--begin-version B`), the last version(`--end-version E`), and the file where to save
-them(`--output-file O`).
+them(`--transactions-file O`).
 Downloaded transactions are split into blocks, to mimic on-chain behavior, so that later blocks can
 be executed one-by-one using an executor.
 
@@ -37,7 +38,7 @@ aptos-replay-benchmark download \
   --rest-endpoint https://mainnet.aptoslabs.com/v1 \
   --begin-version 1944524532 \
   --end-version 1944524714 \
-  --output-file transactions.file
+  --transactions-file transactions.file
 ```
 Saves transactions to `transactions.file` and outputs:
 ```commandline
@@ -48,9 +49,10 @@ Downloaded 24 blocks with 183 transactions in total
 
 ### Initializing the state for the past transactions
 
-Users need to initialize the state for the past transactions they wish to benchmark.
+Users need to initialize the state for the past transactions they wish to benchmark via
+`initialize` command.
 To do that, one has to specify the file where blocks of transactions are saved
-(`--transactions-file T`) and where the inputs will be saved (`--output-file O`).
+(`--transactions-file T`) and where the inputs will be saved (`--inputs-file I`).
 Note that there are as many inputs as there are blocks.
 This way when each block is benchmarked, it is executed against the pre-computed state, so there is
 no "commit" of block execution outputs.
@@ -59,8 +61,8 @@ no "commit" of block execution outputs.
 
 ```commandline
 aptos-replay-benchmark initialize \
-  --transactions-file transactions.file
-  --output-file inputs-onchain.file
+  --transactions-file transactions.file \
+  --inputs-file inputs-onchain.file
 ```
 Saves inputs to `inputs-onchain.file` and outputs:
 ```commandline
@@ -78,11 +80,13 @@ Currently, the only supported overrides are feature flags:
 
   1. Feature flags can be forcefully enabled (`--enable-features F1 F2 ...`).
   2. Feature flags can be forcefully disabled (`--disable-features F1 F2 ...`).
+  3. Gas feature version can be overridden (`--gas-feature-version V`).
 
 Feature flags should be spelled in capital letters, e.g., `ENABLE_LOADER_V2`.
 For the full list of available features, see [here](../../types/src/on_chain_config/aptos_features.rs).
 
-Overriding the feature flags allows to see how having some feature on or off affects the runtime.
+Overriding the feature flags allows one to see how having some feature on or off affects the
+runtime.
 For example, if there is a new feature that improves the performance of MoveVM, with overrides it
 is possible to evaluate it on past transactions.
 
@@ -90,22 +94,35 @@ is possible to evaluate it on past transactions.
 
 ```commandline
 aptos-replay-benchmark initialize \
-  --transactions-file transactions.file
-  --enable-features ENABLE_LOADER_V2
-  --output-file inputs-with-v2-loader-enabled.file
+  --transactions-file transactions.file \
+  --enable-features ENABLE_LOADER_V2 \
+  --inputs-file inputs-with-v2-loader-enabled.file
 ```
 
 
 ### Comparing the execution when using overridden state
 
 Overriding the state can change the execution behavior.
-Hence, if any overrides are provided, the tool can also compare the on-chain outputs to new outputs
-obtained when execution on top of a modified state.
+The tool can also compare outputs when using different states with different overrides via `diff`
+command.
 The diff of comparison is logged, and the users of the tool can evaluate if the differences are
 significant or not.
 If the differences are not significant (e.g., only the gas usage has changed), the execution
 behavior still stays the same.
 Hence, the time measurements are still representative of the on-chain behavior.
+
+By providing `--allow-different-gas-usage` flag, gas fees related differences will be left out of
+comparison.
+That is, differences in account balance, total APT supply, and gas used will be ignored.
+
+#### Example
+
+```commandline
+aptos-replay-benchmark diff \
+  --transactions-file transactions.file \
+  --inputs-file inputs-onchain.file \
+  --other-inputs-file inputs-with-v2-loader-enabled.file
+```
 
 
 ### Benchmarking and measurements
@@ -147,8 +164,8 @@ the first `N` blocks.
 Benchmarking on-chain transactions (`ENABLE_LOADER_V2` is disabled).
 ```commandline
 aptos-replay-benchmark benchmark \
-  --transactions-file transactions.file
-  --inputs-file inputs-onchain.file
+  --transactions-file transactions.file \
+  --inputs-file inputs-onchain.file \
   --concurrency-levels 4 8 \
   --num-repeats 5 \
   --measure-overall-time \
@@ -175,8 +192,8 @@ Overall execution time (blocks 3-24): min 1509407us, average 1595744.20us, media
 Benchmarking on-chain transactions with `ENABLE_LOADER_V2` enabled. 
 ```commandline
 aptos-replay-benchmark benchmark \
-  --transactions-file transactions.file
-  --inputs-file inputs-with-v2-loader-enabled.file
+  --transactions-file transactions.file \
+  --inputs-file inputs-with-v2-loader-enabled.file \
   --concurrency-levels 4 8 \
   --num-repeats 5 \
   --measure-overall-time \

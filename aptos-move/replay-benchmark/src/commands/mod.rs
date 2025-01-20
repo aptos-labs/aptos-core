@@ -7,11 +7,13 @@ use aptos_push_metrics::MetricsPusher;
 use aptos_rest_client::{AptosBaseUrl, Client};
 pub use benchmark::BenchmarkCommand;
 use clap::Parser;
+pub use diff::DiffCommand;
 pub use download::DownloadCommand;
 pub use initialize::InitializeCommand;
 use url::Url;
 
 mod benchmark;
+mod diff;
 mod download;
 mod initialize;
 

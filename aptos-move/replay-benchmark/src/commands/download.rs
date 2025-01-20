@@ -17,22 +17,22 @@ pub struct DownloadCommand {
     #[clap(flatten)]
     rest_api: RestAPI,
 
+    #[clap(
+        long,
+        help = "Path to the file where the downloaded transactions will be saved"
+    )]
+    transactions_file: String,
+
     #[clap(long, help = "First transaction to include for benchmarking")]
     begin_version: Version,
 
     #[clap(long, help = "Last transaction to include for benchmarking")]
     end_version: Version,
-
-    #[clap(
-        long,
-        help = "Path to the file where the downloaded transactions will be saved"
-    )]
-    output_file: String,
 }
 
 impl DownloadCommand {
     /// Downloads a range of transactions, and saves them locally.
-    pub async fn download_and_save_transactions(self) -> anyhow::Result<()> {
+    pub async fn download_transactions(self) -> anyhow::Result<()> {
         assert!(
             self.begin_version <= self.end_version,
             "Transaction versions should be a valid closed interval. Instead got begin: {}, end: {}",
@@ -56,7 +56,7 @@ impl DownloadCommand {
 
         let bytes = bcs::to_bytes(&txn_blocks)
             .map_err(|err| anyhow!("Error when serializing blocks of transactions: {:?}", err))?;
-        fs::write(PathBuf::from(&self.output_file), &bytes).await?;
+        fs::write(PathBuf::from(&self.transactions_file), &bytes).await?;
         Ok(())
     }
 }

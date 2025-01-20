@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    diff::{TransactionDiff, TransactionDiffBuilder},
     execution::execute_workload,
     overrides::OverrideConfig,
     state_view::{ReadSet, ReadSetCapturingStateView},
@@ -24,23 +23,18 @@ use std::{
 pub struct InputOutputDiffGenerator {
     debugger: AptosDebugger,
     override_config: OverrideConfig,
-    allow_different_gas_usage: bool,
 }
 
 impl InputOutputDiffGenerator {
-    /// Generates a sequence of inputs (pre-block states) for benchmarking. Also, returns a vector
-    /// of output diffs when transactions are executed with these inputs (recall that inputs may be
-    /// different from on-chain due to overrides).
+    /// Generates a sequence of inputs (pre-block states) for benchmarking or comparison.
     pub(crate) async fn generate(
         debugger: AptosDebugger,
         override_config: OverrideConfig,
         txn_blocks: Vec<TransactionBlock>,
-        allow_different_gas_usage: bool,
-    ) -> anyhow::Result<(Vec<ReadSet>, Vec<Vec<TransactionDiff>>)> {
+    ) -> anyhow::Result<Vec<ReadSet>> {
         let generator = Arc::new(Self {
             debugger,
             override_config,
-            allow_different_gas_usage,
         });
 
         let num_generated = Arc::new(AtomicU64::new(0));
@@ -53,56 +47,34 @@ impl InputOutputDiffGenerator {
                 let num_generated = num_generated.clone();
                 move || {
                     let start_time = Instant::now();
-                    let (inputs, diffs) = generator.generate_inputs_with_diffs(txn_block);
+                    let inputs = generator.generate_inputs(txn_block);
                     let time = start_time.elapsed().as_secs();
                     println!(
-                        "Generated inputs and computed diffs for block {}/{} in {}s",
+                        "Generated inputs for block {}/{} in {}s",
                         num_generated.fetch_add(1, Ordering::SeqCst) + 1,
                         num_blocks,
                         time
                     );
-                    (inputs, diffs)
+                    inputs
                 }
             });
             tasks.push(task);
         }
 
         let mut all_inputs = Vec::with_capacity(tasks.len());
-        let mut all_diffs = Vec::with_capacity(tasks.len());
         for task in tasks {
-            let (inputs, diffs) = task.await?;
-            all_inputs.push(inputs);
-            all_diffs.push(diffs)
+            all_inputs.push(task.await?);
         }
 
-        Ok((all_inputs, all_diffs))
+        Ok(all_inputs)
     }
 
-    /// Generates a pre-block for a single block of transactions.
-    ///
-    /// Transactions are first executed on top of an actual state. Then, transactions are executed
-    /// in top of an overridden state. The outputs of two executions are compared, and the diffs
-    /// for each transaction are returned together with the inputs.
+    /// Generates a pre-block state for a single block of transactions. Transactions are executed
+    /// on top of an overridden state.
     ///
     /// Note: transaction execution is sequential, so that multiple inputs can be constructed in
     /// parallel.
-    fn generate_inputs_with_diffs(
-        &self,
-        txn_block: TransactionBlock,
-    ) -> (ReadSet, Vec<TransactionDiff>) {
-        // For later comparison of outputs, find fee payers for transactions.
-        let fee_payers = txn_block
-            .transactions
-            .iter()
-            .map(|txn| {
-                txn.try_as_signed_user_txn().map(|txn| {
-                    txn.authenticator_ref()
-                        .fee_payer_address()
-                        .unwrap_or_else(|| txn.sender())
-                })
-            })
-            .collect::<Vec<_>>();
-
+    fn generate_inputs(&self, txn_block: TransactionBlock) -> ReadSet {
         let state_view = self.debugger.state_view_at_version(txn_block.begin_version);
         let state_override = self.override_config.get_state_override(&state_view);
         let workload = Workload::from(txn_block);
@@ -141,25 +113,12 @@ impl InputOutputDiffGenerator {
         // reads.
         flush_warm_vm_cache();
         let state_view_with_override = ReadSetCapturingStateView::new(&state_view, state_override);
-        let outputs = execute_workload(
+        execute_workload(
             &AptosVMBlockExecutor::new(),
             &workload,
             &state_view_with_override,
             1,
         );
-        let inputs = state_view_with_override.into_read_set();
-
-        // Compute the differences between outputs.
-        let diff_builder = TransactionDiffBuilder::new(self.allow_different_gas_usage);
-        let diffs = onchain_outputs
-            .into_iter()
-            .zip(outputs)
-            .zip(fee_payers)
-            .map(|((onchain_output, output), maybe_fee_payer)| {
-                diff_builder.build_from_outputs(onchain_output, output, maybe_fee_payer)
-            })
-            .collect();
-
-        (inputs, diffs)
+        state_view_with_override.into_read_set()
     }
 }

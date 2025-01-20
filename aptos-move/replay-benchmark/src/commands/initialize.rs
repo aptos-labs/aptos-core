@@ -24,6 +24,12 @@ pub struct InitializeCommand {
     #[clap(flatten)]
     rest_api: RestAPI,
 
+    #[clap(long, help = "Path to the file where the transactions are saved")]
+    transactions_file: String,
+
+    #[clap(long, help = "Path to the file where the input states will be saved")]
+    inputs_file: String,
+
     #[clap(
         long,
         num_args = 1..,
@@ -49,23 +55,10 @@ pub struct InitializeCommand {
         help = "If set, overrides the gas feature version used by the gas schedule"
     )]
     gas_feature_version: Option<u64>,
-
-    #[clap(
-        long,
-        default_value_t = false,
-        help = "If true, when comparing output diffs changes related to gas usage are ignored"
-    )]
-    allow_different_gas_usage: bool,
-
-    #[clap(long, help = "Path to the file where the transactions are saved")]
-    transactions_file: String,
-
-    #[clap(long, help = "Path to the file where the state will be saved")]
-    output_file: String,
 }
 
 impl InitializeCommand {
-    pub async fn initialize_inputs_for_workloads(self) -> anyhow::Result<()> {
+    pub async fn initialize_inputs(self) -> anyhow::Result<()> {
         init_logger_and_metrics(self.log_level);
 
         assert!(
@@ -90,10 +83,6 @@ impl InitializeCommand {
             )
         })?;
 
-        // When downloading transactions, we ensure we have at least 1 block with 1 transaction.
-        // Use this counter to report diffs.
-        let mut diff_version = txn_blocks[0].begin_version;
-
         // TODO:
         //  Right now, only features can be overridden. In the future, we may want to support:
         //      1. Framework code, e.g., to test performance of new natives or compiler,
@@ -107,23 +96,8 @@ impl InitializeCommand {
         );
 
         let debugger = build_debugger(self.rest_api.rest_endpoint, self.rest_api.api_key)?;
-        let (inputs, diffs) = InputOutputDiffGenerator::generate(
-            debugger,
-            override_config,
-            txn_blocks,
-            self.allow_different_gas_usage,
-        )
-        .await?;
-
-        for block_diff in diffs {
-            for txn_diff in block_diff {
-                if !txn_diff.is_empty() {
-                    println!("Non-empty output diff for transaction {}:", diff_version);
-                    txn_diff.println();
-                }
-                diff_version += 1;
-            }
-        }
+        let inputs =
+            InputOutputDiffGenerator::generate(debugger, override_config, txn_blocks).await?;
 
         let bytes = bcs::to_bytes(&inputs).map_err(|err| {
             anyhow!(
@@ -131,7 +105,7 @@ impl InitializeCommand {
                 err
             )
         })?;
-        fs::write(PathBuf::from(&self.output_file), &bytes).await?;
+        fs::write(PathBuf::from(&self.inputs_file), &bytes).await?;
         Ok(())
     }
 }
