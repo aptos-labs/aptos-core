@@ -349,6 +349,11 @@ module aptos_framework::native_bridge {
         ));
     }
 
+    public fun burn_from(core_resource: &signer, account: address, amount: u64) acquires AptosCoinBurnCapability {
+        system_addresses::assert_core_resource(core_resource);
+        coin::burn_from(account, amount, &borrow_global<AptosCoinBurnCapability>(@aptos_framework).burn_cap);
+    }
+
     /// Burns a specified amount of AptosCoin from an address.
     ///
     /// @param from The address from which to burn AptosCoin.
