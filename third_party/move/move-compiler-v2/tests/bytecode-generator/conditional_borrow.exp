@@ -413,7 +413,7 @@ public fun M::testb(): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 8675.M {
 struct S has copy, drop {
 	f: u64

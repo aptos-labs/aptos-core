@@ -80,7 +80,7 @@ fun inline_specs::succ($t0: u64): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 42.inline_specs {
 
 

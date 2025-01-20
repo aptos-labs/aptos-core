@@ -124,7 +124,7 @@ fun m::test($t0: bool, $t1: bool) {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 
 

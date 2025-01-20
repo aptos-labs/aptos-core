@@ -672,7 +672,7 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 42.m {
 struct R has key {
 	data: vector<u64>

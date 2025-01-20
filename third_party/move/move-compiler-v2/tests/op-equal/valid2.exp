@@ -164,7 +164,7 @@ public fun m::test(): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 struct S has drop {
 	x: u64

@@ -172,7 +172,7 @@ fun borrow::mut_param($t0: u64): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 42.borrow {
 struct S {
 	f: u64

@@ -97,7 +97,7 @@ fun if_else::if_else_nested($t0: bool, $t1: u64): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 42.if_else {
 
 

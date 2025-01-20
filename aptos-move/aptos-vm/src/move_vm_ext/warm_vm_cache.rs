@@ -9,10 +9,7 @@ use aptos_gas_schedule::AptosGasParameters;
 use aptos_infallible::RwLock;
 use aptos_metrics_core::TimerHelper;
 use aptos_native_interface::SafeNativeBuilder;
-use aptos_types::{
-    on_chain_config::{FeatureFlag, OnChainConfig},
-    state_store::state_key::StateKey,
-};
+use aptos_types::{on_chain_config::OnChainConfig, state_store::state_key::StateKey};
 use aptos_vm_environment::environment::AptosEnvironment;
 use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
@@ -102,7 +99,6 @@ struct WarmVmId {
     natives: Bytes,
     vm_config: Bytes,
     core_packages_registry: Option<Bytes>,
-    bin_v7_enabled: bool,
     inject_create_signer_for_gov_sim: bool,
 }
 
@@ -137,7 +133,6 @@ impl WarmVmId {
             natives,
             vm_config: Self::vm_config_bytes(env.vm_config()),
             core_packages_registry: Self::core_packages_id_bytes(resolver)?,
-            bin_v7_enabled: env.features().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7),
             inject_create_signer_for_gov_sim,
         })
     }

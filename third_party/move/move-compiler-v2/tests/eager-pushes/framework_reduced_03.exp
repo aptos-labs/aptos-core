@@ -65,7 +65,7 @@ public fun m::make($t0: u64, $t1: u64, $t2: u64, $t3: address, $t4: u64): 0xc0ff
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 struct S has key {
 	x: u64,

@@ -60,7 +60,7 @@ fun m::foo($t0: u64, $t1: u64): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0.m {
 
 

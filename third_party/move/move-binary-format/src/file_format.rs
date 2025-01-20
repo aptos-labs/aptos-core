@@ -33,6 +33,7 @@ use crate::{
     access::{ModuleAccess, ScriptAccess},
     errors::{PartialVMError, PartialVMResult},
     file_format_common,
+    file_format_common::VERSION_DEFAULT,
     internals::ModuleIndex,
     IndexKind,
 };
@@ -3397,6 +3398,15 @@ impl Arbitrary for CompiledModule {
 }
 
 impl CompiledModule {
+    /// Sets the version of this module to VERSION_DEFAULT.The default initial value
+    /// is VERSION_MAX.
+    pub fn set_default_version(self) -> Self {
+        Self {
+            version: VERSION_DEFAULT,
+            ..self
+        }
+    }
+
     /// Returns the count of a specific `IndexKind`
     pub fn kind_count(&self, kind: IndexKind) -> usize {
         debug_assert!(!matches!(
