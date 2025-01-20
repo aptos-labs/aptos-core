@@ -349,8 +349,8 @@ module aptos_framework::native_bridge {
         ));
     }
 
-    public fun burn_from(core_resource: &signer, account: address, amount: u64) acquires AptosCoinBurnCapability {
-        system_addresses::assert_core_resource(core_resource);
+    public fun burn_from(aptos_framework: &signer, account: address, amount: u64) acquires AptosCoinBurnCapability {
+        system_addresses::assert_aptos_framework(core_resource);
         coin::burn_from(account, amount, &borrow_global<AptosCoinBurnCapability>(@aptos_framework).burn_cap);
     }
 
