@@ -81,7 +81,7 @@ pathsearch = { workspace = true }
 poem = { workspace = true }
 # We set default-features to false so we don't onboard the libpq dep. See more here:
 # https://github.com/aptos-labs/aptos-core/pull/12568
-processor = { git = "https://github.com/movementlabsxyz/aptos-indexer-processors", rev = "a43b90b98bc5e8d79d37cc6058ed2cfa741c0997", default-features = false }
+processor = { git = "https://github.com/movementlabsxyz/aptos-indexer-processors", branch = "mikhail/upstream-bcs", default-features = false }
 rand = { workspace = true }
 reqwest = { workspace = true }
 self_update = { git = "https://github.com/banool/self_update.git", rev = "8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b", features = [
@@ -91,7 +91,7 @@ self_update = { git = "https://github.com/banool/self_update.git", rev = "830615
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
-server-framework = { git = "https://github.com/movementlabsxyz/aptos-indexer-processors", rev = "a43b90b98bc5e8d79d37cc6058ed2cfa741c0997" }
+server-framework = { git = "https://github.com/movementlabsxyz/aptos-indexer-processors", branch = "mikhail/upstream-bcs" }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
