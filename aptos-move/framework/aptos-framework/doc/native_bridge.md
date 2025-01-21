@@ -1129,6 +1129,12 @@ Mints a specified amount of AptosCoin to a recipient's address.
 
 ## Function `burn_from`
 
+Burns a specified amount of AptosCoin from an address.
+
+@param aptos_framework The signer representing the Aptos framework.
+@param account The address from which to burn AptosCoin.
+@param amount The amount of AptosCoin to burn.
+@abort If the burn capability is not available.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn_from">burn_from</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
