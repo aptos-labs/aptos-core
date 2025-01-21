@@ -101,20 +101,22 @@ impl DiffCommand {
             .begin_version()
             .expect("Begin version must be set");
 
-        let mut gas_used = 0;
-        let mut other_gas_used = 0;
-
         let diff_builder = TransactionDiffBuilder::new(self.allow_different_gas_usage);
         let mut diffs = Vec::with_capacity(outputs.len());
 
-        println!("versions, gas_used, other_gas_used");
-        for ((outputs, other_outputs), fee_payers) in
-            outputs.into_iter().zip(other_outputs).zip(fee_payers)
+        println!(
+            "block, {} (gas), {} (gas)",
+            self.inputs_file, self.other_inputs_file
+        );
+        for (idx, ((outputs, other_outputs), fee_payers)) in outputs
+            .into_iter()
+            .zip(other_outputs)
+            .zip(fee_payers)
+            .enumerate()
         {
             let mut block_gas_used = 0;
             let mut other_block_gas_used = 0;
 
-            let begin_version = version;
             for ((output, other_output), fee_payer) in
                 outputs.into_iter().zip(other_outputs).zip(fee_payers)
             {
@@ -127,15 +129,8 @@ impl DiffCommand {
                 }
                 version += 1;
             }
-            println!(
-                "[{}-{}), {}, {}",
-                begin_version, version, block_gas_used, other_block_gas_used
-            );
-            gas_used += block_gas_used;
-            other_gas_used += other_gas_used;
+            println!("{}, {}, {}", idx + 1, block_gas_used, other_block_gas_used);
         }
-        println!("------------------------");
-        println!("   {}, {}", gas_used, other_gas_used);
 
         for (version, diff) in diffs {
             println!("Non-empty output diff for transaction {}:", version);

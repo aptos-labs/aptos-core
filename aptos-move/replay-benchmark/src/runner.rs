@@ -61,25 +61,17 @@ impl BenchmarkRunner {
             .map(|_| Vec::with_capacity(self.num_repeats))
             .collect::<Vec<_>>();
 
-        for i in 0..self.num_repeats {
+        for _ in 0..self.num_repeats {
             let executor = AptosVMBlockExecutor::new();
             for (idx, block) in blocks.iter().enumerate() {
                 let start_time = Instant::now();
                 block.run(&executor, concurrency_level);
                 let time = start_time.elapsed().as_micros();
-                if idx >= self.num_blocks_to_skip {
-                    println!(
-                        "[{}/{}] Block {} execution time is {}us",
-                        i + 1,
-                        self.num_repeats,
-                        idx + 1,
-                        time,
-                    );
-                }
                 times[idx].push(time);
             }
         }
 
+        println!("concurrency level, block, median (us), mean (us), min (us), max (us)",);
         for (idx, mut time) in times.into_iter().enumerate() {
             // Only report measurements for non-skipped blocks.
             if idx >= self.num_blocks_to_skip {
@@ -90,12 +82,7 @@ impl BenchmarkRunner {
                 let max_time = *time.last().unwrap();
 
                 println!(
-                    "Block {} execution time: min {}us, average {:.2}us, median {}us, max {}us\n",
-                    idx + 1,
-                    min_time,
-                    average_time,
-                    median_time,
-                    max_time,
+                    "{concurrency_level}, {idx}, {median_time}, {average_time:.2}, {min_time}, {max_time}",
                 );
             }
         }
@@ -104,7 +91,7 @@ impl BenchmarkRunner {
     /// Runs the sequence of blocks, measuring the end-to-end execution time.
     fn measure_overall_execution_time(&self, blocks: &[ReplayBlock], concurrency_level: usize) {
         let mut times = Vec::with_capacity(self.num_repeats);
-        for i in 0..self.num_repeats {
+        for _ in 0..self.num_repeats {
             let executor = AptosVMBlockExecutor::new();
 
             // Warm-up.
@@ -118,13 +105,6 @@ impl BenchmarkRunner {
                 block.run(&executor, concurrency_level);
             }
             let time = start_time.elapsed().as_micros();
-
-            println!(
-                "[{}/{}] Overall execution time is {}us",
-                i + 1,
-                self.num_repeats,
-                time,
-            );
             times.push(time);
         }
 
@@ -134,9 +114,7 @@ impl BenchmarkRunner {
         let median_time = times[self.num_repeats / 2];
         let max_time = *times.last().unwrap();
 
-        println!(
-            "Overall execution time (blocks {}-{}): min {}us, average {:.2}us, median {}us, max {}us\n",
-            self.num_blocks_to_skip + 1, blocks.len(), min_time, average_time, median_time, max_time,
-        );
+        println!("concurrency level, median (us), mean (us), min (us), max (us)",);
+        println!("{concurrency_level}, {median_time}, {average_time:.2}, {min_time}, {max_time}",);
     }
 }

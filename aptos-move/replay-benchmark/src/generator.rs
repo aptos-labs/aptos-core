@@ -10,9 +10,14 @@ use crate::{
 use aptos_logger::error;
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_types::transaction::Version;
-use aptos_vm::{aptos_vm::AptosVMBlockExecutor, move_vm_ext::flush_warm_vm_cache, VMBlockExecutor};
+use aptos_vm::{aptos_vm::AptosVMBlockExecutor, data_cache::AsMoveResolver, VMBlockExecutor};
+use aptos_vm_environment::environment::AptosEnvironment;
+use move_core_types::{
+    ident_str,
+    language_storage::{ModuleId, CORE_CODE_ADDRESS},
+};
+use move_vm_runtime::{move_vm::MoveVM, WithRuntimeEnvironment};
 use std::{
-    collections::HashMap,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
@@ -79,17 +84,9 @@ impl InputOutputDiffGenerator {
         let state_override = self.override_config.get_state_override(&state_view);
         let workload = Workload::from(txn_block);
 
-        // First, we execute transactions without overrides. Flush warm VM cache to ensure read-set
-        // contains modules used to warming up the VM.
-        flush_warm_vm_cache();
-        let state_view_without_override =
-            ReadSetCapturingStateView::new(&state_view, HashMap::new());
-        let onchain_outputs = execute_workload(
-            &AptosVMBlockExecutor::new(),
-            &workload,
-            &state_view_without_override,
-            1,
-        );
+        // First, we execute transactions without overrides.
+        let onchain_outputs =
+            execute_workload(&AptosVMBlockExecutor::new(), &workload, &state_view, 1);
 
         // Check on-chain outputs do not modify the state we override. If so, benchmarking results
         // may not be correct.
@@ -109,10 +106,20 @@ impl InputOutputDiffGenerator {
             }
         }
 
-        // Execute transactions with an override. Again, flush the warm VM cache to capture all
-        // reads.
-        flush_warm_vm_cache();
         let state_view_with_override = ReadSetCapturingStateView::new(&state_view, state_override);
+
+        // Execute transactions with an override. Here we do not flush warm VM cache but instead
+        // ensure all prefetched modules are read to avoid race condition on VM cache flushing.
+        let environment = AptosEnvironment::new(&state_view_with_override);
+        if !environment.features().is_loader_v2_enabled() {
+            let vm = MoveVM::new_with_runtime_environment(environment.runtime_environment());
+            #[allow(deprecated)]
+            let _ = vm.load_module(
+                &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
+                &state_view_with_override.as_move_resolver(),
+            );
+        }
+
         execute_workload(
             &AptosVMBlockExecutor::new(),
             &workload,

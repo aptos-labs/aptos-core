@@ -23,10 +23,13 @@ pub struct DownloadCommand {
     )]
     transactions_file: String,
 
-    #[clap(long, help = "First transaction to include for benchmarking")]
+    #[clap(long, help = "Version of the first transaction to benchmark")]
     begin_version: Version,
 
-    #[clap(long, help = "Last transaction to include for benchmarking")]
+    #[clap(
+        long,
+        help = "End version of transaction range (exclusive) selected for benchmarking"
+    )]
     end_version: Version,
 }
 
@@ -34,24 +37,41 @@ impl DownloadCommand {
     /// Downloads a range of transactions, and saves them locally.
     pub async fn download_transactions(self) -> anyhow::Result<()> {
         assert!(
-            self.begin_version <= self.end_version,
-            "Transaction versions should be a valid closed interval. Instead got begin: {}, end: {}",
+            self.begin_version < self.end_version,
+            "Transaction versions should be a valid semi-open interval [b, e). Instead got begin: {}, end: {}",
             self.begin_version,
             self.end_version,
         );
 
         let debugger = build_debugger(self.rest_api.rest_endpoint, self.rest_api.api_key)?;
+
+        // Explicitly get transaction corresponding to the end, so we can verify that blocks are
+        // fully selected.
         let limit = self.end_version - self.begin_version + 1;
-        let (txns, _) = debugger
+        let (mut txns, _) = debugger
             .get_committed_transactions(self.begin_version, limit)
             .await?;
+
+        assert!(!txns.is_empty());
+        assert!(
+            txns[0].is_block_start(),
+            "First transaction {} must be a block start, but it is not",
+            self.begin_version
+        );
+        assert!(
+            txns.pop().unwrap().is_block_start(),
+            "All transactions in the block must be selected, transaction {} is not a block end",
+            self.end_version - 1
+        );
 
         let txn_blocks = partition(self.begin_version, txns);
         assert!(!txn_blocks.is_empty());
         println!(
-            "Downloaded {} blocks with {} transactions in total",
+            "Downloaded {} blocks with {} transactions in total: versions [{}, {})",
             txn_blocks.len(),
-            limit
+            limit,
+            self.begin_version,
+            self.end_version,
         );
 
         let bytes = bcs::to_bytes(&txn_blocks)
