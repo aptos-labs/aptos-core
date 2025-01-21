@@ -33,6 +33,7 @@
 -  [Function `store_aptos_coin_burn_cap`](#0x1_native_bridge_store_aptos_coin_burn_cap)
 -  [Function `store_aptos_coin_mint_cap`](#0x1_native_bridge_store_aptos_coin_mint_cap)
 -  [Function `mint`](#0x1_native_bridge_mint)
+-  [Function `burn_from`](#0x1_native_bridge_burn_from)
 -  [Function `burn`](#0x1_native_bridge_burn)
 -  [Function `initiate_bridge_transfer`](#0x1_native_bridge_initiate_bridge_transfer)
 -  [Function `complete_bridge_transfer`](#0x1_native_bridge_complete_bridge_transfer)
@@ -1117,6 +1118,31 @@ Mints a specified amount of AptosCoin to a recipient's address.
         amount,
         &<b>borrow_global</b>&lt;<a href="native_bridge.md#0x1_native_bridge_AptosCoinMintCapability">AptosCoinMintCapability</a>&gt;(@aptos_framework).mint_cap
     ));
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_native_bridge_burn_from"></a>
+
+## Function `burn_from`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn_from">burn_from</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn_from">burn_from</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_AptosCoinBurnCapability">AptosCoinBurnCapability</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <a href="coin.md#0x1_coin_burn_from">coin::burn_from</a>(<a href="account.md#0x1_account">account</a>, amount, &<b>borrow_global</b>&lt;<a href="native_bridge.md#0x1_native_bridge_AptosCoinBurnCapability">AptosCoinBurnCapability</a>&gt;(@aptos_framework).burn_cap);
 }
 </code></pre>
 
