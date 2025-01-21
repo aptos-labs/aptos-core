@@ -542,6 +542,7 @@ impl<'r, 'l> Session<'r, 'l> {
         traversal_context: &mut TraversalContext,
         ty_tags: &[TypeTag],
     ) -> VMResult<()> {
+        // Charge gas based on the distinct ordered module ids.
         let ordered_ty_tags = ty_tags
             .iter()
             .flat_map(|ty_tag| ty_tag.preorder_traversal_iter())
@@ -553,6 +554,7 @@ impl<'r, 'l> Session<'r, 'l> {
                 (module_id.address(), module_id.name())
             })
             .collect::<BTreeSet<_>>();
+
         self.check_dependencies_and_charge_gas(
             module_storage,
             gas_meter,
