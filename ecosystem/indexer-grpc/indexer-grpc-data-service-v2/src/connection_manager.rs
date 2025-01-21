@@ -161,6 +161,10 @@ impl ConnectionManager {
         }
     }
 
+    pub(crate) fn chain_id(&self) -> u64 {
+        self.chain_id
+    }
+
     pub(crate) fn get_grpc_manager_client_for_request(&self) -> GrpcManagerClient<Channel> {
         let mut rng = thread_rng();
         self.grpc_manager_connections
