@@ -3,6 +3,7 @@
 
 use crate::{
     config::{IndexerGrpcManagerConfig, ServiceConfig},
+    data_manager::DataManager,
     metadata_manager::MetadataManager,
     service::GrpcManagerService,
 };
@@ -18,6 +19,7 @@ const HTTP2_PING_TIMEOUT_DURATION: Duration = Duration::from_secs(10);
 pub(crate) struct GrpcManager {
     chain_id: u64,
     metadata_manager: Arc<MetadataManager>,
+    data_manager: Arc<DataManager>,
 }
 
 impl GrpcManager {
@@ -38,9 +40,22 @@ impl GrpcManager {
             config.fullnode_addresses
         );
 
+        let data_manager = Arc::new(
+            DataManager::new(
+                chain_id,
+                config.file_store_config.clone(),
+                config.cache_config.clone(),
+                metadata_manager.clone(),
+            )
+            .await,
+        );
+
+        info!("DataManager is created.");
+
         Self {
             chain_id,
             metadata_manager,
+            data_manager,
         }
     }
 
@@ -48,6 +63,7 @@ impl GrpcManager {
         let service = GrpcManagerServer::new(GrpcManagerService::new(
             self.chain_id,
             self.metadata_manager.clone(),
+            self.data_manager.clone(),
         ))
         .send_compressed(CompressionEncoding::Zstd)
         .accept_compressed(CompressionEncoding::Zstd);
@@ -60,6 +76,7 @@ impl GrpcManager {
             s.spawn(async move {
                 self.metadata_manager.start().await.unwrap();
             });
+            s.spawn(async move { self.data_manager.start().await });
             s.spawn(async move {
                 info!("Starting GrpcManager at {}.", service_config.listen_address);
                 server.serve(service_config.listen_address).await.unwrap();
