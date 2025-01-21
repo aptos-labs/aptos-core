@@ -42,8 +42,8 @@ pub(crate) fn build_debugger(
 pub struct RestAPI {
     #[clap(
         long,
-        help = "Fullnode's REST API query endpoint, e.g., https://mainnet.aptoslabs.com/v1 for \
-                mainnet"
+        help = "Fullnode's REST API query endpoint, e.g., https://api.mainnet.aptoslabs.com/v1 \
+                for mainnet"
     )]
     rest_endpoint: String,
 

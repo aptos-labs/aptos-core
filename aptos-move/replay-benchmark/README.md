@@ -32,7 +32,7 @@ query endpoint using `--rest-endpoint E` flag. Examples of endpoints are:
 aptos-replay-benchmark download \
   --begin-version 2232125001 \
   --end-version 2232125093 \
-  --rest-endpoint https://mainnet.aptoslabs.com/v1 \
+  --rest-endpoint https://api.mainnet.aptoslabs.com/v1 \
   --transactions-file transactions.file
 ```
 saves transactions to `transactions.file` and outputs
@@ -78,7 +78,7 @@ using the tool the key can be specified using `--api-key K` flag.
 
 ```shell
 aptos-replay-benchmark initialize \
-  --rest-endpoint https://mainnet.aptoslabs.com/v1 \
+  --rest-endpoint https://api.mainnet.aptoslabs.com/v1 \
   --transactions-file transactions.file \
   --inputs-file baseline-state.file
 ```
@@ -111,7 +111,7 @@ on historical workloads.
 
 ```commandline
 aptos-replay-benchmark initialize \
-  --rest-endpoint https://mainnet.aptoslabs.com/v1 \
+  --rest-endpoint https://api.mainnet.aptoslabs.com/v1 \
   --transactions-file transactions.file
   --enable-features ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE \
   --inputs-file experiment-state.file

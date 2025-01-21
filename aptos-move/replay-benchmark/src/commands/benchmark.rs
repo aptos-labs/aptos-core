@@ -7,7 +7,7 @@ use crate::{
     state_view::ReadSet,
     workload::TransactionBlock,
 };
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use aptos_logger::Level;
 use clap::Parser;
 use std::path::PathBuf;
@@ -17,7 +17,9 @@ use tokio::fs;
 const MIN_NUM_REPEATS: usize = 3;
 
 #[derive(Parser)]
-#[command(about = "Executes saved transactions on top of the saved state")]
+#[command(
+    about = "Executes saved transactions on top of the saved state, and reports the time taken"
+)]
 pub struct BenchmarkCommand {
     #[clap(long, default_value_t = Level::Error)]
     log_level: Level,
@@ -47,8 +49,8 @@ pub struct BenchmarkCommand {
     #[clap(
         long,
         default_value_t = MIN_NUM_REPEATS,
-        help = "Number of times to execute blocks of transactions and measure the timr taken for \
-                each concurrency level"
+        help = "Number of times to execute blocks of transactions and measure the time taken for \
+                each concurrency level. Should be at least 3."
     )]
     num_repeats: usize,
 
@@ -66,15 +68,12 @@ impl BenchmarkCommand {
         init_logger_and_metrics(self.log_level);
 
         // Sanity checks for provided commands.
-        assert!(
-            !self.concurrency_levels.is_empty(),
-            "At least one concurrency level must be provided",
-        );
-        assert!(
-            self.num_repeats >= MIN_NUM_REPEATS,
-            "Number of repeats must be at least {}",
-            MIN_NUM_REPEATS,
-        );
+        if self.concurrency_levels.is_empty() {
+            bail!("At least one concurrency level must be provided");
+        }
+        if self.num_repeats < MIN_NUM_REPEATS {
+            bail!("Number of repeats must be at least {}", MIN_NUM_REPEATS,);
+        }
 
         let txn_blocks_bytes = fs::read(PathBuf::from(&self.transactions_file)).await?;
         let txn_blocks: Vec<TransactionBlock> = bcs::from_bytes(&txn_blocks_bytes)
@@ -85,13 +84,21 @@ impl BenchmarkCommand {
             .map_err(|err| anyhow!("Error when deserializing inputs: {:?}", err))?;
 
         // Ensure we have at least one block to benchmark, and that we do not skip all the blocks.
-        assert_eq!(txn_blocks.len(), inputs_read_set.len());
-        assert!(
-            self.num_blocks_to_skip < txn_blocks.len(),
-            "There are only {} blocks, but skipping {}",
-            txn_blocks.len(),
-            self.num_blocks_to_skip
-        );
+        if txn_blocks.len() != inputs_read_set.len() {
+            bail!(
+                "Number of transaction blocks does not match the number of pre-block input states: \
+                there are {} blocks and {} inputs",
+                txn_blocks.len(),
+                inputs_read_set.len()
+            )
+        }
+        if self.num_blocks_to_skip >= txn_blocks.len() {
+            bail!(
+                "There are only {} blocks, but skipping {}",
+                txn_blocks.len(),
+                self.num_blocks_to_skip
+            );
+        }
 
         let blocks = inputs_read_set
             .into_iter()

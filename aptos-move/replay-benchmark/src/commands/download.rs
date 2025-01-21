@@ -5,7 +5,7 @@ use crate::{
     commands::{build_debugger, RestAPI},
     workload::TransactionBlock,
 };
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use aptos_types::transaction::{Transaction, Version};
 use clap::Parser;
 use std::path::PathBuf;
@@ -36,12 +36,14 @@ pub struct DownloadCommand {
 impl DownloadCommand {
     /// Downloads a range of transactions, and saves them locally.
     pub async fn download_transactions(self) -> anyhow::Result<()> {
-        assert!(
-            self.begin_version < self.end_version,
-            "Transaction versions should be a valid semi-open interval [b, e). Instead got begin: {}, end: {}",
-            self.begin_version,
-            self.end_version,
-        );
+        if self.begin_version >= self.end_version {
+            bail!(
+                "Transaction versions should be a valid semi-open interval [b, e).\
+                 Instead got begin: {}, end: {}",
+                self.begin_version,
+                self.end_version,
+            );
+        }
 
         let debugger = build_debugger(self.rest_api.rest_endpoint, self.rest_api.api_key)?;
 
@@ -52,20 +54,21 @@ impl DownloadCommand {
             .get_committed_transactions(self.begin_version, limit)
             .await?;
 
-        assert!(!txns.is_empty());
-        assert!(
-            txns[0].is_block_start(),
-            "First transaction {} must be a block start, but it is not",
-            self.begin_version
-        );
-        assert!(
-            txns.pop().unwrap().is_block_start(),
-            "All transactions in the block must be selected, transaction {} is not a block end",
-            self.end_version - 1
-        );
+        if !txns[0].is_block_start() {
+            bail!(
+                "First transaction {} must be a block start, but it is not",
+                self.begin_version
+            );
+        }
+        if !txns.pop().unwrap().is_block_start() {
+            bail!(
+                "All transactions in the block must be selected, transaction {} is not a block \
+                end",
+                self.end_version - 1
+            );
+        }
 
         let txn_blocks = partition(self.begin_version, txns);
-        assert!(!txn_blocks.is_empty());
         println!(
             "Downloaded {} blocks with {} transactions in total: versions [{}, {})",
             txn_blocks.len(),

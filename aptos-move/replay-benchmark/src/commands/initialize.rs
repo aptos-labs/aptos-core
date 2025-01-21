@@ -7,7 +7,7 @@ use crate::{
     overrides::OverrideConfig,
     workload::TransactionBlock,
 };
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_logger::Level;
 use aptos_types::on_chain_config::FeatureFlag;
@@ -61,15 +61,15 @@ impl InitializeCommand {
     pub async fn initialize_inputs(self) -> anyhow::Result<()> {
         init_logger_and_metrics(self.log_level);
 
-        assert!(
-            self.enable_features
-                .iter()
-                .all(|f| !self.disable_features.contains(f)),
-            "Enabled and disabled feature flags cannot overlap",
-        );
-        if let Some(gas_feature_version) = self.gas_feature_version {
-            assert!(
-                gas_feature_version <= LATEST_GAS_FEATURE_VERSION,
+        if !self
+            .enable_features
+            .iter()
+            .all(|f| !self.disable_features.contains(f))
+        {
+            bail!("Enabled and disabled feature flags cannot overlap")
+        }
+        if matches!(self.gas_feature_version, Some(v) if v > LATEST_GAS_FEATURE_VERSION) {
+            bail!(
                 "Gas feature version must be at most the latest one: {}",
                 LATEST_GAS_FEATURE_VERSION
             );

@@ -8,7 +8,7 @@ use crate::{
     state_view::ReadSet,
     workload::{TransactionBlock, Workload},
 };
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use aptos_logger::Level;
 use aptos_types::transaction::TransactionOutput;
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, move_vm_ext::flush_warm_vm_cache, VMBlockExecutor};
@@ -17,7 +17,7 @@ use std::path::PathBuf;
 use tokio::fs;
 
 #[derive(Parser)]
-#[command(about = "Executes saved transactions on top of the saved state")]
+#[command(about = "Compares execution outputs for transactions executed on different states")]
 pub struct DiffCommand {
     #[clap(long, default_value_t = Level::Error)]
     log_level: Level,
@@ -53,10 +53,9 @@ impl DiffCommand {
         let txn_blocks_bytes = fs::read(PathBuf::from(&self.transactions_file)).await?;
         let txn_blocks: Vec<TransactionBlock> = bcs::from_bytes(&txn_blocks_bytes)
             .map_err(|err| anyhow!("Error when deserializing blocks of transactions: {:?}", err))?;
-        assert!(
-            !txn_blocks.is_empty(),
-            "There must be at least one transaction to execute"
-        );
+        if txn_blocks.is_empty() {
+            bail!("There must be at least one transaction to execute");
+        }
 
         let inputs_read_set_bytes = fs::read(PathBuf::from(&self.inputs_file)).await?;
         let inputs_read_set: Vec<ReadSet> = bcs::from_bytes(&inputs_read_set_bytes)
@@ -90,8 +89,17 @@ impl DiffCommand {
             .collect::<Vec<_>>();
 
         // Ensure the number of blocks matches.
-        assert_eq!(workloads.len(), inputs_read_set.len());
-        assert_eq!(inputs_read_set.len(), other_inputs_read_set.len());
+        if workloads.len() != inputs_read_set.len()
+            || inputs_read_set.len() != other_inputs_read_set.len()
+        {
+            bail!(
+                "Number of blocks of transactions does not match the number of pre-block states: \
+                there {} blocks, but {} and {} input states",
+                workloads.len(),
+                inputs_read_set.len(),
+                other_inputs_read_set.len()
+            );
+        }
 
         let outputs = self.compute_outputs(&workloads, &inputs_read_set);
         let other_outputs = self.compute_outputs(&workloads, &other_inputs_read_set);
