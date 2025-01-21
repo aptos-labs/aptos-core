@@ -12,14 +12,14 @@ VectorPicture { length: 30720 }	34	0.924	1.081	6900.0
 VectorPictureRead { length: 30720 }	34	0.938	1.089	6900.0
 SmartTablePicture { length: 30720, num_points_per_txn: 200 }	34	0.972	1.074	42970.1
 SmartTablePicture { length: 1048576, num_points_per_txn: 300 }	34	0.960	1.066	73865.4
-ResourceGroupsSenderWriteTag { string_length: 1024 }	34	0.898	1.062	16.2
+ResourceGroupsSenderWriteTag { string_length: 1024 }	34	0.898	1.062	19.2
 ResourceGroupsSenderMultiChange { string_length: 1024 }	34	0.923	1.101	33.4
 TokenV1MintAndTransferFT	34	0.947	1.073	390.1
 TokenV1MintAndTransferNFTSequential	34	0.925	1.063	600.3
 TokenV2AmbassadorMint { numbered: true }	34	0.927	1.076	466.4
 LiquidityPoolSwap { is_stable: true }	34	0.920	1.043	689.8
 LiquidityPoolSwap { is_stable: false }	34	0.929	1.061	628.8
-CoinInitAndMint	34	0.945	1.072	207.6
+CoinInitAndMint	34	0.945	1.072	215.6
 FungibleAssetMint	34	0.934	1.063	236.7
 IncGlobalMilestoneAggV2 { milestone_every: 1 }	34	0.913	1.040	33.7
 IncGlobalMilestoneAggV2 { milestone_every: 2 }	34	0.915	1.050	19.1
