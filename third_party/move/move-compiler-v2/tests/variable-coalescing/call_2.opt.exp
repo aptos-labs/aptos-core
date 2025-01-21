@@ -144,10 +144,9 @@ fun m::test($t0: u64): u64 {
      var $t4: u64 [unused]
      var $t5: &mut u64
   0: $t2 := copy($t0)
-  1: $t0 := move($t0)
-  2: $t5 := borrow_local($t2)
-  3: m::update($t5)
-  4: return $t0
+  1: $t5 := borrow_local($t2)
+  2: m::update($t5)
+  3: return $t0
 }
 
 
@@ -168,9 +167,9 @@ L1:	loc0: u64
 B0:
 	0: CopyLoc[0](Arg0: u64)
 	1: StLoc[1](loc0: u64)
-	2: MoveLoc[0](Arg0: u64)
-	3: MutBorrowLoc[1](loc0: u64)
-	4: Call update(&mut u64)
+	2: MutBorrowLoc[1](loc0: u64)
+	3: Call update(&mut u64)
+	4: MoveLoc[0](Arg0: u64)
 	5: Ret
 }
 }

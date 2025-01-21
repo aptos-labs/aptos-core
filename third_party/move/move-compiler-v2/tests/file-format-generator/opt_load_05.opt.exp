@@ -31,7 +31,6 @@ B0:
 }
 public test3(Arg0: u64) /* def_idx: 4 */ {
 L1:	loc0: u64
-L2:	loc1: u64
 B0:
 	0: Call one(): u64
 	1: StLoc[1](loc0: u64)

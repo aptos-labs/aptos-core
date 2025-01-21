@@ -118,6 +118,9 @@ pub enum FeatureFlag {
     /// AIP-103 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-103.md)
     PERMISSIONED_SIGNER = 84,
     ACCOUNT_ABSTRACTION = 85,
+
+    TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE = 86,
+    FAKE_FEATURE_FOR_COMPARISON_TESTING = 1000,
 }
 
 impl FeatureFlag {

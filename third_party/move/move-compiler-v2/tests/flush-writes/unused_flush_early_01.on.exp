@@ -25,7 +25,9 @@ public fun m::test1(): (u64, u64) {
      # live vars: $t3
   2: $t4 := m::one()
      # live vars: $t3, $t4
-  3: return ($t3, $t4)
+  3: $t3 := move($t3)
+     # live vars: $t3, $t4
+  4: return ($t3, $t4)
 }
 
 
@@ -44,7 +46,9 @@ public fun m::test2(): (u64, u64) {
      # live vars: $t2
   2: $t4 := m::one()
      # live vars: $t2, $t4
-  3: return ($t2, $t4)
+  3: $t2 := move($t2)
+     # live vars: $t2, $t4
+  4: return ($t2, $t4)
 }
 
 
@@ -64,7 +68,9 @@ public fun m::test3(): (u64, u64) {
      # live vars: $t2
   2: $t4 := m::one()
      # live vars: $t2, $t4
-  3: return ($t4, $t2)
+  3: $t4 := move($t4)
+     # live vars: $t2, $t4
+  4: return ($t4, $t2)
 }
 
 
@@ -79,6 +85,8 @@ B0:
 	1: Ret
 }
 public test1(): u64 * u64 /* def_idx: 1 */ {
+L0:	loc0: u64
+L1:	loc1: u64
 B0:
 	0: Call one(): u64
 	1: Pop
@@ -87,6 +95,8 @@ B0:
 	4: Ret
 }
 public test2(): u64 * u64 /* def_idx: 2 */ {
+L0:	loc0: u64
+L1:	loc1: u64
 B0:
 	0: Call one(): u64
 	1: Call one(): u64
