@@ -566,7 +566,7 @@ module supra_framework::stake {
             validator_index: 0,
         });
 
-        if (initial_stake_amount > 0) {
+        if (initial_stake_amount != 0) {
             add_stake(owner, initial_stake_amount);
         };
 
@@ -1160,7 +1160,7 @@ module supra_framework::stake {
             assert!(option::is_some(&maybe_active_index), error::invalid_state(ENOT_VALIDATOR));
             let validator_info = vector::swap_remove(
                 &mut validator_set.active_validators, option::extract(&mut maybe_active_index));
-            assert!(vector::length(&validator_set.active_validators) > 0, error::invalid_state(ELAST_VALIDATOR));
+            assert!(vector::length(&validator_set.active_validators) != 0, error::invalid_state(ELAST_VALIDATOR));
             vector::push_back(&mut validator_set.pending_inactive, validator_info);
 
             if (std::features::module_event_migration_enabled()) {
@@ -1413,7 +1413,7 @@ module supra_framework::stake {
             let cur_pending_active = coin::value(&stake_pool.pending_active);
             let cur_pending_inactive = coin::value(&stake_pool.pending_inactive);
 
-            let cur_reward = if (candidate_in_current_validator_set && cur_active > 0) {
+            let cur_reward = if (candidate_in_current_validator_set && cur_active != 0) {
                 spec {
                     assert candidate.config.validator_index < len(validator_perf.validators);
                 };
@@ -1654,7 +1654,7 @@ module supra_framework::stake {
         // We do multiplication in u128 before division to avoid the overflow and minimize the rounding error.
         let rewards_numerator = (stake_amount as u128) * (rewards_rate as u128) * (num_successful_proposals as u128);
         let rewards_denominator = (rewards_rate_denominator as u128) * (num_total_proposals as u128);
-        if (rewards_denominator > 0) {
+        if (rewards_denominator != 0) {
             ((rewards_numerator / rewards_denominator) as u64)
         } else {
             0
@@ -1670,7 +1670,7 @@ module supra_framework::stake {
         rewards_rate_denominator: u64,
     ): u64 acquires SupraCoinCapabilities {
         let stake_amount = coin::value(stake);
-        let rewards_amount = if (stake_amount > 0) {
+        let rewards_amount = if (stake_amount != 0) {
             calculate_rewards_amount(
                 stake_amount,
                 num_successful_proposals,
@@ -1681,7 +1681,7 @@ module supra_framework::stake {
         } else {
             0
         };
-        if (rewards_amount > 0) {
+        if (rewards_amount != 0) {
             let mint_cap = &borrow_global<SupraCoinCapabilities>(@supra_framework).mint_cap;
             let rewards = coin::mint(rewards_amount, mint_cap);
             coin::merge(stake, rewards);
@@ -1739,7 +1739,7 @@ module supra_framework::stake {
         validator_set.total_joining_power = validator_set.total_joining_power + (increase_amount as u128);
 
         // Only validator voting power increase if the current validator set's voting power > 0.
-        if (validator_set.total_voting_power > 0) {
+        if (validator_set.total_voting_power != 0) {
             assert!(
                 validator_set.total_joining_power <= validator_set.total_voting_power * voting_power_increase_limit / 100,
                 error::invalid_argument(EVOTING_POWER_INCREASE_EXCEEDS_LIMIT),

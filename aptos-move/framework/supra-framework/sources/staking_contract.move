@@ -371,7 +371,7 @@ module supra_framework::staking_contract {
         contract_creation_seed: vector<u8>,
     ): address acquires Store {
         assert!(
-            commission_percentage >= 0 && commission_percentage <= 100,
+            commission_percentage <= 100,
             error::invalid_argument(EINVALID_COMMISSION_PERCENTAGE),
         );
         // The amount should be at least the min_stake_required, so the stake pool will be eligible to join the
@@ -494,7 +494,7 @@ module supra_framework::staking_contract {
         new_commission_percentage: u64
     ) acquires Store, BeneficiaryForOperator, StakingGroupUpdateCommissionEvent {
         assert!(
-            new_commission_percentage >= 0 && new_commission_percentage <= 100,
+            new_commission_percentage <= 100,
             error::invalid_argument(EINVALID_COMMISSION_PERCENTAGE),
         );
 
@@ -783,7 +783,7 @@ module supra_framework::staking_contract {
             distribution_pool, distribution_amount, operator, staking_contract.commission_percentage);
 
         // Buy all recipients out of the distribution pool.
-        while (pool_u64::shareholders_count(distribution_pool) > 0) {
+        while (pool_u64::shareholders_count(distribution_pool) != 0) {
             let recipients = pool_u64::shareholders(distribution_pool);
             let recipient = *vector::borrow(&mut recipients, 0);
             let current_shares = pool_u64::shares(distribution_pool, recipient);
@@ -804,7 +804,7 @@ module supra_framework::staking_contract {
         };
 
         // In case there's any dust left, send them all to the staker.
-        if (coin::value(&coins) > 0) {
+        if (coin::value(&coins) != 0) {
             supra_account::deposit_coins(staker, coins);
             pool_u64::update_total_coins(distribution_pool, 0);
         } else {

@@ -289,7 +289,7 @@ module supra_framework::multisig_voting {
     ): u64 acquires VotingForum {
 
         // Make sure the execution script's hash is not empty.
-        assert!(vector::length(&execution_hash) > 0, error::invalid_argument(EPROPOSAL_EMPTY_EXECUTION_HASH));
+        assert!(vector::length(&execution_hash) != 0, error::invalid_argument(EPROPOSAL_EMPTY_EXECUTION_HASH));
 
         assert!(min_vote_threshold > 1, error::invalid_argument(ETHRESHOLD_MUST_BE_GREATER_THAN_ONE));
 

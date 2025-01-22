@@ -204,7 +204,7 @@ module supra_framework::committee_map {
         let committee = simple_map::borrow(&committee_store.committee_map, &id);
         let (addrs, nodes) = simple_map::to_vec_pair(committee.map);
         let node_data_vec = vector::empty<NodeData>();
-        while (vector::length(&addrs) > 0) {
+        while (vector::length(&addrs) != 0) {
             let addr = vector::pop_back(&mut addrs);
             let node_info = vector::pop_back(&mut nodes);
             let node_data = NodeData {
@@ -363,7 +363,7 @@ module supra_framework::committee_map {
         let committee_store = borrow_global_mut<CommitteeInfoStore>(com_store_addr);
         let node_infos = vector::empty<NodeInfo>();
         let node_addresses_for_iteration = node_addresses;
-        while (vector::length(&node_addresses_for_iteration) > 0) {
+        while (vector::length(&node_addresses_for_iteration) != 0) {
             let ip_public_address = vector::pop_back(&mut ip_public_address);
             let node_public_key = vector::pop_back(&mut node_public_key);
             let network_public_key = vector::pop_back(&mut network_public_key);
@@ -456,7 +456,7 @@ module supra_framework::committee_map {
             ids_len == vector::length(&rpc_por_bulkt),
             error::invalid_argument(INVALID_COMMITTEE_NUMBERS)
         );
-        while (vector::length(&ids) > 0) {
+        while (vector::length(&ids) != 0) {
             let id = vector::pop_back(&mut ids);
             let node_addresses = vector::pop_back(&mut node_addresses_bulk);
             let ip_public_address = vector::pop_back(&mut ip_public_address_bulk);
@@ -499,7 +499,7 @@ module supra_framework::committee_map {
         let (id, committee_info) = simple_map::remove(&mut committee_store.committee_map, &id);
         // Also remove the node_to_committee_map
         let (addrs, _) = simple_map::to_vec_pair(committee_info.map);
-        while (vector::length(&addrs) > 0) {
+        while (vector::length(&addrs) != 0) {
             let addr = vector::pop_back(&mut addrs);
             assert!(
                 simple_map::contains_key(&committee_store.node_to_committee_map, &addr),
@@ -522,7 +522,7 @@ module supra_framework::committee_map {
         com_store_addr: address,
         ids: vector<u64>
     ) acquires CommitteeInfoStore, SupraCommitteeEventHandler {
-        while (vector::length(&ids) > 0) {
+        while (vector::length(&ids) != 0) {
             let id = vector::pop_back(&mut ids);
             remove_committee(owner_signer, com_store_addr, id);
         }
@@ -618,7 +618,7 @@ module supra_framework::committee_map {
             vector::length(&ids) == vector::length(&rpc_port),
             error::invalid_argument(INVALID_COMMITTEE_NUMBERS)
         );
-        while (vector::length(&ids) > 0) {
+        while (vector::length(&ids) != 0) {
             let id = vector::pop_back(&mut ids);
             let node_address = vector::pop_back(&mut node_addresses);
             let ip_public_address = vector::pop_back(&mut ip_public_address);

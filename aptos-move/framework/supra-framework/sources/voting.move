@@ -288,7 +288,7 @@ module supra_framework::voting {
             );
         };
         // Make sure the execution script's hash is not empty.
-        assert!(vector::length(&execution_hash) > 0, error::invalid_argument(EPROPOSAL_EMPTY_EXECUTION_HASH));
+        assert!(vector::length(&execution_hash) != 0, error::invalid_argument(EPROPOSAL_EMPTY_EXECUTION_HASH));
 
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
         let proposal_id = voting_forum.next_proposal_id;

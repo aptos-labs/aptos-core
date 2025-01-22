@@ -697,7 +697,7 @@ module supra_framework::pbo_delegation_pool {
         if (stake::is_current_epoch_validator(pool_address)) {
             let (rewards_rate, rewards_rate_denominator) =
                 staking_config::get_reward_rate(&staking_config::get());
-            if (rewards_rate_denominator > 0) {
+            if (rewards_rate_denominator != 0) {
                 assert_delegation_pool_exists(pool_address);
 
                 rewards_rate = rewards_rate
@@ -938,13 +938,13 @@ module supra_framework::pbo_delegation_pool {
         unlock_duration: u64
     ) {
         //Unlock duration can not be zero
-        assert!(unlock_duration > 0, error::invalid_argument(EPERIOD_DURATION_IS_ZERO));
+        assert!(unlock_duration != 0, error::invalid_argument(EPERIOD_DURATION_IS_ZERO));
         //Fraction denominator can not be zero
         assert!(unlock_denominator != 0, error::invalid_argument(EDENOMINATOR_IS_ZERO));
         let numerator_length = vector::length(unlock_numerators);
         //Fraction numerators can not be empty
         assert!(
-            numerator_length > 0,
+            numerator_length != 0,
             error::invalid_argument(EEMPTY_UNLOCK_SCHEDULE)
         );
         //First and last numerator can not be zero
@@ -1061,7 +1061,7 @@ module supra_framework::pbo_delegation_pool {
         // initialize the principle stake table
         let principle_stake_table = table::new<address, u64>();
         // initialize the principle stake table
-        while (vector::length(&delegator_address) > 0) {
+        while (vector::length(&delegator_address) != 0) {
             let delegator = vector::pop_back(&mut delegator_address);
             let stake = vector::pop_back(&mut principle_stake);
             table::add(&mut principle_stake_table, delegator, stake);
@@ -1112,7 +1112,7 @@ module supra_framework::pbo_delegation_pool {
         move_to(owner, DelegationPoolOwnership { pool_address });
 
         // Add stake to each delegator
-        while (vector::length(&delegator_address_copy) > 0) {
+        while (vector::length(&delegator_address_copy) != 0) {
             let delegator = vector::pop_back(&mut delegator_address_copy);
             let stake = vector::pop_back(&mut principle_stake_copy);
             add_stake_initialization(delegator, pool_address, stake);
@@ -1153,7 +1153,7 @@ module supra_framework::pbo_delegation_pool {
             stakes,
             |delegator, stake| {
                 // Ignore if stake to be added is `0`
-                if (stake > 0) {
+                if (stake != 0) {
                     // Compute the actual stake that would be added, `principle_stake` has to be
                     // populated in the table accordingly
                     if (table::contains(principle_stake_table, delegator)) {
@@ -1837,7 +1837,7 @@ module supra_framework::pbo_delegation_pool {
                 error::permission_denied(ENOT_AUTHORIZED)
             );
         };
-        assert!(amount > 0, error::invalid_argument(EWITHDRAW_ZERO_STAKE));
+        assert!(amount != 0, error::invalid_argument(EWITHDRAW_ZERO_STAKE));
         withdraw_internal(
             borrow_global_mut<DelegationPool>(pool_address),
             delegator_address,
@@ -2261,7 +2261,7 @@ module supra_framework::pbo_delegation_pool {
     public entry fun withdraw(
         delegator: &signer, pool_address: address, amount: u64
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
-        assert!(amount > 0, error::invalid_argument(EWITHDRAW_ZERO_STAKE));
+        assert!(amount != 0, error::invalid_argument(EWITHDRAW_ZERO_STAKE));
         // Synchronize the delegation and stake pools before any user operation.
         synchronize_delegation_pool(pool_address);
         let delegator_address = signer::address_of(delegator);

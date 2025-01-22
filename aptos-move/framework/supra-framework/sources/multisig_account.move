@@ -390,7 +390,7 @@ module supra_framework::multisig_account {
     ): MultisigTransaction acquires MultisigAccount {
         let multisig_account_resource = borrow_global<MultisigAccount>(multisig_account);
         assert!(
-            sequence_number > 0 && sequence_number < multisig_account_resource.next_sequence_number,
+            sequence_number != 0 && sequence_number < multisig_account_resource.next_sequence_number,
             error::invalid_argument(EINVALID_SEQUENCE_NUMBER),
         );
         *table::borrow(&multisig_account_resource.transactions, sequence_number)
@@ -510,7 +510,7 @@ module supra_framework::multisig_account {
         multisig_account: address, sequence_number: u64, owner: address): (bool, bool) acquires MultisigAccount {
         let multisig_account_resource = borrow_global_mut<MultisigAccount>(multisig_account);
         assert!(
-            sequence_number > 0 && sequence_number < multisig_account_resource.next_sequence_number,
+            sequence_number != 0 && sequence_number < multisig_account_resource.next_sequence_number,
             error::invalid_argument(EINVALID_SEQUENCE_NUMBER),
         );
         let transaction = table::borrow(&multisig_account_resource.transactions, sequence_number);
@@ -726,7 +726,7 @@ module supra_framework::multisig_account {
     ) acquires MultisigAccount {
         assert!(features::multisig_accounts_enabled(), error::unavailable(EMULTISIG_ACCOUNTS_NOT_ENABLED_YET));
         assert!(
-            num_signatures_required > 0 && num_signatures_required <= vector::length(&owners),
+            num_signatures_required != 0 && num_signatures_required <= vector::length(&owners),
             error::invalid_argument(EINVALID_SIGNATURES_REQUIRED),
         );
 
@@ -965,7 +965,7 @@ module supra_framework::multisig_account {
         multisig_account: address,
         payload: vector<u8>,
     ) acquires MultisigAccount {
-        assert!(vector::length(&payload) > 0, error::invalid_argument(EPAYLOAD_CANNOT_BE_EMPTY));
+        assert!(vector::length(&payload) != 0, error::invalid_argument(EPAYLOAD_CANNOT_BE_EMPTY));
 
         assert_multisig_account_exists(multisig_account);
         assert_is_owner(owner, multisig_account);
@@ -1310,7 +1310,7 @@ module supra_framework::multisig_account {
     ) {
         if (features::multisig_v2_enhancement_feature_enabled()) {
             assert!(
-                available_transaction_queue_capacity(multisig_account) > 0,
+                available_transaction_queue_capacity(multisig_account) != 0,
                 error::invalid_state(EMAX_PENDING_TRANSACTIONS_EXCEEDED)
             );
         };
@@ -1420,7 +1420,7 @@ module supra_framework::multisig_account {
     inline fun assert_valid_sequence_number(multisig_account: address, sequence_number: u64) acquires MultisigAccount {
         let multisig_account_resource = borrow_global<MultisigAccount>(multisig_account);
         assert!(
-            sequence_number > 0 && sequence_number < multisig_account_resource.next_sequence_number,
+            sequence_number != 0 && sequence_number < multisig_account_resource.next_sequence_number,
             error::invalid_argument(EINVALID_SEQUENCE_NUMBER),
         );
     }
@@ -1451,7 +1451,7 @@ module supra_framework::multisig_account {
             )
         });
         // If new owners provided, try to add them and emit an event.
-        if (vector::length(&new_owners) > 0) {
+        if (vector::length(&new_owners) != 0) {
             vector::append(&mut multisig_account_ref_mut.owners, new_owners);
             validate_owners(
                 &multisig_account_ref_mut.owners,
@@ -1466,7 +1466,7 @@ module supra_framework::multisig_account {
             );
         };
         // If owners to remove provided, try to remove them.
-        if (vector::length(&owners_to_remove) > 0) {
+        if (vector::length(&owners_to_remove) != 0) {
             let owners_ref_mut = &mut multisig_account_ref_mut.owners;
             let owners_removed = vector[];
             vector::for_each_ref(&owners_to_remove, |owner_to_remove_ref| {
@@ -1480,7 +1480,7 @@ module supra_framework::multisig_account {
                 }
             });
             // Only emit event if owner(s) actually removed.
-            if (vector::length(&owners_removed) > 0) {
+            if (vector::length(&owners_removed) != 0) {
                 if (std::features::module_event_migration_enabled()) {
                     emit(
                         RemoveOwners { multisig_account: multisig_address, owners_removed }
@@ -1497,7 +1497,7 @@ module supra_framework::multisig_account {
             let new_num_signatures_required =
                 option::extract(&mut optional_new_num_signatures_required);
             assert!(
-                new_num_signatures_required > 0,
+                new_num_signatures_required != 0,
                 error::invalid_argument(EINVALID_SIGNATURES_REQUIRED)
             );
             let old_num_signatures_required =

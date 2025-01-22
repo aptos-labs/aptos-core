@@ -150,7 +150,7 @@ module supra_framework::transaction_fee {
             assume burn_percentage * collected_amount <= MAX_U64;
         };
         let amount_to_burn = (burn_percentage as u64) * collected_amount / 100;
-        if (amount_to_burn > 0) {
+        if (amount_to_burn != 0) {
             let coin_to_burn = coin::extract(coin, amount_to_burn);
             coin::burn(
                 coin_to_burn,

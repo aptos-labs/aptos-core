@@ -646,13 +646,13 @@ module supra_framework::coin {
             account_addr,
             amount
         );
-        let coin = if (coin_amount_to_collect > 0) {
+        let coin = if (coin_amount_to_collect != 0) {
             let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
             extract(&mut coin_store.coin, coin_amount_to_collect)
         } else {
             zero()
         };
-        if (fa_amount_to_collect > 0) {
+        if (fa_amount_to_collect != 0) {
             let store_addr = primary_fungible_store::primary_store_address(
                 account_addr,
                 option::destroy_some(paired_metadata<CoinType>())
@@ -906,12 +906,12 @@ module supra_framework::coin {
             account_addr,
             amount
         );
-        if (coin_amount_to_burn > 0) {
+        if (coin_amount_to_burn != 0) {
             let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
             let coin_to_burn = extract(&mut coin_store.coin, coin_amount_to_burn);
             burn(coin_to_burn, burn_cap);
         };
-        if (fa_amount_to_burn > 0) {
+        if (fa_amount_to_burn != 0) {
             fungible_asset::burn_from(
                 borrow_paired_burn_ref(burn_cap),
                 primary_fungible_store::primary_store(account_addr, option::destroy_some(paired_metadata<CoinType>())),
@@ -1251,7 +1251,7 @@ module supra_framework::coin {
             account_addr,
             amount
         );
-        let withdrawn_coin = if (coin_amount_to_withdraw > 0) {
+        let withdrawn_coin = if (coin_amount_to_withdraw != 0) {
             let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
             assert!(
                 !coin_store.frozen,
@@ -1272,7 +1272,7 @@ module supra_framework::coin {
         } else {
             zero()
         };
-        if (fa_amount_to_withdraw > 0) {
+        if (fa_amount_to_withdraw != 0) {
             let fa = primary_fungible_store::withdraw(
                 account,
                 option::destroy_some(paired_metadata<CoinType>()),

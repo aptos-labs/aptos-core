@@ -92,7 +92,7 @@ module supra_framework::block {
     /// This can only be called during Genesis.
     public(friend) fun initialize(supra_framework: &signer, epoch_interval_microsecs: u64) {
         system_addresses::assert_supra_framework(supra_framework);
-        assert!(epoch_interval_microsecs > 0, error::invalid_argument(EZERO_EPOCH_INTERVAL));
+        assert!(epoch_interval_microsecs != 0, error::invalid_argument(EZERO_EPOCH_INTERVAL));
 
         move_to<CommitHistory>(supra_framework, CommitHistory {
             max_capacity: 2000,
@@ -113,7 +113,7 @@ module supra_framework::block {
 
     /// Initialize the commit history resource if it's not in genesis.
     public fun initialize_commit_history(fx: &signer, max_capacity: u32) {
-        assert!(max_capacity > 0, error::invalid_argument(EZERO_MAX_CAPACITY));
+        assert!(max_capacity != 0, error::invalid_argument(EZERO_MAX_CAPACITY));
         move_to<CommitHistory>(fx, CommitHistory {
             max_capacity,
             next_idx: 0,
@@ -128,7 +128,7 @@ module supra_framework::block {
         new_epoch_interval: u64,
     ) acquires BlockResource {
         system_addresses::assert_supra_framework(supra_framework);
-        assert!(new_epoch_interval > 0, error::invalid_argument(EZERO_EPOCH_INTERVAL));
+        assert!(new_epoch_interval != 0, error::invalid_argument(EZERO_EPOCH_INTERVAL));
 
         let block_resource = borrow_global_mut<BlockResource>(@supra_framework);
         let old_epoch_interval = block_resource.epoch_interval;

@@ -343,7 +343,7 @@ module supra_framework::storage_gas {
     }
 
     public fun new_usage_gas_config(target_usage: u64, read_curve: GasCurve, create_curve: GasCurve, write_curve: GasCurve): UsageGasConfig {
-        assert!(target_usage > 0, error::invalid_argument(EZERO_TARGET_USAGE));
+        assert!(target_usage != 0, error::invalid_argument(EZERO_TARGET_USAGE));
         assert!(target_usage <= MAX_U64 / BASIS_POINT_DENOMINATION, error::invalid_argument(ETARGET_USAGE_TOO_BIG));
         UsageGasConfig {
             target_usage,

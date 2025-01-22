@@ -466,7 +466,7 @@ module supra_framework::genesis {
         delegation_percentage: u64,
     ) {
 		let unique_accounts: vector<address> = vector::empty();
-        assert!(delegation_percentage > 0 && delegation_percentage <= 100, error::invalid_argument(EPERCENTAGE_INVALID));
+        assert!(delegation_percentage != 0 && delegation_percentage <= 100, error::invalid_argument(EPERCENTAGE_INVALID));
         vector::for_each_ref(&pbo_delegator_configs, |pbo_delegator_config| {
             let pbo_delegator_config: &PboDelegatorConfiguration = pbo_delegator_config;
 			assert!(!vector::contains(&unique_accounts,&pbo_delegator_config.delegator_config.owner_address),
@@ -480,7 +480,7 @@ module supra_framework::genesis {
         pbo_delegator_config: &PboDelegatorConfiguration,
         delegation_percentage: u64,
     ) {
-		assert!(delegation_percentage>0 && delegation_percentage<=100,error::invalid_argument(EPERCENTAGE_INVALID));
+		assert!(delegation_percentage != 0 && delegation_percentage<=100,error::invalid_argument(EPERCENTAGE_INVALID));
         let unique_accounts:vector<address> = vector::empty();
         vector::for_each_ref(&pbo_delegator_config.delegator_config.delegator_addresses, |delegator_address| {
             let delegator_address: &address = delegator_address;
@@ -549,9 +549,9 @@ module supra_framework::genesis {
             let pool_config: &VestingPoolsMap = pool_config;
             let schedule  = vector::empty();
             let schedule_length = vector::length(&pool_config.vesting_numerators);
-            assert!(schedule_length > 0, error::invalid_argument(EVESTING_SCHEDULE_IS_ZERO));
-            assert!(pool_config.vesting_denominator > 0, error::invalid_argument(EDENOMINATOR_IS_ZERO));
-            assert!(pool_config.vpool_locking_percentage > 0 && pool_config.vpool_locking_percentage <=100 ,
+            assert!(schedule_length != 0, error::invalid_argument(EVESTING_SCHEDULE_IS_ZERO));
+            assert!(pool_config.vesting_denominator != 0, error::invalid_argument(EDENOMINATOR_IS_ZERO));
+            assert!(pool_config.vpool_locking_percentage != 0 && pool_config.vpool_locking_percentage <=100 ,
                 error::invalid_argument(EPERCENTAGE_INVALID));
             //check the sum of numerator are <= denominator.
             let sum = vector::fold(pool_config.vesting_numerators,0,|acc, x| acc + x);
@@ -567,7 +567,7 @@ module supra_framework::genesis {
             let j=0;
             while (j < schedule_length) {
                 let numerator = *vector::borrow(&pool_config.vesting_numerators,j);
-                assert!(numerator > 0, error::invalid_argument(ENUMERATOR_IS_ZERO));
+                assert!(numerator != 0, error::invalid_argument(ENUMERATOR_IS_ZERO));
                 let event = fixed_point32::create_from_rational(numerator,pool_config.vesting_denominator);
                 vector::push_back(&mut schedule,event);
                 j = j + 1;
@@ -581,7 +581,7 @@ module supra_framework::genesis {
 
             let buy_ins  = simple_map::create();
             let num_shareholders = vector::length(&pool_config.shareholders);
-            assert!(num_shareholders > 0, error::invalid_argument(ENO_SHAREHOLDERS));
+            assert!(num_shareholders != 0, error::invalid_argument(ENO_SHAREHOLDERS));
             let j = 0;
             while (j < num_shareholders) {
                 let shareholder = *vector::borrow(&pool_config.shareholders,j);

@@ -311,7 +311,7 @@ module supra_framework::vesting_without_staking {
         period_duration: u64
     ): VestingSchedule {
         let schedule_len = vector::length(&schedule);
-        assert!(schedule_len > 0, error::invalid_argument(EEMPTY_VESTING_SCHEDULE));
+        assert!(schedule_len != 0, error::invalid_argument(EEMPTY_VESTING_SCHEDULE));
         // If the first vesting fraction is zero, we can replace it with nonzero by increasing start time
         assert!(
             fixed_point32::get_raw_value(*vector::borrow(&schedule, 0)) != 0,
@@ -324,7 +324,7 @@ module supra_framework::vesting_without_staking {
             error::invalid_argument(EEMPTY_VESTING_SCHEDULE)
         );
         assert!(
-            period_duration > 0, error::invalid_argument(EZERO_VESTING_SCHEDULE_PERIOD)
+            period_duration != 0, error::invalid_argument(EZERO_VESTING_SCHEDULE_PERIOD)
         );
         VestingSchedule {
             schedule,
@@ -351,7 +351,7 @@ module supra_framework::vesting_without_staking {
         );
         assert_account_is_registered_for_supra(withdrawal_address);
         assert!(
-            vector::length(&shareholders) > 0,
+            vector::length(&shareholders) != 0,
             error::invalid_argument(ENO_SHAREHOLDERS)
         );
         assert!(
@@ -406,7 +406,7 @@ module supra_framework::vesting_without_staking {
                 grant_amount = grant_amount + amount;
             }
         );
-        assert!(grant_amount > 0, error::invalid_argument(EZERO_GRANT));
+        assert!(grant_amount != 0, error::invalid_argument(EZERO_GRANT));
         coin::transfer<SupraCoin>(admin, contract_signer_address, grant_amount);
 
         let admin_store = borrow_global_mut<AdminStore>(admin_address);
@@ -460,7 +460,7 @@ module supra_framework::vesting_without_staking {
         assert_account_is_registered_for_supra(withdrawal_address);
         let shareholders_address = &simple_map::keys(&buy_ins);
         assert!(
-            vector::length(shareholders_address) > 0,
+            vector::length(shareholders_address) != 0,
             error::invalid_argument(ENO_SHAREHOLDERS)
         );
 
@@ -468,7 +468,7 @@ module supra_framework::vesting_without_staking {
         let grant = coin::zero<SupraCoin>();
         let grant_amount = 0;
         let (shareholders_address, buy_ins) = simple_map::to_vec_pair(buy_ins);
-        while (vector::length(&shareholders_address) > 0) {
+        while (vector::length(&shareholders_address) != 0) {
             let shareholder = vector::pop_back(&mut shareholders_address);
             let buy_in = vector::pop_back(&mut buy_ins);
             let init = coin::value(&buy_in);
@@ -484,7 +484,7 @@ module supra_framework::vesting_without_staking {
             );
             grant_amount = grant_amount + init;
         };
-        assert!(grant_amount > 0, error::invalid_argument(EZERO_GRANT));
+        assert!(grant_amount != 0, error::invalid_argument(EZERO_GRANT));
 
         // If this is the first time this admin account has created a vesting contract, initialize the admin store.
         let admin_address = signer::address_of(admin);
@@ -554,7 +554,7 @@ module supra_framework::vesting_without_staking {
             > timestamp::now_seconds()) { return };
 
         let shareholders = simple_map::keys(&vesting_contract.shareholders);
-        while (vector::length(&shareholders) > 0) {
+        while (vector::length(&shareholders) != 0) {
             let shareholder = vector::pop_back(&mut shareholders);
             vest_individual(contract_address, shareholder);
         };
@@ -593,7 +593,7 @@ module supra_framework::vesting_without_staking {
 
         // Index is 0-based while period is 1-based so we need to subtract 1.
 
-        while (last_completed_period >= next_period_to_vest && vesting_record.left_amount > 0 && next_period_to_vest <= vector::length(schedule)) {
+        while (last_completed_period >= next_period_to_vest && vesting_record.left_amount != 0 && next_period_to_vest <= vector::length(schedule)) {
             let schedule_index = next_period_to_vest - 1;
             let vesting_fraction = *vector::borrow(schedule, schedule_index);
             vest_transfer(vesting_record, signer_cap, beneficiary, vesting_fraction);
@@ -608,7 +608,7 @@ module supra_framework::vesting_without_staking {
             next_period_to_vest = next_period_to_vest + 1;
         };
 
-        if(last_completed_period >= next_period_to_vest && vesting_record.left_amount > 0) {
+        if(last_completed_period >= next_period_to_vest && vesting_record.left_amount != 0) {
             let final_fraction = *vector::borrow(schedule, vector::length(schedule) - 1);
             let final_fraction_amount = fixed_point32::multiply_u64(vesting_record.init_amount, final_fraction);
             // Determine how many periods is needed based on the left_amount

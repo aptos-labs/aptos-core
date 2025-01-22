@@ -19,7 +19,7 @@ module supra_framework::supra_config {
     /// Publishes the SupraConfig config.
     public(friend) fun initialize(supra_framework: &signer, config: vector<u8>) {
         system_addresses::assert_supra_framework(supra_framework);
-        assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
+        assert!(vector::length(&config) != 0, error::invalid_argument(EINVALID_CONFIG));
         move_to(supra_framework, SupraConfig { config });
     }
 
@@ -31,7 +31,7 @@ module supra_framework::supra_config {
     /// ```
     public fun set_for_next_epoch(account: &signer, config: vector<u8>) {
         system_addresses::assert_supra_framework(account);
-        assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
+        assert!(vector::length(&config) != 0, error::invalid_argument(EINVALID_CONFIG));
         std::config_buffer::upsert<SupraConfig>(SupraConfig {config});
     }
 

@@ -92,7 +92,7 @@ module supra_framework::transaction_validation {
             transaction_sender == gas_payer
                 || account::exists_at(transaction_sender)
                 || !features::sponsored_automatic_account_creation_enabled()
-                || txn_sequence_number > 0
+                || txn_sequence_number != 0
         ) {
             assert!(account::exists_at(transaction_sender), error::invalid_argument(PROLOGUE_EACCOUNT_DOES_NOT_EXIST));
             assert!(

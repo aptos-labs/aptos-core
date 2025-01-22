@@ -507,8 +507,8 @@ module supra_framework::vesting {
         start_timestamp_secs: u64,
         period_duration: u64,
     ): VestingSchedule {
-        assert!(vector::length(&schedule) > 0, error::invalid_argument(EEMPTY_VESTING_SCHEDULE));
-        assert!(period_duration > 0, error::invalid_argument(EZERO_VESTING_SCHEDULE_PERIOD));
+        assert!(vector::length(&schedule) != 0, error::invalid_argument(EEMPTY_VESTING_SCHEDULE));
+        assert!(period_duration != 0, error::invalid_argument(EZERO_VESTING_SCHEDULE_PERIOD));
         assert!(
             start_timestamp_secs >= timestamp::now_seconds(),
             error::invalid_argument(EVESTING_START_TOO_SOON),
@@ -540,7 +540,7 @@ module supra_framework::vesting {
             error::invalid_argument(EINVALID_WITHDRAWAL_ADDRESS),
         );
         assert_account_is_registered_for_supra(withdrawal_address);
-        assert!(vector::length(shareholders) > 0, error::invalid_argument(ENO_SHAREHOLDERS));
+        assert!(vector::length(shareholders) != 0, error::invalid_argument(ENO_SHAREHOLDERS));
         assert!(
             simple_map::length(&buy_ins) == vector::length(shareholders),
             error::invalid_argument(ESHARES_LENGTH_MISMATCH),
@@ -562,7 +562,7 @@ module supra_framework::vesting {
             );
             grant_amount = grant_amount + buy_in_amount;
         });
-        assert!(grant_amount > 0, error::invalid_argument(EZERO_GRANT));
+        assert!(grant_amount != 0, error::invalid_argument(EZERO_GRANT));
 
         // If this is the first time this admin account has created a vesting contract, initialize the admin store.
         let admin_address = signer::address_of(admin);
@@ -755,7 +755,7 @@ module supra_framework::vesting {
         });
 
         // Send any remaining "dust" (leftover due to rounding error) to the withdrawal address.
-        if (coin::value(&coins) > 0) {
+        if (coin::value(&coins) != 0) {
             supra_account::deposit_coins(vesting_contract.withdrawal_address, coins);
         } else {
             coin::destroy_zero(coins);

@@ -22,7 +22,7 @@ module supra_framework::consensus_config {
     /// Publishes the ConsensusConfig config.
     public(friend) fun initialize(supra_framework: &signer, config: vector<u8>) {
         system_addresses::assert_supra_framework(supra_framework);
-        assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
+        assert!(vector::length(&config) != 0, error::invalid_argument(EINVALID_CONFIG));
         move_to(supra_framework, ConsensusConfig { config });
     }
 
@@ -34,7 +34,7 @@ module supra_framework::consensus_config {
     public fun set(account: &signer, config: vector<u8>) acquires ConsensusConfig {
         system_addresses::assert_supra_framework(account);
         chain_status::assert_genesis();
-        assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
+        assert!(vector::length(&config) != 0, error::invalid_argument(EINVALID_CONFIG));
 
         let config_ref = &mut borrow_global_mut<ConsensusConfig>(@supra_framework).config;
         *config_ref = config;
@@ -51,7 +51,7 @@ module supra_framework::consensus_config {
     /// ```
     public fun set_for_next_epoch(account: &signer, config: vector<u8>) {
         system_addresses::assert_supra_framework(account);
-        assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
+        assert!(vector::length(&config) != 0, error::invalid_argument(EINVALID_CONFIG));
         std::config_buffer::upsert<ConsensusConfig>(ConsensusConfig {config});
     }
 

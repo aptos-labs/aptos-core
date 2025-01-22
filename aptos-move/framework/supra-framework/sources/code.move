@@ -193,7 +193,7 @@ module supra_framework::code {
 
         event::emit(PublishPackage {
             code_address: addr,
-            is_upgrade: upgrade_number > 0
+            is_upgrade: upgrade_number != 0
         });
 
         // Request publish

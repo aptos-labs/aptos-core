@@ -27,7 +27,7 @@ module supra_framework::execution_config {
         system_addresses::assert_supra_framework(account);
         chain_status::assert_genesis();
 
-        assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
+        assert!(vector::length(&config) != 0, error::invalid_argument(EINVALID_CONFIG));
 
         if (exists<ExecutionConfig>(@supra_framework)) {
             let config_ref = &mut borrow_global_mut<ExecutionConfig>(@supra_framework).config;
@@ -47,7 +47,7 @@ module supra_framework::execution_config {
     /// ```
     public fun set_for_next_epoch(account: &signer, config: vector<u8>) {
         system_addresses::assert_supra_framework(account);
-        assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
+        assert!(vector::length(&config) != 0, error::invalid_argument(EINVALID_CONFIG));
         config_buffer::upsert(ExecutionConfig { config });
     }
 
