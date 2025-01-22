@@ -206,6 +206,10 @@ pub enum EntryPoints {
     /// Burn an NFT token, only works with numbered=false tokens.
     TokenV2AmbassadorBurn,
 
+    CompressedTokenAmbassadorMint {
+        numbered: bool,
+    },
+
     LiquidityPoolSwapInit {
         is_stable: bool,
     },
@@ -291,9 +295,9 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::FungibleAssetMint
             | EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => "framework_usecases",
-            EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
-                "ambassador_token"
-            },
+            EntryPoints::TokenV2AmbassadorMint { .. }
+            | EntryPoints::TokenV2AmbassadorBurn
+            | EntryPoints::CompressedTokenAmbassadorMint { .. } => "ambassador_token",
             EntryPoints::LiquidityPoolSwapInit { .. }
             | EntryPoints::LiquidityPoolSwap { .. }
             | EntryPoints::InitializeVectorPicture { .. }
@@ -357,6 +361,7 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador"
             },
+            EntryPoints::CompressedTokenAmbassadorMint { .. } => "compressed_ambassador",
             EntryPoints::LiquidityPoolSwapInit { .. } | EntryPoints::LiquidityPoolSwap { .. } => {
                 "liquidity_pool_wrapper"
             },
@@ -687,7 +692,8 @@ impl EntryPointTrait for EntryPoints {
                     bcs::to_bytes(&1000u64).unwrap(), // amount
                 ])
             },
-            EntryPoints::TokenV2AmbassadorMint { numbered: true } => {
+            EntryPoints::TokenV2AmbassadorMint { numbered: true }
+            | EntryPoints::CompressedTokenAmbassadorMint { numbered: true } => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 get_payload(
                     module_id,
@@ -699,7 +705,8 @@ impl EntryPointTrait for EntryPoints {
                     ],
                 )
             },
-            EntryPoints::TokenV2AmbassadorMint { numbered: false } => {
+            EntryPoints::TokenV2AmbassadorMint { numbered: false }
+            | EntryPoints::CompressedTokenAmbassadorMint { numbered: false } => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 get_payload(
                     module_id,
@@ -715,7 +722,6 @@ impl EntryPointTrait for EntryPoints {
                 ident_str!("burn_named_by_user").to_owned(),
                 vec![],
             ),
-
             EntryPoints::LiquidityPoolSwapInit { is_stable } => get_payload(
                 module_id,
                 ident_str!("initialize_liquid_pair").to_owned(),
@@ -849,9 +855,9 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::CoinInitAndMint | EntryPoints::FungibleAssetMint => {
                 MultiSigConfig::Publisher
             },
-            EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
-                MultiSigConfig::Publisher
-            },
+            EntryPoints::TokenV2AmbassadorMint { .. }
+            | EntryPoints::TokenV2AmbassadorBurn
+            | EntryPoints::CompressedTokenAmbassadorMint { .. } => MultiSigConfig::Publisher,
             EntryPoints::LiquidityPoolSwap { .. } => MultiSigConfig::Publisher,
             EntryPoints::CreateGlobalMilestoneAggV2 { .. } => MultiSigConfig::Publisher,
             _ => MultiSigConfig::None,
@@ -907,9 +913,9 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::CoinInitAndMint | EntryPoints::FungibleAssetMint => {
                 AutomaticArgs::SignerAndMultiSig
             },
-            EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
-                AutomaticArgs::SignerAndMultiSig
-            },
+            EntryPoints::TokenV2AmbassadorMint { .. }
+            | EntryPoints::TokenV2AmbassadorBurn
+            | EntryPoints::CompressedTokenAmbassadorMint { .. } => AutomaticArgs::SignerAndMultiSig,
             EntryPoints::LiquidityPoolSwapInit { .. } => AutomaticArgs::Signer,
             EntryPoints::LiquidityPoolSwap { .. } => AutomaticArgs::SignerAndMultiSig,
             EntryPoints::InitializeVectorPicture { .. } => AutomaticArgs::Signer,
