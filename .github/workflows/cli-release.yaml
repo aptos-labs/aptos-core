@@ -71,6 +71,22 @@ jobs:
           name: cli-builds-linux
           path: aptos-cli-*.zip
 
+  build-linux-arm-binary:
+    name: "Build Linux ARM binary"
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.source_git_ref_override }}
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      - name: Build CLI
+        run: scripts/cli/build_cli_release.sh "Linux" "${{inputs.release_version}}"
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-builds-linux-arm
+          path: aptos-cli-*.zip
+
   build-macos-x86_64-binary:
     name: "Build MacOS x86_64 binary"
     runs-on: macos-13
@@ -125,6 +141,7 @@ jobs:
       - build-ubuntu22-binary
       - build-windows-binary
       - build-linux-binary
+      - build-linux-arm-binary
       - build-macos-arm-binary
       - build-macos-x86_64-binary
     runs-on: ubuntu-latest
