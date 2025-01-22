@@ -371,9 +371,12 @@ mod tests {
     #[test]
     fn test_module_cache_consistency() {
         // Have 3 modules in the state.
-        let a = empty_module_with_dependencies_and_friends("a", vec![], vec![]);
-        let b = empty_module_with_dependencies_and_friends("b", vec![], vec![]);
-        let c = empty_module_with_dependencies_and_friends("c", vec![], vec![]);
+        let a =
+            empty_module_with_dependencies_and_friends("a", vec![], vec![]).set_default_version();
+        let b =
+            empty_module_with_dependencies_and_friends("b", vec![], vec![]).set_default_version();
+        let c =
+            empty_module_with_dependencies_and_friends("c", vec![], vec![]).set_default_version();
 
         let state_view = MockStateView::new(HashMap::from([
             (
@@ -419,8 +422,10 @@ mod tests {
         assert_eq!(state.module_cache.get_module_version(&c.self_id()), Some(0));
 
         // Change module "a" by adding dependencies and also add a new module "d".
-        let d = empty_module_with_dependencies_and_friends("d", vec![], vec![]);
-        let a_new = empty_module_with_dependencies_and_friends("a", vec!["b", "c"], vec![]);
+        let d =
+            empty_module_with_dependencies_and_friends("d", vec![], vec![]).set_default_version();
+        let a_new = empty_module_with_dependencies_and_friends("a", vec!["b", "c"], vec![])
+            .set_default_version();
         assert_ne!(&a, &a_new);
 
         let new_state_view = MockStateView::new(HashMap::from([

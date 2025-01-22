@@ -1,6 +1,6 @@
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module cafe.Module0 {
 struct Struct0 has copy, drop {
 	x: bool

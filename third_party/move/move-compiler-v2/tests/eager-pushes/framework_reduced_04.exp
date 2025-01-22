@@ -98,7 +98,7 @@ fun m::zero($t0: u64): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 struct Wrap has drop, key {
 	a: u64,

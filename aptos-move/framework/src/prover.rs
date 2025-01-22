@@ -245,8 +245,7 @@ impl ProverOptions {
                     || base_opts.prover.check_inconsistency,
                 unconditional_abort_as_inconsistency: self.unconditional_abort_as_inconsistency
                     || base_opts.prover.unconditional_abort_as_inconsistency,
-                skip_loop_analysis: self.keep_loops
-                    || base_opts.prover.unconditional_abort_as_inconsistency,
+                skip_loop_analysis: self.keep_loops || base_opts.prover.skip_loop_analysis,
                 ..base_opts.prover.clone()
             },
             backend: move_prover_boogie_backend::options::BoogieOptions {

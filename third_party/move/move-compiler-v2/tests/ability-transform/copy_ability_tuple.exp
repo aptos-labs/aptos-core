@@ -442,7 +442,7 @@ public fun M::g($t0: &signer) {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 42.M {
 struct R has key {
 	f: u64

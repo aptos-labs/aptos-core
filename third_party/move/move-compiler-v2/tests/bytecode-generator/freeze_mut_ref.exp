@@ -404,7 +404,7 @@ warning: Unused assignment to `x`. Consider removing or prefixing with an unders
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 42.freeze_mut_ref {
 struct G {
 	f: u64

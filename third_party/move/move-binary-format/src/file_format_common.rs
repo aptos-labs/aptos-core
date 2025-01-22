@@ -513,9 +513,8 @@ pub const VERSION_7: u32 = 7;
 /// + TBD
 pub const VERSION_8: u32 = 8;
 
-/// Mark which version is the latest version. Should be set to v8 once features
-/// are added.
-pub const VERSION_MAX: u32 = VERSION_7;
+/// Mark which version is the latest version.
+pub const VERSION_MAX: u32 = VERSION_8;
 
 /// Mark which version is the default version. This is the version used by default by tools like
 /// the compiler. Notice that this version might be different from the one supported on nodes.
