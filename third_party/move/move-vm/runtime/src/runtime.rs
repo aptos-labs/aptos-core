@@ -19,7 +19,7 @@ use move_binary_format::{
     compatibility::Compatibility,
     errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
     file_format::LocalIndex,
-    normalized, CompiledModule, IndexKind,
+    CompiledModule, IndexKind,
 };
 use move_core_types::{
     account_address::AccountAddress, language_storage::TypeTag, value::MoveTypeLayout,
@@ -143,23 +143,10 @@ impl VMRuntime {
 
             #[allow(deprecated)]
             if data_store.exists_module(&module_id)? && compat.need_check_compat() {
-                let old_module_ref = loader.load_module(&module_id, data_store, module_store)?;
-                let old_module = old_module_ref.as_ref().as_ref();
-                if loader.vm_config().use_compatibility_checker_v2 {
-                    compat
-                        .check(old_module_ref.as_ref().as_ref(), module)
-                        .map_err(|e| e.finish(Location::Undefined))?
-                } else {
-                    #[allow(deprecated)]
-                    let old_m = normalized::Module::new(old_module)
-                        .map_err(|e| e.finish(Location::Undefined))?;
-                    #[allow(deprecated)]
-                    let new_m = normalized::Module::new(module)
-                        .map_err(|e| e.finish(Location::Undefined))?;
-                    compat
-                        .legacy_check(&old_m, &new_m)
-                        .map_err(|e| e.finish(Location::Undefined))?
-                }
+                let old_module = loader.load_module(&module_id, data_store, module_store)?;
+                compat
+                    .check(&old_module, module)
+                    .map_err(|e| e.finish(Location::Undefined))?
             }
             if !bundle_unverified.insert(module_id) {
                 return Err(PartialVMError::new(StatusCode::DUPLICATE_MODULE_NAME)

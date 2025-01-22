@@ -893,11 +893,7 @@ impl AptosVM {
         )?;
 
         // Native entry function is forbidden.
-        if self
-            .features()
-            .is_enabled(FeatureFlag::DISALLOW_USER_NATIVES)
-            && function.is_native()
-        {
+        if function.is_native() {
             return Err(
                 PartialVMError::new(StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED)
                     .with_message(
@@ -1775,12 +1771,7 @@ impl AptosVM {
             self.reject_unstable_bytecode(modules)?;
         }
 
-        if self
-            .features()
-            .is_enabled(FeatureFlag::DISALLOW_USER_NATIVES)
-        {
-            verifier::native_validation::validate_module_natives(modules)?;
-        }
+        verifier::native_validation::validate_module_natives(modules)?;
 
         for m in modules {
             if !expected_modules.remove(m.self_id().name().as_str()) {

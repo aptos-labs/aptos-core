@@ -12,7 +12,7 @@ use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
     errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
-    normalized, CompiledModule, IndexKind,
+    CompiledModule, IndexKind,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -154,25 +154,12 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
             // All modules can be republished, as long as the new module is compatible
             // with the old module.
             if compatibility.need_check_compat() {
-                if let Some(old_module_ref) =
+                if let Some(old_module) =
                     existing_module_storage.fetch_deserialized_module(addr, name)?
                 {
-                    let old_module = old_module_ref.as_ref();
-                    if runtime_environment.vm_config().use_compatibility_checker_v2 {
-                        compatibility
-                            .check(old_module, &compiled_module)
-                            .map_err(|e| e.finish(Location::Undefined))?;
-                    } else {
-                        #[allow(deprecated)]
-                        let old_m = normalized::Module::new(old_module)
-                            .map_err(|e| e.finish(Location::Undefined))?;
-                        #[allow(deprecated)]
-                        let new_m = normalized::Module::new(&compiled_module)
-                            .map_err(|e| e.finish(Location::Undefined))?;
-                        compatibility
-                            .legacy_check(&old_m, &new_m)
-                            .map_err(|e| e.finish(Location::Undefined))?;
-                    }
+                    compatibility
+                        .check(&old_module, &compiled_module)
+                        .map_err(|e| e.finish(Location::Undefined))?;
                 }
             }
 

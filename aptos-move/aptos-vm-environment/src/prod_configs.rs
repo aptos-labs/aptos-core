@@ -125,10 +125,6 @@ pub fn aptos_prod_vm_config(
     let deserializer_config = aptos_prod_deserializer_config(features);
     let verifier_config = aptos_prod_verifier_config(features);
 
-    // Compatibility checker v2 is enabled either by its own flag or if enum types are enabled.
-    let use_compatibility_checker_v2 = verifier_config.enable_enum_types
-        || features.is_enabled(FeatureFlag::USE_COMPATIBILITY_CHECKER_V2);
-
     VMConfig {
         verifier_config,
         deserializer_config,
@@ -142,8 +138,6 @@ pub fn aptos_prod_vm_config(
         // manually where applicable.
         delayed_field_optimization_enabled: false,
         ty_builder,
-        disallow_dispatch_for_native: features.is_enabled(FeatureFlag::DISALLOW_USER_NATIVES),
-        use_compatibility_checker_v2,
         use_loader_v2: features.is_loader_v2_enabled(),
         use_call_tree_and_instruction_cache: features
             .is_call_tree_and_instruction_vm_cache_enabled(),
