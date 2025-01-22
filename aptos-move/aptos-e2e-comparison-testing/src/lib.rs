@@ -334,8 +334,7 @@ fn check_aptos_packages_availability(path: PathBuf) -> bool {
 pub async fn prepare_aptos_packages(path: PathBuf, branch_opt: Option<String>) {
     let mut success = true;
     if path.exists() {
-        return;
-        // success = std::fs::remove_dir_all(path.clone()).is_ok();
+        success = std::fs::remove_dir_all(path.clone()).is_ok();
     }
     if success {
         std::fs::create_dir_all(path.clone()).unwrap();
@@ -428,7 +427,7 @@ fn compile_aptos_packages(
             package_name: package.to_string(),
             upgrade_number: None,
         };
-        let compiled_package = compile_package(root_package_dir, &package_info, compiler_version);
+        let compiled_package = compile_package(root_package_dir, &package_info, compiler_version, vec![]);
         if let Ok(built_package) = compiled_package {
             generate_compiled_blob(&package_info, &built_package, compiled_package_map);
         } else {
@@ -445,11 +444,13 @@ fn compile_package(
     root_dir: PathBuf,
     package_info: &PackageInfo,
     compiler_version: Option<CompilerVersion>,
+    experiments: Vec<String>,
 ) -> anyhow::Result<CompiledPackage> {
     let mut build_options = aptos_framework::BuildOptions {
         compiler_version,
         bytecode_version: Some(7),
-        language_version: Some(CompilerVersion::infer_stable_language_version(&compiler_version.unwrap_or_default())),
+        language_version: Some(LanguageVersion::latest()),
+        experiments,
         ..Default::default()
     };
     build_options
@@ -586,7 +587,8 @@ fn dump_and_compile_from_package_metadata(
         let package_v1 = compile_package(
             root_package_dir.clone(),
             &package_info,
-            Some(CompilerVersion::V1),
+            Some(CompilerVersion::latest_stable()),
+            vec![],
         );
         if let Ok(built_package) = package_v1 {
             if execution_mode.is_some_and(|mode| mode.is_v1_or_compare()) {
@@ -614,7 +616,8 @@ fn dump_and_compile_from_package_metadata(
             let package_v2 = compile_package(
                 root_package_dir,
                 &package_info,
-                Some(CompilerVersion::latest_stable()),
+                Some(CompilerVersion::latest()),
+                vec![],
             );
             if let Ok(built_package) = package_v2 {
                 generate_compiled_blob(

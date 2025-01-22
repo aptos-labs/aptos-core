@@ -116,23 +116,23 @@ impl Execution {
         }
     }
 
-    pub fn check_package_skip_alternative(skip_ref_packages: &Option<String>, package_name: &str) -> bool {
-        println!("package name:{}", package_name);
-        if let Some(p) = skip_ref_packages {
-            let packages = p.split(',').collect_vec();
-            packages.contains(&package_name)
-        } else {
-            false
-        }
-    }
+    // pub fn check_package_skip_alternative(skip_ref_packages: &Option<String>, package_name: &str) -> bool {
+    //     println!("package name:{}", package_name);
+    //     if let Some(p) = skip_ref_packages {
+    //         let packages = p.split(',').collect_vec();
+    //         packages.contains(&package_name)
+    //     } else {
+    //         false
+    //     }
+    // }
 
     pub fn output_result_str(&self, msg: String) {
         eprintln!("{}", msg);
     }
 
-    pub fn output_result_str_alternative(msg: String) {
-        eprintln!("{}", msg);
-    }
+    // pub fn output_result_str_alternative(msg: String) {
+    //     eprintln!("{}", msg);
+    // }
 
     pub fn new(
         input_path: PathBuf,
@@ -394,100 +394,101 @@ impl Execution {
     //     Ok(())
     // }
 
-    fn compile_code_alternative(
-        input_path: PathBuf,
-        txn_idx: &TxnIndex,
-        compiled_cache: &mut CompilationCache,
-        execution_mode: &ExecutionMode,
-        skip_ref_packages: &Option<String>,
-    ) -> Result<()> {
-        if !txn_idx.package_info.is_compilable() {
-            return Err(anyhow::Error::msg("not compilable"));
-        }
-        let package_info = txn_idx.package_info.clone();
-        let package_dir = input_path.join(format!("{}", package_info));
-        if !package_dir.exists() {
-            return Err(anyhow::Error::msg("source code is not available"));
-        }
-        let mut v1_failed = false;
-        let mut v2_failed = false;
-        if execution_mode.is_v1_or_compare()
-            && !compiled_cache
-                .compiled_package_cache_v1
-                .contains_key(&package_info)
-        {
-            if compiled_cache.failed_packages_v1.contains(&package_info) {
-                v1_failed = true;
-            } else {
-                let compiled_res_v1 = compile_package(
-                    package_dir.clone(),
-                    &package_info,
-                    Some(CompilerVersion::V1),
-                );
-                if let Ok(compiled_res) = compiled_res_v1 {
-                    generate_compiled_blob(
-                        &package_info,
-                        &compiled_res,
-                        &mut compiled_cache.compiled_package_cache_v1,
-                    );
-                } else {
-                    v1_failed = true;
-                    compiled_cache
-                        .failed_packages_v1
-                        .insert(package_info.clone());
-                }
-            }
-        }
-        if execution_mode.is_v2_or_compare()
-            && !compiled_cache
-                .compiled_package_cache_v2
-                .contains_key(&package_info)
-        {
-            if compiled_cache.failed_packages_v2.contains(&package_info) {
-                v2_failed = true;
-            } else {
-                // if Self::check_package_skip_alternative(skip_ref_packages, &package_info.package_name) {
-                //     env::set_var(
-                //         "MOVE_COMPILER_EXP",
-                //         format!("{},{}", DISABLE_SPEC_CHECK, DISABLE_REF_CHECK),
-                //     );
-                // } else {
-                //     env::set_var(
-                //         "MOVE_COMPILER_EXP",
-                //         format!("{},{}", DISABLE_SPEC_CHECK, ENABLE_REF_CHECK),
-                //     );
-                // }
-                let compiled_res_v2 =
-                    compile_package(package_dir, &package_info, Some(CompilerVersion::latest_stable()));
-                if let Ok(compiled_res) = compiled_res_v2 {
-                    generate_compiled_blob(
-                        &package_info,
-                        &compiled_res,
-                        &mut compiled_cache.compiled_package_cache_v2,
-                    );
-                } else {
-                    v2_failed = true;
-                    compiled_cache
-                        .failed_packages_v2
-                        .insert(package_info.clone());
-                }
-            }
-        }
-        if v1_failed || v2_failed {
-            let mut err_msg = format!(
-                "compilation for the package {} failed at",
-                package_info.package_name
-            );
-            if v1_failed {
-                err_msg = format!("{} v1", err_msg);
-            }
-            if v2_failed {
-                err_msg = format!("{} v2", err_msg);
-            }
-            return Err(anyhow::Error::msg(err_msg));
-        }
-        Ok(())
-    }
+    // fn compile_code_alternative(
+    //     input_path: PathBuf,
+    //     txn_idx: &TxnIndex,
+    //     compiled_cache: &mut CompilationCache,
+    //     execution_mode: &ExecutionMode,
+    //     skip_ref_packages: &Option<String>,
+    // ) -> Result<()> {
+    //     if !txn_idx.package_info.is_compilable() {
+    //         return Err(anyhow::Error::msg("not compilable"));
+    //     }
+    //     let package_info = txn_idx.package_info.clone();
+    //     let package_dir = input_path.join(format!("{}", package_info));
+    //     if !package_dir.exists() {
+    //         return Err(anyhow::Error::msg("source code is not available"));
+    //     }
+    //     let mut v1_failed = false;
+    //     let mut v2_failed = false;
+    //     if execution_mode.is_v1_or_compare()
+    //         && !compiled_cache
+    //             .compiled_package_cache_v1
+    //             .contains_key(&package_info)
+    //     {
+    //         if compiled_cache.failed_packages_v1.contains(&package_info) {
+    //             v1_failed = true;
+    //         } else {
+    //             let compiled_res_v1 = compile_package(
+    //                 package_dir.clone(),
+    //                 &package_info,
+    //                 Some(CompilerVersion::latest_stable()),
+    //                 vec![],
+    //             );
+    //             if let Ok(compiled_res) = compiled_res_v1 {
+    //                 generate_compiled_blob(
+    //                     &package_info,
+    //                     &compiled_res,
+    //                     &mut compiled_cache.compiled_package_cache_v1,
+    //                 );
+    //             } else {
+    //                 v1_failed = true;
+    //                 compiled_cache
+    //                     .failed_packages_v1
+    //                     .insert(package_info.clone());
+    //             }
+    //         }
+    //     }
+    //     if execution_mode.is_v2_or_compare()
+    //         && !compiled_cache
+    //             .compiled_package_cache_v2
+    //             .contains_key(&package_info)
+    //     {
+    //         if compiled_cache.failed_packages_v2.contains(&package_info) {
+    //             v2_failed = true;
+    //         } else {
+    //             // if Self::check_package_skip_alternative(skip_ref_packages, &package_info.package_name) {
+    //             //     env::set_var(
+    //             //         "MOVE_COMPILER_EXP",
+    //             //         format!("{},{}", DISABLE_SPEC_CHECK, DISABLE_REF_CHECK),
+    //             //     );
+    //             // } else {
+    //             //     env::set_var(
+    //             //         "MOVE_COMPILER_EXP",
+    //             //         format!("{},{}", DISABLE_SPEC_CHECK, ENABLE_REF_CHECK),
+    //             //     );
+    //             // }
+    //             let compiled_res_v2 =
+    //                 compile_package(package_dir, &package_info, Some(CompilerVersion::latest()), vec![]);
+    //             if let Ok(compiled_res) = compiled_res_v2 {
+    //                 generate_compiled_blob(
+    //                     &package_info,
+    //                     &compiled_res,
+    //                     &mut compiled_cache.compiled_package_cache_v2,
+    //                 );
+    //             } else {
+    //                 v2_failed = true;
+    //                 compiled_cache
+    //                     .failed_packages_v2
+    //                     .insert(package_info.clone());
+    //             }
+    //         }
+    //     }
+    //     if v1_failed || v2_failed {
+    //         let mut err_msg = format!(
+    //             "compilation for the package {} failed at",
+    //             package_info.package_name
+    //         );
+    //         if v1_failed {
+    //             err_msg = format!("{} v1", err_msg);
+    //         }
+    //         if v2_failed {
+    //             err_msg = format!("{} v2", err_msg);
+    //         }
+    //         return Err(anyhow::Error::msg(err_msg));
+    //     }
+    //     Ok(())
+    // }
 
     fn compile_code(
         &self,
@@ -515,7 +516,8 @@ impl Execution {
                 let compiled_res_v1 = compile_package(
                     package_dir.clone(),
                     &package_info,
-                    Some(CompilerVersion::V1),
+                    Some(CompilerVersion::latest_stable()),
+                    vec![],
                 );
                 if let Ok(compiled_res) = compiled_res_v1 {
                     generate_compiled_blob(
@@ -551,7 +553,7 @@ impl Execution {
                 //     );
                 // }
                 let compiled_res_v2 =
-                    compile_package(package_dir, &package_info, Some(CompilerVersion::latest_stable()));
+                    compile_package(package_dir, &package_info, Some(CompilerVersion::latest()), vec![]);
                 if let Ok(compiled_res) = compiled_res_v2 {
                     generate_compiled_blob(
                         &package_info,
@@ -582,91 +584,91 @@ impl Execution {
         Ok(())
     }
 
-    fn prepare_data_state(
-        cur_version: Version,
-        data_manager: &DataManager,
-        compiled_cache: &mut CompilationCache,
-        input_path: PathBuf,
-        versions: &mut Vec<Version>,
-        data_state_map: &mut Vec<(Version, TxnIndex, FakeDataStore)>,
-        skip_ref_packages: Option<String>,
-        execution_mode: &ExecutionMode,
-    ) {
-        if versions.contains(&cur_version) {
-            return;
-        }
-        if let Some(txn_idx) = data_manager.get_txn_index(cur_version) {
-            // compile the code if the source code is available
-            if txn_idx.package_info.is_compilable()
-                && !is_aptos_package(&txn_idx.package_info.package_name)
-            {
-                let compiled_result = Self::compile_code_alternative(input_path, &txn_idx, compiled_cache, execution_mode, &skip_ref_packages);
-                if compiled_result.is_err() {
-                    let err = compiled_result.unwrap_err();
-                    Self::output_result_str_alternative(format!("{} at version:{}", err, cur_version));
-                    return;
-                }
-            }
-            // read the state data
-            let state = data_manager.get_state(cur_version);
-            versions.push(cur_version);
-            data_state_map.push((cur_version, txn_idx, state));
-        }
-    }
+    // fn prepare_data_state(
+    //     cur_version: Version,
+    //     data_manager: &DataManager,
+    //     compiled_cache: &mut CompilationCache,
+    //     input_path: PathBuf,
+    //     versions: &mut Vec<Version>,
+    //     data_state_map: &mut Vec<(Version, TxnIndex, FakeDataStore)>,
+    //     skip_ref_packages: Option<String>,
+    //     execution_mode: &ExecutionMode,
+    // ) {
+    //     if versions.contains(&cur_version) {
+    //         return;
+    //     }
+    //     if let Some(txn_idx) = data_manager.get_txn_index(cur_version) {
+    //         // compile the code if the source code is available
+    //         if txn_idx.package_info.is_compilable()
+    //             && !is_aptos_package(&txn_idx.package_info.package_name)
+    //         {
+    //             let compiled_result = Self::compile_code_alternative(input_path, &txn_idx, compiled_cache, execution_mode, &skip_ref_packages);
+    //             if compiled_result.is_err() {
+    //                 let err = compiled_result.unwrap_err();
+    //                 Self::output_result_str_alternative(format!("{} at version:{}", err, cur_version));
+    //                 return;
+    //             }
+    //         }
+    //         // read the state data
+    //         let state = data_manager.get_state(cur_version);
+    //         versions.push(cur_version);
+    //         data_state_map.push((cur_version, txn_idx, state));
+    //     }
+    // }
 
-    fn execute_one_txn_with_result_alternative(
-        cur_version: Version,
-        state: &FakeDataStore,
-        txn_idx: &TxnIndex,
-        cache: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
-    ) -> Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus> {
-        Self::execute_with_result(
-            cur_version,
-            state.clone(),
-            &txn_idx,
-            cache,
-            None,
-        )
-    }
+    // fn execute_one_txn_with_result_alternative(
+    //     cur_version: Version,
+    //     state: &FakeDataStore,
+    //     txn_idx: &TxnIndex,
+    //     cache: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
+    // ) -> Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus> {
+    //     Self::execute_with_result(
+    //         cur_version,
+    //         state.clone(),
+    //         &txn_idx,
+    //         cache,
+    //         None,
+    //     )
+    // }
 
-    fn execute_one_txn_with_result(
-        cur_version: Version,
-        data_manager: &DataManager,
-        compiled_cache: &mut CompilationCache,
-        v2_flag: bool,
-        input_path: PathBuf,
-        execution_mode: &ExecutionMode,
-        skip_ref_packages: &Option<String>,
-    ) -> Option<Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>> {
-        if let Some(txn_idx) = data_manager.get_txn_index(cur_version) {
-            // compile the code if the source code is available
-            if txn_idx.package_info.is_compilable()
-                && !is_aptos_package(&txn_idx.package_info.package_name)
-            {
-                let compiled_result = Self::compile_code_alternative(input_path, &txn_idx, compiled_cache, execution_mode, skip_ref_packages);
-                if compiled_result.is_err() {
-                    let err = compiled_result.unwrap_err();
-                    Self::output_result_str_alternative(format!("{} at version:{}", err, cur_version));
-                    return None;
-                }
-            }
-            // read the state data
-            let state = data_manager.get_state(cur_version);
-            let cache = if v2_flag {
-                &compiled_cache.compiled_package_cache_v2
-            } else {
-                &compiled_cache.compiled_package_cache_v1
-            };
-            return Some(Self::execute_with_result(
-                cur_version,
-                state,
-                &txn_idx,
-                cache,
-                None,
-            ));
-        }
-        None
-    }
+    // fn execute_one_txn_with_result(
+    //     cur_version: Version,
+    //     data_manager: &DataManager,
+    //     compiled_cache: &mut CompilationCache,
+    //     v2_flag: bool,
+    //     input_path: PathBuf,
+    //     execution_mode: &ExecutionMode,
+    //     skip_ref_packages: &Option<String>,
+    // ) -> Option<Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>> {
+    //     if let Some(txn_idx) = data_manager.get_txn_index(cur_version) {
+    //         // compile the code if the source code is available
+    //         if txn_idx.package_info.is_compilable()
+    //             && !is_aptos_package(&txn_idx.package_info.package_name)
+    //         {
+    //             let compiled_result = Self::compile_code_alternative(input_path, &txn_idx, compiled_cache, execution_mode, skip_ref_packages);
+    //             if compiled_result.is_err() {
+    //                 let err = compiled_result.unwrap_err();
+    //                 Self::output_result_str_alternative(format!("{} at version:{}", err, cur_version));
+    //                 return None;
+    //             }
+    //         }
+    //         // read the state data
+    //         let state = data_manager.get_state(cur_version);
+    //         let cache = if v2_flag {
+    //             &compiled_cache.compiled_package_cache_v2
+    //         } else {
+    //             &compiled_cache.compiled_package_cache_v1
+    //         };
+    //         return Some(Self::execute_with_result(
+    //             cur_version,
+    //             state,
+    //             &txn_idx,
+    //             cache,
+    //             None,
+    //         ));
+    //     }
+    //     None
+    // }
 
     fn execute_one_txn(
         &self,
@@ -759,114 +761,114 @@ impl Execution {
         }
     }
 
-    pub(crate) fn execute_with_result(
-        cur_version: Version,
-        state: FakeDataStore,
-        txn_idx: & TxnIndex,
-        compiled_package_cache: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
-        debugger: Option<Arc<dyn AptosValidatorInterface + Send>>,
-    ) -> Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>  {
-        let mut package_cache_main = compiled_package_cache;
-        Self::execute_code_alternative(
-            cur_version,
-            state.clone(),
-            &txn_idx.package_info,
-            &txn_idx.txn,
-            package_cache_main,
-            debugger.clone(),
-        )
-    }
+    // pub(crate) fn execute_with_result(
+    //     cur_version: Version,
+    //     state: FakeDataStore,
+    //     txn_idx: & TxnIndex,
+    //     compiled_package_cache: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
+    //     debugger: Option<Arc<dyn AptosValidatorInterface + Send>>,
+    // ) -> Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus>  {
+    //     let mut package_cache_main = compiled_package_cache;
+    //     Self::execute_code_alternative(
+    //         cur_version,
+    //         state.clone(),
+    //         &txn_idx.package_info,
+    //         &txn_idx.txn,
+    //         package_cache_main,
+    //         debugger.clone(),
+    //     )
+    // }
 
-    fn execute_code_alternative(
-        version: Version,
-        mut state: FakeDataStore,
-        package_info: &PackageInfo,
-        txn: &Transaction,
-        compiled_package_cache: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
-        debugger_opt: Option<Arc<dyn AptosValidatorInterface + Send>>,
-    ) -> Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus> {
-        // Always add Aptos (0x1) packages.
-        add_aptos_packages_to_data_store(&mut state, compiled_package_cache);
+    // fn execute_code_alternative(
+    //     version: Version,
+    //     mut state: FakeDataStore,
+    //     package_info: &PackageInfo,
+    //     txn: &Transaction,
+    //     compiled_package_cache: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
+    //     debugger_opt: Option<Arc<dyn AptosValidatorInterface + Send>>,
+    // ) -> Result<((WriteSet, Vec<ContractEvent>), TransactionStatus, u64), VMStatus> {
+    //     // Always add Aptos (0x1) packages.
+    //     add_aptos_packages_to_data_store(&mut state, compiled_package_cache);
 
-        // Add other modules.
-        if package_info.is_compilable() {
-            add_packages_to_data_store(&mut state, package_info, compiled_package_cache);
-        }
+    //     // Add other modules.
+    //     if package_info.is_compilable() {
+    //         add_packages_to_data_store(&mut state, package_info, compiled_package_cache);
+    //     }
 
-        // Update features if needed to the correct binary format used by V2 compiler.
-        let mut features = Features::fetch_config(&state).unwrap_or_default();
-        features.enable(FeatureFlag::VM_BINARY_FORMAT_V7);
-        features.enable(FeatureFlag::NATIVE_MEMORY_OPERATIONS);
-        // features.enable(FeatureFlag::ENABLE_LOADER_V2);
-        // if v2_flag {
-        //     features.enable(FeatureFlag::FAKE_FEATURE_FOR_COMPARISON_TESTING);
-        // }
-        state.set_features(features);
+    //     // Update features if needed to the correct binary format used by V2 compiler.
+    //     let mut features = Features::fetch_config(&state).unwrap_or_default();
+    //     features.enable(FeatureFlag::VM_BINARY_FORMAT_V7);
+    //     features.enable(FeatureFlag::NATIVE_MEMORY_OPERATIONS);
+    //     // features.enable(FeatureFlag::ENABLE_LOADER_V2);
+    //     // if v2_flag {
+    //     //     features.enable(FeatureFlag::FAKE_FEATURE_FOR_COMPARISON_TESTING);
+    //     // }
+    //     state.set_features(features);
 
-        // We use executor only to get access to block executor and avoid some of
-        // the initializations, but ignore its internal state, i.e., FakeDataStore.
-        let executor = FakeExecutor::no_genesis();
-        let block_executor = AptosVMBlockExecutor::new();
-        let txns = vec![txn.clone()];
-        let verified_txns = into_signature_verified_block(txns);
-        let onchain_config: BlockExecutorConfigFromOnchain = BlockExecutorConfigFromOnchain::on_but_large_for_test();
-        let transaction_slice_metadata = TransactionSliceMetadata::Chunk { begin: version, end: version };
+    //     // We use executor only to get access to block executor and avoid some of
+    //     // the initializations, but ignore its internal state, i.e., FakeDataStore.
+    //     let executor = FakeExecutor::no_genesis();
+    //     let block_executor = AptosVMBlockExecutor::new();
+    //     let txns = vec![txn.clone()];
+    //     let verified_txns = into_signature_verified_block(txns);
+    //     let onchain_config: BlockExecutorConfigFromOnchain = BlockExecutorConfigFromOnchain::on_but_large_for_test();
+    //     let transaction_slice_metadata = TransactionSliceMetadata::Chunk { begin: version, end: version };
 
-        // for txn in &mut txns {
-        // if let UserTransaction(_signed_transaction) = txn {
-        // signed_transaction.set_max_gmount(min(100_000, signed_transaction.max_gas_amount() * 2));
-        // }
-        // }
-        if let Some(debugger) = debugger_opt {
-            let data_view = DataStateView::new(debugger, version, state);
-            block_executor.execute_block(&DefaultTxnProvider::new(verified_txns), &data_view, onchain_config, transaction_slice_metadata)
-            .map(|output| output.into_transaction_outputs_forced()).map(|mut res| {
-                let res_i = res.pop().unwrap();
-                (
-                    res_i.clone().into(),
-                    res_i.status().clone(),
-                    res_i.gas_used(),
-                )
-            })
-            // executor
-            //     .execute_transaction_block_with_state_view(txns, &data_view, false, true)
-            //     .map(|mut res| {
-            //         let res_i = res.pop().unwrap();
-            //         (
-            //             res_i.clone().into(),
-            //             res_i.status().clone(),
-            //             res_i.gas_used(),
-            //         )
-            //     })
-        } else {
-            let res = block_executor.execute_block(&DefaultTxnProvider::new(verified_txns), &state, onchain_config, transaction_slice_metadata)
-            .map(|output| output.into_transaction_outputs_forced()).map(|mut res| {
-                let res_i = res.pop().unwrap();
-                (
-                    res_i.clone().into(),
-                    res_i.status().clone(),
-                    res_i.gas_used(),
-                )
-            });
-            // executor
-            //     .execute_transaction_block_with_state_view(txns, &state, false, true)
-            //     .map(|mut res| {
-            //         let res_i = res.pop().unwrap();
-            //         // println!(
-            //         //     "v2 flag:{} gas used:{}, status:{:?}",
-            //         //     v2_flag,
-            //         //     res_i.gas_used(),
-            //         //     res_i.status()
-            //         // );
-            //         (
-            //             res_i.clone().into(),
-            //             res_i.status().clone(),
-            //             res_i.gas_used(),
-            //         )
-            //     });
-            res
-        }
-    }
+    //     // for txn in &mut txns {
+    //     // if let UserTransaction(_signed_transaction) = txn {
+    //     // signed_transaction.set_max_gmount(min(100_000, signed_transaction.max_gas_amount() * 2));
+    //     // }
+    //     // }
+    //     if let Some(debugger) = debugger_opt {
+    //         let data_view = DataStateView::new(debugger, version, state);
+    //         block_executor.execute_block(&DefaultTxnProvider::new(verified_txns), &data_view, onchain_config, transaction_slice_metadata)
+    //         .map(|output| output.into_transaction_outputs_forced()).map(|mut res| {
+    //             let res_i = res.pop().unwrap();
+    //             (
+    //                 res_i.clone().into(),
+    //                 res_i.status().clone(),
+    //                 res_i.gas_used(),
+    //             )
+    //         })
+    //         // executor
+    //         //     .execute_transaction_block_with_state_view(txns, &data_view, false, true)
+    //         //     .map(|mut res| {
+    //         //         let res_i = res.pop().unwrap();
+    //         //         (
+    //         //             res_i.clone().into(),
+    //         //             res_i.status().clone(),
+    //         //             res_i.gas_used(),
+    //         //         )
+    //         //     })
+    //     } else {
+    //         let res = block_executor.execute_block(&DefaultTxnProvider::new(verified_txns), &state, onchain_config, transaction_slice_metadata)
+    //         .map(|output| output.into_transaction_outputs_forced()).map(|mut res| {
+    //             let res_i = res.pop().unwrap();
+    //             (
+    //                 res_i.clone().into(),
+    //                 res_i.status().clone(),
+    //                 res_i.gas_used(),
+    //             )
+    //         });
+    //         // executor
+    //         //     .execute_transaction_block_with_state_view(txns, &state, false, true)
+    //         //     .map(|mut res| {
+    //         //         let res_i = res.pop().unwrap();
+    //         //         // println!(
+    //         //         //     "v2 flag:{} gas used:{}, status:{:?}",
+    //         //         //     v2_flag,
+    //         //         //     res_i.gas_used(),
+    //         //         //     res_i.status()
+    //         //         // );
+    //         //         (
+    //         //             res_i.clone().into(),
+    //         //             res_i.status().clone(),
+    //         //             res_i.gas_used(),
+    //         //         )
+    //         //     });
+    //         res
+    //     }
+    // }
 
     fn execute_code(
         &self,
