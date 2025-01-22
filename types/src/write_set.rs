@@ -555,8 +555,39 @@ impl WriteSetMut {
         self.write_set.len()
     }
 
+    /// Validates the structural integrity of the write set
+    fn validate(&self) -> Result<()> {
+        // Validate each write operation
+        for (key, op) in self.write_set.iter() {
+            // Validate state key format
+            if key.to_string().is_empty() {
+                bail!("Invalid state key: empty key not allowed");
+            }
+
+            // Validate write operation
+            match op {
+                WriteOp::Creation(state_value) | WriteOp::Modification(state_value) => {
+                    if state_value.bytes().is_empty() {
+                        bail!("Invalid write operation: empty bytes not allowed for creation/modification");
+                    }
+                },
+                WriteOp::Deletion(_) => {
+                    // Deletion is always valid as it just requires metadata
+                },
+            }
+
+            // Validate metadata consistency
+            let metadata = op.metadata();
+            if metadata.creation_time_usecs() > metadata.last_update_time_usecs() {
+                bail!("Invalid metadata: creation time cannot be greater than last update time");
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn freeze(self) -> Result<WriteSet> {
-        // TODO: add structural validation
+        self.validate()?;
         Ok(WriteSet::V0(WriteSetV0(self)))
     }
 
