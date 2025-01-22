@@ -3,6 +3,7 @@ module aptos_framework::util {
     friend aptos_framework::any_map;
     friend aptos_framework::code;
     friend aptos_framework::gas_schedule;
+    friend aptos_framework::verified_external_value;
 
     /// Native function to deserialize a type T.
     ///
