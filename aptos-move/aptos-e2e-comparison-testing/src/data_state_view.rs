@@ -57,7 +57,7 @@ impl DataStateView {
         features_to_disable: Vec<FeatureFlag>,
     ) -> Self {
         let debugger_view = DebuggerStateView::new(db, version);
-        let config = OverrideConfig::new(features_to_enable, features_to_disable);
+        let config = OverrideConfig::new(features_to_enable, features_to_disable, None, vec![]).unwrap();
         let features = config.get_state_override(&debugger_view);
         Self {
             debugger_view:debugger_view,
