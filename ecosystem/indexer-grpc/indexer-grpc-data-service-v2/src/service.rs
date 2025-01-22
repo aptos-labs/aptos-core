@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::connection_manager::ConnectionManager;
+use crate::{config::LIVE_DATA_SERVICE, connection_manager::ConnectionManager};
 use anyhow::Result;
 use aptos_indexer_grpc_utils::timestamp_now_proto;
 use aptos_protos::indexer::v1::{
@@ -169,13 +169,16 @@ impl DataService for DataServiceWrapper {
         };
 
         let response = if self.is_live_data_service {
+            let min_servable_version = match LIVE_DATA_SERVICE.get() {
+                Some(svc) => Some(svc.get_min_servable_version().await),
+                None => None,
+            };
             let info = LiveDataServiceInfo {
                 chain_id: self.connection_manager.chain_id(),
                 timestamp: Some(timestamp_now_proto()),
                 known_latest_version: Some(known_latest_version),
                 stream_info: Some(stream_info),
-                // TODO(grao): Populate min_servable_version.
-                min_servable_version: None,
+                min_servable_version,
             };
             PingDataServiceResponse {
                 info: Some(Info::LiveDataServiceInfo(info)),
