@@ -50,16 +50,13 @@ impl BlockPreparer {
         });
         let start_time = Instant::now();
 
-        let (txns, max_txns_from_block_to_execute) = tokio::select! {
-                // Poll the block qc future until a QC is received. Ignore None outcomes.
-                Some(qc) = block_qc_fut => {
-                    let block_voters = Some(qc.ledger_info().get_voters_bitvec().clone());
-                    self.payload_manager.get_transactions(block, block_voters).await
-                },
-                result = self.payload_manager.get_transactions(block, None) => {
-                   result
-                }
-        }?;
+        let block_voters = block_qc_fut
+            .await
+            .map(|qc| qc.ledger_info().get_voters_bitvec().clone());
+        let (txns, max_txns_from_block_to_execute) = self
+            .payload_manager
+            .get_transactions(block, block_voters)
+            .await?;
         let txn_filter = self.txn_filter.clone();
         let txn_deduper = self.txn_deduper.clone();
         let txn_shuffler = self.txn_shuffler.clone();
