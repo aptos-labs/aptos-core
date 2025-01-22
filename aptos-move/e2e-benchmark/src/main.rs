@@ -253,12 +253,18 @@ fn main() {
         EntryPoints::MapInsertRemove {
             len: 100,
             repeats: 100,
-            map_type: MapType::BigOrderedMap { inner_max_degree: 4, leaf_max_degree: 4 },
+            map_type: MapType::BigOrderedMap {
+                inner_max_degree: 4,
+                leaf_max_degree: 4,
+            },
         },
         EntryPoints::MapInsertRemove {
             len: 100,
             repeats: 100,
-            map_type: MapType::BigOrderedMap { inner_max_degree: 1024, leaf_max_degree: 1024 },
+            map_type: MapType::BigOrderedMap {
+                inner_max_degree: 1024,
+                leaf_max_degree: 1024,
+            },
         },
         EntryPoints::MapInsertRemove {
             len: 1000,
