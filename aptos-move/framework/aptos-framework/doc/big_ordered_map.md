@@ -26,7 +26,7 @@ They are waiting for Move improvement that will allow references to be part of t
 allowing cleaner iterator APIs.
 
 
--  [Struct `Node`](#0x1_big_ordered_map_Node)
+-  [Enum `Node`](#0x1_big_ordered_map_Node)
 -  [Enum `Child`](#0x1_big_ordered_map_Child)
 -  [Enum `IteratorPtr`](#0x1_big_ordered_map_IteratorPtr)
 -  [Enum `BigOrderedMap`](#0x1_big_ordered_map_BigOrderedMap)
@@ -99,7 +99,7 @@ allowing cleaner iterator APIs.
 
 <a id="0x1_big_ordered_map_Node"></a>
 
-## Struct `Node`
+## Enum `Node`
 
 A node of the BigOrderedMap.
 
@@ -109,9 +109,17 @@ Basically - Leaf node is a single-resource OrderedMap, containing as much key/va
 So Leaf node contains multiple values, not just one.
 
 
-<pre><code><b>struct</b> <a href="big_ordered_map.md#0x1_big_ordered_map_Node">Node</a>&lt;K: store, V: store&gt; <b>has</b> store
+<pre><code>enum <a href="big_ordered_map.md#0x1_big_ordered_map_Node">Node</a>&lt;K: store, V: store&gt; <b>has</b> store
 </code></pre>
 
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>V1</summary>
 
 
 <details>
@@ -145,6 +153,10 @@ So Leaf node contains multiple values, not just one.
 </dd>
 </dl>
 
+
+</details>
+
+</details>
 
 </details>
 
@@ -1592,7 +1604,7 @@ Borrow a node mutably, given an index. Works for both root (i.e. inline) node an
 
 
 <pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_destroy_empty_node">destroy_empty_node</a>&lt;K: store, V: store&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_Node">Node</a>&lt;K, V&gt;) {
-    <b>let</b> <a href="big_ordered_map.md#0x1_big_ordered_map_Node">Node</a> { children, is_leaf: _, prev: _, next: _ } = self;
+    <b>let</b> Node::V1 { children, is_leaf: _, prev: _, next: _ } = self;
     <b>assert</b>!(children.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EMAP_NOT_EMPTY">EMAP_NOT_EMPTY</a>));
     children.<a href="big_ordered_map.md#0x1_big_ordered_map_destroy_empty">destroy_empty</a>();
 }
@@ -1618,7 +1630,7 @@ Borrow a node mutably, given an index. Works for both root (i.e. inline) node an
 
 
 <pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_node">new_node</a>&lt;K: store, V: store&gt;(is_leaf: bool): <a href="big_ordered_map.md#0x1_big_ordered_map_Node">Node</a>&lt;K, V&gt; {
-    <a href="big_ordered_map.md#0x1_big_ordered_map_Node">Node</a> {
+    Node::V1 {
         is_leaf: is_leaf,
         children: <a href="ordered_map.md#0x1_ordered_map_new">ordered_map::new</a>(),
         prev: <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>,
@@ -1647,7 +1659,7 @@ Borrow a node mutably, given an index. Works for both root (i.e. inline) node an
 
 
 <pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_node_with_children">new_node_with_children</a>&lt;K: store, V: store&gt;(is_leaf: bool, children: OrderedMap&lt;K, <a href="big_ordered_map.md#0x1_big_ordered_map_Child">Child</a>&lt;V&gt;&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_Node">Node</a>&lt;K, V&gt; {
-    <a href="big_ordered_map.md#0x1_big_ordered_map_Node">Node</a> {
+    Node::V1 {
         is_leaf: is_leaf,
         children: children,
         prev: <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>,
@@ -2275,7 +2287,7 @@ Given a path to node (excluding the node itself), which is currently stored unde
     // But append <b>to</b> the node <b>with</b> smaller keys, <b>as</b> <a href="ordered_map.md#0x1_ordered_map_append">ordered_map::append</a> is more efficient when adding <b>to</b> the end.
     <b>let</b> (key_to_remove, reserved_slot_to_remove) = <b>if</b> (sibling_index == next) {
         // destroying larger sibling node, keeping sibling_slot.
-        <b>let</b> <a href="big_ordered_map.md#0x1_big_ordered_map_Node">Node</a> { children: sibling_children, is_leaf: _, prev: _, next: sibling_next } = sibling_node;
+        <b>let</b> Node::V1 { children: sibling_children, is_leaf: _, prev: _, next: sibling_next } = sibling_node;
         <b>let</b> key_to_remove = *children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(children).<a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow_key">iter_borrow_key</a>(children);
         children.append_disjoint(sibling_children);
         node.next = sibling_next;
@@ -2300,7 +2312,7 @@ Given a path to node (excluding the node itself), which is currently stored unde
         (key_to_remove, node_slot)
     } <b>else</b> {
         // destroying larger current node, keeping node_slot
-        <b>let</b> <a href="big_ordered_map.md#0x1_big_ordered_map_Node">Node</a> { children: node_children, is_leaf: _, prev: _, next: node_next } = node;
+        <b>let</b> Node::V1 { children: node_children, is_leaf: _, prev: _, next: node_next } = node;
         <b>let</b> key_to_remove = *sibling_children.<a href="big_ordered_map.md#0x1_big_ordered_map_new_end_iter">new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(sibling_children).<a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow_key">iter_borrow_key</a>(sibling_children);
         sibling_children.append_disjoint(node_children);
         sibling_node.next = node_next;

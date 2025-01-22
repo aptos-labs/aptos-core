@@ -78,17 +78,19 @@ module aptos_std::big_ordered_map {
     /// Leaf node will have all children be Child::Leaf.
     /// Basically - Leaf node is a single-resource OrderedMap, containing as much key/value entries, as can fit.
     /// So Leaf node contains multiple values, not just one.
-    struct Node<K: store, V: store> has store {
-        // Whether this node is a leaf node.
-        is_leaf: bool,
-        // The children of the nodes.
-        // When node is inner node, K represents max_key within the child subtree, and values are Child::Inner.
-        // When the node is leaf node, K represents key of the leaf, and values are Child::Leaf.
-        children: OrderedMap<K, Child<V>>,
-        // The node index of its previous node at the same level, or `NULL_INDEX` if it doesn't have a previous node.
-        prev: u64,
-        // The node index of its next node at the same level, or `NULL_INDEX` if it doesn't have a next node.
-        next: u64,
+    enum Node<K: store, V: store> has store {
+        V1 {
+            // Whether this node is a leaf node.
+            is_leaf: bool,
+            // The children of the nodes.
+            // When node is inner node, K represents max_key within the child subtree, and values are Child::Inner.
+            // When the node is leaf node, K represents key of the leaf, and values are Child::Leaf.
+            children: OrderedMap<K, Child<V>>,
+            // The node index of its previous node at the same level, or `NULL_INDEX` if it doesn't have a previous node.
+            prev: u64,
+            // The node index of its next node at the same level, or `NULL_INDEX` if it doesn't have a next node.
+            next: u64,
+        }
     }
 
     /// Contents of a child node.
@@ -585,13 +587,13 @@ module aptos_std::big_ordered_map {
     }
 
     fun destroy_empty_node<K: store, V: store>(self: Node<K, V>) {
-        let Node { children, is_leaf: _, prev: _, next: _ } = self;
+        let Node::V1 { children, is_leaf: _, prev: _, next: _ } = self;
         assert!(children.is_empty(), error::invalid_argument(EMAP_NOT_EMPTY));
         children.destroy_empty();
     }
 
     fun new_node<K: store, V: store>(is_leaf: bool): Node<K, V> {
-        Node {
+        Node::V1 {
             is_leaf: is_leaf,
             children: ordered_map::new(),
             prev: NULL_INDEX,
@@ -600,7 +602,7 @@ module aptos_std::big_ordered_map {
     }
 
     fun new_node_with_children<K: store, V: store>(is_leaf: bool, children: OrderedMap<K, Child<V>>): Node<K, V> {
-        Node {
+        Node::V1 {
             is_leaf: is_leaf,
             children: children,
             prev: NULL_INDEX,
@@ -1028,7 +1030,7 @@ module aptos_std::big_ordered_map {
         // But append to the node with smaller keys, as ordered_map::append is more efficient when adding to the end.
         let (key_to_remove, reserved_slot_to_remove) = if (sibling_index == next) {
             // destroying larger sibling node, keeping sibling_slot.
-            let Node { children: sibling_children, is_leaf: _, prev: _, next: sibling_next } = sibling_node;
+            let Node::V1 { children: sibling_children, is_leaf: _, prev: _, next: sibling_next } = sibling_node;
             let key_to_remove = *children.new_end_iter().iter_prev(children).iter_borrow_key(children);
             children.append_disjoint(sibling_children);
             node.next = sibling_next;
@@ -1053,7 +1055,7 @@ module aptos_std::big_ordered_map {
             (key_to_remove, node_slot)
         } else {
             // destroying larger current node, keeping node_slot
-            let Node { children: node_children, is_leaf: _, prev: _, next: node_next } = node;
+            let Node::V1 { children: node_children, is_leaf: _, prev: _, next: node_next } = node;
             let key_to_remove = *sibling_children.new_end_iter().iter_prev(sibling_children).iter_borrow_key(sibling_children);
             sibling_children.append_disjoint(node_children);
             sibling_node.next = node_next;
