@@ -38,7 +38,7 @@ use move_vm_types::{
 };
 use parking_lot::{Mutex, RwLock};
 use std::{
-    collections::{btree_map, BTreeMap, BTreeSet},
+    collections::{btree_map, BTreeMap, BTreeSet, HashMap},
     hash::Hash,
     sync::Arc,
 };
@@ -54,9 +54,10 @@ use crate::{
     loader::modules::{StructVariantInfo, VariantFieldInfo},
     native_functions::NativeFunctions,
     storage::{
-        loader::LoaderV2, module_storage::FunctionValueExtensionAdapter,
-        struct_name_index_map::StructNameIndexMap, ty_cache::StructInfoCache,
-        ty_tag_cache::TypeTagBuilder,
+        loader::LoaderV2,
+        module_storage::FunctionValueExtensionAdapter,
+        struct_name_index_map::StructNameIndexMap,
+        ty_tag_cache::{PricedStructTag, TypeTagBuilder, TypeTagCache},
     },
 };
 pub use function::{Function, LoadedFunction};
@@ -153,13 +154,6 @@ impl Loader {
 
     versioned_loader_getter!(ty_builder, TypeBuilder);
 
-    fn ty_cache<'a>(&'a self, module_storage: &'a dyn ModuleStorage) -> &StructInfoCache {
-        match self {
-            Self::V1(loader) => &loader.type_cache,
-            Self::V2(_) => module_storage.runtime_environment().ty_cache(),
-        }
-    }
-
     pub(crate) fn struct_name_index_map<'a>(
         &'a self,
         module_storage: &'a dyn ModuleStorage,
@@ -173,7 +167,7 @@ impl Loader {
     pub(crate) fn v1(natives: NativeFunctions, vm_config: VMConfig) -> Self {
         Self::V1(LoaderV1 {
             scripts: RwLock::new(ScriptCache::new()),
-            type_cache: StructInfoCache::empty(),
+            type_cache: TypeTagCache::empty(),
             name_cache: StructNameIndexMap::empty(),
             natives,
             invalidated: RwLock::new(false),
@@ -375,7 +369,7 @@ impl Loader {
 // The `pub(crate)` API is what a Loader offers to the runtime.
 pub(crate) struct LoaderV1 {
     scripts: RwLock<ScriptCache>,
-    type_cache: StructInfoCache,
+    type_cache: TypeTagCache,
     natives: NativeFunctions,
     pub(crate) name_cache: StructNameIndexMap,
 
@@ -1729,9 +1723,9 @@ impl LoaderV1 {
         ty_args: &[Type],
         gas_context: &mut PseudoGasContext,
     ) -> PartialVMResult<StructTag> {
-        if let Some((struct_tag, gas)) = self.type_cache.get_struct_tag(&struct_name_idx, ty_args) {
-            gas_context.charge(gas)?;
-            return Ok(struct_tag.clone());
+        if let Some(priced_tag) = self.type_cache.get_struct_tag(&struct_name_idx, ty_args) {
+            gas_context.charge(priced_tag.pseudo_gas_cost)?;
+            return Ok(priced_tag.struct_tag);
         }
 
         let cur_cost = gas_context.current_cost();
@@ -1745,13 +1739,14 @@ impl LoaderV1 {
             .idx_to_struct_tag(struct_name_idx, type_args)?;
 
         gas_context.charge_struct_tag(&struct_tag)?;
-        self.type_cache.store_struct_tag(
-            struct_name_idx,
-            ty_args.to_vec(),
-            struct_tag.clone(),
-            gas_context.current_cost() - cur_cost,
-        );
-        Ok(struct_tag)
+
+        let priced_tag = PricedStructTag {
+            struct_tag,
+            pseudo_gas_cost: gas_context.current_cost() - cur_cost,
+        };
+        self.type_cache
+            .insert_struct_tag(&struct_name_idx, ty_args, &priced_tag);
+        Ok(priced_tag.struct_tag)
     }
 
     fn type_to_type_tag_impl(
@@ -1802,15 +1797,6 @@ impl Loader {
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
-        let ty_cache = self.ty_cache(module_storage);
-        if let Some((struct_layout, node_count, has_identifier_mappings)) =
-            ty_cache.get_struct_layout_info(&struct_name_idx, ty_args)
-        {
-            *count += node_count;
-            return Ok((struct_layout, has_identifier_mappings));
-        }
-
-        let count_before = *count;
         let struct_type =
             self.fetch_struct_ty_by_idx(struct_name_idx, module_store, module_storage)?;
 
@@ -1895,14 +1881,6 @@ impl Loader {
             },
         };
 
-        let field_node_count = *count - count_before;
-        ty_cache.store_struct_layout_info(
-            struct_name_idx,
-            ty_args.to_vec(),
-            layout.clone(),
-            field_node_count,
-            has_identifier_mappings,
-        );
         Ok((layout, has_identifier_mappings))
     }
 
@@ -2054,14 +2032,6 @@ impl Loader {
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<MoveTypeLayout> {
-        let ty_cache = self.ty_cache(module_storage);
-        if let Some((layout, annotated_node_count)) =
-            ty_cache.get_annotated_struct_layout_info(&struct_name_idx, ty_args)
-        {
-            *count += annotated_node_count;
-            return Ok(layout);
-        }
-
         let struct_type =
             self.fetch_struct_ty_by_idx(struct_name_idx, module_store, module_storage)?;
 
@@ -2080,7 +2050,6 @@ impl Loader {
                 .map(|(l, _)| l);
         }
 
-        let count_before = *count;
         let struct_tag = match self {
             Loader::V1(loader) => {
                 let mut gas_context = PseudoGasContext::new(loader.vm_config());
@@ -2109,14 +2078,6 @@ impl Loader {
             .collect::<PartialVMResult<Vec<_>>>()?;
         let struct_layout =
             MoveTypeLayout::Struct(MoveStructLayout::with_types(struct_tag, field_layouts));
-        let field_node_count = *count - count_before;
-
-        ty_cache.store_annotated_struct_layout_info(
-            struct_name_idx,
-            ty_args.to_vec(),
-            struct_layout.clone(),
-            field_node_count,
-        );
         Ok(struct_layout)
     }
 
@@ -2194,10 +2155,10 @@ impl Loader {
         struct_name_idx: StructNameIndex,
         module_store: &LegacyModuleStorageAdapter,
         module_storage: &dyn ModuleStorage,
+        visited_cache: &mut HashMap<StructNameIndex, DepthFormula>,
     ) -> PartialVMResult<DepthFormula> {
-        let ty_cache = self.ty_cache(module_storage);
-        if let Some(depth_formula) = ty_cache.get_depth_formula(&struct_name_idx) {
-            return Ok(depth_formula);
+        if let Some(formula) = visited_cache.get(&struct_name_idx) {
+            return Ok(formula.clone());
         }
 
         let struct_type =
@@ -2206,22 +2167,47 @@ impl Loader {
             StructLayout::Single(fields) => fields
                 .iter()
                 .map(|(_, field_ty)| {
-                    self.calculate_depth_of_type(field_ty, module_store, module_storage)
+                    self.calculate_depth_of_type(
+                        field_ty,
+                        module_store,
+                        module_storage,
+                        visited_cache,
+                    )
                 })
                 .collect::<PartialVMResult<Vec<_>>>()?,
             StructLayout::Variants(variants) => variants
                 .iter()
                 .flat_map(|variant| variant.1.iter().map(|(_, ty)| ty))
                 .map(|field_ty| {
-                    self.calculate_depth_of_type(field_ty, module_store, module_storage)
+                    self.calculate_depth_of_type(
+                        field_ty,
+                        module_store,
+                        module_storage,
+                        visited_cache,
+                    )
                 })
                 .collect::<PartialVMResult<Vec<_>>>()?,
         };
 
         let formula = DepthFormula::normalize(formulas);
+        if visited_cache
+            .insert(struct_name_idx, formula.clone())
+            .is_some()
+        {
+            // Same thread has put this entry previously, which means there is a recursion.
+            let struct_name = self
+                .struct_name_index_map(module_storage)
+                .idx_to_struct_name_ref(struct_name_idx)?;
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                    format!(
+                        "Depth formula for struct '{}' is already cached by the same thread",
+                        struct_name.as_ref(),
+                    ),
+                ),
+            );
+        }
 
-        let struct_name_index_map = self.struct_name_index_map(module_storage);
-        ty_cache.store_depth_formula(struct_name_idx, struct_name_index_map, &formula)?;
         Ok(formula)
     }
 
@@ -2230,6 +2216,7 @@ impl Loader {
         ty: &Type,
         module_store: &LegacyModuleStorageAdapter,
         module_storage: &dyn ModuleStorage,
+        visited_cache: &mut HashMap<StructNameIndex, DepthFormula>,
     ) -> PartialVMResult<DepthFormula> {
         Ok(match ty {
             Type::Bool
@@ -2242,19 +2229,25 @@ impl Loader {
             | Type::U32
             | Type::U256 => DepthFormula::constant(1),
             Type::Vector(ty) => {
-                let mut inner = self.calculate_depth_of_type(ty, module_store, module_storage)?;
+                let mut inner =
+                    self.calculate_depth_of_type(ty, module_store, module_storage, visited_cache)?;
                 inner.scale(1);
                 inner
             },
             Type::Reference(ty) | Type::MutableReference(ty) => {
-                let mut inner = self.calculate_depth_of_type(ty, module_store, module_storage)?;
+                let mut inner =
+                    self.calculate_depth_of_type(ty, module_store, module_storage, visited_cache)?;
                 inner.scale(1);
                 inner
             },
             Type::TyParam(ty_idx) => DepthFormula::type_parameter(*ty_idx),
             Type::Struct { idx, .. } => {
-                let mut struct_formula =
-                    self.calculate_depth_of_struct(*idx, module_store, module_storage)?;
+                let mut struct_formula = self.calculate_depth_of_struct(
+                    *idx,
+                    module_store,
+                    module_storage,
+                    visited_cache,
+                )?;
                 debug_assert!(struct_formula.terms.is_empty());
                 struct_formula.scale(1);
                 struct_formula
@@ -2267,12 +2260,21 @@ impl Loader {
                         let var = idx as TypeParameterIndex;
                         Ok((
                             var,
-                            self.calculate_depth_of_type(ty, module_store, module_storage)?,
+                            self.calculate_depth_of_type(
+                                ty,
+                                module_store,
+                                module_storage,
+                                visited_cache,
+                            )?,
                         ))
                     })
                     .collect::<PartialVMResult<BTreeMap<_, _>>>()?;
-                let struct_formula =
-                    self.calculate_depth_of_struct(*idx, module_store, module_storage)?;
+                let struct_formula = self.calculate_depth_of_struct(
+                    *idx,
+                    module_store,
+                    module_storage,
+                    visited_cache,
+                )?;
                 let mut subst_struct_formula = struct_formula.subst(ty_arg_map)?;
                 subst_struct_formula.scale(1);
                 subst_struct_formula
@@ -2303,6 +2305,8 @@ impl Loader {
         module_store: &LegacyModuleStorageAdapter,
         module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
+        let _timer = VM_TIMER.timer_with_label("Loader::type_to_type_layout");
+
         let mut count = 0;
         self.type_to_type_layout_impl(ty, module_store, module_storage, &mut count, 1)
     }
@@ -2313,6 +2317,8 @@ impl Loader {
         module_store: &LegacyModuleStorageAdapter,
         module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<MoveTypeLayout> {
+        let _timer = VM_TIMER.timer_with_label("Loader::type_to_type_layout");
+
         let mut count = 0;
         let (layout, _has_identifier_mappings) =
             self.type_to_type_layout_impl(ty, module_store, module_storage, &mut count, 1)?;
@@ -2325,6 +2331,8 @@ impl Loader {
         module_store: &LegacyModuleStorageAdapter,
         module_storage: &dyn ModuleStorage,
     ) -> PartialVMResult<MoveTypeLayout> {
+        let _timer = VM_TIMER.timer_with_label("Loader::type_to_type_layout");
+
         let mut count = 0;
         self.type_to_fully_annotated_layout_impl(ty, module_store, module_storage, &mut count, 1)
     }
