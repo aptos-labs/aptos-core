@@ -101,6 +101,14 @@ impl TypeTagCache {
     }
 }
 
+impl Clone for TypeTagCache {
+    fn clone(&self) -> Self {
+        Self {
+            cache: RwLock::new(self.cache.read().clone()),
+        }
+    }
+}
+
 /// Responsible for building type tags, while also doing the metering in order to bound space and
 /// time complexity.
 pub(crate) struct TypeTagBuilder<'a> {
