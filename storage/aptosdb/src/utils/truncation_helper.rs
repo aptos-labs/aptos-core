@@ -4,7 +4,7 @@
 #![allow(dead_code)]
 
 use crate::{
-    ledger_db::{LedgerDb, LedgerDbSchemaBatches},
+    ledger_db::{ledger_metadata_db::LedgerMetadataDb, LedgerDb, LedgerDbSchemaBatches},
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         epoch_by_version::EpochByVersionSchema,
@@ -198,7 +198,7 @@ pub(crate) fn truncate_state_merkle_db_single_shard(
 }
 
 pub(crate) fn find_tree_root_at_or_before(
-    ledger_metadata_db: &DB,
+    ledger_metadata_db: &LedgerMetadataDb,
     state_merkle_db: &StateMerkleDb,
     version: Version,
 ) -> Result<Option<Version>> {
@@ -211,8 +211,11 @@ pub(crate) fn find_tree_root_at_or_before(
 
         // It's possible that it's a partial commit when sharding is not enabled,
         // look again for the previous version:
+        if version == 0 {
+            return Ok(None);
+        }
         if let Some(closest_version) =
-            find_closest_node_version_at_or_before(state_merkle_db.metadata_db(), version)?
+            find_closest_node_version_at_or_before(state_merkle_db.metadata_db(), version - 1)?
         {
             if root_exists_at_version(state_merkle_db, closest_version)? {
                 return Ok(Some(closest_version));
@@ -220,7 +223,7 @@ pub(crate) fn find_tree_root_at_or_before(
 
             // Now we are probably looking at a pruned version in this epoch, look for the previous
             // epoch ending:
-            let mut iter = ledger_metadata_db.iter::<EpochByVersionSchema>()?;
+            let mut iter = ledger_metadata_db.db().iter::<EpochByVersionSchema>()?;
             iter.seek_for_prev(&version)?;
             if let Some((closest_epoch_version, _)) = iter.next().transpose()? {
                 if root_exists_at_version(state_merkle_db, closest_epoch_version)? {
