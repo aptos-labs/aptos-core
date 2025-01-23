@@ -78,17 +78,19 @@ module aptos_std::big_ordered_map {
     /// Leaf node will have all children be Child::Leaf.
     /// Basically - Leaf node is a single-resource OrderedMap, containing as much key/value entries, as can fit.
     /// So Leaf node contains multiple values, not just one.
-    struct Node<K: store, V: store> has store {
-        // Whether this node is a leaf node.
-        is_leaf: bool,
-        // The children of the nodes.
-        // When node is inner node, K represents max_key within the child subtree, and values are Child::Inner.
-        // When the node is leaf node, K represents key of the leaf, and values are Child::Leaf.
-        children: OrderedMap<K, Child<V>>,
-        // The node index of its previous node at the same level, or `NULL_INDEX` if it doesn't have a previous node.
-        prev: u64,
-        // The node index of its next node at the same level, or `NULL_INDEX` if it doesn't have a next node.
-        next: u64,
+    enum Node<K: store, V: store> has store {
+        V1 {
+            // Whether this node is a leaf node.
+            is_leaf: bool,
+            // The children of the nodes.
+            // When node is inner node, K represents max_key within the child subtree, and values are Child::Inner.
+            // When the node is leaf node, K represents key of the leaf, and values are Child::Leaf.
+            children: OrderedMap<K, Child<V>>,
+            // The node index of its previous node at the same level, or `NULL_INDEX` if it doesn't have a previous node.
+            prev: u64,
+            // The node index of its next node at the same level, or `NULL_INDEX` if it doesn't have a next node.
+            next: u64,
+        }
     }
 
     /// Contents of a child node.
@@ -154,7 +156,7 @@ module aptos_std::big_ordered_map {
             error::invalid_argument(EINVALID_CONFIG_PARAMETER)
         );
 
-        new_with_config(0, 0, false, 0)
+        new_with_config(0, 0, false)
     }
 
     /// Returns a new BigOrderedMap with the provided max degree consts (the maximum # of children a node can have, both inner and leaf).
@@ -165,16 +167,15 @@ module aptos_std::big_ordered_map {
     ///   `entry_size * leaf_max_degree <= MAX_NODE_BYTES`
     /// If keys or values have variable size, and first element could be non-representative in size (i.e. smaller than future ones),
     /// it is important to compute and pass inner_max_degree and leaf_max_degree based on the largest element you want to be able to insert.
-    public fun new_with_config<K: store, V: store>(inner_max_degree: u16, leaf_max_degree: u16, reuse_slots: bool, num_to_preallocate: u32): BigOrderedMap<K, V> {
+    public fun new_with_config<K: store, V: store>(inner_max_degree: u16, leaf_max_degree: u16, reuse_slots: bool): BigOrderedMap<K, V> {
         assert!(inner_max_degree == 0 || (inner_max_degree >= DEFAULT_INNER_MIN_DEGREE && (inner_max_degree as u64) <= MAX_DEGREE), error::invalid_argument(EINVALID_CONFIG_PARAMETER));
         assert!(leaf_max_degree == 0 || (leaf_max_degree >= DEFAULT_LEAF_MIN_DEGREE && (leaf_max_degree as u64) <= MAX_DEGREE), error::invalid_argument(EINVALID_CONFIG_PARAMETER));
-        assert!(reuse_slots || num_to_preallocate == 0, error::invalid_argument(EINVALID_CONFIG_PARAMETER));
 
         // Assert that storage_slots_allocator special indices are aligned:
         assert!(storage_slots_allocator::is_null_index(NULL_INDEX), error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
         assert!(storage_slots_allocator::is_special_unused_index(ROOT_INDEX), error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
 
-        let nodes = storage_slots_allocator::new(storage_slots_allocator::new_config(reuse_slots, num_to_preallocate));
+        let nodes = storage_slots_allocator::new(reuse_slots);
 
         let self = BigOrderedMap::BPlusTreeMap {
             root: new_node(/*is_leaf=*/true),
@@ -204,6 +205,14 @@ module aptos_std::big_ordered_map {
         // If root node is empty, then we know that no storage slots are used,
         // and so we can safely destroy all nodes.
         nodes.destroy_empty();
+    }
+
+    /// Map was created with reuse_slots=true, you can allocate spare slots, to pay storage fee now, to
+    /// allow future insertions to not require any storage slot creation - making their gas more predictable
+    /// and better bounded/fair.
+    /// (otherwsie, unlucky inserts create new storage slots and are charge more for it)
+    public fun allocate_spare_slots<K: store, V: store>(self: &mut BigOrderedMap<K, V>, num_to_allocate: u64) {
+        self.nodes.allocate_spare_slots(num_to_allocate)
     }
 
     // ======================= Section with Modifiers =========================
@@ -585,13 +594,13 @@ module aptos_std::big_ordered_map {
     }
 
     fun destroy_empty_node<K: store, V: store>(self: Node<K, V>) {
-        let Node { children, is_leaf: _, prev: _, next: _ } = self;
+        let Node::V1 { children, is_leaf: _, prev: _, next: _ } = self;
         assert!(children.is_empty(), error::invalid_argument(EMAP_NOT_EMPTY));
         children.destroy_empty();
     }
 
     fun new_node<K: store, V: store>(is_leaf: bool): Node<K, V> {
-        Node {
+        Node::V1 {
             is_leaf: is_leaf,
             children: ordered_map::new(),
             prev: NULL_INDEX,
@@ -600,7 +609,7 @@ module aptos_std::big_ordered_map {
     }
 
     fun new_node_with_children<K: store, V: store>(is_leaf: bool, children: OrderedMap<K, Child<V>>): Node<K, V> {
-        Node {
+        Node::V1 {
             is_leaf: is_leaf,
             children: children,
             prev: NULL_INDEX,
@@ -1028,7 +1037,7 @@ module aptos_std::big_ordered_map {
         // But append to the node with smaller keys, as ordered_map::append is more efficient when adding to the end.
         let (key_to_remove, reserved_slot_to_remove) = if (sibling_index == next) {
             // destroying larger sibling node, keeping sibling_slot.
-            let Node { children: sibling_children, is_leaf: _, prev: _, next: sibling_next } = sibling_node;
+            let Node::V1 { children: sibling_children, is_leaf: _, prev: _, next: sibling_next } = sibling_node;
             let key_to_remove = *children.new_end_iter().iter_prev(children).iter_borrow_key(children);
             children.append_disjoint(sibling_children);
             node.next = sibling_next;
@@ -1053,7 +1062,7 @@ module aptos_std::big_ordered_map {
             (key_to_remove, node_slot)
         } else {
             // destroying larger current node, keeping node_slot
-            let Node { children: node_children, is_leaf: _, prev: _, next: node_next } = node;
+            let Node::V1 { children: node_children, is_leaf: _, prev: _, next: node_next } = node;
             let key_to_remove = *sibling_children.new_end_iter().iter_prev(sibling_children).iter_borrow_key(sibling_children);
             sibling_children.append_disjoint(node_children);
             sibling_node.next = node_next;
@@ -1239,7 +1248,8 @@ module aptos_std::big_ordered_map {
 
     #[test]
     fun test_small_example() {
-        let map = new_with_config(5, 3, true, 2);
+        let map = new_with_config(5, 3, true);
+        map.allocate_spare_slots(2);
         map.print_map(); map.validate_map();
         add(&mut map, 1, 1); map.print_map(); map.validate_map();
         add(&mut map, 2, 2); map.print_map(); map.validate_map();
@@ -1278,7 +1288,7 @@ module aptos_std::big_ordered_map {
 
     #[test]
     fun test_for_each() {
-        let map = new_with_config<u64, u64>(4, 3, false, 0);
+        let map = new_with_config<u64, u64>(4, 3, false);
         map.add_all(vector[1, 3, 6, 2, 9, 5, 7, 4, 8], vector[1, 3, 6, 2, 9, 5, 7, 4, 8]);
 
         let expected = vector[1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -1292,7 +1302,7 @@ module aptos_std::big_ordered_map {
 
     #[test]
     fun test_variable_size() {
-        let map = new_with_config<vector<u64>, vector<u64>>(0, 0, false, 0);
+        let map = new_with_config<vector<u64>, vector<u64>>(0, 0, false);
         map.print_map(); map.validate_map();
         add(&mut map, vector[1], vector[1]); map.print_map(); map.validate_map();
         add(&mut map, vector[2], vector[2]); map.print_map(); map.validate_map();
@@ -1319,7 +1329,8 @@ module aptos_std::big_ordered_map {
     }
     #[test]
     fun test_deleting_and_creating_nodes() {
-        let map = new_with_config(4, 3, true, 2);
+        let map = new_with_config(4, 3, true);
+        map.allocate_spare_slots(2);
 
         for (i in 0..25) {
             map.upsert(i, i);
@@ -1366,7 +1377,8 @@ module aptos_std::big_ordered_map {
 
     #[test]
     fun test_iterator() {
-        let map = new_with_config(5, 5, true, 2);
+        let map = new_with_config(5, 5, true);
+        map.allocate_spare_slots(2);
 
         let data = vector[1, 7, 5, 8, 4, 2, 6, 3, 9, 0];
         while (data.length() != 0) {
@@ -1390,7 +1402,8 @@ module aptos_std::big_ordered_map {
 
     #[test]
     fun test_find() {
-        let map = new_with_config(5, 5, true, 2);
+        let map = new_with_config(5, 5, true);
+        map.allocate_spare_slots(2);
 
         let data = vector[11, 1, 7, 5, 8, 2, 6, 3, 0, 10];
         map.add_all(data, data);
@@ -1412,7 +1425,8 @@ module aptos_std::big_ordered_map {
 
     #[test]
     fun test_lower_bound() {
-        let map = new_with_config(5, 5, true, 2);
+        let map = new_with_config(5, 5, true);
+        map.allocate_spare_slots(2);
 
         let data = vector[11, 1, 7, 5, 8, 2, 6, 3, 12, 10];
         map.add_all(data, data);
@@ -1442,7 +1456,7 @@ module aptos_std::big_ordered_map {
 
     #[test]
     fun test_contains() {
-        let map = new_with_config(4, 3, false, 0);
+        let map = new_with_config(4, 3, false);
         let data = vector[3, 1, 9, 7, 5];
         map.add_all(vector[3, 1, 9, 7, 5], vector[3, 1, 9, 7, 5]);
 
@@ -1457,21 +1471,21 @@ module aptos_std::big_ordered_map {
     #[test]
     #[expected_failure(abort_code = 0x1000B, location = Self)] /// EINVALID_CONFIG_PARAMETER
     fun test_inner_max_degree_too_large() {
-        let map = new_with_config<u8, u8>(4097, 0, false, 0);
+        let map = new_with_config<u8, u8>(4097, 0, false);
         map.destroy_and_validate();
     }
 
     #[test]
     #[expected_failure(abort_code = 0x1000B, location = Self)] /// EINVALID_CONFIG_PARAMETER
     fun test_inner_max_degree_too_small() {
-        let map = new_with_config<u8, u8>(3, 0, false, 0);
+        let map = new_with_config<u8, u8>(3, 0, false);
         map.destroy_and_validate();
     }
 
     #[test]
     #[expected_failure(abort_code = 0x1000B, location = Self)] /// EINVALID_CONFIG_PARAMETER
     fun test_leaf_max_degree_too_small() {
-        let map = new_with_config<u8, u8>(0, 2, false, 0);
+        let map = new_with_config<u8, u8>(0, 2, false);
         map.destroy_and_validate();
     }
 
@@ -1495,7 +1509,7 @@ module aptos_std::big_ordered_map {
     #[test]
     #[expected_failure(abort_code = 0x10001, location = Self)] /// EKEY_ALREADY_EXISTS
     fun test_abort_add_existing_value_to_non_leaf() {
-        let map = new_with_config(4, 4, false, 0);
+        let map = new_with_config(4, 4, false);
         map.add_all(vector_range(1, 10), vector_range(1, 10));
         map.add(3, 3);
         map.destroy_and_validate();
@@ -1512,7 +1526,7 @@ module aptos_std::big_ordered_map {
     #[test]
     #[expected_failure(abort_code = 0x10002, location = aptos_std::ordered_map)] /// EKEY_NOT_FOUND
     fun test_abort_remove_missing_value_to_non_leaf() {
-        let map = new_with_config(4, 4, false, 0);
+        let map = new_with_config(4, 4, false);
         map.add_all(vector_range(1, 10), vector_range(1, 10));
         map.remove(&4);
         map.remove(&4);
@@ -1522,7 +1536,7 @@ module aptos_std::big_ordered_map {
     #[test]
     #[expected_failure(abort_code = 0x10002, location = Self)] /// EKEY_NOT_FOUND
     fun test_abort_remove_largest_missing_value_to_non_leaf() {
-        let map = new_with_config(4, 4, false, 0);
+        let map = new_with_config(4, 4, false);
         map.add_all(vector_range(1, 10), vector_range(1, 10));
         map.remove(&11);
         map.destroy_and_validate();
@@ -1547,7 +1561,7 @@ module aptos_std::big_ordered_map {
     #[test]
     #[expected_failure(abort_code = 0x1000E, location = Self)] /// EBORROW_MUT_REQUIRES_CONSTANT_KV_SIZE
     fun test_abort_borrow_mut_requires_constant_kv_size() {
-        let map = new_with_config(0, 0, false, 0);
+        let map = new_with_config(0, 0, false);
         map.add(1, vector[1]);
         map.borrow_mut(&1);
         map.destroy_and_validate();
@@ -1580,7 +1594,7 @@ module aptos_std::big_ordered_map {
     #[test]
     #[expected_failure(abort_code = 0x1000E, location = Self)] /// EBORROW_MUT_REQUIRES_CONSTANT_KV_SIZE
     fun test_abort_iter_borrow_mut_requires_constant_kv_size() {
-        let map = new_with_config(0, 0, false, 0);
+        let map = new_with_config(0, 0, false);
         map.add(1, vector[1]);
         map.new_begin_iter().iter_borrow_mut(&mut map);
         map.destroy_and_validate();
@@ -1612,7 +1626,7 @@ module aptos_std::big_ordered_map {
     #[test]
     #[expected_failure(abort_code = 0x1000D, location = Self)] /// EARGUMENT_BYTES_TOO_LARGE
     fun test_adding_key_too_large() {
-        let map = new_with_config(0, 0, false, 0);
+        let map = new_with_config(0, 0, false);
         map.add(vector[1], 1);
         map.add(vector_range(0, 57), 1);
         map.destroy_and_validate();
@@ -1621,7 +1635,7 @@ module aptos_std::big_ordered_map {
     #[test]
     #[expected_failure(abort_code = 0x1000D, location = Self)] /// EARGUMENT_BYTES_TOO_LARGE
     fun test_adding_value_too_large() {
-        let map = new_with_config(0, 0, false, 0);
+        let map = new_with_config(0, 0, false);
         map.add(1, vector[1]);
         map.add(2, vector_range(0, 107));
         map.destroy_and_validate();
@@ -1629,7 +1643,10 @@ module aptos_std::big_ordered_map {
 
     #[test_only]
     inline fun comparison_test(repeats: u64, inner_max_degree: u16, leaf_max_degree: u16, reuse_slots: bool, next_1: ||u64, next_2: ||u64) {
-        let big_map = new_with_config(inner_max_degree, leaf_max_degree, reuse_slots, if (reuse_slots) {4} else {0});
+        let big_map = new_with_config(inner_max_degree, leaf_max_degree, reuse_slots);
+        if (reuse_slots) {
+            big_map.allocate_spare_slots(4);
+        };
         let small_map = ordered_map::new();
         for (i in 0..repeats) {
             let is_insert = if (2 * i < repeats) {
@@ -1719,7 +1736,10 @@ module aptos_std::big_ordered_map {
     fun test_large_data_set_helper(inner_max_degree: u16, leaf_max_degree: u16, reuse_slots: bool) {
         use std::vector;
 
-        let map = new_with_config(inner_max_degree, leaf_max_degree, reuse_slots, if (reuse_slots) {4} else {0});
+        let map = new_with_config(inner_max_degree, leaf_max_degree, reuse_slots);
+        if (reuse_slots) {
+            map.allocate_spare_slots(4);
+        };
         let data = ordered_map::large_dataset();
         let shuffled_data = ordered_map::large_dataset_shuffled();
 
