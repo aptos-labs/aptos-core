@@ -349,7 +349,7 @@ module aptos_std::ordered_map {
     }
 
     /// Returns whether the iterator is a begin iterator.
-    public fun iter_is_begin<K, V>(self: &IteratorPtr, map: &OrderedMap<K, V>): bool {
+    public(friend) fun iter_is_begin<K, V>(self: &IteratorPtr, map: &OrderedMap<K, V>): bool {
         if (self is IteratorPtr::End) {
             map.is_empty()
         } else {
