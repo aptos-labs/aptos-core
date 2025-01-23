@@ -4,10 +4,7 @@
 use crate::natives::cryptography::{ristretto255_point, ristretto255_scalar};
 use aptos_gas_algebra::GasExpression;
 use aptos_gas_schedule::{gas_params::natives::aptos_framework::*, NativeGasParameters};
-use aptos_native_interface::{
-    safely_assert_eq, safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeError,
-    SafeNativeResult,
-};
+use aptos_native_interface::{safely_assert_eq, safely_pop_arg, safely_pop_vec_arg, RawSafeNative, SafeNativeBuilder, SafeNativeError, SafeNativeResult};
 use aptos_types::vm_status::StatusCode;
 use curve25519_dalek::scalar::Scalar;
 use move_binary_format::errors::PartialVMError;
@@ -172,6 +169,13 @@ pub fn pop_scalar_from_bytes(arguments: &mut VecDeque<Value>) -> SafeNativeResul
     let bytes = safely_pop_arg!(arguments, Vec<u8>);
 
     scalar_from_valid_bytes(bytes)
+}
+
+/// Pops a Scalar's off the argument stack when the argument was a `vector<vector<u8>>`.
+pub fn pop_scalar_vec_from_bytes(arguments: &mut VecDeque<Value>) -> SafeNativeResult<Vec<Scalar>> {
+    let bytes = safely_pop_vec_arg!(arguments, Vec<u8>);
+
+    bytes.iter().map(scalar_from_valid_bytes).collect()
 }
 
 /// The 'data' field inside a Move Scalar struct is at index 0.
