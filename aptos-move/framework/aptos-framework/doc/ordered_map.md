@@ -1002,7 +1002,7 @@ Note: Requires that the map is not changed after the input iterator is generated
 Returns whether the iterator is a begin iterator.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_begin">iter_is_begin</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_begin">iter_is_begin</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): bool
 </code></pre>
 
 
@@ -1011,7 +1011,7 @@ Returns whether the iterator is a begin iterator.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_begin">iter_is_begin</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): bool {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_begin">iter_is_begin</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): bool {
     <b>if</b> (self is IteratorPtr::End) {
         map.<a href="ordered_map.md#0x1_ordered_map_is_empty">is_empty</a>()
     } <b>else</b> {
