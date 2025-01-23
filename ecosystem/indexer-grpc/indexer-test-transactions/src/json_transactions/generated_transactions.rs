@@ -189,6 +189,12 @@ pub const IMPORTED_MAINNET_TXNS_308783012_FA_TRANSFER: &[u8] = include_bytes!(co
     "/src/json_transactions/imported_mainnet_txns/308783012_fa_transfer.json"
 ));
 
+pub const IMPORTED_MAINNET_TXNS_2186504987_COIN_STORE_DELETION_NO_EVENT: &[u8] =
+    include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/json_transactions/imported_mainnet_txns/2186504987_coin_store_deletion_no_event.json"
+    ));
+
 pub const IMPORTED_MAINNET_TXNS_453498957_TOKEN_V2_MINT_AND_TRANSFER_EVENT_V1: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/json_transactions/imported_mainnet_txns/453498957_token_v2_mint_and_transfer_event_v1.json"));
 
 pub const IMPORTED_MAINNET_TXNS_1080786089_TOKEN_V2_BURN_EVENT_V1: &[u8] = include_bytes!(concat!(
@@ -271,6 +277,7 @@ pub const ALL_IMPORTED_MAINNET_TXNS: &[&[u8]] = &[
     IMPORTED_MAINNET_TXNS_2080538_ANS_LOOKUP_V1,
     IMPORTED_MAINNET_TXNS_139449359_STAKE_REACTIVATE,
     IMPORTED_MAINNET_TXNS_308783012_FA_TRANSFER,
+    IMPORTED_MAINNET_TXNS_2186504987_COIN_STORE_DELETION_NO_EVENT,
     IMPORTED_MAINNET_TXNS_453498957_TOKEN_V2_MINT_AND_TRANSFER_EVENT_V1,
     IMPORTED_MAINNET_TXNS_1080786089_TOKEN_V2_BURN_EVENT_V1,
     IMPORTED_MAINNET_TXNS_967255533_TOKEN_V2_MUTATION_EVENT,
