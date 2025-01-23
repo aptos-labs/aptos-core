@@ -161,7 +161,7 @@ fn serialize_struct_def_inst_index(
 }
 
 fn serialize_closure_mask(binary: &mut BinaryData, mask: &ClosureMask) -> Result<()> {
-    write_as_uleb128(binary, mask.mask, u64::MAX)
+    write_as_uleb128(binary, mask.bits(), u64::MAX)
 }
 
 fn seiralize_table_offset(binary: &mut BinaryData, offset: u32) -> Result<()> {
@@ -804,8 +804,11 @@ fn serialize_signature_token_single_node_impl(
             binary.push(SerializedType::TYPE_PARAMETER as u8)?;
             serialize_type_parameter_index(binary, *idx)?;
         },
-        SignatureToken::Function(..) => {
-            unimplemented!("serialization of function types")
+        SignatureToken::Function(args, results, abilities) => {
+            binary.push(SerializedType::FUNCTION as u8)?;
+            serialize_ability_set(binary, *abilities)?;
+            serialize_signature_size(binary, args.len())?;
+            serialize_signature_size(binary, results.len())?;
         },
     }
     Ok(())

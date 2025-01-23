@@ -173,17 +173,10 @@ fn check_ty<const N: usize>(
                 param_constraints,
             )?;
         },
-        Function(args, result, abilities) => {
+        Function(_, _, abilities) => {
             assert_abilities(*abilities, required_abilities)?;
-            for ty in args.iter().chain(result.iter()) {
-                check_ty(
-                    struct_handles,
-                    ty,
-                    false,
-                    required_abilities.requires(),
-                    param_constraints,
-                )?;
-            }
+            // Note we do not need to check abilities of argument or result types,
+            // they do not matter for the `required_abilities`.
         },
         Struct(sh_idx) => {
             let handle = &struct_handles[sh_idx.0 as usize];
@@ -798,7 +791,7 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
         Ok(())
     }
 
-    /// Checks if a code unit is well-formed.
+    /// Checks if a code unit is well-formed. This expects signature checker to be run.
     ///
     /// A code unit is well-formed if
     /// - The locals are well-formed within the context. (References are allowed.)

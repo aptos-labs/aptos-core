@@ -118,7 +118,7 @@ fn clos_pack(
     Ok(())
 }
 
-fn clos_eval(
+fn call_closure(
     verifier: &mut ReferenceSafetyAnalysis,
     state: &mut AbstractState,
     offset: CodeOffset,
@@ -131,7 +131,7 @@ fn clos_eval(
         .map(|_| Ok(safe_unwrap!(verifier.stack.pop())))
         .rev()
         .collect::<PartialVMResult<Vec<_>>>()?;
-    let values = state.clos_eval(offset, arguments, &result_tys, meter)?;
+    let values = state.call_closure(offset, arguments, &result_tys, meter)?;
     for value in values {
         verifier.stack.push(value)
     }
@@ -558,7 +558,7 @@ fn execute_inner(
         },
         Bytecode::CallClosure(idx) => {
             let (arg_tys, result_tys) = fun_type(verifier, *idx)?;
-            clos_eval(verifier, state, offset, arg_tys, result_tys, meter)?
+            call_closure(verifier, state, offset, arg_tys, result_tys, meter)?
         },
 
         Bytecode::VecPack(idx, num) => {

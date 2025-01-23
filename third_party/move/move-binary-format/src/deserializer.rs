@@ -1135,6 +1135,13 @@ fn load_signature_token(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Sign
             arity: usize,
             ty_args: Vec<SignatureToken>,
         },
+        Function {
+            abilities: AbilitySet,
+            arg_count: usize,
+            result_count: usize,
+            args: Vec<SignatureToken>,
+            results: Vec<SignatureToken>,
+        },
     }
 
     impl TypeBuilder {
@@ -1161,6 +1168,30 @@ fn load_signature_token(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Sign
                         }
                     }
                 },
+                T::Function {
+                    abilities,
+                    arg_count,
+                    result_count,
+                    mut args,
+                    mut results,
+                } => {
+                    if args.len() < arg_count {
+                        args.push(tok)
+                    } else {
+                        results.push(tok)
+                    }
+                    if args.len() == arg_count && results.len() == result_count {
+                        T::Saturated(SignatureToken::Function(args, results, abilities))
+                    } else {
+                        T::Function {
+                            abilities,
+                            arg_count,
+                            result_count,
+                            args,
+                            results,
+                        }
+                    }
+                },
                 _ => unreachable!("invalid type constructor application"),
             }
         }
@@ -1181,8 +1212,9 @@ fn load_signature_token(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Sign
 
     let mut read_next = || {
         if let Ok(byte) = cursor.read_u8() {
-            match S::from_u8(byte)? {
-                S::U16 | S::U32 | S::U256 if (cursor.version() < VERSION_6) => {
+            let ser_type = S::from_u8(byte)?;
+            match ser_type {
+                S::U16 | S::U32 | S::U256 if cursor.version() < VERSION_6 => {
                     return Err(
                         PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
                             "u16, u32, u256 integers not supported in bytecode version {}",
@@ -1190,10 +1222,17 @@ fn load_signature_token(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Sign
                         )),
                     );
                 },
+                S::FUNCTION if cursor.version() < VERSION_8 => {
+                    return Err(
+                        PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
+                            "function types not supported in bytecode version {}",
+                            cursor.version()
+                        )),
+                    );
+                },
                 _ => (),
             };
-
-            Ok(match S::from_u8(byte)? {
+            Ok(match ser_type {
                 S::BOOL => T::Saturated(SignatureToken::Bool),
                 S::U8 => T::Saturated(SignatureToken::U8),
                 S::U16 => T::Saturated(SignatureToken::U16),
@@ -1226,6 +1265,25 @@ fn load_signature_token(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Sign
                 S::TYPE_PARAMETER => {
                     let idx = load_type_parameter_index(cursor)?;
                     T::Saturated(SignatureToken::TypeParameter(idx))
+                },
+                S::FUNCTION => {
+                    // The legacy ability set position is only for older bytecode versions,
+                    // still choosing StructTypeParameters matches what functions can have.
+                    let abilities =
+                        load_ability_set(cursor, AbilitySetPosition::StructTypeParameters)?;
+                    let arg_count = load_type_parameter_count(cursor)?;
+                    let result_count = load_type_parameter_count(cursor)?;
+                    if arg_count + result_count == 0 {
+                        T::Saturated(SignatureToken::Function(vec![], vec![], abilities))
+                    } else {
+                        T::Function {
+                            abilities,
+                            arg_count,
+                            result_count,
+                            args: vec![],
+                            results: vec![],
+                        }
+                    }
                 },
             })
         } else {

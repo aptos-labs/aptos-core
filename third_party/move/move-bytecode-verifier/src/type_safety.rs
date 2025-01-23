@@ -301,7 +301,7 @@ fn call(
     Ok(())
 }
 
-fn clos_eval(
+fn call_closure(
     verifier: &mut TypeSafetyChecker,
     meter: &mut impl Meter,
     offset: CodeOffset,
@@ -853,7 +853,7 @@ fn verify_instr(
         Bytecode::CallClosure(idx) => {
             // The signature checker has verified this is a function type.
             let expected_ty = safe_unwrap!(verifier.resolver.signature_at(*idx).0.first());
-            clos_eval(verifier, meter, offset, expected_ty)?
+            call_closure(verifier, meter, offset, expected_ty)?
         },
 
         Bytecode::Pack(idx) => {

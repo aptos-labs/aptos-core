@@ -570,7 +570,7 @@ impl AbstractState {
 
     /// Records the evaluation of a closure in the abstract state. This is currently the
     /// same as calling the function.
-    pub fn clos_eval(
+    pub fn call_closure(
         &mut self,
         offset: CodeOffset,
         arguments: Vec<AbstractValue>,

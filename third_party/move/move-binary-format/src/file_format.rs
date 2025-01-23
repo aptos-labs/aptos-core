@@ -1550,28 +1550,34 @@ impl SignatureToken {
     derive(arbitrary::Arbitrary),
     derive(dearbitrary::Dearbitrary)
 )]
-pub struct ClosureMask {
-    pub mask: u64,
-}
+pub struct ClosureMask(u64);
 
 impl fmt::Display for ClosureMask {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:b}", self.mask)
+        write!(f, "{:b}", self.0)
     }
 }
 
 impl ClosureMask {
-    pub fn new(mask: u64) -> Self {
-        Self { mask }
+    pub fn new(bits: u64) -> Self {
+        Self(bits)
+    }
+
+    pub fn bits(&self) -> u64 {
+        self.0
     }
 
     /// Apply a closure mask to a list of elements, returning only those
     /// where position `i` is set in the mask (if `collect_captured` is true) or not
     /// set (otherwise).
-    pub fn extract<'a, T: Clone>(&self, values: &'a [T], collect_captured: bool) -> Vec<&'a T> {
-        let mut mask = self.mask;
+    pub fn extract<'a, T: Clone>(
+        &self,
+        values: impl IntoIterator<Item = &'a T>,
+        collect_captured: bool,
+    ) -> Vec<&'a T> {
+        let mut mask = self.0;
         values
-            .iter()
+            .into_iter()
             .filter(|_| {
                 let set = mask & 0x1 != 0;
                 mask >>= 1;
@@ -1596,7 +1602,7 @@ impl ClosureMask {
         let mut captured = captured.into_iter();
         let mut provided = provided.into_iter();
         let mut result = vec![];
-        let mut mask = self.mask;
+        let mut mask = self.0;
         while mask != 0 {
             if mask & 0x1 != 0 {
                 result.push(captured.next()?)
@@ -1616,7 +1622,7 @@ impl ClosureMask {
     /// Return the max index of captured arguments
     pub fn max_captured(&self) -> usize {
         let mut i = 0;
-        let mut mask = self.mask;
+        let mut mask = self.0;
         while mask != 0 {
             mask >>= 1;
             i += 1
