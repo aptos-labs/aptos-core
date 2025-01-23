@@ -393,7 +393,9 @@ impl FanoutPartitioner {
             let cur_fanout = self.print_fanout_stats(&access_shards, graph, format!("iter {} with {} moves", iter, num_moves).as_str(), &fanout_formula);
             if (cur_fanout - 1.0) > (prev_fanout - 1.0) * 0.998 && fanout_formula.fanout_probability < 0.99 {
                 let new_fanout_prob = fanout_formula.fanout_probability.powf(0.75);
-                println!("Not enough improvement, increasing probability to {}", new_fanout_prob);
+                if self.print_debug_stats {
+                    info!("Not enough improvement, increasing probability to {}", new_fanout_prob);
+                }
                 fanout_formula = FanoutFormula::new(new_fanout_prob);
                 sender_shard_weights = self.compute_sender_shard_weights(graph, num_shards, &access_shards, &fanout_formula);
             }
@@ -906,7 +908,7 @@ impl FanoutPartitioner {
                         while !cur_unconstrained.is_empty() && shard_fill[shard as usize] < fill_max {
                             transactions.push(cur_unconstrained.pop_front().unwrap());
                             shard_fill[shard as usize] += 1;
-                            if cur_unconstrained.is_empty() {
+                            if cur_unconstrained.is_empty() && self.print_debug_stats {
                                 println!("Run out of unconstrained on {}", shard);
                             }
                         }
