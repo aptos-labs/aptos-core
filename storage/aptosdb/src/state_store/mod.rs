@@ -397,7 +397,7 @@ impl StateStore {
             if crash_if_difference_is_too_large {
                 assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
             }
-            truncate_ledger_db(ledger_db, overall_commit_progress)
+            truncate_ledger_db(ledger_db.clone(), overall_commit_progress)
                 .expect("Failed to truncate ledger db.");
 
             // State K/V commit progress isn't (can't be) written atomically with the data,
@@ -427,16 +427,18 @@ impl StateStore {
                     assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
                 }
             }
-            let db = state_merkle_db.metadata_db();
-            let state_merkle_target_version =
-                find_tree_root_at_or_before(db, &state_merkle_db, overall_commit_progress)
-                    .expect("DB read failed.")
-                    .unwrap_or_else(|| {
-                        panic!(
+            let state_merkle_target_version = find_tree_root_at_or_before(
+                ledger_metadata_db,
+                &state_merkle_db,
+                overall_commit_progress,
+            )
+            .expect("DB read failed.")
+            .unwrap_or_else(|| {
+                panic!(
                     "Could not find a valid root before or at version {}, maybe it was pruned?",
                     overall_commit_progress
                 )
-                    });
+            });
             if state_merkle_target_version < state_merkle_max_version {
                 info!(
                     state_merkle_max_version = state_merkle_max_version,
