@@ -33,7 +33,7 @@ pub fn intern_type(
         },
         SignatureToken::Function(..) => {
             // TODO(#15664): implement closures
-            return Err(PartialVMError::new(StatusCode::UNIMPLEMENTED_FEATURE)
+            return Err(PartialVMError::new(StatusCode::UNIMPLEMENTED_FUNCTIONALITY)
                 .with_message("function types in the type loader".to_owned()));
         },
         SignatureToken::Reference(inner_tok) => {

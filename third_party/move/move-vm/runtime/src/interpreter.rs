@@ -1732,7 +1732,7 @@ impl Frame {
                     Bytecode::PackClosure(..)
                     | Bytecode::PackClosureGeneric(..)
                     | Bytecode::CallClosure(..) => {
-                        return Err(PartialVMError::new(StatusCode::UNIMPLEMENTED_FEATURE)
+                        return Err(PartialVMError::new(StatusCode::UNIMPLEMENTED_FUNCTIONALITY)
                             .with_message("closure opcodes in interpreter".to_owned()))
                     },
 

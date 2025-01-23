@@ -124,7 +124,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             Bytecode::PackClosure(..)
             | Bytecode::PackClosureGeneric(..)
             | Bytecode::CallClosure(..) => {
-                return Err(PartialVMError::new(StatusCode::UNIMPLEMENTED_FEATURE)
+                return Err(PartialVMError::new(StatusCode::UNIMPLEMENTED_FUNCTIONALITY)
                     .with_message("closure opcodes in interpreter".to_owned()))
             },
             // Call instruction will be checked at execute_main.
@@ -258,7 +258,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             Bytecode::PackClosure(..)
             | Bytecode::PackClosureGeneric(..)
             | Bytecode::CallClosure(..) => {
-                return Err(PartialVMError::new(StatusCode::UNIMPLEMENTED_FEATURE)
+                return Err(PartialVMError::new(StatusCode::UNIMPLEMENTED_FUNCTIONALITY)
                     .with_message("closure opcodes in interpreter".to_owned()))
             },
 

@@ -872,8 +872,8 @@ pub enum StatusCode {
     // Struct variant not matching. This error appears on an attempt to unpack or borrow a
     // field from a value which is not of the expected variant.
     STRUCT_VARIANT_MISMATCH = 4038,
-    // An unimplemented feature in the VM.
-    UNIMPLEMENTED_FEATURE = 4039,
+    // An unimplemented functionality in the VM.
+    UNIMPLEMENTED_FUNCTIONALITY = 4039,
 
     // Reserved error code for future use. Always keep this buffer of well-defined new codes.
     RESERVED_RUNTIME_ERROR_1 = 4040,
