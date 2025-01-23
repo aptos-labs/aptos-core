@@ -402,10 +402,6 @@ Genesis step 2: Initialize Aptos coin.
     <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_burn_cap">transaction_fee::store_aptos_coin_burn_cap</a>(aptos_framework, burn_cap);
     // Give <a href="transaction_fee.md#0x1_transaction_fee">transaction_fee</a> <b>module</b> MintCapability&lt;AptosCoin&gt; so it can mint refunds.
     <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_mint_cap">transaction_fee::store_aptos_coin_mint_cap</a>(aptos_framework, mint_cap);
-    // Give <a href="native_bridge.md#0x1_native_bridge">native_bridge</a> <b>module</b> BurnCapability&lt;AptosCoin&gt; so it can burn gas.
-    <a href="native_bridge.md#0x1_native_bridge_store_aptos_coin_burn_cap">native_bridge::store_aptos_coin_burn_cap</a>(aptos_framework, burn_cap);
-    // Give <a href="native_bridge.md#0x1_native_bridge">native_bridge</a> <b>module</b> MintCapability&lt;AptosCoin&gt; so it can mint refunds.
-    <a href="native_bridge.md#0x1_native_bridge_store_aptos_coin_mint_cap">native_bridge::store_aptos_coin_mint_cap</a>(aptos_framework, mint_cap);
 }
 </code></pre>
 

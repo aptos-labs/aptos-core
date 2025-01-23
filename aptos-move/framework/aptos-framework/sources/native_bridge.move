@@ -357,7 +357,7 @@ module aptos_framework::native_bridge {
     /// @abort If the burn capability is not available.
     public entry fun burn_from(core_resource: &signer, from: address, amount: u64) acquires AptosCoinBurnCapability {
         system_addresses::assert_core_resource(core_resource);
-        coin::burn_from(from, amount, &borrow_global<AptosCoinBurnCapability>(@aptos_framework).burn_cap);
+        burn(from, amount);
     }
 
     /// Burns a specified amount of AptosCoin from an address.

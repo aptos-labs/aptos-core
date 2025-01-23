@@ -1131,13 +1131,13 @@ Mints a specified amount of AptosCoin to a recipient's address.
 
 Burns a specified amount of AptosCoin from an address.
 
-@param aptos_framework The signer representing the Aptos framework.
-@param account The address from which to burn AptosCoin.
+@param core_resource The signer representing the core resource account.
+@param from The address from which to burn AptosCoin.
 @param amount The amount of AptosCoin to burn.
 @abort If the burn capability is not available.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn_from">burn_from</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
+<pre><code><b>public</b> entry <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn_from">burn_from</a>(core_resource: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, from: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -1146,10 +1146,9 @@ Burns a specified amount of AptosCoin from an address.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn_from">burn_from</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64) {
-
-    // <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
-    // <a href="coin.md#0x1_coin_burn_from">coin::burn_from</a>(<a href="account.md#0x1_account">account</a>, amount, &<b>borrow_global</b>&lt;<a href="native_bridge.md#0x1_native_bridge_AptosCoinBurnCapability">AptosCoinBurnCapability</a>&gt;(@aptos_framework).burn_cap);
+<pre><code><b>public</b> entry <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn_from">burn_from</a>(core_resource: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, from: <b>address</b>, amount: u64) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_AptosCoinBurnCapability">AptosCoinBurnCapability</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_core_resource">system_addresses::assert_core_resource</a>(core_resource);
+    <a href="coin.md#0x1_coin_burn_from">coin::burn_from</a>(from, amount, &<b>borrow_global</b>&lt;<a href="native_bridge.md#0x1_native_bridge_AptosCoinBurnCapability">AptosCoinBurnCapability</a>&gt;(@aptos_framework).burn_cap);
 }
 </code></pre>
 
