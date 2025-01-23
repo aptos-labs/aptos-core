@@ -64,7 +64,7 @@ impl Default for ConsensusObserverConfig {
         Self {
             observer_enabled: false,
             publisher_enabled: false,
-            enable_pipeline: false,
+            enable_pipeline: true,
             max_network_channel_size: 1000,
             max_parallel_serialization_tasks: num_cpus::get(), // Default to the number of CPUs
             network_request_timeout_ms: 5_000,                 // 5 seconds
@@ -77,7 +77,7 @@ impl Default for ConsensusObserverConfig {
             subscription_peer_change_interval_ms: 180_000,     // 3 minutes
             subscription_refresh_interval_ms: 600_000,         // 10 minutes
             observer_fallback_duration_ms: 600_000,            // 10 minutes
-            observer_fallback_startup_period_ms: 60_000,       // 60 seconds
+            observer_fallback_startup_period_ms: 90_000,       // 90 seconds
             observer_fallback_progress_threshold_ms: 10_000,   // 10 seconds
             observer_fallback_sync_lag_threshold_ms: 15_000,   // 15 seconds
         }
