@@ -736,7 +736,7 @@ initialize permission storage by putting an empty storage under the address.
     <b>move_to</b>(
         &<a href="create_signer.md#0x1_create_signer">create_signer</a>(permissions_storage_addr),
         // Each key is ~100bytes, the value is 12 bytes.
-        PermissionStorage::V1 { perms: <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_config">big_ordered_map::new_with_config</a>(40, 35, <b>false</b>, 0) }
+        PermissionStorage::V1 { perms: <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_config">big_ordered_map::new_with_config</a>(40, 35, <b>false</b>) }
     );
 }
 </code></pre>

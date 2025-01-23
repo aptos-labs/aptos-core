@@ -16,10 +16,12 @@
 /// * inlining some nodes
 /// * having a fee-payer for any storage creation operations
 module aptos_std::storage_slots_allocator {
+    use std::error;
     use aptos_std::table_with_length::{Self, TableWithLength};
     use std::option::{Self, Option};
 
     const EINVALID_ARGUMENT: u64 = 1;
+    const ECANNOT_HAVE_SPARES_WITHOUT_REUSE: u64 = 2;
     const EINTERNAL_INVARIANT_BROKEN: u64 = 7;
 
     const NULL_INDEX: u64 = 0;
@@ -35,13 +37,6 @@ module aptos_std::storage_slots_allocator {
         /// and represents a node in a linked list of empty slots.
         Vacant {
             next: u64,
-        }
-    }
-
-    enum StorageSlotsAllocatorConfig has copy, drop {
-        V1 {
-            should_reuse: bool,
-            num_to_preallocate: u32,
         }
     }
 
@@ -72,35 +67,27 @@ module aptos_std::storage_slots_allocator {
         slot_index: u64,
     }
 
-    public fun new<T: store>(config: StorageSlotsAllocatorConfig): StorageSlotsAllocator<T> {
-        let result = StorageSlotsAllocator::V1 {
+    public fun new<T: store>(should_reuse: bool): StorageSlotsAllocator<T> {
+        StorageSlotsAllocator::V1 {
             slots: option::none(),
             new_slot_index: FIRST_INDEX,
-            should_reuse: config.should_reuse,
+            should_reuse,
             reuse_head_index: NULL_INDEX,
             reuse_spare_count: 0,
-        };
-
-        for (i in 0..config.num_to_preallocate) {
-            let slot_index = result.next_slot_index();
-            result.maybe_push_to_reuse_queue(slot_index);
-        };
-
-        result
-    }
-
-    public fun new_default_config(): StorageSlotsAllocatorConfig {
-        StorageSlotsAllocatorConfig::V1 {
-            should_reuse: false,
-            num_to_preallocate: 0,
         }
     }
 
-    public fun new_config(should_reuse: bool, num_to_preallocate: u32): StorageSlotsAllocatorConfig {
-        StorageSlotsAllocatorConfig::V1 {
-            should_reuse,
-            num_to_preallocate,
-        }
+    public fun allocate_spare_slots<T: store>(self: &mut StorageSlotsAllocator<T>, num_to_allocate: u64) {
+        assert!(self.should_reuse, error::invalid_argument(ECANNOT_HAVE_SPARES_WITHOUT_REUSE));
+        for (i in 0..num_to_allocate) {
+            let slot_index = self.next_slot_index();
+            self.maybe_push_to_reuse_queue(slot_index);
+        };
+    }
+
+    public fun get_num_spare_slot_count<T: store>(self: &StorageSlotsAllocator<T>): u32 {
+        assert!(self.should_reuse, error::invalid_argument(ECANNOT_HAVE_SPARES_WITHOUT_REUSE));
+        self.reuse_spare_count
     }
 
     public fun add<T: store>(self: &mut StorageSlotsAllocator<T>, val: T): StoredSlot {

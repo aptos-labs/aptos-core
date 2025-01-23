@@ -59,7 +59,7 @@ module aptos_framework::permissioned_delegation {
         let addr = signer::address_of(master);
         if (!exists<RegisteredDelegations>(addr)) {
             move_to(master, RegisteredDelegations {
-                delegations: big_ordered_map::new_with_config(50, 20, false, 0)
+                delegations: big_ordered_map::new_with_config(50, 20, false)
             });
         };
         let handles = &mut borrow_global_mut<RegisteredDelegations>(addr).delegations;
