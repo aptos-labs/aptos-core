@@ -24,6 +24,7 @@ futures = { workspace = true }
 prost = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 tokio = { workspace = true }
 tokio-scoped = { workspace = true }
 tonic = { workspace = true }

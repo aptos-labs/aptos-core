@@ -35,6 +35,7 @@ pub struct IndexerGrpcManagerConfig {
     pub(crate) self_advertised_address: GrpcAddress,
     pub(crate) grpc_manager_addresses: Vec<GrpcAddress>,
     pub(crate) fullnode_addresses: Vec<GrpcAddress>,
+    pub(crate) is_master: bool,
 }
 
 const fn default_cache_config() -> CacheConfig {
