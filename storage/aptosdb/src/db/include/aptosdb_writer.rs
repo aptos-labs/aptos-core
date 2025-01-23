@@ -591,6 +591,7 @@ impl AptosDB {
 
             COMMITTED_TXNS.inc_by(num_txns);
             LATEST_TXN_VERSION.set(version as i64);
+            info!("bowu post_commit: {:?}", version);
             if let Some(update_sender) = &self.update_subscriber {
                 update_sender.send(
                     (Instant::now(), version)

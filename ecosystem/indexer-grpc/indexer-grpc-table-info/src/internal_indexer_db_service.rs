@@ -10,6 +10,7 @@ use aptos_db_indexer::{
     indexer_reader::IndexerReaders,
 };
 use aptos_indexer_grpc_utils::counters::{log_grpc_step, IndexerGrpcStep};
+use aptos_logger::info;
 use aptos_storage_interface::DbReader;
 use aptos_types::{indexer::indexer_db_reader::IndexerReader, transaction::Version};
 use std::{
@@ -173,6 +174,7 @@ impl InternalIndexerDBService {
             if target_version == start_version {
                 match self.update_receiver.changed().await {
                     Ok(_) => {
+                        info!("bowu update_receiver changed");
                         (step_timer, target_version) = *self.update_receiver.borrow();
                     },
                     Err(e) => {
@@ -195,6 +197,7 @@ impl InternalIndexerDBService {
                 None,
             );
             start_version = next_version;
+            info!("bowu next_version: {:?}, start_version: {:?}, target_version: {:?}", next_version, start_version, target_version);
         }
     }
 
