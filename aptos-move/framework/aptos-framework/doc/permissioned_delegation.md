@@ -279,7 +279,7 @@
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(master);
     <b>if</b> (!<b>exists</b>&lt;<a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a>&gt;(addr)) {
         <b>move_to</b>(master, <a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a> {
-            delegations: <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_config">big_ordered_map::new_with_config</a>(50, 20, <b>false</b>, 0)
+            delegations: <a href="big_ordered_map.md#0x1_big_ordered_map_new_with_config">big_ordered_map::new_with_config</a>(50, 20, <b>false</b>)
         });
     };
     <b>let</b> handles = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a>&gt;(addr).delegations;
