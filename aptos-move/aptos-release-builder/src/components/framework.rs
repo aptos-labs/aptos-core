@@ -24,6 +24,7 @@ pub fn generate_upgrade_proposals(
     next_execution_hash: Vec<u8>,
 ) -> Result<Vec<(String, String)>> {
     const APTOS_GIT_PATH: &str = "https://github.com/aptos-labs/aptos-core.git";
+    generate_upgrade_proposals_with_repo(config, is_testnet, next_execution_hash, APTOS_GIT_PATH)
 }
 
 pub fn generate_upgrade_proposals_with_repo(
