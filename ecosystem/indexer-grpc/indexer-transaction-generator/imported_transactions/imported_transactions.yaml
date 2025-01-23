@@ -31,6 +31,7 @@ mainnet:
     152449628: 152449628_coin_info_write
     999929475: 999929475_coin_and_fa_transfers
     508365567: 508365567_fa_v1_events
+    2186504987: 2186504987_coin_store_deletion_no_event
 
     # token v2 processor
     1058723093: 1058723093_token_v1_mint_withdraw_deposit_events
