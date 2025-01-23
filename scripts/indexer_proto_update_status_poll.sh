@@ -3,7 +3,7 @@
 # PAT_TOKEN and TARGET_BRANCH are passed in as environment variables.
 
 TARGET_REPO="aptos-labs/aptos-indexer-processors"
-WORKFLOW_NAME="sdk-dependency-update"
+WORKFLOW_NAME="lint.yaml"
 MAX_RETRIES=30
 RETRY_INTERVAL=60 # seconds
 
@@ -22,11 +22,13 @@ for ((i=1; i<=MAX_RETRIES; i++)); do
         # Check the latest completed run for the branch
         response=$(curl -s -H "Authorization: token $PAT_TOKEN" \
         "https://api.github.com/repos/$TARGET_REPO/actions/workflows/$WORKFLOW_NAME/runs?branch=$TARGET_BRANCH&status=completed")
+        echo "$response"
         total_count=$(echo "$response" | jq -r '.total_count')
         if [ "$total_count" -gt 0 ]; then
             conclusion=$(echo "$response" | jq -r '.workflow_runs[0].conclusion')
         else
             echo "No workflow runs found for branch $TARGET_BRANCH"
+            sleep $RETRY_INTERVAL
             continue
         fi
         # If the workflow succeeds, exit with a zero status
