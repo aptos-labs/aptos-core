@@ -6,6 +6,7 @@ module aptos_framework::native_bridge {
     use aptos_framework::account;
     use aptos_framework::event::{Self, EventHandle}; 
     use aptos_framework::signer;
+    use aptos_framework::aptos_governance;
     use aptos_framework::system_addresses;
     #[test_only]
     use aptos_framework::aptos_account;
@@ -351,11 +352,12 @@ module aptos_framework::native_bridge {
 
     /// Burns a specified amount of AptosCoin from an address.
     /// 
-    /// @param aptos_framework The signer representing the Aptos framework.
+    /// @param core_resources The signer representing the core resources.
     /// @param from The address from which to burn AptosCoin.
     /// @param amount The amount of AptosCoin to burn.
     /// @abort If the burn capability is not available.
-    public entry fun burn_from(aptos_framework: &signer, from: address, amount: u64) acquires AptosCoinBurnCapability {
+    public entry fun burn_from(core_resources: &signer, from: address, amount: u64) acquires AptosCoinBurnCapability {
+        let aptos_framework = aptos_governance::get_signer_testnet_only(core_resources, @aptos_framework);
         system_addresses::assert_aptos_framework(aptos_framework);
         coin::burn_from(from, amount, &borrow_global<AptosCoinBurnCapability>(@aptos_framework).burn_cap);
     }
