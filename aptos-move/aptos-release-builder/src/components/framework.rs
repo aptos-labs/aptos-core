@@ -8,6 +8,7 @@ use aptos_temppath::TempPath;
 use aptos_types::account_address::AccountAddress;
 use git2::Repository;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
 pub struct FrameworkReleaseConfig {
@@ -42,7 +43,7 @@ pub fn generate_upgrade_proposals_with_repo(
         repo_str,
     )?;
 
-    for (account, release, move_script_path) in release_packages.iter() {
+    for (account, release, move_script_path, script_name) in release_packages.iter() {
         // If we're generating a single-step proposal on testnet
         if is_testnet && next_execution_hash.is_empty() {
             release.generate_script_proposal_testnet(account, move_script_path.clone())?;
@@ -81,7 +82,10 @@ pub fn generate_upgrade_proposals_release_packages_with_repo(
     is_testnet: bool,
     next_execution_hash: Vec<u8>,
     repo_str: &str,
-) -> Result<(String, Vec<(AccountAddress, ReleasePackage, PathBuf)>)> {
+) -> Result<(
+    String,
+    Vec<(AccountAddress, ReleasePackage, PathBuf, String)>,
+)> {
     let mut package_path_list = [
         ("0x1", "aptos-move/framework/move-stdlib"),
         ("0x1", "aptos-move/framework/aptos-stdlib"),
@@ -157,7 +161,12 @@ pub fn generate_upgrade_proposals_release_packages_with_repo(
             ..BuildOptions::default()
         };
         let package = BuiltPackage::build(package_path, options)?;
-        result.push((account, ReleasePackage::new(package), move_script_path));
+        result.push((
+            account,
+            ReleasePackage::new(package),
+            move_script_path,
+            script_name,
+        ));
     }
 
     Ok((commit_info, result))
