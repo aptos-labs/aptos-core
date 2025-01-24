@@ -56,7 +56,13 @@ use bytes::Bytes;
 use hyper::{HeaderMap, Response};
 use rand::SeedableRng;
 use serde_json::{json, Value};
-use std::{boxed::Box, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
+use std::{
+    boxed::Box,
+    net::SocketAddr,
+    path::PathBuf,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::sync::watch::channel;
 use warp::{http::header::CONTENT_TYPE, Filter, Rejection, Reply};
 use warp_reverse_proxy::reverse_proxy_filter;
@@ -132,7 +138,7 @@ pub fn new_test_context_inner(
     let (root_key, genesis, genesis_waypoint, validators) = builder.build(&mut rng).unwrap();
     let (validator_identity, _, _, _) = validators[0].get_key_objects(None).unwrap();
     let validator_owner = validator_identity.account_address.unwrap();
-    let (sender, recver) = channel::<Version>(0);
+    let (sender, recver) = channel::<(Instant, Version)>((Instant::now(), 0 as Version));
     let (db, db_rw) = if use_db_with_indexer {
         let mut aptos_db = AptosDB::new_for_test_with_indexer(
             &tmp_dir,
