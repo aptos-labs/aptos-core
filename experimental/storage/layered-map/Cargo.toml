@@ -29,6 +29,9 @@ jemallocator = { workspace = true }
 proptest = { workspace = true }
 rand = { workspace = true }
 
+[lib]
+bench = false
+
 [[bench]]
 name = "sorting"
 harness = false
