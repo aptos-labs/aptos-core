@@ -36,7 +36,7 @@ module econia::txn_generator_utils {
         assert!(num_markets < 105, E_NUM_MARKETS_HIGH);
 
         if (num_markets > 0) {
-            register_market<AAC, QAC>(publisher);
+            register_market<AAC, QC>(publisher);
         };
         if (num_markets > 1) {
             register_market<ABC, QBC>(publisher);
@@ -45,7 +45,7 @@ module econia::txn_generator_utils {
             register_market<ACC, QCC>(publisher);
         };
         if (num_markets > 3) {
-            register_market<ADC, QAC>(publisher);
+            register_market<ADC, QC>(publisher);
         };
         if (num_markets > 4) {
             register_market<AEC, QBC>(publisher);
@@ -54,7 +54,7 @@ module econia::txn_generator_utils {
             register_market<AFC, QCC>(publisher);
         };
         if (num_markets > 6) {
-            register_market<AGC, QAC>(publisher);
+            register_market<AGC, QC>(publisher);
         };
         if (num_markets > 7) {
             register_market<AHC, QBC>(publisher);
@@ -63,7 +63,7 @@ module econia::txn_generator_utils {
             register_market<AIC, QCC>(publisher);
         };
         if (num_markets > 9) {
-            register_market<AJC, QAC>(publisher);
+            register_market<AJC, QC>(publisher);
         };
         if (num_markets > 10) {
             register_market<AKC, QBC>(publisher);
@@ -72,7 +72,7 @@ module econia::txn_generator_utils {
             register_market<ALC, QCC>(publisher);
         };
         if (num_markets > 12) {
-            register_market<AMC, QAC>(publisher);
+            register_market<AMC, QC>(publisher);
         };
         if (num_markets > 13) {
             register_market<ANC, QBC>(publisher);
@@ -81,7 +81,7 @@ module econia::txn_generator_utils {
             register_market<AOC, QCC>(publisher);
         };
         if (num_markets > 15) {
-            register_market<APC, QAC>(publisher);
+            register_market<APC, QC>(publisher);
         };
         if (num_markets > 16) {
             register_market<AQC, QBC>(publisher);
@@ -90,7 +90,7 @@ module econia::txn_generator_utils {
             register_market<ARC, QCC>(publisher);
         };
         if (num_markets > 18) {
-            register_market<ASC, QAC>(publisher);
+            register_market<ASC, QC>(publisher);
         };
         if (num_markets > 19) {
             register_market<ATC, QBC>(publisher);
@@ -99,7 +99,7 @@ module econia::txn_generator_utils {
             register_market<AUC, QCC>(publisher);
         };
         if (num_markets > 21) {
-            register_market<AVC, QAC>(publisher);
+            register_market<AVC, QC>(publisher);
         };
         if (num_markets > 22) {
             register_market<AWC, QBC>(publisher);
@@ -108,7 +108,7 @@ module econia::txn_generator_utils {
             register_market<AXC, QCC>(publisher);
         };
         if (num_markets > 24) {
-            register_market<AYC, QAC>(publisher);
+            register_market<AYC, QC>(publisher);
         };
         if (num_markets > 25) {
             register_market<AZC, QBC>(publisher);
@@ -117,7 +117,7 @@ module econia::txn_generator_utils {
             register_market<BAC, QCC>(publisher);
         };
         if (num_markets > 27) {
-            register_market<BBC, QAC>(publisher);
+            register_market<BBC, QC>(publisher);
         };
         if (num_markets > 28) {
             register_market<BCC, QBC>(publisher);
