@@ -43,7 +43,7 @@ pub fn generate_upgrade_proposals_with_repo(
         repo_str,
     )?;
 
-    for (account, release, move_script_path, script_name) in release_packages.iter() {
+    for (account, release, move_script_path, script_name) in release_packages.into_iter() {
         // If we're generating a single-step proposal on testnet
         if is_testnet && next_execution_hash.is_empty() {
             release.generate_script_proposal_testnet(account, move_script_path.clone())?;
@@ -163,7 +163,7 @@ pub fn generate_upgrade_proposals_release_packages_with_repo(
         let package = BuiltPackage::build(package_path, options)?;
         result.push((
             account,
-            ReleasePackage::new(package),
+            ReleasePackage::new(package)?,
             move_script_path,
             script_name,
         ));
