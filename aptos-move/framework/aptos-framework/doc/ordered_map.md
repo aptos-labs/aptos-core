@@ -49,6 +49,12 @@ allowing cleaner iterator APIs.
 -  [Function `append_disjoint`](#0x1_ordered_map_append_disjoint)
 -  [Function `append_impl`](#0x1_ordered_map_append_impl)
 -  [Function `trim`](#0x1_ordered_map_trim)
+-  [Function `borrow_front`](#0x1_ordered_map_borrow_front)
+-  [Function `borrow_back`](#0x1_ordered_map_borrow_back)
+-  [Function `pop_front`](#0x1_ordered_map_pop_front)
+-  [Function `pop_back`](#0x1_ordered_map_pop_back)
+-  [Function `prev_key`](#0x1_ordered_map_prev_key)
+-  [Function `next_key`](#0x1_ordered_map_next_key)
 -  [Function `lower_bound`](#0x1_ordered_map_lower_bound)
 -  [Function `find`](#0x1_ordered_map_find)
 -  [Function `new_begin_iter`](#0x1_ordered_map_new_begin_iter)
@@ -739,7 +745,7 @@ Takes all elements from <code>other</code> and adds them to <code>self</code>, r
     <b>loop</b> {
         <b>let</b> ord = <a href="../../aptos-stdlib/../move-stdlib/doc/cmp.md#0x1_cmp_compare">cmp::compare</a>(&self.entries[cur_i].key, &other_entries[other_i].key);
         <b>if</b> (ord.is_gt()) {
-            reverse_result.push_back(self.entries.pop_back());
+            reverse_result.push_back(self.entries.<a href="ordered_map.md#0x1_ordered_map_pop_back">pop_back</a>());
             <b>if</b> (cur_i == 0) {
                 // make other_entries empty, and rest in entries.
                 // TODO cannot <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/mem.md#0x1_mem_swap">mem::swap</a> until it is <b>public</b>/released
@@ -753,10 +759,10 @@ Takes all elements from <code>other</code> and adds them to <code>self</code>, r
             // is_lt or is_eq
             <b>if</b> (ord.is_eq()) {
                 // we skip the entries one, and below put in the result one from other.
-                overwritten.push_back(self.entries.pop_back());
+                overwritten.push_back(self.entries.<a href="ordered_map.md#0x1_ordered_map_pop_back">pop_back</a>());
             };
 
-            reverse_result.push_back(other_entries.pop_back());
+            reverse_result.push_back(other_entries.<a href="ordered_map.md#0x1_ordered_map_pop_back">pop_back</a>());
             <b>if</b> (other_i == 0) {
                 other_entries.<a href="ordered_map.md#0x1_ordered_map_destroy_empty">destroy_empty</a>();
                 <b>break</b>;
@@ -799,6 +805,174 @@ After the call, the original map will be left containing the elements [0, at).
 
     OrderedMap::SortedVectorMap {
         entries: rest
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_ordered_map_borrow_front"></a>
+
+## Function `borrow_front`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_borrow_front">borrow_front</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): (&K, &V)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_borrow_front">borrow_front</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): (&K, &V) {
+    <b>let</b> entry = self.entries.<a href="ordered_map.md#0x1_ordered_map_borrow">borrow</a>(0);
+    (&entry.key, &entry.value)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_ordered_map_borrow_back"></a>
+
+## Function `borrow_back`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_borrow_back">borrow_back</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): (&K, &V)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_borrow_back">borrow_back</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): (&K, &V) {
+    <b>let</b> entry = self.entries.<a href="ordered_map.md#0x1_ordered_map_borrow">borrow</a>(self.entries.<a href="ordered_map.md#0x1_ordered_map_length">length</a>() - 1);
+    (&entry.key, &entry.value)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_ordered_map_pop_front"></a>
+
+## Function `pop_front`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_pop_front">pop_front</a>&lt;K, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): (K, V)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_pop_front">pop_front</a>&lt;K, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): (K, V) {
+    <b>let</b> <a href="ordered_map.md#0x1_ordered_map_Entry">Entry</a> { key, value } = self.entries.<a href="ordered_map.md#0x1_ordered_map_remove">remove</a>(0);
+    (key, value)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_ordered_map_pop_back"></a>
+
+## Function `pop_back`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_pop_back">pop_back</a>&lt;K, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): (K, V)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_pop_back">pop_back</a>&lt;K, V&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): (K, V) {
+    <b>let</b> <a href="ordered_map.md#0x1_ordered_map_Entry">Entry</a> { key, value } = self.entries.<a href="ordered_map.md#0x1_ordered_map_pop_back">pop_back</a>();
+    (key, value)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_ordered_map_prev_key"></a>
+
+## Function `prev_key`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_prev_key">prev_key</a>&lt;K: <b>copy</b>, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: &K): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;K&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_prev_key">prev_key</a>&lt;K: <b>copy</b>, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, key: &K): Option&lt;K&gt; {
+    <b>let</b> it = self.<a href="ordered_map.md#0x1_ordered_map_lower_bound">lower_bound</a>(key);
+    <b>if</b> (it.<a href="ordered_map.md#0x1_ordered_map_iter_is_begin">iter_is_begin</a>(self)) {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+    } <b>else</b> {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*it.<a href="ordered_map.md#0x1_ordered_map_iter_prev">iter_prev</a>(self).<a href="ordered_map.md#0x1_ordered_map_iter_borrow_key">iter_borrow_key</a>(self))
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_ordered_map_next_key"></a>
+
+## Function `next_key`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_next_key">next_key</a>&lt;K: <b>copy</b>, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: &K): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;K&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_next_key">next_key</a>&lt;K: <b>copy</b>, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, key: &K): Option&lt;K&gt; {
+    <b>let</b> it = self.<a href="ordered_map.md#0x1_ordered_map_lower_bound">lower_bound</a>(key);
+    <b>if</b> (it.<a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>(self)) {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+    } <b>else</b> {
+        <b>let</b> cur_key = it.<a href="ordered_map.md#0x1_ordered_map_iter_borrow_key">iter_borrow_key</a>(self);
+        <b>if</b> (key == cur_key) {
+            <b>let</b> it = it.<a href="ordered_map.md#0x1_ordered_map_iter_next">iter_next</a>(self);
+            <b>if</b> (it.<a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>(self)) {
+                <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+            } <b>else</b> {
+                <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*it.<a href="ordered_map.md#0x1_ordered_map_iter_borrow_key">iter_borrow_key</a>(self))
+            }
+        } <b>else</b> {
+            <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*cur_key)
+        }
     }
 }
 </code></pre>
@@ -1002,7 +1176,7 @@ Note: Requires that the map is not changed after the input iterator is generated
 Returns whether the iterator is a begin iterator.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_begin">iter_is_begin</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_begin">iter_is_begin</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;): bool
 </code></pre>
 
 
@@ -1011,7 +1185,7 @@ Returns whether the iterator is a begin iterator.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_begin">iter_is_begin</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): bool {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_iter_is_begin">iter_is_begin</a>&lt;K, V&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_IteratorPtr">IteratorPtr</a>, map: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;): bool {
     <b>if</b> (self is IteratorPtr::End) {
         map.<a href="ordered_map.md#0x1_ordered_map_is_empty">is_empty</a>()
     } <b>else</b> {
