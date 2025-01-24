@@ -162,6 +162,7 @@ fn borrow_field(
     let struct_def = verifier.resolver.struct_def_at(struct_def_index)?;
     let expected_type = materialize_type(struct_def.struct_handle, type_args);
     match operand {
+        // For inner types use equality
         ST::Reference(inner) | ST::MutableReference(inner) if expected_type == *inner => (),
         _ => return Err(verifier.error(StatusCode::BORROWFIELD_TYPE_MISMATCH_ERROR, offset)),
     }
@@ -183,7 +184,8 @@ fn borrow_field(
             {
                 let ty = instantiate(&field_def.signature.0, type_args);
                 if let Some(field_ty) = &field_ty {
-                    // More than one field possible, compare types.
+                    // More than one field possible, compare types. Notice these types
+                    // must be equal, not just assignable.
                     if &ty != field_ty {
                         return Err(
                             verifier.error(StatusCode::BORROWFIELD_TYPE_MISMATCH_ERROR, offset)
@@ -289,8 +291,10 @@ fn call(
     let parameters = verifier.resolver.signature_at(function_handle.parameters);
     for parameter in parameters.0.iter().rev() {
         let arg = safe_unwrap!(verifier.stack.pop());
-        if (type_actuals.is_empty() && &arg != parameter)
-            || (!type_actuals.is_empty() && arg != instantiate(parameter, type_actuals))
+        // For parameter to argument, use assignability
+        if (type_actuals.is_empty() && !parameter.is_assignable_from(&arg))
+            || (!type_actuals.is_empty()
+                && !instantiate(parameter, type_actuals).is_assignable_from(&arg))
         {
             return Err(verifier.error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset));
         }
@@ -307,37 +311,24 @@ fn call_closure(
     offset: CodeOffset,
     expected_ty: &SignatureToken,
 ) -> PartialVMResult<()> {
-    let SignatureToken::Function(param_tys, ret_tys, abilities) = expected_ty else {
+    let SignatureToken::Function(param_tys, ret_tys, _) = expected_ty else {
         // The signature checker has ensured this is a function
         safe_assert!(false);
         unreachable!()
     };
     // On top of the stack is the closure, pop it.
     let closure_ty = safe_unwrap!(verifier.stack.pop());
-    // Verify that the closure type matches the expected type
-    if &closure_ty != expected_ty {
+    // Verify that the closure type is assignable to the expected type
+    if !expected_ty.is_assignable_from(&closure_ty) {
         return Err(verifier
             .error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset)
             .with_message("closure type mismatch".to_owned()));
     }
-    // Verify that the abilities match
-    let SignatureToken::Function(_, _, closure_abilities) = closure_ty else {
-        // Ensured above, but never panic
-        safe_assert!(false);
-        unreachable!()
-    };
-    if !abilities.is_subset(closure_abilities) {
-        return Err(verifier
-            .error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset)
-            .with_message(format!(
-                "closure ability mismatch, expected {} but found {}",
-                abilities, closure_abilities
-            )));
-    }
     // Pop and verify arguments
     for param_ty in param_tys.iter().rev() {
         let arg_ty = safe_unwrap!(verifier.stack.pop());
-        if &arg_ty != param_ty {
+        // For parameter to argument, use assignability
+        if !param_ty.is_assignable_from(&arg_ty) {
             return Err(verifier.error(StatusCode::CALL_TYPE_MISMATCH_ERROR, offset));
         }
     }
@@ -363,8 +354,9 @@ fn clos_pack(
     for ty in captured_param_tys.into_iter().rev() {
         abilities = abilities.intersect(verifier.abilities(ty)?);
         let arg = safe_unwrap!(verifier.stack.pop());
-        if (type_actuals.is_empty() && &arg != ty)
-            || (!type_actuals.is_empty() && arg != instantiate(ty, type_actuals))
+        // For captured param type to argument, use assignability
+        if (type_actuals.is_empty() && !ty.is_assignable_from(&arg))
+            || (!type_actuals.is_empty() && !instantiate(ty, type_actuals).is_assignable_from(&arg))
         {
             return Err(verifier
                 .error(StatusCode::PACK_TYPE_MISMATCH_ERROR, offset)
@@ -461,7 +453,8 @@ fn pack(
     let field_sig = type_fields_signature(verifier, meter, offset, struct_def, variant, type_args)?;
     for sig in field_sig.0.iter().rev() {
         let arg = safe_unwrap!(verifier.stack.pop());
-        if &arg != sig {
+        // For field signature to argument, use assignability
+        if !sig.is_assignable_from(&arg) {
             return Err(verifier.error(StatusCode::PACK_TYPE_MISMATCH_ERROR, offset));
         }
     }
@@ -504,6 +497,7 @@ fn test_variant(
     let struct_type = materialize_type(struct_def.struct_handle, type_args);
     let arg = safe_unwrap!(verifier.stack.pop());
     match arg {
+        // For inner type, use equality
         ST::Reference(inner) | ST::MutableReference(inner) if struct_type == *inner => (),
         _ => return Err(verifier.error(StatusCode::TEST_VARIANT_TYPE_MISMATCH_ERROR, offset)),
     }
@@ -602,8 +596,10 @@ fn borrow_vector_element(
     }
 
     // check vector and update stack
+    // The declared element type must be exactly the same as the element type of the vector
+    // operand. (No co-variance.)
     let element_type = match get_vector_element_type(operand_vec, mut_ref_only) {
-        Some(ty) if &ty == declared_element_type => ty,
+        Some(ty) if declared_element_type == &ty => ty,
         _ => return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset)),
     };
     let element_ref_type = if mut_ref_only {
@@ -642,7 +638,7 @@ fn verify_instr(
 
         Bytecode::StLoc(idx) => {
             let operand = safe_unwrap!(verifier.stack.pop());
-            if &operand != verifier.local_at(*idx) {
+            if !verifier.local_at(*idx).is_assignable_from(&operand) {
                 return Err(verifier.error(StatusCode::STLOC_TYPE_MISMATCH_ERROR, offset));
             }
         },
@@ -658,7 +654,8 @@ fn verify_instr(
             let return_ = &verifier.function_view.return_().0;
             for return_type in return_.iter().rev() {
                 let operand = safe_unwrap!(verifier.stack.pop());
-                if &operand != return_type {
+                // The return type must be assignable from the returned value.
+                if !return_type.is_assignable_from(&operand) {
                     return Err(verifier.error(StatusCode::RET_TYPE_MISMATCH_ERROR, offset));
                 }
             }
@@ -991,7 +988,8 @@ fn verify_instr(
                 return Err(verifier.error(StatusCode::WRITEREF_WITHOUT_DROP_ABILITY, offset));
             }
 
-            if val_operand != ref_inner_signature {
+            // The inner type of the reference must be assignable from the operand
+            if !ref_inner_signature.is_assignable_from(&val_operand) {
                 return Err(verifier.error(StatusCode::WRITEREF_TYPE_MISMATCH_ERROR, offset));
             }
         },
@@ -1149,7 +1147,8 @@ fn verify_instr(
             let element_type = &verifier.resolver.signature_at(*idx).0[0];
             for _ in 0..*num {
                 let operand_type = safe_unwrap!(verifier.stack.pop());
-                if element_type != &operand_type {
+                // The operand type must be assignable to the element type.
+                if !element_type.is_assignable_from(&operand_type) {
                     return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset));
                 }
             }
@@ -1162,6 +1161,7 @@ fn verify_instr(
             let operand = safe_unwrap!(verifier.stack.pop());
             let declared_element_type = &verifier.resolver.signature_at(*idx).0[0];
             match get_vector_element_type(operand, false) {
+                // The derived and declared element types must be equal (no co-variance)
                 Some(derived_element_type) if &derived_element_type == declared_element_type => {
                     verifier.push(meter, ST::U64)?;
                 },
@@ -1182,10 +1182,12 @@ fn verify_instr(
             let operand_elem = safe_unwrap!(verifier.stack.pop());
             let operand_vec = safe_unwrap!(verifier.stack.pop());
             let declared_element_type = &verifier.resolver.signature_at(*idx).0[0];
-            if declared_element_type != &operand_elem {
+            // The operand type must be assignable to the declared element type.
+            if !declared_element_type.is_assignable_from(&operand_elem) {
                 return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset));
             }
             match get_vector_element_type(operand_vec, true) {
+                // Derived and declared element types must be equal.
                 Some(derived_element_type) if &derived_element_type == declared_element_type => {},
                 _ => return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset)),
             };
@@ -1195,6 +1197,7 @@ fn verify_instr(
             let operand_vec = safe_unwrap!(verifier.stack.pop());
             let declared_element_type = &verifier.resolver.signature_at(*idx).0[0];
             match get_vector_element_type(operand_vec, true) {
+                // Derived and declared element types must be equal.
                 Some(derived_element_type) if &derived_element_type == declared_element_type => {
                     verifier.push(meter, derived_element_type)?;
                 },
@@ -1222,6 +1225,7 @@ fn verify_instr(
             }
             let declared_element_type = &verifier.resolver.signature_at(*idx).0[0];
             match get_vector_element_type(operand_vec, true) {
+                // Derived and declared element types must be equal
                 Some(derived_element_type) if &derived_element_type == declared_element_type => {},
                 _ => return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset)),
             };

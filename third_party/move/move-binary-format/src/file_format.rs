@@ -1476,6 +1476,20 @@ impl SignatureToken {
         }
     }
 
+    /// Returns true if this type can have assigned a value of the source type.
+    /// For function types, this is true if the argument and result types
+    /// are equal, and if this function type's ability set is a subset of the other
+    /// one. For all other types, they must be equal
+    pub fn is_assignable_from(&self, source: &SignatureToken) -> bool {
+        match (self, source) {
+            (
+                SignatureToken::Function(args1, results1, abs1),
+                SignatureToken::Function(args2, results2, abs2),
+            ) => args1 == args2 && results1 == results2 && abs1.is_subset(*abs2),
+            _ => self == source,
+        }
+    }
+
     /// Set the index to this one. Useful for random testing.
     ///
     /// Panics if this token doesn't contain a struct handle.
