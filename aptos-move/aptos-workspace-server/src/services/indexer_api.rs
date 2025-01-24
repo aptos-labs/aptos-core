@@ -5,7 +5,10 @@ use super::{
     docker_common::create_start_and_inspect_container,
     postgres::get_postgres_connection_string_within_docker_network,
 };
-use crate::common::{make_shared, ArcError, IP_LOCAL_HOST};
+use crate::{
+    common::{make_shared, ArcError, IP_LOCAL_HOST},
+    no_panic_println,
+};
 use anyhow::{anyhow, Context, Result};
 use aptos_localnet::{
     health_checker::HealthChecker,
@@ -145,7 +148,7 @@ pub fn start_indexer_api(
                     "failed to start indexer api server: one or more dependencies failed to start",
                 )?;
 
-            println!("Starting indexer API..");
+            no_panic_println!("Starting indexer API..");
 
             let (options, config) =
                 create_container_options_and_config(instance_id, docker_network_name);
@@ -180,7 +183,7 @@ pub fn start_indexer_api(
                 .await
                 .context("failed to wait for indexer API to be ready")?;
 
-            println!("Indexer API is up, applying hasura metadata..");
+            no_panic_println!("Indexer API is up, applying hasura metadata..");
 
             // Apply the hasura metadata, with the second health checker waiting for it to succeed.
             post_metadata(url.clone(), HASURA_METADATA)
@@ -193,9 +196,10 @@ pub fn start_indexer_api(
                 .await
                 .context("failed to wait for indexer API to be ready")?;
 
-            println!(
+            no_panic_println!(
                 "Indexer API is ready. Endpoint: http://{}:{}/",
-                IP_LOCAL_HOST, indexer_api_port
+                IP_LOCAL_HOST,
+                indexer_api_port
             );
 
             anyhow::Ok(indexer_api_port)

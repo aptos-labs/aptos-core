@@ -1,7 +1,10 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::{make_shared, ArcError};
+use crate::{
+    common::{make_shared, ArcError},
+    no_panic_eprintln, no_panic_println,
+};
 use anyhow::{anyhow, bail, Context, Result};
 use bollard::{
     container::{CreateContainerOptions, InspectContainerOptions, StartContainerOptions},
@@ -43,7 +46,7 @@ pub async fn create_docker_network_permanent(
 
         match res {
             Ok(_response) => {
-                println!("Created docker network {}", name);
+                no_panic_println!("Created docker network {}", name);
 
                 Ok(name)
             },
@@ -51,7 +54,7 @@ pub async fn create_docker_network_permanent(
                 bollard::errors::Error::DockerResponseServerError {
                     status_code: 409, ..
                 } => {
-                    println!("Docker network {} already exists, not creating it", name);
+                    no_panic_println!("Docker network {} already exists, not creating it", name);
                     Ok(name)
                 },
                 err => Err(err.into()),
@@ -120,7 +123,7 @@ pub fn create_docker_network(
                 .await
                 .context("failed to create docker network")?;
 
-            println!("Created docker network {}", name);
+            no_panic_println!("Created docker network {}", name);
 
             Ok(name)
         });
@@ -154,10 +157,10 @@ pub fn create_docker_network(
 
             match cleanup.await {
                 Ok(_) => {
-                    println!("Removed docker network {}", name);
+                    no_panic_println!("Removed docker network {}", name);
                 },
                 Err(err) => {
-                    eprintln!("Failed to remove docker network {}: {}", name, err)
+                    no_panic_eprintln!("Failed to remove docker network {}: {}", name, err)
                 },
             }
         }
@@ -220,7 +223,7 @@ pub fn create_docker_volume(
                 .await
                 .context("failed to create docker volume")?;
 
-            println!("Created docker volume {}", name);
+            no_panic_println!("Created docker volume {}", name);
 
             Ok(name)
         });
@@ -254,10 +257,10 @@ pub fn create_docker_volume(
 
             match cleanup.await {
                 Ok(_) => {
-                    println!("Removed docker volume {}", name);
+                    no_panic_println!("Removed docker volume {}", name);
                 },
                 Err(err) => {
-                    eprintln!("Failed to remove docker volume {}: {}", name, err)
+                    no_panic_eprintln!("Failed to remove docker volume {}: {}", name, err)
                 },
             }
         }
@@ -326,10 +329,10 @@ pub fn create_start_and_inspect_container(
             let image_name = config.image.as_ref().unwrap();
             match docker.inspect_image(image_name).await {
                 Ok(_) => {
-                    println!("Docker image {} already exists", image_name);
+                    no_panic_println!("Docker image {} already exists", image_name);
                 },
                 Err(_err) => {
-                    println!(
+                    no_panic_println!(
                         "Docker image {} does not exist. Pulling image..",
                         image_name
                     );
@@ -347,7 +350,7 @@ pub fn create_start_and_inspect_container(
                         .await
                         .context("failed to create docker container")?;
 
-                    println!("Pulled docker image {}", image_name);
+                    no_panic_println!("Pulled docker image {}", image_name);
                 },
             }
 
@@ -358,7 +361,7 @@ pub fn create_start_and_inspect_container(
                 .create_container(Some(options), config)
                 .await
                 .context("failed to create docker container")?;
-            println!("Created docker container {}", name);
+            no_panic_println!("Created docker container {}", name);
 
             if shutdown.is_cancelled() {
                 bail!("failed to start docker container: cancelled")
@@ -368,7 +371,7 @@ pub fn create_start_and_inspect_container(
                 .start_container(&name, None::<StartContainerOptions<&str>>)
                 .await
                 .context("failed to start docker container")?;
-            println!("Started docker container {}", name);
+            no_panic_println!("Started docker container {}", name);
 
             if shutdown.is_cancelled() {
                 bail!("failed to inspect docker container: cancelled")
@@ -407,7 +410,7 @@ pub fn create_start_and_inspect_container(
             let docker = match fut_docker.await {
                 Ok(docker) => docker,
                 Err(err) => {
-                    eprintln!("Failed to clean up docker container {}: {}", name, err);
+                    no_panic_eprintln!("Failed to clean up docker container {}: {}", name, err);
                     return;
                 },
             };
@@ -415,20 +418,20 @@ pub fn create_start_and_inspect_container(
             if *state == State::Started {
                 match docker.stop_container(name.as_str(), None).await {
                     Ok(_) => {
-                        println!("Stopped docker container {}", name)
+                        no_panic_println!("Stopped docker container {}", name)
                     },
                     Err(err) => {
-                        eprintln!("Failed to stop docker container {}: {}", name, err)
+                        no_panic_eprintln!("Failed to stop docker container {}: {}", name, err)
                     },
                 }
             }
 
             match docker.remove_container(name.as_str(), None).await {
                 Ok(_) => {
-                    println!("Removed docker container {}", name)
+                    no_panic_println!("Removed docker container {}", name)
                 },
                 Err(err) => {
-                    eprintln!("Failed to remove docker container {}: {}", name, err)
+                    no_panic_eprintln!("Failed to remove docker container {}: {}", name, err)
                 },
             }
         }
