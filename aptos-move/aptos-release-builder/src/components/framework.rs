@@ -33,14 +33,16 @@ pub fn generate_upgrade_proposals_with_repo(
     next_execution_hash: Vec<u8>,
     repo_str: &str,
 ) -> Result<Vec<(String, String)>> {
-    for (account, release) in generate_upgrade_proposals_release_packages_with_repo(
+    let mut result = vec![];
+
+    let (commit_info, release_packages) = generate_upgrade_proposals_release_packages_with_repo(
         config,
         is_testnet,
-        next_execution_hash,
+        next_execution_hash.clone(),
         repo_str,
-    )
-    .iter()
-    {
+    )?;
+
+    for (account, release, move_script_path) in release_packages.iter() {
         // If we're generating a single-step proposal on testnet
         if is_testnet && next_execution_hash.is_empty() {
             release.generate_script_proposal_testnet(account, move_script_path.clone())?;
@@ -79,7 +81,7 @@ pub fn generate_upgrade_proposals_release_packages_with_repo(
     is_testnet: bool,
     next_execution_hash: Vec<u8>,
     repo_str: &str,
-) -> Result<Vec<(AccountAddress, ReleasePackage)>> {
+) -> Result<(String, Vec<(AccountAddress, ReleasePackage, PathBuf)>)> {
     let mut package_path_list = [
         ("0x1", "aptos-move/framework/move-stdlib"),
         ("0x1", "aptos-move/framework/aptos-stdlib"),
@@ -155,8 +157,8 @@ pub fn generate_upgrade_proposals_release_packages_with_repo(
             ..BuildOptions::default()
         };
         let package = BuiltPackage::build(package_path, options)?;
-        result.push((account, ReleasePackage::new(package)))
+        result.push((account, ReleasePackage::new(package), move_script_path));
     }
 
-    Ok(result)
+    Ok((commit_info, result))
 }
