@@ -1651,6 +1651,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-schemadb",
  "aptos-temppath",
+ "arc-swap",
  "bitvec 1.0.1",
  "criterion",
  "itertools 0.13.0",

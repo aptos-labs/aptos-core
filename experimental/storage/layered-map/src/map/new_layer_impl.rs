@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    flatten_perfect_tree::{FlattenPerfectTree, FptRef, FptRefMut},
+    flatten_perfect_tree::{FlattenPerfectTree, FptFoot, FptRef},
     metrics::TIMER,
     node::{CollisionCell, LeafContent, LeafNode, NodeRef, NodeStrongRef},
     utils::binary_tree_height,
@@ -38,13 +38,13 @@ where
             .collect_vec();
 
         let height = Self::new_peak_height(self.top_layer.peak().num_leaves(), items.len());
-        let mut new_peak = FlattenPerfectTree::new_with_empty_nodes(height);
+        let new_peak = FlattenPerfectTree::new_with_empty_feet(height);
         let builder = SubTreeBuilder {
             layer: self.top_layer.layer() + 1,
             base_layer: self.base_layer(),
             depth: 0,
             position_info: PositionInfo::new(self.top_layer.peak(), self.base_layer()),
-            output_position_info: OutputPositionInfo::new(new_peak.get_mut()),
+            output_position_info: OutputPositionInfo::new(new_peak.get_ref()),
             items: &items,
         };
         builder.build().finalize();
@@ -101,7 +101,7 @@ enum PositionInfo<'a, K, V> {
 impl<'a, K, V> PositionInfo<'a, K, V> {
     fn new(peak: FptRef<'a, K, V>, base_layer: u64) -> Self {
         if peak.num_leaves() == 1 {
-            Self::PeakFootOrBelow(peak.expect_single_node(base_layer))
+            Self::PeakFootOrBelow(peak.expect_single_node().get_strong(base_layer))
         } else {
             Self::AbovePeakFeet(peak)
         }
@@ -126,8 +126,8 @@ impl<'a, K, V> PositionInfo<'a, K, V> {
                 let (left, right) = fpt.expect_sub_trees();
                 if left.is_single_node() {
                     (
-                        PeakFootOrBelow(left.expect_single_node(base_layer)),
-                        PeakFootOrBelow(right.expect_single_node(base_layer)),
+                        PeakFootOrBelow(left.expect_single_node().get_strong(base_layer)),
+                        PeakFootOrBelow(right.expect_single_node().get_strong(base_layer)),
                     )
                 } else {
                     (AbovePeakFeet(left), AbovePeakFeet(right))
@@ -142,13 +142,13 @@ impl<'a, K, V> PositionInfo<'a, K, V> {
 }
 
 enum OutputPositionInfo<'a, K, V> {
-    AboveOrAtPeakFeet(FptRefMut<'a, K, V>),
+    AboveOrAtPeakFeet(FptRef<'a, K, V>),
     BelowPeakFeet,
 }
 
 impl<'a, K, V> OutputPositionInfo<'a, K, V> {
-    pub fn new(fpt_mut: FptRefMut<'a, K, V>) -> Self {
-        Self::AboveOrAtPeakFeet(fpt_mut)
+    pub fn new(peak: FptRef<'a, K, V>) -> Self {
+        Self::AboveOrAtPeakFeet(peak)
     }
 
     pub fn is_above_peak_feet(&self) -> bool {
@@ -171,15 +171,15 @@ impl<'a, K, V> OutputPositionInfo<'a, K, V> {
         OutputPositionInfo<'a, K, V>,
     ) {
         match self {
-            OutputPositionInfo::AboveOrAtPeakFeet(fpt_mut) => {
-                if fpt_mut.is_single_node() {
+            OutputPositionInfo::AboveOrAtPeakFeet(fpt) => {
+                if fpt.is_single_node() {
                     (
-                        PendingBuild::FootOfPeak(fpt_mut.expect_into_single_node_mut()),
+                        PendingBuild::FootOfPeak(fpt.expect_single_node()),
                         OutputPositionInfo::BelowPeakFeet,
                         OutputPositionInfo::BelowPeakFeet,
                     )
                 } else {
-                    let (left, right) = fpt_mut.expect_into_sub_trees();
+                    let (left, right) = fpt.expect_sub_trees();
                     (
                         PendingBuild::AbovePeakFeet,
                         OutputPositionInfo::AboveOrAtPeakFeet(left),
@@ -198,7 +198,7 @@ impl<'a, K, V> OutputPositionInfo<'a, K, V> {
 
 enum PendingBuild<'a, K, V> {
     AbovePeakFeet,
-    FootOfPeak(&'a mut NodeRef<K, V>),
+    FootOfPeak(&'a FptFoot<K, V>),
     BelowPeakFeet,
 }
 
@@ -206,8 +206,8 @@ impl<'a, K, V> PendingBuild<'a, K, V> {
     fn seal_with_node(&mut self, node: NodeRef<K, V>) -> BuiltSubTree<K, V> {
         match self {
             PendingBuild::AbovePeakFeet => unreachable!("Trying to put node above peak feet."),
-            PendingBuild::FootOfPeak(ref_mut) => {
-                **ref_mut = node;
+            PendingBuild::FootOfPeak(foot) => {
+                foot.set(node);
                 BuiltSubTree::InOrAtFootOfPeak
             },
             PendingBuild::BelowPeakFeet => BuiltSubTree::BelowPeak(node),

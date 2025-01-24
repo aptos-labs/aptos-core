@@ -49,7 +49,7 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> LayerInner<K, V> {
     fn new_family(use_case: &'static str) -> Arc<Self> {
         let family = HashValue::random();
         Arc::new(Self {
-            peak: FlattenPerfectTree::new_with_empty_nodes(1),
+            peak: FlattenPerfectTree::new_with_empty_feet(1),
             children: Mutex::new(Vec::new()),
             use_case,
             family,

@@ -18,6 +18,7 @@ aptos-crypto = { workspace = true }
 aptos-drop-helper = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-metrics-core = { workspace = true }
+arc-swap = { workspace = true }
 bitvec = "1.0.1"
 itertools = { workspace = true }
 once_cell = { workspace = true }
