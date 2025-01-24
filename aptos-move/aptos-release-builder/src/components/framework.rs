@@ -33,7 +33,7 @@ pub fn generate_upgrade_proposals_with_repo(
     next_execution_hash: Vec<u8>,
     repo_str: &str,
 ) -> Result<Vec<(String, String)>> {
-    for (account, release_package) in generate_upgrade_proposals_release_packages_with_repo(
+    for (account, release) in generate_upgrade_proposals_release_packages_with_repo(
         config,
         is_testnet,
         next_execution_hash,
