@@ -174,6 +174,7 @@ pub struct BufferManager {
     // If the buffer manager receives a commit vote for a block that is not in buffer items, then
     // the vote will be cached. We can cache upto max_pending_rounds_in_commit_vote_cache (100) blocks.
     pending_commit_votes: BTreeMap<Round, HashMap<AccountAddress, CommitVote>>,
+    new_pipeline_enabled: bool,
 }
 
 impl BufferManager {
@@ -205,6 +206,7 @@ impl BufferManager {
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
         max_pending_rounds_in_commit_vote_cache: u64,
+        new_pipeline_enabled: bool,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
 
@@ -269,6 +271,7 @@ impl BufferManager {
 
             max_pending_rounds_in_commit_vote_cache,
             pending_commit_votes: BTreeMap::new(),
+            new_pipeline_enabled,
         }
     }
 
@@ -995,8 +998,10 @@ impl BufferManager {
                     }});
                 },
                 _ = self.execution_schedule_retry_rx.next() => {
-                    monitor!("buffer_manager_process_execution_schedule_retry",
-                        self.retry_schedule_phase().await);
+                    if !self.new_pipeline_enabled {
+                        monitor!("buffer_manager_process_execution_schedule_retry",
+                            self.retry_schedule_phase().await);
+                    }
                 },
                 Some(response) = self.signing_phase_rx.next() => {
                     monitor!("buffer_manager_process_signing_response", {
