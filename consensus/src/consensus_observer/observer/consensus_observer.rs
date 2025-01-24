@@ -1026,6 +1026,7 @@ impl ConsensusObserver {
                 None,
                 rand_msg_rx,
                 0,
+                self.pipeline_enabled(),
             )
             .await;
         if self.pipeline_enabled() {

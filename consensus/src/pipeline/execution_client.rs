@@ -70,6 +70,7 @@ pub trait TExecutionClient: Send + Sync {
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_committed_round: Round,
+        new_pipeline_enabled: bool,
     );
 
     /// This is needed for some DAG tests. Clean this up as a TODO.
@@ -208,6 +209,7 @@ impl ExecutionProxyClient {
         buffer_manager_back_pressure_enabled: bool,
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
+        new_pipeline_enabled: bool,
     ) {
         let network_sender = NetworkSender::new(
             self.author,
@@ -295,6 +297,7 @@ impl ExecutionProxyClient {
             consensus_publisher,
             self.consensus_config
                 .max_pending_rounds_in_commit_vote_cache,
+            new_pipeline_enabled,
         );
 
         tokio::spawn(execution_schedule_phase.start());
@@ -320,6 +323,7 @@ impl TExecutionClient for ExecutionProxyClient {
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_committed_round: Round,
+        new_pipeline_enabled: bool,
     ) {
         let maybe_rand_msg_tx = self.spawn_decoupled_execution(
             maybe_consensus_key,
@@ -333,6 +337,7 @@ impl TExecutionClient for ExecutionProxyClient {
             self.consensus_config.enable_pre_commit,
             self.consensus_observer_config,
             self.consensus_publisher.clone(),
+            new_pipeline_enabled,
         );
 
         let transaction_shuffler =
@@ -536,6 +541,7 @@ impl TExecutionClient for DummyExecutionClient {
         _fast_rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _highest_committed_round: Round,
+        _new_pipeline_enabled: bool,
     ) {
     }
 
