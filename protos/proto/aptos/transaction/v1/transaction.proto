@@ -226,6 +226,7 @@ message WriteSetChange {
     TYPE_WRITE_MODULE = 4;
     TYPE_WRITE_RESOURCE = 5;
     TYPE_WRITE_TABLE_ITEM = 6;
+    TYPE_WRITE_UNKNONWN = 7;
   }
 
   Type type = 1;

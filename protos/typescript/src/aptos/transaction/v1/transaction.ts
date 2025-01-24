@@ -496,6 +496,7 @@ export enum WriteSetChange_Type {
   TYPE_WRITE_MODULE = 4,
   TYPE_WRITE_RESOURCE = 5,
   TYPE_WRITE_TABLE_ITEM = 6,
+  TYPE_WRITE_UNKNONWN = 7,
   UNRECOGNIZED = -1,
 }
 
@@ -522,6 +523,9 @@ export function writeSetChange_TypeFromJSON(object: any): WriteSetChange_Type {
     case 6:
     case "TYPE_WRITE_TABLE_ITEM":
       return WriteSetChange_Type.TYPE_WRITE_TABLE_ITEM;
+    case 7:
+    case "TYPE_WRITE_UNKNONWN":
+      return WriteSetChange_Type.TYPE_WRITE_UNKNONWN;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -545,6 +549,8 @@ export function writeSetChange_TypeToJSON(object: WriteSetChange_Type): string {
       return "TYPE_WRITE_RESOURCE";
     case WriteSetChange_Type.TYPE_WRITE_TABLE_ITEM:
       return "TYPE_WRITE_TABLE_ITEM";
+    case WriteSetChange_Type.TYPE_WRITE_UNKNONWN:
+      return "TYPE_WRITE_UNKNONWN";
     case WriteSetChange_Type.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";

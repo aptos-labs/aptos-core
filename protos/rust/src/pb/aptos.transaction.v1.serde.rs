@@ -10160,6 +10160,7 @@ impl serde::Serialize for write_set_change::Type {
             Self::WriteModule => "TYPE_WRITE_MODULE",
             Self::WriteResource => "TYPE_WRITE_RESOURCE",
             Self::WriteTableItem => "TYPE_WRITE_TABLE_ITEM",
+            Self::WriteUnknonwn => "TYPE_WRITE_UNKNONWN",
         };
         serializer.serialize_str(variant)
     }
@@ -10178,6 +10179,7 @@ impl<'de> serde::Deserialize<'de> for write_set_change::Type {
             "TYPE_WRITE_MODULE",
             "TYPE_WRITE_RESOURCE",
             "TYPE_WRITE_TABLE_ITEM",
+            "TYPE_WRITE_UNKNONWN",
         ];
 
         struct GeneratedVisitor;
@@ -10227,6 +10229,7 @@ impl<'de> serde::Deserialize<'de> for write_set_change::Type {
                     "TYPE_WRITE_MODULE" => Ok(write_set_change::Type::WriteModule),
                     "TYPE_WRITE_RESOURCE" => Ok(write_set_change::Type::WriteResource),
                     "TYPE_WRITE_TABLE_ITEM" => Ok(write_set_change::Type::WriteTableItem),
+                    "TYPE_WRITE_UNKNONWN" => Ok(write_set_change::Type::WriteUnknonwn),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }
