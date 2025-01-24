@@ -273,6 +273,54 @@ module aptos_std::ordered_map {
         }
     }
 
+    public fun borrow_front<K, V>(self: &OrderedMap<K, V>): (&K, &V) {
+        let entry = self.entries.borrow(0);
+        (&entry.key, &entry.value)
+    }
+
+    public fun borrow_back<K, V>(self: &OrderedMap<K, V>): (&K, &V) {
+        let entry = self.entries.borrow(self.entries.length() - 1);
+        (&entry.key, &entry.value)
+    }
+
+    public fun pop_front<K, V>(self: &mut OrderedMap<K, V>): (K, V) {
+        let Entry { key, value } = self.entries.remove(0);
+        (key, value)
+    }
+
+    public fun pop_back<K, V>(self: &mut OrderedMap<K, V>): (K, V) {
+        let Entry { key, value } = self.entries.pop_back();
+        (key, value)
+    }
+
+    public fun prev_key<K: copy, V>(self: &OrderedMap<K, V>, key: &K): Option<K> {
+        let it = self.lower_bound(key);
+        if (it.iter_is_begin(self)) {
+            option::none()
+        } else {
+            option::some(*it.iter_prev(self).iter_borrow_key(self))
+        }
+    }
+
+    public fun next_key<K: copy, V>(self: &OrderedMap<K, V>, key: &K): Option<K> {
+        let it = self.lower_bound(key);
+        if (it.iter_is_end(self)) {
+            option::none()
+        } else {
+            let cur_key = it.iter_borrow_key(self);
+            if (key == cur_key) {
+                let it = it.iter_next(self);
+                if (it.iter_is_end(self)) {
+                    option::none()
+                } else {
+                    option::some(*it.iter_borrow_key(self))
+                }
+            } else {
+                option::some(*cur_key)
+            }
+        }
+    }
+
     // TODO: see if it is more understandable if iterator points between elements,
     // and there is iter_borrow_next and iter_borrow_prev, and provide iter_insert.
 
@@ -349,7 +397,7 @@ module aptos_std::ordered_map {
     }
 
     /// Returns whether the iterator is a begin iterator.
-    public fun iter_is_begin<K, V>(self: &IteratorPtr, map: &OrderedMap<K, V>): bool {
+    public(friend) fun iter_is_begin<K, V>(self: &IteratorPtr, map: &OrderedMap<K, V>): bool {
         if (self is IteratorPtr::End) {
             map.is_empty()
         } else {
@@ -865,6 +913,35 @@ module aptos_std::ordered_map {
         let rest = map.trim(2);
         assert!(map == new_from(vector[1, 2], vector[10, 20]), 1);
         assert!(rest == new_from(vector[3], vector[30]), 2);
+    }
+
+    #[test]
+    fun test_non_iterator_ordering() {
+        let map = new_from(vector[1, 2, 3], vector[10, 20, 30]);
+        assert!(map.prev_key(&1).is_none(), 1);
+        assert!(map.next_key(&1) == option::some(2), 1);
+
+        assert!(map.prev_key(&2) == option::some(1), 2);
+        assert!(map.next_key(&2) == option::some(3), 3);
+
+        assert!(map.prev_key(&3) == option::some(2), 4);
+        assert!(map.next_key(&3).is_none(), 5);
+
+        let (front_k, front_v) = map.borrow_front();
+        assert!(front_k == &1, 6);
+        assert!(front_v == &10, 7);
+
+        let (back_k, back_v) = map.borrow_back();
+        assert!(back_k == &3, 8);
+        assert!(back_v == &30, 9);
+
+        let (front_k, front_v) = map.pop_front();
+        assert!(front_k == 1, 10);
+        assert!(front_v == 10, 11);
+
+        let (back_k, back_v) = map.pop_back();
+        assert!(back_k == 3, 12);
+        assert!(back_v == 30, 13);
     }
 
     #[test]
