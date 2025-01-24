@@ -83,7 +83,7 @@ fn spawn_shared_fut<
         match join_handle.await {
             Ok(Ok(res)) => Ok(res),
             Ok(e @ Err(TaskError::PropagatedError(_))) => e,
-            Ok(Err(e @ TaskError::InternalError(_))) => {
+            Ok(Err(e @ TaskError::InternalError(_) | e @ TaskError::JoinError(_))) => {
                 Err(TaskError::PropagatedError(Box::new(e)))
             },
             Err(e) => Err(TaskError::JoinError(Arc::new(e))),
