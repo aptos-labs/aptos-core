@@ -33,6 +33,53 @@ pub fn generate_upgrade_proposals_with_repo(
     next_execution_hash: Vec<u8>,
     repo_str: &str,
 ) -> Result<Vec<(String, String)>> {
+    for (account, release_package) in generate_upgrade_proposals_release_packages_with_repo(
+        config,
+        is_testnet,
+        next_execution_hash,
+        repo_str,
+    )
+    .iter()
+    {
+        // If we're generating a single-step proposal on testnet
+        if is_testnet && next_execution_hash.is_empty() {
+            release.generate_script_proposal_testnet(account, move_script_path.clone())?;
+            // If we're generating a single-step proposal on mainnet
+        } else if next_execution_hash.is_empty() {
+            release.generate_script_proposal(account, move_script_path.clone())?;
+            // If we're generating a multi-step proposal
+        } else {
+            let next_execution_hash_bytes = if result.is_empty() {
+                next_execution_hash.clone()
+            } else {
+                get_execution_hash(&result)
+            };
+            release.generate_script_proposal_multi_step(
+                account,
+                move_script_path.clone(),
+                next_execution_hash_bytes,
+            )?;
+        };
+
+        let mut script = format!(
+            "// Framework commit hash: {}\n// Builder commit hash: {}\n",
+            commit_info,
+            aptos_build_info::get_git_hash()
+        );
+
+        script.push_str(&std::fs::read_to_string(move_script_path.as_path())?);
+
+        result.push((script_name, script));
+    }
+    Ok(result)
+}
+
+pub fn generate_upgrade_proposals_release_packages_with_repo(
+    config: &FrameworkReleaseConfig,
+    is_testnet: bool,
+    next_execution_hash: Vec<u8>,
+    repo_str: &str,
+) -> Result<Vec<(AccountAddress, ReleasePackage)>> {
     let mut package_path_list = [
         ("0x1", "aptos-move/framework/move-stdlib"),
         ("0x1", "aptos-move/framework/aptos-stdlib"),
@@ -41,7 +88,7 @@ pub fn generate_upgrade_proposals_with_repo(
         ("0x4", "aptos-move/framework/aptos-token-objects"),
     ];
 
-    let mut result: Vec<(String, String)> = vec![];
+    let mut result = vec![];
 
     let temp_root_path = TempPath::new();
     temp_root_path.create_as_dir()?;
@@ -108,37 +155,8 @@ pub fn generate_upgrade_proposals_with_repo(
             ..BuildOptions::default()
         };
         let package = BuiltPackage::build(package_path, options)?;
-        let release = ReleasePackage::new(package)?;
-
-        // If we're generating a single-step proposal on testnet
-        if is_testnet && next_execution_hash.is_empty() {
-            release.generate_script_proposal_testnet(account, move_script_path.clone())?;
-            // If we're generating a single-step proposal on mainnet
-        } else if next_execution_hash.is_empty() {
-            release.generate_script_proposal(account, move_script_path.clone())?;
-            // If we're generating a multi-step proposal
-        } else {
-            let next_execution_hash_bytes = if result.is_empty() {
-                next_execution_hash.clone()
-            } else {
-                get_execution_hash(&result)
-            };
-            release.generate_script_proposal_multi_step(
-                account,
-                move_script_path.clone(),
-                next_execution_hash_bytes,
-            )?;
-        };
-
-        let mut script = format!(
-            "// Framework commit hash: {}\n// Builder commit hash: {}\n",
-            commit_info,
-            aptos_build_info::get_git_hash()
-        );
-
-        script.push_str(&std::fs::read_to_string(move_script_path.as_path())?);
-
-        result.push((script_name, script));
+        result.push((account, ReleasePackage::new(package)))
     }
+
     Ok(result)
 }
