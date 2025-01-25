@@ -1149,7 +1149,7 @@ Burns a specified amount of AptosCoin from an address.
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn_from">burn_from</a>(core_resource: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, from: <b>address</b>, amount: u64) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_AptosCoinBurnCapability">AptosCoinBurnCapability</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_core_resource">system_addresses::assert_core_resource</a>(core_resource);
-    <a href="native_bridge.md#0x1_native_bridge_burn">burn</a>(from, amount);
+    <a href="native_bridge.md#0x1_native_bridge_burn_internal">burn_internal</a>(from, amount);
 }
 </code></pre>
 
@@ -1180,11 +1180,7 @@ Burns a specified amount of AptosCoin from an address.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn">burn</a>(from: <b>address</b>, amount: u64) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_AptosCoinBurnCapability">AptosCoinBurnCapability</a> {
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_abort_native_bridge_enabled">features::abort_native_bridge_enabled</a>(), <a href="native_bridge.md#0x1_native_bridge_ENATIVE_BRIDGE_NOT_ENABLED">ENATIVE_BRIDGE_NOT_ENABLED</a>);
 
-    <a href="coin.md#0x1_coin_burn_from">coin::burn_from</a>(
-        from,
-        amount,
-        &<b>borrow_global</b>&lt;<a href="native_bridge.md#0x1_native_bridge_AptosCoinBurnCapability">AptosCoinBurnCapability</a>&gt;(@aptos_framework).burn_cap,
-    );
+    <a href="native_bridge.md#0x1_native_bridge_burn_internal">burn_internal</a>(from, amount);
 }
 </code></pre>
 
@@ -1196,6 +1192,10 @@ Burns a specified amount of AptosCoin from an address.
 
 ## Function `burn_internal`
 
+Burns a specified amount of AptosCoin from an address.
+
+@param from The address from which to burn AptosCoin.
+@param amount The amount of AptosCoin to burn.
 
 
 <pre><code><b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn_internal">burn_internal</a>(from: <b>address</b>, amount: u64)
@@ -1274,7 +1274,7 @@ The amount is burnt from the initiator and the module-level nonce is incremented
     <a href="native_bridge.md#0x1_native_bridge_add">add</a>(nonce, details);
 
     // Burn the amount from the initiator
-    <a href="native_bridge.md#0x1_native_bridge_burn">burn</a>(initiator_address, amount);
+    <a href="native_bridge.md#0x1_native_bridge_burn_internal">burn_internal</a>(initiator_address, amount);
 
     <b>let</b> bridge_events = <b>borrow_global_mut</b>&lt;<a href="native_bridge.md#0x1_native_bridge_BridgeEvents">BridgeEvents</a>&gt;(@aptos_framework);
 
