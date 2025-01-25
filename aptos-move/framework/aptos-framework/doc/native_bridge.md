@@ -35,6 +35,7 @@
 -  [Function `mint`](#0x1_native_bridge_mint)
 -  [Function `burn_from`](#0x1_native_bridge_burn_from)
 -  [Function `burn`](#0x1_native_bridge_burn)
+-  [Function `burn_internal`](#0x1_native_bridge_burn_internal)
 -  [Function `initiate_bridge_transfer`](#0x1_native_bridge_initiate_bridge_transfer)
 -  [Function `complete_bridge_transfer`](#0x1_native_bridge_complete_bridge_transfer)
 -  [Function `charge_bridge_fee`](#0x1_native_bridge_charge_bridge_fee)
@@ -1148,7 +1149,7 @@ Burns a specified amount of AptosCoin from an address.
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn_from">burn_from</a>(core_resource: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, from: <b>address</b>, amount: u64) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_AptosCoinBurnCapability">AptosCoinBurnCapability</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_core_resource">system_addresses::assert_core_resource</a>(core_resource);
-    <a href="coin.md#0x1_coin_burn_from">coin::burn_from</a>(from, amount, &<b>borrow_global</b>&lt;<a href="native_bridge.md#0x1_native_bridge_AptosCoinBurnCapability">AptosCoinBurnCapability</a>&gt;(@aptos_framework).burn_cap);
+    <a href="native_bridge.md#0x1_native_bridge_burn">burn</a>(from, amount);
 }
 </code></pre>
 
@@ -1179,6 +1180,34 @@ Burns a specified amount of AptosCoin from an address.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn">burn</a>(from: <b>address</b>, amount: u64) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_AptosCoinBurnCapability">AptosCoinBurnCapability</a> {
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_abort_native_bridge_enabled">features::abort_native_bridge_enabled</a>(), <a href="native_bridge.md#0x1_native_bridge_ENATIVE_BRIDGE_NOT_ENABLED">ENATIVE_BRIDGE_NOT_ENABLED</a>);
 
+    <a href="coin.md#0x1_coin_burn_from">coin::burn_from</a>(
+        from,
+        amount,
+        &<b>borrow_global</b>&lt;<a href="native_bridge.md#0x1_native_bridge_AptosCoinBurnCapability">AptosCoinBurnCapability</a>&gt;(@aptos_framework).burn_cap,
+    );
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_native_bridge_burn_internal"></a>
+
+## Function `burn_internal`
+
+
+
+<pre><code><b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn_internal">burn_internal</a>(from: <b>address</b>, amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn_internal">burn_internal</a>(from: <b>address</b>, amount: u64) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_AptosCoinBurnCapability">AptosCoinBurnCapability</a> {
     <a href="coin.md#0x1_coin_burn_from">coin::burn_from</a>(
         from,
         amount,
