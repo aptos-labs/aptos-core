@@ -15,15 +15,27 @@ pub const NUM_PEERS_PER_RETRY: usize = 3;
 pub const RETRY_INTERVAL_MSEC: u64 = 500;
 pub const RPC_TIMEOUT_MSEC: u64 = 5000;
 
-/// RPC to get a chain of block of the given length starting from the given block id.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct BlockRetrievalRequest {
+pub enum BlockRetrievalRequest {
+    V1(BlockRetrievalRequestV1),
+    V2(BlockRetrievalRequestV2),
+}
+
+/// RPC to get a chain of block of the given length starting from the given block id.
+/// TODO @bchocho @hariria fix comment after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
+/// NOTE: The [`BlockRetrievalRequest`](BlockRetrievalRequest) struct is being renamed to
+/// [`BlockRetrievalRequestV1`](BlockRetrievalRequestV1) and deprecated in favor of a
+/// [`BlockRetrievalRequest`](BlockRetrievalRequest) enum
+///
+/// Going forward, please use the [`BlockRetrievalRequest`](BlockRetrievalRequest) enum
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct BlockRetrievalRequestV1 {
     block_id: HashValue,
     num_blocks: u64,
     target_block_id: Option<HashValue>,
 }
 
-impl BlockRetrievalRequest {
+impl BlockRetrievalRequestV1 {
     pub fn new(block_id: HashValue, num_blocks: u64) -> Self {
         Self {
             block_id,
@@ -61,13 +73,62 @@ impl BlockRetrievalRequest {
     }
 }
 
-impl fmt::Display for BlockRetrievalRequest {
+impl fmt::Display for BlockRetrievalRequestV1 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
             "[BlockRetrievalRequest starting from id {} with {} blocks]",
             self.block_id, self.num_blocks
         )
+    }
+}
+
+/// RPC to get a chain of block of the given length starting from the given block id.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct BlockRetrievalRequestV2 {
+    block_id: HashValue,
+    num_blocks: u64,
+    // TODO: remove the Option, if it's not too painful
+    target_epoch_and_round: Option<(u64, u64)>,
+}
+
+impl BlockRetrievalRequestV2 {
+    pub fn new(block_id: HashValue, num_blocks: u64) -> Self {
+        BlockRetrievalRequestV2 {
+            block_id,
+            num_blocks,
+            target_epoch_and_round: None,
+        }
+    }
+
+    pub fn new_with_target_round(
+        block_id: HashValue,
+        num_blocks: u64,
+        target_epoch: u64,
+        target_round: u64,
+    ) -> Self {
+        BlockRetrievalRequestV2 {
+            block_id,
+            num_blocks,
+            target_epoch_and_round: Some((target_epoch, target_round)),
+        }
+    }
+
+    pub fn block_id(&self) -> HashValue {
+        self.block_id
+    }
+
+    pub fn num_blocks(&self) -> u64 {
+        self.num_blocks
+    }
+
+    pub fn target_epoch_and_round(&self) -> Option<(u64, u64)> {
+        self.target_epoch_and_round
+    }
+
+    pub fn match_target_round(&self, epoch: u64, round: u64) -> bool {
+        self.target_epoch_and_round()
+            .map_or(false, |target| (epoch, round) <= target)
     }
 }
 
@@ -105,7 +166,7 @@ impl BlockRetrievalResponse {
 
     pub fn verify(
         &self,
-        retrieval_request: BlockRetrievalRequest,
+        retrieval_request: BlockRetrievalRequestV1,
         sig_verifier: &ValidatorVerifier,
     ) -> anyhow::Result<()> {
         ensure!(

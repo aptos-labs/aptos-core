@@ -23,7 +23,7 @@ use anyhow::{anyhow, bail, ensure};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::{
-    block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
+    block_retrieval::{BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalResponse},
     common::Author,
     order_vote_msg::OrderVoteMsg,
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
@@ -92,10 +92,24 @@ impl RpcResponder {
     }
 }
 
+/// NOTE: The [`IncomingBlockRetrievalRequest`](IncomingBlockRetrievalRequest) struct is being
+/// deprecated in favor of [`IncomingBlockRetrievalRequestV2`](IncomingBlockRetrievalRequestV2) which
+/// supports the new [`BlockRetrievalRequest`](BlockRetrievalRequest) enum for the `req` field
+///
+/// Going forward, please use [`IncomingBlockRetrievalRequestV2`](IncomingBlockRetrievalRequestV2)
+/// For more details, see comments above [`BlockRetrievalRequestV1`](BlockRetrievalRequestV1)
+/// TODO @bchocho @hariria can remove after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
+#[derive(Debug)]
+pub struct IncomingBlockRetrievalRequest {
+    pub req: BlockRetrievalRequestV1,
+    pub protocol: ProtocolId,
+    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+}
+
 /// The block retrieval request is used internally for implementing RPC: the callback is executed
 /// for carrying the response
 #[derive(Debug)]
-pub struct IncomingBlockRetrievalRequest {
+pub struct IncomingBlockRetrievalRequestV2 {
     pub req: BlockRetrievalRequest,
     pub protocol: ProtocolId,
     pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
@@ -132,21 +146,26 @@ pub struct IncomingRandGenRequest {
 
 #[derive(Debug)]
 pub enum IncomingRpcRequest {
-    BlockRetrieval(IncomingBlockRetrievalRequest),
+    /// NOTE: This is being phased out in two releases to accommodate `IncomingBlockRetrievalRequestV2`
+    /// TODO @bchocho @hariria can remove after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
+    DeprecatedBlockRetrieval(IncomingBlockRetrievalRequest),
     BatchRetrieval(IncomingBatchRetrievalRequest),
     DAGRequest(IncomingDAGRequest),
     CommitRequest(IncomingCommitRequest),
     RandGenRequest(IncomingRandGenRequest),
+    BlockRetrievalV2(IncomingBlockRetrievalRequestV2),
 }
 
 impl IncomingRpcRequest {
+    /// TODO @bchocho @hariria can remove after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
     pub fn epoch(&self) -> Option<u64> {
         match self {
             IncomingRpcRequest::BatchRetrieval(req) => Some(req.req.epoch()),
             IncomingRpcRequest::DAGRequest(req) => Some(req.req.epoch()),
             IncomingRpcRequest::RandGenRequest(req) => Some(req.req.epoch()),
             IncomingRpcRequest::CommitRequest(req) => req.req.epoch(),
-            IncomingRpcRequest::BlockRetrieval(_) => None,
+            IncomingRpcRequest::DeprecatedBlockRetrieval(_) => None,
+            IncomingRpcRequest::BlockRetrievalV2(_) => None,
         }
     }
 }
@@ -223,7 +242,7 @@ impl NetworkSender {
     /// returns a future that is fulfilled with BlockRetrievalResponse.
     pub async fn request_block(
         &self,
-        retrieval_request: BlockRetrievalRequest,
+        retrieval_request: BlockRetrievalRequestV1,
         from: Author,
         timeout: Duration,
     ) -> anyhow::Result<BlockRetrievalResponse> {
@@ -812,11 +831,13 @@ impl NetworkTask {
                                 "{}",
                                 request
                             );
-                            IncomingRpcRequest::BlockRetrieval(IncomingBlockRetrievalRequest {
-                                req: *request,
-                                protocol,
-                                response_sender: callback,
-                            })
+                            IncomingRpcRequest::DeprecatedBlockRetrieval(
+                                IncomingBlockRetrievalRequest {
+                                    req: *request,
+                                    protocol,
+                                    response_sender: callback,
+                                },
+                            )
                         },
                         ConsensusMsg::BatchRequestMsg(request) => {
                             debug!(

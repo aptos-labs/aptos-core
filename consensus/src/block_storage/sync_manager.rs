@@ -27,7 +27,7 @@ use anyhow::{anyhow, bail, Context};
 use aptos_consensus_types::{
     block::Block,
     block_retrieval::{
-        BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus, NUM_PEERS_PER_RETRY,
+        BlockRetrievalRequestV1, BlockRetrievalResponse, BlockRetrievalStatus, NUM_PEERS_PER_RETRY,
         NUM_RETRIES, RETRY_INTERVAL_MSEC, RPC_TIMEOUT_MSEC,
     },
     common::Author,
@@ -576,7 +576,7 @@ impl BlockRetriever {
                     .boxed(),
                 )
             }
-            let request = BlockRetrievalRequest::new_with_target_block_id(
+            let request = BlockRetrievalRequestV1::new_with_target_block_id(
                 block_id,
                 retrieve_batch_size,
                 target_block_id,

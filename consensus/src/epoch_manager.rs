@@ -31,8 +31,9 @@ use crate::{
     metrics_safety_rules::MetricsSafetyRules,
     monitor,
     network::{
-        IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest, IncomingDAGRequest,
-        IncomingRandGenRequest, IncomingRpcRequest, NetworkReceivers, NetworkSender,
+        IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest,
+        IncomingBlockRetrievalRequestV2, IncomingDAGRequest, IncomingRandGenRequest,
+        IncomingRpcRequest, NetworkReceivers, NetworkSender,
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::{
@@ -59,6 +60,7 @@ use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{ConsensusConfig, DagConsensusConfig, ExecutionConfig, NodeConfig};
 use aptos_consensus_types::{
+    block_retrieval::{BlockRetrievalRequest, BlockRetrievalRequestV1},
     common::{Author, Round},
     epoch_retrieval::EpochRetrievalRequest,
     proof_of_store::ProofCache,
@@ -1666,6 +1668,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
     }
 
+    /// TODO: @bchocho @hariria can change after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
     fn process_rpc_request(
         &mut self,
         peer_id: Author,
@@ -1684,13 +1687,19 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 return Ok(());
             },
             None => {
-                ensure!(matches!(request, IncomingRpcRequest::BlockRetrieval(_)));
+                // TODO: @bchocho @hariria can change after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
+                ensure!(matches!(
+                    request,
+                    IncomingRpcRequest::DeprecatedBlockRetrieval(_)
+                        | IncomingRpcRequest::BlockRetrievalV2(_)
+                ));
             },
             _ => {},
         }
 
         match request {
-            IncomingRpcRequest::BlockRetrieval(request) => {
+            // TODO @bchocho @hariria can remove after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
+            IncomingRpcRequest::DeprecatedBlockRetrieval(request) => {
                 if let Some(tx) = &self.block_retrieval_tx {
                     tx.push(peer_id, request)
                 } else {
@@ -1720,6 +1729,29 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     tx.push(peer_id, request)
                 } else {
                     bail!("Rand manager not started");
+                }
+            },
+            IncomingRpcRequest::BlockRetrievalV2(IncomingBlockRetrievalRequestV2 {
+                req,
+                protocol,
+                response_sender,
+            }) => {
+                if let Some(tx) = &self.block_retrieval_tx {
+                    let checked_request: BlockRetrievalRequestV1 = match req {
+                        BlockRetrievalRequest::V1(v1) => v1,
+                        // TODO @bchocho @hariria implement after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
+                        BlockRetrievalRequest::V2(_) => {
+                            unimplemented!("Should not have received a BlockRetrievalRequestV2...")
+                        },
+                    };
+                    tx.push(peer_id, IncomingBlockRetrievalRequest {
+                        req: checked_request,
+                        protocol,
+                        response_sender,
+                    })
+                } else {
+                    error!("Round manager not started");
+                    Ok(())
                 }
             },
         }
