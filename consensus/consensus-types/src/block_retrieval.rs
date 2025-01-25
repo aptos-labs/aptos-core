@@ -88,29 +88,23 @@ impl fmt::Display for BlockRetrievalRequestV1 {
 pub struct BlockRetrievalRequestV2 {
     block_id: HashValue,
     num_blocks: u64,
-    // TODO: remove the Option, if it's not too painful
-    target_epoch_and_round: Option<(u64, u64)>,
+    target_round: u64,
 }
 
 impl BlockRetrievalRequestV2 {
-    pub fn new(block_id: HashValue, num_blocks: u64) -> Self {
+    pub fn new(block_id: HashValue, num_blocks: u64, target_round: u64) -> Self {
         BlockRetrievalRequestV2 {
             block_id,
             num_blocks,
-            target_epoch_and_round: None,
+            target_round,
         }
     }
 
-    pub fn new_with_target_round(
-        block_id: HashValue,
-        num_blocks: u64,
-        target_epoch: u64,
-        target_round: u64,
-    ) -> Self {
+    pub fn new_with_target_round(block_id: HashValue, num_blocks: u64, target_round: u64) -> Self {
         BlockRetrievalRequestV2 {
             block_id,
             num_blocks,
-            target_epoch_and_round: Some((target_epoch, target_round)),
+            target_round,
         }
     }
 
@@ -122,13 +116,12 @@ impl BlockRetrievalRequestV2 {
         self.num_blocks
     }
 
-    pub fn target_epoch_and_round(&self) -> Option<(u64, u64)> {
-        self.target_epoch_and_round
+    pub fn target_round(&self) -> u64 {
+        self.target_round
     }
 
-    pub fn match_target_round(&self, epoch: u64, round: u64) -> bool {
-        self.target_epoch_and_round()
-            .map_or(false, |target| (epoch, round) <= target)
+    pub fn match_target_round(&self, round: u64) -> bool {
+        round <= self.target_round()
     }
 }
 

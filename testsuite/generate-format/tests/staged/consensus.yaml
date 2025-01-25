@@ -269,6 +269,16 @@ BlockMetadataWithRandomness:
         OPTION:
           TYPENAME: Randomness
 BlockRetrievalRequest:
+  ENUM:
+    0:
+      V1:
+        NEWTYPE:
+          TYPENAME: BlockRetrievalRequestV1
+    1:
+      V2:
+        NEWTYPE:
+          TYPENAME: BlockRetrievalRequestV2
+BlockRetrievalRequestV1:
   STRUCT:
     - block_id:
         TYPENAME: HashValue
@@ -276,6 +286,12 @@ BlockRetrievalRequest:
     - target_block_id:
         OPTION:
           TYPENAME: HashValue
+BlockRetrievalRequestV2:
+  STRUCT:
+    - block_id:
+        TYPENAME: HashValue
+    - num_blocks: U64
+    - target_round: U64
 BlockRetrievalResponse:
   STRUCT:
     - status:
@@ -362,7 +378,7 @@ ConsensusMsg:
     0:
       BlockRetrievalRequest:
         NEWTYPE:
-          TYPENAME: BlockRetrievalRequest
+          TYPENAME: BlockRetrievalRequestV1
     1:
       BlockRetrievalResponse:
         NEWTYPE:
@@ -439,6 +455,10 @@ ConsensusMsg:
       RoundTimeoutMsg:
         NEWTYPE:
           TYPENAME: RoundTimeoutMsg
+    20:
+      BlockRetrievalRequestV2:
+        NEWTYPE:
+          TYPENAME: BlockRetrievalRequest
 ContractEvent:
   ENUM:
     0:
