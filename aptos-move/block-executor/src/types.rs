@@ -29,6 +29,10 @@ impl<T: Transaction> ReadWriteSummary<T> {
         !self.reads.is_disjoint(&previous.writes)
     }
 
+    pub fn find_conflicts<'a>(&'a self, previous: &'a Self) -> HashSet<&InputOutputKey<T::Key, T::Tag>> {
+        self.reads.intersection(&previous.writes).collect::<HashSet<_>>()
+    }
+
     pub fn collapse_resource_group_conflicts(self) -> Self {
         let collapse = |k: InputOutputKey<T::Key, T::Tag>| match k {
             InputOutputKey::Resource(k) => InputOutputKey::Resource(k),

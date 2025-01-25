@@ -52,6 +52,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
             let txn_read_write_summary = txn_read_write_summary.expect(
                 "txn_read_write_summary needs to be computed if conflict_penalty_window is set",
             );
+            // println!("Transaction read/write sets: {:?}", txn_read_write_summary);
             self.txn_read_write_summaries.push(
                 if self
                     .block_gas_limit_type
@@ -181,9 +182,11 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         let current = &self.txn_read_write_summaries[end];
         for prev in &self.txn_read_write_summaries[start..end] {
             if current.conflicts_with_previous(prev) {
+                println!("Conflicts with previous: {:?}", current.find_conflicts(prev));
                 conflict_count += 1;
             }
         }
+        println!("Number of conflicts: {} out of {}", conflict_count, conflict_overlap_length);
         assert_le!(conflict_count + 1, conflict_overlap_length);
         (conflict_count + 1) as u64
     }
