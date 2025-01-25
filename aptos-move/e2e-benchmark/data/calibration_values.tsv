@@ -23,7 +23,7 @@ CoinInitAndMint	59	0.952	1.127	222.3
 FungibleAssetMint	59	0.941	1.125	240.8
 IncGlobalMilestoneAggV2 { milestone_every: 1 }	59	0.908	1.151	34.6
 IncGlobalMilestoneAggV2 { milestone_every: 2 }	59	0.904	1.131	19.7
-EmitEvents { count: 1000 }	59	0.959	1.197	9093.8
+EmitEvents { count: 1000 }	59	0.959	1.197	10093.8
 APTTransferWithPermissionedSigner	34	0.946	1.091	1068.0
 APTTransferWithMasterSigner	34	0.946	1.091	185.0
 VectorTrimAppend { vec_len: 3000, element_len: 1, index: 0, repeats: 0 }	59	0.937	1.134	6387.1
