@@ -18,7 +18,8 @@
 use crate::{file_format::*, file_format_common::*};
 use anyhow::{anyhow, bail, Result};
 use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, metadata::Metadata,
+    ability::AbilitySet, account_address::AccountAddress, function::ClosureMask,
+    identifier::Identifier, metadata::Metadata,
 };
 
 impl CompiledScript {

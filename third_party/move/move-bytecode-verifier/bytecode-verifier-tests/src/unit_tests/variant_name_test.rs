@@ -3,9 +3,9 @@
 
 use move_binary_format::{
     file_format::{
-        AbilitySet, AddressIdentifierIndex, FieldDefinition, IdentifierIndex, ModuleHandle,
-        ModuleHandleIndex, Signature, SignatureToken, StructDefinition, StructFieldInformation,
-        StructHandle, StructHandleIndex, StructTypeParameter, TypeSignature, VariantDefinition,
+        AddressIdentifierIndex, FieldDefinition, IdentifierIndex, ModuleHandle, ModuleHandleIndex,
+        Signature, SignatureToken, StructDefinition, StructFieldInformation, StructHandle,
+        StructHandleIndex, StructTypeParameter, TypeSignature, VariantDefinition,
     },
     file_format_common::VERSION_7,
     CompiledModule,
@@ -13,7 +13,7 @@ use move_binary_format::{
 use move_bytecode_verifier::{
     verifier::verify_module_with_config_for_test_with_version, VerifierConfig,
 };
-use move_core_types::{identifier::Identifier, vm_status::StatusCode};
+use move_core_types::{ability::AbilitySet, identifier::Identifier, vm_status::StatusCode};
 
 /// Tests whether the name of a variant is in bounds. (That is, the IdentifierIndex
 /// is in bounds of the identifier table.)

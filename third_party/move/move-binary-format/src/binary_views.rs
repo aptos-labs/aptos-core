@@ -7,19 +7,20 @@ use crate::{
     control_flow_graph::VMControlFlowGraph,
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        AbilitySet, AddressIdentifierIndex, CodeUnit, CompiledScript, Constant, ConstantPoolIndex,
-        FieldHandle, FieldHandleIndex, FieldInstantiation, FieldInstantiationIndex,
-        FunctionDefinition, FunctionDefinitionIndex, FunctionHandle, FunctionHandleIndex,
-        FunctionInstantiation, FunctionInstantiationIndex, IdentifierIndex, ModuleHandle,
-        ModuleHandleIndex, Signature, SignatureIndex, SignatureToken, StructDefInstantiation,
-        StructDefInstantiationIndex, StructDefinition, StructDefinitionIndex, StructHandle,
-        StructHandleIndex, StructVariantHandle, StructVariantHandleIndex,
-        StructVariantInstantiation, StructVariantInstantiationIndex, VariantFieldHandle,
-        VariantFieldHandleIndex, VariantFieldInstantiation, VariantFieldInstantiationIndex,
+        AddressIdentifierIndex, CodeUnit, CompiledScript, Constant, ConstantPoolIndex, FieldHandle,
+        FieldHandleIndex, FieldInstantiation, FieldInstantiationIndex, FunctionDefinition,
+        FunctionDefinitionIndex, FunctionHandle, FunctionHandleIndex, FunctionInstantiation,
+        FunctionInstantiationIndex, IdentifierIndex, ModuleHandle, ModuleHandleIndex, Signature,
+        SignatureIndex, SignatureToken, StructDefInstantiation, StructDefInstantiationIndex,
+        StructDefinition, StructDefinitionIndex, StructHandle, StructHandleIndex,
+        StructVariantHandle, StructVariantHandleIndex, StructVariantInstantiation,
+        StructVariantInstantiationIndex, VariantFieldHandle, VariantFieldHandleIndex,
+        VariantFieldInstantiation, VariantFieldInstantiationIndex,
     },
     CompiledModule,
 };
 use move_core_types::{
+    ability::AbilitySet,
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::ModuleId,
@@ -342,7 +343,11 @@ impl<'a> BinaryIndexedView<'a> {
             TypeParameter(idx) => Ok(constraints[*idx as usize]),
             Vector(ty) => AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
                 self.abilities(ty, constraints)?,
-            ]),
+            ])
+            .map_err(|e| {
+                PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION)
+                    .with_message(e.to_string())
+            }),
             Function(_, _, abilities) => Ok(*abilities),
             Struct(idx) => {
                 let sh = self.struct_handle_at(*idx);
@@ -360,6 +365,10 @@ impl<'a> BinaryIndexedView<'a> {
                     sh.type_parameters.iter().map(|param| param.is_phantom),
                     type_arguments,
                 )
+                .map_err(|e| {
+                    PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION)
+                        .with_message(e.to_string())
+                })
             },
         }
     }

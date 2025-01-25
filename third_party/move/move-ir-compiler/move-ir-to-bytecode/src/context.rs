@@ -6,7 +6,7 @@ use anyhow::{bail, format_err, Result};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
-        AbilitySet, AddressIdentifierIndex, CodeOffset, Constant, ConstantPoolIndex, FieldHandle,
+        AddressIdentifierIndex, CodeOffset, Constant, ConstantPoolIndex, FieldHandle,
         FieldHandleIndex, FieldInstantiation, FieldInstantiationIndex, FunctionDefinitionIndex,
         FunctionHandle, FunctionHandleIndex, FunctionInstantiation, FunctionInstantiationIndex,
         FunctionSignature, IdentifierIndex, ModuleHandle, ModuleHandleIndex, Signature,
@@ -17,6 +17,7 @@ use move_binary_format::{
 };
 use move_bytecode_source_map::source_map::SourceMap;
 use move_core_types::{
+    ability::AbilitySet,
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
 };

@@ -9,10 +9,10 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     control_flow_graph::{ControlFlowGraph, VMControlFlowGraph},
     file_format::{
-        Ability, AbilitySet, Bytecode, CodeUnit, FieldDefinition, FunctionDefinition,
-        FunctionDefinitionIndex, FunctionHandle, ModuleHandle, Signature, SignatureIndex,
-        SignatureToken, StructDefinition, StructDefinitionIndex, StructFieldInformation,
-        StructTypeParameter, StructVariantHandleIndex, TableIndex, VariantIndex, Visibility,
+        Bytecode, CodeUnit, FieldDefinition, FunctionDefinition, FunctionDefinitionIndex,
+        FunctionHandle, ModuleHandle, Signature, SignatureIndex, SignatureToken, StructDefinition,
+        StructDefinitionIndex, StructFieldInformation, StructTypeParameter,
+        StructVariantHandleIndex, TableIndex, VariantIndex, Visibility,
     },
     views::FieldOrVariantIndex,
 };
@@ -21,7 +21,12 @@ use move_bytecode_source_map::{
     source_map::{FunctionSourceMap, SourceName, StructSourceMap},
 };
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule, NamedCompiledScript};
-use move_core_types::{ident_str, identifier::IdentStr, language_storage::ModuleId};
+use move_core_types::{
+    ability::{Ability, AbilitySet},
+    ident_str,
+    identifier::IdentStr,
+    language_storage::ModuleId,
+};
 use move_coverage::coverage_map::{ExecCoverageMap, FunctionCoverage};
 use move_ir_types::location::Loc;
 use std::collections::HashMap;

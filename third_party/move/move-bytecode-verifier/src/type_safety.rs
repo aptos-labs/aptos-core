@@ -11,15 +11,18 @@ use move_binary_format::{
     control_flow_graph::ControlFlowGraph,
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        Ability, AbilitySet, Bytecode, ClosureMask, CodeOffset, FunctionDefinitionIndex,
-        FunctionHandle, FunctionHandleIndex, LocalIndex, Signature, SignatureToken,
-        SignatureToken as ST, StructDefinition, StructDefinitionIndex, StructFieldInformation,
-        StructHandleIndex, VariantIndex, Visibility,
+        Bytecode, CodeOffset, FunctionDefinitionIndex, FunctionHandle, FunctionHandleIndex,
+        LocalIndex, Signature, SignatureToken, SignatureToken as ST, StructDefinition,
+        StructDefinitionIndex, StructFieldInformation, StructHandleIndex, VariantIndex, Visibility,
     },
     safe_assert, safe_unwrap,
     views::FieldOrVariantIndex,
 };
-use move_core_types::vm_status::StatusCode;
+use move_core_types::{
+    ability::{Ability, AbilitySet},
+    function::ClosureMask,
+    vm_status::StatusCode,
+};
 
 struct Locals<'a> {
     param_count: usize,
@@ -397,7 +400,7 @@ fn clos_pack(
         .extract(&param_sgn.0, false)
         .into_iter()
         .cloned()
-        .collect();
+        .collect::<Vec<_>>();
     let ret_sign = verifier.resolver.signature_at(func_handle.return_);
     verifier.push(
         meter,

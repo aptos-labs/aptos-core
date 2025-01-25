@@ -9,18 +9,17 @@ use crate::{
         PartialVMError, PartialVMResult,
     },
     file_format::{
-        AbilitySet, Bytecode, CodeOffset, CodeUnit, CompiledModule, CompiledScript, Constant,
-        FieldDefinition, FieldHandle, FieldInstantiation, FunctionDefinition,
-        FunctionDefinitionIndex, FunctionHandle, FunctionInstantiation, LocalIndex, ModuleHandle,
-        Signature, SignatureIndex, SignatureToken, StructDefInstantiation, StructDefinition,
-        StructFieldInformation, StructHandle, StructVariantHandle, StructVariantInstantiation,
-        TableIndex, TypeParameterIndex, VariantFieldHandle, VariantFieldInstantiation,
-        VariantIndex,
+        Bytecode, CodeOffset, CodeUnit, CompiledModule, CompiledScript, Constant, FieldDefinition,
+        FieldHandle, FieldInstantiation, FunctionDefinition, FunctionDefinitionIndex,
+        FunctionHandle, FunctionInstantiation, LocalIndex, ModuleHandle, Signature, SignatureIndex,
+        SignatureToken, StructDefInstantiation, StructDefinition, StructFieldInformation,
+        StructHandle, StructVariantHandle, StructVariantInstantiation, TableIndex,
+        TypeParameterIndex, VariantFieldHandle, VariantFieldInstantiation, VariantIndex,
     },
     internals::ModuleIndex,
     IndexKind,
 };
-use move_core_types::vm_status::StatusCode;
+use move_core_types::{ability::AbilitySet, vm_status::StatusCode};
 use std::{
     cell::RefCell,
     collections::{btree_map, BTreeMap},

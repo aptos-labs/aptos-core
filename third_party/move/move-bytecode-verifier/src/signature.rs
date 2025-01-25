@@ -10,14 +10,14 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        AbilitySet, Bytecode, CodeUnit, CompiledModule, CompiledScript, FieldDefinition,
-        FunctionDefinition, FunctionHandle, Signature, SignatureIndex, SignatureToken,
-        StructDefinition, StructFieldInformation, StructTypeParameter, TableIndex,
+        Bytecode, CodeUnit, CompiledModule, CompiledScript, FieldDefinition, FunctionDefinition,
+        FunctionHandle, Signature, SignatureIndex, SignatureToken, StructDefinition,
+        StructFieldInformation, StructTypeParameter, TableIndex,
     },
     file_format_common::VERSION_6,
     IndexKind,
 };
-use move_core_types::vm_status::StatusCode;
+use move_core_types::{ability::AbilitySet, vm_status::StatusCode};
 
 pub struct SignatureChecker<'a> {
     resolver: BinaryIndexedView<'a>,

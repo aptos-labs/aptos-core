@@ -29,7 +29,7 @@ use crate::{
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use move_binary_format::file_format::{self, Ability, AbilitySet};
+use move_binary_format::file_format::{self};
 use move_compiler::{
     expansion::ast::{self as EA, Exp_},
     hlir::ast as HA,
@@ -37,7 +37,11 @@ use move_compiler::{
     parser::ast::{self as PA, CallKind, Field},
     shared::{unique_map::UniqueMap, Identifier, Name},
 };
-use move_core_types::{account_address::AccountAddress, value::MoveValue};
+use move_core_types::{
+    ability::{Ability, AbilitySet},
+    account_address::AccountAddress,
+    value::MoveValue,
+};
 use move_ir_types::{
     location::{sp, Spanned},
     sp,
