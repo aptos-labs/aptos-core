@@ -1,8 +1,16 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_experimental_layered_map::{LayeredMap, MapLayer};
+use aptos_schemadb::{
+    batch::WriteBatch,
+    define_schema,
+    schema::{KeyCodec, ValueCodec},
+    DB, DEFAULT_COLUMN_FAMILY_NAME,
+};
+use aptos_temppath::TempPath;
 use criterion::{
     criterion_group, criterion_main, measurement::WallTime, BatchSize, BenchmarkGroup, Criterion,
 };
@@ -20,6 +28,33 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 type Key = u128;
 type Value = HashValue;
+
+define_schema!(DbMap, Key, Value, DEFAULT_COLUMN_FAMILY_NAME);
+
+impl KeyCodec<DbMap> for Key {
+    fn encode_key(&self) -> Result<Vec<u8>> {
+        Ok(self.to_be_bytes().to_vec())
+    }
+
+    fn decode_key(data: &[u8]) -> Result<Self> {
+        assert_eq!(data.len(), 16);
+
+        let mut buffer = [0u8; 16];
+        buffer.copy_from_slice(data);
+        Ok(Self::from_be_bytes(buffer))
+    }
+}
+
+impl ValueCodec<DbMap> for Value {
+    fn encode_value(&self) -> Result<Vec<u8>> {
+        Ok(self.to_vec())
+    }
+
+    fn decode_value(data: &[u8]) -> Result<Self> {
+        assert_eq!(data.len(), 32);
+        Ok(Self::from_slice(data)?)
+    }
+}
 
 const K: usize = 1024;
 
@@ -175,6 +210,62 @@ fn get(
             BatchSize::SmallInput,
         )
     });
+
+    let name = format!("rocksdb_{map_size_k}k_items");
+    let map: OnceCell<DB> = OnceCell::new();
+    let keys: OnceCell<Vec<Key>> = OnceCell::new();
+    group.bench_function(&name, |b| {
+        b.iter_batched(
+            || {
+                let (items, keys_) =
+                    gen_get(batch_cache, keys_cache, map_size_k, n_keys_to_get, existing);
+                let keys = keys.get_or_init(|| keys_.clone());
+                let map = map.get_or_init(|| {
+                    println!();
+                    println!("    Opening rocksdb.");
+                    let mut db_path = TempPath::new();
+                    db_path.persist(); // leak the temp dir
+
+                    let mut options = rocksdb::Options::default();
+                    options.create_if_missing(true);
+
+                    let db = DB::open(
+                        &db_path,
+                        "bench",
+                        vec![DEFAULT_COLUMN_FAMILY_NAME],
+                        &options,
+                    )
+                    .unwrap();
+
+                    items.iter().chunks(1_000_000).into_iter().for_each(|kvs| {
+                        println!("    Inserting.");
+                        let mut batch = db.new_native_batch();
+                        kvs.for_each(|(key, value)| batch.put::<DbMap>(key, value).unwrap());
+                        db.write_schemas(batch).unwrap();
+                    });
+
+                    println!("    Flushing to mem-tables.");
+                    db.flush_cf(DEFAULT_COLUMN_FAMILY_NAME).unwrap();
+
+                    println!("    Preheat all keys to be queried.");
+                    keys.iter().for_each(|key| {
+                        db.get::<DbMap>(key).unwrap();
+                    });
+
+                    println!("    RocksDB ready.");
+                    db
+                });
+
+                (map, keys)
+            },
+            |(map, keys)| {
+                keys.iter()
+                    .map(|key| map.get::<DbMap>(key).unwrap())
+                    .collect_vec()
+            },
+            BatchSize::SmallInput,
+        )
+    });
 }
 
 type KeysCache = HashMap<usize, HashMap<bool, Vec<Key>>>;
@@ -217,7 +308,7 @@ fn compare_maps(c: &mut Criterion) {
 
     {
         let mut group = c.benchmark_group("get_existing");
-        for map_size_k in [100, 1000, 128_000] {
+        for map_size_k in [100, 1000, 4_000, 16_000, 128_000] {
             get(
                 &mut group,
                 &mut batch_cache,
@@ -230,7 +321,7 @@ fn compare_maps(c: &mut Criterion) {
 
     {
         let mut group = c.benchmark_group("get_non_existing");
-        for map_size_k in [100, 1000, 128_000] {
+        for map_size_k in [100, 1000, 4_000, 16_000, 128_000] {
             get(
                 &mut group,
                 &mut batch_cache,

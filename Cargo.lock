@@ -1644,10 +1644,13 @@ name = "aptos-experimental-layered-map"
 version = "0.1.0"
 dependencies = [
  "ahash 0.8.11",
+ "anyhow",
  "aptos-crypto",
  "aptos-drop-helper",
  "aptos-infallible",
  "aptos-metrics-core",
+ "aptos-schemadb",
+ "aptos-temppath",
  "bitvec 1.0.1",
  "criterion",
  "itertools 0.13.0",
@@ -1655,6 +1658,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "rand 0.7.3",
+ "rocksdb",
 ]
 
 [[package]]
