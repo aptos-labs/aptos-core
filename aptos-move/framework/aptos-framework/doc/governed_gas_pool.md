@@ -4,14 +4,6 @@
 # Module `0x1::governed_gas_pool`
 
 
-MIP-52: https://github.com/movementlabsxyz/MIP/pull/52
-
-The Governed Gas Pool is a pool into which and when enabled all gas fees are deposited.
-
-Non-view methods herein are only intended to be called by the aptos_framework, hence via a governance proposal.
-
-The implementation provided is based on Aptos Lab's Delegation Pool implementation: https://github.com/aptos-labs/aptos-core/blob/7e0aaa2ad12759f6afd6bac04bc55c2ea8046676/aptos-move/framework/aptos-framework/sources/delegation_pool.move#L4
-
 
 -  [Resource `GovernedGasPool`](#0x1_governed_gas_pool_GovernedGasPool)
 -  [Constants](#@Constants_0)
@@ -25,6 +17,12 @@ The implementation provided is based on Aptos Lab's Delegation Pool implementati
 -  [Function `deposit_from`](#0x1_governed_gas_pool_deposit_from)
 -  [Function `deposit_from_fungible_store`](#0x1_governed_gas_pool_deposit_from_fungible_store)
 -  [Function `deposit_gas_fee`](#0x1_governed_gas_pool_deposit_gas_fee)
+-  [Function `get_balance`](#0x1_governed_gas_pool_get_balance)
+-  [Specification](#@Specification_1)
+    -  [Function `initialize`](#@Specification_1_initialize)
+    -  [Function `fund`](#@Specification_1_fund)
+    -  [Function `deposit`](#@Specification_1_deposit)
+    -  [Function `deposit_gas_fee`](#@Specification_1_deposit_gas_fee)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -163,6 +161,8 @@ Initializes the governed gas pool around a resource account creation seed.
     aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     delegation_pool_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ) {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+
     // generate a seed <b>to</b> be used <b>to</b> create the resource <a href="account.md#0x1_account">account</a> hosting the delegation pool
     <b>let</b> seed = <a href="governed_gas_pool.md#0x1_governed_gas_pool_create_resource_account_seed">create_resource_account_seed</a>(delegation_pool_creation_seed);
 
@@ -198,7 +198,7 @@ Borrows the signer of the governed gas pool.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_governed_gas_signer">governed_gas_signer</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>  <b>acquires</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPool">GovernedGasPool</a> {
+<pre><code><b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_governed_gas_signer">governed_gas_signer</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPool">GovernedGasPool</a> {
     <b>let</b> signer_cap = &<b>borrow_global</b>&lt;<a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPool">GovernedGasPool</a>&gt;(@aptos_framework).signer_capability;
     create_signer_with_capability(signer_cap)
 }
@@ -212,11 +212,10 @@ Borrows the signer of the governed gas pool.
 
 ## Function `governed_gas_pool_address`
 
-Gets the address of the governed gas pool.
-@return The address of the governed gas pool.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_governed_gas_pool_address">governed_gas_pool_address</a>(): <b>address</b>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_governed_gas_pool_address">governed_gas_pool_address</a>(): <b>address</b>
 </code></pre>
 
 
@@ -394,6 +393,111 @@ Deposits gas fees into the governed gas pool.
 
 
 </details>
+
+<a id="0x1_governed_gas_pool_get_balance"></a>
+
+## Function `get_balance`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_get_balance">get_balance</a>&lt;CoinType&gt;(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_get_balance">get_balance</a>&lt;CoinType&gt;(): u64 <b>acquires</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPool">GovernedGasPool</a> {
+    <b>let</b> pool_address = <a href="governed_gas_pool.md#0x1_governed_gas_pool_governed_gas_pool_address">governed_gas_pool_address</a>();
+    <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;CoinType&gt;(pool_address)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<b>invariant</b> <b>exists</b>&lt;<a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPool">GovernedGasPool</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
+<a id="@Specification_1_initialize"></a>
+
+### Function `initialize`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, delegation_pool_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>requires</b> <a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework));
+// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<b>ensures</b> <b>exists</b>&lt;<a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPool">GovernedGasPool</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
+<a id="@Specification_1_fund"></a>
+
+### Function `fund`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_fund">fund</a>&lt;CoinType&gt;(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial = <b>true</b>;
+// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
+<b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework));
+</code></pre>
+
+
+Abort if the governed gas pool has insufficient funds
+
+
+<pre><code><b>aborts_with</b> <a href="coin.md#0x1_coin_EINSUFFICIENT_BALANCE">coin::EINSUFFICIENT_BALANCE</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(EINSUFFICIENT_BALANCE), 0x1, 0x5, 0x7;
+</code></pre>
+
+
+
+<a id="@Specification_1_deposit"></a>
+
+### Function `deposit`
+
+
+<pre><code><b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit">deposit</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial = <b>true</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_deposit_gas_fee"></a>
+
+### Function `deposit_gas_fee`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit_gas_fee">deposit_gas_fee</a>(gas_payer: <b>address</b>, gas_fee: u64)
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

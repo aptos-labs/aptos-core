@@ -12,6 +12,7 @@
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_genesis_initialize)
 -  [Function `initialize_aptos_coin`](#0x1_genesis_initialize_aptos_coin)
+-  [Function `initialize_governed_gas_pool`](#0x1_genesis_initialize_governed_gas_pool)
 -  [Function `initialize_core_resources_and_aptos_coin`](#0x1_genesis_initialize_core_resources_and_aptos_coin)
 -  [Function `create_accounts`](#0x1_genesis_create_accounts)
 -  [Function `create_account`](#0x1_genesis_create_account)
@@ -53,6 +54,7 @@
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
 <b>use</b> <a href="gas_schedule.md#0x1_gas_schedule">0x1::gas_schedule</a>;
+<b>use</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool">0x1::governed_gas_pool</a>;
 <b>use</b> <a href="native_bridge.md#0x1_native_bridge">0x1::native_bridge</a>;
 <b>use</b> <a href="native_bridge.md#0x1_native_bridge_core">0x1::native_bridge_core</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
@@ -410,6 +412,33 @@ Genesis step 2: Initialize Aptos coin.
     <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_burn_cap">transaction_fee::store_aptos_coin_burn_cap</a>(aptos_framework, burn_cap);
     // Give <a href="transaction_fee.md#0x1_transaction_fee">transaction_fee</a> <b>module</b> MintCapability&lt;AptosCoin&gt; so it can mint refunds.
     <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_mint_cap">transaction_fee::store_aptos_coin_mint_cap</a>(aptos_framework, mint_cap);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_genesis_initialize_governed_gas_pool"></a>
+
+## Function `initialize_governed_gas_pool`
+
+
+
+<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize_governed_gas_pool">initialize_governed_gas_pool</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, delegation_pool_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize_governed_gas_pool">initialize_governed_gas_pool</a>(
+    aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    delegation_pool_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+) {
+    <a href="governed_gas_pool.md#0x1_governed_gas_pool_initialize">governed_gas_pool::initialize</a>(aptos_framework, delegation_pool_creation_seed);
 }
 </code></pre>
 
