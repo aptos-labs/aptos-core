@@ -126,7 +126,12 @@ spec aptos_framework::genesis {
         include aptos_coin::ExistsAptosCoin;
     }
 
+    spec initialize_validator {
+        pragma verify = false;
+    }
+
     spec create_initialize_validator {
+        pragma verify = false;
         include stake::ResourceRequirement;
     }
 
