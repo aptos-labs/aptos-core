@@ -215,7 +215,7 @@ fun m::main() {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 32.m {
 
 

@@ -264,7 +264,7 @@ fun fields::write_val($t0: 0x42::fields::S): 0x42::fields::S {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 42.fields {
 struct T has drop {
 	h: u64

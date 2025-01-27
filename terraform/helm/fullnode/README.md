@@ -12,8 +12,11 @@
 | backup.config.azure.account | string | `nil` |  |
 | backup.config.azure.container | string | `nil` |  |
 | backup.config.azure.sas | string | `nil` |  |
+| backup.config.concurrent_data_requests | string | `nil` | Number of concurrent requests to the PFN backup port |
 | backup.config.gcs.bucket | string | `nil` |  |
 | backup.config.location | string | `nil` | Which of the below backup configurations to use |
+| backup.config.r2.bucket | string | `nil` |  |
+| backup.config.r2.endpoint_url | string | `nil` |  |
 | backup.config.s3.bucket | string | `nil` |  |
 | backup.config.state_snapshot_interval_epochs | int | `2` | State snapshot interval epochs |
 | backup.config.transaction_batch_size | int | `1000000` | Transaction batch size |
@@ -22,10 +25,10 @@
 | backup.image.repo | string | `"aptoslabs/tools"` | Image repo to use for backup images |
 | backup.image.tag | string | `nil` | Image tag to use for backup images |
 | backup.nodeSelector | object | `{}` |  |
-| backup.resources.limits.cpu | int | `4` |  |
+| backup.resources.limits.cpu | int | `6` |  |
 | backup.resources.limits.memory | string | `"8Gi"` |  |
 | backup.resources.requests.cpu | int | `4` |  |
-| backup.resources.requests.memory | string | `"8Gi"` |  |
+| backup.resources.requests.memory | string | `"4Gi"` |  |
 | backup.tolerations | list | `[]` |  |
 | backup_compaction.affinity | object | `{}` |  |
 | backup_compaction.nodeSelector | object | `{}` |  |
@@ -36,11 +39,12 @@
 | backup_compaction.schedule | string | `"@daily"` | The schedule for backup compaction |
 | backup_compaction.tolerations | list | `[]` |  |
 | backup_verify.affinity | object | `{}` |  |
+| backup_verify.config.concurrent_downloads | int | `50` |  |
 | backup_verify.nodeSelector | object | `{}` |  |
-| backup_verify.resources.limits.cpu | int | `8` |  |
-| backup_verify.resources.limits.memory | string | `"32Gi"` |  |
-| backup_verify.resources.requests.cpu | int | `4` |  |
-| backup_verify.resources.requests.memory | string | `"16Gi"` |  |
+| backup_verify.resources.limits.cpu | int | `32` |  |
+| backup_verify.resources.limits.memory | string | `"60Gi"` |  |
+| backup_verify.resources.requests.cpu | int | `8` |  |
+| backup_verify.resources.requests.memory | string | `"8Gi"` |  |
 | backup_verify.schedule | string | `"@daily"` | The schedule for backup verification |
 | backup_verify.tolerations | list | `[]` |  |
 | chain.era | int | `1` | Bump this number to wipe the underlying storage |
@@ -61,10 +65,10 @@
 | manageImages | bool | `true` | If true, helm will always override the deployed image with what is configured in the helm values. If not, helm will take the latest image from the currently running workloads, which is useful if you have a separate procedure to update images (e.g. rollout) |
 | metrics.destination | string | `"dev"` | The upstream sink for metrics. Supported values are "dev" and "prod" |
 | nodeSelector | object | `{}` |  |
-| resources.limits.cpu | int | `14` |  |
-| resources.limits.memory | string | `"56Gi"` |  |
-| resources.requests.cpu | int | `14` |  |
-| resources.requests.memory | string | `"56Gi"` |  |
+| resources.limits.cpu | int | `30` |  |
+| resources.limits.memory | string | `"60Gi"` |  |
+| resources.requests.cpu | int | `30` |  |
+| resources.requests.memory | string | `"60Gi"` |  |
 | restore.affinity | object | `{}` |  |
 | restore.config.azure.account | string | `nil` |  |
 | restore.config.azure.container | string | `nil` |  |

@@ -175,7 +175,7 @@ fun pack_unpack::pack6($t0: u8, $t1: u8, $t2: u8): 0x42::pack_unpack::S {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 42.pack_unpack {
 struct S {
 	f1: u8,

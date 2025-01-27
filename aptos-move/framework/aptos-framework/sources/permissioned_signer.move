@@ -240,7 +240,7 @@ module aptos_framework::permissioned_signer {
         move_to(
             &create_signer(permissions_storage_addr),
             // Each key is ~100bytes, the value is 12 bytes.
-            PermissionStorage::V1 { perms: big_ordered_map::new_with_config(40, 35, false, 0) }
+            PermissionStorage::V1 { perms: big_ordered_map::new_with_config(40, 35, false) }
         );
     }
 

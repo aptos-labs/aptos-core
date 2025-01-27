@@ -190,7 +190,10 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     Ok(combined_args)
 }
 
-// Return whether the argument is valid/allowed and whether it needs construction.
+/// Returns true if the argument is valid (that is, it is a primitive type or a struct with a
+/// known constructor function). Otherwise, (for structs without constructors, signers or
+/// references) returns false. An error is returned in cases when a struct type is encountered and
+/// its name cannot be queried for some reason.
 pub(crate) fn is_valid_txn_arg(
     session: &SessionExt,
     module_storage: &impl AptosModuleStorage,
@@ -202,12 +205,21 @@ pub(crate) fn is_valid_txn_arg(
     match ty {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
         Vector(inner) => is_valid_txn_arg(session, module_storage, inner, allowed_structs),
-        Struct { idx, .. } | StructInstantiation { idx, .. } => session
-            .fetch_struct_ty_by_idx(*idx, module_storage)
-            .is_some_and(|st| {
-                let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
-                allowed_structs.contains_key(&full_name)
-            }),
+        Struct { .. } | StructInstantiation { .. } => {
+            // Note: Original behavior was to return false even if the module loading fails (e.g.,
+            //       if struct does not exist. This preserves it.
+            session
+                .get_struct_name(ty, module_storage)
+                .ok()
+                .flatten()
+                .is_some_and(|(module_id, identifier)| {
+                    allowed_structs.contains_key(&format!(
+                        "{}::{}",
+                        module_id.short_str_lossless(),
+                        identifier
+                    ))
+                })
+        },
         Signer | Reference(_) | MutableReference(_) | TyParam(_) => false,
     }
 }
@@ -340,12 +352,16 @@ pub(crate) fn recursively_construct_arg(
                 len -= 1;
             }
         },
-        Struct { idx, .. } | StructInstantiation { idx, .. } => {
-            let st = session
-                .fetch_struct_ty_by_idx(*idx, module_storage)
+        Struct { .. } | StructInstantiation { .. } => {
+            let (module_id, identifier) = session
+                .get_struct_name(ty, module_storage)
+                .map_err(|_| {
+                    // Note: The original behaviour was to map all errors to an invalid signature
+                    //       error, here we want to preserve it for now.
+                    invalid_signature()
+                })?
                 .ok_or_else(invalid_signature)?;
-
-            let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
+            let full_name = format!("{}::{}", module_id.short_str_lossless(), identifier);
             let constructor = allowed_structs
                 .get(&full_name)
                 .ok_or_else(invalid_signature)?;

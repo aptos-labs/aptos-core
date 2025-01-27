@@ -75,7 +75,7 @@ fun M::t0_u128() {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 8675309.M {
 struct R<Ty0: key> {
 	r: Ty0

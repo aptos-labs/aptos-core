@@ -5,8 +5,10 @@
 use crate::{
     loader::{LegacyModuleStorageAdapter, Loader},
     logging::expect_no_verification_errors,
-    storage::module_storage::FunctionValueExtensionAdapter,
-    ModuleStorage,
+    storage::{
+        module_storage::FunctionValueExtensionAdapter, ty_layout_converter::LoaderLayoutConverter,
+    },
+    LayoutConverter, ModuleStorage,
 };
 use bytes::Bytes;
 use move_binary_format::{
@@ -229,8 +231,9 @@ impl<'r> TransactionDataCache<'r> {
                 },
             };
             // TODO(Gas): Shall we charge for this?
-            let (ty_layout, has_aggregator_lifting) = loader
-                .type_to_type_layout_with_identifier_mappings(ty, module_store, module_storage)?;
+            let (ty_layout, has_aggregator_lifting) =
+                LoaderLayoutConverter::new(loader, module_store, module_storage)
+                    .type_to_type_layout_with_identifier_mappings(ty)?;
 
             let (data, bytes_loaded) = match loader {
                 Loader::V1(_) => {

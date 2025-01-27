@@ -303,7 +303,7 @@ fun m::g<#0>($t0: &mut vector<#0>) {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 
 

@@ -68,7 +68,7 @@ public fun m::test($t0: &signer, $t1: 0xc0ffee::m::S) {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 struct S has drop {
 	a: u64,

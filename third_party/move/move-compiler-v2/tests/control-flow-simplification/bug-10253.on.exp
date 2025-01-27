@@ -240,7 +240,7 @@ fun vectors::test_guess_without_break() {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module cafe.vectors {
 
 

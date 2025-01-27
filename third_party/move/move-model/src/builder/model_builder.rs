@@ -21,9 +21,9 @@ use crate::{
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use move_binary_format::file_format::{AbilitySet, Visibility};
+use move_binary_format::file_format::Visibility;
 use move_compiler::{expansion::ast as EA, parser::ast as PA, shared::NumericalAddress};
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{ability::AbilitySet, account_address::AccountAddress};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// A builder is used to enter a sequence of modules in acyclic dependency order into the model. The

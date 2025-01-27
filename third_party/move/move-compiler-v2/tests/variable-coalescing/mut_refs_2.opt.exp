@@ -139,7 +139,7 @@ fun m::test($t0: 0xc0ffee::m::S): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 struct S has copy, drop {
 	a: u64,

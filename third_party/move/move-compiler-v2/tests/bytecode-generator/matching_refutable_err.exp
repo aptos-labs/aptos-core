@@ -41,7 +41,7 @@ fun m::t($t0: 0x815::m::E): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 815.m {
 enum E {
  None{

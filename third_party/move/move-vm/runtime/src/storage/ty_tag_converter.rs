@@ -7,7 +7,7 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     vm_status::StatusCode,
 };
-use move_vm_types::loaded_data::runtime_types::{StructNameIndex, Type};
+use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndex};
 use parking_lot::RwLock;
 use std::collections::{hash_map::Entry, HashMap};
 
@@ -103,13 +103,13 @@ impl TypeTagCache {
 
 /// Responsible for building type tags, while also doing the metering in order to bound space and
 /// time complexity.
-pub(crate) struct TypeTagBuilder<'a> {
+pub(crate) struct TypeTagConverter<'a> {
     /// Stores caches for struct names and tags, as well as pseudo-gas metering configs.
     runtime_environment: &'a RuntimeEnvironment,
 }
 
-impl<'a> TypeTagBuilder<'a> {
-    /// Creates a new builder for the specified environment and configs.
+impl<'a> TypeTagConverter<'a> {
+    /// Creates a new converter for the specified environment and configs.
     pub(crate) fn new(runtime_environment: &'a RuntimeEnvironment) -> Self {
         Self {
             runtime_environment,
@@ -225,9 +225,10 @@ mod tests {
     use super::*;
     use crate::config::VMConfig;
     use claims::{assert_err, assert_none, assert_ok, assert_ok_eq, assert_some};
-    use move_binary_format::file_format::{AbilitySet, StructTypeParameter};
+    use move_binary_format::file_format::StructTypeParameter;
     use move_core_types::{
-        account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+        ability::AbilitySet, account_address::AccountAddress, identifier::Identifier,
+        language_storage::ModuleId,
     };
     use move_vm_types::loaded_data::runtime_types::{
         AbilityInfo, StructIdentifier, StructLayout, StructType, TypeBuilder,
@@ -238,24 +239,26 @@ mod tests {
     fn test_type_tag_cache() {
         let cache = TypeTagCache::empty();
         assert!(cache.cache.read().is_empty());
-        assert!(cache.get_struct_tag(&StructNameIndex(0), &[]).is_none());
+        assert!(cache
+            .get_struct_tag(&StructNameIndex::new(0), &[])
+            .is_none());
 
         let tag = PricedStructTag {
             struct_tag: StructTag::from_str("0x1::foo::Foo").unwrap(),
             pseudo_gas_cost: 10,
         };
-        assert!(cache.insert_struct_tag(&StructNameIndex(0), &[], &tag));
+        assert!(cache.insert_struct_tag(&StructNameIndex::new(0), &[], &tag));
 
         let tag = PricedStructTag {
             struct_tag: StructTag::from_str("0x1::foo::Foo").unwrap(),
             // Set different cost to check.
             pseudo_gas_cost: 100,
         };
-        assert!(!cache.insert_struct_tag(&StructNameIndex(0), &[], &tag));
+        assert!(!cache.insert_struct_tag(&StructNameIndex::new(0), &[], &tag));
 
         assert_eq!(cache.cache.read().len(), 1);
         let cost = cache
-            .get_struct_tag(&StructNameIndex(0), &[])
+            .get_struct_tag(&StructNameIndex::new(0), &[])
             .unwrap()
             .pseudo_gas_cost;
         assert_eq!(cost, 10);
@@ -266,7 +269,7 @@ mod tests {
         let ty_builder = TypeBuilder::with_limits(10, 10);
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
-        let ty_tag_builder = TypeTagBuilder::new(&runtime_environment);
+        let ty_tag_converter = TypeTagConverter::new(&runtime_environment);
 
         let disallowed_tys = [
             Type::TyParam(0),
@@ -278,7 +281,7 @@ mod tests {
                 .unwrap(),
         ];
         for ty in disallowed_tys {
-            assert_err!(ty_tag_builder.ty_to_ty_tag(&ty));
+            assert_err!(ty_tag_converter.ty_to_ty_tag(&ty));
         }
 
         let allowed_primitive_tys = [
@@ -293,7 +296,7 @@ mod tests {
             (ty_builder.create_signer_ty(), TypeTag::Signer),
         ];
         for (ty, expected_tag) in allowed_primitive_tys {
-            let actual_tag = assert_ok!(ty_tag_builder.ty_to_ty_tag(&ty));
+            let actual_tag = assert_ok!(ty_tag_converter.ty_to_ty_tag(&ty));
             assert_eq!(actual_tag, expected_tag);
         }
 
@@ -303,7 +306,7 @@ mod tests {
             .unwrap();
         let bool_vec_tag = TypeTag::Vector(Box::new(TypeTag::Bool));
         assert_ok_eq!(
-            ty_tag_builder.ty_to_ty_tag(&bool_vec_ty),
+            ty_tag_converter.ty_to_ty_tag(&bool_vec_ty),
             bool_vec_tag.clone()
         );
 
@@ -327,7 +330,7 @@ mod tests {
             ty_builder.create_struct_ty(bar_idx, AbilityInfo::struct_(AbilitySet::EMPTY));
         let struct_tag = StructTag::from_str("0x1::foo::Bar").unwrap();
         assert_ok_eq!(
-            ty_tag_builder.ty_to_ty_tag(&struct_ty),
+            ty_tag_converter.ty_to_ty_tag(&struct_ty),
             TypeTag::Struct(Box::new(struct_tag))
         );
 
@@ -343,15 +346,13 @@ mod tests {
                 constraints: AbilitySet::EMPTY,
                 is_phantom: false,
             }],
-            name: Identifier::new("Foo").unwrap(),
-            module: ModuleId::new(AccountAddress::TWO, Identifier::new("foo").unwrap()),
         };
         let generic_struct_ty = ty_builder
             .create_struct_instantiation_ty(&struct_ty, &[Type::TyParam(0)], &[bool_vec_ty])
             .unwrap();
         let struct_tag = StructTag::from_str("0x2::foo::Foo<vector<bool>>").unwrap();
         assert_ok_eq!(
-            ty_tag_builder.ty_to_ty_tag(&generic_struct_ty),
+            ty_tag_converter.ty_to_ty_tag(&generic_struct_ty),
             TypeTag::Struct(Box::new(struct_tag))
         );
     }
@@ -366,19 +367,19 @@ mod tests {
             ..Default::default()
         };
         let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
-        let ty_tag_builder = TypeTagBuilder::new(&runtime_environment);
+        let ty_tag_converter = TypeTagConverter::new(&runtime_environment);
 
         let bool_ty = ty_builder.create_bool_ty();
-        assert_ok_eq!(ty_tag_builder.ty_to_ty_tag(&bool_ty), TypeTag::Bool);
+        assert_ok_eq!(ty_tag_converter.ty_to_ty_tag(&bool_ty), TypeTag::Bool);
 
         let vec_ty = ty_builder.create_vec_ty(&bool_ty).unwrap();
         assert_ok_eq!(
-            ty_tag_builder.ty_to_ty_tag(&vec_ty),
+            ty_tag_converter.ty_to_ty_tag(&vec_ty),
             TypeTag::Vector(Box::new(TypeTag::Bool))
         );
 
         let vec_ty = ty_builder.create_vec_ty(&vec_ty).unwrap();
-        let err = assert_err!(ty_tag_builder.ty_to_ty_tag(&vec_ty));
+        let err = assert_err!(ty_tag_converter.ty_to_ty_tag(&vec_ty));
         assert_eq!(err.major_status(), StatusCode::TYPE_TAG_LIMIT_EXCEEDED);
     }
 
@@ -392,7 +393,7 @@ mod tests {
             ..Default::default()
         };
         let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
-        let ty_tag_builder = TypeTagBuilder::new(&runtime_environment);
+        let ty_tag_converter = TypeTagConverter::new(&runtime_environment);
 
         let id = StructIdentifier {
             module: ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap()),
@@ -406,7 +407,7 @@ mod tests {
 
         let mut gas_context = PseudoGasContext::new(runtime_environment.vm_config());
         assert_ok_eq!(
-            ty_tag_builder.struct_name_idx_to_struct_tag_impl(&idx, &[], &mut gas_context),
+            ty_tag_converter.struct_name_idx_to_struct_tag_impl(&idx, &[], &mut gas_context),
             struct_tag.clone()
         );
 
@@ -429,7 +430,7 @@ mod tests {
         let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
         let mut gas_context = PseudoGasContext::new(runtime_environment.vm_config());
 
-        let err = assert_err!(ty_tag_builder.struct_name_idx_to_struct_tag_impl(
+        let err = assert_err!(ty_tag_converter.struct_name_idx_to_struct_tag_impl(
             &idx,
             &[],
             &mut gas_context

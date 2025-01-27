@@ -3,12 +3,15 @@
 
 use crate::{
     config::{IndexerGrpcManagerConfig, ServiceConfig},
+    data_manager::DataManager,
+    file_store_uploader::FileStoreUploader,
     metadata_manager::MetadataManager,
     service::GrpcManagerService,
 };
 use anyhow::Result;
 use aptos_protos::indexer::v1::grpc_manager_server::GrpcManagerServer;
 use std::{sync::Arc, time::Duration};
+use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, transport::Server};
 use tracing::info;
 
@@ -17,12 +20,30 @@ const HTTP2_PING_TIMEOUT_DURATION: Duration = Duration::from_secs(10);
 
 pub(crate) struct GrpcManager {
     chain_id: u64,
+    file_store_uploader: Mutex<FileStoreUploader>,
     metadata_manager: Arc<MetadataManager>,
+    data_manager: Arc<DataManager>,
+    is_master: bool,
 }
 
 impl GrpcManager {
     pub(crate) async fn new(config: &IndexerGrpcManagerConfig) -> Self {
         let chain_id = config.chain_id;
+        let file_store_uploader = Mutex::new(
+            FileStoreUploader::new(chain_id, config.file_store_config.clone())
+                .await
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "Failed to create filestore uploader, config: {:?}, error: {e:?}",
+                        config.file_store_config
+                    )
+                }),
+        );
+
+        info!(
+            chain_id = chain_id,
+            "FilestoreUploader is created, config: {:?}.", config.file_store_config
+        );
 
         let metadata_manager = Arc::new(MetadataManager::new(
             chain_id,
@@ -38,9 +59,24 @@ impl GrpcManager {
             config.fullnode_addresses
         );
 
+        let data_manager = Arc::new(
+            DataManager::new(
+                chain_id,
+                config.file_store_config.clone(),
+                config.cache_config.clone(),
+                metadata_manager.clone(),
+            )
+            .await,
+        );
+
+        info!("DataManager is created.");
+
         Self {
             chain_id,
+            file_store_uploader,
             metadata_manager,
+            data_manager,
+            is_master: config.is_master,
         }
     }
 
@@ -48,6 +84,7 @@ impl GrpcManager {
         let service = GrpcManagerServer::new(GrpcManagerService::new(
             self.chain_id,
             self.metadata_manager.clone(),
+            self.data_manager.clone(),
         ))
         .send_compressed(CompressionEncoding::Zstd)
         .accept_compressed(CompressionEncoding::Zstd);
@@ -60,6 +97,19 @@ impl GrpcManager {
             s.spawn(async move {
                 self.metadata_manager.start().await.unwrap();
             });
+            s.spawn(async move { self.data_manager.start().await });
+            if self.is_master {
+                s.spawn(async move {
+                    self.file_store_uploader
+                        .lock()
+                        .await
+                        .start(self.data_manager.clone())
+                        .await
+                        .unwrap();
+                });
+            } else {
+                // TODO(grao): Start a task to periodically update the file store version.
+            }
             s.spawn(async move {
                 info!("Starting GrpcManager at {}.", service_config.listen_address);
                 server.serve(service_config.listen_address).await.unwrap();

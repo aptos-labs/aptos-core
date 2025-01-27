@@ -20,6 +20,7 @@ hashbrown = { workspace = true }
 itertools = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
+parking_lot = { workspace = true }
 proptest = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive", "rc"] }
 sha3 = { workspace = true }

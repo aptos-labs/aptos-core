@@ -20,8 +20,11 @@ aptos-protos = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }
 dashmap = { workspace = true }
+futures = { workspace = true }
+prost = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 tokio = { workspace = true }
 tokio-scoped = { workspace = true }
 tonic = { workspace = true }
@@ -29,6 +32,7 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 aptos-config = { workspace = true }
+serde_json = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 jemallocator = { workspace = true }

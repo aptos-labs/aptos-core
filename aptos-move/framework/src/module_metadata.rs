@@ -11,12 +11,13 @@ use lru::LruCache;
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
-        Ability, AbilitySet, CompiledScript, FunctionDefinition, FunctionHandle, IdentifierIndex,
-        SignatureToken, StructDefinition, StructFieldInformation, StructHandle, TableIndex,
+        CompiledScript, FunctionDefinition, FunctionHandle, IdentifierIndex, SignatureToken,
+        StructDefinition, StructFieldInformation, StructHandle, TableIndex,
     },
     CompiledModule,
 };
 use move_core_types::{
+    ability::{Ability, AbilitySet},
     errmap::ErrorDescription,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},

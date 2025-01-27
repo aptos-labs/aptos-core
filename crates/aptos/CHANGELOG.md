@@ -4,6 +4,9 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+## [6.0.2] - 2025/01/24
+- Fix `aptos workspace run` so it does not panic when writing to closed stdout/stderr, allowing it to finish its graceful shutdown sequence when used as a child process.
+
 ## [6.0.1] - 2025/01/17
 - Update Hasura metadata to include `entry_function_contract_address`, `entry_function_module_name`, and `entry_function_function_name` in `user_transactions` table.
 

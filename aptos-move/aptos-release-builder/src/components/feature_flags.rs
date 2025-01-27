@@ -137,6 +137,7 @@ pub enum FeatureFlag {
     EnableCallTreeAndInstructionVMCache,
     PermissionedSigner,
     AccountAbstraction,
+    VMBinaryFormatV8,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -229,6 +230,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::AptosStdChainIdNatives => AptosFeatureFlag::APTOS_STD_CHAIN_ID_NATIVES,
             FeatureFlag::VMBinaryFormatV6 => AptosFeatureFlag::VM_BINARY_FORMAT_V6,
             FeatureFlag::VMBinaryFormatV7 => AptosFeatureFlag::VM_BINARY_FORMAT_V7,
+            FeatureFlag::VMBinaryFormatV8 => AptosFeatureFlag::VM_BINARY_FORMAT_V8,
             FeatureFlag::MultiEd25519PkValidateV2Natives => {
                 AptosFeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES
             },
@@ -384,6 +386,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::APTOS_STD_CHAIN_ID_NATIVES => FeatureFlag::AptosStdChainIdNatives,
             AptosFeatureFlag::VM_BINARY_FORMAT_V6 => FeatureFlag::VMBinaryFormatV6,
             AptosFeatureFlag::VM_BINARY_FORMAT_V7 => FeatureFlag::VMBinaryFormatV7,
+            AptosFeatureFlag::VM_BINARY_FORMAT_V8 => FeatureFlag::VMBinaryFormatV8,
             AptosFeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES => {
                 FeatureFlag::MultiEd25519PkValidateV2Natives
             },

@@ -56,7 +56,7 @@ fun m::test_common_access(): u8 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 815.m {
 enum Positional has drop {
  A{

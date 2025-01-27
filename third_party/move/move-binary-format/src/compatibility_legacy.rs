@@ -7,12 +7,12 @@
 use crate::{
     compatibility,
     errors::{PartialVMError, PartialVMResult},
-    file_format::{AbilitySet, StructTypeParameter, Visibility},
+    file_format::{StructTypeParameter, Visibility},
     file_format_common::VERSION_5,
     normalized::Module,
 };
 use compatibility::Compatibility;
-use move_core_types::vm_status::StatusCode;
+use move_core_types::{ability::AbilitySet, vm_status::StatusCode};
 use std::collections::BTreeSet;
 
 impl Compatibility {
