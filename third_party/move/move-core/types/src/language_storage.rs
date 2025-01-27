@@ -180,7 +180,7 @@ impl FromStr for TypeTag {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 #[cfg_attr(
-    feature = "fuzzing",
+    any(test, feature = "fuzzing"),
     derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
 )]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
@@ -267,7 +267,7 @@ impl FromStr for StructTag {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 #[cfg_attr(
-    feature = "fuzzing",
+    any(test, feature = "fuzzing"),
     derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
 )]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
@@ -306,7 +306,7 @@ impl ResourceKey {
 /// the struct tag. The struct fields are public to support pattern matching.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 #[cfg_attr(
-    feature = "fuzzing",
+    any(test, feature = "fuzzing"),
     derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
 )]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
