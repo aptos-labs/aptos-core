@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{change_set::WriteOpInfo, resolver::ExecutorView};
+use crate::change_set::WriteOpInfo;
 use aptos_types::{
     state_store::state_key::StateKey,
     write_set::{TransactionWrite, WriteOp, WriteOpSize},
@@ -11,7 +11,6 @@ use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
     vm_status::StatusCode,
 };
-use move_vm_runtime::ModuleStorage;
 use std::collections::BTreeMap;
 
 /// A write with a published module, also containing the information about its address and name.
@@ -105,24 +104,20 @@ impl ModuleWriteSet {
             .map(|(k, v)| (k, v.write_op().write_op_size()))
     }
 
-    pub fn write_op_info_iter_mut<'a>(
-        &'a mut self,
-        executor_view: &'a dyn ExecutorView,
-        module_storage: &'a impl ModuleStorage,
-    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
+    pub fn write_op_info_iter_mut(&mut self) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
         self.writes.iter_mut().map(move |(key, write)| {
-            let prev_size = if module_storage.is_enabled() {
-                module_storage
-                    .fetch_module_size_in_bytes(write.module_address(), write.module_name())
-                    .map_err(|e| e.to_partial())?
-                    .unwrap_or(0) as u64
-            } else {
-                executor_view.get_module_state_value_size(key)?.unwrap_or(0)
-            };
+            // let prev_size = if module_storage.is_enabled() {
+            //     module_storage
+            //         .fetch_module_size_in_bytes(write.module_address(), write.module_name())
+            //         .map_err(|e| e.to_partial())?
+            //         .unwrap_or(0) as u64
+            // } else {
+            //     executor_view.get_module_state_value_size(key)?.unwrap_or(0)
+            // };
             Ok(WriteOpInfo {
                 key,
                 op_size: write.write_op().write_op_size(),
-                prev_size,
+                prev_size: 0,
                 metadata_mut: write.write_op_mut().metadata_mut(),
             })
         })

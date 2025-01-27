@@ -6,9 +6,7 @@ use crate::{
         AbstractResourceWriteOp, GroupWrite, InPlaceDelayedFieldChangeOp,
         ResourceGroupInPlaceDelayedFieldChangeOp, WriteWithDelayedFieldsOp,
     },
-    module_and_script_storage::module_storage::AptosModuleStorage,
     module_write_set::{ModuleWrite, ModuleWriteSet},
-    resolver::ExecutorView,
 };
 use aptos_aggregator::{
     delayed_change::DelayedChange,
@@ -848,10 +846,10 @@ pub trait ChangeSetInterface {
 
     fn events_iter(&self) -> impl Iterator<Item = &ContractEvent>;
 
-    fn write_op_info_iter_mut<'a>(
-        &'a mut self,
-        executor_view: &'a dyn ExecutorView,
-        module_storage: &'a impl AptosModuleStorage,
+    fn write_op_info_iter_mut(
+        &mut self,
+        // executor_view: &'a dyn ExecutorView,
+        // module_storage: &'a impl AptosModuleStorage,
     ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>>;
 }
 
@@ -873,16 +871,12 @@ impl ChangeSetInterface for VMChangeSet {
             )
     }
 
-    fn write_op_info_iter_mut<'a>(
-        &'a mut self,
-        executor_view: &'a dyn ExecutorView,
-        _module_storage: &'a impl AptosModuleStorage,
-    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
+    fn write_op_info_iter_mut(&mut self) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
         let resources = self.resource_write_set.iter_mut().map(|(key, op)| {
             Ok(WriteOpInfo {
                 key,
                 op_size: op.materialized_size(),
-                prev_size: op.prev_materialized_size(key, executor_view)?,
+                prev_size: 0, //op.prev_materialized_size(key, executor_view)?,
                 metadata_mut: op.metadata_mut(),
             })
         });
@@ -890,9 +884,9 @@ impl ChangeSetInterface for VMChangeSet {
             Ok(WriteOpInfo {
                 key,
                 op_size: op.write_op_size(),
-                prev_size: executor_view
-                    .get_aggregator_v1_state_value_size(key)?
-                    .unwrap_or(0),
+                prev_size: 0, //executor_view
+                //.get_aggregator_v1_state_value_size(key)?
+                //.unwrap_or(0),
                 metadata_mut: op.metadata_mut(),
             })
         });
