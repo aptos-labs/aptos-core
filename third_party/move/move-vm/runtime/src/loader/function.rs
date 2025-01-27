@@ -8,8 +8,8 @@ use crate::{
         Resolver, Script,
     },
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
-    storage::ty_tag_converter::TypeTagConverter,
-    ModuleStorage,
+    storage::{module_storage, ty_tag_converter::TypeTagConverter},
+    LayoutConverter, ModuleStorage, StorageLayoutConverter,
 };
 use better_any::{Tid, TidAble, TidExt};
 use move_binary_format::{
@@ -83,11 +83,18 @@ pub(crate) struct LazyLoadedFunction(pub(crate) Rc<RefCell<LazyLoadedFunctionSta
 pub(crate) enum LazyLoadedFunctionState {
     Unresolved {
         data: SerializedFunctionData,
+        // If this function was previously attempted to resolve, but this failed,
+        // remember the error, so resolution is not attempted again.
         resolution_error: Option<PartialVMError>,
     },
     Resolved {
         fun: Rc<LoadedFunction>,
-        fun_inst: Vec<TypeTag>,
+        // For a resolved function, we need to store the type argument tags,
+        // even though we have the resolved `Type` for the arguments in `fun.ty_args`.
+        // This is needed so we can compare with deterministic results an unresolved and
+        // resolved function context free (i.e. wo/ converter from Type to TypeTag). For the
+        // unresolved case, the type argument tags are stored with the serialized data.
+        ty_args: Vec<TypeTag>,
         mask: ClosureMask,
     },
 }
@@ -106,17 +113,13 @@ impl LazyLoadedFunction {
         fun: Rc<LoadedFunction>,
         mask: ClosureMask,
     ) -> PartialVMResult<Self> {
-        let fun_inst = fun
+        let ty_args = fun
             .ty_args
             .iter()
             .map(|t| converter.ty_to_ty_tag(t))
             .collect::<PartialVMResult<Vec<_>>>()?;
         Ok(Self(Rc::new(RefCell::new(
-            LazyLoadedFunctionState::Resolved {
-                fun,
-                fun_inst,
-                mask,
-            },
+            LazyLoadedFunctionState::Resolved { fun, ty_args, mask },
         ))))
     }
 
@@ -130,7 +133,10 @@ impl LazyLoadedFunction {
 
     /// Access name components independent of resolution state. Since RefCell is in the play,
     /// the accessor is passed in as a function.
-    pub(crate) fn with_name_and_inst<T>(
+    ///
+    /// Notice if no module id is given to the action, the function being processed stems from
+    /// a script.
+    pub(crate) fn with_name_and_ty_args<T>(
         &self,
         action: impl FnOnce(Option<&ModuleId>, &IdentStr, &[TypeTag]) -> T,
     ) -> T {
@@ -140,13 +146,13 @@ impl LazyLoadedFunction {
                     SerializedFunctionData {
                         module_id,
                         fun_id,
-                        fun_inst,
+                        ty_args,
                         ..
                     },
                 ..
-            } => action(Some(module_id), fun_id, fun_inst),
-            LazyLoadedFunctionState::Resolved { fun, fun_inst, .. } => {
-                action(fun.module_id(), fun.name_id(), fun_inst)
+            } => action(Some(module_id), fun_id, ty_args),
+            LazyLoadedFunctionState::Resolved { fun, ty_args, .. } => {
+                action(fun.module_id(), fun.name_id(), ty_args)
             },
         }
     }
@@ -171,32 +177,27 @@ impl LazyLoadedFunction {
                     SerializedFunctionData {
                         module_id,
                         fun_id,
-                        fun_inst,
+                        ty_args,
                         mask,
                         captured_layouts,
                     },
                 resolution_error,
-            } => match Self::resolve(
-                storage,
-                module_id,
-                fun_id,
-                fun_inst,
-                *mask,
-                captured_layouts,
-            ) {
-                Ok(fun) => {
-                    let result = action(fun.clone());
-                    *state = LazyLoadedFunctionState::Resolved {
-                        fun,
-                        fun_inst: fun_inst.clone(),
-                        mask: *mask,
-                    };
-                    result
-                },
-                Err(e) => {
-                    *resolution_error = Some(e.clone());
-                    Err(e)
-                },
+            } => {
+                match Self::resolve(storage, module_id, fun_id, ty_args, *mask, captured_layouts) {
+                    Ok(fun) => {
+                        let result = action(fun.clone());
+                        *state = LazyLoadedFunctionState::Resolved {
+                            fun,
+                            ty_args: ty_args.clone(),
+                            mask: *mask,
+                        };
+                        result
+                    },
+                    Err(e) => {
+                        *resolution_error = Some(e.clone());
+                        Err(e)
+                    },
+                }
             },
         }
     }
@@ -207,52 +208,46 @@ impl LazyLoadedFunction {
         module_storage: &dyn ModuleStorage,
         module_id: &ModuleId,
         fun_id: &IdentStr,
-        fun_inst: &[TypeTag],
+        ty_args: &[TypeTag],
         mask: ClosureMask,
         captured_layouts: &[MoveTypeLayout],
     ) -> PartialVMResult<Rc<LoadedFunction>> {
         let (module, function) = module_storage
             .fetch_function_definition(module_id.address(), module_id.name(), fun_id)
             .map_err(|err| err.to_partial())?;
-        let ty_args = fun_inst
+        let ty_args = ty_args
             .iter()
             .map(|t| module_storage.fetch_ty(t))
             .collect::<PartialVMResult<Vec<_>>>()?;
+        Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)?;
 
-        // Verify that the function arguments match the types used for deserialization.
+        // Verify that the function argument types match the layouts used for deserialization.
         let captured_arg_types = mask.extract(function.param_tys(), true);
-        let converter = TypeTagConverter::new(module_storage.runtime_environment());
-        let mut ok = captured_arg_types.len() == captured_layouts.len();
-        if ok {
-            for (ty, layout) in captured_arg_types.into_iter().zip(captured_layouts) {
-                // Convert layout into TypeTag
-                let serialized_tag: TypeTag = layout.try_into().map_err(|_| {
-                    PartialVMError::new_invariant_violation(
-                        "unexpected type tag conversion failure",
-                    )
-                })?;
-                let arg_tag = converter.ty_to_ty_tag(ty)?;
-                if arg_tag != serialized_tag {
-                    ok = false;
-                    break;
-                }
+        let converter = StorageLayoutConverter::new(module_storage);
+        if captured_arg_types.len() != captured_layouts.len() {
+            return Err(
+                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(
+                    "captured argument count does not match declared parameters".to_string(),
+                ),
+            );
+        }
+        for (ty, layout) in captured_arg_types.into_iter().zip(captured_layouts) {
+            // Note that the below call returns a runtime layout, so we can directly
+            // compare it without desugaring.
+            let ty_layout = converter.type_to_type_layout(ty)?;
+            if &ty_layout != layout {
+                return Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                    .with_message(
+                        "stored captured argument layout does not match declared parameters"
+                            .to_string(),
+                    ));
             }
         }
-        if ok {
-            Ok(Rc::new(LoadedFunction {
-                owner: LoadedFunctionOwner::Module(module),
-                ty_args,
-                function,
-            }))
-        } else {
-            Err(
-                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(
-                    "inconsistency between types of serialized captured \
-                values and function parameter types"
-                        .to_string(),
-                ),
-            )
-        }
+        Ok(Rc::new(LoadedFunction {
+            owner: LoadedFunctionOwner::Module(module),
+            ty_args,
+            function,
+        }))
     }
 }
 
@@ -270,8 +265,8 @@ impl AbstractFunction for LazyLoadedFunction {
 
     fn cmp_dyn(&self, other: &dyn AbstractFunction) -> PartialVMResult<Ordering> {
         let other = LazyLoadedFunction::expect_this_impl(other)?;
-        self.with_name_and_inst(|mid1, fid1, inst1| {
-            other.with_name_and_inst(|mid2, fid2, inst2| {
+        self.with_name_and_ty_args(|mid1, fid1, inst1| {
+            other.with_name_and_ty_args(|mid2, fid2, inst2| {
                 Ok(mid1
                     .cmp(&mid2)
                     .then_with(|| fid1.cmp(fid2))
@@ -285,25 +280,25 @@ impl AbstractFunction for LazyLoadedFunction {
     }
 
     fn to_stable_string(&self) -> String {
-        self.with_name_and_inst(|module_id, fun_id, fun_inst| {
+        self.with_name_and_ty_args(|module_id, fun_id, ty_args| {
             let prefix = if let Some(m) = module_id {
                 format!("0x{}::{}::", m.address(), m.name())
             } else {
                 "".to_string()
             };
-            let fun_inst_str = if fun_inst.is_empty() {
+            let ty_args_str = if ty_args.is_empty() {
                 "".to_string()
             } else {
                 format!(
                     "<{}>",
-                    fun_inst
+                    ty_args
                         .iter()
                         .map(|t| t.to_canonical_string())
                         .collect::<Vec<_>>()
                         .join(",")
                 )
             };
-            format!("{}::{}:{}", prefix, fun_id, fun_inst_str)
+            format!("{}::{}:{}", prefix, fun_id, ty_args_str)
         })
     }
 }

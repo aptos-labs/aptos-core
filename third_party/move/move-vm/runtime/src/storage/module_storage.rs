@@ -463,11 +463,7 @@ impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
     ) -> PartialVMResult<SerializedFunctionData> {
         match &*LazyLoadedFunction::expect_this_impl(fun)?.0.borrow() {
             LazyLoadedFunctionState::Unresolved { data, .. } => Ok(data.clone()),
-            LazyLoadedFunctionState::Resolved {
-                fun,
-                mask,
-                fun_inst,
-            } => {
+            LazyLoadedFunctionState::Resolved { fun, mask, ty_args } => {
                 let ty_converter = StorageLayoutConverter::new(self.module_storage);
                 let ty_builder = &self
                     .module_storage
@@ -496,7 +492,7 @@ impl<'a> FunctionValueExtension for FunctionValueExtensionAdapter<'a> {
                         })?
                         .clone(),
                     fun_id: fun.function.name.clone(),
-                    fun_inst: fun_inst.clone(),
+                    ty_args: ty_args.clone(),
                     mask: *mask,
                     captured_layouts,
                 })

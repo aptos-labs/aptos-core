@@ -45,7 +45,7 @@ pub struct Closure(
 pub struct SerializedFunctionData {
     pub module_id: ModuleId,
     pub fun_id: Identifier,
-    pub fun_inst: Vec<TypeTag>,
+    pub ty_args: Vec<TypeTag>,
     pub mask: ClosureMask,
     /// The layouts used for deserialization of the captured arguments
     /// are stored so one can verify type consistency at
@@ -126,7 +126,7 @@ impl<'c, 'l, 'v> serde::Serialize
         let mut seq = serializer.serialize_seq(Some(4 + captured.len()))?;
         seq.serialize_element(&data.module_id)?;
         seq.serialize_element(&data.fun_id)?;
-        seq.serialize_element(&data.fun_inst)?;
+        seq.serialize_element(&data.ty_args)?;
         seq.serialize_element(&data.mask)?;
         for (layout, value) in data.captured_layouts.into_iter().zip(captured) {
             seq.serialize_element(&layout)?;
@@ -187,7 +187,7 @@ impl<'d, 'c, 'l> serde::de::Visitor<'d> for ClosureVisitor<'c, 'l> {
             .create_from_serialization_data(SerializedFunctionData {
                 module_id,
                 fun_id,
-                fun_inst,
+                ty_args: fun_inst,
                 mask,
                 captured_layouts,
             })
