@@ -28,7 +28,7 @@ use move_vm_types::{
     loaded_data::runtime_types::{Type, TypeBuilder},
     values::{GlobalValue, Value},
 };
-use std::borrow::Borrow;
+use std::{borrow::Borrow, collections::BTreeSet};
 
 pub struct Session<'r, 'l> {
     pub(crate) move_vm: &'l MoveVM,

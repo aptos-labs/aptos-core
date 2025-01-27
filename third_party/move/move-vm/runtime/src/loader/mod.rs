@@ -31,7 +31,10 @@ use move_core_types::{
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::runtime_types::{AbilityInfo, StructNameIndex, StructType, Type},
+    loaded_data::{
+        runtime_types::{AbilityInfo, StructType, Type},
+        struct_name_indexing::StructNameIndex,
+    },
     sha3_256,
     value_serde::FunctionValueExtension,
 };
@@ -54,8 +57,7 @@ use crate::{
     loader::modules::{StructVariantInfo, VariantFieldInfo},
     native_functions::NativeFunctions,
     storage::{
-        loader::LoaderV2, module_storage::FunctionValueExtensionAdapter,
-        struct_name_index_map::StructNameIndexMap, ty_cache::StructInfoCache,
+        loader::LoaderV2, module_storage::FunctionValueExtensionAdapter, ty_cache::StructInfoCache,
         ty_layout_converter::LoaderLayoutConverter, ty_tag_converter::TypeTagConverter,
     },
 };
@@ -67,10 +69,9 @@ use move_binary_format::file_format::{
     StructVariantHandleIndex, StructVariantInstantiationIndex, TypeParameterIndex,
     VariantFieldHandleIndex, VariantFieldInstantiationIndex, VariantIndex,
 };
-use move_vm_metrics::{Timer, VM_TIMER};
-use move_vm_types::{
-    loaded_data::runtime_types::{DepthFormula, StructLayout, TypeBuilder},
-    value_serde::FunctionValueExtension,
+use move_vm_types::loaded_data::{
+    runtime_types::{DepthFormula, StructLayout, TypeBuilder},
+    struct_name_indexing::StructNameIndexMap,
 };
 pub use script::Script;
 pub(crate) use script::ScriptCache;

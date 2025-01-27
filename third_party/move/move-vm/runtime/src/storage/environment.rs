@@ -6,7 +6,7 @@ use crate::{
     loader::check_natives,
     native_functions::{NativeFunction, NativeFunctions},
     storage::{
-        ty_cache::StructInfoCache, ty_tag_cache::TypeTagCache,
+        ty_cache::StructInfoCache, ty_tag_converter::TypeTagCache,
         verified_module_cache::VERIFIED_MODULES_V2,
     },
     Module, Script,
