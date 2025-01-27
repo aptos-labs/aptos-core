@@ -9,8 +9,8 @@ use crate::{
     module_traversal::TraversalContext,
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
-    storage::module_storage::ModuleStorage,
-    CodeStorage,
+    storage::{module_storage::ModuleStorage, ty_layout_converter::LoaderLayoutConverter},
+    CodeStorage, LayoutConverter,
 };
 use bytes::Bytes;
 use move_binary_format::{compatibility::Compatibility, errors::*, file_format::LocalIndex};
@@ -28,7 +28,7 @@ use move_vm_types::{
     loaded_data::runtime_types::{StructNameIndex, StructType, Type, TypeBuilder},
     values::{GlobalValue, Value},
 };
-use std::{borrow::Borrow, sync::Arc};
+use std::{borrow::Borrow, collections::BTreeSet, sync::Arc};
 
 pub struct Session<'r, 'l> {
     pub(crate) move_vm: &'l MoveVM,
@@ -487,11 +487,13 @@ impl<'r, 'l> Session<'r, 'l> {
         ty: &Type,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<MoveTypeLayout> {
-        self.move_vm
-            .runtime
-            .loader()
-            .type_to_type_layout(ty, &self.module_store, module_storage)
-            .map_err(|e| e.finish(Location::Undefined))
+        LoaderLayoutConverter::new(
+            self.move_vm.runtime.loader(),
+            &self.module_store,
+            module_storage,
+        )
+        .type_to_type_layout(ty)
+        .map_err(|e| e.finish(Location::Undefined))
     }
 
     pub fn get_fully_annotated_type_layout_from_ty(
@@ -499,11 +501,13 @@ impl<'r, 'l> Session<'r, 'l> {
         ty: &Type,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<MoveTypeLayout> {
-        self.move_vm
-            .runtime
-            .loader()
-            .type_to_fully_annotated_layout(ty, &self.module_store, module_storage)
-            .map_err(|e| e.finish(Location::Undefined))
+        LoaderLayoutConverter::new(
+            self.move_vm.runtime.loader(),
+            &self.module_store,
+            module_storage,
+        )
+        .type_to_fully_annotated_layout(ty)
+        .map_err(|e| e.finish(Location::Undefined))
     }
 
     /// Gets the underlying native extensions.
@@ -533,6 +537,34 @@ impl<'r, 'l> Session<'r, 'l> {
             .loader()
             .fetch_struct_ty_by_idx(idx, &self.module_store, module_storage)
             .ok()
+    }
+
+    pub fn check_type_tag_dependencies_and_charge_gas(
+        &mut self,
+        module_storage: &impl ModuleStorage,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+        ty_tags: &[TypeTag],
+    ) -> VMResult<()> {
+        // Charge gas based on the distinct ordered module ids.
+        let ordered_ty_tags = ty_tags
+            .iter()
+            .flat_map(|ty_tag| ty_tag.preorder_traversal_iter())
+            .filter_map(TypeTag::struct_tag)
+            .map(|struct_tag| {
+                let module_id = traversal_context
+                    .referenced_module_ids
+                    .alloc(struct_tag.module_id());
+                (module_id.address(), module_id.name())
+            })
+            .collect::<BTreeSet<_>>();
+
+        self.check_dependencies_and_charge_gas(
+            module_storage,
+            gas_meter,
+            traversal_context,
+            ordered_ty_tags,
+        )
     }
 
     pub fn check_dependencies_and_charge_gas<'a, I>(

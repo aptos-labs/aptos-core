@@ -2,10 +2,16 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+// The below is to deal with a strange problem with derive(Dearbitrary), which creates warnings
+// of unused variables in derived code which cannot be turned off by applying the attribute
+// just at the type in question. (Here, MoveStructLayout.)
+#![allow(unused_variables)]
+
 use crate::{
     account_address::AccountAddress,
+    ident_str,
     identifier::Identifier,
-    language_storage::{StructTag, TypeTag},
+    language_storage::{ModuleId, StructTag, TypeTag},
     u256,
 };
 use anyhow::{anyhow, bail, Result as AResult};
@@ -75,6 +81,19 @@ pub fn variant_name_placeholder(len: usize) -> &'static [&'static str] {
     }
 }
 
+/// enum signer {
+///     Master { account: address },
+///     Permissioned { account: address, permissions_address: address },
+/// }
+/// enum variant tag for a master signer.
+pub const MASTER_SIGNER_VARIANT: u16 = 0;
+/// enum variant tag for a permissioned signer.
+pub const PERMISSIONED_SIGNER_VARIANT: u16 = 1;
+/// field offset of a master account address in a enum encoded signer.
+pub const MASTER_ADDRESS_FIELD_OFFSET: usize = 1;
+/// field offset of a permission storage address in a enum encoded permission signer.
+pub const PERMISSION_ADDRESS_FIELD_OFFSET: usize = 2;
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(
     any(test, feature = "fuzzing"),
@@ -109,6 +128,8 @@ pub enum MoveValue {
     Address(AccountAddress),
     Vector(Vec<MoveValue>),
     Struct(MoveStruct),
+    // TODO: Signer is only used to construct arguments easily.
+    //       Refactor the code to reflect the new permissioned signer schema.
     Signer(AccountAddress),
     // NOTE: Added in bytecode version v6, do not reorder!
     U16(u16),
@@ -118,7 +139,10 @@ pub enum MoveValue {
 
 /// A layout associated with a named field
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
 pub struct MoveFieldLayout {
     pub name: Identifier,
     pub layout: MoveTypeLayout,
@@ -131,14 +155,20 @@ impl MoveFieldLayout {
 }
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
 pub struct MoveVariantLayout {
     pub name: Identifier,
     pub fields: Vec<MoveFieldLayout>,
 }
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
 pub enum MoveStructLayout {
     /// The representation used by the MoveVM for plain structs
     Runtime(Vec<MoveTypeLayout>),
@@ -158,15 +188,47 @@ pub enum MoveStructLayout {
 
 /// Used to distinguish between aggregators ans snapshots.
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
 pub enum IdentifierMappingKind {
     Aggregator,
     Snapshot,
     DerivedString,
 }
 
+impl IdentifierMappingKind {
+    /// If the struct identifier has a special mapping, return it.
+    pub fn from_ident(
+        module_id: &ModuleId,
+        struct_id: &Identifier,
+    ) -> Option<IdentifierMappingKind> {
+        if module_id.address().eq(&AccountAddress::ONE)
+            && module_id.name().eq(ident_str!("aggregator_v2"))
+        {
+            let ident_str = struct_id.as_ident_str();
+            if ident_str.eq(ident_str!("Aggregator")) {
+                Some(IdentifierMappingKind::Aggregator)
+            } else if ident_str.eq(ident_str!("AggregatorSnapshot")) {
+                Some(IdentifierMappingKind::Snapshot)
+            } else if ident_str.eq(ident_str!("DerivedStringSnapshot")) {
+                Some(IdentifierMappingKind::DerivedString)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary),
+    derive(dearbitrary::Dearbitrary)
+)]
 pub enum MoveTypeLayout {
     #[serde(rename(serialize = "bool", deserialize = "bool"))]
     Bool,
@@ -465,6 +527,13 @@ impl MoveStructLayout {
             },
         }
     }
+
+    pub fn signer_serialization_layout() -> Self {
+        MoveStructLayout::RuntimeVariants(vec![vec![MoveTypeLayout::Address], vec![
+            MoveTypeLayout::Address,
+            MoveTypeLayout::Address,
+        ]])
+    }
 }
 
 impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
@@ -485,9 +554,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
             MoveTypeLayout::Address => {
                 AccountAddress::deserialize(deserializer).map(MoveValue::Address)
             },
-            MoveTypeLayout::Signer => {
-                AccountAddress::deserialize(deserializer).map(MoveValue::Signer)
-            },
+            MoveTypeLayout::Signer => Err(D::Error::custom("cannot deserialize signer")),
             MoveTypeLayout::Struct(ty) => Ok(MoveValue::Struct(ty.deserialize(deserializer)?)),
             MoveTypeLayout::Vector(layout) => Ok(MoveValue::Vector(
                 deserializer.deserialize_seq(VectorElementVisitor(layout))?,
@@ -691,7 +758,15 @@ impl serde::Serialize for MoveValue {
             MoveValue::U128(i) => serializer.serialize_u128(*i),
             MoveValue::U256(i) => i.serialize(serializer),
             MoveValue::Address(a) => a.serialize(serializer),
-            MoveValue::Signer(a) => a.serialize(serializer),
+            MoveValue::Signer(a) => {
+                // Runtime representation of signer looks following:
+                // enum signer {
+                //     Master { account: address },
+                //     Permissioned { account: address, permissions_address: address },
+                // }
+                MoveStruct::new_variant(MASTER_SIGNER_VARIANT, vec![MoveValue::Address(*a)])
+                    .serialize(serializer)
+            },
             MoveValue::Vector(v) => {
                 let mut t = serializer.serialize_seq(Some(v.len()))?;
                 for val in v {
@@ -801,7 +876,7 @@ impl fmt::Display for MoveTypeLayout {
             U256 => write!(f, "u256"),
             Address => write!(f, "address"),
             Vector(typ) => write!(f, "vector<{}>", typ),
-            Struct(s) => write!(f, "{}", s),
+            Struct(s) => fmt::Display::fmt(s, f),
             Signer => write!(f, "signer"),
             // TODO[agg_v2](cleanup): consider printing the tag as well.
             Native(_, typ) => write!(f, "native<{}>", typ),

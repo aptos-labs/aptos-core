@@ -1152,7 +1152,7 @@ fun m::test_for_each_mut() {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 42.m {
 
 

@@ -2,7 +2,8 @@ comparison between v1 and v2 failed:
 = processed 1 task
 = 
 = task 0 'print-bytecode'. lines 2-14:
-= // Move bytecode v7
+- // Move bytecode v7
++ // Move bytecode v8
 = module c0ffee.m {
 = 
 = 

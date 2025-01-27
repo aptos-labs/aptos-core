@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{KnownAttribute, RandomnessAnnotation, RuntimeModuleMetadataV1};
-use move_binary_format::file_format::{Ability, AbilitySet, Visibility};
+use move_binary_format::file_format::Visibility;
 use move_cli::base::test_validation;
 use move_compiler::shared::known_attributes;
 use move_core_types::{
+    ability::{Ability, AbilitySet},
     account_address::AccountAddress,
     errmap::{ErrorDescription, ErrorMapping},
     identifier::Identifier,

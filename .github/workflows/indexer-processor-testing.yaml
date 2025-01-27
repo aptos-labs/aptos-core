@@ -63,7 +63,7 @@ jobs:
           sed -i "s/MAINNET_API_KEY/${{ steps.api_key_tokens.outputs.mainnet_api_key }}/g" ./imported_transactions/imported_transactions.yaml
           
           cat ./imported_transactions/imported_transactions.yaml  # Print the updated file for verification
-          cargo run -- --testing-folder ./imported_transactions --output-folder ../indexer-test-transactions/new_json_transactions
+          cargo run -- --testing-folder ./imported_transactions --output-folder ../indexer-test-transactions/src/new_json_transactions
 
       - name: Install jq
         run: sudo apt-get install jq  # Ensure jq is installed for JSON processing
@@ -72,10 +72,10 @@ jobs:
       # Prepare Original and New JSON Files
       - name: Prepare and Clean JSON Files
         run: |
-          cd ecosystem/indexer-grpc/indexer-test-transactions
-          ls -al ./new_json_transactions/scripted_transactions
+          cd ecosystem/indexer-grpc/indexer-test-transactions/src
+          ls -al ./new_json_transactions
           
-          for folder in json_transactions/scripted_transactions new_json_transactions/scripted_transactions; do
+          for folder in json_transactions/scripted_transactions new_json_transactions/json_transactions/scripted_transactions; do
             for file in $folder/*.json; do
               echo "Processing $file..."
               base_file=$(basename "$file")

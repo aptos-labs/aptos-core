@@ -26,7 +26,7 @@ use aptos_protos::{
 };
 use aptos_types::jwks::jwk::JWK;
 use hex;
-use move_binary_format::file_format::Ability;
+use move_core_types::ability::Ability;
 use std::time::Duration;
 
 pub fn convert_move_module_id(move_module_id: &MoveModuleId) -> transaction::MoveModuleId {
@@ -675,6 +675,15 @@ pub fn convert_account_signature(
                 "[Indexer Fullnode] Indexer should never see transactions with NoAccountSignature"
             )
         },
+        AccountSignature::AbstractionSignature(s) => (
+            transaction::account_signature::Type::Abstraction,
+            transaction::account_signature::Signature::Abstraction(
+                transaction::AbstractionSignature {
+                    function_info: s.function_info.to_owned(),
+                    signature: s.auth_data.inner().to_owned(),
+                },
+            ),
+        ),
     };
 
     transaction::AccountSignature {

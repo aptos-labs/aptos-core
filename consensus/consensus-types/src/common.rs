@@ -6,6 +6,7 @@ use crate::{
     payload::{OptQuorumStorePayload, PayloadExecutionLimit},
     proof_of_store::{BatchInfo, ProofCache, ProofOfStore},
 };
+use anyhow::ensure;
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher},
     HashValue,
@@ -487,6 +488,23 @@ impl Payload {
         Ok(())
     }
 
+    pub fn verify_inline_batches<'a>(
+        inline_batches: impl Iterator<Item = (&'a BatchInfo, &'a Vec<SignedTransaction>)>,
+    ) -> anyhow::Result<()> {
+        for (batch, payload) in inline_batches {
+            // TODO: Can cloning be avoided here?
+            let computed_digest = BatchPayload::new(batch.author(), payload.clone()).hash();
+            ensure!(
+                computed_digest == *batch.digest(),
+                "Hash of the received inline batch doesn't match the digest value for batch {}: {} != {}",
+                batch,
+                computed_digest,
+                batch.digest()
+            );
+        }
+        Ok(())
+    }
+
     pub fn verify(
         &self,
         validator: &ValidatorVerifier,
@@ -505,20 +523,20 @@ impl Payload {
             ),
             (true, Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)) => {
                 Self::verify_with_cache(&proof_with_data.proofs, validator, proof_cache)?;
-                for (batch, payload) in inline_batches.iter() {
-                    // TODO: Can cloning be avoided here?
-                    if BatchPayload::new(batch.author(), payload.clone()).hash() != *batch.digest()
-                    {
-                        return Err(anyhow::anyhow!(
-                            "Hash of the received inline batch doesn't match the digest value",
-                        ));
-                    }
-                }
+                Self::verify_inline_batches(
+                    inline_batches.iter().map(|(info, txns)| (info, txns)),
+                )?;
                 Ok(())
             },
             (true, Payload::OptQuorumStore(opt_quorum_store)) => {
                 let proof_with_data = opt_quorum_store.proof_with_data();
                 Self::verify_with_cache(&proof_with_data.batch_summary, validator, proof_cache)?;
+                Self::verify_inline_batches(
+                    opt_quorum_store
+                        .inline_batches()
+                        .iter()
+                        .map(|batch| (batch.info(), batch.transactions())),
+                )?;
                 Ok(())
             },
             (_, _) => Err(anyhow::anyhow!(
@@ -527,6 +545,42 @@ impl Payload {
                 self
             )),
         }
+    }
+
+    pub(crate) fn verify_epoch(&self, epoch: u64) -> anyhow::Result<()> {
+        match self {
+            Payload::DirectMempool(_) => return Ok(()),
+            Payload::InQuorumStore(proof_with_data) => {
+                ensure!(
+                    proof_with_data.proofs.iter().all(|p| p.epoch() == epoch),
+                    "Payload epoch doesn't match given epoch"
+                );
+            },
+            Payload::InQuorumStoreWithLimit(proof_with_data_with_txn_limit) => {
+                ensure!(
+                    proof_with_data_with_txn_limit
+                        .proof_with_data
+                        .proofs
+                        .iter()
+                        .all(|p| p.epoch() == epoch),
+                    "Payload epoch doesn't match given epoch"
+                );
+            },
+            Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
+                ensure!(
+                    proof_with_data.proofs.iter().all(|p| p.epoch() == epoch),
+                    "Payload proof epoch doesn't match given epoch"
+                );
+                ensure!(
+                    inline_batches.iter().all(|b| b.0.epoch() == epoch),
+                    "Payload inline batch epoch doesn't match given epoch"
+                )
+            },
+            Payload::OptQuorumStore(opt_quorum_store_payload) => {
+                opt_quorum_store_payload.check_epoch(epoch)?;
+            },
+        };
+        Ok(())
     }
 }
 

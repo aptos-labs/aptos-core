@@ -13,6 +13,7 @@ use aptos_consensus_types::{
     proof_of_store::{BatchId, ProofOfStore, SignedBatchInfo},
 };
 use aptos_crypto::HashValue;
+use aptos_infallible::Mutex;
 use aptos_types::{
     aggregate_signature::PartialSignatures,
     block_info::BlockInfo,
@@ -21,7 +22,10 @@ use aptos_types::{
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
 use move_core_types::account_address::AccountAddress;
-use std::time::{Duration, Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::sync::oneshot;
 
 #[derive(Clone)]
@@ -98,7 +102,7 @@ async fn test_batch_request_exists() {
         .request_batch(
             *batch.digest(),
             batch.expiration(),
-            vec![AccountAddress::random()],
+            Arc::new(Mutex::new(vec![AccountAddress::random()])),
             tx,
             subscriber_rx,
         )
@@ -194,7 +198,7 @@ async fn test_batch_request_not_exists_not_expired() {
         .request_batch(
             *batch.digest(),
             batch.expiration(),
-            vec![AccountAddress::random()],
+            Arc::new(Mutex::new(vec![AccountAddress::random()])),
             tx,
             subscriber_rx,
         )
@@ -242,7 +246,7 @@ async fn test_batch_request_not_exists_expired() {
         .request_batch(
             *batch.digest(),
             batch.expiration(),
-            vec![AccountAddress::random()],
+            Arc::new(Mutex::new(vec![AccountAddress::random()])),
             tx,
             subscriber_rx,
         )

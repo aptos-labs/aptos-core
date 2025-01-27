@@ -54,7 +54,7 @@ impl MutableReferenceUsageTracker {
         for instr in target.get_bytecode() {
             tracker.update(target, instr);
         }
-        tracker.get_mutably_unused_locations()
+        tracker.get_mutably_unused_locations(target)
     }
 
     /// Get an initial tracker from function parameters.
@@ -67,11 +67,15 @@ impl MutableReferenceUsageTracker {
     }
 
     /// Get locations where origins are not used mutably.
-    fn get_mutably_unused_locations(self) -> Vec<Loc> {
+    fn get_mutably_unused_locations(self, target: &FunctionTarget) -> Vec<Loc> {
         self.origins
             .into_iter()
             .filter_map(|(t, loc)| {
-                if !self.mutably_used.contains(&t) {
+                let ignore_local = target
+                    .symbol_pool()
+                    .string(target.get_local_name(t))
+                    .starts_with('_');
+                if !ignore_local && !self.mutably_used.contains(&t) {
                     Some(loc)
                 } else {
                     None

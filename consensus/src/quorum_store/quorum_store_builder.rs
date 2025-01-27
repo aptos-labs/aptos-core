@@ -25,7 +25,7 @@ use crate::{
     round_manager::VerifiedEvent,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::{QuorumStoreConfig, SecureBackend};
+use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
     common::Author, proof_of_store::ProofCache, request_response::GetPayloadCommand,
 };
@@ -129,7 +129,6 @@ pub struct InnerBuilder {
     network_sender: NetworkSender,
     verifier: Arc<ValidatorVerifier>,
     proof_cache: ProofCache,
-    _backend: SecureBackend,
     coordinator_tx: Sender<CoordinatorCommand>,
     coordinator_rx: Option<Receiver<CoordinatorCommand>>,
     batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
@@ -165,7 +164,6 @@ impl InnerBuilder {
         network_sender: NetworkSender,
         verifier: Arc<ValidatorVerifier>,
         proof_cache: ProofCache,
-        backend: SecureBackend,
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
         broadcast_proofs: bool,
         consensus_key: Arc<PrivateKey>,
@@ -205,7 +203,6 @@ impl InnerBuilder {
             network_sender,
             verifier,
             proof_cache,
-            _backend: backend,
             coordinator_tx,
             coordinator_rx: Some(coordinator_rx),
             batch_generator_cmd_tx,

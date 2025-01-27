@@ -615,6 +615,25 @@ module std::features {
         is_enabled(NATIVE_MEMORY_OPERATIONS)
     }
 
+    const PERMISSIONED_SIGNER: u64 = 84;
+
+    public fun get_permissioned_signer_feature(): u64 { PERMISSIONED_SIGNER }
+
+    public fun is_permissioned_signer_enabled(): bool acquires Features {
+        is_enabled(PERMISSIONED_SIGNER)
+    }
+
+    /// Whether the account abstraction is enabled.
+    ///
+    /// Lifetime: transient
+    const ACCOUNT_ABSTRACTION: u64 = 85;
+
+    public fun get_account_abstraction_feature(): u64 { ACCOUNT_ABSTRACTION }
+
+    public fun is_account_abstraction_enabled(): bool acquires Features {
+        is_enabled(ACCOUNT_ABSTRACTION)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

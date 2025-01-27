@@ -216,7 +216,7 @@ fn test_serialized_size() {
         (Value::u256(u256::U256::one()), U256),
         (Value::bool(true), Bool),
         (Value::address(AccountAddress::ONE), Address),
-        (Value::signer(AccountAddress::ONE), Signer),
+        (Value::master_signer(AccountAddress::ONE), Signer),
         (u64_delayed_value, Native(Aggregator, Box::new(U64))),
         (u128_delayed_value, Native(Snapshot, Box::new(U128))),
         (
@@ -260,4 +260,72 @@ fn test_serialized_size() {
             .with_delayed_fields_serde()
             .serialized_size(&value, &layout));
     }
+}
+
+#[test]
+fn new_signer_round_trip_vm_value() {
+    let move_value = MoveValue::Signer(AccountAddress::ZERO);
+    let bytes = move_value.simple_serialize().unwrap();
+
+    let vm_value = Value::master_signer(AccountAddress::ZERO);
+    let vm_bytes = ValueSerDeContext::new()
+        .serialize(&vm_value, &MoveTypeLayout::Signer)
+        .unwrap()
+        .unwrap();
+
+    // VM Value Roundtrip
+    assert!(ValueSerDeContext::new()
+        .deserialize(&vm_bytes, &MoveTypeLayout::Signer)
+        .unwrap()
+        .equals(&vm_value)
+        .unwrap());
+
+    // MoveValue Roundtrip
+    assert!(MoveValue::simple_deserialize(&bytes, &MoveTypeLayout::Signer).is_err());
+
+    // ser(MoveValue) == ser(VMValue)
+    assert_eq!(bytes, vm_bytes);
+
+    // Permissioned Signer Roundtrip
+    let vm_value = Value::permissioned_signer(AccountAddress::ZERO, AccountAddress::ONE);
+    let vm_bytes = ValueSerDeContext::new()
+        .serialize(&vm_value, &MoveTypeLayout::Signer)
+        .unwrap()
+        .unwrap();
+
+    // VM Value Roundtrip
+    assert!(ValueSerDeContext::new()
+        .deserialize(&vm_bytes, &MoveTypeLayout::Signer)
+        .unwrap()
+        .equals(&vm_value)
+        .unwrap());
+
+    // Cannot serialize permissioned signer into bytes with legacy signer
+    assert!(ValueSerDeContext::new()
+        .with_legacy_signer()
+        .serialize(&vm_value, &MoveTypeLayout::Signer)
+        .unwrap()
+        .is_none());
+}
+
+#[test]
+fn legacy_signer_round_trip_vm_value() {
+    let move_value = MoveValue::Address(AccountAddress::ZERO);
+    let bytes = move_value.simple_serialize().unwrap();
+
+    let vm_value = Value::master_signer(AccountAddress::ZERO);
+    let vm_bytes = ValueSerDeContext::new()
+        .with_legacy_signer()
+        .serialize(&vm_value, &MoveTypeLayout::Signer)
+        .unwrap()
+        .unwrap();
+
+    // VM Value Roundtrip
+    assert!(ValueSerDeContext::new()
+        .with_legacy_signer()
+        .deserialize(&vm_bytes, &MoveTypeLayout::Signer)
+        .is_none());
+
+    // ser(MoveValue) == ser(VMValue)
+    assert_eq!(bytes, vm_bytes);
 }

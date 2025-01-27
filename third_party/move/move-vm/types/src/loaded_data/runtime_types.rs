@@ -9,13 +9,13 @@ use itertools::Itertools;
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        Ability, AbilitySet, SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex,
-        VariantIndex,
+        SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex, VariantIndex,
     },
 };
 #[cfg(test)]
 use move_core_types::account_address::AccountAddress;
 use move_core_types::{
+    ability::{Ability, AbilitySet},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
@@ -478,10 +478,9 @@ impl Type {
         paranoid_failure!(msg)
     }
 
-    pub fn paranoid_check_is_vec_ref_ty(
+    pub fn paranoid_check_is_vec_ref_ty<const IS_MUT: bool>(
         &self,
         expected_elem_ty: &Self,
-        is_mut: bool,
     ) -> PartialVMResult<()> {
         if let Self::MutableReference(inner_ty) = self {
             if let Self::Vector(elem_ty) = inner_ty.as_ref() {
@@ -491,7 +490,7 @@ impl Type {
         }
 
         if let Self::Reference(inner_ty) = self {
-            if !is_mut {
+            if !IS_MUT {
                 if let Self::Vector(elem_ty) = inner_ty.as_ref() {
                     elem_ty.paranoid_check_eq(expected_elem_ty)?;
                     return Ok(());
@@ -501,24 +500,23 @@ impl Type {
 
         let msg = format!(
             "Expected a (mutable: {}) vector reference, got {}",
-            is_mut, self
+            IS_MUT, self
         );
         paranoid_failure!(msg)
     }
 
     /// Returns an error if the type is not a (mutable) vector reference. Otherwise, returns
     /// a (mutable) reference to its element type.
-    pub fn paranoid_check_and_get_vec_elem_ref_ty(
+    pub fn paranoid_check_and_get_vec_elem_ref_ty<const IS_MUT: bool>(
         &self,
         expected_elem_ty: &Self,
-        is_mut: bool,
     ) -> PartialVMResult<Self> {
-        self.paranoid_check_is_vec_ref_ty(expected_elem_ty, is_mut)?;
+        self.paranoid_check_is_vec_ref_ty::<IS_MUT>(expected_elem_ty)?;
         let elem_ty = Box::new(self.get_vec_ref_elem_ty());
 
         // SAFETY: This type construction satisfies all constraints on size/depth because the parent
         //         vector reference type has been safely constructed.
-        Ok(if is_mut {
+        Ok(if IS_MUT {
             Type::MutableReference(elem_ty)
         } else {
             Type::Reference(elem_ty)
@@ -527,12 +525,11 @@ impl Type {
 
     /// Returns an error if the type is not a (mutable) vector reference. Otherwise, returns
     /// its element type.
-    pub fn paranoid_check_and_get_vec_elem_ty(
+    pub fn paranoid_check_and_get_vec_elem_ty<const IS_MUT: bool>(
         &self,
         expected_elem_ty: &Self,
-        is_mut: bool,
     ) -> PartialVMResult<Self> {
-        self.paranoid_check_is_vec_ref_ty(expected_elem_ty, is_mut)?;
+        self.paranoid_check_is_vec_ref_ty::<IS_MUT>(expected_elem_ty)?;
         Ok(self.get_vec_ref_elem_ty())
     }
 
@@ -625,6 +622,10 @@ impl Type {
                 AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
                     ty.abilities()?
                 ])
+                .map_err(|e| {
+                    PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION)
+                        .with_message(e.to_string())
+                })
             },
             Type::Struct { ability, .. } => Ok(ability.base_ability_set),
             Type::StructInstantiation {
@@ -645,6 +646,10 @@ impl Type {
                     phantom_ty_args_mask.iter(),
                     type_argument_abilities,
                 )
+                .map_err(|e| {
+                    PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION)
+                        .with_message(e.to_string())
+                })
             },
         }
     }

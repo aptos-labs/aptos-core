@@ -50,7 +50,7 @@
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use log::{debug, log_enabled, trace, Level};
-use move_binary_format::file_format::Ability;
+use move_core_types::ability::Ability;
 use move_model::{
     ast::{Exp, ExpData, Operation, Pattern, Value, VisitorPosition},
     constant_folder::ConstantFolder,

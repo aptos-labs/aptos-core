@@ -16,6 +16,7 @@ use move_binary_format::{
     file_format as FF,
     file_format::{CodeOffset, FunctionDefinitionIndex},
 };
+use move_core_types::ability;
 use move_model::{
     ast::{ExpData, Spec, SpecBlockTarget, TempIndex},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
@@ -1200,7 +1201,7 @@ impl<'env> FunctionContext<'env> {
         self.module
             .env
             .type_abilities(self.temp_type(temp), &self.type_parameters)
-            .has_ability(FF::Ability::Copy)
+            .has_ability(ability::Ability::Copy)
     }
 
     /// Returns true of the given temporary can/should be dropped when flushing the stack.
@@ -1208,7 +1209,7 @@ impl<'env> FunctionContext<'env> {
         self.module
             .env
             .type_abilities(self.temp_type(temp), &self.type_parameters)
-            .has_ability(FF::Ability::Drop)
+            .has_ability(ability::Ability::Drop)
     }
 }
 

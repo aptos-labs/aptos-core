@@ -526,7 +526,7 @@ fun test::xor_vec_wrapped_coin_new($t0: vector<0x42::test::Wrapper<0x42::test::C
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 42.test {
 struct Coin has drop, key {
 	_0: u256

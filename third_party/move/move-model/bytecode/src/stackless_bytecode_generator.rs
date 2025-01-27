@@ -293,6 +293,12 @@ impl<'a> StacklessBytecodeGenerator<'a> {
         };
 
         match bytecode {
+            MoveBytecode::PackClosure(..)
+            | MoveBytecode::PackClosureGeneric(..)
+            | MoveBytecode::CallClosure(..) => {
+                // TODO(#15664): implement for closures
+                unimplemented!("stackless bytecode generation for closure opcodes")
+            },
             MoveBytecode::Pop => {
                 let temp_index = self.temp_stack.pop().unwrap();
                 self.code

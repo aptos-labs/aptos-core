@@ -16,6 +16,7 @@ use aptos_types::{
         },
         AnyKeylessPublicKey, Configuration, EphemeralCertificate, FederatedKeylessPublicKey,
         Groth16VerificationKey, KeylessPublicKey, KeylessSignature, TransactionAndProof,
+        VERIFICATION_KEY_FOR_TESTING,
     },
     on_chain_config::FeatureFlag,
     transaction::{
@@ -35,7 +36,7 @@ use move_core_types::{
     },
 };
 
-/// Initializes an Aptos VM and sets the keyless configuration via script (the VK is already set in genesis).
+/// Initializes an Aptos VM and sets the keyless configuration via script.
 fn init_feature_gating(
     enabled_features: Vec<FeatureFlag>,
     disabled_features: Vec<FeatureFlag>,
@@ -46,6 +47,12 @@ fn init_feature_gating(
 
     // initialize JWKs
     let core_resources = run_jwk_and_config_script(&mut h);
+    // initialize default VK
+    run_upgrade_vk_script(
+        &mut h,
+        core_resources.clone(),
+        Groth16VerificationKey::from(VERIFICATION_KEY_FOR_TESTING.clone()),
+    );
 
     (h, recipient, core_resources)
 }
@@ -256,6 +263,14 @@ fn test_federated_keyless_at_jwk_addr() {
 
     let jwk_addr = AccountAddress::from_hex_literal("0xadd").unwrap();
 
+    // Step 0: Make sure the default VK is installed
+    let core_resources = h.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
+    run_upgrade_vk_script(
+        &mut h,
+        core_resources.clone(),
+        Groth16VerificationKey::from(VERIFICATION_KEY_FOR_TESTING.clone()),
+    );
+
     // Step 1: Make sure TXN validation fails if JWKs are not installed at jwk_addr.
     let (sig, pk) = get_sample_groth16_sig_and_pk();
     let sender = create_federated_keyless_account(&mut h, jwk_addr, pk);
@@ -280,7 +295,7 @@ fn test_federated_keyless_at_jwk_addr() {
     // Step 1: Make sure TXN validation succeeds once JWKs are installed at jwk_addr.
     let iss = get_sample_iss();
     let jwk = get_sample_jwk();
-    let _core_resources = install_federated_jwks_and_set_keyless_config(&mut h, jwk_addr, iss, jwk);
+    let _ = install_federated_jwks_and_set_keyless_config(&mut h, jwk_addr, iss, jwk);
 
     let txn = spend_keyless_account(&mut h, sig, &sender, *recipient.address());
     let output = h.run_raw(txn);
@@ -308,7 +323,14 @@ fn test_federated_keyless_override_at_0x1() {
     let jwk_addr = AccountAddress::from_hex_literal("0xadd").unwrap();
     let iss = get_sample_iss();
     let jwk = secure_test_rsa_jwk(); // this will be the wrong JWK
-    let _core_resources = install_federated_jwks_and_set_keyless_config(&mut h, jwk_addr, iss, jwk);
+    let core_resources = install_federated_jwks_and_set_keyless_config(&mut h, jwk_addr, iss, jwk);
+
+    // Step 0: Make sure the default VK is installed
+    run_upgrade_vk_script(
+        &mut h,
+        core_resources.clone(),
+        Groth16VerificationKey::from(VERIFICATION_KEY_FOR_TESTING.clone()),
+    );
 
     // Step 1: Make sure the TXN does not validate, since the wrong JWK is installed at JWK addr
     let (sig, pk) = get_sample_groth16_sig_and_pk();
@@ -441,7 +463,7 @@ fn create_and_spend_keyless_account(
     spend_keyless_account(h, sig, &account, recipient)
 }
 
-/// Sets the keyless configuration (Note: the VK is already set in genesis.)
+/// Sets the keyless configuration
 fn run_jwk_and_config_script(h: &mut MoveHarness) -> Account {
     let core_resources = h.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
 
@@ -475,16 +497,14 @@ fn run_jwk_and_config_script(h: &mut MoveHarness) -> Account {
         .sign();
 
     // NOTE: We cannot write the Configuration and Groth16Verification key via MoveHarness::set_resource
-    // because it does not (yet) work with resource groups. This is okay, because the VK will be
-    // there from genesis.
+    // because it does not (yet) work with resource groups.
 
     assert_success!(h.run(txn));
 
     core_resources
 }
 
-/// Sets the keyless configuration and installs the sample RSA JWK as a federated JWK
-/// (Note: the VK is already set in genesis.)
+/// Sets the keyless configuration and installs the sample RSA JWK as a federated JWK.
 fn install_federated_jwks_and_set_keyless_config(
     h: &mut MoveHarness,
     jwk_owner: AccountAddress,
@@ -524,8 +544,7 @@ fn federated_keyless_init_config(h: &mut MoveHarness, core_resources: Account) {
         .sign();
 
     // NOTE: We cannot write the Configuration and Groth16Verification key via MoveHarness::set_resource
-    // because it does not (yet) work with resource groups. This is okay, because the VK will be
-    // there from genesis.
+    // because it does not (yet) work with resource groups.
 
     assert_success!(h.run(txn));
 }
@@ -557,8 +576,7 @@ fn federated_keyless_install_jwk(
         .sign();
 
     // NOTE: We cannot write the Configuration and Groth16Verification key via MoveHarness::set_resource
-    // because it does not (yet) work with resource groups. This is okay, because the VK will be
-    // there from genesis.
+    // because it does not (yet) work with resource groups.
 
     assert_success!(h.run(txn));
 }

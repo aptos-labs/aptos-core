@@ -14,9 +14,11 @@ use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
     errors::{PartialVMError, PartialVMResult},
-    file_format::{AbilitySet, Bytecode, CompiledModule, FunctionDefinitionIndex, Visibility},
+    file_format::{Bytecode, CompiledModule, FunctionDefinitionIndex, Visibility},
 };
-use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
+use move_core_types::{
+    ability::AbilitySet, identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode,
+};
 use move_vm_types::loaded_data::{
     runtime_access_specifier::AccessSpecifier,
     runtime_types::{StructIdentifier, Type},
@@ -123,6 +125,10 @@ impl LoadedFunction {
 
     pub(crate) fn code(&self) -> &[Bytecode] {
         &self.function.code
+    }
+
+    pub(crate) fn code_size(&self) -> usize {
+        self.function.code.len()
     }
 
     pub(crate) fn access_specifier(&self) -> &AccessSpecifier {

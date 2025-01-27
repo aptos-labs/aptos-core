@@ -402,7 +402,7 @@ fun m::g() {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 42.m {
 
 

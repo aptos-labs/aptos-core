@@ -7,13 +7,15 @@ use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
     file_format::{
-        AbilitySet, CodeOffset, CodeUnit, ConstantPoolIndex, FunctionDefinitionIndex, LocalIndex,
-        MemberCount, ModuleHandleIndex, SignatureIndex, StructDefinition, StructDefinitionIndex,
-        TableIndex, VariantIndex,
+        CodeOffset, CodeUnit, ConstantPoolIndex, FunctionDefinitionIndex, LocalIndex, MemberCount,
+        ModuleHandleIndex, SignatureIndex, StructDefinition, StructDefinitionIndex, TableIndex,
+        VariantIndex,
     },
 };
 use move_command_line_common::files::FileHash;
-use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+use move_core_types::{
+    ability::AbilitySet, account_address::AccountAddress, identifier::Identifier,
+};
 use move_ir_types::{
     ast::{ConstantName, ModuleIdent, ModuleName, NopLabel},
     location::Loc,

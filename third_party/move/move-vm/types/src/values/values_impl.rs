@@ -19,8 +19,11 @@ use move_core_types::{
     account_address::AccountAddress,
     effects::Op,
     gas_algebra::AbstractMemorySize,
-    u256, value,
-    value::{MoveStruct, MoveStructLayout, MoveTypeLayout, MoveValue},
+    u256,
+    value::{
+        self, MoveStruct, MoveStructLayout, MoveTypeLayout, MoveValue, MASTER_ADDRESS_FIELD_OFFSET,
+        MASTER_SIGNER_VARIANT, PERMISSIONED_SIGNER_VARIANT, PERMISSION_ADDRESS_FIELD_OFFSET,
+    },
     vm_status::{sub_status::NFE_VECTOR_ERROR_BASE, StatusCode},
 };
 use serde::{
@@ -290,8 +293,11 @@ impl Container {
         }
     }
 
-    fn signer(x: AccountAddress) -> Self {
-        Container::Struct(Rc::new(RefCell::new(vec![ValueImpl::Address(x)])))
+    fn master_signer(x: AccountAddress) -> Self {
+        Container::Struct(Rc::new(RefCell::new(vec![
+            ValueImpl::U16(MASTER_SIGNER_VARIANT),
+            ValueImpl::Address(x),
+        ])))
     }
 }
 
@@ -1513,7 +1519,39 @@ impl Locals {
 
 impl SignerRef {
     pub fn borrow_signer(&self) -> PartialVMResult<Value> {
-        Ok(Value(self.0.borrow_elem(0)?))
+        Ok(Value(self.0.borrow_elem(1)?))
+    }
+
+    pub fn is_permissioned(&self) -> PartialVMResult<bool> {
+        match &self.0 {
+            ContainerRef::Local(Container::Struct(s)) => {
+                Ok(*s.borrow()[0].as_value_ref::<u16>()? == PERMISSIONED_SIGNER_VARIANT)
+            },
+            _ => Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(format!("unexpected signer value: {:?}", self)),
+            ),
+        }
+    }
+
+    /// Get the permission address associated with a signer.
+    /// Needs to make sure the signer passed in is a permissioned signer.
+    pub fn permission_address(&self) -> PartialVMResult<Value> {
+        match &self.0 {
+            ContainerRef::Local(Container::Struct(s)) => Ok(Value::address(
+                *s.borrow()
+                    .get(PERMISSION_ADDRESS_FIELD_OFFSET)
+                    .ok_or_else(|| {
+                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                            .with_message(format!("unexpected signer value: {:?}", self))
+                    })?
+                    .as_value_ref::<AccountAddress>()?,
+            )),
+            _ => Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(format!("unexpected signer value: {:?}", self)),
+            ),
+        }
     }
 }
 
@@ -1672,15 +1710,22 @@ impl Value {
         Self(ValueImpl::Address(x))
     }
 
-    pub fn signer(x: AccountAddress) -> Self {
-        Self(ValueImpl::Container(Container::signer(x)))
+    pub fn master_signer(x: AccountAddress) -> Self {
+        Self(ValueImpl::Container(Container::master_signer(x)))
+    }
+
+    pub fn permissioned_signer(x: AccountAddress, perm_storage_address: AccountAddress) -> Self {
+        Self::struct_(Struct::pack_variant(PERMISSIONED_SIGNER_VARIANT, vec![
+            Value::address(x),
+            Value::address(perm_storage_address),
+        ]))
     }
 
     /// Create a "unowned" reference to a signer value (&signer) for populating the &signer in
     /// execute function
-    pub fn signer_reference(x: AccountAddress) -> Self {
+    pub fn master_signer_reference(x: AccountAddress) -> Self {
         Self(ValueImpl::ContainerRef(ContainerRef::Local(
-            Container::signer(x),
+            Container::master_signer(x),
         )))
     }
 
@@ -3710,19 +3755,41 @@ impl<'c, 'l, 'v> serde::Serialize
 
             // Signer.
             (L::Signer, ValueImpl::Container(Container::Struct(r))) => {
-                let v = r.borrow();
-                if v.len() != 1 {
-                    return Err(invariant_violation::<S>(format!(
-                        "cannot serialize container as a signer -- expected 1 field got {}",
-                        v.len()
-                    )));
+                if self.ctx.legacy_signer {
+                    // Only allow serialization of master signer.
+                    if *r.borrow()[0].as_value_ref::<u16>().map_err(|_| {
+                        invariant_violation::<S>(format!(
+                            "First field of a signer needs to be an enum descriminator, got {:?}",
+                            self.value
+                        ))
+                    })? != MASTER_SIGNER_VARIANT
+                    {
+                        return Err(S::Error::custom(PartialVMError::new(StatusCode::ABORTED)));
+                    }
+                    r.borrow()
+                        .get(MASTER_ADDRESS_FIELD_OFFSET)
+                        .ok_or_else(|| {
+                            invariant_violation::<S>(format!(
+                                "cannot serialize container {:?} as {:?}",
+                                self.value, self.layout
+                            ))
+                        })?
+                        .as_value_ref::<AccountAddress>()
+                        .map_err(|_| {
+                            invariant_violation::<S>(format!(
+                                "cannot serialize container {:?} as {:?}",
+                                self.value, self.layout
+                            ))
+                        })?
+                        .serialize(serializer)
+                } else {
+                    (SerializationReadyValue {
+                        ctx: self.ctx,
+                        layout: &MoveStructLayout::signer_serialization_layout(),
+                        value: &*r.borrow(),
+                    })
+                    .serialize(serializer)
                 }
-                (SerializationReadyValue {
-                    ctx: self.ctx,
-                    layout: &L::Address,
-                    value: &v[0],
-                })
-                .serialize(serializer)
             },
 
             // Delayed values. For their serialization, we must have custom
@@ -3874,7 +3941,19 @@ impl<'d, 'c> serde::de::DeserializeSeed<'d> for DeserializationSeed<'c, &MoveTyp
             L::U128 => u128::deserialize(deserializer).map(Value::u128),
             L::U256 => u256::U256::deserialize(deserializer).map(Value::u256),
             L::Address => AccountAddress::deserialize(deserializer).map(Value::address),
-            L::Signer => AccountAddress::deserialize(deserializer).map(Value::signer),
+            L::Signer => {
+                if self.ctx.legacy_signer {
+                    Err(D::Error::custom(
+                        "Cannot deserialize signer into value".to_string(),
+                    ))
+                } else {
+                    let seed = DeserializationSeed {
+                        ctx: self.ctx,
+                        layout: &MoveStructLayout::signer_serialization_layout(),
+                    };
+                    Ok(Value::struct_(seed.deserialize(deserializer)?))
+                }
+            },
 
             // Structs.
             L::Struct(struct_layout) => {
@@ -4159,7 +4238,7 @@ impl Value {
             S::Signer => return None,
             S::Vector(inner) => L::Vector(Box::new(Self::constant_sig_token_to_layout(inner)?)),
             // Not yet supported
-            S::Struct(_) | S::StructInstantiation(_, _) => return None,
+            S::Struct(_) | S::StructInstantiation(_, _) | S::Function(..) => return None,
             // Not allowed/Not meaningful
             S::TypeParameter(_) | S::Reference(_) | S::MutableReference(_) => return None,
         })
@@ -4466,7 +4545,9 @@ pub mod prop {
             L::U256 => any::<u256::U256>().prop_map(Value::u256).boxed(),
             L::Bool => any::<bool>().prop_map(Value::bool).boxed(),
             L::Address => any::<AccountAddress>().prop_map(Value::address).boxed(),
-            L::Signer => any::<AccountAddress>().prop_map(Value::signer).boxed(),
+            L::Signer => any::<AccountAddress>()
+                .prop_map(Value::master_signer)
+                .boxed(),
 
             L::Vector(layout) => match &**layout {
                 L::U8 => vec(any::<u8>(), 0..10)
@@ -4568,7 +4649,6 @@ pub mod prop {
             1 => Just(L::U256),
             1 => Just(L::Bool),
             1 => Just(L::Address),
-            1 => Just(L::Signer),
         ];
 
         leaf.prop_recursive(8, 32, 2, |inner| {
@@ -4660,10 +4740,7 @@ impl ValueImpl {
 
             (L::Signer, ValueImpl::Container(Container::Struct(r))) => {
                 let v = r.borrow();
-                if v.len() != 1 {
-                    panic!("Unexpected signer layout: {:?}", v);
-                }
-                match &v[0] {
+                match &v[MASTER_ADDRESS_FIELD_OFFSET] {
                     ValueImpl::Address(a) => MoveValue::Signer(*a),
                     v => panic!("Unexpected non-address while converting signer: {:?}", v),
                 }

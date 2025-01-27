@@ -939,7 +939,7 @@ fun test::inc_wrapped_coin_old($t0: &mut 0x42::test::Wrapper<0x42::test::Coin>) 
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 42.test {
 struct Coin has drop, key {
 	_0: u256
