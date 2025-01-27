@@ -33,7 +33,9 @@
 -  [Function `store_aptos_coin_burn_cap`](#0x1_native_bridge_store_aptos_coin_burn_cap)
 -  [Function `store_aptos_coin_mint_cap`](#0x1_native_bridge_store_aptos_coin_mint_cap)
 -  [Function `mint`](#0x1_native_bridge_mint)
+-  [Function `burn_from`](#0x1_native_bridge_burn_from)
 -  [Function `burn`](#0x1_native_bridge_burn)
+-  [Function `burn_internal`](#0x1_native_bridge_burn_internal)
 -  [Function `initiate_bridge_transfer`](#0x1_native_bridge_initiate_bridge_transfer)
 -  [Function `complete_bridge_transfer`](#0x1_native_bridge_complete_bridge_transfer)
 -  [Function `charge_bridge_fee`](#0x1_native_bridge_charge_bridge_fee)
@@ -1127,6 +1129,37 @@ Mints a specified amount of AptosCoin to a recipient's address.
 
 </details>
 
+<a id="0x1_native_bridge_burn_from"></a>
+
+## Function `burn_from`
+
+Burns a specified amount of AptosCoin from an address.
+
+@param core_resource The signer representing the core resource account.
+@param from The address from which to burn AptosCoin.
+@param amount The amount of AptosCoin to burn.
+@abort If the burn capability is not available.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn_from">burn_from</a>(core_resource: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, from: <b>address</b>, amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn_from">burn_from</a>(core_resource: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, from: <b>address</b>, amount: u64) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_AptosCoinBurnCapability">AptosCoinBurnCapability</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_core_resource">system_addresses::assert_core_resource</a>(core_resource);
+    <a href="native_bridge.md#0x1_native_bridge_burn_internal">burn_internal</a>(from, amount);
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_native_bridge_burn"></a>
 
 ## Function `burn`
@@ -1150,6 +1183,34 @@ Burns a specified amount of AptosCoin from an address.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn">burn</a>(from: <b>address</b>, amount: u64) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_AptosCoinBurnCapability">AptosCoinBurnCapability</a> {
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_abort_native_bridge_enabled">features::abort_native_bridge_enabled</a>(), <a href="native_bridge.md#0x1_native_bridge_ENATIVE_BRIDGE_NOT_ENABLED">ENATIVE_BRIDGE_NOT_ENABLED</a>);
 
+    <a href="native_bridge.md#0x1_native_bridge_burn_internal">burn_internal</a>(from, amount);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_native_bridge_burn_internal"></a>
+
+## Function `burn_internal`
+
+Burns a specified amount of AptosCoin from an address.
+
+@param from The address from which to burn AptosCoin.
+@param amount The amount of AptosCoin to burn.
+
+
+<pre><code><b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn_internal">burn_internal</a>(from: <b>address</b>, amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn_internal">burn_internal</a>(from: <b>address</b>, amount: u64) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_AptosCoinBurnCapability">AptosCoinBurnCapability</a> {
     <a href="coin.md#0x1_coin_burn_from">coin::burn_from</a>(
         from,
         amount,
@@ -1216,7 +1277,7 @@ The amount is burnt from the initiator and the module-level nonce is incremented
     <a href="native_bridge.md#0x1_native_bridge_add">add</a>(nonce, details);
 
     // Burn the amount from the initiator
-    <a href="native_bridge.md#0x1_native_bridge_burn">burn</a>(initiator_address, amount);
+    <a href="native_bridge.md#0x1_native_bridge_burn_internal">burn_internal</a>(initiator_address, amount);
 
     <b>let</b> bridge_events = <b>borrow_global_mut</b>&lt;<a href="native_bridge.md#0x1_native_bridge_BridgeEvents">BridgeEvents</a>&gt;(@aptos_framework);
 

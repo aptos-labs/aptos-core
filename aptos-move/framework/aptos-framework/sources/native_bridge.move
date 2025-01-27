@@ -350,6 +350,17 @@ module aptos_framework::native_bridge {
     }
 
     /// Burns a specified amount of AptosCoin from an address.
+    /// 
+    /// @param core_resource The signer representing the core resource account.
+    /// @param from The address from which to burn AptosCoin.
+    /// @param amount The amount of AptosCoin to burn.
+    /// @abort If the burn capability is not available.
+    public entry fun burn_from(aptos_framework: &signer, from: address, amount: u64) acquires AptosCoinBurnCapability {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        burn_internal(from, amount);
+    }
+
+    /// Burns a specified amount of AptosCoin from an address.
     ///
     /// @param from The address from which to burn AptosCoin.
     /// @param amount The amount of AptosCoin to burn.
@@ -357,6 +368,14 @@ module aptos_framework::native_bridge {
     public(friend) fun burn(from: address, amount: u64) acquires AptosCoinBurnCapability {
         assert!(features::abort_native_bridge_enabled(), ENATIVE_BRIDGE_NOT_ENABLED);
 
+        burn_internal(from, amount);
+    }
+
+    /// Burns a specified amount of AptosCoin from an address.
+    /// 
+    /// @param from The address from which to burn AptosCoin.
+    /// @param amount The amount of AptosCoin to burn.
+    fun burn_internal(from: address, amount: u64) acquires AptosCoinBurnCapability {
         coin::burn_from(
             from,
             amount,
@@ -403,7 +422,7 @@ module aptos_framework::native_bridge {
         add(nonce, details);
 
         // Burn the amount from the initiator  
-        burn(initiator_address, amount);  
+        burn_internal(initiator_address, amount);  
 
         let bridge_events = borrow_global_mut<BridgeEvents>(@aptos_framework);
 
