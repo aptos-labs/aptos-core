@@ -8,7 +8,7 @@ use crate::{
         Resolver, Script,
     },
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
-    storage::{module_storage, ty_tag_converter::TypeTagConverter},
+    storage::ty_tag_converter::TypeTagConverter,
     LayoutConverter, ModuleStorage, StorageLayoutConverter,
 };
 use better_any::{Tid, TidAble, TidExt};
@@ -83,9 +83,6 @@ pub(crate) struct LazyLoadedFunction(pub(crate) Rc<RefCell<LazyLoadedFunctionSta
 pub(crate) enum LazyLoadedFunctionState {
     Unresolved {
         data: SerializedFunctionData,
-        // If this function was previously attempted to resolve, but this failed,
-        // remember the error, so resolution is not attempted again.
-        resolution_error: Option<PartialVMError>,
     },
     Resolved {
         fun: Rc<LoadedFunction>,
@@ -103,7 +100,6 @@ impl LazyLoadedFunction {
     pub(crate) fn new_unresolved(data: SerializedFunctionData) -> Self {
         Self(Rc::new(RefCell::new(LazyLoadedFunctionState::Unresolved {
             data,
-            resolution_error: None,
         })))
     }
 
@@ -169,10 +165,6 @@ impl LazyLoadedFunction {
         match &mut *state {
             LazyLoadedFunctionState::Resolved { fun, .. } => action(fun.clone()),
             LazyLoadedFunctionState::Unresolved {
-                resolution_error: Some(e),
-                ..
-            } => Err(e.clone()),
-            LazyLoadedFunctionState::Unresolved {
                 data:
                     SerializedFunctionData {
                         module_id,
@@ -181,23 +173,16 @@ impl LazyLoadedFunction {
                         mask,
                         captured_layouts,
                     },
-                resolution_error,
             } => {
-                match Self::resolve(storage, module_id, fun_id, ty_args, *mask, captured_layouts) {
-                    Ok(fun) => {
-                        let result = action(fun.clone());
-                        *state = LazyLoadedFunctionState::Resolved {
-                            fun,
-                            ty_args: ty_args.clone(),
-                            mask: *mask,
-                        };
-                        result
-                    },
-                    Err(e) => {
-                        *resolution_error = Some(e.clone());
-                        Err(e)
-                    },
-                }
+                let fun =
+                    Self::resolve(storage, module_id, fun_id, ty_args, *mask, captured_layouts)?;
+                let result = action(fun.clone());
+                *state = LazyLoadedFunctionState::Resolved {
+                    fun,
+                    ty_args: ty_args.clone(),
+                    mask: *mask,
+                };
+                result
             },
         }
     }
