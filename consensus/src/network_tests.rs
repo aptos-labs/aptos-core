@@ -880,7 +880,7 @@ mod tests {
             .push((peer_id, protocol_id), bad_msg)
             .unwrap();
 
-        let liveness_check_msg = ConsensusMsg::BlockRetrievalRequest(Box::new(
+        let liveness_check_msg = ConsensusMsg::DeprecatedBlockRetrievalRequest(Box::new(
             BlockRetrievalRequestV1::new(HashValue::random(), 1),
         ));
 

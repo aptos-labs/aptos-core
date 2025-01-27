@@ -23,11 +23,15 @@ pub enum BlockRetrievalRequest {
 
 /// RPC to get a chain of block of the given length starting from the given block id.
 /// TODO @bchocho @hariria fix comment after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
-/// NOTE: The [`BlockRetrievalRequest`](BlockRetrievalRequest) struct is being renamed to
-/// [`BlockRetrievalRequestV1`](BlockRetrievalRequestV1) and deprecated in favor of a
-/// [`BlockRetrievalRequest`](BlockRetrievalRequest) enum
 ///
-/// Going forward, please use the [`BlockRetrievalRequest`](BlockRetrievalRequest) enum
+/// NOTE:
+/// 1. The [`BlockRetrievalRequest`](BlockRetrievalRequest) struct was renamed to
+///    [`BlockRetrievalRequestV1`](BlockRetrievalRequestV1) and deprecated
+/// 2. [`BlockRetrievalRequest`](BlockRetrievalRequest) enum was introduced to replace the old
+///    [`BlockRetrievalRequest`](BlockRetrievalRequest) struct
+///
+/// Please use the [`BlockRetrievalRequest`](BlockRetrievalRequest) enum going forward once this enum
+/// is introduced in the next release
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct BlockRetrievalRequestV1 {
     block_id: HashValue,
@@ -157,6 +161,7 @@ impl BlockRetrievalResponse {
         &self.blocks
     }
 
+    /// TODO @bchocho @hariria change `retrieval_request` after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
     pub fn verify(
         &self,
         retrieval_request: BlockRetrievalRequestV1,

@@ -35,11 +35,11 @@ use std::{collections::HashMap, time::Duration};
 /// Network type for consensus
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum ConsensusMsg {
-    /// DEPRECATED: Please use [`ConsensusMsg::BlockRetrievalRequestV2`](ConsensusMsg::BlockRetrievalRequestV2) going forward
+    /// DEPRECATED: Once this is introduced in the next release, please use
+    /// [`ConsensusMsg::BlockRetrievalRequest`](ConsensusMsg::BlockRetrievalRequest) going forward
+    /// This variant was renamed from `BlockRetrievalRequest` to `DeprecatedBlockRetrievalRequest`
     /// RPC to get a chain of block of the given length starting from the given block id.
-    /// Note: Naming here is `BlockRetrievalRequest` and not `DeprecatedBlockRetrievalRequest`
-    /// to be consistent with the naming implementation in [`ConsensusMsg::name`](ConsensusMsg::name)
-    BlockRetrievalRequest(Box<BlockRetrievalRequestV1>),
+    DeprecatedBlockRetrievalRequest(Box<BlockRetrievalRequestV1>),
     /// Carries the returned blocks and the retrieval status.
     BlockRetrievalResponse(Box<BlockRetrievalResponse>),
     /// Request to get a EpochChangeProof from current_epoch to target_epoch
@@ -87,7 +87,7 @@ pub enum ConsensusMsg {
     /// RoundTimeoutMsg is broadcasted by a validator once it decides to timeout the current round.
     RoundTimeoutMsg(Box<RoundTimeoutMsg>),
     /// RPC to get a chain of block of the given length starting from the given block id, using epoch and round.
-    BlockRetrievalRequestV2(Box<BlockRetrievalRequest>),
+    BlockRetrievalRequest(Box<BlockRetrievalRequest>),
 }
 
 /// Network type for consensus
@@ -96,8 +96,7 @@ impl ConsensusMsg {
     /// TODO @bchocho @hariria can remove after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
     pub fn name(&self) -> &str {
         match self {
-            // TODO Not changing the naming. Double check if this is OK
-            ConsensusMsg::BlockRetrievalRequest(_) => "BlockRetrievalRequest",
+            ConsensusMsg::DeprecatedBlockRetrievalRequest(_) => "DeprecatedBlockRetrievalRequest",
             ConsensusMsg::BlockRetrievalResponse(_) => "BlockRetrievalResponse",
             ConsensusMsg::EpochRetrievalRequest(_) => "EpochRetrievalRequest",
             ConsensusMsg::ProposalMsg(_) => "ProposalMsg",
@@ -117,8 +116,7 @@ impl ConsensusMsg {
             ConsensusMsg::RandGenMessage(_) => "RandGenMessage",
             ConsensusMsg::BatchResponseV2(_) => "BatchResponseV2",
             ConsensusMsg::RoundTimeoutMsg(_) => "RoundTimeoutV2",
-            // TODO should this also be BlockRetrievalRequest? What's the appropriate naming here?
-            ConsensusMsg::BlockRetrievalRequestV2(_) => "BlockRetrievalRequestV2",
+            ConsensusMsg::BlockRetrievalRequest(_) => "BlockRetrievalRequest",
         }
     }
 }

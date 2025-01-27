@@ -376,7 +376,7 @@ CommitVote:
 ConsensusMsg:
   ENUM:
     0:
-      BlockRetrievalRequest:
+      DeprecatedBlockRetrievalRequest:
         NEWTYPE:
           TYPENAME: BlockRetrievalRequestV1
     1:
@@ -456,7 +456,7 @@ ConsensusMsg:
         NEWTYPE:
           TYPENAME: RoundTimeoutMsg
     20:
-      BlockRetrievalRequestV2:
+      BlockRetrievalRequest:
         NEWTYPE:
           TYPENAME: BlockRetrievalRequest
 ContractEvent:

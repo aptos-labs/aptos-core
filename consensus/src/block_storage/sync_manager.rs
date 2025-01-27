@@ -17,7 +17,7 @@ use crate::{
     epoch_manager::LivenessStorageData,
     logging::{LogEvent, LogSchema},
     monitor,
-    network::{IncomingBlockRetrievalRequest, NetworkSender},
+    network::{DeprecatedIncomingBlockRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
     payload_manager::TPayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
@@ -470,7 +470,7 @@ impl BlockStore {
     /// future possible changes.
     pub async fn process_block_retrieval(
         &self,
-        request: IncomingBlockRetrievalRequest,
+        request: DeprecatedIncomingBlockRetrievalRequest,
     ) -> anyhow::Result<()> {
         fail_point!("consensus::process_block_retrieval", |_| {
             Err(anyhow::anyhow!("Injected error in process_block_retrieval"))

@@ -31,8 +31,8 @@ use crate::{
     metrics_safety_rules::MetricsSafetyRules,
     monitor,
     network::{
-        IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest,
-        IncomingBlockRetrievalRequestV2, IncomingDAGRequest, IncomingRandGenRequest,
+        DeprecatedIncomingBlockRetrievalRequest, IncomingBatchRetrievalRequest,
+        IncomingBlockRetrievalRequest, IncomingDAGRequest, IncomingRandGenRequest,
         IncomingRpcRequest, NetworkReceivers, NetworkSender,
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
@@ -60,7 +60,7 @@ use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{ConsensusConfig, DagConsensusConfig, ExecutionConfig, NodeConfig};
 use aptos_consensus_types::{
-    block_retrieval::{BlockRetrievalRequest, BlockRetrievalRequestV1},
+    block_retrieval::BlockRetrievalRequest,
     common::{Author, Round},
     epoch_retrieval::EpochRetrievalRequest,
     proof_of_store::ProofCache,
@@ -155,7 +155,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     round_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     epoch_state: Option<Arc<EpochState>>,
     block_retrieval_tx:
-        Option<aptos_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>>,
+        Option<aptos_channel::Sender<AccountAddress, DeprecatedIncomingBlockRetrievalRequest>>,
     quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, (Author, VerifiedEvent)>>,
     quorum_store_coordinator_tx: Option<Sender<CoordinatorCommand>>,
     quorum_store_storage: Arc<dyn QuorumStoreStorage>,
@@ -563,11 +563,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         block_store: Arc<BlockStore>,
         max_blocks_allowed: u64,
     ) {
-        let (request_tx, mut request_rx) = aptos_channel::new::<_, IncomingBlockRetrievalRequest>(
-            QueueStyle::KLAST,
-            10,
-            Some(&counters::BLOCK_RETRIEVAL_TASK_MSGS),
-        );
+        let (request_tx, mut request_rx) =
+            aptos_channel::new::<_, DeprecatedIncomingBlockRetrievalRequest>(
+                QueueStyle::KLAST,
+                10,
+                Some(&counters::BLOCK_RETRIEVAL_TASK_MSGS),
+            );
         let task = async move {
             info!(epoch = epoch, "Block retrieval task starts");
             while let Some(request) = request_rx.next().await {
@@ -1691,7 +1692,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 ensure!(matches!(
                     request,
                     IncomingRpcRequest::DeprecatedBlockRetrieval(_)
-                        | IncomingRpcRequest::BlockRetrievalV2(_)
+                        | IncomingRpcRequest::BlockRetrieval(_)
                 ));
             },
             _ => {},
@@ -1731,24 +1732,25 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     bail!("Rand manager not started");
                 }
             },
-            IncomingRpcRequest::BlockRetrievalV2(IncomingBlockRetrievalRequestV2 {
+            IncomingRpcRequest::BlockRetrieval(IncomingBlockRetrievalRequest {
                 req,
                 protocol,
                 response_sender,
             }) => {
                 if let Some(tx) = &self.block_retrieval_tx {
-                    let checked_request: BlockRetrievalRequestV1 = match req {
-                        BlockRetrievalRequest::V1(v1) => v1,
-                        // TODO @bchocho @hariria implement after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
-                        BlockRetrievalRequest::V2(_) => {
-                            unimplemented!("Should not have received a BlockRetrievalRequestV2...")
+                    match req {
+                        BlockRetrievalRequest::V1(v1) => {
+                            tx.push(peer_id, DeprecatedIncomingBlockRetrievalRequest {
+                                req: v1,
+                                protocol,
+                                response_sender,
+                            })
                         },
-                    };
-                    tx.push(peer_id, IncomingBlockRetrievalRequest {
-                        req: checked_request,
-                        protocol,
-                        response_sender,
-                    })
+                        // TODO @bchocho @hariria implement after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
+                        BlockRetrievalRequest::V2(v2) => {
+                            bail!("Should not have received a BlockRetrievalRequestV2 {:?} from peer with id {}", v2, peer_id);
+                        },
+                    }
                 } else {
                     error!("Round manager not started");
                     Ok(())

@@ -92,15 +92,17 @@ impl RpcResponder {
     }
 }
 
-/// NOTE: The [`IncomingBlockRetrievalRequest`](IncomingBlockRetrievalRequest) struct is being
-/// deprecated in favor of [`IncomingBlockRetrievalRequestV2`](IncomingBlockRetrievalRequestV2) which
-/// supports the new [`BlockRetrievalRequest`](BlockRetrievalRequest) enum for the `req` field
+/// NOTE:
+/// 1. [`IncomingBlockRetrievalRequest`](DeprecatedIncomingBlockRetrievalRequest) struct was
+/// renamed to `DeprecatedIncomingBlockRetrievalRequest`.
+/// 2. `DeprecatedIncomingBlockRetrievalRequest` is being deprecated in favor of a new [`IncomingBlockRetrievalRequest`](IncomingBlockRetrievalRequest)
+/// struct which supports the new [`BlockRetrievalRequest`](BlockRetrievalRequest) enum for the `req` field
 ///
-/// Going forward, please use [`IncomingBlockRetrievalRequestV2`](IncomingBlockRetrievalRequestV2)
+/// Going forward, please use [`IncomingBlockRetrievalRequest`](IncomingBlockRetrievalRequest)
 /// For more details, see comments above [`BlockRetrievalRequestV1`](BlockRetrievalRequestV1)
 /// TODO @bchocho @hariria can remove after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
 #[derive(Debug)]
-pub struct IncomingBlockRetrievalRequest {
+pub struct DeprecatedIncomingBlockRetrievalRequest {
     pub req: BlockRetrievalRequestV1,
     pub protocol: ProtocolId,
     pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
@@ -109,7 +111,7 @@ pub struct IncomingBlockRetrievalRequest {
 /// The block retrieval request is used internally for implementing RPC: the callback is executed
 /// for carrying the response
 #[derive(Debug)]
-pub struct IncomingBlockRetrievalRequestV2 {
+pub struct IncomingBlockRetrievalRequest {
     pub req: BlockRetrievalRequest,
     pub protocol: ProtocolId,
     pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
@@ -148,12 +150,12 @@ pub struct IncomingRandGenRequest {
 pub enum IncomingRpcRequest {
     /// NOTE: This is being phased out in two releases to accommodate `IncomingBlockRetrievalRequestV2`
     /// TODO @bchocho @hariria can remove after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
-    DeprecatedBlockRetrieval(IncomingBlockRetrievalRequest),
+    DeprecatedBlockRetrieval(DeprecatedIncomingBlockRetrievalRequest),
     BatchRetrieval(IncomingBatchRetrievalRequest),
     DAGRequest(IncomingDAGRequest),
     CommitRequest(IncomingCommitRequest),
     RandGenRequest(IncomingRandGenRequest),
-    BlockRetrievalV2(IncomingBlockRetrievalRequestV2),
+    BlockRetrieval(IncomingBlockRetrievalRequest),
 }
 
 impl IncomingRpcRequest {
@@ -165,7 +167,7 @@ impl IncomingRpcRequest {
             IncomingRpcRequest::RandGenRequest(req) => Some(req.req.epoch()),
             IncomingRpcRequest::CommitRequest(req) => req.req.epoch(),
             IncomingRpcRequest::DeprecatedBlockRetrieval(_) => None,
-            IncomingRpcRequest::BlockRetrievalV2(_) => None,
+            IncomingRpcRequest::BlockRetrieval(_) => None,
         }
     }
 }
@@ -254,7 +256,8 @@ impl NetworkSender {
         });
 
         ensure!(from != self.author, "Retrieve block from self");
-        let msg = ConsensusMsg::BlockRetrievalRequest(Box::new(retrieval_request.clone()));
+        let msg =
+            ConsensusMsg::DeprecatedBlockRetrievalRequest(Box::new(retrieval_request.clone()));
         counters::CONSENSUS_SENT_MSGS
             .with_label_values(&[msg.name()])
             .inc();
@@ -824,7 +827,7 @@ impl NetworkTask {
                         .with_label_values(&[msg.name()])
                         .inc();
                     let req = match msg {
-                        ConsensusMsg::BlockRetrievalRequest(request) => {
+                        ConsensusMsg::DeprecatedBlockRetrievalRequest(request) => {
                             debug!(
                                 remote_peer = peer_id,
                                 event = LogEvent::ReceiveBlockRetrieval,
@@ -832,7 +835,7 @@ impl NetworkTask {
                                 request
                             );
                             IncomingRpcRequest::DeprecatedBlockRetrieval(
-                                IncomingBlockRetrievalRequest {
+                                DeprecatedIncomingBlockRetrievalRequest {
                                     req: *request,
                                     protocol,
                                     response_sender: callback,
