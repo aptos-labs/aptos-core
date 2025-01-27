@@ -11995,6 +11995,7 @@ dependencies = [
  "itertools 0.13.0",
  "move-binary-format",
  "move-core-types",
+ "parking_lot 0.12.1",
  "proptest",
  "rand 0.7.3",
  "serde",
