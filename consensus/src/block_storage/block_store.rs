@@ -231,6 +231,8 @@ impl BlockStore {
             max_pruned_blocks_in_mem,
             highest_2chain_timeout_cert.map(Arc::new),
         );
+        // TODO: need to replace later?
+        // TODO: is there a race condition here on rebuild? The tree is replaced to before the blocks are inserted.
         let inner = if let Some(tree_to_replace) = tree_to_replace {
             *tree_to_replace.write() = tree;
             tree_to_replace
@@ -694,6 +696,14 @@ impl BlockStore {
     pub fn get_block_for_round(&self, round: Round) -> Option<Arc<PipelinedBlock>> {
         self.inner.read().get_block_for_round(round)
     }
+
+    fn ordered_round(&self) -> Option<Round> {
+        self.inner.read().ordered_round()
+    }
+
+    fn commit_round(&self) -> Option<Round> {
+        self.inner.read().commit_round()
+    }
 }
 
 impl BlockReader for BlockStore {
@@ -772,12 +782,16 @@ impl BlockReader for BlockStore {
                 return true;
             }
         }
-        let commit_round = self.commit_root().round();
-        let ordered_round = self.ordered_root().round();
-        counters::OP_COUNTERS
-            .gauge("back_pressure")
-            .set((ordered_round - commit_round) as i64);
-        ordered_round > self.vote_back_pressure_limit + commit_round
+        if let Some(commit_round) = self.commit_round() {
+            if let Some(ordered_round) = self.ordered_round() {
+                counters::OP_COUNTERS
+                    .gauge("back_pressure")
+                    .set((ordered_round - commit_round) as i64);
+                return ordered_round > self.vote_back_pressure_limit + commit_round;
+            }
+        }
+        // TODO: we are saying backpressured if it's not init'ed yet.
+        true
     }
 
     fn pipeline_pending_latency(&self, proposal_timestamp: Duration) -> Duration {

@@ -112,7 +112,8 @@ pub trait TExecutionClient: Send + Sync {
 
 struct BufferManagerHandle {
     pub execute_tx: Option<UnboundedSender<OrderedBlocks>>,
-    pub commit_tx: Option<aptos_channel::Sender<AccountAddress, IncomingCommitRequest>>,
+    pub commit_tx:
+        Option<aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingCommitRequest)>>,
     pub reset_tx_to_buffer_manager: Option<UnboundedSender<ResetRequest>>,
     pub reset_tx_to_rand_manager: Option<UnboundedSender<ResetRequest>>,
 }
@@ -130,7 +131,7 @@ impl BufferManagerHandle {
     pub fn init(
         &mut self,
         execute_tx: UnboundedSender<OrderedBlocks>,
-        commit_tx: aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
+        commit_tx: aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingCommitRequest)>,
         reset_tx_to_buffer_manager: UnboundedSender<ResetRequest>,
         reset_tx_to_rand_manager: Option<UnboundedSender<ResetRequest>>,
     ) {
@@ -218,7 +219,7 @@ impl ExecutionProxyClient {
         let (reset_buffer_manager_tx, reset_buffer_manager_rx) = unbounded::<ResetRequest>();
 
         let (commit_msg_tx, commit_msg_rx) =
-            aptos_channel::new::<AccountAddress, IncomingCommitRequest>(
+            aptos_channel::new::<AccountAddress, (AccountAddress, IncomingCommitRequest)>(
                 QueueStyle::FIFO,
                 100,
                 Some(&counters::BUFFER_MANAGER_MSGS),
@@ -402,7 +403,7 @@ impl TExecutionClient for ExecutionProxyClient {
         commit_msg: IncomingCommitRequest,
     ) -> Result<()> {
         if let Some(tx) = &self.handle.read().commit_tx {
-            tx.push(peer_id, commit_msg)
+            tx.push(peer_id, (peer_id, commit_msg))
         } else {
             counters::EPOCH_MANAGER_ISSUES_DETAILS
                 .with_label_values(&["buffer_manager_not_started"])

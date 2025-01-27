@@ -63,12 +63,21 @@ impl BlockExecutorLocalConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct BlockExecutorConfigFromOnchain {
     pub block_gas_limit_type: BlockGasLimitType,
+    pub block_gas_limit_override: Option<u64>,
 }
 
 impl BlockExecutorConfigFromOnchain {
+    pub fn new(block_gas_limit_type: BlockGasLimitType) -> Self {
+        Self {
+            block_gas_limit_type,
+            block_gas_limit_override: None,
+        }
+    }
+
     pub fn new_no_block_limit() -> Self {
         Self {
             block_gas_limit_type: BlockGasLimitType::NoLimit,
+            block_gas_limit_override: None,
         }
     }
 
@@ -76,6 +85,7 @@ impl BlockExecutorConfigFromOnchain {
         Self {
             block_gas_limit_type: maybe_block_gas_limit
                 .map_or(BlockGasLimitType::NoLimit, BlockGasLimitType::Limit),
+            block_gas_limit_override: None,
         }
     }
 
@@ -94,6 +104,7 @@ impl BlockExecutorConfigFromOnchain {
                     add_block_limit_outcome_onchain: false,
                     use_granular_resource_group_conflicts: false,
                 },
+            block_gas_limit_override: None,
         }
     }
 }

@@ -5,8 +5,9 @@ use crate::traits::GasAlgebra;
 use aptos_gas_algebra::{Fee, FeePerGasUnit, Gas, GasExpression, NumBytes, NumModules, Octa};
 use aptos_gas_schedule::{gas_feature_versions, VMGasParameters};
 use aptos_logger::error;
-use aptos_vm_types::storage::{
-    io_pricing::IoPricing, space_pricing::DiskSpacePricing, StorageGasParameters,
+use aptos_vm_types::{
+    resolver::BlockSynchronizationView,
+    storage::{io_pricing::IoPricing, space_pricing::DiskSpacePricing, StorageGasParameters},
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
@@ -18,7 +19,7 @@ use std::fmt::Debug;
 /// Base gas algebra implementation that tracks the gas usage using its internal counters.
 ///
 /// Abstract gas amounts are always evaluated to concrete values at the spot.
-pub struct StandardGasAlgebra {
+pub struct StandardGasAlgebra<'a> {
     feature_version: u64,
     vm_gas_params: VMGasParameters,
     storage_gas_params: StorageGasParameters,
@@ -40,15 +41,18 @@ pub struct StandardGasAlgebra {
 
     num_dependencies: NumModules,
     total_dependency_size: NumBytes,
+
+    maybe_block_synchronization_view: Option<&'a dyn BlockSynchronizationView>,
 }
 
-impl StandardGasAlgebra {
+impl<'a> StandardGasAlgebra<'a> {
     pub fn new(
         gas_feature_version: u64,
         vm_gas_params: VMGasParameters,
         storage_gas_params: StorageGasParameters,
         is_approved_gov_script: bool,
         balance: impl Into<Gas>,
+        maybe_block_synchronization_view: Option<&'a dyn BlockSynchronizationView>,
     ) -> Self {
         let balance = balance.into().to_unit_with_params(&vm_gas_params.txn);
 
@@ -83,11 +87,12 @@ impl StandardGasAlgebra {
             storage_fee_used: 0.into(),
             num_dependencies: 0.into(),
             total_dependency_size: 0.into(),
+            maybe_block_synchronization_view,
         }
     }
 }
 
-impl StandardGasAlgebra {
+impl StandardGasAlgebra<'_> {
     fn charge(&mut self, amount: InternalGas) -> (InternalGas, PartialVMResult<()>) {
         match self.balance.checked_sub(amount) {
             Some(new_balance) => {
@@ -106,7 +111,7 @@ impl StandardGasAlgebra {
     }
 }
 
-impl GasAlgebra for StandardGasAlgebra {
+impl GasAlgebra for StandardGasAlgebra<'_> {
     fn feature_version(&self) -> u64 {
         self.feature_version
     }
@@ -165,6 +170,16 @@ impl GasAlgebra for StandardGasAlgebra {
         &mut self,
         abstract_amount: impl GasExpression<VMGasParameters, Unit = InternalGasUnit> + Debug,
     ) -> PartialVMResult<()> {
+        if self
+            .maybe_block_synchronization_view
+            .is_some_and(|view| view.early_abort_execution())
+        {
+            return Err(
+                PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
+                    .with_message("Interrupted from block synchronization view".to_string()),
+            );
+        }
+
         let amount = abstract_amount.evaluate(self.feature_version, &self.vm_gas_params);
 
         let (actual, res) = self.charge(amount);
@@ -187,6 +202,16 @@ impl GasAlgebra for StandardGasAlgebra {
         &mut self,
         abstract_amount: impl GasExpression<VMGasParameters, Unit = InternalGasUnit>,
     ) -> PartialVMResult<()> {
+        if self
+            .maybe_block_synchronization_view
+            .is_some_and(|view| view.early_abort_execution())
+        {
+            return Err(
+                PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
+                    .with_message("Interrupted from block synchronization view".to_string()),
+            );
+        }
+
         let amount = abstract_amount.evaluate(self.feature_version, &self.vm_gas_params);
 
         let (actual, res) = self.charge(amount);

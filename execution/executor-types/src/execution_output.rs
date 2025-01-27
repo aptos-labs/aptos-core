@@ -126,6 +126,10 @@ impl ExecutionOutput {
     pub fn expect_last_version(&self) -> Version {
         self.first_version + self.num_transactions_to_commit() as Version - 1
     }
+
+    pub fn block_end_info(&self) -> Option<&BlockEndInfo> {
+        self.block_end_info.as_ref()
+    }
 }
 
 #[derive(Debug)]

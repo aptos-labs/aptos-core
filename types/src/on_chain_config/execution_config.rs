@@ -49,9 +49,7 @@ impl OnChainExecutionConfig {
     }
 
     pub fn block_executor_onchain_config(&self) -> BlockExecutorConfigFromOnchain {
-        BlockExecutorConfigFromOnchain {
-            block_gas_limit_type: self.block_gas_limit_type(),
-        }
+        BlockExecutorConfigFromOnchain::new(self.block_gas_limit_type())
     }
 
     /// The type of the transaction deduper being used.

@@ -33,7 +33,7 @@ pub fn prepare_phases_and_buffer_manager(
     execution_proxy: Arc<dyn StateComputer>,
     safety_rules: Arc<dyn CommitSignerProvider>,
     commit_msg_tx: NetworkSender,
-    commit_msg_rx: Receiver<AccountAddress, IncomingCommitRequest>,
+    commit_msg_rx: Receiver<AccountAddress, (AccountAddress, IncomingCommitRequest)>,
     persisting_proxy: Arc<dyn StateComputer>,
     block_rx: UnboundedReceiver<OrderedBlocks>,
     sync_rx: UnboundedReceiver<ResetRequest>,

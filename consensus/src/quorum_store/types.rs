@@ -319,8 +319,8 @@ impl BatchMsg {
         Ok(epoch)
     }
 
-    pub fn author(&self) -> PeerId {
-        self.batches[0].author()
+    pub fn author(&self) -> Option<PeerId> {
+        self.batches.first().map(|batch| batch.author())
     }
 
     pub fn take(self) -> Vec<Batch> {

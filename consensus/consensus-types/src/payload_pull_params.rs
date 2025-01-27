@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::{Author, PayloadFilter},
+    common::{Author, PayloadFilter, Round},
     utils::PayloadTxnsSize,
 };
 use std::{collections::HashSet, time::Duration};
@@ -24,6 +24,7 @@ pub struct PayloadPullParameters {
     pub pending_uncommitted_blocks: usize,
     pub recent_max_fill_fraction: f32,
     pub block_timestamp: Duration,
+    pub block_round: Round,
     pub maybe_optqs_payload_pull_params: Option<OptQSPayloadPullParams>,
 }
 
@@ -50,6 +51,7 @@ impl PayloadPullParameters {
         pending_uncommitted_blocks: usize,
         recent_max_fill_fraction: f32,
         block_timestamp: Duration,
+        block_round: Round,
     ) -> Self {
         Self {
             max_poll_time,
@@ -62,6 +64,7 @@ impl PayloadPullParameters {
             pending_uncommitted_blocks,
             recent_max_fill_fraction,
             block_timestamp,
+            block_round,
             maybe_optqs_payload_pull_params: None,
         }
     }

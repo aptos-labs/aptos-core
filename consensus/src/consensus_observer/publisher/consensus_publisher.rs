@@ -543,6 +543,7 @@ mod test {
             vec![],
             vec![],
             Some(10),
+            None,
             vec![],
         );
         let block_payload_message = ConsensusObserverMessage::new_block_payload_message(

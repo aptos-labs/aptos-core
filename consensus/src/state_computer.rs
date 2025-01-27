@@ -82,6 +82,7 @@ pub struct ExecutionProxy {
     transaction_filter: Arc<TransactionFilter>,
     execution_pipeline: ExecutionPipeline,
     state: RwLock<Option<MutableState>>,
+    max_block_txns: u64,
 }
 
 impl ExecutionProxy {
@@ -92,6 +93,7 @@ impl ExecutionProxy {
         handle: &tokio::runtime::Handle,
         txn_filter: TransactionFilter,
         enable_pre_commit: bool,
+        max_block_txns: u64,
     ) -> Self {
         let pre_commit_notifier = Self::spawn_future_runner(
             handle,
@@ -113,6 +115,7 @@ impl ExecutionProxy {
             transaction_filter: Arc::new(txn_filter),
             execution_pipeline,
             state: RwLock::new(None),
+            max_block_txns,
         }
     }
 
@@ -187,6 +190,7 @@ impl ExecutionProxy {
             self.transaction_filter.clone(),
             transaction_deduper.clone(),
             transaction_shuffler.clone(),
+            self.max_block_txns,
         ));
         PipelineBuilder::new(
             block_preparer,
@@ -214,6 +218,9 @@ impl StateComputer for ExecutionProxy {
         lifetime_guard: CountedRequest<()>,
     ) -> StateComputeResultFut {
         block.init_committed_transactions();
+        if let Some(s) = self.state.write().as_ref() {
+            s.payload_manager.notify_ordered(block.clone());
+        }
 
         let block_id = block.id();
         debug!(
@@ -241,6 +248,7 @@ impl StateComputer for ExecutionProxy {
             self.transaction_filter.clone(),
             transaction_deduper.clone(),
             transaction_shuffler.clone(),
+            self.max_block_txns,
         );
 
         let block_executor_onchain_config = block_executor_onchain_config.clone();
@@ -259,6 +267,7 @@ impl StateComputer for ExecutionProxy {
             .execution_pipeline
             .queue(
                 block.clone(),
+                self.max_block_txns,
                 metadata.clone(),
                 parent_block_id,
                 transaction_generator,
@@ -647,6 +656,7 @@ async fn test_commit_sync_race() {
         &tokio::runtime::Handle::current(),
         TransactionFilter::new(Filter::empty()),
         true,
+        3000,
     );
 
     executor.new_epoch(
