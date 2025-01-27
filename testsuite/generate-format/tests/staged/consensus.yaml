@@ -1,4 +1,6 @@
 ---
+AbilitySet:
+  NEWTYPESTRUCT: U8
 AbstractionAuthData:
   ENUM:
     0:
@@ -560,6 +562,16 @@ FunctionInfo:
         TYPENAME: AccountAddress
     - module_name: STR
     - function_name: STR
+FunctionTag:
+  STRUCT:
+    - args:
+        SEQ:
+          TYPENAME: TypeTag
+    - results:
+        SEQ:
+          TYPENAME: TypeTag
+    - abilities:
+        TYPENAME: AbilitySet
 G1Bytes:
   NEWTYPESTRUCT:
     TUPLEARRAY:
@@ -1154,6 +1166,10 @@ TypeTag:
       u32: UNIT
     10:
       u256: UNIT
+    11:
+      Function:
+        NEWTYPE:
+          TYPENAME: FunctionTag
 ValidatorConsensusInfo:
   STRUCT:
     - address:

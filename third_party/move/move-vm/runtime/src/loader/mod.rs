@@ -73,10 +73,11 @@ use move_binary_format::file_format::{
     VariantFieldHandleIndex, VariantFieldInstantiationIndex, VariantIndex,
 };
 use move_core_types::language_storage::FunctionTag;
-use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
-    loaded_data::runtime_types::{DepthFormula, StructLayout, TypeBuilder},
-    value_serde::FunctionValueExtension,
+    loaded_data::{
+        runtime_types::{DepthFormula, StructLayout, TypeBuilder},
+        struct_name_indexing::StructNameIndexMap,
+    },
     values::{AbstractFunction, SerializedFunctionData},
 };
 pub use script::Script;
