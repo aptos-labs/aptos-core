@@ -139,11 +139,13 @@ class WorkerPod:
         self.status = self.get_pod_status()
 
     def is_completed(self) -> bool:
-        self.update_status()
-        if self.status and self.status.status.phase in ["Succeeded", "Failed"]:
-            return True
-        return False
-
+        try:
+            self.update_status()
+            if self.status and self.status.status.phase in ["Succeeded", "Failed"]:
+                return True
+        except Exception as e:
+            logger.error(f"Failed to get pod status: {e}")
+        return False    
     def is_failed(self) -> bool:
         self.update_status()
         if self.status and self.status.status.phase == "Failed":
@@ -252,13 +254,20 @@ class WorkerPod:
         ),
     )
     def delete_pod(self):
-        response = self.client.delete_namespaced_pod(
-            name=self.name,
-            namespace=self.namespace,
-            body=client.V1DeleteOptions(
-                propagation_policy="Foreground", grace_period_seconds=0
-            ),
-        )
+        try:
+            response = self.client.delete_namespaced_pod(
+                name=self.name,
+                namespace=self.namespace,
+                body=client.V1DeleteOptions(
+                    propagation_policy="Foreground", grace_period_seconds=0
+                ),
+            )
+            return response
+        except ApiException as e:
+            if e.status == 404:  # Pod not found
+                logger.info(f"Pod {self.name} already deleted or doesn't exist")
+                return None  # Consider this a success
+            raise  # Re-raise other API exceptions for retry
 
     def get_pod_exit_code(self):
         # Check the status of the pod containers
@@ -457,10 +466,14 @@ class ReplayScheduler:
                     self.task_stats[worker_pod.name] = TaskStats(worker_pod.name)
 
                 if self.current_workers[i] is not None:
-                    phase = self.current_workers[i].get_phase()
-                    logger.info(
-                        f"Checking worker {i}: {self.current_workers[i].name}: {phase}"
-                    )
+                    try: 
+                        phase = self.current_workers[i].get_phase()
+                        logger.info(
+                            f"Checking worker {i}: {self.current_workers[i].name}: {phase}"
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to get pod status: {e}")
+                        self.reschedule_pod(self.current_workers[i], i)
             time.sleep(QUERY_DELAY)
         logger.info("All tasks have been scheduled")
 
