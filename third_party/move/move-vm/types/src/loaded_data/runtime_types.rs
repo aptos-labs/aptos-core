@@ -25,7 +25,7 @@ use smallvec::{smallvec, SmallVec};
 use std::{
     cell::RefCell,
     cmp::max,
-    collections::{btree_map, BTreeMap, BTreeSet},
+    collections::{btree_map, BTreeMap},
     fmt,
     fmt::Debug,
     sync::Arc,

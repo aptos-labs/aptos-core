@@ -10,6 +10,8 @@ use crate::{
 use serde::{de::Error, ser::SerializeSeq, Deserialize, Serialize};
 use std::fmt;
 
+//===========================================================================================
+
 /// A `ClosureMask` is a value which determines how to distinguish those function arguments
 /// which are captured and which are not when a closure is constructed. For instance,
 /// with `_` representing an omitted argument, the mask for `f(a,_,b,_)` would have the argument
@@ -18,7 +20,7 @@ use std::fmt;
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
 #[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
 #[cfg_attr(
-    feature = "fuzzing",
+    any(test, feature = "fuzzing"),
     derive(arbitrary::Arbitrary),
     derive(dearbitrary::Dearbitrary)
 )]
@@ -134,6 +136,31 @@ impl ClosureMask {
     }
 }
 
+#[cfg(test)]
+mod closure_mask_tests {
+    use super::*;
+    #[test]
+    fn extract_compose_roundtrip_test() {
+        // mask.compose(mask.extract(v, true), mask.extract(v, false)) == v
+        let mask = ClosureMask::new(0b101011);
+        let v = vec![1, 2, 3, 4, 5, 6];
+        let captured = mask.extract(&v, true);
+        assert_eq!(captured, vec![&1, &2, &4, &6]);
+        let not_captured = mask.extract(&v, false);
+        assert_eq!(not_captured, vec![&3, &5]);
+        assert_eq!(
+            v,
+            mask.compose(captured, not_captured)
+                .expect("composition must succeed")
+                .into_iter()
+                .copied()
+                .collect::<Vec<_>>()
+        );
+    }
+}
+
+//===========================================================================================
+
 /// Function type layout, with arguments and result types.
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(
@@ -223,7 +250,7 @@ impl serde::Serialize for MoveClosure {
             mask,
             captured,
         } = self;
-        let mut s = serializer.serialize_seq(Some(4 + captured.len()))?;
+        let mut s = serializer.serialize_seq(Some(4 + captured.len() * 2))?;
         s.serialize_element(module_id)?;
         s.serialize_element(fun_id)?;
         s.serialize_element(ty_args)?;
@@ -235,6 +262,63 @@ impl serde::Serialize for MoveClosure {
         s.end()
     }
 }
+
+#[cfg(test)]
+mod serialization_tests {
+    use super::*;
+    use crate::{
+        account_address::AccountAddress,
+        ident_str,
+        value::{MoveStruct, MoveStructLayout},
+    };
+
+    #[test]
+    fn function_value_serialization_ok() {
+        let value = MoveValue::Closure(Box::new(MoveClosure {
+            module_id: ModuleId {
+                address: AccountAddress::ONE,
+                name: ident_str!("mod").to_owned(),
+            },
+            fun_id: ident_str!("func").to_owned(),
+            ty_args: vec![TypeTag::Bool],
+            mask: ClosureMask::new(0b111),
+            captured: vec![
+                (MoveTypeLayout::U64, MoveValue::U64(2066)),
+                (
+                    MoveTypeLayout::Vector(Box::new(MoveTypeLayout::Bool)),
+                    MoveValue::Vector(vec![MoveValue::Bool(false)]),
+                ),
+                (
+                    MoveTypeLayout::Struct(MoveStructLayout::Runtime(vec![
+                        MoveTypeLayout::Bool,
+                        MoveTypeLayout::U8,
+                    ])),
+                    MoveValue::Struct(MoveStruct::Runtime(vec![
+                        MoveValue::Bool(false),
+                        MoveValue::U8(22),
+                    ])),
+                ),
+            ],
+        }));
+        let blob = value
+            .simple_serialize()
+            .expect("serialization must succeed");
+        eprintln!("{:?}", blob);
+        assert_eq!(
+            value,
+            MoveValue::simple_deserialize(
+                &blob,
+                // The type layout is currently ignored by the serializer, so pass in some
+                // arbitrary one
+                &MoveTypeLayout::Function(MoveFunctionLayout(vec![], vec![], AbilitySet::EMPTY))
+            )
+            .expect("deserialization must succeed"),
+            "deserialized value not equal to original one"
+        );
+    }
+}
+
+//===========================================================================================
 
 impl fmt::Display for MoveFunctionLayout {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
