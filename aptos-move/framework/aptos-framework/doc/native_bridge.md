@@ -338,6 +338,8 @@ A nonce to ensure the uniqueness of bridge transfers
 
 </details>
 
+<<<<<<< HEAD
+=======
 <a id="0x1_native_bridge_SmartTableWrapper"></a>
 
 ## Resource `SmartTableWrapper`
@@ -515,6 +517,7 @@ An event triggered upon change of bridgefee
 
 </details>
 
+>>>>>>> movement
 <a id="@Constants_0"></a>
 
 ## Constants

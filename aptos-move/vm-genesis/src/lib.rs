@@ -283,6 +283,7 @@ pub fn encode_genesis_change_set(
     initialize_jwk_consensus_config(&mut session, &jwk_consensus_config);
     initialize_jwks_resources(&mut session);
     initialize_keyless_accounts(&mut session, chain_id);
+    initialize_governed_gas_pool(&mut session);
     set_genesis_end(&mut session);
 
     // Reconfiguration should happen after all on-chain invocations.
@@ -471,6 +472,19 @@ fn initialize_aptos_coin(session: &mut SessionExt) {
         "initialize_aptos_coin",
         vec![],
         serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_governed_gas_pool(session: &mut SessionExt) {
+    exec_function(
+        session,
+        GENESIS_MODULE_NAME,
+        "initialize_governed_gas_pool",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            MoveValue::Vector(vec![MoveValue::U8(22)]),
+        ]),
     );
 }
 
@@ -1330,12 +1344,11 @@ mod tests {
         assert!(!validator_set_addresses.contains(&same_owner_validator_3_pool_address));
     }
 
-
     #[test]
     fn test_zero_rewards_apy_percentage() {
         let test_validators = TestValidator::new_test_set(Some(1), Some(100_000_000));
         let validators: Vec<Validator> = test_validators.into_iter().map(|t| t.data).collect();
-    
+
         let _genesis = encode_genesis_change_set(
             &GENESIS_KEYPAIR.1,
             &validators,
@@ -1368,10 +1381,10 @@ mod tests {
 
     #[test]
     fn test_pathological_epoch_duration() {
-		let epoch_duration_secs: u64 = 60 * 60 * 24 * 1024 * 128;
+        let epoch_duration_secs: u64 = 60 * 60 * 24 * 1024 * 128;
         let test_validators = TestValidator::new_test_set(Some(1), Some(100_000_000));
         let validators: Vec<Validator> = test_validators.into_iter().map(|t| t.data).collect();
-    
+
         let _genesis = encode_genesis_change_set(
             &GENESIS_KEYPAIR.1,
             &validators,

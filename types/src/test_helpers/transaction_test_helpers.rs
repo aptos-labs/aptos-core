@@ -136,6 +136,34 @@ pub fn get_test_signed_txn(
     )
 }
 
+pub fn get_test_signed_transaction_with_chain_id(
+    sender: AccountAddress,
+    sequence_number: u64,
+    private_key: &Ed25519PrivateKey,
+    public_key: Ed25519PublicKey,
+    payload: Option<TransactionPayload>,
+    expiration_timestamp_secs: u64,
+    gas_unit_price: u64,
+    max_gas_amount: Option<u64>,
+    chain_id: ChainId
+) -> SignedTransaction {
+    let raw_txn = RawTransaction::new(
+        sender,
+        sequence_number,
+        payload.unwrap_or_else(|| {
+            TransactionPayload::Script(Script::new(EMPTY_SCRIPT.to_vec(), vec![], vec![]))
+        }),
+        max_gas_amount.unwrap_or(MAX_GAS_AMOUNT),
+        gas_unit_price,
+        expiration_timestamp_secs,
+        chain_id,
+    );
+
+    let signature = private_key.sign(&raw_txn).unwrap();
+
+    SignedTransaction::new(raw_txn, public_key, signature)
+}
+
 pub fn get_test_unchecked_txn(
     sender: AccountAddress,
     sequence_number: u64,
