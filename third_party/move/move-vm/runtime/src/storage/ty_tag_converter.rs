@@ -274,10 +274,10 @@ mod tests {
         let disallowed_tys = [
             Type::TyParam(0),
             ty_builder
-                .create_ref_ty(&ty_builder.create_u8_ty(), true)
+                .create_ref_ty::<true>(&ty_builder.create_u8_ty())
                 .unwrap(),
             ty_builder
-                .create_ref_ty(&ty_builder.create_u8_ty(), false)
+                .create_ref_ty::<false>(&ty_builder.create_u8_ty())
                 .unwrap(),
         ];
         for ty in disallowed_tys {

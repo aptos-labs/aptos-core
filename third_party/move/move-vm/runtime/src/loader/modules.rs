@@ -632,8 +632,8 @@ impl Module {
         &self.id
     }
 
-    pub(crate) fn struct_at(&self, idx: StructDefinitionIndex) -> Arc<StructType> {
-        self.structs[idx.0 as usize].definition_struct_type.clone()
+    pub(crate) fn struct_at(&self, idx: StructDefinitionIndex) -> &Arc<StructType> {
+        &self.structs[idx.0 as usize].definition_struct_type
     }
 
     pub(crate) fn struct_instantiation_at(&self, idx: u16) -> &StructInstantiation {

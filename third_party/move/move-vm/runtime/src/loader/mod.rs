@@ -1358,7 +1358,7 @@ impl<'a> Resolver<'a> {
             BinaryType::Module(module) => module.struct_at(idx),
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
-        self.create_struct_ty(&struct_ty)
+        self.create_struct_ty(struct_ty)
     }
 
     pub(crate) fn get_struct_variant_at(
@@ -1450,12 +1450,9 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    pub(crate) fn get_struct(
-        &self,
-        idx: StructDefinitionIndex,
-    ) -> PartialVMResult<Arc<StructType>> {
+    pub(crate) fn get_struct_definition(&self, idx: StructDefinitionIndex) -> &Arc<StructType> {
         match &self.binary {
-            BinaryType::Module(module) => Ok(module.struct_at(idx)),
+            BinaryType::Module(module) => module.struct_at(idx),
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         }
     }
@@ -1592,21 +1589,24 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    pub(crate) fn create_struct_ty(&self, struct_ty: &Arc<StructType>) -> Type {
-        self.loader()
-            .ty_builder()
-            .create_struct_ty(struct_ty.idx, AbilityInfo::struct_(struct_ty.abilities))
+    pub(crate) fn create_struct_ty(&self, struct_definition: &Arc<StructType>) -> Type {
+        self.loader().ty_builder().create_struct_ty(
+            struct_definition.idx,
+            AbilityInfo::struct_(struct_definition.abilities),
+        )
     }
 
     pub(crate) fn create_struct_instantiation_ty(
         &self,
-        struct_ty: &Arc<StructType>,
+        struct_definition: &Arc<StructType>,
         ty_params: &[Type],
         ty_args: &[Type],
     ) -> PartialVMResult<Type> {
-        self.loader()
-            .ty_builder()
-            .create_struct_instantiation_ty(struct_ty, ty_params, ty_args)
+        self.loader().ty_builder().create_struct_instantiation_ty(
+            struct_definition,
+            ty_params,
+            ty_args,
+        )
     }
 
     pub(crate) fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {

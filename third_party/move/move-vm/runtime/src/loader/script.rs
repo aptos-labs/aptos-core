@@ -7,7 +7,7 @@ use move_binary_format::{
     access::ScriptAccess,
     binary_views::BinaryIndexedView,
     errors::{PartialVMError, PartialVMResult},
-    file_format::{Bytecode, CompiledScript, FunctionDefinitionIndex, Signature, SignatureIndex},
+    file_format::{Bytecode, CompiledScript, FunctionDefinitionIndex, SignatureIndex},
 };
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
 use move_vm_types::loaded_data::{
@@ -86,41 +86,29 @@ impl Script {
             });
         }
 
-        let code: Vec<Bytecode> = script.code.code.clone();
-        let parameters = script.signature_at(script.parameters).clone();
+        let params = &script.signature_at(script.parameters).0;
+        let param_tys = params
+            .iter()
+            .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
+            .collect::<PartialVMResult<Vec<_>>>()?;
+        let local_tys = params
+            .iter()
+            .chain(script.signature_at(script.code.locals).0.iter())
+            .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
+            .collect::<PartialVMResult<Vec<_>>>()?;
 
-        let param_tys = parameters
-            .0
-            .iter()
-            .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
-            .collect::<PartialVMResult<Vec<_>>>()?;
-        let locals = Signature(
-            parameters
-                .0
-                .iter()
-                .chain(script.signature_at(script.code.locals).0.iter())
-                .cloned()
-                .collect(),
-        );
-        let local_tys = locals
-            .0
-            .iter()
-            .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
-            .collect::<PartialVMResult<Vec<_>>>()?;
-        let ty_param_abilities = script.type_parameters.clone();
-        // TODO: main does not have a name. Revisit.
-        let name = Identifier::new("main").unwrap();
-        let (native, def_is_native) = (None, false); // Script entries cannot be native
         let main: Arc<Function> = Arc::new(Function {
             file_format_version: script.version(),
             index: FunctionDefinitionIndex(0),
-            code,
-            ty_param_abilities,
-            native,
-            is_native: def_is_native,
+            code: script.code.code.clone(),
+            ty_param_abilities: script.type_parameters.clone(),
+            // Script entries cannot be native, entry or have visibility.
+            native: None,
+            is_native: false,
             is_friend_or_private: false,
             is_entry: false,
-            name,
+            // TODO: main does not have a name. Revisit.
+            name: Identifier::new("main").unwrap(),
             // Script must not return values.
             return_tys: vec![],
             local_tys,
