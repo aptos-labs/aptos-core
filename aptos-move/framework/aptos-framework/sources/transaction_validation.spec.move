@@ -264,6 +264,7 @@ spec aptos_framework::transaction_validation {
         use aptos_framework::coin::{CoinStore, CoinInfo};
         use aptos_framework::optional_aggregator;
         use aptos_framework::transaction_fee::{AptosCoinCapabilities, AptosCoinMintCapability, CollectedFeesPerBlock};
+        use aptos_framework::governed_gas_pool::{GovernedGasPool, governed_gas_pool_address};
 
         account: signer;
         gas_payer: address;
@@ -271,6 +272,10 @@ spec aptos_framework::transaction_validation {
         txn_gas_price: u64;
         txn_max_gas_units: u64;
         gas_units_remaining: u64;
+
+        // Precondition: Governed Gas Pool must be initialized
+        requires exists<GovernedGasPool>(@aptos_framework);
+        requires exists<CoinStore<AptosCoin>>(governed_gas_pool_address());
 
         // Check transaction invariants.
         aborts_if !(txn_max_gas_units >= gas_units_remaining);
@@ -283,18 +288,26 @@ spec aptos_framework::transaction_validation {
         // TODO(fa_migration)
         // let pre_balance = global<coin::CoinStore<AptosCoin>>(gas_payer).coin.value;
         // let post balance = global<coin::CoinStore<AptosCoin>>(gas_payer).coin.value;
+
+        // TODO(governed_gas_pool)
+        let pre_governed_gas_pool_balance = global<coin::CoinStore<AptosCoin>>(governed_gas_pool_address()).coin.value;
+        let post governed_gas_pool_balance = global<coin::CoinStore<AptosCoin>>(governed_gas_pool_address()).coin.value;
+
         let pre_account = global<account::Account>(addr);
         let post account = global<account::Account>(addr);
 
         aborts_if !exists<CoinStore<AptosCoin>>(gas_payer);
         aborts_if !exists<Account>(addr);
         aborts_if !(global<Account>(addr).sequence_number < MAX_U64);
+        // TODO(fa_migration)
         // aborts_if pre_balance < transaction_fee_amount;
         // ensures balance == pre_balance - transaction_fee_amount + storage_fee_refunded;
+        // TODO(governd_gas_pool)
+        ensures governed_gas_pool_balance == pre_governed_gas_pool_balance + transaction_fee_amount;
         ensures account.sequence_number == pre_account.sequence_number + 1;
 
-
         // Check fee collection.
+        let governed_gas_pool_enabled = features::spec_is_enabled(features::GOVERNED_GAS_POOL);
         let collect_fee_enabled = features::spec_is_enabled(features::COLLECT_AND_DISTRIBUTE_GAS_FEES);
         let collected_fees = global<CollectedFeesPerBlock>(@aptos_framework).amount;
         let aggr = collected_fees.value;

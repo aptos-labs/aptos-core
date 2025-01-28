@@ -17,6 +17,7 @@ module aptos_framework::aptos_account {
     friend aptos_framework::resource_account;
     friend aptos_framework::transaction_fee;
     friend aptos_framework::transaction_validation;
+    friend aptos_framework::governed_gas_pool;
 
     /// Account does not exist.
     const EACCOUNT_NOT_FOUND: u64 = 1;

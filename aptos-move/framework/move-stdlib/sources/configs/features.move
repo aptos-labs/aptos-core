@@ -489,7 +489,7 @@ module std::features {
     public fun get_coin_to_fungible_asset_migration_feature(): u64 { COIN_TO_FUNGIBLE_ASSET_MIGRATION }
 
     public fun coin_to_fungible_asset_migration_feature_enabled(): bool acquires Features {
-        is_enabled(COIN_TO_FUNGIBLE_ASSET_MIGRATION)
+        is_enabled(COIN_TO_FUNGIBLE_ASSET_MIGRATION) 
     }
 
     const PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS: u64 = 61;
@@ -584,6 +584,17 @@ module std::features {
 
     /// Whether the Atomic bridge is available
     /// Lifetime: transient
+    const ATOMIC_BRIDGE: u64 = 71;
+
+    public fun get_atomic_bridge_feature(): u64 { ATOMIC_BRIDGE }
+
+    public fun abort_atomic_bridge_enabled(): bool acquires Features {
+        is_enabled(ATOMIC_BRIDGE)
+    }
+
+
+    /// Whether the Atomic bridge is available
+    /// Lifetime: transient
     const NATIVE_BRIDGE: u64 = 72;
 
     public fun get_native_bridge_feature(): u64 { NATIVE_BRIDGE }
@@ -592,14 +603,16 @@ module std::features {
         is_enabled(NATIVE_BRIDGE)
     }
 
-    /// Whether the Atomic bridge is available
-    /// Lifetime: transient
-    const ATOMIC_BRIDGE: u64 = 71;
+    /// Whether the Governed Gas Pool is used to capture gas fees
+    ///
+    /// Lifetime: permanent
+    const GOVERNED_GAS_POOL: u64 = 73;
 
-    public fun get_atomic_bridge_feature(): u64 { ATOMIC_BRIDGE }
+    /// Whether the Governed Gas Pool is enabled.
+    public fun get_governed_gas_pool_feature(): u64 { GOVERNED_GAS_POOL }
 
-    public fun abort_atomic_bridge_enabled(): bool acquires Features {
-        is_enabled(ATOMIC_BRIDGE)
+    public fun governed_gas_pool_enabled(): bool acquires Features {
+        is_enabled(GOVERNED_GAS_POOL)
     }
 
     // ============================================================================================
