@@ -5,54 +5,56 @@
 
 
 
-- [Module `0x1::native_bridge`](#module-0x1native_bridge)
-  - [Struct `BridgeConfigRelayerUpdated`](#struct-bridgeconfigrelayerupdated)
-  - [Struct `BridgeFeeChangedEvent`](#struct-bridgefeechangedevent)
-  - [Struct `BridgeRiskDenominatorChangedEvent`](#struct-bridgeriskdenominatorchangedevent)
-  - [Struct `BridgeInsuranceFundChangedEvent`](#struct-bridgeinsurancefundchangedevent)
-  - [Struct `BridgeTransferInitiatedEvent`](#struct-bridgetransferinitiatedevent)
-  - [Struct `BridgeTransferCompletedEvent`](#struct-bridgetransfercompletedevent)
-  - [Resource `BridgeEvents`](#resource-bridgeevents)
-  - [Resource `AptosCoinBurnCapability`](#resource-aptoscoinburncapability)
-  - [Resource `AptosCoinMintCapability`](#resource-aptoscoinmintcapability)
-  - [Resource `AptosFABurnCapabilities`](#resource-aptosfaburncapabilities)
-  - [Resource `AptosFAMintCapabilities`](#resource-aptosfamintcapabilities)
-  - [Resource `Nonce`](#resource-nonce)
-  - [Resource `SmartTableWrapper`](#resource-smarttablewrapper)
-  - [Struct `OutboundTransfer`](#struct-outboundtransfer)
-  - [Resource `BridgeConfig`](#resource-bridgeconfig)
-  - [Constants](#constants)
-  - [Function `initialize`](#function-initialize)
-  - [Function `normalize_u64_to_32_bytes`](#function-normalize_u64_to_32_bytes)
-  - [Function `is_inbound_nonce_set`](#function-is_inbound_nonce_set)
-  - [Function `create_details`](#function-create_details)
-  - [Function `add`](#function-add)
-  - [Function `set_bridge_transfer_id_to_inbound_nonce`](#function-set_bridge_transfer_id_to_inbound_nonce)
-  - [Function `assert_valid_bridge_transfer_id`](#function-assert_valid_bridge_transfer_id)
-  - [Function `bridge_transfer_id`](#function-bridge_transfer_id)
-  - [Function `bridge_relayer`](#function-bridge_relayer)
-  - [Function `insurance_fund`](#function-insurance_fund)
-  - [Function `risk_denominator`](#function-risk_denominator)
-  - [Function `bridge_fee`](#function-bridge_fee)
-  - [Function `get_bridge_transfer_details_from_nonce`](#function-get_bridge_transfer_details_from_nonce)
-  - [Function `get_inbound_nonce_from_bridge_transfer_id`](#function-get_inbound_nonce_from_bridge_transfer_id)
-  - [Function `increment_and_get_nonce`](#function-increment_and_get_nonce)
-  - [Function `store_aptos_coin_burn_cap`](#function-store_aptos_coin_burn_cap)
-  - [Function `store_aptos_coin_mint_cap`](#function-store_aptos_coin_mint_cap)
-  - [Function `mint`](#function-mint)
-  - [Function `burn_from`](#function-burn_from)
-  - [Function `burn`](#function-burn)
-  - [Function `burn_internal`](#function-burn_internal)
-  - [Function `initiate_bridge_transfer`](#function-initiate_bridge_transfer)
-  - [Function `complete_bridge_transfer`](#function-complete_bridge_transfer)
-  - [Function `charge_bridge_fee`](#function-charge_bridge_fee)
-  - [Function `update_bridge_relayer`](#function-update_bridge_relayer)
-  - [Function `update_bridge_fee`](#function-update_bridge_fee)
-  - [Function `update_insurance_fund`](#function-update_insurance_fund)
-  - [Function `update_risk_denominator`](#function-update_risk_denominator)
-  - [Function `assert_is_caller_relayer`](#function-assert_is_caller_relayer)
-  - [Function `assert_rate_limit_budget_not_exceeded`](#function-assert_rate_limit_budget_not_exceeded)
-  - [Function `test_normalize_u64_to_32_bytes_helper`](#function-test_normalize_u64_to_32_bytes_helper)
+-  [Struct `BridgeConfigRelayerUpdated`](#0x1_native_bridge_BridgeConfigRelayerUpdated)
+-  [Struct `BridgeFeeChangedEvent`](#0x1_native_bridge_BridgeFeeChangedEvent)
+-  [Struct `BridgeInsuranceBudgetDividerChangedEvent`](#0x1_native_bridge_BridgeInsuranceBudgetDividerChangedEvent)
+-  [Struct `BridgeInsuranceFundChangedEvent`](#0x1_native_bridge_BridgeInsuranceFundChangedEvent)
+-  [Struct `BridgeTransferInitiatedEvent`](#0x1_native_bridge_BridgeTransferInitiatedEvent)
+-  [Struct `BridgeTransferCompletedEvent`](#0x1_native_bridge_BridgeTransferCompletedEvent)
+-  [Resource `BridgeEvents`](#0x1_native_bridge_BridgeEvents)
+-  [Resource `AptosCoinBurnCapability`](#0x1_native_bridge_AptosCoinBurnCapability)
+-  [Resource `AptosCoinMintCapability`](#0x1_native_bridge_AptosCoinMintCapability)
+-  [Resource `AptosFABurnCapabilities`](#0x1_native_bridge_AptosFABurnCapabilities)
+-  [Resource `AptosFAMintCapabilities`](#0x1_native_bridge_AptosFAMintCapabilities)
+-  [Resource `Nonce`](#0x1_native_bridge_Nonce)
+-  [Resource `OutboundRateLimitBudget`](#0x1_native_bridge_OutboundRateLimitBudget)
+-  [Resource `InboundRateLimitBudget`](#0x1_native_bridge_InboundRateLimitBudget)
+-  [Resource `SmartTableWrapper`](#0x1_native_bridge_SmartTableWrapper)
+-  [Struct `OutboundTransfer`](#0x1_native_bridge_OutboundTransfer)
+-  [Resource `BridgeConfig`](#0x1_native_bridge_BridgeConfig)
+-  [Constants](#@Constants_0)
+-  [Function `initialize`](#0x1_native_bridge_initialize)
+-  [Function `normalize_u64_to_32_bytes`](#0x1_native_bridge_normalize_u64_to_32_bytes)
+-  [Function `is_inbound_nonce_set`](#0x1_native_bridge_is_inbound_nonce_set)
+-  [Function `create_details`](#0x1_native_bridge_create_details)
+-  [Function `add`](#0x1_native_bridge_add)
+-  [Function `set_bridge_transfer_id_to_inbound_nonce`](#0x1_native_bridge_set_bridge_transfer_id_to_inbound_nonce)
+-  [Function `assert_valid_bridge_transfer_id`](#0x1_native_bridge_assert_valid_bridge_transfer_id)
+-  [Function `bridge_transfer_id`](#0x1_native_bridge_bridge_transfer_id)
+-  [Function `bridge_relayer`](#0x1_native_bridge_bridge_relayer)
+-  [Function `insurance_fund`](#0x1_native_bridge_insurance_fund)
+-  [Function `insurance_budget_divider`](#0x1_native_bridge_insurance_budget_divider)
+-  [Function `bridge_fee`](#0x1_native_bridge_bridge_fee)
+-  [Function `get_bridge_transfer_details_from_nonce`](#0x1_native_bridge_get_bridge_transfer_details_from_nonce)
+-  [Function `get_inbound_nonce_from_bridge_transfer_id`](#0x1_native_bridge_get_inbound_nonce_from_bridge_transfer_id)
+-  [Function `increment_and_get_nonce`](#0x1_native_bridge_increment_and_get_nonce)
+-  [Function `store_aptos_coin_burn_cap`](#0x1_native_bridge_store_aptos_coin_burn_cap)
+-  [Function `store_aptos_coin_mint_cap`](#0x1_native_bridge_store_aptos_coin_mint_cap)
+-  [Function `mint`](#0x1_native_bridge_mint)
+-  [Function `burn_from`](#0x1_native_bridge_burn_from)
+-  [Function `burn`](#0x1_native_bridge_burn)
+-  [Function `burn_internal`](#0x1_native_bridge_burn_internal)
+-  [Function `initiate_bridge_transfer`](#0x1_native_bridge_initiate_bridge_transfer)
+-  [Function `complete_bridge_transfer`](#0x1_native_bridge_complete_bridge_transfer)
+-  [Function `charge_bridge_fee`](#0x1_native_bridge_charge_bridge_fee)
+-  [Function `update_bridge_relayer`](#0x1_native_bridge_update_bridge_relayer)
+-  [Function `update_bridge_fee`](#0x1_native_bridge_update_bridge_fee)
+-  [Function `update_insurance_fund`](#0x1_native_bridge_update_insurance_fund)
+-  [Function `update_insurance_budget_divider`](#0x1_native_bridge_update_insurance_budget_divider)
+-  [Function `assert_is_caller_relayer`](#0x1_native_bridge_assert_is_caller_relayer)
+-  [Function `assert_outbound_rate_limit_budget_not_exceeded`](#0x1_native_bridge_assert_outbound_rate_limit_budget_not_exceeded)
+-  [Function `assert_inbound_rate_limit_budget_not_exceeded`](#0x1_native_bridge_assert_inbound_rate_limit_budget_not_exceeded)
+-  [Function `test_normalize_u64_to_32_bytes_helper`](#0x1_native_bridge_test_normalize_u64_to_32_bytes_helper)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -143,15 +145,15 @@ An event triggered upon change of bridgefee
 
 </details>
 
-<a id="0x1_native_bridge_BridgeRiskDenominatorChangedEvent"></a>
+<a id="0x1_native_bridge_BridgeInsuranceBudgetDividerChangedEvent"></a>
 
-## Struct `BridgeRiskDenominatorChangedEvent`
+## Struct `BridgeInsuranceBudgetDividerChangedEvent`
 
-An event triggered upon change of risk denominator
+An event triggered upon change of insurance budget divider
 
 
 <pre><code>#[<a href="event.md#0x1_event">event</a>]
-<b>struct</b> <a href="native_bridge.md#0x1_native_bridge_BridgeRiskDenominatorChangedEvent">BridgeRiskDenominatorChangedEvent</a> <b>has</b> drop, store
+<b>struct</b> <a href="native_bridge.md#0x1_native_bridge_BridgeInsuranceBudgetDividerChangedEvent">BridgeInsuranceBudgetDividerChangedEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -162,13 +164,13 @@ An event triggered upon change of risk denominator
 
 <dl>
 <dt>
-<code>old_risk_denominator: u64</code>
+<code>old_insurance_budget_divider: u64</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>new_risk_denominator: u64</code>
+<code>new_insurance_budget_divider: u64</code>
 </dt>
 <dd>
 
@@ -380,7 +382,7 @@ This struct will store the event handles for bridge events.
 
 </details>
 
-<a id="0x1_native_bridge_SmartTableWrapper"></a>
+<a id="0x1_native_bridge_AptosCoinMintCapability"></a>
 
 ## Resource `AptosCoinMintCapability`
 
@@ -480,6 +482,60 @@ A nonce to ensure the uniqueness of bridge transfers
 <dl>
 <dt>
 <code>value: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_native_bridge_OutboundRateLimitBudget"></a>
+
+## Resource `OutboundRateLimitBudget`
+
+
+
+<pre><code><b>struct</b> <a href="native_bridge.md#0x1_native_bridge_OutboundRateLimitBudget">OutboundRateLimitBudget</a> <b>has</b> store, key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>day: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;u64, u64&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_native_bridge_InboundRateLimitBudget"></a>
+
+## Resource `InboundRateLimitBudget`
+
+
+
+<pre><code><b>struct</b> <a href="native_bridge.md#0x1_native_bridge_InboundRateLimitBudget">InboundRateLimitBudget</a> <b>has</b> store, key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>day: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;u64, u64&gt;</code>
 </dt>
 <dd>
 
@@ -592,7 +648,7 @@ Details on the outbound transfer
 
 </dd>
 <dt>
-<code>risk_denominator: u64</code>
+<code>insurance_budget_divider: u64</code>
 </dt>
 <dd>
 
@@ -608,77 +664,6 @@ Details on the outbound transfer
 
 </details>
 
-<a id="0x1_native_bridge_BridgeConfigRelayerUpdated"></a>
-
-## Struct `BridgeConfigRelayerUpdated`
-
-Event emitted when the bridge relayer is updated.
-
-
-<pre><code>#[<a href="event.md#0x1_event">event</a>]
-<b>struct</b> <a href="native_bridge.md#0x1_native_bridge_BridgeConfigRelayerUpdated">BridgeConfigRelayerUpdated</a> <b>has</b> drop, store
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>old_relayer: <b>address</b></code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>new_relayer: <b>address</b></code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-<a id="0x1_native_bridge_BridgeFeeChangedEvent"></a>
-
-## Struct `BridgeFeeChangedEvent`
-
-An event triggered upon change of bridgefee
-
-
-<pre><code>#[<a href="event.md#0x1_event">event</a>]
-<b>struct</b> <a href="native_bridge.md#0x1_native_bridge_BridgeFeeChangedEvent">BridgeFeeChangedEvent</a> <b>has</b> drop, store
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>old_bridge_fee: u64</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>new_bridge_fee: u64</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
->>>>>>> movement
 <a id="@Constants_0"></a>
 
 ## Constants
@@ -689,6 +674,24 @@ An event triggered upon change of bridgefee
 
 
 <pre><code><b>const</b> <a href="native_bridge.md#0x1_native_bridge_ENATIVE_BRIDGE_NOT_ENABLED">ENATIVE_BRIDGE_NOT_ENABLED</a>: u64 = 8;
+</code></pre>
+
+
+
+<a id="0x1_native_bridge_EINVALID_BRIDGE_TRANSFER_ID"></a>
+
+
+
+<pre><code><b>const</b> <a href="native_bridge.md#0x1_native_bridge_EINVALID_BRIDGE_TRANSFER_ID">EINVALID_BRIDGE_TRANSFER_ID</a>: u64 = 2;
+</code></pre>
+
+
+
+<a id="0x1_native_bridge_EZERO_AMOUNT"></a>
+
+
+
+<pre><code><b>const</b> <a href="native_bridge.md#0x1_native_bridge_EZERO_AMOUNT">EZERO_AMOUNT</a>: u64 = 7;
 </code></pre>
 
 
@@ -738,20 +741,20 @@ An event triggered upon change of bridgefee
 
 
 
-<a id="0x1_native_bridge_EINVALID_BRIDGE_TRANSFER_ID"></a>
-
-
-
-<pre><code><b>const</b> <a href="native_bridge.md#0x1_native_bridge_EINVALID_BRIDGE_TRANSFER_ID">EINVALID_BRIDGE_TRANSFER_ID</a>: u64 = 2;
-</code></pre>
-
-
-
 <a id="0x1_native_bridge_EINVALID_NONCE"></a>
 
 
 
 <pre><code><b>const</b> <a href="native_bridge.md#0x1_native_bridge_EINVALID_NONCE">EINVALID_NONCE</a>: u64 = 4;
+</code></pre>
+
+
+
+<a id="0x1_native_bridge_EINVALID_VALUE"></a>
+
+
+
+<pre><code><b>const</b> <a href="native_bridge.md#0x1_native_bridge_EINVALID_VALUE">EINVALID_VALUE</a>: u64 = 3;
 </code></pre>
 
 
@@ -783,29 +786,11 @@ An event triggered upon change of bridgefee
 
 
 
-<a id="0x1_native_bridge_ESAME_VALUE"></a>
-
-
-
-<pre><code><b>const</b> <a href="native_bridge.md#0x1_native_bridge_ESAME_VALUE">ESAME_VALUE</a>: u64 = 3;
-</code></pre>
-
-
-
 <a id="0x1_native_bridge_ETRANSFER_ALREADY_PROCESSED"></a>
 
 
 
 <pre><code><b>const</b> <a href="native_bridge.md#0x1_native_bridge_ETRANSFER_ALREADY_PROCESSED">ETRANSFER_ALREADY_PROCESSED</a>: u64 = 1;
-</code></pre>
-
-
-
-<a id="0x1_native_bridge_EZERO_AMOUNT"></a>
-
-
-
-<pre><code><b>const</b> <a href="native_bridge.md#0x1_native_bridge_EZERO_AMOUNT">EZERO_AMOUNT</a>: u64 = 7;
 </code></pre>
 
 
@@ -832,7 +817,7 @@ Initializes the module and stores the <code>EventHandle</code>s in the resource.
     <b>let</b> bridge_config = <a href="native_bridge.md#0x1_native_bridge_BridgeConfig">BridgeConfig</a> {
         bridge_relayer: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework),
         insurance_fund: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework),
-        risk_denominator: 4,
+        insurance_budget_divider: 4,
         bridge_fee: 40_000_000_000,
     };
     <b>move_to</b>(aptos_framework, bridge_config);
@@ -848,8 +833,6 @@ Initializes the module and stores the <code>EventHandle</code>s in the resource.
         value: 0
     });
 
-    // Create the InboundRateLimitBudget resource
-
 
     <b>move_to</b>(aptos_framework, <a href="native_bridge.md#0x1_native_bridge_BridgeEvents">BridgeEvents</a> {
         bridge_transfer_initiated_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="native_bridge.md#0x1_native_bridge_BridgeTransferInitiatedEvent">BridgeTransferInitiatedEvent</a>&gt;(aptos_framework),
@@ -857,8 +840,15 @@ Initializes the module and stores the <code>EventHandle</code>s in the resource.
     });
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
 
-    <b>let</b> inbound_rate_limit_budget = <a href="native_bridge.md#0x1_native_bridge_SmartTableWrapper">SmartTableWrapper</a>&lt;u64, u64&gt; {
-        inner: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>(),
+    <b>let</b> outbound_rate_limit_budget = <a href="native_bridge.md#0x1_native_bridge_OutboundRateLimitBudget">OutboundRateLimitBudget</a> {
+        day: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>(),
+    };
+
+    <b>move_to</b>(aptos_framework, outbound_rate_limit_budget);
+
+
+    <b>let</b> inbound_rate_limit_budget = <a href="native_bridge.md#0x1_native_bridge_InboundRateLimitBudget">InboundRateLimitBudget</a> {
+        day: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>(),
     };
 
     <b>move_to</b>(aptos_framework, inbound_rate_limit_budget);
@@ -1179,17 +1169,17 @@ Retrieves the address of the current insurance fund.
 
 </details>
 
-<a id="0x1_native_bridge_risk_denominator"></a>
+<a id="0x1_native_bridge_insurance_budget_divider"></a>
 
-## Function `risk_denominator`
+## Function `insurance_budget_divider`
 
-Retrieves the current risk denominator.
+Retrieves the current insurance budget divider.
 
-@return The current risk denominator.
+@return The current insurance budget divider.
 
 
 <pre><code>#[view]
-<b>public</b> <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_risk_denominator">risk_denominator</a>(): u64
+<b>public</b> <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_insurance_budget_divider">insurance_budget_divider</a>(): u64
 </code></pre>
 
 
@@ -1198,8 +1188,8 @@ Retrieves the current risk denominator.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_risk_denominator">risk_denominator</a>(): u64 <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_BridgeConfig">BridgeConfig</a> {
-    <b>borrow_global_mut</b>&lt;<a href="native_bridge.md#0x1_native_bridge_BridgeConfig">BridgeConfig</a>&gt;(@aptos_framework).risk_denominator
+<pre><code><b>public</b> <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_insurance_budget_divider">insurance_budget_divider</a>(): u64 <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_BridgeConfig">BridgeConfig</a> {
+    <b>borrow_global_mut</b>&lt;<a href="native_bridge.md#0x1_native_bridge_BridgeConfig">BridgeConfig</a>&gt;(@aptos_framework).insurance_budget_divider
 }
 </code></pre>
 
@@ -1548,12 +1538,14 @@ The amount is burnt from the initiator and the module-level nonce is incremented
     initiator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     recipient: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     amount: u64
-) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_BridgeEvents">BridgeEvents</a>, <a href="native_bridge.md#0x1_native_bridge_Nonce">Nonce</a>, <a href="native_bridge.md#0x1_native_bridge_AptosCoinBurnCapability">AptosCoinBurnCapability</a>, <a href="native_bridge.md#0x1_native_bridge_AptosCoinMintCapability">AptosCoinMintCapability</a>, <a href="native_bridge.md#0x1_native_bridge_SmartTableWrapper">SmartTableWrapper</a>, <a href="native_bridge.md#0x1_native_bridge_BridgeConfig">BridgeConfig</a> {
+) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_BridgeEvents">BridgeEvents</a>, <a href="native_bridge.md#0x1_native_bridge_Nonce">Nonce</a>, <a href="native_bridge.md#0x1_native_bridge_AptosCoinBurnCapability">AptosCoinBurnCapability</a>, <a href="native_bridge.md#0x1_native_bridge_AptosCoinMintCapability">AptosCoinMintCapability</a>, <a href="native_bridge.md#0x1_native_bridge_SmartTableWrapper">SmartTableWrapper</a>, <a href="native_bridge.md#0x1_native_bridge_OutboundRateLimitBudget">OutboundRateLimitBudget</a>, <a href="native_bridge.md#0x1_native_bridge_BridgeConfig">BridgeConfig</a> {
     <b>let</b> initiator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(initiator);
     <b>let</b> ethereum_address = <a href="ethereum.md#0x1_ethereum_ethereum_address_20_bytes">ethereum::ethereum_address_20_bytes</a>(recipient);
 
     // Ensure the amount is enough for the bridge fee and charge for it
     <b>let</b> new_amount = <a href="native_bridge.md#0x1_native_bridge_charge_bridge_fee">charge_bridge_fee</a>(amount);
+
+    <a href="native_bridge.md#0x1_native_bridge_assert_outbound_rate_limit_budget_not_exceeded">assert_outbound_rate_limit_budget_not_exceeded</a>(new_amount);
 
     // Increment and retrieve the nonce
     <b>let</b> nonce = <a href="native_bridge.md#0x1_native_bridge_increment_and_get_nonce">increment_and_get_nonce</a>();
@@ -1630,10 +1622,10 @@ Completes a bridge transfer on the destination chain.
     recipient: <b>address</b>,
     amount: u64,
     nonce: u64
-) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_BridgeEvents">BridgeEvents</a>, <a href="native_bridge.md#0x1_native_bridge_AptosCoinMintCapability">AptosCoinMintCapability</a>, <a href="native_bridge.md#0x1_native_bridge_SmartTableWrapper">SmartTableWrapper</a>, <a href="native_bridge.md#0x1_native_bridge_BridgeConfig">BridgeConfig</a> {
+) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_BridgeEvents">BridgeEvents</a>, <a href="native_bridge.md#0x1_native_bridge_AptosCoinMintCapability">AptosCoinMintCapability</a>, <a href="native_bridge.md#0x1_native_bridge_SmartTableWrapper">SmartTableWrapper</a>, <a href="native_bridge.md#0x1_native_bridge_InboundRateLimitBudget">InboundRateLimitBudget</a>, <a href="native_bridge.md#0x1_native_bridge_BridgeConfig">BridgeConfig</a> {
     // Ensure the caller is the bridge relayer
     <a href="native_bridge.md#0x1_native_bridge_assert_is_caller_relayer">assert_is_caller_relayer</a>(caller);
-    <a href="native_bridge.md#0x1_native_bridge_assert_rate_limit_budget_not_exceeded">assert_rate_limit_budget_not_exceeded</a>(amount);
+    <a href="native_bridge.md#0x1_native_bridge_assert_inbound_rate_limit_budget_not_exceeded">assert_inbound_rate_limit_budget_not_exceeded</a>(amount);
 
     // Check <b>if</b> the bridge transfer ID is already associated <b>with</b> an inbound nonce
     <b>let</b> inbound_nonce_exists = <a href="native_bridge.md#0x1_native_bridge_is_inbound_nonce_set">is_inbound_nonce_set</a>(bridge_transfer_id);
@@ -1820,7 +1812,7 @@ Updates the insurance fund, requiring governance validation.
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
     <b>let</b> bridge_config = <b>borrow_global_mut</b>&lt;<a href="native_bridge.md#0x1_native_bridge_BridgeConfig">BridgeConfig</a>&gt;(@aptos_framework);
     <b>let</b> old_insurance_fund = bridge_config.insurance_fund;
-    <b>assert</b>!(old_insurance_fund != new_insurance_fund, <a href="native_bridge.md#0x1_native_bridge_ESAME_VALUE">ESAME_VALUE</a>);
+    <b>assert</b>!(old_insurance_fund != new_insurance_fund, <a href="native_bridge.md#0x1_native_bridge_EINVALID_VALUE">EINVALID_VALUE</a>);
     bridge_config.insurance_fund = new_insurance_fund;
 
     <a href="event.md#0x1_event_emit">event::emit</a>(
@@ -1836,18 +1828,18 @@ Updates the insurance fund, requiring governance validation.
 
 </details>
 
-<a id="0x1_native_bridge_update_risk_denominator"></a>
+<a id="0x1_native_bridge_update_insurance_budget_divider"></a>
 
-## Function `update_risk_denominator`
+## Function `update_insurance_budget_divider`
 
-Updates the risk denominator, requiring governance validation.
+Updates the insurance budget divider, requiring governance validation.
 
 @param aptos_framework The signer representing the Aptos framework.
-@param new_risk_denominator The new risk denominator to be set.
-@abort If the new risk denominator is the same as the old risk denominator.
+@param new_insurance_budget_divider The new insurance budget divider to be set.
+@abort If the new insurance budget divider is the same as the old insurance budget divider.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_update_risk_denominator">update_risk_denominator</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_risk_denominator: u64)
+<pre><code><b>public</b> entry <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_update_insurance_budget_divider">update_insurance_budget_divider</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_insurance_budget_divider: u64)
 </code></pre>
 
 
@@ -1856,18 +1848,23 @@ Updates the risk denominator, requiring governance validation.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_update_risk_denominator">update_risk_denominator</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_risk_denominator: u64
+<pre><code><b>public</b> entry <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_update_insurance_budget_divider">update_insurance_budget_divider</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_insurance_budget_divider: u64
 ) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_BridgeConfig">BridgeConfig</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    // Ensure the new insurance budget divider is greater than 1 and different from the <b>old</b> one
+    // Assumes symmetric Insurance Funds on both L1 and L2
+    <b>assert</b>!(new_insurance_budget_divider &gt; 1, <a href="native_bridge.md#0x1_native_bridge_EINVALID_VALUE">EINVALID_VALUE</a>);
+
     <b>let</b> bridge_config = <b>borrow_global_mut</b>&lt;<a href="native_bridge.md#0x1_native_bridge_BridgeConfig">BridgeConfig</a>&gt;(@aptos_framework);
-    <b>let</b> old_risk_denominator = bridge_config.risk_denominator;
-    <b>assert</b>!(old_risk_denominator != new_risk_denominator, <a href="native_bridge.md#0x1_native_bridge_ESAME_VALUE">ESAME_VALUE</a>);
-    bridge_config.risk_denominator = new_risk_denominator;
+    <b>let</b> old_insurance_budget_divider = bridge_config.insurance_budget_divider;
+    <b>assert</b>!(old_insurance_budget_divider != new_insurance_budget_divider, <a href="native_bridge.md#0x1_native_bridge_EINVALID_VALUE">EINVALID_VALUE</a>);
+
+    bridge_config.insurance_budget_divider = new_insurance_budget_divider;
 
     <a href="event.md#0x1_event_emit">event::emit</a>(
-        <a href="native_bridge.md#0x1_native_bridge_BridgeRiskDenominatorChangedEvent">BridgeRiskDenominatorChangedEvent</a> {
-            old_risk_denominator,
-            new_risk_denominator,
+        <a href="native_bridge.md#0x1_native_bridge_BridgeInsuranceBudgetDividerChangedEvent">BridgeInsuranceBudgetDividerChangedEvent</a> {
+            old_insurance_budget_divider,
+            new_insurance_budget_divider,
         },
     );
 }
@@ -1906,16 +1903,16 @@ Asserts that the caller is the current bridge relayer.
 
 </details>
 
-<a id="0x1_native_bridge_assert_rate_limit_budget_not_exceeded"></a>
+<a id="0x1_native_bridge_assert_outbound_rate_limit_budget_not_exceeded"></a>
 
-## Function `assert_rate_limit_budget_not_exceeded`
+## Function `assert_outbound_rate_limit_budget_not_exceeded`
 
 Asserts that the rate limit budget is not exceeded.
 
 @param amount The amount to be transferred.
 
 
-<pre><code><b>fun</b> <a href="native_bridge.md#0x1_native_bridge_assert_rate_limit_budget_not_exceeded">assert_rate_limit_budget_not_exceeded</a>(amount: u64)
+<pre><code><b>fun</b> <a href="native_bridge.md#0x1_native_bridge_assert_outbound_rate_limit_budget_not_exceeded">assert_outbound_rate_limit_budget_not_exceeded</a>(amount: u64)
 </code></pre>
 
 
@@ -1924,16 +1921,51 @@ Asserts that the rate limit budget is not exceeded.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="native_bridge.md#0x1_native_bridge_assert_rate_limit_budget_not_exceeded">assert_rate_limit_budget_not_exceeded</a>(amount: u64) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_SmartTableWrapper">SmartTableWrapper</a>, <a href="native_bridge.md#0x1_native_bridge_BridgeConfig">BridgeConfig</a> {
+<pre><code><b>fun</b> <a href="native_bridge.md#0x1_native_bridge_assert_outbound_rate_limit_budget_not_exceeded">assert_outbound_rate_limit_budget_not_exceeded</a>(amount: u64) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_OutboundRateLimitBudget">OutboundRateLimitBudget</a>, <a href="native_bridge.md#0x1_native_bridge_BridgeConfig">BridgeConfig</a> {
     <b>let</b> insurance_fund = <b>borrow_global</b>&lt;<a href="native_bridge.md#0x1_native_bridge_BridgeConfig">BridgeConfig</a>&gt;(@aptos_framework).insurance_fund;
-    <b>let</b> risk_denominator = <b>borrow_global</b>&lt;<a href="native_bridge.md#0x1_native_bridge_BridgeConfig">BridgeConfig</a>&gt;(@aptos_framework).risk_denominator;
-    <b>let</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a> = <b>borrow_global_mut</b>&lt;<a href="native_bridge.md#0x1_native_bridge_SmartTableWrapper">SmartTableWrapper</a>&lt;u64, u64&gt;&gt;(@aptos_framework);
+    <b>let</b> insurance_budget_divider = <b>borrow_global</b>&lt;<a href="native_bridge.md#0x1_native_bridge_BridgeConfig">BridgeConfig</a>&gt;(@aptos_framework).insurance_budget_divider;
+    <b>let</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a> = <b>borrow_global_mut</b>&lt;<a href="native_bridge.md#0x1_native_bridge_OutboundRateLimitBudget">OutboundRateLimitBudget</a>&gt;(@aptos_framework);
 
     <b>let</b> day = <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() / 86400;
-    <b>let</b> current_budget = <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow_mut_with_default">smart_table::borrow_mut_with_default</a>(&<b>mut</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>.inner, day, 0);
-    <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_upsert">smart_table::upsert</a>(&<b>mut</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>.inner, day, *current_budget + amount);
-    <b>let</b> rate_limit = <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;AptosCoin&gt;(insurance_fund) / risk_denominator;
-    <b>assert</b>!(*<a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow">smart_table::borrow</a>(&<a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>.inner, day) &lt; rate_limit, <a href="native_bridge.md#0x1_native_bridge_ERATE_LIMIT_EXCEEDED">ERATE_LIMIT_EXCEEDED</a>);
+    <b>let</b> current_budget = <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow_mut_with_default">smart_table::borrow_mut_with_default</a>(&<b>mut</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>.day, day, 0);
+    <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_upsert">smart_table::upsert</a>(&<b>mut</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>.day, day, *current_budget + amount);
+    <b>let</b> rate_limit = <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;AptosCoin&gt;(insurance_fund) / insurance_budget_divider;
+    <b>assert</b>!(*<a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow">smart_table::borrow</a>(&<a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>.day, day) &lt; rate_limit, <a href="native_bridge.md#0x1_native_bridge_ERATE_LIMIT_EXCEEDED">ERATE_LIMIT_EXCEEDED</a>);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_native_bridge_assert_inbound_rate_limit_budget_not_exceeded"></a>
+
+## Function `assert_inbound_rate_limit_budget_not_exceeded`
+
+Asserts that the rate limit budget is not exceeded.
+
+@param amount The amount to be transferred.
+
+
+<pre><code><b>fun</b> <a href="native_bridge.md#0x1_native_bridge_assert_inbound_rate_limit_budget_not_exceeded">assert_inbound_rate_limit_budget_not_exceeded</a>(amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="native_bridge.md#0x1_native_bridge_assert_inbound_rate_limit_budget_not_exceeded">assert_inbound_rate_limit_budget_not_exceeded</a>(amount: u64) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_InboundRateLimitBudget">InboundRateLimitBudget</a>, <a href="native_bridge.md#0x1_native_bridge_BridgeConfig">BridgeConfig</a> {
+    <b>let</b> insurance_fund = <b>borrow_global</b>&lt;<a href="native_bridge.md#0x1_native_bridge_BridgeConfig">BridgeConfig</a>&gt;(@aptos_framework).insurance_fund;
+    <b>let</b> insurance_budget_divider = <b>borrow_global</b>&lt;<a href="native_bridge.md#0x1_native_bridge_BridgeConfig">BridgeConfig</a>&gt;(@aptos_framework).insurance_budget_divider;
+    <b>let</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a> = <b>borrow_global_mut</b>&lt;<a href="native_bridge.md#0x1_native_bridge_InboundRateLimitBudget">InboundRateLimitBudget</a>&gt;(@aptos_framework);
+
+    <b>let</b> day = <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() / 86400;
+    <b>let</b> current_budget = <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow_mut_with_default">smart_table::borrow_mut_with_default</a>(&<b>mut</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>.day, day, 0);
+    <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_upsert">smart_table::upsert</a>(&<b>mut</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>.day, day, *current_budget + amount);
+    <b>let</b> rate_limit = <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;AptosCoin&gt;(insurance_fund) / insurance_budget_divider;
+    <b>assert</b>!(*<a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow">smart_table::borrow</a>(&<a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>.day, day) &lt; rate_limit, <a href="native_bridge.md#0x1_native_bridge_ERATE_LIMIT_EXCEEDED">ERATE_LIMIT_EXCEEDED</a>);
 }
 </code></pre>
 
