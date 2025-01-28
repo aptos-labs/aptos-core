@@ -152,6 +152,8 @@ mod limit_processor;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod proptest_types;
 mod scheduler;
+mod scheduler_status;
+mod scheduler_v2;
 pub mod task;
 pub mod txn_commit_hook;
 pub mod txn_last_input_output;
