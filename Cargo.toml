@@ -498,7 +498,7 @@ ark-groth16 = "0.4.0"
 ark-relations = "0.4.0"
 ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
-aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "3064a075e1abc06c60363f3f2551cc41f5c091de" }
+aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "d68d37eefccd61fa19ff3afd2c9c11a1ae8f7d3b" }
 assert_approx_eq = "1.1.0"
 async-channel = "1.7.1"
 async-mutex = "1.4.0"
@@ -695,7 +695,7 @@ pretty = "0.10.0"
 pretty_assertions = "1.2.1"
 # We set default-features to false so we don't onboard the libpq dep. See more here:
 # https://github.com/aptos-labs/aptos-core/pull/12568
-processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "3064a075e1abc06c60363f3f2551cc41f5c091de", default-features = false }
+processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "d68d37eefccd61fa19ff3afd2c9c11a1ae8f7d3b", default-features = false }
 procfs = "0.14.1"
 proc-macro2 = "1.0.38"
 project-root = "0.2.2"
@@ -758,7 +758,7 @@ serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev =
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 serde_with = "3.4.0"
 serde_yaml = "0.8.24"
-server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "3064a075e1abc06c60363f3f2551cc41f5c091de" }
+server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "d68d37eefccd61fa19ff3afd2c9c11a1ae8f7d3b" }
 set_env = "1.3.4"
 shadow-rs = "0.16.2"
 simplelog = "0.9.0"

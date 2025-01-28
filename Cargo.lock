@@ -2949,7 +2949,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=3064a075e1abc06c60363f3f2551cc41f5c091de#3064a075e1abc06c60363f3f2551cc41f5c091de"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d68d37eefccd61fa19ff3afd2c9c11a1ae8f7d3b#d68d37eefccd61fa19ff3afd2c9c11a1ae8f7d3b"
 dependencies = [
  "chrono",
 ]
@@ -3467,7 +3467,7 @@ dependencies = [
 [[package]]
 name = "aptos-protos"
 version = "1.3.1"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=6116af69aa173ca49e1761daabd6fe103fe2c65e#6116af69aa173ca49e1761daabd6fe103fe2c65e"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=1d8460a995503574ec4e9699d3442d0150d7f3b9#1d8460a995503574ec4e9699d3442d0150d7f3b9"
 dependencies = [
  "pbjson",
  "prost 0.13.4",
@@ -13695,14 +13695,14 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=3064a075e1abc06c60363f3f2551cc41f5c091de#3064a075e1abc06c60363f3f2551cc41f5c091de"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d68d37eefccd61fa19ff3afd2c9c11a1ae8f7d3b#d68d37eefccd61fa19ff3afd2c9c11a1ae8f7d3b"
 dependencies = [
  "ahash 0.8.11",
  "allocative",
  "allocative_derive",
  "anyhow",
  "aptos-moving-average",
- "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=6116af69aa173ca49e1761daabd6fe103fe2c65e)",
+ "aptos-protos 1.3.1 (git+https://github.com/aptos-labs/aptos-core.git?rev=1d8460a995503574ec4e9699d3442d0150d7f3b9)",
  "async-trait",
  "bcs 0.1.4",
  "bigdecimal",
@@ -15489,7 +15489,7 @@ dependencies = [
 [[package]]
 name = "server-framework"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=3064a075e1abc06c60363f3f2551cc41f5c091de#3064a075e1abc06c60363f3f2551cc41f5c091de"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d68d37eefccd61fa19ff3afd2c9c11a1ae8f7d3b#d68d37eefccd61fa19ff3afd2c9c11a1ae8f7d3b"
 dependencies = [
  "anyhow",
  "aptos-system-utils 0.1.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=202bdccff2b2d333a385ae86a4fcf23e89da9f62)",
