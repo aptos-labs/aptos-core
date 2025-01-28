@@ -122,6 +122,21 @@ module aptos_std::bls12381 {
         }
     }
 
+    /// CRYPTOGRAPHY WARNING: Using this function to create `PublicKeyWithPoP' without first externally verifying the pop can
+    /// result in rogue-key attacks.
+    /// Creates a PoP'd public key from a normal public key assuming the pop is verified externally
+    /// This function in contrast to `public_key_from_bytes_with_pop' does not require pop and assumes that
+    /// the pop is already verified and we donot wish to verify it again or pop is unavailable due to some reason.
+    public fun public_key_from_bytes_with_pop_externally_verified(pk_bytes: vector<u8>): Option<PublicKeyWithPoP> {
+        if (validate_pubkey_internal(pk_bytes)) {
+            option::some(PublicKeyWithPoP {
+                bytes: pk_bytes
+            })
+        } else {
+            option::none<PublicKeyWithPoP>()
+        }
+    }
+
     /// Creates a normal public key from a PoP'd public key.
     public fun public_key_with_pop_to_normal(pkpop: &PublicKeyWithPoP): PublicKey {
         PublicKey {
