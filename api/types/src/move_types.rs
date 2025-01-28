@@ -681,6 +681,10 @@ impl From<TypeTag> for MoveType {
                 items: Box::new(MoveType::from(*v)),
             },
             TypeTag::Struct(v) => MoveType::Struct((*v).into()),
+            TypeTag::Function(..) => {
+                // TODO(#15664): determine whether functions and closures need to be supported
+                panic!("functions not supported by API types")
+            },
         }
     }
 }
@@ -701,6 +705,10 @@ impl From<&TypeTag> for MoveType {
                 items: Box::new(MoveType::from(v.as_ref())),
             },
             TypeTag::Struct(v) => MoveType::Struct((&**v).into()),
+            TypeTag::Function(..) => {
+                // TODO(#15664): determine whether functions and closures need to be supported
+                panic!("functions not supported by API types")
+            },
         }
     }
 }
