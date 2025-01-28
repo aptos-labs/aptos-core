@@ -262,11 +262,12 @@ module aptos_framework::aptos_account {
         ref: &BurnRef,
         account: address,
         amount: u64,
+        upgrade_to_concurrent: bool,
     ) {
         // Skip burning if amount is zero. This shouldn't error out as it's called as part of transaction fee burning.
         if (amount != 0) {
             let store_addr = primary_fungible_store_address(account);
-            fungible_asset::address_burn_from_for_gas(ref, store_addr, amount);
+            fungible_asset::address_burn_from_for_gas(ref, store_addr, amount, upgrade_to_concurrent);
         };
     }
 

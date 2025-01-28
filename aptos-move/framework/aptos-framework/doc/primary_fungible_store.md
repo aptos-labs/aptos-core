@@ -44,6 +44,7 @@ fungible asset to it. This emits an deposit event.
 -  [Function `withdraw_with_ref`](#0x1_primary_fungible_store_withdraw_with_ref)
 -  [Function `deposit_with_ref`](#0x1_primary_fungible_store_deposit_with_ref)
 -  [Function `transfer_with_ref`](#0x1_primary_fungible_store_transfer_with_ref)
+-  [Function `upgrade_to_concurrent`](#0x1_primary_fungible_store_upgrade_to_concurrent)
 -  [Function `may_be_unburn`](#0x1_primary_fungible_store_may_be_unburn)
 -  [Specification](#@Specification_0)
     -  [High-level Requirements](#high-level-req)
@@ -850,6 +851,31 @@ Transfer <code>amount</code> of FA from the primary store of <code>from</code> t
     <b>let</b> from_primary_store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_store</a>(from, <a href="fungible_asset.md#0x1_fungible_asset_transfer_ref_metadata">fungible_asset::transfer_ref_metadata</a>(transfer_ref));
     <b>let</b> to_primary_store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(<b>to</b>, <a href="fungible_asset.md#0x1_fungible_asset_transfer_ref_metadata">fungible_asset::transfer_ref_metadata</a>(transfer_ref));
     <a href="fungible_asset.md#0x1_fungible_asset_transfer_with_ref">fungible_asset::transfer_with_ref</a>(transfer_ref, from_primary_store, to_primary_store, amount);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_primary_fungible_store_upgrade_to_concurrent"></a>
+
+## Function `upgrade_to_concurrent`
+
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_upgrade_to_concurrent">upgrade_to_concurrent</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_upgrade_to_concurrent">upgrade_to_concurrent</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: Object&lt;Metadata&gt;) <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> {
+    <b>let</b> store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner), metadata);
+    <a href="fungible_asset.md#0x1_fungible_asset_upgrade_store_to_concurrent">fungible_asset::upgrade_store_to_concurrent</a>(owner, store);
 }
 </code></pre>
 
