@@ -707,6 +707,7 @@ impl FakeExecutor {
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let config = BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
+                block_stm_v2: false,
                 concurrency_level: if sequential {
                     1
                 } else {
