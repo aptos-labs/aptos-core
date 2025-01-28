@@ -17,7 +17,9 @@ use crate::{
     epoch_manager::LivenessStorageData,
     logging::{LogEvent, LogSchema},
     monitor,
-    network::{DeprecatedIncomingBlockRetrievalRequest, NetworkSender},
+    network::{
+        DeprecatedIncomingBlockRetrievalRequest, IncomingBlockRetrievalRequest, NetworkSender,
+    },
     network_interface::ConsensusMsg,
     payload_manager::TPayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
@@ -504,6 +506,23 @@ impl BlockStore {
             .response_sender
             .send(Ok(response_bytes.into()))
             .map_err(|_| anyhow::anyhow!("Failed to send block retrieval response"))
+    }
+
+    /// TODO @bchocho @hariria to implement in upcoming PR
+    /// Retrieve a n chained blocks from the block store starting from
+    /// an initial parent id, returning with <n (as many as possible) if
+    /// id or its ancestors can not be found.
+    ///
+    /// The current version of the function is not really async, but keeping it this way for
+    /// future possible changes.
+    pub async fn process_block_retrieval_v2(
+        &self,
+        request: IncomingBlockRetrievalRequest,
+    ) -> anyhow::Result<()> {
+        bail!(
+            "Unexpected request {:?} for process_block_retrieval_v2",
+            request.req
+        )
     }
 }
 
