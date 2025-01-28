@@ -13,6 +13,7 @@ use crate::{
         buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
         decoupled_execution_utils::prepare_phases_and_buffer_manager,
         errors::Error,
+        pipeline_builder::PipelineBuilder,
         signing_phase::CommitSignerProvider,
     },
     rand::rand_gen::{
@@ -58,7 +59,7 @@ pub trait TExecutionClient: Send + Sync {
     /// Initialize the execution phase for a new epoch.
     async fn start_epoch(
         &self,
-        maybe_consensus_key: Option<Arc<PrivateKey>>,
+        maybe_consensus_key: Arc<PrivateKey>,
         epoch_state: Arc<EpochState>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -104,6 +105,9 @@ pub trait TExecutionClient: Send + Sync {
 
     /// Shutdown the current processor at the end of the epoch.
     async fn end_epoch(&self);
+
+    /// Returns a pipeline builder for the current epoch.
+    fn pipeline_builder(&self, signer: Arc<ValidatorSigner>) -> PipelineBuilder;
 }
 
 struct BufferManagerHandle {
@@ -192,7 +196,7 @@ impl ExecutionProxyClient {
 
     fn spawn_decoupled_execution(
         &self,
-        maybe_consensus_key: Option<Arc<PrivateKey>>,
+        consensus_sk: Arc<PrivateKey>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         epoch_state: Arc<EpochState>,
         rand_config: Option<RandConfig>,
@@ -226,8 +230,6 @@ impl ExecutionProxyClient {
                 let (rand_ready_block_tx, rand_ready_block_rx) = unbounded::<OrderedBlocks>();
 
                 let (reset_tx_to_rand_manager, reset_rand_manager_rx) = unbounded::<ResetRequest>();
-                let consensus_sk = maybe_consensus_key
-                    .expect("consensus key unavailable for ExecutionProxyClient");
                 let signer = Arc::new(ValidatorSigner::new(self.author, consensus_sk));
 
                 let rand_manager = RandManager::<Share, AugmentedData>::new(
@@ -306,7 +308,7 @@ impl ExecutionProxyClient {
 impl TExecutionClient for ExecutionProxyClient {
     async fn start_epoch(
         &self,
-        maybe_consensus_key: Option<Arc<PrivateKey>>,
+        maybe_consensus_key: Arc<PrivateKey>,
         epoch_state: Arc<EpochState>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -510,6 +512,10 @@ impl TExecutionClient for ExecutionProxyClient {
         }
         self.execution_proxy.end_epoch();
     }
+
+    fn pipeline_builder(&self, signer: Arc<ValidatorSigner>) -> PipelineBuilder {
+        self.execution_proxy.pipeline_builder(signer)
+    }
 }
 
 pub struct DummyExecutionClient;
@@ -518,7 +524,7 @@ pub struct DummyExecutionClient;
 impl TExecutionClient for DummyExecutionClient {
     async fn start_epoch(
         &self,
-        _maybe_consensus_key: Option<Arc<PrivateKey>>,
+        _maybe_consensus_key: Arc<PrivateKey>,
         _epoch_state: Arc<EpochState>,
         _commit_signer_provider: Arc<dyn CommitSignerProvider>,
         _payload_manager: Arc<dyn TPayloadManager>,
@@ -567,4 +573,8 @@ impl TExecutionClient for DummyExecutionClient {
     }
 
     async fn end_epoch(&self) {}
+
+    fn pipeline_builder(&self, _signer: Arc<ValidatorSigner>) -> PipelineBuilder {
+        todo!()
+    }
 }

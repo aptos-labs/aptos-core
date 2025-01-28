@@ -27,7 +27,7 @@ use move_compiler::{
     shared::{Flags, NamedAddressMap, NumericalAddress, PackagePaths},
     Compiler,
 };
-use move_compiler_v2::Experiment;
+use move_compiler_v2::{external_checks::ExternalChecks, Experiment};
 use move_docgen::{Docgen, DocgenOptions};
 use move_model::{
     model::GlobalEnv, options::ModelBuilderOptions,
@@ -39,6 +39,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     io::Write,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 use termcolor::{ColorChoice, StandardStream};
 
@@ -544,6 +545,7 @@ impl CompiledPackage {
             /* whether source is available */ bool,
         )>,
         config: &CompilerConfig,
+        external_checks: Vec<Arc<dyn ExternalChecks>>,
         resolution_graph: &ResolvedGraph,
         mut compiler_driver_v1: impl FnMut(Compiler) -> CompilerDriverResult,
         mut compiler_driver_v2: impl FnMut(move_compiler_v2::Options) -> CompilerDriverResult,
@@ -696,6 +698,7 @@ impl CompiledPackage {
                         compiler_version: Some(version),
                         compile_test_code: flags.keep_testing_functions(),
                         experiments: config.experiments.clone(),
+                        external_checks,
                         ..Default::default()
                     };
                     options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);

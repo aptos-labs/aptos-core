@@ -29,9 +29,14 @@ use std::sync::Arc;
 pub struct UnsyncCodeStorage<M>(UnsyncCodeStorageImpl<M>);
 
 impl<M: ModuleStorage> UnsyncCodeStorage<M> {
-    /// Returns the underlying module storage used by this code storage.
+    /// Returns the reference to the underlying module storage used by this code storage.
     pub fn module_storage(&self) -> &M {
         &self.0.module_storage
+    }
+
+    /// Returns the underlying module storage used by this code storage.
+    pub fn into_module_storage(self) -> M {
+        self.0.module_storage
     }
 
     /// Test-only method that checks the state of the script cache.

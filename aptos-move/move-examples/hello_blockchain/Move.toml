@@ -6,4 +6,4 @@ version = "0.0.0"
 hello_blockchain = "_"
 
 [dependencies]
-AptosFramework = { local = "../../framework/aptos-framework" }
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-framework", rev = "mainnet" }

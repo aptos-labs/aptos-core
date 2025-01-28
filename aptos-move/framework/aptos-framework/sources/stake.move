@@ -79,7 +79,7 @@ module aptos_framework::stake {
     const EINVALID_LOCKUP: u64 = 18;
     /// Table to store collected transaction fees for each validator already exists.
     const EFEES_TABLE_ALREADY_EXISTS: u64 = 19;
-    /// Validator set change temporarily disabled because of in-progress reconfiguration.
+    /// Validator set change temporarily disabled because of in-progress reconfiguration. Please retry after 1 minute.
     const ERECONFIGURATION_IN_PROGRESS: u64 = 20;
 
     /// Validator status enum. We can switch to proper enum later once Move supports it.

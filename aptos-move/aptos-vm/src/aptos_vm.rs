@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_executor::{AptosTransactionOutput, BlockAptosVM},
+    block_executor::{AptosTransactionOutput, AptosVMBlockExecutorWrapper},
     counters::*,
     data_cache::{AsMoveResolver, StorageAdapter},
     errors::{discarded_output, expect_only_successful_execution},
@@ -22,12 +22,16 @@ use crate::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
-    transaction_validation, verifier,
-    verifier::randomness::get_randomness_annotation,
-    VMExecutor, VMValidator,
+    transaction_validation,
+    verifier::{self, randomness::get_randomness_annotation},
+    VMBlockExecutor, VMValidator,
 };
 use anyhow::anyhow;
-use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::{
+    code_cache_global_manager::AptosModuleCacheManager,
+    txn_commit_hook::NoOpTransactionCommitHook,
+    txn_provider::{default::DefaultTxnProvider, TxnProvider},
+};
 use aptos_crypto::HashValue;
 use aptos_framework::{
     natives::{code::PublishRequest, randomness::RandomnessContext},
@@ -43,8 +47,12 @@ use aptos_types::state_store::StateViewId;
 use aptos_types::{
     account_config::{self, new_block_event_key, AccountResource},
     block_executor::{
-        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
+        config::{
+            BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig,
+            BlockExecutorModuleCacheLocalConfig,
+        },
         partitioner::PartitionedTransactions,
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     block_metadata::BlockMetadata,
     block_metadata_ext::{BlockMetadataExt, BlockMetadataWithRandomness},
@@ -1646,7 +1654,12 @@ impl AptosVM {
         let check_friend_linking = !self
             .features()
             .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE);
-        let compatability_checks = Compatibility::new(check_struct_layout, check_friend_linking);
+        let compatibility_checks = Compatibility::new(
+            check_struct_layout,
+            check_friend_linking,
+            self.timed_features()
+                .is_enabled(TimedFeatureFlag::EntryCompatibility),
+        );
 
         if self.features().is_loader_v2_enabled() {
             session.finish_with_module_publishing_and_initialization(
@@ -1659,7 +1672,7 @@ impl AptosVM {
                 destination,
                 bundle,
                 modules,
-                compatability_checks,
+                compatibility_checks,
             )
         } else {
             // Check what modules exist before publishing.
@@ -1683,7 +1696,7 @@ impl AptosVM {
                     bundle.into_inner(),
                     destination,
                     gas_meter,
-                    compatability_checks,
+                    compatibility_checks,
                 )
             })?;
 
@@ -2766,17 +2779,32 @@ impl AptosVM {
     }
 }
 
-// Executor external API
-impl VMExecutor for AptosVM {
-    /// Execute a block of `transactions`. The output vector will have the exact same length as the
-    /// input vector. The discarded transactions will be marked as `TransactionStatus::Discard` and
-    /// have an empty `WriteSet`. Also `state_view` is immutable, and does not have interior
-    /// mutability. Writes to be applied to the data view are encoded in the write set part of a
-    /// transaction output.
+// TODO - move out from this file?
+
+/// Production implementation of VMBlockExecutor.
+///
+/// Transaction execution: AptosVM
+/// Executing conflicts: in the input order, via BlockSTM,
+/// State: BlockSTM-provided MVHashMap-based view with caching
+pub struct AptosVMBlockExecutor {
+    /// Manages module cache and execution environment of this block executor. Users of executor
+    /// must use manager's API to ensure the correct state of caches.
+    module_cache_manager: AptosModuleCacheManager,
+}
+
+impl VMBlockExecutor for AptosVMBlockExecutor {
+    fn new() -> Self {
+        Self {
+            module_cache_manager: AptosModuleCacheManager::new(),
+        }
+    }
+
     fn execute_block(
-        transactions: &[SignatureVerifiedTransaction],
+        &self,
+        txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction>,
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
+        transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         fail_point!("move_adapter::execute_block", |_| {
             Err(VMStatus::error(
@@ -2788,24 +2816,28 @@ impl VMExecutor for AptosVM {
         info!(
             log_context,
             "Executing block, transaction count: {}",
-            transactions.len()
+            txn_provider.num_txns()
         );
 
-        let count = transactions.len();
-        let ret = BlockAptosVM::execute_block::<
+        let count = txn_provider.num_txns();
+        let ret = AptosVMBlockExecutorWrapper::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+            DefaultTxnProvider<SignatureVerifiedTransaction>,
         >(
-            transactions,
+            txn_provider,
             state_view,
+            &self.module_cache_manager,
             BlockExecutorConfig {
                 local: BlockExecutorLocalConfig {
-                    concurrency_level: Self::get_concurrency_level(),
+                    concurrency_level: AptosVM::get_concurrency_level(),
                     allow_fallback: true,
-                    discard_failed_blocks: Self::get_discard_failed_blocks(),
+                    discard_failed_blocks: AptosVM::get_discard_failed_blocks(),
+                    module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
                 },
                 onchain: onchain_config,
             },
+            transaction_slice_metadata,
             None,
         );
         if ret.is_ok() {
@@ -3053,13 +3085,44 @@ pub(crate) fn fetch_module_metadata_for_struct_tag(
     }
 }
 
-#[test]
-fn vm_thread_safe() {
-    fn assert_send<T: Send>() {}
-    fn assert_sync<T: Sync>() {}
+#[cfg(test)]
+mod tests {
+    use crate::{move_vm_ext::MoveVmExt, AptosVM};
+    use aptos_types::{
+        account_address::AccountAddress,
+        account_config::{NEW_EPOCH_EVENT_MOVE_TYPE_TAG, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG},
+        contract_event::ContractEvent,
+        event::EventKey,
+    };
 
-    assert_send::<AptosVM>();
-    assert_sync::<AptosVM>();
-    assert_send::<MoveVmExt>();
-    assert_sync::<MoveVmExt>();
+    #[test]
+    fn vm_thread_safe() {
+        fn assert_send<T: Send>() {}
+        fn assert_sync<T: Sync>() {}
+
+        assert_send::<AptosVM>();
+        assert_sync::<AptosVM>();
+        assert_send::<MoveVmExt>();
+        assert_sync::<MoveVmExt>();
+    }
+
+    #[test]
+    fn should_restart_execution_on_new_epoch() {
+        let new_epoch_event = ContractEvent::new_v1(
+            EventKey::new(0, AccountAddress::ONE),
+            0,
+            NEW_EPOCH_EVENT_MOVE_TYPE_TAG.clone(),
+            vec![],
+        );
+        let new_epoch_event_v2 =
+            ContractEvent::new_v2(NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(), vec![]);
+        assert!(AptosVM::should_restart_execution(&[(
+            new_epoch_event,
+            None
+        )]));
+        assert!(AptosVM::should_restart_execution(&[(
+            new_epoch_event_v2,
+            None
+        )]));
+    }
 }

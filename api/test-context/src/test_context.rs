@@ -31,7 +31,9 @@ use aptos_sdk::{
         transaction::SignedTransaction, AccountKey, LocalAccount,
     },
 };
-use aptos_storage_interface::{state_view::DbStateView, DbReaderWriter};
+use aptos_storage_interface::{
+    state_store::state_view::db_state_view::DbStateView, DbReaderWriter,
+};
 use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::{create_multisig_account_address, AccountAddress},
@@ -47,7 +49,7 @@ use aptos_types::{
         TransactionPayload, TransactionStatus, Version,
     },
 };
-use aptos_vm::AptosVM;
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use aptos_vm_validator::vm_validator::PooledVMValidator;
 use bytes::Bytes;
 use hyper::{HeaderMap, Response};
@@ -168,8 +170,12 @@ pub fn new_test_context_inner(
         }
         DbReaderWriter::wrap(aptos_db)
     };
-    let ret =
-        db_bootstrapper::maybe_bootstrap::<AptosVM>(&db_rw, &genesis, genesis_waypoint).unwrap();
+    let ret = db_bootstrapper::maybe_bootstrap::<AptosVMBlockExecutor>(
+        &db_rw,
+        &genesis,
+        genesis_waypoint,
+    )
+    .unwrap();
     assert!(ret.is_some());
 
     let mempool = MockSharedMempool::new_in_runtime(&db_rw, PooledVMValidator::new(db.clone(), 1));
@@ -204,7 +210,7 @@ pub fn new_test_context_inner(
         rng,
         root_key,
         validator_owner,
-        Box::new(BlockExecutor::<AptosVM>::new(db_rw)),
+        Box::new(BlockExecutor::<AptosVMBlockExecutor>::new(db_rw)),
         mempool,
         db,
         test_name,

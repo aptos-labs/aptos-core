@@ -11,11 +11,15 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{
         account_address::AccountAddress,
-        transaction::{SignedTransaction, TransactionPayload},
+        transaction::{Script, SignedTransaction, TransactionPayload},
         LocalAccount,
     },
 };
-use move_binary_format::{access::ModuleAccess, file_format::SignatureToken, CompiledModule};
+use move_binary_format::{
+    access::ModuleAccess,
+    file_format::{CompiledScript, SignatureToken},
+    CompiledModule,
+};
 use rand::{rngs::StdRng, Rng};
 
 // Information used to track a publisher and what allows to identify and
@@ -127,6 +131,26 @@ impl Package {
         Self::Simple(modules, metadata)
     }
 
+    pub fn script(publisher: AccountAddress) -> TransactionPayload {
+        assert_ne!(publisher, AccountAddress::MAX_ADDRESS);
+
+        let code = &*raw_module_data::SCRIPT_SIMPLE;
+        let mut script = CompiledScript::deserialize(code).expect("Script must deserialize");
+
+        // Make sure dependencies link to published modules. Compiler V2 adds 0xf..ff so we need to
+        // skip it.
+        assert_eq!(script.address_identifiers.len(), 2);
+        for address in &mut script.address_identifiers {
+            if address != &AccountAddress::MAX_ADDRESS {
+                *address = publisher;
+            }
+        }
+
+        let mut code = vec![];
+        script.serialize(&mut code).expect("Script must serialize");
+        TransactionPayload::Script(Script::new(code, vec![], vec![]))
+    }
+
     fn load_package(
         package_bytes: &[u8],
         modules_bytes: &[Vec<u8>],
@@ -163,11 +187,28 @@ impl Package {
         module_simple::scramble(self.get_mut_module("simple"), fn_count, rng)
     }
 
+    pub fn get_publish_args(&self) -> (Vec<u8>, Vec<Vec<u8>>) {
+        match self {
+            Self::Simple(modules, metadata) => {
+                let metadata_serialized =
+                    bcs::to_bytes(metadata).expect("PackageMetadata must serialize");
+                let mut code: Vec<Vec<u8>> = vec![];
+                for (_, module) in modules {
+                    let mut module_code: Vec<u8> = vec![];
+                    module
+                        .serialize(&mut module_code)
+                        .expect("Module must serialize");
+                    code.push(module_code);
+                }
+                (metadata_serialized, code)
+            },
+        }
+    }
+
     // Return a transaction payload to publish the current package
     pub fn publish_transaction_payload(&self) -> TransactionPayload {
-        match self {
-            Self::Simple(modules, metadata) => publish_transaction_payload(modules, metadata),
-        }
+        let (metadata_serialized, code) = self.get_publish_args();
+        aptos_stdlib::code_publish_package_txn(metadata_serialized, code)
     }
 
     // Return a transaction to use the current package
@@ -177,8 +218,8 @@ impl Package {
         account: &LocalAccount,
         txn_factory: &TransactionFactory,
     ) -> SignedTransaction {
-        // let payload = module_simple::rand_gen_function(rng, module_id);
-        let payload = module_simple::rand_simple_function(rng, self.get_module_id("simple"));
+        // let payload = module_simple::rand_gen_function(self, "simple", rng);
+        let payload = module_simple::rand_simple_function(self, "simple", rng);
         account.sign_with_transaction_builder(txn_factory.payload(payload))
     }
 
@@ -299,20 +340,4 @@ fn update(
         }
     }
     (new_modules, metadata)
-}
-
-fn publish_transaction_payload(
-    modules: &[(String, CompiledModule)],
-    metadata: &PackageMetadata,
-) -> TransactionPayload {
-    let metadata = bcs::to_bytes(metadata).expect("PackageMetadata must serialize");
-    let mut code: Vec<Vec<u8>> = vec![];
-    for (_, module) in modules {
-        let mut module_code: Vec<u8> = vec![];
-        module
-            .serialize(&mut module_code)
-            .expect("Module must serialize");
-        code.push(module_code);
-    }
-    aptos_stdlib::code_publish_package_txn(metadata, code)
 }

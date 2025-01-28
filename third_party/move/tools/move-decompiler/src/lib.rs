@@ -161,15 +161,15 @@ impl Decompiler {
                 continue;
             }
             if let Some(def) = astifier::generate_ast_raw(&target) {
-                let def = if self.options.no_conditionals {
-                    def
-                } else {
-                    astifier::transform_conditionals(&target, def)
-                };
                 let def = if self.options.no_expressions {
                     def
                 } else {
                     astifier::transform_assigns(&target, def)
+                };
+                let def = if self.options.no_conditionals {
+                    def
+                } else {
+                    astifier::transform_conditionals(&target, def)
                 };
                 // The next step must always happen to create valid Move
                 let def = astifier::bind_free_vars(&target, def);

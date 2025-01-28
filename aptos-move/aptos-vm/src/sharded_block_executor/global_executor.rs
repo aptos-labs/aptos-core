@@ -60,11 +60,9 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
             GLOBAL_ROUND_ID,
             state_view,
             BlockExecutorConfig {
-                local: BlockExecutorLocalConfig {
-                    concurrency_level: self.concurrency_level,
-                    allow_fallback: true,
-                    discard_failed_blocks: false,
-                },
+                local: BlockExecutorLocalConfig::default_with_concurrency_level(
+                    self.concurrency_level,
+                ),
                 onchain: onchain_config,
             },
         )

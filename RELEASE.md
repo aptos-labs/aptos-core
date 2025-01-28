@@ -40,9 +40,9 @@ The aptos cli release tags are created to track the CLI versions for community t
 * [day 0] A release branch `aptos-release-vx.y` will be created, with a commit hash `abcde`. The full test suite will be triggered for the commit hash for validation.
 * [day 1] The release will be deployed to **devnet**.
 * [day 7] Once the release passed devnet test, a release tag `aptos-node-vx.y.z.rc` will be created, and get deployed to **testnet**.
-* [day 10] After the binary release stablized on testnet, testnet framework will be upgraded.
+* [day 10] After the binary release stabilized on testnet, testnet framework will be upgraded.
 * Hot-fixes release will be created as needed when a release version is soaking in testnet, and we will only promote a release from testnet to Mainnet after confirming a release version is stable.
-* [day 14] Once confirmed that both binary upgrade and framework upgrade stablized on testnet, a release tag `aptos-node-vx.y.z` will be created, the release version will be deployed to 1% of the stake on **Mainnet**.
+* [day 14] Once confirmed that both binary upgrade and framework upgrade stabilized on testnet, a release tag `aptos-node-vx.y.z` will be created, the release version will be deployed to 1% of the stake on **Mainnet**.
 * [day 16] Wider announcement will be made for the community to upgrade the binary, `aptos-node-vx.y.z` will be updated with "[Mainnet]" in the release page, Mainnet validators will be slowly upgrading.
 * [day 17] A list of framework upgrade proposals will be submitted to Mainnet for voting.
 * [day 24] Proposals executed on-chain if passed voting.

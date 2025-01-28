@@ -8,7 +8,9 @@ pub mod test_runner;
 
 use crate::test_runner::TestRunner;
 use clap::*;
-use move_command_line_common::files::verify_and_create_named_address_mapping;
+use move_command_line_common::{
+    env::get_move_compiler_v2_from_env, files::verify_and_create_named_address_mapping,
+};
 use move_compiler::{
     self,
     diagnostics::{self, codes::Severity},
@@ -16,7 +18,10 @@ use move_compiler::{
     unit_test::{self, TestPlan},
     Compiler, Flags, PASS_CFGIR,
 };
+use move_compiler_v2::plan_builder as plan_builder_v2;
 use move_core_types::{effects::ChangeSet, language_storage::ModuleId};
+use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_package::compilation::compiled_package::build_and_report_v2_driver;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use std::{
     collections::BTreeMap,
@@ -156,37 +161,59 @@ impl UnitTestingConfig {
     ) -> Option<TestPlan> {
         let addresses =
             verify_and_create_named_address_mapping(self.named_address_values.clone()).ok()?;
-        let (files, comments_and_compiler_res) = Compiler::from_files(
-            source_files,
-            deps,
-            addresses,
-            Flags::testing().set_skip_attribute_checks(false),
-            KnownAttribute::get_all_attribute_names(),
-        )
-        .run::<PASS_CFGIR>()
-        .unwrap();
-        let (_, compiler) =
-            diagnostics::unwrap_or_report_diagnostics(&files, comments_and_compiler_res);
+        let (test_plan, files, units) = if get_move_compiler_v2_from_env() {
+            let options = move_compiler_v2::Options {
+                compile_test_code: true,
+                testing: true,
+                sources: source_files,
+                dependencies: deps,
+                compiler_version: Some(CompilerVersion::latest_stable()),
+                language_version: Some(LanguageVersion::latest_stable()),
+                named_address_mapping: addresses
+                    .iter()
+                    .map(|(string, num_addr)| format!("{}={}", string, num_addr))
+                    .collect(),
+                ..Default::default()
+            };
+            let (files, units, opt_env) = build_and_report_v2_driver(options).unwrap();
+            let env = opt_env.expect("v2 driver should return env");
+            let test_plan = plan_builder_v2::construct_test_plan(&env, None);
+            (test_plan, files, units)
+        } else {
+            let (files, comments_and_compiler_res) = Compiler::from_files(
+                source_files,
+                deps,
+                addresses,
+                Flags::testing().set_skip_attribute_checks(false),
+                KnownAttribute::get_all_attribute_names(),
+            )
+            .run::<PASS_CFGIR>()
+            .unwrap();
+            let (_, compiler) =
+                diagnostics::unwrap_or_report_diagnostics(&files, comments_and_compiler_res);
 
-        let (mut compiler, cfgir) = compiler.into_ast();
-        let compilation_env = compiler.compilation_env();
-        let test_plan = unit_test::plan_builder::construct_test_plan(compilation_env, None, &cfgir);
+            let (mut compiler, cfgir) = compiler.into_ast();
+            let compilation_env = compiler.compilation_env();
+            let test_plan =
+                unit_test::plan_builder::construct_test_plan(compilation_env, None, &cfgir);
 
-        if let Err(diags) = compilation_env.check_diags_at_or_above_severity(
-            if self.ignore_compile_warnings {
-                Severity::NonblockingError
-            } else {
-                Severity::Warning
-            },
-        ) {
-            diagnostics::report_diagnostics(&files, diags);
-        }
+            if let Err(diags) = compilation_env.check_diags_at_or_above_severity(
+                if self.ignore_compile_warnings {
+                    Severity::NonblockingError
+                } else {
+                    Severity::Warning
+                },
+            ) {
+                diagnostics::report_diagnostics(&files, diags);
+            }
 
-        let compilation_result = compiler.at_cfgir(cfgir).build();
+            let compilation_result = compiler.at_cfgir(cfgir).build();
 
-        let (units, warnings) =
-            diagnostics::unwrap_or_report_diagnostics(&files, compilation_result);
-        diagnostics::report_warnings(&files, warnings);
+            let (units, warnings) =
+                diagnostics::unwrap_or_report_diagnostics(&files, compilation_result);
+            diagnostics::report_warnings(&files, warnings);
+            (test_plan, files, units)
+        };
         test_plan.map(|tests| TestPlan::new(tests, files, units))
     }
 

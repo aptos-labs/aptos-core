@@ -13,12 +13,16 @@ use aptos_executor_types::{
     BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode,
 };
 use aptos_storage_interface::{
-    async_proof_fetcher::AsyncProofFetcher, DbReaderWriter, ExecutedTrees, Result,
+    state_store::state_view::async_proof_fetcher::AsyncProofFetcher, DbReaderWriter, ExecutedTrees,
+    Result,
 };
 use aptos_types::{
     account_address::AccountAddress,
     aggregate_signature::AggregateSignature,
-    block_executor::config::BlockExecutorConfigFromOnchain,
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain,
+        transaction_slice_metadata::TransactionSliceMetadata,
+    },
     block_info::BlockInfo,
     bytes::NumToBytes,
     chain_id::ChainId,
@@ -33,6 +37,7 @@ use aptos_types::{
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
+use aptos_vm::VMBlockExecutor;
 use itertools::Itertools;
 use mock_vm::{
     encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
@@ -677,7 +682,8 @@ fn run_transactions_naive(
 
     for txn in transactions {
         let ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
-        let out = DoGetExecutionOutput::by_transaction_execution::<MockVM>(
+        let out = DoGetExecutionOutput::by_transaction_execution(
+            &MockVM::new(),
             vec![txn].into(),
             ledger_view
                 .verified_state_view(
@@ -687,7 +693,7 @@ fn run_transactions_naive(
                 )
                 .unwrap(),
             block_executor_onchain_config.clone(),
-            None,
+            TransactionSliceMetadata::unknown(),
         )
         .unwrap();
         let output = ApplyExecutionOutput::run(out, &ledger_view).unwrap();

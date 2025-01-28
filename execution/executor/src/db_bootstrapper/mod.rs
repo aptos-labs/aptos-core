@@ -12,13 +12,18 @@ use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_storage_interface::{
-    async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
-    DbWriter, ExecutedTrees,
+    state_store::state_view::{
+        async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView,
+    },
+    DbReaderWriter, DbWriter, ExecutedTrees,
 };
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     aggregate_signature::AggregateSignature,
-    block_executor::config::BlockExecutorConfigFromOnchain,
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain,
+        transaction_slice_metadata::TransactionSliceMetadata,
+    },
     block_info::{BlockInfo, GENESIS_EPOCH, GENESIS_ROUND, GENESIS_TIMESTAMP_USECS},
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ConfigurationResource,
@@ -27,10 +32,10 @@ use aptos_types::{
     transaction::Transaction,
     waypoint::Waypoint,
 };
-use aptos_vm::VMExecutor;
+use aptos_vm::VMBlockExecutor;
 use std::sync::Arc;
 
-pub fn generate_waypoint<V: VMExecutor>(
+pub fn generate_waypoint<V: VMBlockExecutor>(
     db: &DbReaderWriter,
     genesis_txn: &Transaction,
 ) -> Result<Waypoint> {
@@ -43,7 +48,7 @@ pub fn generate_waypoint<V: VMExecutor>(
 /// If current version + 1 != waypoint.version(), return Ok(false) indicating skipping the txn.
 /// otherwise apply the txn and commit it if the result matches the waypoint.
 /// Returns Ok(true) if committed otherwise Err.
-pub fn maybe_bootstrap<V: VMExecutor>(
+pub fn maybe_bootstrap<V: VMBlockExecutor>(
     db: &DbReaderWriter,
     genesis_txn: &Transaction,
     waypoint: Waypoint,
@@ -110,7 +115,7 @@ impl GenesisCommitter {
     }
 }
 
-pub fn calculate_genesis<V: VMExecutor>(
+pub fn calculate_genesis<V: VMBlockExecutor>(
     db: &DbReaderWriter,
     executed_trees: ExecutedTrees,
     genesis_txn: &Transaction,
@@ -132,10 +137,11 @@ pub fn calculate_genesis<V: VMExecutor>(
     };
 
     let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
+        &V::new(),
         vec![genesis_txn.clone().into()].into(),
         base_state_view,
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
-        None,
+        TransactionSliceMetadata::unknown(),
     )?;
     ensure!(
         execution_output.num_transactions_to_commit() != 0,

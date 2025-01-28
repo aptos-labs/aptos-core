@@ -16,7 +16,7 @@ use aptos_logger::{info, trace};
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::SchemaBatch;
 use aptos_scratchpad::SmtAncestors;
-use aptos_storage_interface::state_delta::StateDelta;
+use aptos_storage_interface::state_store::state_delta::StateDelta;
 use aptos_types::state_store::state_value::StateValue;
 use std::sync::{mpsc::Receiver, Arc};
 
