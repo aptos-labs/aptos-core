@@ -236,10 +236,27 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [hash_keccak256_per_byte: InternalGasPerByte, { 1.. => "hash.keccak256.per_byte" }, 165],
 
         // Bulletproofs gas parameters begin.
-        // Generated at time 1683148919.0628748 by `scripts/algebra-gas/update_bulletproofs_gas_params.py` with gas_per_ns=10.0.
-        [bulletproofs_base: InternalGas, { 11.. => "bulletproofs.base" }, 11794651],
-        [bulletproofs_per_bit_rangeproof_verify: InternalGasPerArg, { 11.. => "bulletproofs.per_bit_rangeproof_verify" }, 1004253],
-        [bulletproofs_per_byte_rangeproof_deserialize: InternalGasPerByte, { 11.. => "bulletproofs.per_byte_rangeproof_deserialize" }, 121],
+        // Generated at time 1738158053.7406907 by `scripts/algebra-gas/update_bulletproofs_gas_params.py` with gas_per_ns=10.0.
+        [bulletproofs_verify_base_1: InternalGas, { 11.. => "bulletproofs.verify.base_1" }, 1_966_039],
+        [bulletproofs_verify_base_2: InternalGas, { 11.. => "bulletproofs.verify.base_2" }, 2_992_994],
+        [bulletproofs_verify_base_4: InternalGas, { 11.. => "bulletproofs.verify.base_4" }, 6_362_208],
+        [bulletproofs_verify_base_8: InternalGas, { 11.. => "bulletproofs.verify.base_8" }, 8_565_140],
+        [bulletproofs_verify_base_16: InternalGas, { 11.. => "bulletproofs.verify.base_16" }, 12_538_560],
+        [bulletproofs_verify_per_bit_1: InternalGasPerByte, { 11.. => "bulletproofs.verify.per_bit_1" }, 130_096],
+        [bulletproofs_verify_per_bit_2: InternalGasPerByte, { 11.. => "bulletproofs.verify.per_bit_2" }, 228_691],
+        [bulletproofs_verify_per_bit_4: InternalGasPerByte, { 11.. => "bulletproofs.verify.per_bit_4" }, 359_323],
+        [bulletproofs_verify_per_bit_8: InternalGasPerByte, { 11.. => "bulletproofs.verify.per_bit_8" }, 658_527],
+        [bulletproofs_verify_per_bit_16: InternalGasPerByte, { 11.. => "bulletproofs.verify.per_bit_16" }, 1_212_581],
+        [bulletproofs_deserialize_base_1: InternalGas, { 11.. => "bulletproofs.deserialize.base_1" }, 3_253],
+        [bulletproofs_deserialize_base_2: InternalGas, { 11.. => "bulletproofs.deserialize.base_2" }, 3_226],
+        [bulletproofs_deserialize_base_4: InternalGas, { 11.. => "bulletproofs.deserialize.base_4" }, 3_155],
+        [bulletproofs_deserialize_base_8: InternalGas, { 11.. => "bulletproofs.deserialize.base_8" }, 3_647],
+        [bulletproofs_deserialize_base_16: InternalGas, { 11.. => "bulletproofs.deserialize.base_16" }, 2_496],
+        [bulletproofs_deserialize_per_byte_1: InternalGasPerByte, { 11.. => "bulletproofs.deserialize.per_byte_1" }, 34],
+        [bulletproofs_deserialize_per_byte_2: InternalGasPerByte, { 11.. => "bulletproofs.deserialize.per_byte_2" }, 44],
+        [bulletproofs_deserialize_per_byte_4: InternalGasPerByte, { 11.. => "bulletproofs.deserialize.per_byte_4" }, 39],
+        [bulletproofs_deserialize_per_byte_8: InternalGasPerByte, { 11.. => "bulletproofs.deserialize.per_byte_8" }, 28],
+        [bulletproofs_deserialize_per_byte_16: InternalGasPerByte, { 11.. => "bulletproofs.deserialize.per_byte_16" }, 59],
         // Bulletproofs gas parameters end.
 
         [type_info_type_of_base: InternalGas, "type_info.type_of.base", 1102],

@@ -4,6 +4,7 @@
 #[macro_use]
 extern crate criterion;
 
+use aptos_crypto::bulletproofs::MAX_RANGE_BITS;
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 use criterion::{measurement::Measurement, BenchmarkGroup, BenchmarkId, Criterion, Throughput};
 use curve25519_dalek_ng::scalar::Scalar;
@@ -28,12 +29,9 @@ fn get_values(num_bits: usize, batch_size: usize) -> (Vec<u64>, Vec<Scalar>) {
 fn bench_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("bulletproofs");
 
-    for num_bits in [32, 64] {
-        range_proof_deserialize(&mut group, num_bits);
-    }
-
-    for batch_size in [1, 2] {
+    for batch_size in [1, 2, 4, 8, 16] {
         for num_bits in [32, 64] {
+            range_proof_deserialize(&mut group, num_bits, batch_size);
             range_prove(&mut group, num_bits, batch_size);
             range_verify(&mut group, num_bits, batch_size);
         }
@@ -44,14 +42,11 @@ fn bench_group(c: &mut Criterion) {
 
 fn range_prove<M: Measurement>(g: &mut BenchmarkGroup<M>, num_bits: usize, batch_size: usize) {
     let pg = PedersenGens::default();
-    let bg = BulletproofGens::new(num_bits, batch_size);
+    let bg = BulletproofGens::new(MAX_RANGE_BITS, 16);
 
     g.throughput(Throughput::Elements(batch_size as u64));
     g.bench_function(
-        BenchmarkId::new(
-            "range_prove",
-            format!("batch={}/bits={}", batch_size, num_bits),
-        ),
+        BenchmarkId::new(format!("range_prove_batch_{}", batch_size), num_bits),
         move |b| {
             b.iter_with_setup(
                 || get_values(num_bits, batch_size),
@@ -72,13 +67,20 @@ fn range_prove<M: Measurement>(g: &mut BenchmarkGroup<M>, num_bits: usize, batch
     );
 }
 
-fn range_proof_deserialize<M: Measurement>(g: &mut BenchmarkGroup<M>, num_bits: usize) {
-    let bp_gens = BulletproofGens::new(num_bits, 1);
+fn range_proof_deserialize<M: Measurement>(
+    g: &mut BenchmarkGroup<M>,
+    num_bits: usize,
+    batch_size: usize,
+) {
+    let bp_gens = BulletproofGens::new(MAX_RANGE_BITS, 16);
     let pc_gens = PedersenGens::default();
 
     g.throughput(Throughput::Elements(1));
     g.bench_function(
-        BenchmarkId::new("range_proof_deserialize", num_bits),
+        BenchmarkId::new(
+            format!("range_proof_deserialize_batch_{}", batch_size),
+            num_bits,
+        ),
         move |b| {
             b.iter_with_setup(
                 || {
@@ -106,15 +108,12 @@ fn range_proof_deserialize<M: Measurement>(g: &mut BenchmarkGroup<M>, num_bits: 
 }
 
 fn range_verify<M: Measurement>(g: &mut BenchmarkGroup<M>, num_bits: usize, batch_size: usize) {
-    let bp_gens = BulletproofGens::new(num_bits, batch_size);
+    let bp_gens = BulletproofGens::new(MAX_RANGE_BITS, 16);
     let pc_gens = PedersenGens::default();
 
     g.throughput(Throughput::Elements(batch_size as u64));
     g.bench_function(
-        BenchmarkId::new(
-            "range_verify",
-            format!("batch={}/bits={}", batch_size, num_bits),
-        ),
+        BenchmarkId::new(format!("range_verify_batch_{}", batch_size), num_bits),
         move |b| {
             b.iter_with_setup(
                 || {

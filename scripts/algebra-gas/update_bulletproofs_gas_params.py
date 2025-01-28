@@ -17,7 +17,7 @@ import math
 
 # Typically you are making a new version of gas schedule,
 # so this should be larger than `LATEST_GAS_FEATURE_VERSION` in `aptos-move/aptos-gas/src/gas_meter.rs`.
-TARGET_GAS_VERSION = 9
+TARGET_GAS_VERSION = 11
 
 def get_bench_ns_linear(bench_path):
     datapoints = load_bench_datapoints.main(bench_path)
@@ -34,22 +34,40 @@ def prettify_number(x:int) -> str:
 
 def get_bulletproofs_lines(gas_per_ns):
     nanoseconds = {}
-    _,_,verify_slope,verify_base = get_bench_ns_linear('target/criterion/bulletproofs/range_proof_verify')
-    nanoseconds['per_bit_rangeproof_verify'] = verify_slope
-    #_,_,nanoseconds['per_bit_rangeproof_verify'],nanoseconds['rangeproof_verify_base'] = get_bench_ns_linear('target/criterion/bulletproofs/range_proof_verify')
-    _,_,deserialize_slope,deserialize_base = get_bench_ns_linear('target/criterion/bulletproofs/range_proof_deserialize')
-    nanoseconds['per_byte_rangeproof_deserialize'] = deserialize_slope
-    nanoseconds['base'] = verify_base + verify_slope
+
+    for batch_size in [1, 2, 4, 8, 16]:
+        _,_,verify_slope,verify_base = get_bench_ns_linear(f'target/criterion/bulletproofs/range_verify_batch_{batch_size}')
+        _,_,deserialize_slope,deserialize_base = get_bench_ns_linear(f'target/criterion/bulletproofs/range_proof_deserialize_batch_{batch_size}')
+
+        nanoseconds[f'bulletproofs_verify_base_{batch_size}'] = verify_base
+        nanoseconds[f'bulletproofs_verify_per_bit_{batch_size}'] = verify_slope
+        nanoseconds[f'bulletproofs_deserialize_base_{batch_size}'] = deserialize_base
+        nanoseconds[f'bulletproofs_deserialize_per_byte_{batch_size}'] = deserialize_slope
+
     gas_units = {k:gas_per_ns*v for k,v in nanoseconds.items()}
-    lines = [f'    [.bulletproofs.{k}, {{ {TARGET_GAS_VERSION}.. => "bulletproofs.{k}" }}, {prettify_number(v)} * MUL],' for k,v in sorted(gas_units.items())]
+
+    lines = []
+
+    for batch_size in [1, 2, 4, 8, 16]:
+        lines.append(f'        [bulletproofs_verify_base_{batch_size}: InternalGas, {{ {TARGET_GAS_VERSION}.. => "bulletproofs.verify.base_{batch_size}" }}, {prettify_number(gas_units[f"bulletproofs_verify_base_{batch_size}"])}],')
+
+    for batch_size in [1, 2, 4, 8, 16]:
+        lines.append(f'        [bulletproofs_verify_per_bit_{batch_size}: InternalGasPerByte, {{ {TARGET_GAS_VERSION}.. => "bulletproofs.verify.per_bit_{batch_size}" }}, {prettify_number(gas_units[f"bulletproofs_verify_per_bit_{batch_size}"])}],')
+
+    for batch_size in [1, 2, 4, 8, 16]:
+        lines.append(f'        [bulletproofs_deserialize_base_{batch_size}: InternalGas, {{ {TARGET_GAS_VERSION}.. => "bulletproofs.deserialize.base_{batch_size}" }}, {prettify_number(gas_units[f"bulletproofs_deserialize_base_{batch_size}"])}],')
+
+    for batch_size in [1, 2, 4, 8, 16]:
+        lines.append(f'        [bulletproofs_deserialize_per_byte_{batch_size}: InternalGasPerByte, {{ {TARGET_GAS_VERSION}.. => "bulletproofs.deserialize.per_byte_{batch_size}" }}, {prettify_number(gas_units[f"bulletproofs_deserialize_per_byte_{batch_size}"])}],')
+
     return lines
 
 def main(gas_per_ns):
-    path = Path('aptos-move/aptos-gas/src/aptos_framework.rs')
+    path = Path('aptos-move/aptos-gas-schedule/src/gas_schedule/aptos_framework.rs')
     lines = path.read_text().split('\n')
-    line_id_begin = lines.index('    // Bulletproofs gas parameters begin.')
-    line_id_end = lines.index('    // Bulletproofs gas parameters end.')
-    generator_note_line = f'    // Generated at time {time()} by `scripts/algebra-gas/update_bulletproofs_gas_params.py` with gas_per_ns={gas_per_ns}.'
+    line_id_begin = lines.index('        // Bulletproofs gas parameters begin.')
+    line_id_end = lines.index('        // Bulletproofs gas parameters end.')
+    generator_note_line = f'        // Generated at time {time()} by `scripts/algebra-gas/update_bulletproofs_gas_params.py` with gas_per_ns={gas_per_ns}.'
     new_lines = lines[:line_id_begin+1] + [generator_note_line] + get_bulletproofs_lines(gas_per_ns) + lines[line_id_end:]
     path.write_text('\n'.join(new_lines))
 
