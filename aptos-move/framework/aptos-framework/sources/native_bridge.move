@@ -33,7 +33,7 @@ module aptos_framework::native_bridge {
     const EID_NOT_FOUND: u64 = 10;
     const EINVALID_BRIDGE_RELAYER: u64 = 11;
     const ESAME_FEE: u64 = 0x2;
-    const ESAME_VALUE: u64 = 0x3;
+    const EINVALID_VALUE: u64 = 0x3;
     const ERATE_LIMIT_EXCEEDED: u64 = 0x4;
 
     friend aptos_framework::genesis;
@@ -642,9 +642,11 @@ module aptos_framework::native_bridge {
     public entry fun update_insurance_budget_divider(aptos_framework: &signer, new_insurance_budget_divider: u64
     ) acquires BridgeConfig {
         system_addresses::assert_aptos_framework(aptos_framework);
+        assert!(new_insurance_budget_divider > 1, EINVALID_VALUE);
+        assert!(old_insurance_budget_divider != new_insurance_budget_divider, EINVALID_VALUE);
+        
         let bridge_config = borrow_global_mut<BridgeConfig>(@aptos_framework);
         let old_insurance_budget_divider = bridge_config.insurance_budget_divider;
-        assert!(old_insurance_budget_divider != new_insurance_budget_divider, ESAME_VALUE);
         bridge_config.insurance_budget_divider = new_insurance_budget_divider;
 
         event::emit(
