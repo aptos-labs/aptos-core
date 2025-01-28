@@ -113,31 +113,36 @@ spec aptos_framework::permissioned_signer {
 
     spec check_permission_exists<PermKey: copy + drop + store>(s: &signer, perm: PermKey): bool {
         pragma verify = false;
-        // pragma opaque;
-        // aborts_if false;
-        // ensures [abstract] result == spec_check_permission_exists(s, perm);
+        pragma opaque;
+        modifies global<PermissionStorage>(spec_permission_address(s));
+        ensures [abstract] result == spec_check_permission_exists(s, perm);
     }
 
-    spec fun spec_check_permission_exists<PermKey: copy + drop + store>(s: signer, perm: PermKey): bool {
-        use aptos_std::type_info;
-        use std::bcs;
-        let addr = spec_permission_address(s);
-        let key = Any {
-            type_name: type_info::type_name<PermKey>(),
-            data: bcs::serialize(perm)
-        };
-        if (!spec_is_permissioned_signer(s)) { true }
-        else if (!exists<PermissionStorage>(addr)) { false }
-        else {
-            // ordered_map::spec_contains_key(global<PermissionStorage>(addr).perms, key)
-            // FIXME: ordered map spec doesn't exist yet.
-            true
-        }
-    }
+    spec fun spec_check_permission_exists<PermKey: copy + drop + store>(s: signer, perm: PermKey): bool;
+
+
+    // TODO(teng): add this back later
+    // spec fun spec_check_permission_exists<PermKey: copy + drop + store>(s: signer, perm: PermKey): bool {
+    //     use aptos_std::type_info;
+    //     use std::bcs;
+    //     let addr = spec_permission_address(s);
+    //     let key = Any {
+    //         type_name: type_info::type_name<PermKey>(),
+    //         data: bcs::serialize(perm)
+    //     };
+    //     if (!spec_is_permissioned_signer(s)) { true }
+    //     else if (!exists<PermissionStorage>(addr)) { false }
+    //     else {
+    //         // ordered_map::spec_contains_key(global<PermissionStorage>(addr).perms, key)
+    //         // FIXME: ordered map spec doesn't exist yet.
+    //         true
+    //     }
+    // }
 
     spec check_permission_capacity_above<PermKey: copy + drop + store>(
         s: &signer, threshold: u256, perm: PermKey
     ): bool {
+        modifies global<PermissionStorage>(spec_permission_address(s));
         let permissioned_signer_addr = spec_permission_address(s);
         ensures !spec_is_permissioned_signer(s) ==> result == true;
         ensures (
