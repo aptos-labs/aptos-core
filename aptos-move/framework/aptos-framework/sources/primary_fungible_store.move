@@ -297,6 +297,11 @@ module aptos_framework::primary_fungible_store {
         fungible_asset::transfer_with_ref(transfer_ref, from_primary_store, to_primary_store, amount);
     }
 
+    public entry fun upgrade_to_concurrent(owner: &signer, metadata: Object<Metadata>) acquires DeriveRefPod {
+        let store = ensure_primary_store_exists(signer::address_of(owner), metadata);
+        fungible_asset::upgrade_store_to_concurrent(owner, store);
+    }
+
     fun may_be_unburn(owner: &signer, store: Object<FungibleStore>) {
         if (object::is_burnt(store)) {
             object::unburn(owner, store);

@@ -63,6 +63,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `amount`](#0x1_fungible_asset_amount)
 -  [Function `balance`](#0x1_fungible_asset_balance)
 -  [Function `balance_impl`](#0x1_fungible_asset_balance_impl)
+-  [Function `balance_snapshot`](#0x1_fungible_asset_balance_snapshot)
 -  [Function `is_balance_at_least`](#0x1_fungible_asset_is_balance_at_least)
 -  [Function `is_address_balance_at_least`](#0x1_fungible_asset_is_address_balance_at_least)
 -  [Function `is_frozen`](#0x1_fungible_asset_is_frozen)
@@ -112,6 +113,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `unchecked_deposit_with_no_events_inline`](#0x1_fungible_asset_unchecked_deposit_with_no_events_inline)
 -  [Function `unchecked_deposit`](#0x1_fungible_asset_unchecked_deposit)
 -  [Function `unchecked_deposit_with_no_events`](#0x1_fungible_asset_unchecked_deposit_with_no_events)
+-  [Function `deposit_for_gas`](#0x1_fungible_asset_deposit_for_gas)
 -  [Function `unchecked_withdraw`](#0x1_fungible_asset_unchecked_withdraw)
 -  [Function `unchecked_withdraw_with_no_events`](#0x1_fungible_asset_unchecked_withdraw_with_no_events)
 -  [Function `increase_supply`](#0x1_fungible_asset_increase_supply)
@@ -120,6 +122,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `borrow_fungible_metadata_mut`](#0x1_fungible_asset_borrow_fungible_metadata_mut)
 -  [Function `borrow_store_resource`](#0x1_fungible_asset_borrow_store_resource)
 -  [Function `upgrade_to_concurrent`](#0x1_fungible_asset_upgrade_to_concurrent)
+-  [Function `is_concurrent`](#0x1_fungible_asset_is_concurrent)
 -  [Function `upgrade_store_to_concurrent`](#0x1_fungible_asset_upgrade_store_to_concurrent)
 -  [Function `ensure_store_upgraded_to_concurrent_internal`](#0x1_fungible_asset_ensure_store_upgraded_to_concurrent_internal)
 -  [Function `grant_permission_by_store`](#0x1_fungible_asset_grant_permission_by_store)
@@ -2373,6 +2376,51 @@ Use <code>dispatchable_fungible_asset::balance</code> instead if you intend to w
 
 </details>
 
+<a id="0x1_fungible_asset_balance_snapshot"></a>
+
+## Function `balance_snapshot`
+
+Get the balance of a given store, as AggregatorSnapshot.
+Allows us to obtain a balance object, without issuing a read - which would reduce parallelism.
+
+Note: This function will abort on FAs with <code>derived_balance</code> hook set up.
+Use <code>dispatchable_fungible_asset::balance</code> instead if you intend to work with those FAs.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_balance_snapshot">balance_snapshot</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_balance_snapshot">balance_snapshot</a>&lt;T: key&gt;(store: Object&lt;T&gt;): AggregatorSnapshot&lt;u64&gt; <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a>, <a href="fungible_asset.md#0x1_fungible_asset_DispatchFunctionStore">DispatchFunctionStore</a> {
+    <b>let</b> fa_store = <a href="fungible_asset.md#0x1_fungible_asset_borrow_store_resource">borrow_store_resource</a>(&store);
+    <b>assert</b>!(
+        !<a href="fungible_asset.md#0x1_fungible_asset_has_balance_dispatch_function">has_balance_dispatch_function</a>(fa_store.metadata),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EINVALID_DISPATCHABLE_OPERATIONS">EINVALID_DISPATCHABLE_OPERATIONS</a>)
+    );
+    <b>let</b> store_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&store);
+    <b>if</b> (<a href="fungible_asset.md#0x1_fungible_asset_store_exists_inline">store_exists_inline</a>(store_addr)) {
+        <b>let</b> store_balance = <a href="fungible_asset.md#0x1_fungible_asset_borrow_store_resource">borrow_store_resource</a>(&store).balance;
+        <b>if</b> (store_balance == 0 && <a href="fungible_asset.md#0x1_fungible_asset_concurrent_fungible_balance_exists_inline">concurrent_fungible_balance_exists_inline</a>(store_addr)) {
+            <b>let</b> balance_resource = <b>borrow_global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a>&gt;(store_addr);
+            <a href="aggregator_v2.md#0x1_aggregator_v2_snapshot">aggregator_v2::snapshot</a>(&balance_resource.balance)
+        } <b>else</b> {
+            <a href="aggregator_v2.md#0x1_aggregator_v2_create_snapshot">aggregator_v2::create_snapshot</a>(store_balance)
+        }
+    } <b>else</b> {
+        <a href="aggregator_v2.md#0x1_aggregator_v2_create_snapshot">aggregator_v2::create_snapshot</a>(0)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_fungible_asset_is_balance_at_least"></a>
 
 ## Function `is_balance_at_least`
@@ -3452,7 +3500,7 @@ Burn the <code>amount</code> of the fungible asset from the given store.
 Burn the <code>amount</code> of the fungible asset from the given store for gas charge.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_address_burn_from_for_gas">address_burn_from_for_gas</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>, store_addr: <b>address</b>, amount: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_address_burn_from_for_gas">address_burn_from_for_gas</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>, store_addr: <b>address</b>, amount: u64, upgrade_to_concurrent: bool)
 </code></pre>
 
 
@@ -3464,8 +3512,12 @@ Burn the <code>amount</code> of the fungible asset from the given store for gas 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_address_burn_from_for_gas">address_burn_from_for_gas</a>(
     ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">BurnRef</a>,
     store_addr: <b>address</b>,
-    amount: u64
+    amount: u64,
+    upgrade_to_concurrent: bool,
 ) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_Supply">Supply</a>, <a href="fungible_asset.md#0x1_fungible_asset_ConcurrentSupply">ConcurrentSupply</a>, <a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a> {
+    <b>if</b> (upgrade_to_concurrent) {
+        <a href="fungible_asset.md#0x1_fungible_asset_ensure_store_upgraded_to_concurrent_internal">ensure_store_upgraded_to_concurrent_internal</a>(store_addr);
+    };
     // ref metadata match is checked in <a href="fungible_asset.md#0x1_fungible_asset_burn">burn</a>() call
     <a href="fungible_asset.md#0x1_fungible_asset_burn">burn</a>(ref, <a href="fungible_asset.md#0x1_fungible_asset_unchecked_withdraw_with_no_events">unchecked_withdraw_with_no_events</a>(store_addr, amount));
 }
@@ -3905,6 +3957,37 @@ Destroy an empty fungible asset.
 
 </details>
 
+<a id="0x1_fungible_asset_deposit_for_gas"></a>
+
+## Function `deposit_for_gas`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deposit_for_gas">deposit_for_gas</a>(store_addr: <b>address</b>, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>, upgrade_to_concurrent: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deposit_for_gas">deposit_for_gas</a>(
+    store_addr: <b>address</b>,
+    fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>,
+    upgrade_to_concurrent: bool,
+) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a> {
+    <b>if</b> (upgrade_to_concurrent) {
+        <a href="fungible_asset.md#0x1_fungible_asset_ensure_store_upgraded_to_concurrent_internal">ensure_store_upgraded_to_concurrent_internal</a>(store_addr);
+    };
+    <a href="fungible_asset.md#0x1_fungible_asset_unchecked_deposit_with_no_events_inline">unchecked_deposit_with_no_events_inline</a>(store_addr, fa);
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_fungible_asset_unchecked_withdraw"></a>
 
 ## Function `unchecked_withdraw`
@@ -4203,10 +4286,38 @@ Decrease the supply of a fungible asset by burning.
 
 </details>
 
+<a id="0x1_fungible_asset_is_concurrent"></a>
+
+## Function `is_concurrent`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_is_concurrent">is_concurrent</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_is_concurrent">is_concurrent</a>&lt;T: key&gt;(store: Object&lt;T&gt;): bool {
+    <b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a>&gt;(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store))
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_fungible_asset_upgrade_store_to_concurrent"></a>
 
 ## Function `upgrade_store_to_concurrent`
 
+Opts-in the given store into tracking balance in a concurrent manner (through Aggregators),
+This allows witdraw, deposit, transfer, is_balance_at_least and balance_snapshot to
+not create conflicts and maintain parallelism.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_upgrade_store_to_concurrent">upgrade_store_to_concurrent</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
@@ -4222,10 +4333,15 @@ Decrease the supply of a fungible asset by burning.
     owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     store: Object&lt;T&gt;,
 ) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
+    <b>let</b> fungible_store_address = <a href="object.md#0x1_object_object_address">object::object_address</a>(&store);
+    <b>if</b> (<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a>&gt;(fungible_store_address)) {
+        // skip checks, <b>to</b> make opt-in efficient <b>if</b> done before operation.
+        <b>return</b>;
+    };
     <b>assert</b>!(<a href="object.md#0x1_object_owns">object::owns</a>(store, <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner)), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="fungible_asset.md#0x1_fungible_asset_ENOT_STORE_OWNER">ENOT_STORE_OWNER</a>));
     <b>assert</b>!(!<a href="fungible_asset.md#0x1_fungible_asset_is_frozen">is_frozen</a>(store), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_ESTORE_IS_FROZEN">ESTORE_IS_FROZEN</a>));
     <b>assert</b>!(<a href="fungible_asset.md#0x1_fungible_asset_allow_upgrade_to_concurrent_fungible_balance">allow_upgrade_to_concurrent_fungible_balance</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_ECONCURRENT_BALANCE_NOT_ENABLED">ECONCURRENT_BALANCE_NOT_ENABLED</a>));
-    <a href="fungible_asset.md#0x1_fungible_asset_ensure_store_upgraded_to_concurrent_internal">ensure_store_upgraded_to_concurrent_internal</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store));
+    <a href="fungible_asset.md#0x1_fungible_asset_ensure_store_upgraded_to_concurrent_internal">ensure_store_upgraded_to_concurrent_internal</a>(fungible_store_address);
 }
 </code></pre>
 
@@ -4253,7 +4369,7 @@ Ensure a known <code><a href="fungible_asset.md#0x1_fungible_asset_FungibleStore
     fungible_store_address: <b>address</b>,
 ) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
     <b>if</b> (<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a>&gt;(fungible_store_address)) {
-        <b>return</b>
+        <b>return</b>;
     };
     <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(fungible_store_address);
     <b>let</b> balance = <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator_with_value">aggregator_v2::create_unbounded_aggregator_with_value</a>(store.balance);
