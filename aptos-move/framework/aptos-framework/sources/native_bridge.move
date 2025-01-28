@@ -642,7 +642,7 @@ module aptos_framework::native_bridge {
         system_addresses::assert_aptos_framework(aptos_framework);
         let bridge_config = borrow_global_mut<BridgeConfig>(@aptos_framework);
         let old_insurance_fund = bridge_config.insurance_fund;
-        assert!(old_insurance_fund != new_insurance_fund, ESAME_VALUE);
+        assert!(old_insurance_fund != new_insurance_fund, EINVALID_VALUE);
         bridge_config.insurance_fund = new_insurance_fund;
 
         event::emit(
@@ -664,10 +664,11 @@ module aptos_framework::native_bridge {
         // Ensure the new insurance budget divider is greater than 1 and different from the old one
         // Assumes symmetric Insurance Funds on both L1 and L2
         assert!(new_insurance_budget_divider > 1, EINVALID_VALUE);
-        assert!(old_insurance_budget_divider != new_insurance_budget_divider, EINVALID_VALUE);
 
         let bridge_config = borrow_global_mut<BridgeConfig>(@aptos_framework);
         let old_insurance_budget_divider = bridge_config.insurance_budget_divider;
+        assert!(old_insurance_budget_divider != new_insurance_budget_divider, EINVALID_VALUE);
+
         bridge_config.insurance_budget_divider = new_insurance_budget_divider;
 
         event::emit(
