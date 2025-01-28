@@ -8,7 +8,6 @@ use aptos_types::{
         signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
     },
 };
-use sender_aware::SenderAwareShuffler;
 use std::sync::Arc;
 
 mod sender_aware;
@@ -77,12 +76,8 @@ pub fn create_transaction_shuffler(
             info!("Using no-op sender aware shuffling v1");
             Arc::new(NoOpShuffler {})
         },
-        SenderAwareV2(conflict_window_size) => {
-            info!(
-                "Using sender aware transaction shuffling with conflict window size {}",
-                conflict_window_size
-            );
-            Arc::new(SenderAwareShuffler::new(conflict_window_size as usize))
+        SenderAwareV2(_) => {
+            unreachable!("SenderAware shuffler is no longer supported.")
         },
         DeprecatedFairness => {
             unreachable!("DeprecatedFairness shuffler is no longer supported.")

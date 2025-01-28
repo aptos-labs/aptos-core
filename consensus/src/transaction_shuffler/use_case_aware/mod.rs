@@ -59,9 +59,7 @@ impl UseCaseAwareShuffler {
 
 impl TransactionShuffler for UseCaseAwareShuffler {
     fn shuffle(&self, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
-        ShuffledTransactionIterator::new(self.config.clone())
-            .extended_with(txns)
-            .collect()
+        self.signed_transaction_iterator(txns).collect()
     }
 
     fn signed_transaction_iterator(
