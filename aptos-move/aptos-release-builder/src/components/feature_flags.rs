@@ -138,6 +138,7 @@ pub enum FeatureFlag {
     PermissionedSigner,
     AccountAbstraction,
     VMBinaryFormatV8,
+    BulletproofsBatchNatives,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -367,6 +368,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::PermissionedSigner => AptosFeatureFlag::PERMISSIONED_SIGNER,
             FeatureFlag::AccountAbstraction => AptosFeatureFlag::ACCOUNT_ABSTRACTION,
+            FeatureFlag::BulletproofsBatchNatives => AptosFeatureFlag::BULLETPROOFS_BATCH_NATIVES,
         }
     }
 }
@@ -523,6 +525,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::PERMISSIONED_SIGNER => FeatureFlag::PermissionedSigner,
             AptosFeatureFlag::ACCOUNT_ABSTRACTION => FeatureFlag::AccountAbstraction,
+            AptosFeatureFlag::BULLETPROOFS_BATCH_NATIVES => FeatureFlag::BulletproofsBatchNatives,
         }
     }
 }

@@ -4,11 +4,13 @@
 #[macro_use]
 extern crate criterion;
 
+use aptos_crypto::bulletproofs::MAX_RANGE_BITS;
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 use criterion::{measurement::Measurement, BenchmarkGroup, BenchmarkId, Criterion, Throughput};
 use curve25519_dalek_ng::scalar::Scalar;
 use merlin::Transcript;
 use rand::{thread_rng, Rng};
+use rand_core::RngCore;
 
 fn get_values(num_bits: usize, batch_size: usize) -> (Vec<u64>, Vec<Scalar>) {
     let mut rng = thread_rng();
@@ -19,32 +21,37 @@ fn get_values(num_bits: usize, batch_size: usize) -> (Vec<u64>, Vec<Scalar>) {
 
     // Sigh, some RngCore incompatibilities I don't want to deal with right now.
     let b = (0..batch_size)
-        .map(|_| Scalar::hash_from_bytes::<sha3::Sha3_512>(b"some random blinder"))
+        .map(|_| {
+            let mut scalar = [0u8; 32];
+            rng.fill_bytes(&mut scalar);
+
+            Scalar::from_bytes_mod_order(scalar)
+        })
         .collect::<Vec<Scalar>>();
 
     (v, b)
 }
 
 fn bench_group(c: &mut Criterion) {
-    let mut group = c.benchmark_group("bulletproofs");
+    let mut group = c.benchmark_group("bulletproofs_batch_verify");
 
-    for num_bits in [32, 64] {
-        range_proof_deserialize(&mut group, num_bits);
-    }
-
-    for batch_size in [1, 2] {
-        for num_bits in [32, 64] {
-            range_prove(&mut group, num_bits, batch_size);
-            range_verify(&mut group, num_bits, batch_size);
+    for batch_size in [1, 2, 4, 8, 16] {
+        for num_bits in [8, 16, 32, 64] {
+            range_batch_prove(&mut group, num_bits, batch_size);
+            range_batch_verify(&mut group, num_bits, batch_size);
         }
     }
 
     group.finish();
 }
 
-fn range_prove<M: Measurement>(g: &mut BenchmarkGroup<M>, num_bits: usize, batch_size: usize) {
+fn range_batch_prove<M: Measurement>(
+    g: &mut BenchmarkGroup<M>,
+    num_bits: usize,
+    batch_size: usize,
+) {
     let pg = PedersenGens::default();
-    let bg = BulletproofGens::new(num_bits, batch_size);
+    let bg = BulletproofGens::new(MAX_RANGE_BITS, 16);
 
     g.throughput(Throughput::Elements(batch_size as u64));
     g.bench_function(
@@ -72,41 +79,12 @@ fn range_prove<M: Measurement>(g: &mut BenchmarkGroup<M>, num_bits: usize, batch
     );
 }
 
-fn range_proof_deserialize<M: Measurement>(g: &mut BenchmarkGroup<M>, num_bits: usize) {
-    let bp_gens = BulletproofGens::new(num_bits, 1);
-    let pc_gens = PedersenGens::default();
-
-    g.throughput(Throughput::Elements(1));
-    g.bench_function(
-        BenchmarkId::new("range_proof_deserialize", num_bits),
-        move |b| {
-            b.iter_with_setup(
-                || {
-                    let (v, b) = get_values(num_bits, 1);
-
-                    let mut t = merlin::Transcript::new(b"AptosBenchmark");
-
-                    let proof = RangeProof::prove_multiple(
-                        &bp_gens,
-                        &pc_gens,
-                        &mut t,
-                        v.as_slice(),
-                        b.as_slice(),
-                        num_bits,
-                    )
-                    .unwrap();
-                    proof.0.to_bytes()
-                },
-                |proof_bytes| {
-                    assert!(RangeProof::from_bytes(&proof_bytes[..]).is_ok());
-                },
-            )
-        },
-    );
-}
-
-fn range_verify<M: Measurement>(g: &mut BenchmarkGroup<M>, num_bits: usize, batch_size: usize) {
-    let bp_gens = BulletproofGens::new(num_bits, batch_size);
+fn range_batch_verify<M: Measurement>(
+    g: &mut BenchmarkGroup<M>,
+    num_bits: usize,
+    batch_size: usize,
+) {
+    let bp_gens = BulletproofGens::new(MAX_RANGE_BITS, 16);
     let pc_gens = PedersenGens::default();
 
     g.throughput(Throughput::Elements(batch_size as u64));
@@ -120,9 +98,9 @@ fn range_verify<M: Measurement>(g: &mut BenchmarkGroup<M>, num_bits: usize, batc
                 || {
                     let (v, b) = get_values(num_bits, batch_size);
 
-                    let mut t = merlin::Transcript::new(b"AptosBenchmark");
+                    let mut t = Transcript::new(b"AptosBenchmark");
 
-                    RangeProof::prove_multiple(
+                    let (proof, comm) = RangeProof::prove_multiple(
                         &bp_gens,
                         &pc_gens,
                         &mut t,
@@ -130,10 +108,14 @@ fn range_verify<M: Measurement>(g: &mut BenchmarkGroup<M>, num_bits: usize, batc
                         b.as_slice(),
                         num_bits,
                     )
-                    .unwrap()
+                    .unwrap();
+
+                    (proof.to_bytes(), comm)
                 },
-                |(proof, comm)| {
-                    let mut t = merlin::Transcript::new(b"AptosBenchmark");
+                |(proof_bytes, comm)| {
+                    let mut t = Transcript::new(b"AptosBenchmark");
+
+                    let proof = RangeProof::from_bytes(&proof_bytes[..]).unwrap();
 
                     assert!(proof
                         .verify_multiple(&bp_gens, &pc_gens, &mut t, &comm, num_bits)

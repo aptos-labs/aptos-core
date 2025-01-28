@@ -634,6 +634,16 @@ module std::features {
         is_enabled(ACCOUNT_ABSTRACTION)
     }
 
+    /// Whether the batch Bulletproofs native functions are available. This is needed because of the introduction of a new native function.
+    /// Lifetime: transient
+    const BULLETPROOFS_BATCH_NATIVES: u64 = 87;
+
+    public fun get_bulletproofs_batch_feature(): u64 { BULLETPROOFS_BATCH_NATIVES }
+
+    public fun bulletproofs_batch_enabled(): bool acquires Features {
+        is_enabled(BULLETPROOFS_BATCH_NATIVES)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

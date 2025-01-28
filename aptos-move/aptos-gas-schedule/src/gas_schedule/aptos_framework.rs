@@ -6,7 +6,9 @@
 use crate::{
     gas_feature_versions::{RELEASE_V1_14, RELEASE_V1_8, RELEASE_V1_9_SKIPPED},
     gas_schedule::NativeGasParameters,
-    ver::gas_feature_versions::{RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_23, RELEASE_V1_26},
+    ver::gas_feature_versions::{
+        RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_23, RELEASE_V1_26, RELEASE_V1_27,
+    },
 };
 use aptos_gas_algebra::{
     InternalGas, InternalGasPerAbstractValueUnit, InternalGasPerArg, InternalGasPerByte,
@@ -241,6 +243,30 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [bulletproofs_per_bit_rangeproof_verify: InternalGasPerArg, { 11.. => "bulletproofs.per_bit_rangeproof_verify" }, 1004253],
         [bulletproofs_per_byte_rangeproof_deserialize: InternalGasPerByte, { 11.. => "bulletproofs.per_byte_rangeproof_deserialize" }, 121],
         // Bulletproofs gas parameters end.
+
+        // Bulletproofs batch verify gas parameters begin.
+        // Generated at time 1738614645.7369282 by `scripts/algebra-gas/update_bulletproofs_batch_verify_gas_params.py` with gas_per_ns=37.59.
+        [bulletproofs_verify_base_batch_1_bits_8: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_1_bits_8" }, 16_962_560],
+        [bulletproofs_verify_base_batch_1_bits_16: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_1_bits_16" }, 24_931_911],
+        [bulletproofs_verify_base_batch_1_bits_32: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_1_bits_32" }, 39_516_428],
+        [bulletproofs_verify_base_batch_1_bits_64: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_1_bits_64" }, 67_484_670],
+        [bulletproofs_verify_base_batch_2_bits_8: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_2_bits_8" }, 25_473_326],
+        [bulletproofs_verify_base_batch_2_bits_16: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_2_bits_16" }, 40_014_330],
+        [bulletproofs_verify_base_batch_2_bits_32: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_2_bits_32" }, 68_026_144],
+        [bulletproofs_verify_base_batch_2_bits_64: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_2_bits_64" }, 117_680_288],
+        [bulletproofs_verify_base_batch_4_bits_8: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_4_bits_8" }, 41_271_318],
+        [bulletproofs_verify_base_batch_4_bits_16: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_4_bits_16" }, 69_235_455],
+        [bulletproofs_verify_base_batch_4_bits_32: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_4_bits_32" }, 118_757_702],
+        [bulletproofs_verify_base_batch_4_bits_64: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_4_bits_64" }, 196_220_007],
+        [bulletproofs_verify_base_batch_8_bits_8: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_8_bits_8" }, 71_634_568],
+        [bulletproofs_verify_base_batch_8_bits_16: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_8_bits_16" }, 121_056_810],
+        [bulletproofs_verify_base_batch_8_bits_32: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_8_bits_32" }, 198_192_129],
+        [bulletproofs_verify_base_batch_8_bits_64: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_8_bits_64" }, 340_723_072],
+        [bulletproofs_verify_base_batch_16_bits_8: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_16_bits_8" }, 125_715_047],
+        [bulletproofs_verify_base_batch_16_bits_16: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_16_bits_16" }, 201_725_965],
+        [bulletproofs_verify_base_batch_16_bits_32: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_16_bits_32" }, 343_308_155],
+        [bulletproofs_verify_base_batch_16_bits_64: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_16_bits_64" }, 602_998_839],
+        // Bulletproofs batch verify gas parameters end.
 
         [type_info_type_of_base: InternalGas, "type_info.type_of.base", 1102],
         // TODO(Gas): the on-chain name is wrong...
