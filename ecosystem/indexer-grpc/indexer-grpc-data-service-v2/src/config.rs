@@ -4,6 +4,7 @@
 use crate::{
     connection_manager::ConnectionManager,
     historical_data_service::HistoricalDataService,
+    live_data_service::LiveDataService,
     service::{DataServiceWrapper, DataServiceWrapperWrapper},
 };
 use anyhow::Result;
@@ -21,6 +22,7 @@ use tokio::task::JoinHandle;
 use tonic::{codec::CompressionEncoding, transport::Server};
 use tracing::info;
 
+pub(crate) static LIVE_DATA_SERVICE: OnceCell<LiveDataService<'static>> = OnceCell::new();
 pub(crate) static HISTORICAL_DATA_SERVICE: OnceCell<HistoricalDataService> = OnceCell::new();
 
 pub(crate) const MAX_MESSAGE_SIZE: usize = 256 * (1 << 20);
@@ -50,6 +52,26 @@ pub struct ServiceConfig {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+pub struct LiveDataServiceConfig {
+    pub enabled: bool,
+    #[serde(default = "LiveDataServiceConfig::default_num_slots")]
+    pub num_slots: usize,
+    #[serde(default = "LiveDataServiceConfig::default_size_limit_bytes")]
+    pub size_limit_bytes: usize,
+}
+
+impl LiveDataServiceConfig {
+    fn default_num_slots() -> usize {
+        5_000_000
+    }
+
+    fn default_size_limit_bytes() -> usize {
+        10_000_000_000
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct HistoricalDataServiceConfig {
     pub enabled: bool,
     pub file_store_config: IndexerGrpcFileStoreConfig,
@@ -60,6 +82,7 @@ pub struct HistoricalDataServiceConfig {
 pub struct IndexerGrpcDataServiceConfig {
     pub(crate) chain_id: u64,
     pub(crate) service_config: ServiceConfig,
+    pub(crate) live_data_service_config: LiveDataServiceConfig,
     pub(crate) historical_data_service_config: HistoricalDataServiceConfig,
     pub(crate) grpc_manager_addresses: Vec<String>,
     pub(crate) self_advertised_address: String,
@@ -70,6 +93,48 @@ pub struct IndexerGrpcDataServiceConfig {
 impl IndexerGrpcDataServiceConfig {
     const fn default_data_service_response_channel_size() -> usize {
         DEFAULT_MAX_RESPONSE_CHANNEL_SIZE
+    }
+
+    async fn create_live_data_service(
+        &self,
+        tasks: &mut Vec<JoinHandle<Result<()>>>,
+    ) -> Option<DataServiceWrapper> {
+        if !self.live_data_service_config.enabled {
+            return None;
+        }
+        let connection_manager = Arc::new(
+            ConnectionManager::new(
+                self.chain_id,
+                self.grpc_manager_addresses.clone(),
+                self.self_advertised_address.clone(),
+                /*is_live_data_service=*/ true,
+            )
+            .await,
+        );
+        let (handler_tx, handler_rx) = tokio::sync::mpsc::channel(10);
+        let service = DataServiceWrapper::new(
+            connection_manager.clone(),
+            handler_tx,
+            self.data_service_response_channel_size,
+            /*is_live_data_service=*/ true,
+        );
+
+        let connection_manager_clone = connection_manager.clone();
+        tasks.push(tokio::task::spawn(async move {
+            connection_manager_clone.start().await;
+            Ok(())
+        }));
+
+        let chain_id = self.chain_id;
+        let config = self.live_data_service_config.clone();
+        tasks.push(tokio::task::spawn_blocking(move || {
+            LIVE_DATA_SERVICE
+                .get_or_init(|| LiveDataService::new(chain_id, config, connection_manager))
+                .run(handler_rx);
+            Ok(())
+        }));
+
+        Some(service)
     }
 
     async fn create_historical_data_service(
@@ -135,9 +200,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
 
         let mut tasks = vec![];
 
-        // TODO(grao): Implement.
-        let live_data_service = None;
-
+        let live_data_service = self.create_live_data_service(&mut tasks).await;
         let historical_data_service = self.create_historical_data_service(&mut tasks).await;
 
         let wrapper = Arc::new(DataServiceWrapperWrapper::new(

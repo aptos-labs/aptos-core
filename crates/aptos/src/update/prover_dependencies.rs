@@ -43,9 +43,12 @@ const Z3_EXE: &str = "z3.exe";
 #[cfg(not(target_os = "windows"))]
 const Z3_EXE: &str = "z3";
 
+#[cfg(not(target_os = "windows"))]
 const CVC5_BINARY_NAME: &str = "cvc5";
+#[cfg(not(target_os = "windows"))]
 const TARGET_CVC5_VERSION: &str = "0.0.3";
 
+#[cfg(not(target_os = "windows"))]
 const CVC5_EXE_ENV: &str = "CVC5_EXE";
 #[cfg(target_os = "windows")]
 const CVC5_EXE: &str = "cvc5.exe";

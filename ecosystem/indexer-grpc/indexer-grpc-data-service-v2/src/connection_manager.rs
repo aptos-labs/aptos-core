@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::MAX_MESSAGE_SIZE;
+use crate::config::{LIVE_DATA_SERVICE, MAX_MESSAGE_SIZE};
 use aptos_indexer_grpc_utils::{system_time_to_proto, timestamp_now_proto};
 use aptos_protos::indexer::v1::{
     grpc_manager_client::GrpcManagerClient, service_info::Info, ActiveStream, HeartbeatRequest,
@@ -239,13 +239,16 @@ impl ConnectionManager {
         });
 
         let info = if self.is_live_data_service {
+            let min_servable_version = match LIVE_DATA_SERVICE.get() {
+                Some(svc) => Some(svc.get_min_servable_version().await),
+                None => None,
+            };
             Some(Info::LiveDataServiceInfo(LiveDataServiceInfo {
                 chain_id: self.chain_id,
                 timestamp,
                 known_latest_version,
                 stream_info,
-                // TODO(grao): Populate min_servable_version.
-                min_servable_version: None,
+                min_servable_version,
             }))
         } else {
             Some(Info::HistoricalDataServiceInfo(HistoricalDataServiceInfo {
