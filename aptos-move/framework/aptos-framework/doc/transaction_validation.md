@@ -36,6 +36,7 @@
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+<b>use</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool">0x1::governed_gas_pool</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
@@ -647,10 +648,16 @@ Called by the Adapter
 
     <b>if</b> (amount_to_burn &gt; storage_fee_refunded) {
         <b>let</b> burn_amount = amount_to_burn - storage_fee_refunded;
-        <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(gas_payer, burn_amount);
+        <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_governed_gas_pool_enabled">features::governed_gas_pool_enabled</a>()) {
+            <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit_gas_fee">governed_gas_pool::deposit_gas_fee</a>(gas_payer, burn_amount);
+        } <b>else</b> {
+            <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(gas_payer, burn_amount);
+        }
     } <b>else</b> <b>if</b> (amount_to_burn &lt; storage_fee_refunded) {
         <b>let</b> mint_amount = storage_fee_refunded - amount_to_burn;
-        <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(gas_payer, mint_amount)
+        <b>if</b> (!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_governed_gas_pool_enabled">features::governed_gas_pool_enabled</a>()) {
+            <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(gas_payer, mint_amount);
+        }
     };
 
     // Increment sequence number
@@ -976,17 +983,23 @@ Skip transaction_fee::burn_fee verification.
     txn_gas_price: u64;
     txn_max_gas_units: u64;
     gas_units_remaining: u64;
+    <b>requires</b> <b>exists</b>&lt;GovernedGasPool&gt;(@aptos_framework);
+    <b>requires</b> <b>exists</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(governed_gas_pool_address());
     <b>aborts_if</b> !(txn_max_gas_units &gt;= gas_units_remaining);
     <b>let</b> gas_used = txn_max_gas_units - gas_units_remaining;
     <b>aborts_if</b> !(txn_gas_price * gas_used &lt;= <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>);
     <b>let</b> transaction_fee_amount = txn_gas_price * gas_used;
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>let</b> pre_governed_gas_pool_balance = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(governed_gas_pool_address()).<a href="coin.md#0x1_coin">coin</a>.value;
+    <b>let</b> <b>post</b> governed_gas_pool_balance = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(governed_gas_pool_address()).<a href="coin.md#0x1_coin">coin</a>.value;
     <b>let</b> pre_account = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
     <b>let</b> <b>post</b> <a href="account.md#0x1_account">account</a> = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
     <b>aborts_if</b> !<b>exists</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(gas_payer);
     <b>aborts_if</b> !<b>exists</b>&lt;Account&gt;(addr);
     <b>aborts_if</b> !(<b>global</b>&lt;Account&gt;(addr).sequence_number &lt; <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>);
+    <b>ensures</b> governed_gas_pool_balance == pre_governed_gas_pool_balance + transaction_fee_amount;
     <b>ensures</b> <a href="account.md#0x1_account">account</a>.sequence_number == pre_account.sequence_number + 1;
+    <b>let</b> governed_gas_pool_enabled = <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_GOVERNED_GAS_POOL">features::GOVERNED_GAS_POOL</a>);
     <b>let</b> collect_fee_enabled = <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES">features::COLLECT_AND_DISTRIBUTE_GAS_FEES</a>);
     <b>let</b> collected_fees = <b>global</b>&lt;CollectedFeesPerBlock&gt;(@aptos_framework).amount;
     <b>let</b> aggr = collected_fees.value;

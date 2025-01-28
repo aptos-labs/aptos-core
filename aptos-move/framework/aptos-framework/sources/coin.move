@@ -24,6 +24,7 @@ module aptos_framework::coin {
     friend aptos_framework::aptos_coin;
     friend aptos_framework::genesis;
     friend aptos_framework::transaction_fee;
+    friend aptos_framework::governed_gas_pool;
 
     //
     // Errors.
@@ -1159,6 +1160,51 @@ module aptos_framework::coin {
     /// Returns the `value` passed in `coin`.
     public fun value<CoinType>(coin: &Coin<CoinType>): u64 {
         coin.value
+    }
+
+    /// Withdraws a specifed `amount` of coin `CoinType` from the specified `account`.
+    /// @param account The account from which to withdraw the coin.
+    /// @param amount The amount of coin to withdraw.
+    public(friend) fun withdraw_from<CoinType>(
+        account_addr: address,
+        amount: u64
+    ): Coin<CoinType> acquires CoinStore, CoinConversionMap, CoinInfo, PairedCoinType {
+
+        let (coin_amount_to_withdraw, fa_amount_to_withdraw) = calculate_amount_to_withdraw<CoinType>(
+            account_addr,
+            amount
+        );
+        let withdrawn_coin = if (coin_amount_to_withdraw > 0) {
+            let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
+            assert!(
+                !coin_store.frozen,
+                error::permission_denied(EFROZEN),
+            );
+            if (std::features::module_event_migration_enabled()) {
+                event::emit(
+                    CoinWithdraw {
+                        coin_type: type_name<CoinType>(), account: account_addr, amount: coin_amount_to_withdraw
+                    }
+                );
+            };
+            event::emit_event<WithdrawEvent>(
+                &mut coin_store.withdraw_events,
+                WithdrawEvent { amount: coin_amount_to_withdraw },
+            );
+            extract(&mut coin_store.coin, coin_amount_to_withdraw)
+        } else {
+            zero()
+        };
+        if (fa_amount_to_withdraw > 0) {
+            let store_addr = primary_fungible_store::primary_store_address(
+                account_addr,
+                option::destroy_some(paired_metadata<CoinType>())
+            );
+            let fa = fungible_asset::withdraw_internal(store_addr, fa_amount_to_withdraw);
+            merge(&mut withdrawn_coin, fungible_asset_to_coin<CoinType>(fa));
+        };
+
+        withdrawn_coin
     }
 
     /// Withdraw specified `amount` of coin `CoinType` from the signing account.

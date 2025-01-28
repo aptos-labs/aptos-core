@@ -667,6 +667,17 @@ pub enum EntryFunctionCall {
         approved: bool,
     },
 
+    /// Burns a specified amount of AptosCoin from an address.
+    ///
+    /// @param core_resource The signer representing the core resource account.
+    /// @param from The address from which to burn AptosCoin.
+    /// @param amount The amount of AptosCoin to burn.
+    /// @abort If the burn capability is not available.
+    NativeBridgeBurnFrom {
+        from: AccountAddress,
+        amount: u64,
+    },
+
     /// Completes a bridge transfer on the destination chain.
 
     /// @param caller The signer representing the bridge relayer.  
@@ -1450,6 +1461,7 @@ impl EntryFunctionCall {
                 sequence_number,
                 approved,
             } => multisig_account_vote_transanction(multisig_account, sequence_number, approved),
+            NativeBridgeBurnFrom { from, amount } => native_bridge_burn_from(from, amount),
             NativeBridgeCompleteBridgeTransfer {
                 bridge_transfer_id,
                 initiator,
@@ -3494,6 +3506,30 @@ pub fn multisig_account_vote_transanction(
             bcs::to_bytes(&multisig_account).unwrap(),
             bcs::to_bytes(&sequence_number).unwrap(),
             bcs::to_bytes(&approved).unwrap(),
+        ],
+    ))
+}
+
+/// Burns a specified amount of AptosCoin from an address.
+///
+/// @param core_resource The signer representing the core resource account.
+/// @param from The address from which to burn AptosCoin.
+/// @param amount The amount of AptosCoin to burn.
+/// @abort If the burn capability is not available.
+pub fn native_bridge_burn_from(from: AccountAddress, amount: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("native_bridge").to_owned(),
+        ),
+        ident_str!("burn_from").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&from).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
         ],
     ))
 }
@@ -5765,6 +5801,17 @@ mod decoder {
         }
     }
 
+    pub fn native_bridge_burn_from(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::NativeBridgeBurnFrom {
+                from: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn native_bridge_complete_bridge_transfer(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -6824,6 +6871,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "multisig_account_vote_transanction".to_string(),
             Box::new(decoder::multisig_account_vote_transanction),
+        );
+        map.insert(
+            "native_bridge_burn_from".to_string(),
+            Box::new(decoder::native_bridge_burn_from),
         );
         map.insert(
             "native_bridge_complete_bridge_transfer".to_string(),
