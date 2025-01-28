@@ -121,6 +121,7 @@ spec aptos_framework::permissioned_signer {
     spec fun spec_check_permission_exists<PermKey: copy + drop + store>(s: signer, perm: PermKey): bool;
 
 
+    // TODO(teng): add this back later
     // spec fun spec_check_permission_exists<PermKey: copy + drop + store>(s: signer, perm: PermKey): bool {
     //     use aptos_std::type_info;
     //     use std::bcs;
