@@ -2,17 +2,20 @@ module aptos_framework::governed_gas_pool {
     use std::vector;
     use aptos_framework::account::{Self, SignerCapability, create_signer_with_capability};
     use aptos_framework::system_addresses::{Self};
-    use aptos_framework::primary_fungible_store::{Self};
+    // use aptos_framework::primary_fungible_store::{Self};
     use aptos_framework::fungible_asset::{Self};
     use aptos_framework::object::{Self};
-    use aptos_framework::aptos_coin::{Self, AptosCoin};
-    use aptos_framework::coin::{Self, Coin, MintCapability, BurnCapability};
+    use aptos_framework::aptos_coin::AptosCoin;
+    use aptos_framework::coin::{Self, Coin};
     use std::features;
     use aptos_framework::signer;
-    use aptos_framework::aptos_account::{Self};
-
+    use aptos_framework::aptos_account::Self;
     #[test_only]
-    use aptos_framework::fungible_asset::{BurnRef};
+    use aptos_framework::coin::{BurnCapability, MintCapability};
+    #[test_only]
+    use aptos_framework::fungible_asset::BurnRef;
+    #[test_only]
+    use aptos_framework::aptos_coin::Self;
 
     const MODULE_SALT: vector<u8> = b"aptos_framework::governed_gas_pool";
 
@@ -69,9 +72,9 @@ module aptos_framework::governed_gas_pool {
         create_signer_with_capability(signer_cap)
     }
 
+    #[view]
     /// Gets the address of the governed gas pool.
     /// @return The address of the governed gas pool.
-    #[view]
     public fun governed_gas_pool_address(): address acquires GovernedGasPool {
         signer::address_of(&governed_gas_signer())
     }
@@ -128,7 +131,6 @@ module aptos_framework::governed_gas_pool {
     /// @param gas_payer The address of the account that paid the gas fees.
     /// @param gas_fee The amount of gas fees to be deposited.
     public fun deposit_gas_fee(gas_payer: address, gas_fee: u64) acquires GovernedGasPool {
-        
         if (features::operations_default_to_fa_apt_store_enabled()) {
             deposit_from_fungible_store(gas_payer, gas_fee);
         } else {
@@ -137,9 +139,9 @@ module aptos_framework::governed_gas_pool {
 
     }
 
+    #[view]
     /// Gets the balance of a specified coin type in the governed gas pool.
     /// @return The balance of the coin in the pool.
-    #[view]
     public fun get_balance<CoinType>(): u64 acquires GovernedGasPool {
         let pool_address = governed_gas_pool_address();
         coin::balance<CoinType>(pool_address)
