@@ -15,6 +15,7 @@ use crate::{
     explicit_sync_wrapper::ExplicitSyncWrapper,
     limit_processor::BlockGasLimitProcessor,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
+    scheduler_v2::SchedulerV2,
     task::{ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::{KeyKind, TxnLastInputOutput},
@@ -1036,6 +1037,55 @@ where
         }
     }
 
+    pub(crate) fn execute_transactions_parallel_v2(
+        &self,
+        signature_verified_block: &TP,
+        base_view: &S,
+        module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
+    ) -> Result<BlockOutput<E::Output>, ()> {
+        let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
+        // Using parallel execution with 1 thread currently will not work as it
+        // will only have a coordinator role but no workers for rolling commit.
+        // Need to special case no roles (commit hook by thread itself) to run
+        // w. concurrency_level = 1 for some reason.
+        assert!(
+            self.config.local.concurrency_level > 1,
+            "Must use sequential execution"
+        );
+
+        let start_shared_counter = gen_id_start_value(false);
+        let shared_counter = AtomicU32::new(start_shared_counter);
+
+        let num_txns = signature_verified_block.num_txns();
+        if num_txns == 0 {
+            return Ok(BlockOutput::new(vec![], self.empty_block_end_info()));
+        }
+
+        let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2) as u32;
+        let shared_maybe_error = AtomicBool::new(false);
+
+        let final_results = ExplicitSyncWrapper::new(Vec::with_capacity(num_txns));
+
+        {
+            final_results
+                .acquire()
+                .resize_with(num_txns, E::Output::skip_output);
+        }
+
+        let num_txns = num_txns as u32;
+
+        // let last_input_output = TxnLastInputOutput::new(num_txns);
+        let scheduler = SchedulerV2::new(num_txns, num_workers);
+
+        // TODO:
+        // let shared_commit_state = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
+        //     self.config.onchain.block_gas_limit_type.clone(),
+        //     num_txns,
+        // ));
+
+        Err(())
+    }
+
     pub(crate) fn execute_transactions_parallel(
         &self,
         signature_verified_block: &TP,
@@ -1634,11 +1684,19 @@ where
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
         if self.config.local.concurrency_level > 1 {
-            let parallel_result = self.execute_transactions_parallel(
-                signature_verified_block,
-                base_view,
-                module_cache_manager_guard,
-            );
+            let parallel_result = if self.config.local.block_stm_v2 {
+                self.execute_transactions_parallel_v2(
+                    signature_verified_block,
+                    base_view,
+                    module_cache_manager_guard,
+                )
+            } else {
+                self.execute_transactions_parallel(
+                    signature_verified_block,
+                    base_view,
+                    module_cache_manager_guard,
+                )
+            };
 
             // If parallel gave us result, return it
             if let Ok(output) = parallel_result {
