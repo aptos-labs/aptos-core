@@ -14,7 +14,9 @@ use crate::{
         round_state::{ExponentialTimeInterval, RoundState},
     },
     metrics_safety_rules::MetricsSafetyRules,
-    network::{IncomingBlockRetrievalRequest, NetworkSender},
+    network::{
+        DeprecatedIncomingBlockRetrievalRequest, IncomingBlockRetrievalRequest, NetworkSender,
+    },
     network_interface::{CommitMessage, ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::DirectMempoolPayloadManager,
@@ -38,7 +40,7 @@ use aptos_consensus_types::{
         block_test_utils::{certificate_for_genesis, gen_test_certificate},
         Block,
     },
-    block_retrieval::{BlockRetrievalRequest, BlockRetrievalStatus},
+    block_retrieval::{BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalStatus},
     common::{Author, Payload, Round},
     order_vote_msg::OrderVoteMsg,
     pipeline::commit_decision::CommitDecision,
@@ -504,9 +506,46 @@ impl NodeSetup {
         self.commit_decision_queue.pop_front().unwrap()
     }
 
-    pub async fn poll_block_retreival(&mut self) -> Option<IncomingBlockRetrievalRequest> {
+    /// SOON TO BE DEPRECATED: Please use [`poll_block_retrieval_v2`](NodeSetup::poll_block_retrieval_v2) going forward
+    /// NOTE: [`IncomingBlockRetrievalRequest`](DeprecatedIncomingBlockRetrievalRequest) is being phased out over two releases
+    /// After the first release, this can be deleted
+    pub async fn poll_block_retrieval(
+        &mut self,
+    ) -> Option<DeprecatedIncomingBlockRetrievalRequest> {
         match self.poll_next_network_event() {
             Some(Event::RpcRequest(_, msg, protocol, response_sender)) => match msg {
+                ConsensusMsg::DeprecatedBlockRetrievalRequest(v) => {
+                    Some(DeprecatedIncomingBlockRetrievalRequest {
+                        req: *v,
+                        protocol,
+                        response_sender,
+                    })
+                },
+                msg => panic!(
+                    "Unexpected Consensus Message: {:?} on node {}",
+                    msg,
+                    self.identity_desc()
+                ),
+            },
+            Some(Event::Message(_, msg)) => panic!(
+                "Unexpected Consensus Message: {:?} on node {}",
+                msg,
+                self.identity_desc()
+            ),
+            None => None,
+        }
+    }
+
+    pub async fn poll_block_retrieval_v2(&mut self) -> Option<IncomingBlockRetrievalRequest> {
+        match self.poll_next_network_event() {
+            Some(Event::RpcRequest(_, msg, protocol, response_sender)) => match msg {
+                ConsensusMsg::DeprecatedBlockRetrievalRequest(v) => {
+                    Some(IncomingBlockRetrievalRequest {
+                        req: BlockRetrievalRequest::V1(*v),
+                        protocol,
+                        response_sender,
+                    })
+                },
                 ConsensusMsg::BlockRetrievalRequest(v) => Some(IncomingBlockRetrievalRequest {
                     req: *v,
                     protocol,
@@ -569,7 +608,7 @@ fn start_replying_to_block_retreival(nodes: Vec<NodeSetup>) -> ReplyingRPCHandle
         handles.push(tokio::spawn(async move {
             while !done_clone.load(Ordering::Relaxed) {
                 info!("Asking for RPC request on {:?}", node.identity_desc());
-                let maybe_request = node.poll_block_retreival().await;
+                let maybe_request = node.poll_block_retrieval().await;
                 if let Some(request) = maybe_request {
                     info!(
                         "RPC request received: {:?} on {:?}",
@@ -1337,8 +1376,8 @@ fn response_on_block_retrieval() {
 
         // first verify that we can retrieve the block if it's in the tree
         let (tx1, rx1) = oneshot::channel();
-        let single_block_request = IncomingBlockRetrievalRequest {
-            req: BlockRetrievalRequest::new(block_id, 1),
+        let single_block_request = DeprecatedIncomingBlockRetrievalRequest {
+            req: BlockRetrievalRequestV1::new(block_id, 1),
             protocol: ProtocolId::ConsensusRpcBcs,
             response_sender: tx1,
         };
@@ -1360,8 +1399,8 @@ fn response_on_block_retrieval() {
 
         // verify that if a block is not there, return ID_NOT_FOUND
         let (tx2, rx2) = oneshot::channel();
-        let missing_block_request = IncomingBlockRetrievalRequest {
-            req: BlockRetrievalRequest::new(HashValue::random(), 1),
+        let missing_block_request = DeprecatedIncomingBlockRetrievalRequest {
+            req: BlockRetrievalRequestV1::new(HashValue::random(), 1),
             protocol: ProtocolId::ConsensusRpcBcs,
             response_sender: tx2,
         };
@@ -1384,8 +1423,8 @@ fn response_on_block_retrieval() {
 
         // if asked for many blocks, return NOT_ENOUGH_BLOCKS
         let (tx3, rx3) = oneshot::channel();
-        let many_block_request = IncomingBlockRetrievalRequest {
-            req: BlockRetrievalRequest::new(block_id, 3),
+        let many_block_request = DeprecatedIncomingBlockRetrievalRequest {
+            req: BlockRetrievalRequestV1::new(block_id, 3),
             protocol: ProtocolId::ConsensusRpcBcs,
             response_sender: tx3,
         };
