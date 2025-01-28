@@ -1,5 +1,4 @@
 spec aptos_framework::governed_gas_pool {
-    use aptos_framework::coin::CoinStore; 
     use aptos_framework::coin::EINSUFFICIENT_BALANCE; 
     use aptos_framework::error;
 
@@ -55,6 +54,7 @@ spec aptos_framework::governed_gas_pool {
     spec deposit<CoinType>(coin: Coin<CoinType>) {
         pragma aborts_if_is_partial = true;
 
+        /*
         /// [high-level-req-3]
         /// Ensure the deposit increases the value in the CoinStore
 
@@ -66,11 +66,14 @@ spec aptos_framework::governed_gas_pool {
 
         //ensures global<CoinStore<CoinType>>(aptos_framework_address).coin.value ==
         //old(global<CoinStore<CoinType>>(aptos_framework_address).coin.value) + coin.value;
+        */
     }
 
     spec deposit_gas_fee(gas_payer: address, gas_fee: u64) {
+        /*
         /// [high-level-req-5]
         //   ensures governed_gas_pool_balance<AptosCoin> == old(governed_gas_pool_balance<AptosCoin>) + gas_fee;
         //   ensures gas_payer_balance<AptosCoin> == old(gas_payer_balance<AptosCoin>) - gas_fee;
+        */
     }
 }

@@ -212,6 +212,8 @@ Borrows the signer of the governed gas pool.
 
 ## Function `governed_gas_pool_address`
 
+Gets the address of the governed gas pool.
+@return The address of the governed gas pool.
 
 
 <pre><code>#[view]
@@ -380,7 +382,6 @@ Deposits gas fees into the governed gas pool.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit_gas_fee">deposit_gas_fee</a>(gas_payer: <b>address</b>, gas_fee: u64) <b>acquires</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPool">GovernedGasPool</a> {
-
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operations_default_to_fa_apt_store_enabled">features::operations_default_to_fa_apt_store_enabled</a>()) {
         <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit_from_fungible_store">deposit_from_fungible_store</a>(gas_payer, gas_fee);
     } <b>else</b> {
@@ -398,6 +399,8 @@ Deposits gas fees into the governed gas pool.
 
 ## Function `get_balance`
 
+Gets the balance of a specified coin type in the governed gas pool.
+@return The balance of the coin in the pool.
 
 
 <pre><code>#[view]
