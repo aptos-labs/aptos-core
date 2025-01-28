@@ -4,6 +4,10 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+
+## [6.0.3] - 2025/01/27
+- Update the processors used by localnet to 1.26.
+
 ## [6.0.2] - 2025/01/24
 - Fix `aptos workspace run` so it does not panic when writing to closed stdout/stderr, allowing it to finish its graceful shutdown sequence when used as a child process.
 
