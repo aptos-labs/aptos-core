@@ -773,10 +773,6 @@ impl SignedTransaction {
         self.raw_txn.max_gas_amount
     }
 
-    pub fn increase_max_gas_amount_by(&mut self, amount: u64) {
-        self.raw_txn.max_gas_amount += amount;
-    }
-
     pub fn gas_unit_price(&self) -> u64 {
         self.raw_txn.gas_unit_price
     }
