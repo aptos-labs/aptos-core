@@ -148,6 +148,7 @@ spec aptos_framework::account {
     /// The Account does not exist under the new address before creating the account.
     spec create_account_unchecked(new_address: address): signer {
         include CreateAccountAbortsIf {addr: new_address};
+        modifies global<Account>(new_address);
         ensures signer::address_of(result) == new_address;
         ensures exists<Account>(new_address);
     }

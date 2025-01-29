@@ -462,6 +462,7 @@ Only called during genesis to initialize system resources for this module.
             txn_sequence_number == account_sequence_number,
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW">PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW</a>)
         );
+        <a href="account.md#0x1_account_create_account_if_does_not_exist">account::create_account_if_does_not_exist</a>(transaction_sender);
     } <b>else</b> {
         // In this case, the transaction is sponsored and the <a href="account.md#0x1_account">account</a> does not exist, so ensure
         // the default values match.

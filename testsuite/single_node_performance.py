@@ -107,7 +107,7 @@ if os.environ.get("DISABLE_FA_APT"):
     FEATURE_FLAGS = ""
     FA_MIGRATION_COMPLETE = False
 else:
-    FEATURE_FLAGS = "--enable-feature NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE --enable-feature OPERATIONS_DEFAULT_TO_FA_APT_STORE"
+    FEATURE_FLAGS = "--enable-feature NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE --enable-feature OPERATIONS_DEFAULT_TO_FA_APT_STORE --enable-feature DEFAULT_ACCOUNT_RESOURCE""
     FA_MIGRATION_COMPLETE = True
 
 if os.environ.get("ENABLE_PRUNER"):
