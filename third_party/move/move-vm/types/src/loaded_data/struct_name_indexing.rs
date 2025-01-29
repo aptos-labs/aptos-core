@@ -1,14 +1,41 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::loaded_data::runtime_types::StructIdentifier;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::language_storage::{StructTag, TypeTag};
-use move_vm_types::{
-    loaded_data::runtime_types::{StructIdentifier, StructNameIndex},
-    panic_error,
-};
 use parking_lot::RwLock;
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, fmt::Formatter, sync::Arc};
+
+macro_rules! panic_error {
+    ($msg:expr) => {{
+        println!("[Error] panic detected: {}", $msg);
+        move_binary_format::errors::PartialVMError::new(
+            move_core_types::vm_status::StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR,
+        )
+        .with_message(format!("Panic detected: {:?}", $msg))
+    }};
+}
+
+/// Represents a unique identifier for the struct name. Note that this index has no public
+/// constructor - the only way to construct it is via [StructNameIndexMap].
+#[derive(Debug, Copy, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct StructNameIndex(usize);
+
+impl StructNameIndex {
+    /// Creates a new index for testing purposes only. For production, indices must always be
+    /// created by the data structure that uses them to intern struct names.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn new(idx: usize) -> Self {
+        Self(idx)
+    }
+}
+
+impl std::fmt::Display for StructNameIndex {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Clone)]
 struct IndexMap<T: Clone + Ord> {
@@ -19,11 +46,11 @@ struct IndexMap<T: Clone + Ord> {
 /// A data structure to cache struct identifiers (address, module name, struct name) and use
 /// indices instead, to save on the memory consumption and avoid unnecessary cloning. It
 /// guarantees that the same struct name identifier always corresponds to a unique index.
-pub(crate) struct StructNameIndexMap(RwLock<IndexMap<StructIdentifier>>);
+pub struct StructNameIndexMap(RwLock<IndexMap<StructIdentifier>>);
 
 impl StructNameIndexMap {
     /// Returns an empty map with no entries.
-    pub(crate) fn empty() -> Self {
+    pub fn empty() -> Self {
         Self(RwLock::new(IndexMap {
             forward_map: BTreeMap::new(),
             backward_map: vec![],
@@ -31,7 +58,7 @@ impl StructNameIndexMap {
     }
 
     /// Flushes the cached struct names and indices.
-    pub(crate) fn flush(&self) {
+    pub fn flush(&self) {
         let mut index_map = self.0.write();
         index_map.backward_map.clear();
         index_map.forward_map.clear();
@@ -40,7 +67,7 @@ impl StructNameIndexMap {
     /// Maps the struct identifier into an index. If the identifier already exists returns the
     /// corresponding index. This function guarantees that for any struct identifiers A and B,
     /// if A == B, they have the same indices.
-    pub(crate) fn struct_name_to_idx(
+    pub fn struct_name_to_idx(
         &self,
         struct_name: &StructIdentifier,
     ) -> PartialVMResult<StructNameIndex> {
@@ -88,7 +115,7 @@ impl StructNameIndexMap {
 
     /// Returns the reference of the struct name corresponding to the index. Here, we wrap the
     /// name into an [Arc] to ensure that the lock is released.
-    pub(crate) fn idx_to_struct_name_ref(
+    pub fn idx_to_struct_name_ref(
         &self,
         idx: StructNameIndex,
     ) -> PartialVMResult<Arc<StructIdentifier>> {
@@ -98,10 +125,7 @@ impl StructNameIndexMap {
 
     /// Returns the clone of the struct name corresponding to the index. The clone ensures that the
     /// lock is released before the control returns to the caller.
-    pub(crate) fn idx_to_struct_name(
-        &self,
-        idx: StructNameIndex,
-    ) -> PartialVMResult<StructIdentifier> {
+    pub fn idx_to_struct_name(&self, idx: StructNameIndex) -> PartialVMResult<StructIdentifier> {
         let index_map = self.0.read();
         Ok(Self::idx_to_struct_name_helper(&index_map, idx)?
             .as_ref()
@@ -109,7 +133,7 @@ impl StructNameIndexMap {
     }
 
     /// Returns the struct tag corresponding to the struct name and the provided type arguments.
-    pub(crate) fn idx_to_struct_tag(
+    pub fn idx_to_struct_tag(
         &self,
         idx: StructNameIndex,
         ty_args: Vec<TypeTag>,
@@ -126,7 +150,7 @@ impl StructNameIndexMap {
 
     /// Returns the number of cached entries. Asserts that the number of cached indices is equal to
     /// the number of cached struct names.
-    pub(crate) fn checked_len(&self) -> PartialVMResult<usize> {
+    pub fn checked_len(&self) -> PartialVMResult<usize> {
         let (forward_map_len, backward_map_len) = {
             let index_map = self.0.read();
             (index_map.forward_map.len(), index_map.backward_map.len())
@@ -145,7 +169,6 @@ impl StructNameIndexMap {
     }
 }
 
-// Only used by V1 loader.
 impl Clone for StructNameIndexMap {
     fn clone(&self) -> Self {
         Self(RwLock::new(self.0.read().clone()))
@@ -171,7 +194,7 @@ mod test {
     #[test]
     fn test_index_map_must_contain_idx() {
         let struct_name_idx_map = StructNameIndexMap::empty();
-        assert_err!(struct_name_idx_map.idx_to_struct_name_ref(StructNameIndex(0)));
+        assert_err!(struct_name_idx_map.idx_to_struct_name_ref(StructNameIndex::new(0)));
     }
 
     #[test]

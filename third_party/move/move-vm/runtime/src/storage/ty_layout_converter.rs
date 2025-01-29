@@ -4,10 +4,7 @@
 use crate::{
     config::VMConfig,
     loader::{LegacyModuleStorageAdapter, Loader, PseudoGasContext, VALUE_DEPTH_MAX},
-    storage::{
-        struct_name_index_map::StructNameIndexMap, ty_cache::StructInfoCache,
-        ty_tag_converter::TypeTagConverter,
-    },
+    storage::{ty_cache::StructInfoCache, ty_tag_converter::TypeTagConverter},
     ModuleStorage,
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -16,7 +13,10 @@ use move_core_types::{
     value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
-use move_vm_types::loaded_data::runtime_types::{StructLayout, StructNameIndex, StructType, Type};
+use move_vm_types::loaded_data::{
+    runtime_types::{StructLayout, StructType, Type},
+    struct_name_indexing::{StructNameIndex, StructNameIndexMap},
+};
 use std::sync::Arc;
 
 /// Maximal nodes which are allowed when converting to layout. This includes the types of
