@@ -52,7 +52,7 @@ def get_bulletproofs_lines(gas_per_ns):
         lines.append(f'        [bulletproofs_verify_base_{batch_size}: InternalGas, {{ {TARGET_GAS_VERSION}.. => "bulletproofs.verify.base_{batch_size}" }}, {prettify_number(gas_units[f"bulletproofs_verify_base_{batch_size}"])}],')
 
     for batch_size in [1, 2, 4, 8, 16]:
-        lines.append(f'        [bulletproofs_verify_per_bit_{batch_size}: InternalGasPerByte, {{ {TARGET_GAS_VERSION}.. => "bulletproofs.verify.per_bit_{batch_size}" }}, {prettify_number(gas_units[f"bulletproofs_verify_per_bit_{batch_size}"])}],')
+        lines.append(f'        [bulletproofs_verify_per_bit_{batch_size}: InternalGasPerArg, {{ {TARGET_GAS_VERSION}.. => "bulletproofs.verify.per_bit_{batch_size}" }}, {prettify_number(gas_units[f"bulletproofs_verify_per_bit_{batch_size}"])}],')
 
     for batch_size in [1, 2, 4, 8, 16]:
         lines.append(f'        [bulletproofs_deserialize_base_{batch_size}: InternalGas, {{ {TARGET_GAS_VERSION}.. => "bulletproofs.deserialize.base_{batch_size}" }}, {prettify_number(gas_units[f"bulletproofs_deserialize_base_{batch_size}"])}],')

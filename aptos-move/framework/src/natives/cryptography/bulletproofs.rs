@@ -17,7 +17,7 @@ use bulletproofs::{BulletproofGens, PedersenGens};
 use byteorder::{ByteOrder, LittleEndian};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use merlin::Transcript;
-use move_core_types::gas_algebra::NumBytes;
+use move_core_types::gas_algebra::{NumArgs, NumBytes};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
@@ -28,25 +28,21 @@ use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
 pub mod abort_codes {
-    /// Abort code when deserialization fails (leading 0x01 == INVALID_ARGUMENT)
-    /// NOTE: This must match the code in the Move implementation
-    pub const _NFE_DESERIALIZE_RANGE_PROOF: u64 = 0x01_0001;
-
     /// Abort code when input value for a range proof is too large.
     /// NOTE: This must match the code in the Move implementation
-    pub const NFE_VALUE_OUTSIDE_RANGE: u64 = 0x01_0002;
+    pub const NFE_VALUE_OUTSIDE_RANGE: u64 = 0x01_0001;
 
     /// Abort code when the requested range is larger than the maximum supported one.
     /// NOTE: This must match the code in the Move implementation
-    pub const NFE_RANGE_NOT_SUPPORTED: u64 = 0x01_0003;
+    pub const NFE_RANGE_NOT_SUPPORTED: u64 = 0x01_0002;
 
     /// Abort code when the requested batch size is larger than the maximum supported one.
     /// NOTE: This must match the code in the Move implementation
-    pub const NFE_BATCH_SIZE_NOT_SUPPORTED: u64 = 0x01_0004;
+    pub const NFE_BATCH_SIZE_NOT_SUPPORTED: u64 = 0x01_0003;
 
     /// Abort code when the vector lengths of values and blinding factors do not match.
     /// NOTE: This must match the code in the Move implementation
-    pub const NFE_VECTOR_LENGTHS_MISMATCH: u64 = 0x01_0005;
+    pub const NFE_VECTOR_LENGTHS_MISMATCH: u64 = 0x01_0004;
 }
 
 /// The Bulletproofs library only seems to support proving [0, 2^{num_bits}) ranges where num_bits is
@@ -446,7 +442,7 @@ fn charge_gas_for_verification(
     bit_length: usize,
     batch_size: usize,
 ) -> SafeNativeResult<()> {
-    let bit_length = NumBytes::new(bit_length as u64);
+    let bit_length = NumArgs::new(bit_length as u64);
 
     match batch_size {
         1 => {
