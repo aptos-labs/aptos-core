@@ -30,9 +30,11 @@
 -  [Function `create_account`](#0x1_account_create_account)
 -  [Function `create_account_unchecked`](#0x1_account_create_account_unchecked)
 -  [Function `exists_at`](#0x1_account_exists_at)
+-  [Function `resource_exists_at`](#0x1_account_resource_exists_at)
 -  [Function `get_guid_next_creation_num`](#0x1_account_get_guid_next_creation_num)
 -  [Function `get_sequence_number`](#0x1_account_get_sequence_number)
 -  [Function `originating_address`](#0x1_account_originating_address)
+-  [Function `ensure_resource_exists`](#0x1_account_ensure_resource_exists)
 -  [Function `increment_sequence_number`](#0x1_account_increment_sequence_number)
 -  [Function `get_authentication_key`](#0x1_account_get_authentication_key)
 -  [Function `rotate_authentication_key_internal`](#0x1_account_rotate_authentication_key_internal)
@@ -1145,7 +1147,7 @@ Only called during genesis to initialize system resources for this module.
 
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_create_account_if_does_not_exist">create_account_if_does_not_exist</a>(account_address: <b>address</b>) {
     <b>if</b> (!<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_address)) {
-        <a href="account.md#0x1_account_create_account">create_account</a>(account_address);
+        <a href="account.md#0x1_account_create_account_unchecked">create_account_unchecked</a>(account_address);
     }
 }
 </code></pre>
@@ -1175,14 +1177,16 @@ is returned. This way, the caller of this function can publish additional resour
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="account.md#0x1_account_create_account">create_account</a>(new_address: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
     // there cannot be an <a href="account.md#0x1_account_Account">Account</a> resource under new_addr already.
     <b>assert</b>!(!<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(new_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="account.md#0x1_account_EACCOUNT_ALREADY_EXISTS">EACCOUNT_ALREADY_EXISTS</a>));
-
     // NOTE: @core_resources gets created via a `create_account` call, so we do not <b>include</b> it below.
     <b>assert</b>!(
         new_address != @vm_reserved && new_address != @aptos_framework && new_address != @aptos_token,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_ECANNOT_RESERVED_ADDRESS">ECANNOT_RESERVED_ADDRESS</a>)
     );
-
-    <a href="account.md#0x1_account_create_account_unchecked">create_account_unchecked</a>(new_address)
+    <b>if</b> (!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_default_account_resource_enabled">features::is_default_account_resource_enabled</a>()) {
+        <a href="account.md#0x1_account_create_account_unchecked">create_account_unchecked</a>(new_address)
+    } <b>else</b> {
+        <a href="create_signer.md#0x1_create_signer">create_signer</a>(new_address)
+    }
 }
 </code></pre>
 
@@ -1259,6 +1263,30 @@ is returned. This way, the caller of this function can publish additional resour
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_exists_at">exists_at</a>(addr: <b>address</b>): bool {
+    <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_default_account_resource_enabled">features::is_default_account_resource_enabled</a>() || <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_account_resource_exists_at"></a>
+
+## Function `resource_exists_at`
+
+
+
+<pre><code><b>fun</b> <a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(addr: <b>address</b>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(addr: <b>address</b>): bool {
     <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr)
 }
 </code></pre>
@@ -1284,7 +1312,13 @@ is returned. This way, the caller of this function can publish additional resour
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_guid_next_creation_num">get_guid_next_creation_num</a>(addr: <b>address</b>): u64 <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
-    <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).guid_creation_num
+    <b>if</b> (<a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(addr)) {
+        <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).guid_creation_num
+    } <b>else</b> <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_default_account_resource_enabled">features::is_default_account_resource_enabled</a>()) {
+        0
+    } <b>else</b> {
+        <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>)
+    }
 }
 </code></pre>
 
@@ -1309,7 +1343,13 @@ is returned. This way, the caller of this function can publish additional resour
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_sequence_number">get_sequence_number</a>(addr: <b>address</b>): u64 <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
-    <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).sequence_number
+    <b>if</b> (<a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(addr)) {
+        <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).sequence_number
+    } <b>else</b> <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_default_account_resource_enabled">features::is_default_account_resource_enabled</a>()) {
+        0
+    } <b>else</b> {
+        <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>)
+    }
 }
 </code></pre>
 
@@ -1347,6 +1387,32 @@ is returned. This way, the caller of this function can publish additional resour
 
 </details>
 
+<a id="0x1_account_ensure_resource_exists"></a>
+
+## Function `ensure_resource_exists`
+
+
+
+<pre><code><b>fun</b> <a href="account.md#0x1_account_ensure_resource_exists">ensure_resource_exists</a>(addr: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="account.md#0x1_account_ensure_resource_exists">ensure_resource_exists</a>(addr: <b>address</b>) {
+    <b>if</b> (!<a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(addr)) {
+        <a href="account.md#0x1_account_create_account_unchecked">create_account_unchecked</a>(addr);
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_account_increment_sequence_number"></a>
 
 ## Function `increment_sequence_number`
@@ -1363,6 +1429,7 @@ is returned. This way, the caller of this function can publish additional resour
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="account.md#0x1_account_increment_sequence_number">increment_sequence_number</a>(addr: <b>address</b>) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
+    <a href="account.md#0x1_account_ensure_resource_exists">ensure_resource_exists</a>(addr);
     <b>let</b> sequence_number = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).sequence_number;
 
     <b>assert</b>!(
@@ -1395,7 +1462,13 @@ is returned. This way, the caller of this function can publish additional resour
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_authentication_key">get_authentication_key</a>(addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
-    <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).authentication_key
+    <b>if</b> (<a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(addr)) {
+        <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).authentication_key
+    } <b>else</b> <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_default_account_resource_enabled">features::is_default_account_resource_enabled</a>()) {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&addr)
+    } <b>else</b> {
+        <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>)
+    }
 }
 </code></pre>
 
@@ -1425,7 +1498,7 @@ many contexts:
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="account.md#0x1_account_rotate_authentication_key_internal">rotate_authentication_key_internal</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-    <b>assert</b>!(<a href="account.md#0x1_account_exists_at">exists_at</a>(addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>));
+    <a href="account.md#0x1_account_ensure_resource_exists">ensure_resource_exists</a>(addr);
     <b>assert</b>!(
         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&new_auth_key) == 32,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_EMALFORMED_AUTHENTICATION_KEY">EMALFORMED_AUTHENTICATION_KEY</a>)
@@ -1525,8 +1598,8 @@ to rotate his address to Alice's address in the first place.
     cap_update_table: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a>, <a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a> {
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-    <b>assert</b>!(<a href="account.md#0x1_account_exists_at">exists_at</a>(addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>));
     <a href="account.md#0x1_account_check_rotation_permission">check_rotation_permission</a>(<a href="account.md#0x1_account">account</a>);
+    <a href="account.md#0x1_account_ensure_resource_exists">ensure_resource_exists</a>(addr);
     <b>let</b> account_resource = <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
 
     // Verify the given `from_public_key_bytes` matches this <a href="account.md#0x1_account">account</a>'s current authentication key.
@@ -1603,7 +1676,7 @@ to rotate his address to Alice's address in the first place.
     cap_update_table: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 ) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a>, <a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a> {
     <a href="account.md#0x1_account_check_rotation_permission">check_rotation_permission</a>(delegate_signer);
-    <b>assert</b>!(<a href="account.md#0x1_account_exists_at">exists_at</a>(rotation_cap_offerer_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EOFFERER_ADDRESS_DOES_NOT_EXIST">EOFFERER_ADDRESS_DOES_NOT_EXIST</a>));
+    <b>assert</b>!(<a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(rotation_cap_offerer_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EOFFERER_ADDRESS_DOES_NOT_EXIST">EOFFERER_ADDRESS_DOES_NOT_EXIST</a>));
 
     // Check that there <b>exists</b> a rotation <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> offer at the offerer's <a href="account.md#0x1_account">account</a> resource for the delegate.
     <b>let</b> delegate_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegate_signer);
@@ -1684,6 +1757,7 @@ offer, calling this function will replace the previous <code>recipient_address</
 ) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
     <a href="account.md#0x1_account_check_rotation_permission">check_rotation_permission</a>(<a href="account.md#0x1_account">account</a>);
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <a href="account.md#0x1_account_ensure_resource_exists">ensure_resource_exists</a>(addr);
     <b>assert</b>!(<a href="account.md#0x1_account_exists_at">exists_at</a>(recipient_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>));
 
     // proof that this <a href="account.md#0x1_account">account</a> intends <b>to</b> delegate its rotation <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> <b>to</b> another <a href="account.md#0x1_account">account</a>
@@ -1765,9 +1839,8 @@ authority of the new authentication key.
 
 <pre><code>entry <b>fun</b> <a href="account.md#0x1_account_set_originating_address">set_originating_address</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a>, <a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a> {
     <b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-    <b>assert</b>!(<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>));
     <b>let</b> auth_key_as_address =
-        <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(<b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr).authentication_key);
+        <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(<a href="account.md#0x1_account_get_authentication_key">get_authentication_key</a>(account_addr));
     <b>let</b> address_map_ref_mut =
         &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a>&gt;(@aptos_framework).address_map;
     <b>if</b> (<a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(address_map_ref_mut, auth_key_as_address)) {
@@ -1830,6 +1903,12 @@ Returns the address of the account that has a rotation capability offer from the
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_rotation_capability_offer_for">get_rotation_capability_offer_for</a>(account_addr: <b>address</b>): <b>address</b> <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_default_account_resource_enabled">features::is_default_account_resource_enabled</a>()) {
+        <b>assert</b>!(
+            <a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(account_addr),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_SIGNER_CAPABILITY_OFFERED">ENO_SIGNER_CAPABILITY_OFFERED</a>),
+        );
+    };
     <b>let</b> account_resource = <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
     <b>assert</b>!(
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&account_resource.rotation_capability_offer.for),
@@ -1894,7 +1973,16 @@ Revoke any rotation capability offer in the specified account.
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="account.md#0x1_account_revoke_any_rotation_capability">revoke_any_rotation_capability</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
     <a href="account.md#0x1_account_check_rotation_permission">check_rotation_permission</a>(<a href="account.md#0x1_account">account</a>);
-    <b>let</b> account_resource = <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));
+    <b>let</b> offerer_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_default_account_resource_enabled">features::is_default_account_resource_enabled</a>()) {
+        <b>assert</b>!(
+            <a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(offerer_addr),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_SUCH_ROTATION_CAPABILITY_OFFER">ENO_SUCH_ROTATION_CAPABILITY_OFFER</a>),
+        );
+    } <b>else</b> {
+        <b>assert</b>!(<a href="account.md#0x1_account_exists_at">exists_at</a>(offerer_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>));
+    };
+    <b>let</b> account_resource = <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(offerer_addr);
     <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> account_resource.rotation_capability_offer.for);
 }
 </code></pre>
@@ -2066,8 +2154,17 @@ Revoke any signer capability offer in the specified account.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="account.md#0x1_account_revoke_any_signer_capability">revoke_any_signer_capability</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
+    <b>let</b> offerer_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_default_account_resource_enabled">features::is_default_account_resource_enabled</a>()) {
+        <b>assert</b>!(
+            <a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(offerer_addr),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_SUCH_SIGNER_CAPABILITY">ENO_SUCH_SIGNER_CAPABILITY</a>),
+        );
+    } <b>else</b> {
+        <b>assert</b>!(<a href="account.md#0x1_account_exists_at">exists_at</a>(offerer_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>));
+    };
     <a href="account.md#0x1_account_check_offering_permission">check_offering_permission</a>(<a href="account.md#0x1_account">account</a>);
-    <b>let</b> account_resource = <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));
+    <b>let</b> account_resource = <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(offerer_addr);
     <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> account_resource.signer_capability_offer.for);
 }
 </code></pre>
@@ -2095,8 +2192,14 @@ at the offerer's address.
 
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_create_authorized_signer">create_authorized_signer</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, offerer_address: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
     <a href="account.md#0x1_account_check_offering_permission">check_offering_permission</a>(<a href="account.md#0x1_account">account</a>);
-    <b>assert</b>!(<a href="account.md#0x1_account_exists_at">exists_at</a>(offerer_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EOFFERER_ADDRESS_DOES_NOT_EXIST">EOFFERER_ADDRESS_DOES_NOT_EXIST</a>));
-
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_default_account_resource_enabled">features::is_default_account_resource_enabled</a>()) {
+        <b>assert</b>!(
+            <a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(offerer_address),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_ENO_SUCH_SIGNER_CAPABILITY">ENO_SUCH_SIGNER_CAPABILITY</a>),
+        );
+    } <b>else</b> {
+        <b>assert</b>!(<a href="account.md#0x1_account_exists_at">exists_at</a>(offerer_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>));
+    };
     // Check <b>if</b> there's an existing <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <a href="../../aptos-stdlib/doc/capability.md#0x1_capability">capability</a> offer from the offerer.
     <b>let</b> account_resource = <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(offerer_address);
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
@@ -2299,13 +2402,15 @@ than <code>(1/2)^(256)</code>.
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_create_resource_account">create_resource_account</a>(source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="account.md#0x1_account_SignerCapability">SignerCapability</a>) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
     <b>let</b> resource_addr = <a href="account.md#0x1_account_create_resource_address">create_resource_address</a>(&<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(source), seed);
     <b>let</b> resource = <b>if</b> (<a href="account.md#0x1_account_exists_at">exists_at</a>(resource_addr)) {
-        <b>let</b> <a href="account.md#0x1_account">account</a> = <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(resource_addr);
+        <b>if</b> (<a href="account.md#0x1_account_resource_exists_at">resource_exists_at</a>(resource_addr)) {
+            <b>let</b> <a href="account.md#0x1_account">account</a> = <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(resource_addr);
+            <b>assert</b>!(
+                <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(&<a href="account.md#0x1_account">account</a>.signer_capability_offer.for),
+                <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="account.md#0x1_account_ERESOURCE_ACCCOUNT_EXISTS">ERESOURCE_ACCCOUNT_EXISTS</a>),
+            );
+        };
         <b>assert</b>!(
-            <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(&<a href="account.md#0x1_account">account</a>.signer_capability_offer.for),
-            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="account.md#0x1_account_ERESOURCE_ACCCOUNT_EXISTS">ERESOURCE_ACCCOUNT_EXISTS</a>),
-        );
-        <b>assert</b>!(
-            <a href="account.md#0x1_account">account</a>.sequence_number == 0,
+            <a href="account.md#0x1_account_get_sequence_number">get_sequence_number</a>(resource_addr) == 0,
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="account.md#0x1_account_EACCOUNT_ALREADY_USED">EACCOUNT_ALREADY_USED</a>),
         );
         <a href="create_signer.md#0x1_create_signer">create_signer</a>(resource_addr)
@@ -2387,6 +2492,7 @@ GUID management methods.
 
 <pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_create_guid">create_guid</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <a href="guid.md#0x1_guid_GUID">guid::GUID</a> <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(account_signer);
+    <a href="account.md#0x1_account_ensure_resource_exists">ensure_resource_exists</a>(addr);
     <b>let</b> <a href="account.md#0x1_account">account</a> = <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
     <b>let</b> <a href="guid.md#0x1_guid">guid</a> = <a href="guid.md#0x1_guid_create">guid::create</a>(addr, &<b>mut</b> <a href="account.md#0x1_account">account</a>.guid_creation_num);
     <b>assert</b>!(
@@ -2443,7 +2549,6 @@ Coin management methods.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="account.md#0x1_account_register_coin">register_coin</a>&lt;CoinType&gt;(account_addr: <b>address</b>) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
-    <b>let</b> <a href="account.md#0x1_account">account</a> = <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
     <b>if</b> (std::features::module_event_migration_enabled()) {
         <a href="event.md#0x1_event_emit">event::emit</a>(
             <a href="account.md#0x1_account_CoinRegister">CoinRegister</a> {
@@ -2452,6 +2557,8 @@ Coin management methods.
             },
         );
     } <b>else</b> {
+        <a href="account.md#0x1_account_ensure_resource_exists">ensure_resource_exists</a>(account_addr);
+        <b>let</b> <a href="account.md#0x1_account">account</a> = <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_addr);
         <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="account.md#0x1_account_CoinRegisterEvent">CoinRegisterEvent</a>&gt;(
             &<b>mut</b> <a href="account.md#0x1_account">account</a>.coin_register_events,
             <a href="account.md#0x1_account_CoinRegisterEvent">CoinRegisterEvent</a> {
@@ -2538,13 +2645,13 @@ Capability based functions for efficient use.
     signed_message_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     message: T,
 ) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
-    <b>let</b> account_resource = <b>borrow_global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(<a href="account.md#0x1_account">account</a>);
+    <b>let</b> auth_key = <a href="account.md#0x1_account_get_authentication_key">get_authentication_key</a>(<a href="account.md#0x1_account">account</a>);
     // Verify that the `<a href="account.md#0x1_account_SignerCapabilityOfferProofChallengeV2">SignerCapabilityOfferProofChallengeV2</a>` <b>has</b> the right information and is signed by the <a href="account.md#0x1_account">account</a> owner's key
     <b>if</b> (account_scheme == <a href="account.md#0x1_account_ED25519_SCHEME">ED25519_SCHEME</a>) {
         <b>let</b> pubkey = <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_new_unvalidated_public_key_from_bytes">ed25519::new_unvalidated_public_key_from_bytes</a>(account_public_key);
         <b>let</b> expected_auth_key = <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_unvalidated_public_key_to_authentication_key">ed25519::unvalidated_public_key_to_authentication_key</a>(&pubkey);
         <b>assert</b>!(
-            account_resource.authentication_key == expected_auth_key,
+            auth_key == expected_auth_key,
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_EWRONG_CURRENT_PUBLIC_KEY">EWRONG_CURRENT_PUBLIC_KEY</a>),
         );
 
@@ -2557,7 +2664,7 @@ Capability based functions for efficient use.
         <b>let</b> pubkey = <a href="../../aptos-stdlib/doc/multi_ed25519.md#0x1_multi_ed25519_new_unvalidated_public_key_from_bytes">multi_ed25519::new_unvalidated_public_key_from_bytes</a>(account_public_key);
         <b>let</b> expected_auth_key = <a href="../../aptos-stdlib/doc/multi_ed25519.md#0x1_multi_ed25519_unvalidated_public_key_to_authentication_key">multi_ed25519::unvalidated_public_key_to_authentication_key</a>(&pubkey);
         <b>assert</b>!(
-            account_resource.authentication_key == expected_auth_key,
+            auth_key == expected_auth_key,
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_EWRONG_CURRENT_PUBLIC_KEY">EWRONG_CURRENT_PUBLIC_KEY</a>),
         );
 
@@ -2785,6 +2892,7 @@ The Account does not exist under the new address before creating the account.
 
 
 <pre><code><b>include</b> <a href="account.md#0x1_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> {addr: new_address};
+<b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(new_address);
 <b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(result) == new_address;
 <b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(new_address);
 </code></pre>
