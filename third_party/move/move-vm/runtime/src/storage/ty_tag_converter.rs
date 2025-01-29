@@ -288,7 +288,9 @@ mod tests {
     use hashbrown::Equivalent;
     use move_binary_format::file_format::StructTypeParameter;
     use move_core_types::{
-        ability::{Ability, AbilitySet}, account_address::AccountAddress, identifier::Identifier,
+        ability::{Ability, AbilitySet},
+        account_address::AccountAddress,
+        identifier::Identifier,
         language_storage::ModuleId,
     };
     use move_vm_types::loaded_data::runtime_types::{
