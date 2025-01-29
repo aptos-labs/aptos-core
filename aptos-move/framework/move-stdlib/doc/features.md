@@ -141,6 +141,8 @@ return true.
 -  [Function `is_account_abstraction_enabled`](#0x1_features_is_account_abstraction_enabled)
 -  [Function `get_bulletproofs_batch_feature`](#0x1_features_get_bulletproofs_batch_feature)
 -  [Function `bulletproofs_batch_enabled`](#0x1_features_bulletproofs_batch_enabled)
+-  [Function `get_default_account_resource_feature`](#0x1_features_get_default_account_resource_feature)
+-  [Function `is_default_account_resource_enabled`](#0x1_features_is_default_account_resource_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -157,6 +159,7 @@ return true.
     -  [Function `partial_governance_voting_enabled`](#@Specification_1_partial_governance_voting_enabled)
     -  [Function `module_event_enabled`](#@Specification_1_module_event_enabled)
     -  [Function `abort_if_multisig_payload_mismatch_enabled`](#@Specification_1_abort_if_multisig_payload_mismatch_enabled)
+    -  [Function `is_default_account_resource_enabled`](#@Specification_1_is_default_account_resource_enabled)
     -  [Function `change_feature_flags_internal`](#@Specification_1_change_feature_flags_internal)
     -  [Function `change_feature_flags_for_next_epoch`](#@Specification_1_change_feature_flags_for_next_epoch)
     -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
@@ -449,6 +452,16 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_CRYPTOGRAPHY_ALGEBRA_NATIVES">CRYPTOGRAPHY_ALGEBRA_NATIVES</a>: u64 = 12;
+</code></pre>
+
+
+
+<a id="0x1_features_DEFAULT_ACCOUNT_RESOURCE"></a>
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_DEFAULT_ACCOUNT_RESOURCE">DEFAULT_ACCOUNT_RESOURCE</a>: u64 = 88;
 </code></pre>
 
 
@@ -3508,6 +3521,52 @@ Deprecated feature
 
 </details>
 
+<a id="0x1_features_get_default_account_resource_feature"></a>
+
+## Function `get_default_account_resource_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_default_account_resource_feature">get_default_account_resource_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_default_account_resource_feature">get_default_account_resource_feature</a>(): u64 { <a href="features.md#0x1_features_DEFAULT_ACCOUNT_RESOURCE">DEFAULT_ACCOUNT_RESOURCE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_is_default_account_resource_enabled"></a>
+
+## Function `is_default_account_resource_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_default_account_resource_enabled">is_default_account_resource_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_default_account_resource_enabled">is_default_account_resource_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DEFAULT_ACCOUNT_RESOURCE">DEFAULT_ACCOUNT_RESOURCE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_features_change_feature_flags"></a>
 
 ## Function `change_feature_flags`
@@ -3822,7 +3881,7 @@ Helper to check whether a feature flag is enabled.
 
 
 
-<pre><code><b>pragma</b> bv=b"0";
+<pre><code><b>pragma</b> bv = b"0";
 </code></pre>
 
 
@@ -3848,7 +3907,7 @@ Helper to check whether a feature flag is enabled.
 
 
 
-<pre><code><b>pragma</b> bv=b"0";
+<pre><code><b>pragma</b> bv = b"0";
 </code></pre>
 
 
@@ -3969,6 +4028,24 @@ Helper to check whether a feature flag is enabled.
 
 
 
+<a id="@Specification_1_is_default_account_resource_enabled"></a>
+
+### Function `is_default_account_resource_enabled`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_default_account_resource_enabled">is_default_account_resource_enabled</a>(): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_DEFAULT_ACCOUNT_RESOURCE">DEFAULT_ACCOUNT_RESOURCE</a>);
+</code></pre>
+
+
+
 <a id="@Specification_1_change_feature_flags_internal"></a>
 
 ### Function `change_feature_flags_internal`
@@ -4011,7 +4088,9 @@ Helper to check whether a feature flag is enabled.
 
 
 <pre><code><b>fun</b> <a href="features.md#0x1_features_spec_contains">spec_contains</a>(<a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, feature: u64): bool {
-   ((int2bv((((1 <b>as</b> u8) &lt;&lt; ((feature % (8 <b>as</b> u64)) <b>as</b> u64)) <b>as</b> u8)) <b>as</b> u8) & <a href="features.md#0x1_features">features</a>[feature/8] <b>as</b> u8) &gt; (0 <b>as</b> u8)
+   ((int2bv(
+       (((1 <b>as</b> u8) &lt;&lt; ((feature % (8 <b>as</b> u64)) <b>as</b> u64)) <b>as</b> u8)
+   ) <b>as</b> u8) & <a href="features.md#0x1_features">features</a>[feature / 8] <b>as</b> u8) &gt; (0 <b>as</b> u8)
        && (feature / 8) &lt; len(<a href="features.md#0x1_features">features</a>)
 }
 </code></pre>
@@ -4121,7 +4200,7 @@ Helper to check whether a feature flag is enabled.
 
 
 
-<pre><code><b>pragma</b> bv=b"0";
+<pre><code><b>pragma</b> bv = b"0";
 <b>aborts_if</b> <b>false</b>;
 <b>ensures</b> feature / 8 &lt; len(<a href="features.md#0x1_features">features</a>);
 <b>ensures</b> <b>include</b> == <a href="features.md#0x1_features_spec_contains">spec_contains</a>(<a href="features.md#0x1_features">features</a>, feature);
@@ -4140,7 +4219,7 @@ Helper to check whether a feature flag is enabled.
 
 
 
-<pre><code><b>pragma</b> bv=b"0";
+<pre><code><b>pragma</b> bv = b"0";
 <b>aborts_if</b> <b>false</b>;
 <b>ensures</b> result == <a href="features.md#0x1_features_spec_contains">spec_contains</a>(<a href="features.md#0x1_features">features</a>, feature);
 </code></pre>
