@@ -1,16 +1,16 @@
 ---
 remote_endpoint: ~
-name: "AIP-103 Permissioned Signer"
+name: "AIP-103 Permissioned Signer - disable"
 proposals:
   - name: permissioned_signer
     metadata:
-      title: "Enable Permissioned Signer"
+      title: "Enable Permissioned Signer - disable"
       description: "Enables AIP-103"
       source_code_url: "https://github.com/aptos-labs/aptos-core/pull/14605"
       discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-103.md"
     execution_mode: MultiStep
     update_sequence:
       - FeatureFlag:
-          enabled:
+          enabled: []
+          disabled:
             - permissioned_signer
-          disabled: []
