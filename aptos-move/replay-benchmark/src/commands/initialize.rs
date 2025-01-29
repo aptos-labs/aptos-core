@@ -7,9 +7,8 @@ use crate::{
     overrides::{OverrideConfig, PackageOverride},
     workload::TransactionBlock,
 };
-use anyhow::{anyhow, bail};
-use aptos_framework::{BuildOptions, BuiltPackage};
-use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
+use anyhow::anyhow;
+use aptos_framework::BuildOptions;
 use aptos_logger::Level;
 use aptos_types::on_chain_config::FeatureFlag;
 use clap::Parser;
@@ -70,20 +69,6 @@ impl InitializeCommand {
     pub async fn initialize_inputs(self) -> anyhow::Result<()> {
         init_logger_and_metrics(self.log_level);
 
-        if !self
-            .enable_features
-            .iter()
-            .all(|f| !self.disable_features.contains(f))
-        {
-            bail!("Enabled and disabled feature flags cannot overlap")
-        }
-        if matches!(self.gas_feature_version, Some(v) if v > LATEST_GAS_FEATURE_VERSION) {
-            bail!(
-                "Gas feature version must be at most the latest one: {}",
-                LATEST_GAS_FEATURE_VERSION
-            );
-        }
-
         let bytes = fs::read(PathBuf::from(&self.transactions_file)).await?;
         let txn_blocks: Vec<TransactionBlock> = bcs::from_bytes(&bytes).map_err(|err| {
             anyhow!(
@@ -104,7 +89,7 @@ impl InitializeCommand {
             self.disable_features,
             self.gas_feature_version,
             package_override,
-        );
+        )?;
 
         let debugger = build_debugger(self.rest_api.rest_endpoint, self.rest_api.api_key)?;
         let inputs =
