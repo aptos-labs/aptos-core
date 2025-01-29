@@ -164,7 +164,8 @@ pub(crate) fn run_script_prologue(
                         .as_move_value()
                         .simple_serialize()
                         .unwrap(),
-                    MoveValue::U64(txn_sequence_number)
+                    txn_replay_protector
+                        .to_move_value()
                         .simple_serialize()
                         .unwrap(),
                     MoveValue::vector_address(txn_data.secondary_signers())
@@ -196,7 +197,8 @@ pub(crate) fn run_script_prologue(
                         .as_move_value()
                         .simple_serialize()
                         .unwrap(),
-                    MoveValue::U64(txn_sequence_number)
+                    txn_replay_protector
+                        .to_move_value()
                         .simple_serialize()
                         .unwrap(),
                     MoveValue::vector_address(txn_data.secondary_signers())
