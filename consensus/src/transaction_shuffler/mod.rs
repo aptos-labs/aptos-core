@@ -10,7 +10,6 @@ use aptos_types::{
 };
 use std::sync::Arc;
 
-mod sender_aware;
 mod use_case_aware;
 // re-export use case aware shuffler for fuzzer.
 #[cfg(feature = "fuzzing")]
