@@ -20,7 +20,18 @@ pub enum SignatureVerifiedTransaction {
 
 impl PartialEq for SignatureVerifiedTransaction {
     fn eq(&self, other: &Self) -> bool {
-        self.borrow_into_inner().eq(other.borrow_into_inner())
+        match (self, other) {
+            (
+                SignatureVerifiedTransaction::Invalid(a),
+                SignatureVerifiedTransaction::Invalid(b),
+            ) => a.eq(b),
+            (SignatureVerifiedTransaction::Valid(a), SignatureVerifiedTransaction::Valid(b)) => {
+                a.eq(b)
+            },
+            _ => {
+                panic!("Unexpected equality check on {:?} and {:?}", self, other)
+            },
+        }
     }
 }
 

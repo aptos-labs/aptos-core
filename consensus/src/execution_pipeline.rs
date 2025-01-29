@@ -115,11 +115,8 @@ impl ExecutionPipeline {
                 command_creation_time: Instant::now(),
                 pre_commit_hook,
                 lifetime_guard,
-<<<<<<< HEAD
                 block_qc,
-=======
                 shuffler,
->>>>>>> 615e629006 ([execution-pool] Create iterator on TransactionShuffler)
             })
             .expect("Failed to send block to execution pipeline.");
 
@@ -149,11 +146,8 @@ impl ExecutionPipeline {
             result_tx,
             command_creation_time,
             lifetime_guard,
-<<<<<<< HEAD
             block_qc,
-=======
             shuffler,
->>>>>>> 615e629006 ([execution-pool] Create iterator on TransactionShuffler)
         } = command;
         counters::PREPARE_BLOCK_WAIT_TIME.observe_duration(command_creation_time.elapsed());
         debug!("prepare_block received block {}.", block.id());
@@ -228,7 +222,7 @@ impl ExecutionPipeline {
             result_tx,
             command_creation_time,
             lifetime_guard,
-            shuffler,
+            shuffler: _,
         }) = block_rx.recv().await
         {
             counters::EXECUTE_BLOCK_WAIT_TIME.observe_duration(command_creation_time.elapsed());
@@ -394,11 +388,8 @@ struct PrepareBlockCommand {
     result_tx: oneshot::Sender<ExecutorResult<PipelineExecutionResult>>,
     command_creation_time: Instant,
     lifetime_guard: CountedRequest<()>,
-<<<<<<< HEAD
     block_qc: Option<Arc<QuorumCert>>,
-=======
     shuffler: Arc<dyn TransactionShuffler>,
->>>>>>> 615e629006 ([execution-pool] Create iterator on TransactionShuffler)
 }
 
 struct ExecuteBlockCommand {
