@@ -98,7 +98,11 @@ impl<const N: usize> BitsetTypeParameterConstraints<N> {
     fn check_in_context(&self, context: &Self) -> PartialVMResult<()> {
         for i in 0..N {
             if self.words[i] | context.words[i] != context.words[i] {
-                return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED));
+                return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
+                    .with_message(format!(
+                        "expected abilities {:?} got abilities {:?}",
+                        self.words[i], context.words[i]
+                    )));
             }
         }
 
