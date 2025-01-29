@@ -3,9 +3,15 @@
 
 //! Defines different overrides for on-chain state used for benchmarking. With overrides, past
 //! transactions can be replayed on top of a modified state, and we can evaluate how it impacts
-//! performance or other things.
+//! performance or other things. Supported overrides include:
+//!   1. enabling feature flags,
+//!   2. disabling feature flags,
+//!   3. overriding gas feature version,
+//!   4. changing modules (bytecode, metadata, etc.) and package information.
 
+use anyhow::bail;
 use aptos_framework::{natives::code::PackageRegistry, BuildOptions, BuiltPackage};
+use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_logger::error;
 use aptos_types::{
     on_chain_config::{FeatureFlag, Features, GasScheduleV2, OnChainConfig},
@@ -14,12 +20,16 @@ use aptos_types::{
 use serde::Serialize;
 use std::{collections::HashMap, path::PathBuf};
 
+/// Stores information about compiled Move packages and the build options used to create them. Used
+/// by the override configuration to shadow existing on-chain modules with modules defined in these
+/// packages.
 pub(crate) struct PackageOverride {
     packages: Vec<BuiltPackage>,
     build_options: BuildOptions,
 }
 
 impl PackageOverride {
+    /// Uses the provided build options to build multiple packages from the specified paths.
     pub(crate) fn new(
         package_paths: Vec<String>,
         build_options: BuildOptions,
@@ -37,11 +47,11 @@ impl PackageOverride {
 
 /// Stores all state overrides.
 pub struct OverrideConfig {
-    /// Feature flags to enable.
+    /// Feature flags to enable. Invariant: does not overlap with disabled features.
     additional_enabled_features: Vec<FeatureFlag>,
-    /// Feature flags to disable.
+    /// Feature flags to disable. Invariant: does not overlap with enabled features.
     additional_disabled_features: Vec<FeatureFlag>,
-    /// Gas feature version to use.
+    /// Gas feature version to use. Invariant: must be at most the latest version.
     gas_feature_version: Option<u64>,
     /// Information about overridden packages.
     package_override: PackageOverride,
@@ -53,13 +63,26 @@ impl OverrideConfig {
         additional_disabled_features: Vec<FeatureFlag>,
         gas_feature_version: Option<u64>,
         package_override: PackageOverride,
-    ) -> Self {
-        Self {
+    ) -> anyhow::Result<Self> {
+        if !additional_enabled_features
+            .iter()
+            .all(|f| !additional_disabled_features.contains(f))
+        {
+            bail!("Enabled and disabled feature flags cannot overlap")
+        }
+        if matches!(gas_feature_version, Some(v) if v > LATEST_GAS_FEATURE_VERSION) {
+            bail!(
+                "Gas feature version must be at most the latest one: {}",
+                LATEST_GAS_FEATURE_VERSION
+            );
+        }
+
+        Ok(Self {
             additional_enabled_features,
             additional_disabled_features,
             gas_feature_version,
             package_override,
-        }
+        })
     }
 
     pub(crate) fn get_state_override(
@@ -112,7 +135,8 @@ impl OverrideConfig {
                 .last()
                 .expect("Package must contain at least one module");
             let package_registry_state_key =
-                StateKey::resource(package_address, &PackageRegistry::struct_tag()).unwrap();
+                StateKey::resource(package_address, &PackageRegistry::struct_tag())
+                    .expect("Should always be able to create state key for package registry");
 
             let old_package_state_value =
                 match overridden_package_registries.remove(&package_registry_state_key) {
@@ -160,7 +184,7 @@ impl OverrideConfig {
                         .expect("Package registry should serialize");
                     Ok(bytes.into())
                 })
-                .unwrap();
+                .expect("Modifying package never returns an error");
 
             overridden_package_registries
                 .insert(package_registry_state_key, new_package_state_value);
