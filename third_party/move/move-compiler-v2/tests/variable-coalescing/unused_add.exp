@@ -93,8 +93,9 @@ public fun m::test() {
      var $t3: u64 [unused]
   0: $t0 := 1
   1: $t1 := 2
-  2: $t0 := +($t0, $t1)
-  3: return ()
+  2: $t0 := move($t0)
+  3: $t0 := +($t0, $t1)
+  4: return ()
 }
 
 
@@ -104,6 +105,8 @@ module c0ffee.m {
 
 
 public test() /* def_idx: 0 */ {
+L0:	loc0: u64
+L1:	loc1: u64
 B0:
 	0: LdU64(1)
 	1: LdU64(2)

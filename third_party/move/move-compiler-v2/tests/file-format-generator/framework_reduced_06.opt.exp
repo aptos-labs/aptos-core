@@ -38,9 +38,6 @@ B0:
 }
 foo(Arg0: address, Arg1: &mut S, Arg2: &mut S): u64 /* def_idx: 4 */ {
 L3:	loc0: u64
-L4:	loc1: u64
-L5:	loc2: &mut S
-L6:	loc3: address
 B0:
 	0: MoveLoc[1](Arg1: &mut S)
 	1: LdU64(1)
@@ -51,18 +48,16 @@ B0:
 	6: StLoc[1](Arg1: &mut S)
 	7: CopyLoc[0](Arg0: address)
 	8: CopyLoc[1](Arg1: &mut S)
-	9: CopyLoc[3](loc0: u64)
-	10: StLoc[4](loc1: u64)
-	11: MoveLoc[0](Arg0: address)
-	12: MoveLoc[4](loc1: u64)
-	13: MoveLoc[2](Arg2: &mut S)
-	14: Call f2(address, &mut S, address, u64, &mut S)
-	15: CopyLoc[3](loc0: u64)
-	16: MoveLoc[1](Arg1: &mut S)
-	17: ImmBorrowField[0](S.g: u64)
-	18: Call f3(u64, &u64)
-	19: MoveLoc[3](loc0: u64)
-	20: Ret
+	9: MoveLoc[0](Arg0: address)
+	10: CopyLoc[3](loc0: u64)
+	11: MoveLoc[2](Arg2: &mut S)
+	12: Call f2(address, &mut S, address, u64, &mut S)
+	13: CopyLoc[3](loc0: u64)
+	14: MoveLoc[1](Arg1: &mut S)
+	15: ImmBorrowField[0](S.g: u64)
+	16: Call f3(u64, &u64)
+	17: MoveLoc[3](loc0: u64)
+	18: Ret
 }
 }
 ============ bytecode verification succeeded ========

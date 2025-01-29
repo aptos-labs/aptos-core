@@ -119,18 +119,17 @@ fun m::foo($t0: bool, $t1: u64): u64 {
      var $t4: u64
      var $t5: u64 [unused]
      var $t6: u64 [unused]
-  0: $t1 := move($t1)
-  1: if ($t0) goto 4 else goto 2
-  2: label L3
-  3: goto 7
-  4: label L0
-  5: $t4 := 0
-  6: $t1 := move($t4)
-  7: label L2
-  8: $t1 := move($t1)
-  9: $t4 := 1
- 10: $t1 := +($t1, $t4)
- 11: return $t1
+  0: if ($t0) goto 3 else goto 1
+  1: label L3
+  2: goto 6
+  3: label L0
+  4: $t4 := 0
+  5: $t1 := move($t4)
+  6: label L2
+  7: $t1 := move($t1)
+  8: $t4 := 1
+  9: $t1 := +($t1, $t4)
+ 10: return $t1
 }
 
 
