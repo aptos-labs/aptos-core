@@ -36,7 +36,6 @@ fungible asset to it. This emits an deposit event.
 -  [Function `withdraw`](#0x1_primary_fungible_store_withdraw)
 -  [Function `deposit`](#0x1_primary_fungible_store_deposit)
 -  [Function `deposit_with_signer`](#0x1_primary_fungible_store_deposit_with_signer)
--  [Function `force_deposit`](#0x1_primary_fungible_store_force_deposit)
 -  [Function `transfer`](#0x1_primary_fungible_store_transfer)
 -  [Function `transfer_assert_minimum_deposit`](#0x1_primary_fungible_store_transfer_assert_minimum_deposit)
 -  [Function `mint`](#0x1_primary_fungible_store_mint)
@@ -610,33 +609,6 @@ the same amount of fund in the future.
     <b>let</b> metadata = <a href="fungible_asset.md#0x1_fungible_asset_asset_metadata">fungible_asset::asset_metadata</a>(&fa);
     <b>let</b> store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner), metadata);
     <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_deposit">dispatchable_fungible_asset::deposit</a>(store, fa);
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_primary_fungible_store_force_deposit"></a>
-
-## Function `force_deposit`
-
-Deposit fungible asset <code>fa</code> to the given account's primary store.
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_force_deposit">force_deposit</a>(owner: <b>address</b>, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_force_deposit">force_deposit</a>(owner: <b>address</b>, fa: FungibleAsset) <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> {
-    <b>let</b> metadata = <a href="fungible_asset.md#0x1_fungible_asset_asset_metadata">fungible_asset::asset_metadata</a>(&fa);
-    <b>let</b> store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(owner, metadata);
-    <a href="fungible_asset.md#0x1_fungible_asset_unchecked_deposit">fungible_asset::unchecked_deposit</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store), fa);
 }
 </code></pre>
 
