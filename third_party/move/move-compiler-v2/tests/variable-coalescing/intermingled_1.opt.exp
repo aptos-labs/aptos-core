@@ -97,10 +97,11 @@ fun m::test(): u64 {
      var $t3: u64 [unused]
      var $t4: u64
   0: $t1 := 1
-  1: $t4 := 2
-  2: $t1 := +($t1, $t4)
-  3: $t2 := 4
-  4: return $t2
+  1: $t1 := move($t1)
+  2: $t4 := 2
+  3: $t1 := +($t1, $t4)
+  4: $t2 := 4
+  5: return $t2
 }
 
 

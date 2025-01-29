@@ -1161,7 +1161,8 @@ L0:	loc0: vector<u64>
 L1:	loc1: u64
 L2:	loc2: u64
 L3:	loc3: &mut vector<u64>
-L4:	loc4: &mut u64
+L4:	loc4: u64
+L5:	loc5: &mut u64
 B0:
 	0: LdConst[0](Vector(U64): [3, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0])
 	1: StLoc[0](loc0: vector<u64>)
@@ -1181,9 +1182,9 @@ B2:
 	13: CopyLoc[3](loc3: &mut vector<u64>)
 	14: CopyLoc[1](loc1: u64)
 	15: VecMutBorrow(1)
-	16: StLoc[4](loc4: &mut u64)
+	16: StLoc[5](loc5: &mut u64)
 	17: LdU64(2)
-	18: MoveLoc[4](loc4: &mut u64)
+	18: MoveLoc[5](loc5: &mut u64)
 	19: WriteRef
 	20: MoveLoc[1](loc1: u64)
 	21: LdU64(1)
