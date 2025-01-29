@@ -317,7 +317,7 @@ Burn transaction fees in epilogue.
             <a href="aptos_account.md#0x1_aptos_account_burn_from_fungible_store_for_gas">aptos_account::burn_from_fungible_store_for_gas</a>(&burn_ref, <a href="account.md#0x1_account">account</a>, fee);
             <a href="coin.md#0x1_coin_return_paired_burn_ref">coin::return_paired_burn_ref</a>(burn_ref, burn_receipt);
         } <b>else</b> {
-            <a href="coin.md#0x1_coin_burn_from">coin::burn_from</a>&lt;AptosCoin&gt;(
+            <a href="coin.md#0x1_coin_burn_from_for_gas">coin::burn_from_for_gas</a>&lt;AptosCoin&gt;(
                 <a href="account.md#0x1_account">account</a>,
                 fee,
                 burn_cap,
@@ -350,7 +350,7 @@ Mint refund in epilogue.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">mint_and_refund</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, refund: u64) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinMintCapability">AptosCoinMintCapability</a> {
     <b>let</b> mint_cap = &<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinMintCapability">AptosCoinMintCapability</a>&gt;(@aptos_framework).mint_cap;
     <b>let</b> refund_coin = <a href="coin.md#0x1_coin_mint">coin::mint</a>(refund, mint_cap);
-    <a href="coin.md#0x1_coin_force_deposit">coin::force_deposit</a>(<a href="account.md#0x1_account">account</a>, refund_coin);
+    <a href="coin.md#0x1_coin_deposit_for_gas_fee">coin::deposit_for_gas_fee</a>(<a href="account.md#0x1_account">account</a>, refund_coin);
 }
 </code></pre>
 

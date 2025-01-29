@@ -1808,6 +1808,9 @@ signer::address_of(master) == signer::address_of(signer_from_permissioned_handle
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> opaque;
+<b>modifies</b> <b>global</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermissionStorage">PermissionStorage</a>&gt;(<a href="permissioned_signer.md#0x1_permissioned_signer_spec_permission_address">spec_permission_address</a>(s));
+<b>ensures</b> [abstract] result == <a href="permissioned_signer.md#0x1_permissioned_signer_spec_check_permission_exists">spec_check_permission_exists</a>(s, perm);
 </code></pre>
 
 
@@ -1816,22 +1819,7 @@ signer::address_of(master) == signer::address_of(signer_from_permissioned_handle
 <a id="0x1_permissioned_signer_spec_check_permission_exists"></a>
 
 
-<pre><code><b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_check_permission_exists">spec_check_permission_exists</a>&lt;PermKey: <b>copy</b> + drop + store&gt;(s: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, perm: PermKey): bool {
-   <b>use</b> aptos_std::type_info;
-   <b>use</b> std::bcs;
-   <b>let</b> addr = <a href="permissioned_signer.md#0x1_permissioned_signer_spec_permission_address">spec_permission_address</a>(s);
-   <b>let</b> key = Any {
-       type_name: <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;PermKey&gt;(),
-       data: <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_serialize">bcs::serialize</a>(perm)
-   };
-   <b>if</b> (!<a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">spec_is_permissioned_signer</a>(s)) { <b>true</b> }
-   <b>else</b> <b>if</b> (!<b>exists</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermissionStorage">PermissionStorage</a>&gt;(addr)) { <b>false</b> }
-   <b>else</b> {
-       // ordered_map::spec_contains_key(<b>global</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermissionStorage">PermissionStorage</a>&gt;(addr).perms, key)
-       // FIXME: ordered map <b>spec</b> doesn't exist yet.
-       <b>true</b>
-   }
-}
+<pre><code><b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_check_permission_exists">spec_check_permission_exists</a>&lt;PermKey: <b>copy</b> + drop + store&gt;(s: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, perm: PermKey): bool;
 </code></pre>
 
 
@@ -1847,7 +1835,8 @@ signer::address_of(master) == signer::address_of(signer_from_permissioned_handle
 
 
 
-<pre><code><b>let</b> permissioned_signer_addr = <a href="permissioned_signer.md#0x1_permissioned_signer_spec_permission_address">spec_permission_address</a>(s);
+<pre><code><b>modifies</b> <b>global</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermissionStorage">PermissionStorage</a>&gt;(<a href="permissioned_signer.md#0x1_permissioned_signer_spec_permission_address">spec_permission_address</a>(s));
+<b>let</b> permissioned_signer_addr = <a href="permissioned_signer.md#0x1_permissioned_signer_spec_permission_address">spec_permission_address</a>(s);
 <b>ensures</b> !<a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">spec_is_permissioned_signer</a>(s) ==&gt; result == <b>true</b>;
 <b>ensures</b> (
     <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">spec_is_permissioned_signer</a>(s)

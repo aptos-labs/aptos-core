@@ -506,7 +506,8 @@ def create_one_pvc_from_snapshot(
 ) -> str:
     config.load_kube_config()
     api_instance = client.CoreV1Api()
-    storage_size = "10Ti" if TESTNET_SNAPSHOT_NAME in snapshot_name else "8Ti"
+    # testnet and mainnet disk size could be different
+    storage_size = "10Ti" if TESTNET_SNAPSHOT_NAME in snapshot_name else "10Ti"
     # Define the PVC manifest
     pvc_manifest = {
         "apiVersion": "v1",
