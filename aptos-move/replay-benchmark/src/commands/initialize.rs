@@ -4,10 +4,11 @@
 use crate::{
     commands::{build_debugger, init_logger_and_metrics, RestAPI},
     generator::InputOutputDiffGenerator,
-    overrides::OverrideConfig,
+    overrides::{OverrideConfig, PackageOverride},
     workload::TransactionBlock,
 };
 use anyhow::{anyhow, bail};
+use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_logger::Level;
 use aptos_types::on_chain_config::FeatureFlag;
@@ -55,6 +56,14 @@ pub struct InitializeCommand {
         help = "If set, overrides the gas feature version used by the gas schedule"
     )]
     gas_feature_version: Option<u64>,
+
+    #[clap(
+        long,
+        num_args = 1..,
+        value_delimiter = ' ',
+        help = "List of space-separated paths to compiled / built packages with Move code"
+    )]
+    override_packages: Vec<String>,
 }
 
 impl InitializeCommand {
@@ -84,15 +93,17 @@ impl InitializeCommand {
         })?;
 
         // TODO:
-        //  Right now, only features can be overridden. In the future, we may want to support:
-        //      1. Framework code, e.g., to test performance of new natives or compiler,
-        //      2. Gas schedule, to track the costs of charging gas or tracking limits.
-        //      3. BlockExecutorConfigFromOnchain to experiment with different block cutting based
-        //         on gas limits.
+        //   1. Override gas schedule, to track the costs of charging gas or tracking limits.
+        //   2. BlockExecutorConfigFromOnchain to experiment with different block cutting based
+        //      on gas limits?.
+        //   3. Build options for package overrides.
+        let build_options = BuildOptions::move_2();
+        let package_override = PackageOverride::new(self.override_packages, build_options)?;
         let override_config = OverrideConfig::new(
             self.enable_features,
             self.disable_features,
             self.gas_feature_version,
+            package_override,
         );
 
         let debugger = build_debugger(self.rest_api.rest_endpoint, self.rest_api.api_key)?;
