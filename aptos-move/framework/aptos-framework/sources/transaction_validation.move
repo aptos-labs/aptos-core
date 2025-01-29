@@ -158,6 +158,7 @@ module aptos_framework::transaction_validation {
                 txn_sequence_number == account_sequence_number,
                 error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
             );
+            account::create_account_if_does_not_exist(transaction_sender);
         } else {
             // In this case, the transaction is sponsored and the account does not exist, so ensure
             // the default values match.

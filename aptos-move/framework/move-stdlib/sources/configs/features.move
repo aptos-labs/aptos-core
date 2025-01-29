@@ -644,6 +644,15 @@ module std::features {
         is_enabled(BULLETPROOFS_BATCH_NATIVES)
     }
 
+    /// Lifetime: transient
+    const DEFAULT_ACCOUNT_RESOURCE: u64 = 88;
+
+    public fun get_default_account_resource_feature(): u64 { DEFAULT_ACCOUNT_RESOURCE }
+
+    public fun is_default_account_resource_enabled(): bool acquires Features {
+        is_enabled(DEFAULT_ACCOUNT_RESOURCE)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

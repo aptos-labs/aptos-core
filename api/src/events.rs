@@ -78,7 +78,6 @@ impl EventsApi {
         let api = self.clone();
         api_spawn_blocking(move || {
             let account = Account::new(api.context.clone(), address.0, None, None, None)?;
-            account.verify_account_or_object_resource()?;
             api.list(
                 account.latest_ledger_info,
                 accept_type,
