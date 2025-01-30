@@ -14,6 +14,7 @@ use aptos_types::{
 use move_core_types::{ident_str, language_storage::ModuleId};
 use serde_json::json;
 use std::path::PathBuf;
+const ACCOUNT_ABSTRACTION: u64 = 85;
 
 async fn simulate_aptos_transfer(
     context: &mut TestContext,
@@ -104,6 +105,21 @@ async fn test_simulate_transaction_with_insufficient_balance() {
     assert!(!resp[0]["success"].as_bool().is_some_and(|v| v));
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_bcs_simulate_fee_payer_transaction_without_gas_fee_check_with_aa_disabled() {
+    let mut context = new_test_context(current_function_name!());
+    context.disable_feature(ACCOUNT_ABSTRACTION).await;
+    bcs_simulate_fee_payer_transaction_without_gas_fee_check(&mut context).await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_bcs_simulate_fee_payer_transaction_without_gas_fee_check() {
+    let mut context = new_test_context(current_function_name!());
+    context.disable_feature(ACCOUNT_ABSTRACTION).await;
+    bcs_simulate_fee_payer_transaction_without_gas_fee_check(&mut context).await;
+}
+
+// Enable the MODULE_EVENT_MIGRATION feature
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_simulate_txn_with_aggregator() {
     let mut context = new_test_context(current_function_name!());
@@ -234,9 +250,7 @@ async fn test_bcs_simulate_without_auth_key_check() {
     assert!(resp[0]["success"].as_bool().unwrap(), "{}", pretty(&resp));
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_bcs_simulate_fee_payer_transaction_without_gas_fee_check() {
-    let mut context = new_test_context(current_function_name!());
+async fn bcs_simulate_fee_payer_transaction_without_gas_fee_check(context: &mut TestContext) {
     let alice = &mut context.gen_account();
     let bob = &mut context.gen_account();
     let txn = context.mint_user_account(alice).await;
