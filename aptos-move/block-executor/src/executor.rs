@@ -1063,6 +1063,7 @@ where
 
         let shared_commit_state = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
             self.config.onchain.block_gas_limit_type.clone(),
+            self.config.onchain.block_gas_limit_override(),
             num_txns,
         ));
         let shared_maybe_error = AtomicBool::new(false);
@@ -1309,6 +1310,7 @@ where
         let mut ret = Vec::with_capacity(num_txns);
         let mut block_limit_processor = BlockGasLimitProcessor::<T>::new(
             self.config.onchain.block_gas_limit_type.clone(),
+            self.config.onchain.block_gas_limit_override(),
             num_txns,
         );
 

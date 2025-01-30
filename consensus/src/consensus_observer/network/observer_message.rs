@@ -533,12 +533,15 @@ impl BlockTransactionPayload {
     pub fn new_quorum_store_inline_hybrid(
         transactions: Vec<SignedTransaction>,
         proofs: Vec<ProofOfStore>,
-        limit: Option<u64>,
+        transaction_limit: Option<u64>,
+        gas_limit: Option<u64>,
         inline_batches: Vec<BatchInfo>,
     ) -> Self {
         let payload_with_proof = PayloadWithProof::new(transactions, proofs);
-        let proof_with_limit = PayloadWithProofAndLimit::new(payload_with_proof, limit);
-        Self::QuorumStoreInlineHybrid(proof_with_limit, inline_batches)
+        let proof_with_limits = TransactionsWithProof::TransactionsWithProofAndLimits(
+            TransactionsWithProofAndLimits::new(payload_with_proof, transaction_limit, gas_limit),
+        );
+        Self::QuorumStoreInlineHybridV2(proof_with_limits, inline_batches)
     }
 
     pub fn new_opt_quorum_store(
@@ -665,6 +668,22 @@ impl BlockTransactionPayload {
                 // Verify the transaction limit
                 self.verify_transaction_limit(*max_txns_to_execute)?;
             },
+            Payload::QuorumStoreInlineHybridV2(
+                inline_batches,
+                proof_with_data,
+                execution_limits,
+            ) => {
+                // Verify the batches in the requested block
+                self.verify_batches(&proof_with_data.proofs)?;
+
+                // Verify the inline batches
+                self.verify_inline_batches(inline_batches)?;
+
+                // Verify the transaction limit
+                self.verify_transaction_limit(execution_limits.max_txns_to_execute())?;
+
+                // TODO: verify the block gas limit?
+            },
             Payload::OptQuorumStore(opt_qs_payload) => {
                 // Verify the batches in the requested block
                 self.verify_batches(opt_qs_payload.proof_with_data())?;
@@ -716,7 +735,8 @@ impl BlockTransactionPayload {
 
         // Get the inline batches in the payload
         let inline_batches: Vec<&BatchInfo> = match self {
-            BlockTransactionPayload::QuorumStoreInlineHybrid(_, inline_batches) => {
+            BlockTransactionPayload::QuorumStoreInlineHybrid(_, inline_batches)
+            | BlockTransactionPayload::QuorumStoreInlineHybridV2(_, inline_batches) => {
                 inline_batches.iter().map(|batch_info| batch_info).collect()
             },
             _ => {
@@ -1133,11 +1153,13 @@ mod test {
         // Create an empty transaction payload with no proofs and no inline batches
         let proofs = vec![];
         let transaction_limit = Some(100);
+        let gas_limit = Some(10_000);
         let inline_batches = vec![];
         let transaction_payload = BlockTransactionPayload::new_quorum_store_inline_hybrid(
             vec![],
             proofs.clone(),
             transaction_limit,
+            gas_limit,
             inline_batches.clone(),
         );
 
@@ -1749,6 +1771,7 @@ mod test {
             vec![],
             proofs.clone(),
             None,
+            None,
             vec![],
         );
 
@@ -1821,6 +1844,7 @@ mod test {
         let transaction_payload = BlockTransactionPayload::new_quorum_store_inline_hybrid(
             signed_transactions.to_vec(),
             proofs.to_vec(),
+            None,
             None,
             inline_batches.to_vec(),
         );
