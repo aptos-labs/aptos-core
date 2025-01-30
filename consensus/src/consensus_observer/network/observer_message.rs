@@ -401,14 +401,10 @@ pub enum BlockTransactionPayload {
     DeprecatedInQuorumStoreWithLimit(PayloadWithProofAndLimit),
     QuorumStoreInlineHybrid(PayloadWithProofAndLimit, Vec<BatchInfo>),
     OptQuorumStore(
-        PayloadWithProofAndLimit,
-        /* OptQS and Inline Batches */ Vec<BatchInfo>,
-    ),
-    QuorumStoreInlineHybridV2(PayloadWithProofAndLimits, Vec<BatchInfo>),
-    OptQuorumStoreV2(
         PayloadWithProofAndLimits,
         /* OptQS and Inline Batches */ Vec<BatchInfo>,
     ),
+    QuorumStoreInlineHybridV2(PayloadWithProofAndLimits, Vec<BatchInfo>),
 }
 
 impl BlockTransactionPayload {
@@ -451,8 +447,8 @@ impl BlockTransactionPayload {
         batch_infos: Vec<BatchInfo>,
     ) -> Self {
         let payload_with_proof = PayloadWithProof::new(transactions, proofs);
-        let proof_with_limit = PayloadWithProofAndLimit::new(payload_with_proof, limit);
-        Self::OptQuorumStore(proof_with_limit, batch_infos)
+        let proof_with_limits = PayloadWithProofAndLimits::new(payload_with_proof, limit, None);
+        Self::OptQuorumStore(proof_with_limits, batch_infos)
     }
 
     #[cfg(test)]
@@ -467,9 +463,8 @@ impl BlockTransactionPayload {
             BlockTransactionPayload::DeprecatedInQuorumStore(_)
             | BlockTransactionPayload::DeprecatedInQuorumStoreWithLimit(_) => &[],
             BlockTransactionPayload::QuorumStoreInlineHybrid(_, inline_batches)
+            | BlockTransactionPayload::QuorumStoreInlineHybridV2(_, inline_batches)
             | BlockTransactionPayload::OptQuorumStore(_, inline_batches) => inline_batches,
-            BlockTransactionPayload::QuorumStoreInlineHybridV2(_, inline_batches)
-            | BlockTransactionPayload::OptQuorumStoreV2(_, inline_batches) => inline_batches,
         }
     }
 
@@ -480,10 +475,11 @@ impl BlockTransactionPayload {
             BlockTransactionPayload::DeprecatedInQuorumStoreWithLimit(payload) => {
                 payload.transaction_limit
             },
-            BlockTransactionPayload::QuorumStoreInlineHybrid(payload, _)
-            | BlockTransactionPayload::OptQuorumStore(payload, _) => payload.transaction_limit,
+            BlockTransactionPayload::QuorumStoreInlineHybrid(payload, _) => {
+                payload.transaction_limit
+            },
             BlockTransactionPayload::QuorumStoreInlineHybridV2(payload, _)
-            | BlockTransactionPayload::OptQuorumStoreV2(payload, _) => payload.transaction_limit,
+            | BlockTransactionPayload::OptQuorumStore(payload, _) => payload.transaction_limit,
         }
     }
 
@@ -492,10 +488,9 @@ impl BlockTransactionPayload {
         match self {
             BlockTransactionPayload::DeprecatedInQuorumStore(_)
             | BlockTransactionPayload::DeprecatedInQuorumStoreWithLimit(_)
-            | BlockTransactionPayload::QuorumStoreInlineHybrid(_, _)
-            | BlockTransactionPayload::OptQuorumStore(_, _) => None,
+            | BlockTransactionPayload::QuorumStoreInlineHybrid(_, _) => None,
             BlockTransactionPayload::QuorumStoreInlineHybridV2(payload, _)
-            | BlockTransactionPayload::OptQuorumStoreV2(payload, _) => payload.gas_limit,
+            | BlockTransactionPayload::OptQuorumStore(payload, _) => payload.gas_limit,
         }
     }
 
@@ -506,12 +501,11 @@ impl BlockTransactionPayload {
             BlockTransactionPayload::DeprecatedInQuorumStoreWithLimit(payload) => {
                 payload.payload_with_proof.proofs.clone()
             },
-            BlockTransactionPayload::QuorumStoreInlineHybrid(payload, _)
-            | BlockTransactionPayload::OptQuorumStore(payload, _) => {
+            BlockTransactionPayload::QuorumStoreInlineHybrid(payload, _) => {
                 payload.payload_with_proof.proofs.clone()
             },
             BlockTransactionPayload::QuorumStoreInlineHybridV2(payload, _)
-            | BlockTransactionPayload::OptQuorumStoreV2(payload, _) => {
+            | BlockTransactionPayload::OptQuorumStore(payload, _) => {
                 payload.payload_with_proof.proofs.clone()
             },
         }
@@ -526,12 +520,11 @@ impl BlockTransactionPayload {
             BlockTransactionPayload::DeprecatedInQuorumStoreWithLimit(payload) => {
                 payload.payload_with_proof.transactions.clone()
             },
-            BlockTransactionPayload::QuorumStoreInlineHybrid(payload, _)
-            | BlockTransactionPayload::OptQuorumStore(payload, _) => {
+            BlockTransactionPayload::QuorumStoreInlineHybrid(payload, _) => {
                 payload.payload_with_proof.transactions.clone()
             },
             BlockTransactionPayload::QuorumStoreInlineHybridV2(payload, _)
-            | BlockTransactionPayload::OptQuorumStoreV2(payload, _) => {
+            | BlockTransactionPayload::OptQuorumStore(payload, _) => {
                 payload.payload_with_proof.transactions.clone()
             },
         }
@@ -691,10 +684,11 @@ impl BlockTransactionPayload {
             BlockTransactionPayload::DeprecatedInQuorumStoreWithLimit(payload) => {
                 payload.transaction_limit
             },
-            BlockTransactionPayload::QuorumStoreInlineHybrid(payload, _)
-            | BlockTransactionPayload::OptQuorumStore(payload, _) => payload.transaction_limit,
+            BlockTransactionPayload::QuorumStoreInlineHybrid(payload, _) => {
+                payload.transaction_limit
+            },
             BlockTransactionPayload::QuorumStoreInlineHybridV2(payload, _)
-            | BlockTransactionPayload::OptQuorumStoreV2(payload, _) => payload.transaction_limit,
+            | BlockTransactionPayload::OptQuorumStore(payload, _) => payload.transaction_limit,
         };
 
         // Compare the expected limit against the payload limit
