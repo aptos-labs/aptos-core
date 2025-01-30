@@ -100,12 +100,36 @@ impl<T> IntoIterator for BatchPointer<T> {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct TxnAndGasLimits {
+    pub transaction_limit: Option<u64>,
+    pub gas_limit: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum PayloadExecutionLimit {
     None,
     MaxTransactionsToExecute(u64),
+    TxnAndGasLimits(TxnAndGasLimits),
 }
 
 impl PayloadExecutionLimit {
+    pub fn new(max_txns: Option<u64>, _max_gas: Option<u64>) -> Self {
+        // TODO: on next release, start using TxnAndGasLimits
+        match max_txns {
+            Some(max_txns) => PayloadExecutionLimit::MaxTransactionsToExecute(max_txns),
+            None => PayloadExecutionLimit::None,
+        }
+    }
+
+    fn extend_options(o1: Option<u64>, o2: Option<u64>) -> Option<u64> {
+        match (o1, o2) {
+            (Some(v1), Some(v2)) => Some(v1 + v2),
+            (Some(v), None) => Some(v),
+            (None, Some(v)) => Some(v),
+            _ => None,
+        }
+    }
+
     pub(crate) fn extend(&mut self, other: PayloadExecutionLimit) {
         *self = match (&self, &other) {
             (PayloadExecutionLimit::None, _) => other,
@@ -114,13 +138,48 @@ impl PayloadExecutionLimit {
                 PayloadExecutionLimit::MaxTransactionsToExecute(limit1),
                 PayloadExecutionLimit::MaxTransactionsToExecute(limit2),
             ) => PayloadExecutionLimit::MaxTransactionsToExecute(*limit1 + *limit2),
+            (
+                PayloadExecutionLimit::TxnAndGasLimits(block1_limits),
+                PayloadExecutionLimit::TxnAndGasLimits(block2_limits),
+            ) => PayloadExecutionLimit::TxnAndGasLimits(TxnAndGasLimits {
+                transaction_limit: Self::extend_options(
+                    block1_limits.transaction_limit,
+                    block2_limits.transaction_limit,
+                ),
+                gas_limit: Self::extend_options(block1_limits.gas_limit, block2_limits.gas_limit),
+            }),
+            (
+                PayloadExecutionLimit::MaxTransactionsToExecute(limit1),
+                PayloadExecutionLimit::TxnAndGasLimits(block2_limits),
+            ) => PayloadExecutionLimit::TxnAndGasLimits(TxnAndGasLimits {
+                transaction_limit: Some(*limit1 + block2_limits.transaction_limit.unwrap_or(0)),
+                gas_limit: block2_limits.gas_limit,
+            }),
+            (
+                PayloadExecutionLimit::TxnAndGasLimits(block1_limits),
+                PayloadExecutionLimit::MaxTransactionsToExecute(limit2),
+            ) => PayloadExecutionLimit::TxnAndGasLimits(TxnAndGasLimits {
+                transaction_limit: Some(*limit2 + block1_limits.transaction_limit.unwrap_or(0)),
+                gas_limit: block1_limits.gas_limit,
+            }),
         };
     }
 
-    pub(crate) fn max_txns_to_execute(limit: Option<u64>) -> Self {
-        limit.map_or(PayloadExecutionLimit::None, |val| {
-            PayloadExecutionLimit::MaxTransactionsToExecute(val)
-        })
+    pub fn max_txns_to_execute(&self) -> Option<u64> {
+        match self {
+            PayloadExecutionLimit::None => None,
+            PayloadExecutionLimit::MaxTransactionsToExecute(max) => Some(*max),
+            PayloadExecutionLimit::TxnAndGasLimits(limits) => limits.transaction_limit,
+        }
+    }
+
+    pub fn block_gas_limit(&self) -> Option<u64> {
+        match self {
+            PayloadExecutionLimit::None | PayloadExecutionLimit::MaxTransactionsToExecute(_) => {
+                None
+            },
+            PayloadExecutionLimit::TxnAndGasLimits(limits) => limits.gas_limit,
+        }
     }
 }
 
@@ -240,10 +299,7 @@ impl OptQuorumStorePayloadV1 {
     }
 
     pub fn max_txns_to_execute(&self) -> Option<u64> {
-        match self.execution_limits {
-            PayloadExecutionLimit::None => None,
-            PayloadExecutionLimit::MaxTransactionsToExecute(max) => Some(max),
-        }
+        self.execution_limits.max_txns_to_execute()
     }
 
     pub fn check_epoch(&self, epoch: u64) -> anyhow::Result<()> {

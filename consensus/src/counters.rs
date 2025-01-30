@@ -35,6 +35,13 @@ pub const TXN_COMMIT_FAILED_EXPIRED_LABEL: &str = "failed_expired";
 /// Transaction commit was unsuccessful, but will be retried
 pub const TXN_COMMIT_RETRY_LABEL: &str = "retry";
 
+fn gas_buckets() -> Vec<f64> {
+    exponential_buckets(
+        /*start=*/ 1.0, /*factor=*/ 1.5, /*count=*/ 30,
+    )
+    .unwrap()
+}
+
 //////////////////////
 // HEALTH COUNTERS
 //////////////////////
@@ -388,6 +395,16 @@ pub static PROPOSER_ESTIMATED_CALIBRATED_BLOCK_TXNS: Lazy<Histogram> = Lazy::new
         "aptos_proposer_estimated_calibrated_block_txns",
         "Histogram for max number of transactions calibrated block should have, based on the proposer",
         NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+/// Histogram for max gas calibrated block should have, based on the proposer
+pub static PROPOSER_ESTIMATED_CALIBRATED_BLOCK_GAS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_proposer_estimated_calibrated_block_gas",
+        "Histogram for max gas calibrated block should have, based on the proposer",
+        gas_buckets()
     )
     .unwrap()
 });

@@ -40,5 +40,5 @@ pub trait TPayloadManager: Send + Sync {
         &self,
         block: &Block,
         block_voters: Option<BitVec>,
-    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)>;
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>, Option<u64>)>;
 }
