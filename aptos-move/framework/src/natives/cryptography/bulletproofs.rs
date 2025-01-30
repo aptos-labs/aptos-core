@@ -17,6 +17,7 @@ use bulletproofs::{BulletproofGens, PedersenGens};
 use byteorder::{ByteOrder, LittleEndian};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use merlin::Transcript;
+use move_core_types::gas_algebra::{NumArgs, NumBytes};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
@@ -318,15 +319,11 @@ fn verify_range_proof(
     bit_length: usize,
     dst: Vec<u8>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-<<<<<<< HEAD
-    charge_gas(context, 1, bit_length)?;
-=======
     context.charge(
         BULLETPROOFS_BASE
             + BULLETPROOFS_PER_BYTE_RANGEPROOF_DESERIALIZE
             * NumBytes::new(proof_bytes.len() as u64),
     )?;
->>>>>>> acc6098cda (revert unexpected changes to existing natives)
 
     let range_proof = match bulletproofs::RangeProof::from_bytes(proof_bytes) {
         Ok(proof) => proof,
@@ -337,12 +334,9 @@ fn verify_range_proof(
         },
     };
 
-<<<<<<< HEAD
-=======
     // The (Bullet)proof size is $\log_2(num_bits)$ and its verification time is $O(num_bits)$
     context.charge(BULLETPROOFS_PER_BIT_RANGEPROOF_VERIFY * NumArgs::new(bit_length as u64))?;
 
->>>>>>> acc6098cda (revert unexpected changes to existing natives)
     let mut ver_trans = Transcript::new(dst.as_slice());
 
     let success = range_proof
