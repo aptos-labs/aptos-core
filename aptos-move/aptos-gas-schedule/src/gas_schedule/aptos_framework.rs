@@ -235,8 +235,12 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [hash_keccak256_base: InternalGas, { 1.. => "hash.keccak256.base" }, 14704],
         [hash_keccak256_per_byte: InternalGasPerByte, { 1.. => "hash.keccak256.per_byte" }, 165],
 
-        // Bulletproofs gas parameters begin.
-        // Generated at time 1738238124.9169538 by `scripts/algebra-gas/update_bulletproofs_gas_params.py` with gas_per_ns=50.0.
+        // Generated at time 1683148919.0628748 by `scripts/algebra-gas/update_bulletproofs_gas_params.py` with gas_per_ns=10.0.
+        [bulletproofs_base: InternalGas, { 11.. => "bulletproofs.base" }, 11794651],
+        [bulletproofs_per_bit_rangeproof_verify: InternalGasPerArg, { 11.. => "bulletproofs.per_bit_rangeproof_verify" }, 1004253],
+        [bulletproofs_per_byte_rangeproof_deserialize: InternalGasPerByte, { 11.. => "bulletproofs.per_byte_rangeproof_deserialize" }, 121],
+        // Bulletproofs gas parameters end.
+
         [bulletproofs_verify_base_batch_1_bits_8: InternalGas, { 11.. => "bulletproofs.verify.base_batch_1_bits_8" }, 16_705_294],
         [bulletproofs_verify_base_batch_1_bits_16: InternalGas, { 11.. => "bulletproofs.verify.base_batch_1_bits_16" }, 24_544_670],
         [bulletproofs_verify_base_batch_1_bits_32: InternalGas, { 11.. => "bulletproofs.verify.base_batch_1_bits_32" }, 38_971_181],
@@ -257,7 +261,6 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [bulletproofs_verify_base_batch_16_bits_16: InternalGas, { 11.. => "bulletproofs.verify.base_batch_16_bits_16" }, 186_439_388],
         [bulletproofs_verify_base_batch_16_bits_32: InternalGas, { 11.. => "bulletproofs.verify.base_batch_16_bits_32" }, 315_464_900],
         [bulletproofs_verify_base_batch_16_bits_64: InternalGas, { 11.. => "bulletproofs.verify.base_batch_16_bits_64" }, 551_678_425],
-        // Bulletproofs gas parameters end.
 
         [type_info_type_of_base: InternalGas, "type_info.type_of.base", 1102],
         // TODO(Gas): the on-chain name is wrong...

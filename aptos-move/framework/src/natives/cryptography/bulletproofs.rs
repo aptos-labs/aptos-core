@@ -27,6 +27,10 @@ use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
 pub mod abort_codes {
+    /// Abort code when deserialization fails (leading 0x01 == INVALID_ARGUMENT)
+    /// NOTE: This must match the code in the Move implementation
+    pub const NFE_DESERIALIZE_RANGE_PROOF: u64 = 0x01_0001;
+
     /// Abort code when input value for a range proof is too large.
     /// NOTE: This must match the code in the Move implementation
     pub const NFE_VALUE_OUTSIDE_RANGE: u64 = 0x01_0001;
@@ -314,13 +318,31 @@ fn verify_range_proof(
     bit_length: usize,
     dst: Vec<u8>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+<<<<<<< HEAD
     charge_gas(context, 1, bit_length)?;
+=======
+    context.charge(
+        BULLETPROOFS_BASE
+            + BULLETPROOFS_PER_BYTE_RANGEPROOF_DESERIALIZE
+            * NumBytes::new(proof_bytes.len() as u64),
+    )?;
+>>>>>>> acc6098cda (revert unexpected changes to existing natives)
 
     let range_proof = match bulletproofs::RangeProof::from_bytes(proof_bytes) {
         Ok(proof) => proof,
-        Err(_) => return Ok(smallvec![Value::bool(false)]),
+        Err(_) => {
+            return Err(SafeNativeError::Abort {
+                abort_code: abort_codes::NFE_DESERIALIZE_RANGE_PROOF,
+            })
+        },
     };
 
+<<<<<<< HEAD
+=======
+    // The (Bullet)proof size is $\log_2(num_bits)$ and its verification time is $O(num_bits)$
+    context.charge(BULLETPROOFS_PER_BIT_RANGEPROOF_VERIFY * NumArgs::new(bit_length as u64))?;
+
+>>>>>>> acc6098cda (revert unexpected changes to existing natives)
     let mut ver_trans = Transcript::new(dst.as_slice());
 
     let success = range_proof
