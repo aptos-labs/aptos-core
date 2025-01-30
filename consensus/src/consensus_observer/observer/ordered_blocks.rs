@@ -6,7 +6,8 @@ use crate::consensus_observer::{
         logging::{LogEntry, LogSchema},
         metrics,
     },
-    network::observer_message::{CommitDecision, OrderedBlock},
+    network::observer_message::CommitDecision,
+    observer::execution_pool::ObservedOrderedBlock,
 };
 use aptos_config::config::ConsensusObserverConfig;
 use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
@@ -24,7 +25,7 @@ pub struct OrderedBlockStore {
 
     // Ordered blocks. The key is the epoch and round of the last block in the
     // ordered block. Each entry contains the block and the commit decision (if any).
-    ordered_blocks: BTreeMap<(u64, Round), (OrderedBlock, Option<CommitDecision>)>,
+    ordered_blocks: BTreeMap<(u64, Round), (ObservedOrderedBlock, Option<CommitDecision>)>,
 }
 
 impl OrderedBlockStore {
@@ -44,7 +45,7 @@ impl OrderedBlockStore {
     /// Returns a copy of the ordered blocks
     pub fn get_all_ordered_blocks(
         &self,
-    ) -> BTreeMap<(u64, Round), (OrderedBlock, Option<CommitDecision>)> {
+    ) -> BTreeMap<(u64, Round), (ObservedOrderedBlock, Option<CommitDecision>)> {
         self.ordered_blocks.clone()
     }
 
@@ -57,20 +58,26 @@ impl OrderedBlockStore {
     pub fn get_last_ordered_block(&self) -> Option<Arc<PipelinedBlock>> {
         self.ordered_blocks
             .last_key_value()
-            .map(|(_, (ordered_block, _))| ordered_block.last_block())
+            .map(|(_, (observed_ordered_block, _))| {
+                observed_ordered_block.ordered_block().last_block()
+            })
     }
 
-    /// Returns the ordered block for the given epoch and round (if any)
-    pub fn get_ordered_block(&self, epoch: u64, round: Round) -> Option<OrderedBlock> {
+    /// Returns the observed ordered block for the given epoch and round (if any)
+    pub fn get_observed_ordered_block(
+        &self,
+        epoch: u64,
+        round: Round,
+    ) -> Option<ObservedOrderedBlock> {
         self.ordered_blocks
             .get(&(epoch, round))
-            .map(|(ordered_block, _)| ordered_block.clone())
+            .map(|(observed_ordered_block, _)| observed_ordered_block.clone())
     }
 
     /// Inserts the given ordered block into the ordered blocks. This function
     /// assumes the block has already been checked to extend the current ordered
     /// blocks, and that the ordered proof has been verified.
-    pub fn insert_ordered_block(&mut self, ordered_block: OrderedBlock) {
+    pub fn insert_ordered_block(&mut self, observed_ordered_block: ObservedOrderedBlock) {
         // Verify that the number of ordered blocks doesn't exceed the maximum
         let max_num_ordered_blocks = self.consensus_observer_config.max_num_pending_blocks as usize;
         if self.ordered_blocks.len() >= max_num_ordered_blocks {
@@ -78,7 +85,7 @@ impl OrderedBlockStore {
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                     "Exceeded the maximum number of ordered blocks: {:?}. Dropping block: {:?}.",
                     max_num_ordered_blocks,
-                    ordered_block.proof_block_info()
+                    observed_ordered_block.ordered_block().proof_block_info()
                 ))
             );
             return; // Drop the block if we've exceeded the maximum
@@ -88,18 +95,20 @@ impl OrderedBlockStore {
         debug!(
             LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                 "Adding ordered block to the ordered blocks: {:?}",
-                ordered_block.proof_block_info()
+                observed_ordered_block.ordered_block().proof_block_info()
             ))
         );
 
         // Get the epoch and round of the last ordered block
-        let last_block = ordered_block.last_block();
+        let last_block = observed_ordered_block.ordered_block().last_block();
         let last_block_epoch = last_block.epoch();
         let last_block_round = last_block.round();
 
         // Insert the ordered block
-        self.ordered_blocks
-            .insert((last_block_epoch, last_block_round), (ordered_block, None));
+        self.ordered_blocks.insert(
+            (last_block_epoch, last_block_round),
+            (observed_ordered_block, None),
+        );
     }
 
     /// Removes the ordered blocks for the given commit ledger info. This will
@@ -173,7 +182,9 @@ impl OrderedBlockStore {
         let num_ordered_blocks = self
             .ordered_blocks
             .values()
-            .map(|(ordered_block, _)| ordered_block.blocks().len() as u64)
+            .map(|(observed_ordered_block, _)| {
+                observed_ordered_block.ordered_block().blocks().len() as u64
+            })
             .sum();
         metrics::set_gauge_with_label(
             &metrics::OBSERVER_NUM_PROCESSED_BLOCKS,
@@ -185,7 +196,9 @@ impl OrderedBlockStore {
         let highest_ordered_round = self
             .ordered_blocks
             .last_key_value()
-            .map(|(_, (ordered_block, _))| ordered_block.last_block().round())
+            .map(|(_, (observed_ordered_block, _))| {
+                observed_ordered_block.ordered_block().last_block().round()
+            })
             .unwrap_or(0);
         metrics::set_gauge_with_label(
             &metrics::OBSERVER_PROCESSED_BLOCK_ROUNDS,
@@ -209,6 +222,7 @@ impl OrderedBlockStore {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::consensus_observer::network::observer_message::OrderedBlock;
     use aptos_consensus_types::{
         block::Block,
         block_data::{BlockData, BlockType},
@@ -420,15 +434,15 @@ mod test {
         for ordered_block in &ordered_blocks {
             let block_info = ordered_block.last_block().block_info();
             let fetched_ordered_block = ordered_block_store
-                .get_ordered_block(block_info.epoch(), block_info.round())
+                .get_observed_ordered_block(block_info.epoch(), block_info.round())
                 .unwrap();
-            assert_eq!(ordered_block.clone(), fetched_ordered_block);
+            assert_eq!(ordered_block, fetched_ordered_block.ordered_block());
         }
 
         // Verify that a non-existent block cannot be retrieved
         let last_block = ordered_blocks.last().unwrap();
         let last_block_info = last_block.last_block().block_info();
-        let ordered_block = ordered_block_store.get_ordered_block(
+        let ordered_block = ordered_block_store.get_observed_ordered_block(
             last_block_info.epoch(),
             last_block_info.round() + 1, // Request a round that doesn't exist
         );
@@ -465,8 +479,8 @@ mod test {
         // Verify the ordered blocks were not inserted (they should have just been dropped)
         for ordered_block in &ordered_blocks {
             let block_info = ordered_block.last_block().block_info();
-            let fetched_ordered_block =
-                ordered_block_store.get_ordered_block(block_info.epoch(), block_info.round());
+            let fetched_ordered_block = ordered_block_store
+                .get_observed_ordered_block(block_info.epoch(), block_info.round());
             assert!(fetched_ordered_block.is_none());
         }
 
@@ -724,9 +738,10 @@ mod test {
             let blocks = vec![pipelined_block];
             let ordered_proof = create_ledger_info(epoch, i as Round);
             let ordered_block = OrderedBlock::new(blocks, ordered_proof);
+            let observed_ordered_block = ObservedOrderedBlock::new(ordered_block.clone());
 
             // Insert the block into the ordered block store
-            ordered_block_store.insert_ordered_block(ordered_block.clone());
+            ordered_block_store.insert_ordered_block(observed_ordered_block);
 
             // Add the block to the ordered blocks
             ordered_blocks.push(ordered_block);

@@ -7,7 +7,7 @@ use crate::consensus_observer::{
         metrics,
     },
     network::observer_message::OrderedBlock,
-    observer::payload_store::BlockPayloadStore,
+    observer::{execution_pool::ObservedOrderedBlock, payload_store::BlockPayloadStore},
 };
 use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
 use aptos_infallible::Mutex;
@@ -24,34 +24,39 @@ use std::{
 pub struct PendingBlockWithMetadata {
     peer_network_id: PeerNetworkId, // The peer network ID of the block sender
     block_receipt_time: Instant,    // The time the block was received
-    ordered_block: OrderedBlock,    // The ordered block
+    observed_ordered_block: ObservedOrderedBlock, // The observed ordered block
 }
 
 impl PendingBlockWithMetadata {
     pub fn new(
         peer_network_id: PeerNetworkId,
         block_receipt_time: Instant,
-        ordered_block: OrderedBlock,
+        observed_ordered_block: ObservedOrderedBlock,
     ) -> Self {
         Self {
             peer_network_id,
             block_receipt_time,
-            ordered_block,
+            observed_ordered_block,
         }
     }
 
     /// Unpacks the block with metadata into its components
-    pub fn into_parts(self) -> (PeerNetworkId, Instant, OrderedBlock) {
+    pub fn into_parts(self) -> (PeerNetworkId, Instant, ObservedOrderedBlock) {
         (
             self.peer_network_id,
             self.block_receipt_time,
-            self.ordered_block,
+            self.observed_ordered_block,
         )
     }
 
-    /// Returns a reference to the ordered block
+    /// Returns a reference to the inner ordered block
     pub fn ordered_block(&self) -> &OrderedBlock {
-        &self.ordered_block
+        self.observed_ordered_block.ordered_block()
+    }
+
+    /// Returns a reference to the observed ordered block
+    pub fn observed_ordered_block(&self) -> &ObservedOrderedBlock {
+        &self.observed_ordered_block
     }
 }
 
@@ -529,10 +534,11 @@ mod test {
             let ordered_block = create_ordered_block(0, 0, 1, i);
 
             // Create a pending block with metadata
+            let observed_ordered_block = ObservedOrderedBlock::new(ordered_block.clone());
             let pending_block_with_metadata = PendingBlockWithMetadata::new(
                 PeerNetworkId::random(),
                 Instant::now(),
-                ordered_block.clone(),
+                observed_ordered_block.clone(),
             );
 
             // Insert the ordered block into the pending block store
@@ -558,15 +564,16 @@ mod test {
         // Remove each of the pending blocks and verify that the metadata is correct
         for expected_block_with_metadata in pending_blocks_with_metadata {
             // Unpack the expected block with metadata into its components
-            let (expected_peer_network_id, expected_block_receipt_time, expected_ordered_block) =
+            let (expected_peer_network_id, expected_block_receipt_time, observed_ordered_block) =
                 expected_block_with_metadata.into_parts();
 
             // Remove the pending block from the store
+            let first_block = observed_ordered_block.ordered_block().first_block();
             let removed_block_with_metadata = pending_block_store
                 .lock()
                 .remove_ready_block(
-                    expected_ordered_block.first_block().epoch(),
-                    expected_ordered_block.first_block().round(),
+                    first_block.epoch(),
+                    first_block.round(),
                     block_payload_store.clone(),
                 )
                 .unwrap();
@@ -582,7 +589,7 @@ mod test {
             );
             assert_eq!(
                 removed_block_with_metadata.ordered_block().clone(),
-                expected_ordered_block
+                observed_ordered_block.consume_ordered_block()
             );
         }
     }
@@ -913,10 +920,11 @@ mod test {
                 create_ordered_block(epoch, starting_round, max_pipelined_blocks, i);
 
             // Create a pending block with metadata
+            let observed_ordered_block = ObservedOrderedBlock::new(ordered_block.clone());
             let pending_block_with_metadata = PendingBlockWithMetadata::new(
                 PeerNetworkId::random(),
                 Instant::now(),
-                ordered_block.clone(),
+                observed_ordered_block.clone(),
             );
 
             // Insert the ordered block into the pending block store

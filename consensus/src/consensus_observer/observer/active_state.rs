@@ -42,6 +42,9 @@ pub struct ActiveObserverState {
     // The current epoch state
     epoch_state: Option<Arc<EpochState>>,
 
+    // Execution pool window size (if None, execution pool is disabled)
+    execution_pool_window_size: Option<u64>,
+
     // Whether quorum store is enabled for the current epoch
     quorum_store_enabled: bool,
 
@@ -78,8 +81,9 @@ impl ActiveObserverState {
         Self {
             node_config,
             consensus_publisher,
-            epoch_state: None,
-            quorum_store_enabled: false,
+            epoch_state: None,                // This is updated on epoch change
+            execution_pool_window_size: None, // This is updated by the on-chain configs
+            quorum_store_enabled: false,      // This is updated by the on-chain configs
             reconfig_events,
             root: Arc::new(Mutex::new(root)),
         }
@@ -134,6 +138,11 @@ impl ActiveObserverState {
             .expect("The epoch state is not set! This should never happen!")
     }
 
+    /// Returns the execution pool window size
+    pub fn execution_pool_window_size(&self) -> Option<u64> {
+        self.execution_pool_window_size
+    }
+
     /// Returns true iff the quorum store is enabled for the current epoch
     pub fn is_quorum_store_enabled(&self) -> bool {
         self.quorum_store_enabled
@@ -168,6 +177,7 @@ impl ActiveObserverState {
 
         // Update the local epoch state and quorum store config
         self.epoch_state = Some(epoch_state.clone());
+        self.execution_pool_window_size = consensus_config.execution_pool_window_size();
         self.quorum_store_enabled = consensus_config.quorum_store_enabled();
         info!(
             LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
@@ -342,8 +352,9 @@ fn handle_committed_blocks(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::consensus_observer::network::observer_message::{
-        BlockPayload, BlockTransactionPayload, OrderedBlock,
+    use crate::consensus_observer::{
+        network::observer_message::{BlockPayload, BlockTransactionPayload, OrderedBlock},
+        observer::execution_pool::ObservedOrderedBlock,
     };
     use aptos_channels::{aptos_channel, message_queues::QueueStyle};
     use aptos_consensus_types::{
@@ -556,11 +567,12 @@ mod test {
             let ordered_proof =
                 create_ledger_info(epoch, i as aptos_consensus_types::common::Round);
             let ordered_block = OrderedBlock::new(blocks, ordered_proof);
+            let observed_ordered_block = ObservedOrderedBlock::new(ordered_block.clone());
 
             // Insert the block into the ordered block store
             ordered_block_store
                 .lock()
-                .insert_ordered_block(ordered_block.clone());
+                .insert_ordered_block(observed_ordered_block);
 
             // Add the block to the ordered blocks
             ordered_blocks.push(ordered_block);

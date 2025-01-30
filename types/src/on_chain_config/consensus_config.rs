@@ -218,6 +218,11 @@ impl OnChainConsensusConfig {
         true
     }
 
+    /// Returns the execution pool window size. None if execution pool is disabled.
+    pub fn execution_pool_window_size(&self) -> Option<u64> {
+        None // TODO: update me!
+    }
+
     // Trim the list of failed authors from immediatelly preceeding rounds
     // to this max size.
     pub fn max_failed_authors_to_store(&self) -> usize {
