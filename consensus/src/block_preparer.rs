@@ -53,7 +53,8 @@ impl BlockPreparer {
         let block_voters = block_qc_fut
             .await
             .map(|qc| qc.ledger_info().get_voters_bitvec().clone());
-        let (txns, max_txns_from_block_to_execute) = self
+        // TODO: implement the block gas limit functionality
+        let (txns, max_txns_from_block_to_execute, _block_gas_limit) = self
             .payload_manager
             .get_transactions(block, block_voters)
             .await?;

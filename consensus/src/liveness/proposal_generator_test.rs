@@ -25,6 +25,8 @@ use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_signer::Validat
 use futures::{future::BoxFuture, FutureExt};
 use std::{sync::Arc, time::Duration};
 
+const MAX_BLOCK_GAS_LIMIT: u64 = 30_000;
+
 fn empty_callback() -> BoxFuture<'static, ()> {
     async move {}.boxed()
 }
@@ -52,6 +54,7 @@ async fn test_proposal_generation_empty_tree() {
         PayloadTxnsSize::new(1, 10),
         10,
         1,
+        Some(MAX_BLOCK_GAS_LIMIT),
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
@@ -98,6 +101,7 @@ async fn test_proposal_generation_parent() {
         PayloadTxnsSize::new(1, 500),
         10,
         1,
+        Some(MAX_BLOCK_GAS_LIMIT),
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
@@ -174,6 +178,7 @@ async fn test_old_proposal_generation() {
         PayloadTxnsSize::new(1, 500),
         10,
         1,
+        Some(MAX_BLOCK_GAS_LIMIT),
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
@@ -215,6 +220,7 @@ async fn test_correct_failed_authors() {
         PayloadTxnsSize::new(1, 500),
         10,
         1,
+        Some(MAX_BLOCK_GAS_LIMIT),
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,

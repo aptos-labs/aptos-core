@@ -199,7 +199,12 @@ impl ProofManager {
                 proof_block.len(),
                 inline_block.len()
             );
-            Payload::QuorumStoreInlineHybrid(inline_block, ProofWithData::new(proof_block), None)
+            Payload::QuorumStoreInlineHybrid(
+                inline_block,
+                ProofWithData::new(proof_block),
+                None,
+                None,
+            )
         };
 
         let res = GetPayloadResponse::GetPayloadResponse(response);
