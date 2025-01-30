@@ -7,10 +7,7 @@ then update the gas parameter definitions in rust.
 '''
 
 import argparse
-import fit_linear_model
 import load_bench_ns
-import load_bench_datapoints
-from math import ceil
 from pathlib import Path
 from time import time
 import math
@@ -18,11 +15,6 @@ import math
 # Typically you are making a new version of gas schedule,
 # so this should be larger than `LATEST_GAS_FEATURE_VERSION` in `aptos-move/aptos-gas/src/gas_meter.rs`.
 TARGET_GAS_VERSION = 11
-
-def get_bench_ns_linear(bench_path):
-    datapoints = load_bench_datapoints.main(bench_path)
-    X,Y,k,b = fit_linear_model.main(datapoints)
-    return X,Y,k,b
 
 def prettify_number(x:int) -> str:
     s = str(math.ceil(x))
@@ -36,29 +28,18 @@ def get_bulletproofs_lines(gas_per_ns):
     nanoseconds = {}
 
     for batch_size in [1, 2, 4, 8, 16]:
-        _,_,verify_slope,verify_base = get_bench_ns_linear(f'target/criterion/bulletproofs/range_verify_batch_{batch_size}')
-        _,_,deserialize_slope,deserialize_base = get_bench_ns_linear(f'target/criterion/bulletproofs/range_proof_deserialize_batch_{batch_size}')
+        for num_bits in [8, 16, 32, 64]:
+            ns = load_bench_ns.main(f'target/criterion/bulletproofs/range_verify/batch={batch_size}_bits={num_bits}')
 
-        nanoseconds[f'bulletproofs_verify_base_{batch_size}'] = verify_base
-        nanoseconds[f'bulletproofs_verify_per_bit_{batch_size}'] = verify_slope
-        nanoseconds[f'bulletproofs_deserialize_base_{batch_size}'] = deserialize_base
-        nanoseconds[f'bulletproofs_deserialize_per_byte_{batch_size}'] = deserialize_slope
+            nanoseconds[f'bulletproofs_verify_base_batch_{batch_size}_bits_{num_bits}'] = ns
 
     gas_units = {k:gas_per_ns*v for k,v in nanoseconds.items()}
 
     lines = []
 
     for batch_size in [1, 2, 4, 8, 16]:
-        lines.append(f'        [bulletproofs_verify_base_{batch_size}: InternalGas, {{ {TARGET_GAS_VERSION}.. => "bulletproofs.verify.base_{batch_size}" }}, {prettify_number(gas_units[f"bulletproofs_verify_base_{batch_size}"])}],')
-
-    for batch_size in [1, 2, 4, 8, 16]:
-        lines.append(f'        [bulletproofs_verify_per_bit_{batch_size}: InternalGasPerArg, {{ {TARGET_GAS_VERSION}.. => "bulletproofs.verify.per_bit_{batch_size}" }}, {prettify_number(gas_units[f"bulletproofs_verify_per_bit_{batch_size}"])}],')
-
-    for batch_size in [1, 2, 4, 8, 16]:
-        lines.append(f'        [bulletproofs_deserialize_base_{batch_size}: InternalGas, {{ {TARGET_GAS_VERSION}.. => "bulletproofs.deserialize.base_{batch_size}" }}, {prettify_number(gas_units[f"bulletproofs_deserialize_base_{batch_size}"])}],')
-
-    for batch_size in [1, 2, 4, 8, 16]:
-        lines.append(f'        [bulletproofs_deserialize_per_byte_{batch_size}: InternalGasPerByte, {{ {TARGET_GAS_VERSION}.. => "bulletproofs.deserialize.per_byte_{batch_size}" }}, {prettify_number(gas_units[f"bulletproofs_deserialize_per_byte_{batch_size}"])}],')
+        for num_bits in [8, 16, 32, 64]:
+            lines.append(f'        [bulletproofs_verify_base_batch_{batch_size}_bits_{num_bits}: InternalGas, {{ {TARGET_GAS_VERSION}.. => "bulletproofs.verify.base_batch_{batch_size}_bits_{num_bits}" }}, {prettify_number(gas_units[f'bulletproofs_verify_base_batch_{batch_size}_bits_{num_bits}'])}],')
 
     return lines
 

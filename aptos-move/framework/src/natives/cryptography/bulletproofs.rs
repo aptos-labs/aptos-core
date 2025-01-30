@@ -17,7 +17,6 @@ use bulletproofs::{BulletproofGens, PedersenGens};
 use byteorder::{ByteOrder, LittleEndian};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use merlin::Transcript;
-use move_core_types::gas_algebra::{NumArgs, NumBytes};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
@@ -315,16 +314,12 @@ fn verify_range_proof(
     bit_length: usize,
     dst: Vec<u8>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    // Batch size of 1 corresponds to the first element in the array.
-    charge_gas_for_deserialization(context, proof_bytes, 1)?;
+    charge_gas(context, 1, bit_length)?;
 
     let range_proof = match bulletproofs::RangeProof::from_bytes(proof_bytes) {
         Ok(proof) => proof,
         Err(_) => return Ok(smallvec![Value::bool(false)]),
     };
-
-    // The (Bullet)proof size is $\log_2(num_bits)$ and its verification time is $O(num_bits)$
-    charge_gas_for_verification(context, bit_length, 1)?;
 
     let mut ver_trans = Transcript::new(dst.as_slice());
 
@@ -351,15 +346,12 @@ fn verify_batch_range_proof(
     bit_length: usize,
     dst: Vec<u8>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    charge_gas_for_deserialization(context, proof_bytes, comm_points.len())?;
+    charge_gas(context, comm_points.len(), bit_length)?;
 
     let range_proof = match bulletproofs::RangeProof::from_bytes(proof_bytes) {
         Ok(proof) => proof,
         Err(_) => return Ok(smallvec![Value::bool(false)]),
     };
-
-    // The (Bullet)proof size is $\log_2(num_bits)$ and its verification time is $O(num_bits)$
-    charge_gas_for_verification(context, bit_length, comm_points.len())?;
 
     let mut ver_trans = Transcript::new(dst.as_slice());
 
@@ -407,58 +399,33 @@ pub fn make_all(
     builder.make_named_natives(natives)
 }
 
-/// Charges gas for deserializing a Bulletproof range proof.
-fn charge_gas_for_deserialization(
+/// Charges base gas fee for verifying and deserializing a Bulletproof range proof.
+fn charge_gas(
     context: &mut SafeNativeContext,
-    proof_bytes: &[u8],
     batch_size: usize,
-) -> SafeNativeResult<()> {
-    let proof_bytes_len = NumBytes::new(proof_bytes.len() as u64);
-
-    match batch_size {
-        1 => context.charge(
-            BULLETPROOFS_DESERIALIZE_BASE_1 + BULLETPROOFS_DESERIALIZE_PER_BYTE_1 * proof_bytes_len,
-        ),
-        2 => context.charge(
-            BULLETPROOFS_DESERIALIZE_BASE_2 + BULLETPROOFS_DESERIALIZE_PER_BYTE_2 * proof_bytes_len,
-        ),
-        4 => context.charge(
-            BULLETPROOFS_DESERIALIZE_BASE_4 + BULLETPROOFS_DESERIALIZE_PER_BYTE_4 * proof_bytes_len,
-        ),
-        8 => context.charge(
-            BULLETPROOFS_DESERIALIZE_BASE_8 + BULLETPROOFS_DESERIALIZE_PER_BYTE_8 * proof_bytes_len,
-        ),
-        16 => context.charge(
-            BULLETPROOFS_DESERIALIZE_BASE_16
-                + BULLETPROOFS_DESERIALIZE_PER_BYTE_16 * proof_bytes_len,
-        ),
-        _ => unreachable!(),
-    }
-}
-
-/// Charges gas for verifying a Bulletproof range proof.
-fn charge_gas_for_verification(
-    context: &mut SafeNativeContext,
     bit_length: usize,
-    batch_size: usize,
 ) -> SafeNativeResult<()> {
-    let bit_length = NumArgs::new(bit_length as u64);
-
-    match batch_size {
-        1 => {
-            context.charge(BULLETPROOFS_VERIFY_BASE_1 + BULLETPROOFS_VERIFY_PER_BIT_1 * bit_length)
-        },
-        2 => {
-            context.charge(BULLETPROOFS_VERIFY_BASE_2 + BULLETPROOFS_VERIFY_PER_BIT_2 * bit_length)
-        },
-        4 => {
-            context.charge(BULLETPROOFS_VERIFY_BASE_4 + BULLETPROOFS_VERIFY_PER_BIT_4 * bit_length)
-        },
-        8 => {
-            context.charge(BULLETPROOFS_VERIFY_BASE_8 + BULLETPROOFS_VERIFY_PER_BIT_8 * bit_length)
-        },
-        16 => context
-            .charge(BULLETPROOFS_VERIFY_BASE_16 + BULLETPROOFS_VERIFY_PER_BIT_16 * bit_length),
+    match (batch_size, bit_length) {
+        (1, 8) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_1_BITS_8),
+        (1, 16) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_1_BITS_16),
+        (1, 32) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_1_BITS_32),
+        (1, 64) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_1_BITS_64),
+        (2, 8) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_2_BITS_8),
+        (2, 16) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_2_BITS_16),
+        (2, 32) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_2_BITS_32),
+        (2, 64) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_2_BITS_64),
+        (4, 8) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_4_BITS_8),
+        (4, 16) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_4_BITS_16),
+        (4, 32) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_4_BITS_32),
+        (4, 64) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_4_BITS_64),
+        (8, 8) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_8_BITS_8),
+        (8, 16) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_8_BITS_16),
+        (8, 32) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_8_BITS_32),
+        (8, 64) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_8_BITS_64),
+        (16, 8) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_16_BITS_8),
+        (16, 16) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_16_BITS_16),
+        (16, 32) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_16_BITS_32),
+        (16, 64) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_16_BITS_64),
         _ => unreachable!(),
     }
 }
