@@ -71,6 +71,7 @@ for blind signing.
     -  [Function `check_permission_capacity_above`](#@Specification_1_check_permission_capacity_above)
     -  [Function `check_permission_consume`](#@Specification_1_check_permission_consume)
     -  [Function `capacity`](#@Specification_1_capacity)
+    -  [Function `is_permissioned_signer_impl`](#@Specification_1_is_permissioned_signer_impl)
     -  [Function `permission_address`](#@Specification_1_permission_address)
     -  [Function `signer_from_permissioned_handle_impl`](#@Specification_1_signer_from_permissioned_handle_impl)
 
@@ -1629,7 +1630,7 @@ signer::address_of(master) == signer::address_of(signer_from_permissioned_handle
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> verify = <b>true</b>;
 <b>axiom</b> <b>forall</b> a: <a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a>:
     (
         <b>forall</b> i in 0..len(a.active_handles):
@@ -1642,10 +1643,10 @@ signer::address_of(master) == signer::address_of(signer_from_permissioned_handle
 
 
 
-<a id="0x1_permissioned_signer_spec_is_permissioned_signer"></a>
+<a id="0x1_permissioned_signer_spec_is_permissioned_signer_impl"></a>
 
 
-<pre><code><b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">spec_is_permissioned_signer</a>(s: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): bool;
+<pre><code><b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer_impl">spec_is_permissioned_signer_impl</a>(s: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): bool;
 </code></pre>
 
 
@@ -1807,8 +1808,7 @@ signer::address_of(master) == signer::address_of(signer_from_permissioned_handle
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
-<b>pragma</b> opaque;
+<pre><code><b>pragma</b> opaque;
 <b>modifies</b> <b>global</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermissionStorage">PermissionStorage</a>&gt;(<a href="permissioned_signer.md#0x1_permissioned_signer_spec_permission_address">spec_permission_address</a>(s));
 <b>ensures</b> [abstract] result == <a href="permissioned_signer.md#0x1_permissioned_signer_spec_check_permission_exists">spec_check_permission_exists</a>(s, perm);
 </code></pre>
@@ -1857,12 +1857,19 @@ signer::address_of(master) == signer::address_of(signer_from_permissioned_handle
 
 
 
-<pre><code><b>let</b> permissioned_signer_addr = <a href="permissioned_signer.md#0x1_permissioned_signer_spec_permission_address">spec_permission_address</a>(s);
-<b>ensures</b> !<a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">spec_is_permissioned_signer</a>(s) ==&gt; result == <b>true</b>;
-<b>ensures</b> (
-    <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">spec_is_permissioned_signer</a>(s)
-        && !<b>exists</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermissionStorage">PermissionStorage</a>&gt;(permissioned_signer_addr)
-) ==&gt; result == <b>false</b>;
+<pre><code><b>pragma</b> opaque;
+<b>let</b> permissioned_signer_addr = <a href="permissioned_signer.md#0x1_permissioned_signer_spec_permission_address">spec_permission_address</a>(s);
+<b>modifies</b> <b>global</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermissionStorage">PermissionStorage</a>&gt;(<a href="permissioned_signer.md#0x1_permissioned_signer_spec_permission_address">spec_permission_address</a>(s));
+<b>ensures</b> [abstract] result == <a href="permissioned_signer.md#0x1_permissioned_signer_spec_check_permission_consume">spec_check_permission_consume</a>(s, threshold, perm);
+</code></pre>
+
+
+
+
+<a id="0x1_permissioned_signer_spec_check_permission_consume"></a>
+
+
+<pre><code><b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_check_permission_consume">spec_check_permission_consume</a>&lt;PermKey: <b>copy</b> + drop + store&gt;(s: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, threshold: u256, perm: PermKey): bool;
 </code></pre>
 
 
@@ -1875,6 +1882,57 @@ signer::address_of(master) == signer::address_of(signer_from_permissioned_handle
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_capacity">capacity</a>&lt;PermKey: <b>copy</b>, drop, store&gt;(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, perm: PermKey): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u256&gt;
 </code></pre>
 
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>let</b> permissioned_signer_addr = <a href="permissioned_signer.md#0x1_permissioned_signer_spec_permission_address">spec_permission_address</a>(s);
+<b>modifies</b> <b>global</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_PermissionStorage">PermissionStorage</a>&gt;(<a href="permissioned_signer.md#0x1_permissioned_signer_spec_permission_address">spec_permission_address</a>(s));
+<b>ensures</b> [abstract] result == <a href="permissioned_signer.md#0x1_permissioned_signer_spec_capacity">spec_capacity</a>(s, perm);
+</code></pre>
+
+
+
+
+<a id="0x1_permissioned_signer_spec_capacity"></a>
+
+
+<pre><code><b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_capacity">spec_capacity</a>&lt;PermKey: <b>copy</b> + drop + store&gt;(s: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, perm: PermKey): Option&lt;u256&gt;;
+</code></pre>
+
+
+
+<a id="@Specification_1_is_permissioned_signer_impl"></a>
+
+### Function `is_permissioned_signer_impl`
+
+
+<pre><code><b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_is_permissioned_signer_impl">is_permissioned_signer_impl</a>(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>ensures</b> [abstract] result == <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer_impl">spec_is_permissioned_signer_impl</a>(s);
+</code></pre>
+
+
+
+
+<a id="0x1_permissioned_signer_spec_is_permissioned_signer"></a>
+
+
+<pre><code><b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer">spec_is_permissioned_signer</a>(s: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): bool {
+   <b>use</b> std::features;
+   <b>use</b> std::features::PERMISSIONED_SIGNER;
+   <b>if</b> (!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(PERMISSIONED_SIGNER)) {
+       <b>false</b>
+   } <b>else</b> {
+       <a href="permissioned_signer.md#0x1_permissioned_signer_spec_is_permissioned_signer_impl">spec_is_permissioned_signer_impl</a>(s)
+   }
+}
+</code></pre>
 
 
 

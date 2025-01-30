@@ -1,7 +1,7 @@
 spec aptos_framework::permissioned_signer {
 
     spec module {
-        pragma verify = false;
+        pragma verify = true;
         axiom forall a: GrantedPermissionHandles:
             (
                 forall i in 0..len(a.active_handles):
@@ -11,7 +11,22 @@ spec aptos_framework::permissioned_signer {
             );
     }
 
-    spec fun spec_is_permissioned_signer(s: signer): bool;
+    spec fun spec_is_permissioned_signer_impl(s: signer): bool;
+
+    spec is_permissioned_signer_impl(s: &signer): bool {
+        pragma opaque;
+        ensures [abstract] result == spec_is_permissioned_signer_impl(s);
+    }
+
+    spec fun spec_is_permissioned_signer(s: signer): bool {
+        use std::features;
+        use std::features::PERMISSIONED_SIGNER;
+        if (!features::spec_is_enabled(PERMISSIONED_SIGNER)) {
+            false
+        } else {
+            spec_is_permissioned_signer_impl(s)
+        }
+    }
 
     spec is_permissioned_signer(s: &signer): bool {
         pragma opaque;
@@ -79,7 +94,6 @@ spec aptos_framework::permissioned_signer {
         let post granted_permissions = global<GrantedPermissionHandles>(
             p.master_account_addr
         );
-        // ensures [abstract] !vector::spec_contains(granted_permissions.active_handles, p.permissions_storage_addr);
     }
 
     spec revoke_permission_storage_address(s: &signer, permissions_storage_addr: address) {
@@ -89,9 +103,6 @@ spec aptos_framework::permissioned_signer {
     spec authorize_increase<PermKey: copy + drop + store>(
         master: &signer, permissioned: &signer, capacity: u256, perm: PermKey
     ) {
-
-        // use aptos_std::type_info;
-        // use std::bcs;
         pragma aborts_if_is_partial;
         aborts_if !spec_is_permissioned_signer(permissioned);
         aborts_if spec_is_permissioned_signer(master);
@@ -99,27 +110,15 @@ spec aptos_framework::permissioned_signer {
         ensures exists<PermissionStorage>(
             spec_permission_address(permissioned)
         );
-        // let perms = global<PermissionStorage>(permission_signer_addr).perms;
-        // let post post_perms = global<PermissionStorage>(permission_signer_addr).perms;
-        // let key = Any {
-        //     type_name: type_info::type_name<SmartTable<Any, u256>>(),
-        //     data: bcs::serialize(perm)
-        // };
-        // ensures smart_table::spec_contains(perms, key) ==>
-        //     smart_table::spec_get(post_perms, key) == old(smart_table::spec_get(perms, key)) + capacity;
-        // ensures !smart_table::spec_contains(perms, key) ==>
-        //     smart_table::spec_get(post_perms, key) == capacity;
     }
 
     spec check_permission_exists<PermKey: copy + drop + store>(s: &signer, perm: PermKey): bool {
-        pragma verify = false;
         pragma opaque;
         modifies global<PermissionStorage>(spec_permission_address(s));
         ensures [abstract] result == spec_check_permission_exists(s, perm);
     }
 
     spec fun spec_check_permission_exists<PermKey: copy + drop + store>(s: signer, perm: PermKey): bool;
-
 
     // TODO(teng): add this back later
     // spec fun spec_check_permission_exists<PermKey: copy + drop + store>(s: signer, perm: PermKey): bool {
@@ -149,27 +148,25 @@ spec aptos_framework::permissioned_signer {
             spec_is_permissioned_signer(s)
                 && !exists<PermissionStorage>(permissioned_signer_addr)
         ) ==> result == false;
-        // ensures (spec_is_permissioned_signer(s) && exists<PermissionStorage>(permissioned_signer_addr) && !smart_table::spec_contains(global<PermissionStorage>(permissioned_signer_addr).perms, key)) ==>
-        //     result == false;
-        // ensures (spec_is_permissioned_signer(s) && exists<PermissionStorage>(permissioned_signer_addr) && smart_table::spec_contains(global<PermissionStorage>(permissioned_signer_addr).perms, key)) ==>
-        //     result == (smart_table::spec_get(global<PermissionStorage>(permissioned_signer_addr).perms, key) > threshold);
     }
 
     spec check_permission_consume<PermKey: copy + drop + store>(
         s: &signer, threshold: u256, perm: PermKey
     ): bool {
+        pragma opaque;
         let permissioned_signer_addr = spec_permission_address(s);
-        ensures !spec_is_permissioned_signer(s) ==> result == true;
-        ensures (
-            spec_is_permissioned_signer(s)
-                && !exists<PermissionStorage>(permissioned_signer_addr)
-        ) ==> result == false;
-
+        modifies global<PermissionStorage>(spec_permission_address(s));
+        ensures [abstract] result == spec_check_permission_consume(s, threshold, perm);
     }
+
+    spec fun spec_check_permission_consume<PermKey: copy + drop + store>(s: signer, threshold: u256, perm: PermKey): bool;
 
     spec capacity<PermKey: copy + drop + store>(s: &signer, perm: PermKey): Option<u256> {
-        // let permissioned_signer_addr = signer::address_of(spec_permission_address(s));
-        // ensures !exists<PermissionStorage>(permissioned_signer_addr) ==>
-        //     option::is_none(result);
+        pragma opaque;
+        let permissioned_signer_addr = spec_permission_address(s);
+        modifies global<PermissionStorage>(spec_permission_address(s));
+        ensures [abstract] result == spec_capacity(s, perm);
     }
+
+    spec fun spec_capacity<PermKey: copy + drop + store>(s: signer, perm: PermKey): Option<u256>;
 }
