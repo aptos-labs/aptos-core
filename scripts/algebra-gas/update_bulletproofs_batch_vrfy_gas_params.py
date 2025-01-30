@@ -29,7 +29,7 @@ def get_bulletproofs_lines(gas_per_ns):
 
     for batch_size in [1, 2, 4, 8, 16]:
         for num_bits in [8, 16, 32, 64]:
-            ns = load_bench_ns.main(f'target/criterion/bulletproofs/range_verify/batch={batch_size}_bits={num_bits}')
+            ns = load_bench_ns.main(f'target/criterion/bulletproofs_batch_vrfy/range_verify/batch={batch_size}_bits={num_bits}')
 
             nanoseconds[f'bulletproofs_verify_base_batch_{batch_size}_bits_{num_bits}'] = ns
 
@@ -54,7 +54,7 @@ def main(gas_per_ns):
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(
-        description='Generate gas parameters for bulletproofs batch verification in `aptos-move/aptos-gas/src/aptos_framework.rs`.')
+        description='Generate gas parameters for bulletproofs batch verification in `aptos-move/aptos-gas-schedule/src/gas_schedule/aptos_framework.rs`.')
     parser.add_argument('--gas_per_ns', required=True, type=float)
     args = parser.parse_args()
     main(args.gas_per_ns)
