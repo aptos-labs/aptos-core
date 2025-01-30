@@ -264,7 +264,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [bulletproofs_verify_base_batch_16_bits_16: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_16_bits_16" }, 186_439_388],
         [bulletproofs_verify_base_batch_16_bits_32: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_16_bits_32" }, 315_464_900],
         [bulletproofs_verify_base_batch_16_bits_64: InternalGas, { RELEASE_V1_27.. => "bulletproofs.verify.base_batch_16_bits_64" }, 551_678_425],
-        // Bulletproofs bath vrfy gas parameters end.
+        // Bulletproofs batch vrfy gas parameters end.
 
         [type_info_type_of_base: InternalGas, "type_info.type_of.base", 1102],
         // TODO(Gas): the on-chain name is wrong...
