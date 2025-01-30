@@ -95,3 +95,6 @@ mainnet:
     2200077591: 2200077591_account_restoration_single_ed25519
     2200077877: 2200077877_account_restoration_rotated_to_single_secp256k1
     2200077800: 2200077800_account_restoration_rotated_to_multi_key
+
+    # events processor
+    554229017: 554229017_events_with_no_event_size_info
