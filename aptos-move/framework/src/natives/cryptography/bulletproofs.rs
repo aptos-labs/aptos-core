@@ -368,36 +368,6 @@ fn verify_batch_range_proof(
     Ok(smallvec![Value::bool(success)])
 }
 
-pub fn make_all(
-    builder: &SafeNativeBuilder,
-) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
-    let mut natives = vec![];
-
-    #[cfg(feature = "testing")]
-    natives.extend([
-        (
-            "prove_range_internal",
-            native_test_only_prove_range as RawSafeNative,
-        ),
-        (
-            "prove_batch_range_internal",
-            native_test_only_batch_prove_range,
-        ),
-    ]);
-
-    natives.extend([
-        (
-            "verify_range_proof_internal",
-            native_verify_range_proof as RawSafeNative,
-        ),
-        (
-            "verify_batch_range_proof_internal",
-            native_verify_batch_range_proof,
-        ),
-    ]);
-
-    builder.make_named_natives(natives)
-}
 
 /// Charges base gas fee for verifying and deserializing a Bulletproof range proof.
 fn charge_gas(
@@ -428,4 +398,35 @@ fn charge_gas(
         (16, 64) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_16_BITS_64),
         _ => unreachable!(),
     }
+}
+
+pub fn make_all(
+    builder: &SafeNativeBuilder,
+) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
+    let mut natives = vec![];
+
+    #[cfg(feature = "testing")]
+    natives.extend([
+        (
+            "prove_range_internal",
+            native_test_only_prove_range as RawSafeNative,
+        ),
+        (
+            "prove_batch_range_internal",
+            native_test_only_batch_prove_range,
+        ),
+    ]);
+
+    natives.extend([
+        (
+            "verify_range_proof_internal",
+            native_verify_range_proof as RawSafeNative,
+        ),
+        (
+            "verify_batch_range_proof_internal",
+            native_verify_batch_range_proof,
+        ),
+    ]);
+
+    builder.make_named_natives(natives)
 }
