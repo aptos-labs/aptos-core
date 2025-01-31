@@ -17,9 +17,7 @@ use crate::{
     epoch_manager::LivenessStorageData,
     logging::{LogEvent, LogSchema},
     monitor,
-    network::{
-        DeprecatedIncomingBlockRetrievalRequest, IncomingBlockRetrievalRequest, NetworkSender,
-    },
+    network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
     payload_manager::TPayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
@@ -29,8 +27,9 @@ use anyhow::{anyhow, bail, Context};
 use aptos_consensus_types::{
     block::Block,
     block_retrieval::{
-        BlockRetrievalRequestV1, BlockRetrievalResponse, BlockRetrievalStatus, NUM_PEERS_PER_RETRY,
-        NUM_RETRIES, RETRY_INTERVAL_MSEC, RPC_TIMEOUT_MSEC,
+        BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalResponse,
+        BlockRetrievalStatus, NUM_PEERS_PER_RETRY, NUM_RETRIES, RETRY_INTERVAL_MSEC,
+        RPC_TIMEOUT_MSEC,
     },
     common::Author,
     quorum_cert::QuorumCert,
@@ -232,7 +231,6 @@ impl BlockStore {
                 .retrieve_blocks_in_range(
                     retrieve_qc.certified_block().id(),
                     1,
-                    retrieve_qc.certified_block().epoch(),
                     retrieve_qc.certified_block().round(),
                     qc.ledger_info()
                         .get_voters(&retriever.validator_addresses()),
@@ -345,7 +343,6 @@ impl BlockStore {
             .retrieve_blocks_in_range(
                 highest_quorum_cert.certified_block().id(),
                 num_blocks,
-                highest_commit_cert.commit_info().epoch(),
                 target_round,
                 highest_quorum_cert
                     .ledger_info()
@@ -396,7 +393,6 @@ impl BlockStore {
                     .retrieve_blocks_in_range(
                         highest_commit_certified_block.id(),
                         1,
-                        highest_commit_certified_block.epoch(),
                         highest_commit_certified_block.round(),
                         highest_commit_cert
                             .ledger_info()
@@ -497,6 +493,75 @@ impl BlockStore {
         }
     }
 
+    /// TODO @bchocho @hariria deprecate later once BlockRetrievalRequest enum is released
+    pub async fn process_block_retrieval_inner(
+        &self,
+        request: &IncomingBlockRetrievalRequest,
+    ) -> Box<BlockRetrievalResponse> {
+        let mut blocks = vec![];
+        let mut status = BlockRetrievalStatus::Succeeded;
+        let mut id = request.req.block_id();
+
+        match &request.req {
+            BlockRetrievalRequest::V1(req) => {
+                while (blocks.len() as u64) < req.num_blocks() {
+                    if let Some(executed_block) = self.get_block(id) {
+                        blocks.push(executed_block.block().clone());
+                        if req.match_target_id(id) {
+                            status = BlockRetrievalStatus::SucceededWithTarget;
+                            break;
+                        }
+                        id = executed_block.parent_id();
+                    } else {
+                        status = BlockRetrievalStatus::NotEnoughBlocks;
+                        break;
+                    }
+                }
+            },
+            BlockRetrievalRequest::V2(req) => {
+                while (blocks.len() as u64) < req.num_blocks() {
+                    if let Some(executed_block) = self.get_block(id) {
+                        info!(
+                            "Block found: {}, round: ({}, {})",
+                            executed_block.block().id(),
+                            executed_block.epoch(),
+                            executed_block.round()
+                        );
+                        if !executed_block.block().is_genesis_block() {
+                            blocks.push(executed_block.block().clone());
+                        } else {
+                            info!(
+                                "Skipping genesis block: ({}, {})",
+                                executed_block.epoch(),
+                                executed_block.round()
+                            );
+                        }
+                        if req.match_target_round(executed_block.round()) {
+                            info!(
+                                "SucceededWithTarget: {} <= {:?}",
+                                executed_block.round(),
+                                req.target_round(),
+                            );
+                            status = BlockRetrievalStatus::SucceededWithTarget;
+                            break;
+                        }
+                        id = executed_block.parent_id();
+                    } else {
+                        info!("NotEnoughBlocks: {}", id);
+                        status = BlockRetrievalStatus::NotEnoughBlocks;
+                        break;
+                    }
+                }
+            },
+        }
+
+        if blocks.is_empty() {
+            status = BlockRetrievalStatus::IdNotFound;
+        }
+
+        Box::new(BlockRetrievalResponse::new(status, blocks))
+    }
+
     /// Retrieve a n chained blocks from the block store starting from
     /// an initial parent id, returning with <n (as many as possible) if
     /// id or its ancestors can not be found.
@@ -505,57 +570,12 @@ impl BlockStore {
     /// future possible changes.
     pub async fn process_block_retrieval(
         &self,
-        request: DeprecatedIncomingBlockRetrievalRequest,
+        request: IncomingBlockRetrievalRequest,
     ) -> anyhow::Result<()> {
         fail_point!("consensus::process_block_retrieval", |_| {
             Err(anyhow::anyhow!("Injected error in process_block_retrieval"))
         });
-        let mut blocks = vec![];
-        let mut status = BlockRetrievalStatus::Succeeded;
-        let mut id = request.req.block_id();
-        while (blocks.len() as u64) < request.req.num_blocks() {
-            if let Some(executed_block) = self.get_block(id) {
-                info!(
-                    "Block found: {}, round: ({}, {})",
-                    executed_block.block().id(),
-                    executed_block.epoch(),
-                    executed_block.round()
-                );
-                if !executed_block.block().is_genesis_block() {
-                    blocks.push(executed_block.block().clone());
-                } else {
-                    info!(
-                        "Skipping genesis block: ({}, {})",
-                        executed_block.epoch(),
-                        executed_block.round()
-                    );
-                }
-                if request
-                    .req
-                    .match_target_round(executed_block.epoch(), executed_block.round())
-                {
-                    info!(
-                        "SucceededWithTarget: ({}, {}) <= {:?}",
-                        executed_block.epoch(),
-                        executed_block.round(),
-                        request.req.target_epoch_and_round(),
-                    );
-                    status = BlockRetrievalStatus::SucceededWithTarget;
-                    break;
-                }
-                id = executed_block.parent_id();
-            } else {
-                info!("NotEnoughBlocks: {}", id);
-                status = BlockRetrievalStatus::NotEnoughBlocks;
-                break;
-            }
-        }
-
-        if blocks.is_empty() {
-            status = BlockRetrievalStatus::IdNotFound;
-        }
-
-        let response = Box::new(BlockRetrievalResponse::new(status, blocks));
+        let response = self.process_block_retrieval_inner(&request).await;
         let response_bytes = request
             .protocol
             .to_bytes(&ConsensusMsg::BlockRetrievalResponse(response))?;
@@ -563,23 +583,6 @@ impl BlockStore {
             .response_sender
             .send(Ok(response_bytes.into()))
             .map_err(|_| anyhow::anyhow!("Failed to send block retrieval response"))
-    }
-
-    /// TODO @bchocho @hariria to implement in upcoming PR
-    /// Retrieve a n chained blocks from the block store starting from
-    /// an initial parent id, returning with <n (as many as possible) if
-    /// id or its ancestors can not be found.
-    ///
-    /// The current version of the function is not really async, but keeping it this way for
-    /// future possible changes.
-    pub async fn process_block_retrieval_v2(
-        &self,
-        request: IncomingBlockRetrievalRequest,
-    ) -> anyhow::Result<()> {
-        bail!(
-            "Unexpected request {:?} for process_block_retrieval_v2",
-            request.req
-        )
     }
 }
 
@@ -616,8 +619,6 @@ impl BlockRetriever {
     async fn retrieve_block_for_id_chunk(
         &mut self,
         block_id: HashValue,
-        // TODO: epoch is unneeded?
-        target_epoch: u64,
         target_round: u64,
         retrieve_batch_size: u64,
         mut peers: Vec<AccountAddress>,
@@ -652,12 +653,19 @@ impl BlockRetriever {
                     .boxed(),
                 )
             }
-            let request = BlockRetrievalRequest::new_with_target_round(
+            // TLDR: We cannot use this until BlockRetrievalRequestV2 is available in the next release
+            // For more info, see bail!() in tokio::select! below
+            //
+            // TODO @bchocho @hariria to fix after the release
+            // let request = BlockRetrievalRequest::new_with_target_round(
+            //     block_id,
+            //     retrieve_batch_size,
+            //     target_round,
+            // );
+            let request = BlockRetrievalRequest::V1(BlockRetrievalRequestV1::new(
                 block_id,
                 retrieve_batch_size,
-                target_epoch,
-                target_round,
-            );
+            ));
             loop {
                 tokio::select! {
                     _ = interval.tick() => {
@@ -688,12 +696,25 @@ impl BlockRetriever {
                                 failed_attempt
                             );
                             let remote_peer = peer;
-                            let future = self.network.request_block(
-                                request.clone(),
-                                peer,
-                                rpc_timeout,
-                            );
-                            futures.push(async move { (remote_peer, future.await) }.boxed());
+                            // TODO @bchocho @hariria fix once BlockRetrievalRequestV2 is released
+                            match &request {
+                                BlockRetrievalRequest::V1(v1) => {
+                                    let future = self.network.request_block(
+                                        v1.clone(),
+                                        peer,
+                                        rpc_timeout,
+                                    );
+                                    futures.push(async move { (remote_peer, future.await) }.boxed());
+                                }
+                                // Using a BlockRetrievalRequestV2 currently bails. This is
+                                // intentional since we should not make network requests for V2
+                                // BlockRetrievalRequests yet.That being said, we have gone ahead
+                                // and already implement the logic for processing these requests.
+                                BlockRetrievalRequest::V2(_) => {
+                                    bail!("BlockRetrievalRequest::V2 is not enabled yet, bailed at retrieve_block_for_id_chunk")
+                                }
+                            }
+
                         }
                     }
                     Some((peer, response)) = futures.next() => {
@@ -727,14 +748,13 @@ impl BlockRetriever {
     async fn retrieve_block_for_id(
         &mut self,
         block_id: HashValue,
-        target_epoch: u64,
         target_round: u64,
         peers: Vec<AccountAddress>,
         num_blocks: u64,
     ) -> anyhow::Result<Vec<Block>> {
         info!(
-            "Retrieving {} blocks starting from {} with target_epoch {} and target_round {}",
-            num_blocks, block_id, target_epoch, target_round
+            "Retrieving {} blocks starting from {} with target_round {}",
+            num_blocks, block_id, target_round
         );
         let mut progress = 0;
         let mut last_block_id = block_id;
@@ -755,7 +775,6 @@ impl BlockRetriever {
             let response = self
                 .retrieve_block_for_id_chunk(
                     last_block_id,
-                    target_epoch,
                     target_round,
                     retrieve_batch_size,
                     peers.clone(),
@@ -777,12 +796,23 @@ impl BlockRetriever {
                     result_blocks.extend(batch);
                     break;
                 },
-                _e => {
-                    bail!(
-                        "Failed to fetch block {}, for original start {}",
-                        last_block_id,
-                        block_id,
-                    );
+                res => match res {
+                    Ok(resp) => {
+                        bail!(
+                            "Failed to fetch block {}, for original start {}, returned status {:?}",
+                            last_block_id,
+                            block_id,
+                            resp.status()
+                        );
+                    },
+                    Err(e) => {
+                        bail!(
+                            "Error: Failed to fetch block {}, for original start {}: {}",
+                            last_block_id,
+                            block_id,
+                            e
+                        );
+                    },
                 },
             }
         }
@@ -793,13 +823,6 @@ impl BlockRetriever {
             result_blocks
         );
 
-        assert_ge!(
-            target_epoch,
-            result_blocks
-                .last()
-                .expect("Expected at least a result_block")
-                .epoch()
-        );
         assert_ge!(
             target_round,
             result_blocks
@@ -815,19 +838,12 @@ impl BlockRetriever {
         &mut self,
         initial_block_id: HashValue,
         num_blocks: u64,
-        target_epoch: u64,
         target_round: u64,
         peers: Vec<AccountAddress>,
     ) -> anyhow::Result<Vec<Block>> {
         BLOCKS_FETCHED_FROM_NETWORK_IN_BLOCK_RETRIEVER.inc_by(num_blocks);
-        self.retrieve_block_for_id(
-            initial_block_id,
-            target_epoch,
-            target_round,
-            peers,
-            num_blocks,
-        )
-        .await
+        self.retrieve_block_for_id(initial_block_id, target_round, peers, num_blocks)
+            .await
     }
 
     fn pick_peer(&self, first_atempt: bool, peers: &mut Vec<AccountAddress>) -> AccountAddress {
