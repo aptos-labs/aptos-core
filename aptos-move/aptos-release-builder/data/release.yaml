@@ -1,19 +1,20 @@
 ---
 remote_endpoint: https://fullnode.mainnet.aptoslabs.com
-name: "TBD"
+# replace with below for actual release, compat test needs concrete URL above:
+# remote_endpoint: ~
+name: "vX.YY.Z"
 proposals:
   - name: proposal_1_upgrade_framework
     metadata:
-      title: "Multi-step proposal to upgrade mainnet framework, version TBD"
-      description: "This includes changes in (TBA: URL to changes)"
+      title: "Multi-step proposal to upgrade mainnet framework, version vX.YY.Z"
+      description: "This includes changes in https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-vX.YY.Z"
     execution_mode: MultiStep
     update_sequence:
       - Gas:
           new: current
+          # replace with below for actual release, above "current" is needed for compat tests:
+          # old: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/vX.WW.Z.json
+          # new: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/vX.YY.Z.json
       - Framework:
           bytecode_version: 7
           git_hash: ~
-      - FeatureFlag:
-          enabled:
-            - allow_serialized_script_args
-
