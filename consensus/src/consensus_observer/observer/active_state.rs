@@ -42,7 +42,7 @@ pub struct ActiveObserverState {
     // The current epoch state
     epoch_state: Option<Arc<EpochState>>,
 
-    // Execution pool window size (if None, execution pool is disabled)
+    // Execution pool window size (if none, execution pool is disabled)
     execution_pool_window_size: Option<u64>,
 
     // Whether quorum store is enabled for the current epoch

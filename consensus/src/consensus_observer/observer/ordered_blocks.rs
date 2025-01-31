@@ -6,7 +6,7 @@ use crate::consensus_observer::{
         logging::{LogEntry, LogSchema},
         metrics,
     },
-    network::observer_message::CommitDecision,
+    network::observer_message::{CommitDecision, OrderedBlockWithWindow},
     observer::execution_pool::ObservedOrderedBlock,
 };
 use aptos_config::config::ConsensusObserverConfig;
@@ -47,6 +47,16 @@ impl OrderedBlockStore {
         &self,
     ) -> BTreeMap<(u64, Round), (ObservedOrderedBlock, Option<CommitDecision>)> {
         self.ordered_blocks.clone()
+    }
+
+    /// Returns a copy of all ordered blocks in the window for the given
+    /// ordered block with window. This method is all or nothing, i.e.,
+    /// if some ordered blocks are missing, None is returned.
+    pub fn get_all_ordered_blocks_for_window(
+        &self,
+        _ordered_block_with_window: &OrderedBlockWithWindow,
+    ) -> Option<Vec<OrderedBlockWithWindow>> {
+        Some(vec![]) // TODO: complete me!
     }
 
     /// Returns the highest committed epoch and round (if any)

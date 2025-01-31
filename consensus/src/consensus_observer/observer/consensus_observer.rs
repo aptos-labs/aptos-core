@@ -161,11 +161,14 @@ impl ConsensusObserver {
         }
     }
 
-    /// Returns true iff all payloads exist for the observed ordered block
-    fn all_payloads_exist(&self, observed_ordered_block: &ObservedOrderedBlock) -> bool {
+    /// Returns true iff all blocks and payloads exist for the observed ordered block.
+    /// For self-contained ordered blocks (no execution pool), we just need to check
+    /// for the block payload. For ordered blocks with execution pool windows, we need
+    /// to check for all ordered blocks and payloads in the window history.
+    fn all_blocks_and_payloads_exist(&self, observed_ordered_block: &ObservedOrderedBlock) -> bool {
         match observed_ordered_block {
             ObservedOrderedBlock::Ordered(ordered_block) => {
-                // If quorum store is disabled, all payloads exist (they're already in the blocks)
+                // If quorum store is disabled, all payloads exist (they're embedded in the blocks)
                 if !self.active_observer_state.is_quorum_store_enabled() {
                     return true;
                 }
@@ -175,8 +178,35 @@ impl ConsensusObserver {
                     .lock()
                     .all_payloads_exist(ordered_block.blocks())
             },
-            ObservedOrderedBlock::OrderedWithWindow(_ordered_block_with_window) => {
-                false // TODO: complete me!
+            ObservedOrderedBlock::OrderedWithWindow(ordered_block_with_window) => {
+                // Check if all ordered blocks exist for the current window
+                let all_ordered_blocks = match self
+                    .ordered_block_store
+                    .lock()
+                    .get_all_ordered_blocks_for_window(ordered_block_with_window)
+                {
+                    Some(ordered_blocks) => ordered_blocks,
+                    None => return false, // Some blocks were missing!
+                };
+
+                // If quorum store is disabled, all payloads exist (they're embedded in the blocks)
+                if !self.active_observer_state.is_quorum_store_enabled() {
+                    return true;
+                }
+
+                // Otherwise, check if all payloads exist in the window
+                for ordered_block_with_window in all_ordered_blocks {
+                    let pipelined_blocks = ordered_block_with_window.ordered_block().blocks();
+                    if !self
+                        .block_payload_store
+                        .lock()
+                        .all_payloads_exist(pipelined_blocks)
+                    {
+                        return false; // Some payloads were missing!
+                    }
+                }
+
+                true // All blocks and payloads exist
             },
         }
     }
@@ -584,7 +614,7 @@ impl ConsensusObserver {
         // Process the pending block
         if let Some(pending_ordered_block) = pending_ordered_block {
             // If all payloads exist, add the commit decision to the pending blocks
-            if self.all_payloads_exist(&pending_ordered_block) {
+            if self.all_blocks_and_payloads_exist(&pending_ordered_block) {
                 debug!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                         "Adding decision to pending block: {}",
@@ -746,7 +776,8 @@ impl ConsensusObserver {
 
         // If all payloads exist, process the block. Otherwise, store it
         // in the pending block store and wait for the payloads to arrive.
-        if self.all_payloads_exist(pending_block_with_metadata.observed_ordered_block()) {
+        if self.all_blocks_and_payloads_exist(pending_block_with_metadata.observed_ordered_block())
+        {
             self.process_ordered_block(pending_block_with_metadata)
                 .await;
         } else {
@@ -843,7 +874,8 @@ impl ConsensusObserver {
 
             // If state sync is not syncing to a commit, finalize the ordered blocks
             if !self.state_sync_manager.is_syncing_to_commit() {
-                self.finalize_ordered_block(ordered_block.clone()).await;
+                self.finalize_ordered_block(observed_ordered_block.consume_ordered_block())
+                    .await;
             }
         } else {
             warn!(
@@ -955,7 +987,8 @@ impl ConsensusObserver {
 
         // If all payloads exist, process the block. Otherwise, store it
         // in the pending block store and wait for the payloads to arrive.
-        if self.all_payloads_exist(pending_block_with_metadata.observed_ordered_block()) {
+        if self.all_blocks_and_payloads_exist(pending_block_with_metadata.observed_ordered_block())
+        {
             self.process_ordered_block(pending_block_with_metadata)
                 .await;
         } else {
