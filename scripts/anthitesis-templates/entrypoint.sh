@@ -7,7 +7,7 @@ if [ "$ROLE" = "faucet" ]; then
   echo "Starting aptos-faucet-service with key: ${MINT_KEY}"
   echo "Node URL: ${NODE_URL}, Chain ID: ${CHAIN_ID}"
   exec /usr/local/bin/aptos-faucet-service run-simple \
-       --key "${MINT_KEY}" \
+       --key "$(cat "${MINT_KEY}")" \
        --node-url "${NODE_URL}" \
        --chain-id "${CHAIN_ID}"
 elif [ "$ROLE" = "validator" ]; then

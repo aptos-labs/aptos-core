@@ -105,11 +105,12 @@ for i in $(seq 1 "$NODE_COUNT"); do
     SERVICES="$SERVICES .services.validator_$i.expose = [6180, 6181, 9101, 8080]"
 done
 
+# NODE_URL is the first validator node for the faucet to connect to
 yq eval -n "
   .services.faucet.image = \"aptos/node:latest\" |
   .services.faucet.environment.ROLE = \"faucet\" |
   .services.faucet.environment.MINT_KEY = \"/opt/aptos/etc/mint.key\" |
-  .services.faucet.environment.NODE_URL = \"http://valiadator_1:8080\" |
+  .services.faucet.environment.NODE_URL = \"http://$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+11)}'):8080\" |
   .services.faucet.environment.CHAIN_ID = \"$CHAIN_ID\" |
   .services.faucet.volumes = [\"./mint.key:/opt/aptos/etc/mint.key\"] |
   .services.faucet.networks.custom_network.ipv4_address = \"$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+30)}')\" |
