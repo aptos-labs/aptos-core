@@ -74,6 +74,7 @@ use aptos_types::{
     on_chain_config::{
         ConsensusAlgorithmConfig, ConsensusConfigV1, OnChainConsensusConfig,
         OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorTxnConfig,
+        DEFAULT_WINDOW_SIZE,
     },
     transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
@@ -2557,9 +2558,10 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
         runtime.handle().clone(),
         1,
         None,
-        Some(OnChainConsensusConfig::V3 {
+        Some(OnChainConsensusConfig::V4 {
             alg: alg_config,
             vtxn: vtxn_config,
+            window_size: DEFAULT_WINDOW_SIZE,
         }),
         Some(local_config),
         Some(randomness_config),

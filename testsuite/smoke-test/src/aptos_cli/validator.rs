@@ -202,6 +202,10 @@ async fn test_onchain_config_change() {
                     alg: ConsensusAlgorithmConfig::Jolteon { main, .. },
                     ..
                 } => main,
+                OnChainConsensusConfig::V4 {
+                    alg: ConsensusAlgorithmConfig::Jolteon { main, .. },
+                    ..
+                } => main,
                 _ => unimplemented!(),
             };
 
