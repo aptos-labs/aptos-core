@@ -163,7 +163,7 @@ impl TransactionFactory {
         function_info: FunctionInfo,
     ) -> TransactionBuilder {
         self.payload(
-            aptos_stdlib::account_abstraction_add_dispatchable_authentication_function(
+            aptos_stdlib::account_abstraction_add_authentication_function(
                 function_info.module_address,
                 function_info.module_name.into_bytes(),
                 function_info.function_name.into_bytes(),
