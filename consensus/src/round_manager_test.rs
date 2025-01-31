@@ -515,6 +515,7 @@ impl NodeSetup {
     /// SOON TO BE DEPRECATED: Please use [`poll_block_retrieval_v2`](NodeSetup::poll_block_retrieval_v2) going forward
     /// NOTE: [`IncomingBlockRetrievalRequest`](DeprecatedIncomingBlockRetrievalRequest) is being phased out over two releases
     /// After the first release, this can be deleted
+    /// TODO @bchocho @hariria to fix after BlockRetrievalRequest enum is merged
     pub async fn poll_block_retrieval(
         &mut self,
     ) -> Option<DeprecatedIncomingBlockRetrievalRequest> {
@@ -621,8 +622,13 @@ fn start_replying_to_block_retreival(nodes: Vec<NodeSetup>) -> ReplyingRPCHandle
                         request,
                         node.identity_desc()
                     );
+                    let wrapped_request = IncomingBlockRetrievalRequest {
+                        req: BlockRetrievalRequest::V1(request.req),
+                        protocol: request.protocol,
+                        response_sender: request.response_sender,
+                    };
                     node.block_store
-                        .process_block_retrieval(request)
+                        .process_block_retrieval(wrapped_request)
                         .await
                         .unwrap();
                 } else {
@@ -1382,8 +1388,8 @@ fn response_on_block_retrieval() {
 
         // first verify that we can retrieve the block if it's in the tree
         let (tx1, rx1) = oneshot::channel();
-        let single_block_request = DeprecatedIncomingBlockRetrievalRequest {
-            req: BlockRetrievalRequestV1::new(block_id, 1),
+        let single_block_request = IncomingBlockRetrievalRequest {
+            req: BlockRetrievalRequest::V1(BlockRetrievalRequestV1::new(block_id, 1)),
             protocol: ProtocolId::ConsensusRpcBcs,
             response_sender: tx1,
         };
@@ -1405,8 +1411,8 @@ fn response_on_block_retrieval() {
 
         // verify that if a block is not there, return ID_NOT_FOUND
         let (tx2, rx2) = oneshot::channel();
-        let missing_block_request = DeprecatedIncomingBlockRetrievalRequest {
-            req: BlockRetrievalRequestV1::new(HashValue::random(), 1),
+        let missing_block_request = IncomingBlockRetrievalRequest {
+            req: BlockRetrievalRequest::V1(BlockRetrievalRequestV1::new(HashValue::random(), 1)),
             protocol: ProtocolId::ConsensusRpcBcs,
             response_sender: tx2,
         };
@@ -1429,8 +1435,8 @@ fn response_on_block_retrieval() {
 
         // if asked for many blocks, return NOT_ENOUGH_BLOCKS
         let (tx3, rx3) = oneshot::channel();
-        let many_block_request = DeprecatedIncomingBlockRetrievalRequest {
-            req: BlockRetrievalRequestV1::new(block_id, 3),
+        let many_block_request = IncomingBlockRetrievalRequest {
+            req: BlockRetrievalRequest::V1(BlockRetrievalRequestV1::new(block_id, 3)),
             protocol: ProtocolId::ConsensusRpcBcs,
             response_sender: tx3,
         };

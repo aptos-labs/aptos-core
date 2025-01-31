@@ -581,11 +581,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                             );
                             continue;
                         }
+                        // This should be OK. Wrapping BlockRetrievalRequestV1 in an IncomingBlockRetrievalRequest
+                        // instead of DeprecatedIncomingBlockRetrievalRequest
                         if let Err(e) = monitor!(
                             "process_block_retrieval",
                             block_store
-                                .process_block_retrieval(DeprecatedIncomingBlockRetrievalRequest {
-                                    req: v1,
+                                .process_block_retrieval(IncomingBlockRetrievalRequest {
+                                    req: BlockRetrievalRequest::V1(v1),
                                     protocol: request.protocol,
                                     response_sender: request.response_sender,
                                 })
@@ -605,7 +607,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         if let Err(e) = monitor!(
                             "process_block_retrieval_v2",
                             block_store
-                                .process_block_retrieval_v2(IncomingBlockRetrievalRequest {
+                                .process_block_retrieval(IncomingBlockRetrievalRequest {
                                     req: BlockRetrievalRequest::V2(v2),
                                     protocol: request.protocol,
                                     response_sender: request.response_sender,
@@ -1739,16 +1741,22 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         match request {
             // TODO @bchocho @hariria can remove after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
-            IncomingRpcRequest::DeprecatedBlockRetrieval(request) => {
+            IncomingRpcRequest::DeprecatedBlockRetrieval(
+                DeprecatedIncomingBlockRetrievalRequest {
+                    req,
+                    protocol,
+                    response_sender,
+                },
+            ) => {
                 if let Some(tx) = &self.block_retrieval_tx {
                     let incoming_block_retrieval_request = IncomingBlockRetrievalRequest {
-                        req: BlockRetrievalRequest::V1(request.req),
-                        protocol: request.protocol,
-                        response_sender: request.response_sender,
+                        req: BlockRetrievalRequest::V1(req),
+                        protocol,
+                        response_sender,
                     };
                     tx.push(peer_id, incoming_block_retrieval_request)
                 } else {
-                    error!("Round manager not started");
+                    error!("Round manager not started (in IncomingRpcRequest::DeprecatedBlockRetrieval)");
                     Ok(())
                 }
             },
