@@ -371,8 +371,11 @@ impl BlockStore {
         );
 
         if let Some(payload) = block.payload() {
-            self.payload_manager
-                .prefetch_payload_data(payload, block.timestamp_usecs());
+            self.payload_manager.prefetch_payload_data(
+                payload,
+                block.author().expect("Payload block must have author"),
+                block.timestamp_usecs(),
+            );
         }
 
         let pipelined_block = PipelinedBlock::new_ordered(block.clone());

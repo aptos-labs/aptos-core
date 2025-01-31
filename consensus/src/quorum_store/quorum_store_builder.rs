@@ -8,7 +8,10 @@ use crate::{
     monitor,
     network::{IncomingBatchRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
-    payload_manager::{DirectMempoolPayloadManager, QuorumStorePayloadManager, TPayloadManager},
+    payload_manager::{
+        DirectMempoolPayloadManager, QuorumStoreCommitNotifier, QuorumStorePayloadManager,
+        TPayloadManager,
+    },
     quorum_store::{
         batch_coordinator::{BatchCoordinator, BatchCoordinatorCommand},
         batch_generator::{BackPressure, BatchGenerator, BatchGeneratorCommand},
@@ -440,7 +443,7 @@ impl InnerBuilder {
             Arc::from(QuorumStorePayloadManager::new(
                 batch_reader,
                 // TODO: remove after splitting out clean requests
-                self.coordinator_tx.clone(),
+                Box::new(QuorumStoreCommitNotifier::new(self.coordinator_tx.clone())),
                 consensus_publisher,
                 self.verifier.get_ordered_account_addresses(),
                 self.verifier.address_to_validator_index().clone(),

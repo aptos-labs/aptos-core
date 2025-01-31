@@ -12,8 +12,6 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_crypto_derive::CryptoHasher;
-use aptos_executor_types::ExecutorResult;
-use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress, transaction::SignedTransaction,
@@ -25,10 +23,8 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
     fmt::{self, Write},
-    sync::Arc,
     u64,
 };
-use tokio::sync::oneshot;
 
 /// The round of a block is a consensus-internal counter, which starts with 0 and increases
 /// monotonically. It is used for the protocol safety and liveness (please see the detailed
@@ -127,40 +123,14 @@ pub struct RejectedTransactionSummary {
     pub reason: DiscardedVMStatus,
 }
 
-#[derive(Debug)]
-pub enum DataStatus {
-    Cached(Vec<SignedTransaction>),
-    Requested(
-        Vec<(
-            HashValue,
-            oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>,
-        )>,
-    ),
-}
-
-impl DataStatus {
-    pub fn extend(&mut self, other: DataStatus) {
-        match (self, other) {
-            (DataStatus::Requested(v1), DataStatus::Requested(v2)) => v1.extend(v2),
-            (_, _) => unreachable!(),
-        }
-    }
-
-    pub fn take(&mut self) -> DataStatus {
-        std::mem::replace(self, DataStatus::Requested(vec![]))
-    }
-}
-
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct ProofWithData {
     pub proofs: Vec<ProofOfStore>,
-    #[serde(skip)]
-    pub status: Arc<Mutex<Option<DataStatus>>>,
 }
 
 impl PartialEq for ProofWithData {
     fn eq(&self, other: &Self) -> bool {
-        self.proofs == other.proofs && Arc::as_ptr(&self.status) == Arc::as_ptr(&other.status)
+        self.proofs == other.proofs
     }
 }
 
@@ -168,10 +138,7 @@ impl Eq for ProofWithData {}
 
 impl ProofWithData {
     pub fn new(proofs: Vec<ProofOfStore>) -> Self {
-        Self {
-            proofs,
-            status: Arc::new(Mutex::new(None)),
-        }
+        Self { proofs }
     }
 
     pub fn empty() -> Self {
@@ -180,14 +147,7 @@ impl ProofWithData {
 
     #[allow(clippy::unwrap_used)]
     pub fn extend(&mut self, other: ProofWithData) {
-        let other_data_status = other.status.lock().as_mut().unwrap().take();
         self.proofs.extend(other.proofs);
-        let mut status = self.status.lock();
-        if status.is_none() {
-            *status = Some(other_data_status);
-        } else {
-            status.as_mut().unwrap().extend(other_data_status);
-        }
     }
 
     pub fn len(&self) -> usize {
