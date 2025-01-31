@@ -93,6 +93,7 @@ pub fn run_model_builder_in_compiler_mode(
     source: PackageInfo,
     source_deps: PackageInfo,
     deps: Vec<PackageInfo>,
+    deps_for_verification: PackageInfo,
     skip_attribute_checks: bool,
     known_attributes: &BTreeSet<String>,
     language_version: LanguageVersion,
@@ -113,6 +114,7 @@ pub fn run_model_builder_in_compiler_mode(
         vec![to_package_paths(source)],
         vec![to_package_paths(source_deps)],
         deps.into_iter().map(to_package_paths).collect(),
+        vec![to_package_paths(deps_for_verification)],
         ModelBuilderOptions {
             compile_via_model: true,
             language_version,
@@ -151,6 +153,7 @@ pub fn run_model_builder_with_options<
         move_sources,
         move_deps,
         deps,
+        vec![],
         options,
         flags,
         known_attributes,
@@ -165,6 +168,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     move_sources_targets: Vec<PackagePaths<Paths, NamedAddress>>,
     move_sources_deps: Vec<PackagePaths<Paths, NamedAddress>>,
     deps: Vec<PackagePaths<Paths, NamedAddress>>,
+    deps_with_same_package_targets: Vec<PackagePaths<Paths, NamedAddress>>,
     options: ModelBuilderOptions,
     flags: Flags,
     known_attributes: &BTreeSet<String>,
@@ -180,6 +184,15 @@ pub fn run_model_builder_with_options_and_compilation_flags<
         .cloned()
         .collect();
     let target_sources_names: BTreeSet<String> = move_sources_targets
+        .iter()
+        .flat_map(|pack| pack.paths.iter())
+        .map(|sym| {
+            <Paths as Into<MoveSymbol>>::into(sym.clone())
+                .as_str()
+                .to_owned()
+        })
+        .collect();
+    let primary_package_sources_names: BTreeSet<String> = deps_with_same_package_targets
         .iter()
         .flat_map(|pack| pack.paths.iter())
         .map(|sym| {
@@ -205,6 +218,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
                     fsrc,
                     /* is_target */ true,
                     target_sources_names.contains(fname.as_str()),
+                    primary_package_sources_names.contains(fname.as_str()),
                 );
             }
             add_move_lang_diagnostics(&mut env, diags);
@@ -242,6 +256,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
             fsrc,
             is_target,
             target_sources_names.contains(fname.as_str()),
+            primary_package_sources_names.contains(fname.as_str()),
         );
     }
 
@@ -257,6 +272,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
                 fsrc,
                 is_target,
                 target_sources_names.contains(fname.as_str()),
+                primary_package_sources_names.contains(fname.as_str()),
             );
         }
     }

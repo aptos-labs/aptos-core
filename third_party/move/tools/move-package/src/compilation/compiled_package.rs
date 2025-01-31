@@ -763,6 +763,7 @@ impl CompiledPackage {
                     vec![sources_package_paths],
                     vec![],
                     deps_package_paths.into_iter().map(|(p, _)| p).collect_vec(),
+                    vec![],
                     ModelBuilderOptions::default(),
                     flags,
                     &known_attributes,

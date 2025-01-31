@@ -560,6 +560,8 @@ pub struct GlobalEnv {
     pub(crate) file_id_is_target: BTreeSet<FileId>,
     /// A set indicating whether a file id is a test/docgen/warning/prover target.
     pub(crate) file_id_is_primary_target: BTreeSet<FileId>,
+    /// A set indicating whether a file id is in the same package as the primary target.
+    pub(crate) file_id_is_same_package_with_primary: BTreeSet<FileId>,
     /// A special constant location representing an unknown location.
     /// This uses a pseudo entry in `source_files` to be safely represented.
     pub(crate) unknown_loc: Loc,
@@ -651,6 +653,7 @@ impl GlobalEnv {
             file_idx_to_id,
             file_id_is_target: BTreeSet::new(),
             file_id_is_primary_target: BTreeSet::new(),
+            file_id_is_same_package_with_primary: BTreeSet::new(),
             diags: RefCell::new(vec![]),
             symbol_pool: SymbolPool::new(),
             next_free_node_id: Default::default(),
@@ -815,6 +818,7 @@ impl GlobalEnv {
         source: &str,
         is_target: bool,
         is_primary_target: bool,
+        is_primary_package: bool,
     ) -> FileId {
         // Check for address alias conflicts.
         self.stdlib_address =
@@ -833,6 +837,9 @@ impl GlobalEnv {
             if is_primary_target && !self.file_id_is_primary_target.contains(file_id) {
                 self.file_id_is_primary_target.insert(*file_id);
             }
+            if is_primary_package && !self.file_id_is_same_package_with_primary.contains(file_id) {
+                self.file_id_is_same_package_with_primary.insert(*file_id);
+            }
             *file_id
         } else {
             // Record new source file and properties
@@ -848,6 +855,9 @@ impl GlobalEnv {
             }
             if is_primary_target {
                 self.file_id_is_primary_target.insert(file_id);
+            }
+            if is_primary_package {
+                self.file_id_is_same_package_with_primary.insert(file_id);
             }
             file_id
         }
@@ -2928,6 +2938,14 @@ impl<'env> ModuleEnv<'env> {
         self.env.file_id_is_primary_target.contains(&file_id)
     }
 
+    /// Returns true if this module is in the same package with the primary target.
+    pub fn is_same_package_with_primary(&self) -> bool {
+        let file_id = self.data.loc.file_id;
+        self.env
+            .file_id_is_same_package_with_primary
+            .contains(&file_id)
+    }
+
     /// Returns the path to source file of this module.
     pub fn get_source_path(&self) -> &OsStr {
         let file_id = self.data.loc.file_id;
@@ -3028,7 +3046,7 @@ impl<'env> ModuleEnv<'env> {
             && !other.is_script_module()
             // TODO(#13745): fix this when we have a way to check if
             // two non-primary targets are in the same package
-            && (!self.is_primary_target() || other.is_primary_target())
+            && (!self.is_primary_target() || other.is_primary_target() || other.is_same_package_with_primary())
             && self.self_address() == other.self_address()
     }
 
