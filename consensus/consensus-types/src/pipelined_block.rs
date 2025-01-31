@@ -68,7 +68,7 @@ impl From<Error> for TaskError {
 pub type TaskResult<T> = Result<T, TaskError>;
 pub type TaskFuture<T> = Shared<BoxFuture<'static, TaskResult<T>>>;
 
-pub type PrepareResult = Arc<Vec<SignatureVerifiedTransaction>>;
+pub type PrepareResult = (Arc<Vec<SignatureVerifiedTransaction>>, Option<u64>);
 pub type ExecuteResult = Duration;
 pub type LedgerUpdateResult = (StateComputeResult, Duration, Option<u64>);
 pub type PostLedgerUpdateResult = ();

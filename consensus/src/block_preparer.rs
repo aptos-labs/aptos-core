@@ -41,7 +41,7 @@ impl BlockPreparer {
         &self,
         block: &Block,
         block_qc_fut: Shared<impl Future<Output = Option<Arc<QuorumCert>>>>,
-    ) -> ExecutorResult<Vec<SignedTransaction>> {
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<u64>)> {
         fail_point!("consensus::prepare_block", |_| {
             use aptos_executor_types::ExecutorError;
             use std::{thread, time::Duration};
@@ -54,7 +54,7 @@ impl BlockPreparer {
             .await
             .map(|qc| qc.ledger_info().get_voters_bitvec().clone());
         // TODO: implement the block gas limit functionality
-        let (txns, max_txns_from_block_to_execute, _block_gas_limit) = self
+        let (txns, max_txns_from_block_to_execute, block_gas_limit) = self
             .payload_manager
             .get_transactions(block, block_voters)
             .await?;
@@ -82,6 +82,6 @@ impl BlockPreparer {
         .await
         .expect("Failed to spawn blocking task for transaction generation");
         counters::BLOCK_PREPARER_LATENCY.observe_duration(start_time.elapsed());
-        result
+        result.map(|result| (result, block_gas_limit))
     }
 }
