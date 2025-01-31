@@ -106,6 +106,10 @@ impl<'a> LiveDataService<'a> {
         self.in_memory_cache.data_manager.read().await.start_version
     }
 
+    pub(super) fn get_connection_manager(&self) -> &ConnectionManager {
+        &self.connection_manager
+    }
+
     async fn start_streaming(
         &'a self,
         id: String,

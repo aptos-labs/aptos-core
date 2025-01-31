@@ -21,6 +21,7 @@ use std::{net::SocketAddr, sync::Arc};
 use tokio::task::JoinHandle;
 use tonic::{codec::CompressionEncoding, transport::Server};
 use tracing::info;
+use warp::{reply::Response, Rejection};
 
 pub(crate) static LIVE_DATA_SERVICE: OnceCell<LiveDataService<'static>> = OnceCell::new();
 pub(crate) static HISTORICAL_DATA_SERVICE: OnceCell<HistoricalDataService> = OnceCell::new();
@@ -259,5 +260,9 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
 
     fn get_server_name(&self) -> String {
         "indexer_grpc_data_service_v2".to_string()
+    }
+
+    async fn status_page(&self) -> Result<Response, Rejection> {
+        crate::status_page::status_page()
     }
 }

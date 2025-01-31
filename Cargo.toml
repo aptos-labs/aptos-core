@@ -519,9 +519,11 @@ blst = "0.3.11"
 # The __private_bench feature exposes the Fp12 type which we need to implement a multi-threaded multi-pairing.
 blstrs = { version = "0.7.1", features = ["serde", "__private_bench"] }
 bollard = "0.15"
+build_html = "2.5.0"
 bulletproofs = { version = "4.0.0" }
 byteorder = "1.4.3"
 bytes = { version = "1.4.0", features = ["serde"] }
+bytesize = { version = "1.3.0" }
 camino = { version = "1.1.6" }
 chrono = { version = "0.4.19", features = ["clock", "serde"] }
 cfg-if = "1.0.0"
@@ -705,6 +707,8 @@ prometheus-parse = "0.2.4"
 proptest = "1.4.0"
 proptest-derive = "0.4.0"
 prost = { version = "0.13.4", features = ["no-recursion-limit"] }
+prost-types = "0.13.3"
+quanta = "0.10.1"
 quick_cache = "0.5.1"
 quick-junit = "0.5.0"
 quote = "1.0.18"
