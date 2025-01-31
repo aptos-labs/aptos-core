@@ -199,6 +199,10 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
             sources: options.dependencies.clone(),
             address_map: addrs.clone(),
         }],
+        PackageInfo {
+            sources: options.sources_deps_for_verification.clone(),
+            address_map: addrs.clone(),
+        },
         options.skip_attribute_checks,
         if !options.skip_attribute_checks && options.known_attributes.is_empty() {
             KnownAttribute::get_all_attribute_names()

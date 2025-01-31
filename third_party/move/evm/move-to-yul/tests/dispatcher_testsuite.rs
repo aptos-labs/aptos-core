@@ -78,6 +78,7 @@ fn compile_yul_to_bytecode_bytes(filename: &str) -> Result<Vec<u8>> {
             paths: deps,
             named_address_map,
         }],
+        vec![],
         ModelBuilderOptions::default(),
         flags,
         &known_attributes,

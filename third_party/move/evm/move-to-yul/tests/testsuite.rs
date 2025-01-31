@@ -60,6 +60,7 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
             paths: deps,
             named_address_map,
         }],
+        vec![],
         ModelBuilderOptions::default(),
         flags,
         &known_attributes,

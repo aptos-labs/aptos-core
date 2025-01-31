@@ -936,6 +936,7 @@ fn compile_source_unit(
                         move_target_package,
                         deps_target_package,
                         lib_paths.to_vec(),
+                        vec![],
                         model_options,
                         flags,
                         known_attributes,

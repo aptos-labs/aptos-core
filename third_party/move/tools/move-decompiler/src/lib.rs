@@ -209,6 +209,7 @@ impl Decompiler {
             "",
             true,
             true,
+            true,
         );
         let loc = Loc::new(file_id, Span::new(0, 0));
         SourceMap::new(self.env.to_ir_loc(&loc), None)
