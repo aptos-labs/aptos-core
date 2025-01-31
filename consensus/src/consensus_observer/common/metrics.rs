@@ -54,6 +54,16 @@ pub static OBSERVER_DROPPED_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter for tracking invalid (direct send) messages by the consensus observer
+pub static OBSERVER_INVALID_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "consensus_observer_invalid_messages",
+        "Counters related to invalid messages by the consensus observer",
+        &["message_type", "network_id"]
+    )
+    .unwrap()
+});
+
 /// Counter for tracking rejected (direct send) messages by the consensus observer
 pub static OBSERVER_REJECTED_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(

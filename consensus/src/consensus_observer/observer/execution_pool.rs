@@ -4,7 +4,7 @@
 use crate::consensus_observer::network::observer_message::{OrderedBlock, OrderedBlockWithWindow};
 
 /// A simple enum wrapper that holds an observed ordered block, allowing
-/// both self-contained ordered blocks and ordered blocks with windows.
+/// self-contained ordered blocks and ordered blocks with execution pool windows.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ObservedOrderedBlock {
     Ordered(OrderedBlock),
