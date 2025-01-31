@@ -1090,10 +1090,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
                 "[VM, StateView] Error getting data from storage for {:?}",
                 state_key
             );
-            self.mark_incorrect_use();
         }
 
-        ret.map_err(Into::into)
+        ret
     }
 
     fn patch_base_value(
