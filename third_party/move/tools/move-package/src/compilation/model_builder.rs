@@ -82,10 +82,12 @@ impl ModelBuilder {
         } else {
             (vec![target], deps)
         };
-        let (all_targets, all_deps) = match &self.model_config.target_filter {
+        let (all_targets, all_deps, false_targets_in_root) = match &self.model_config.target_filter
+        {
             Some(filter) => {
                 let mut new_targets = vec![];
                 let mut new_deps = all_deps.into_iter().map(|(p, _)| p).collect_vec();
+                let mut false_targets_in_root = vec![];
                 for PackagePaths {
                     name,
                     paths,
@@ -104,16 +106,22 @@ impl ModelBuilder {
                     if !false_targets.is_empty() {
                         new_deps.push(PackagePaths {
                             name,
+                            paths: false_targets.clone(),
+                            named_address_map: named_address_map.clone(),
+                        });
+                        false_targets_in_root.push(PackagePaths {
+                            name,
                             paths: false_targets,
                             named_address_map,
                         })
                     }
                 }
-                (new_targets, new_deps)
+                (new_targets, new_deps, false_targets_in_root)
             },
             None => (
                 all_targets,
                 all_deps.into_iter().map(|(p, _)| p).collect_vec(),
+                vec![],
             ),
         };
 
@@ -137,7 +145,8 @@ impl ModelBuilder {
                 known_attributes,
             ),
             CompilerVersion::V2_0 | CompilerVersion::V2_1 => {
-                let mut options = make_options_for_v2_compiler(all_targets, all_deps);
+                let mut options =
+                    make_options_for_v2_compiler(all_targets, all_deps, false_targets_in_root);
                 options.language_version = self
                     .resolution_graph
                     .build_options
@@ -154,7 +163,11 @@ impl ModelBuilder {
     }
 }
 
-fn make_options_for_v2_compiler(targets: Vec<PackagePaths>, deps: Vec<PackagePaths>) -> Options {
+fn make_options_for_v2_compiler(
+    targets: Vec<PackagePaths>,
+    deps: Vec<PackagePaths>,
+    false_targets_in_root: Vec<PackagePaths>,
+) -> Options {
     let mut options = Options {
         sources: targets
             .iter()
@@ -162,6 +175,10 @@ fn make_options_for_v2_compiler(targets: Vec<PackagePaths>, deps: Vec<PackagePat
             .collect(),
         ..Options::default()
     };
+    options.sources_deps_for_verification = false_targets_in_root
+        .iter()
+        .flat_map(|p| p.paths.iter().map(|s| s.to_string()).collect_vec())
+        .collect();
     options.dependencies = deps
         .iter()
         .flat_map(|p| p.paths.iter().map(|s| s.to_string()).collect_vec())

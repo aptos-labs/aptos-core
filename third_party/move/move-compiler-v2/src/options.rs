@@ -97,6 +97,9 @@ pub struct Options {
     #[clap(skip)]
     pub sources_deps: Vec<String>,
 
+    #[clap(skip)]
+    pub sources_deps_for_verification: Vec<String>,
+
     /// Warn about use of deprecated functions, modules, etc.
     #[clap(long = cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE_FLAG,
            default_value=bool_to_str(move_compiler_warn_of_deprecation_use_env_var()))]
