@@ -560,15 +560,31 @@ impl InterpreterImpl {
                     // It is possible to call a private function of another module via
                     // a closure.
 
-                    // Charge gas
+                    // Charge gas for module loading. If this function has no associated
+                    // module, it stems from a script.
+                    // TODO(#15664): currently we need the module id for gas charging of calls,
+                    //   so we can't proceed here without one.
                     let module_id = function.module_id().ok_or_else(|| {
-                        let err =
-                            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                                .with_message(
-                                    "Failed to get native function module id".to_string(),
-                                );
+                        let err = PartialVMError::new_invariant_violation(format!(
+                            "module id required to charge gas for function `{}`",
+                            lazy_function.to_stable_string()
+                        ));
                         set_err_info!(current_frame, err)
                     })?;
+                    let arena_id = traversal_context
+                        .referenced_module_ids
+                        .alloc(module_id.clone());
+                    loader.check_dependencies_and_charge_gas(
+                        resolver.module_store(),
+                        data_store,
+                        gas_meter,
+                        &mut traversal_context.visited,
+                        traversal_context.referenced_modules,
+                        [(arena_id.address(), arena_id.name())],
+                        resolver.module_storage(),
+                    )?;
+
+                    // Charge gas for call.
                     gas_meter
                         .charge_call(
                             module_id,
@@ -1852,14 +1868,6 @@ impl Frame {
                 )?;
 
                 match instruction {
-                    // TODO(#15664): implement closures
-                    Bytecode::PackClosure(..)
-                    | Bytecode::PackClosureGeneric(..)
-                    | Bytecode::CallClosure(..) => {
-                        return Err(PartialVMError::new(StatusCode::UNIMPLEMENTED_FUNCTIONALITY)
-                            .with_message("closure opcodes in interpreter".to_owned()))
-                    },
-
                     Bytecode::Pop => {
                         let popped_val = interpreter.operand_stack.pop()?;
                         gas_meter.charge_pop(popped_val)?;
