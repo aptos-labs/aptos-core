@@ -30,11 +30,13 @@ public fun m::test() {
      # live vars:
   0: ($t0, $t1) := m::one_one()
      # live vars: $t0, $t1
-  1: $t3 := copy($t0)
+  1: $t1 := move($t1)
+     # live vars: $t0, $t1
+  2: $t3 := copy($t0)
      # live vars: $t0, $t1, $t3
-  2: m::consume($t1, $t3, $t0)
+  3: m::consume($t1, $t3, $t0)
      # live vars:
-  3: return ()
+  4: return ()
 }
 
 

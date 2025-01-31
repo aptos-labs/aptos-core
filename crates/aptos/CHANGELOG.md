@@ -4,6 +4,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+- Remove FFI support from Aptos CLI
 
 ## [6.0.3] - 2025/01/27
 - Update the processors used by localnet to 1.26.

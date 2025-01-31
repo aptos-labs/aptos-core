@@ -47,9 +47,21 @@ public fun m::test() {
      # live vars: $t0, $t1, $t2, $t3, $t4, $t5
   6: $t6 := m::one()
      # live vars: $t0, $t1, $t2, $t3, $t4, $t5, $t6
-  7: m::consume($t0, $t1, $t2, $t3, $t4, $t5, $t6)
+  7: $t0 := move($t0)
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5, $t6
+  8: $t1 := move($t1)
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5, $t6
+  9: $t2 := move($t2)
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5, $t6
+ 10: $t3 := move($t3)
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5, $t6
+ 11: $t4 := move($t4)
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5, $t6
+ 12: $t5 := move($t5)
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5, $t6
+ 13: m::consume($t0, $t1, $t2, $t3, $t4, $t5, $t6)
      # live vars:
-  8: return ()
+ 14: return ()
 }
 
 
@@ -68,6 +80,13 @@ B0:
 	1: Ret
 }
 public test() /* def_idx: 2 */ {
+L0:	loc0: u64
+L1:	loc1: u64
+L2:	loc2: u64
+L3:	loc3: u64
+L4:	loc4: u64
+L5:	loc5: u64
+L6:	loc6: u64
 B0:
 	0: Call one(): u64
 	1: Call one(): u64

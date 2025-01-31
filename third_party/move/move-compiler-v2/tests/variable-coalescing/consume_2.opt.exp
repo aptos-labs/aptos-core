@@ -163,20 +163,18 @@ fun m::consume_($t0: 0xc0ffee::m::W) {
 [variant baseline]
 public fun m::test1($t0: u64) {
      var $t1: u64 [unused]
-  0: $t0 := move($t0)
+  0: m::consume($t0)
   1: m::consume($t0)
-  2: m::consume($t0)
-  3: return ()
+  2: return ()
 }
 
 
 [variant baseline]
 public fun m::test2($t0: 0xc0ffee::m::W) {
      var $t1: 0xc0ffee::m::W [unused]
-  0: $t0 := move($t0)
+  0: m::consume_($t0)
   1: m::consume_($t0)
-  2: m::consume_($t0)
-  3: return ()
+  2: return ()
 }
 
 

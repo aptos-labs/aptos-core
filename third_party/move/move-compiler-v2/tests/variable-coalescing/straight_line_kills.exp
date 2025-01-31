@@ -123,8 +123,9 @@ fun m::copy_kill($t0: u64): u64 {
   2: $t0 := move($t0)
   3: $t6 := 1
   4: $t0 := +($t0, $t6)
-  5: $t2 := +($t3, $t2)
-  6: return $t2
+  5: $t3 := move($t3)
+  6: $t2 := +($t3, $t2)
+  7: return $t2
 }
 
 
