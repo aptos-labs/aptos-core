@@ -74,6 +74,7 @@ use aptos_types::{
     on_chain_config::{
         ConsensusAlgorithmConfig, ConsensusConfigV1, OnChainConsensusConfig,
         OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorTxnConfig,
+        DEFAULT_WINDOW_SIZE,
     },
     transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
@@ -153,7 +154,7 @@ impl NodeSetup {
         let mut onchain_consensus_config = onchain_consensus_config.unwrap_or_default();
         // With order votes feature, the validators additionally send order votes.
         // next_proposal and next_vote functions could potentially break because of it.
-        if let OnChainConsensusConfig::V3 {
+        if let OnChainConsensusConfig::V4 {
             alg:
                 ConsensusAlgorithmConfig::JolteonV2 {
                     main: _,
@@ -161,6 +162,7 @@ impl NodeSetup {
                     order_vote_enabled,
                 },
             vtxn: _,
+            window_size: _,
         } = &mut onchain_consensus_config
         {
             *order_vote_enabled = false;
@@ -2557,9 +2559,10 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
         runtime.handle().clone(),
         1,
         None,
-        Some(OnChainConsensusConfig::V3 {
+        Some(OnChainConsensusConfig::V4 {
             alg: alg_config,
             vtxn: vtxn_config,
+            window_size: DEFAULT_WINDOW_SIZE,
         }),
         Some(local_config),
         Some(randomness_config),
