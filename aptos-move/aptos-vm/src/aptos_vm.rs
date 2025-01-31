@@ -2166,6 +2166,7 @@ impl AptosVM {
                 code_storage,
                 user_session,
                 &serialized_signers,
+                &prologue_change_set,
                 gas_meter,
                 &mut traversal_context,
                 &txn_data,

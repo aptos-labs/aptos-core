@@ -47,7 +47,7 @@ use aptos_types::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
         BlockOutput, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
-        TransactionPayloadWrapper, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
+        TransactionPayloadWrapper, TransactionExecutable, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
     },
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -851,8 +851,26 @@ impl FakeExecutor {
                         unreachable!("Module bundle payload has been removed")
                     },
 
-                    TransactionPayloadWrapper::Payload(_) => {
-                        unimplemented!("Nested transaction payload is not yet supported")
+                    TransactionPayloadWrapper::Payload(TransactionPayloadInnner::V1 {
+                        executable,
+                        extra_config
+                    }) => {
+                        if extra_config.is_multisig() {
+                            unimplemented!("not supported yet")
+                        } else {
+                            match executable {
+                                TransactionExecutable::EntryFunction(entry_func) => {
+                                    GasProfiler::new_function(
+                                        gas_meter,
+                                        entry_func.module().clone(),
+                                        entry_func.function().to_owned(),
+                                        entry_func.ty_args().to_vec(),
+                                    )
+                                },
+                                TransactionExecutable::Script(_) =>  GasProfiler::new_script(gas_meter),
+                                TransactionExecutable::Empty => unimplemented!("not supported yet"),
+                            }
+                        }
                     },
                 };
                 gas_profiler

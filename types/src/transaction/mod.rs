@@ -757,6 +757,24 @@ impl TransactionPayloadWrapper {
             }) => extra_config.clone(),
         }
     }
+
+    pub fn payload_type(&self) -> String {
+        match self {
+            TransactionPayloadWrapper::Script(_) => "script".to_string(),
+            TransactionPayloadWrapper::ModuleBundle(_) => "module_bundle".to_string(),
+            TransactionPayloadWrapper::EntryFunction(entry_function) => format!(
+                "entry {}::{}",
+                entry_function.module(),
+                entry_function.function()
+            ),
+            TransactionPayloadWrapper::Multisig(_) => "multisig".to_string(),
+            // TODO[Orderless]: Edit this.
+            TransactionPayloadWrapper::Payload(TransactionPayloadInner::V1 {
+                executable: _,
+                extra_config: _,
+            }) => "payload".to_string(),
+        }
+    }
 }
 
 impl TransactionExtraConfig {

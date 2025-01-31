@@ -223,6 +223,7 @@ impl Default for Account {
     }
 }
 
+// Question: We have a TransactionBuilder already in SDK. Is this duplicate necessary?
 pub struct TransactionBuilder {
     pub sender: Account,
     pub secondary_signers: Vec<Account>,
@@ -275,6 +276,7 @@ impl TransactionBuilder {
         self
     }
 
+    // TODO[Orderless]: Need to upgrade these functions to use txn paylaod v2 format
     pub fn script(mut self, s: Script) -> Self {
         self.program = Some(TransactionPayloadWrapper::Script(s));
         self
@@ -300,7 +302,7 @@ impl TransactionBuilder {
         self
     }
 
-    // TODO: Primarily used for running the tests with both payload v1 and v2 formats.
+    // TODO[Orderless]: Primarily used for running the tests with both payload v1 and v2 formats.
     // After orderless transactions is fully released, clean this up.
     pub fn upgrade_payload(mut self, use_payload_v2_format: bool, add_nonce: bool) -> Self {
         use aptos_types::transaction::TransactionExtraConfig;

@@ -119,6 +119,7 @@ impl AUTransactionGen for Arc<dyn AUTransactionGen> {
 pub struct AccountCurrent {
     initial_data: AccountData,
     balance: u64,
+    // TODO[Orderless]: Check if sequence number here can be made optional.
     sequence_number: u64,
     sent_events_count: u64,
     received_events_count: u64,
@@ -251,6 +252,7 @@ pub fn txn_one_account_result(
     match (enough_max_gas, enough_to_transfer, enough_to_succeed) {
         (true, true, true) => {
             // Success!
+            // TODO[Orderless]: Change this sequence number update for orderless transactions
             sender.sequence_number += 1;
             sender.sent_events_count += 1;
             sender.balance -= to_deduct;

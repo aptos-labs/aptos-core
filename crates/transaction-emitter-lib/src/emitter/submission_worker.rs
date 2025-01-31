@@ -767,17 +767,7 @@ pub async fn submit_transactions(
                 sample!(SampleRate::Duration(Duration::from_secs(60)), {
                     let first_failed_txn = &txns[failure.transaction_index];
                     let sender = first_failed_txn.sender();
-                    use aptos_types::transaction::TransactionPayload::*;
-                    let payload = match first_failed_txn.payload() {
-                        Script(_) => "script".to_string(),
-                        ModuleBundle(_) => "module_bundle".to_string(),
-                        EntryFunction(entry_function) => format!(
-                            "entry {}::{}",
-                            entry_function.module(),
-                            entry_function.function()
-                        ),
-                        Multisig(_) => "multisig".to_string(),
-                    };
+                    let payload = first_failed_txn.payload().payload_type();
 
                     let first_failed_txn_info = format!(
                         "due to {:?}, for account {}, max gas {}, payload {}",
@@ -787,7 +777,7 @@ pub async fn submit_transactions(
                         payload,
                     );
 
-                    // TODO: Update this code, as transactions could be orderless and the account could be stateless.
+                    // TODO[Orderless]: Update this code, as transactions could be orderless and the account could be stateless.
                     let last_transactions =
                         if let Ok(account) = client.get_account_bcs(sender).await {
                             client

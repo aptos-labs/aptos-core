@@ -519,6 +519,17 @@ pub struct UserTransactionRequest {
     pub replay_protection_nonce: Option<U64>,
 }
 
+/// Request to create signing messages
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct UserCreateSigningMessageRequest {
+    #[serde(flatten)]
+    #[oai(flatten)]
+    pub transaction: UserTransactionRequest,
+    /// Secondary signer accounts of the request for Multi-agent
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub secondary_signers: Option<Vec<Address>>,
+}
+
 /// Request to encode a submission
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct EncodeSubmissionRequest {

@@ -21,13 +21,13 @@ pub const TXN_RESERVED: u64 = 500_000;
 ///
 /// This includes the cost of the event counter creation which makes the transaction more
 /// expensive. All such transactions are expected to cost the same gas.
-pub static CREATE_ACCOUNT_FIRST: Lazy<u64> = Lazy::new(|| {
+pub static CREATE_ACCOUNT_FIRST: Lazy<u64> = Lazy::new(|use_txn_payload_v2_format: bool, use_orderless_transactions: bool| {
     let mut executor = FakeExecutor::from_head_genesis();
     let sender = AccountData::new(1_000_000, 10);
     executor.add_account_data(&sender);
     let receiver = Account::new();
 
-    let txn = create_account_txn(sender.account(), &receiver, 10);
+    let txn = create_account_txn(sender.account(), &receiver, 10, use_txn_payload_v2_format, use_orderless_transactions);
     compute_gas_used(txn, &mut executor)
 });
 

@@ -2151,8 +2151,8 @@ pub fn account_abstraction_add_dispatchable_authentication_function(
     module_address: AccountAddress,
     module_name: Vec<u8>,
     function_name: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2174,8 +2174,8 @@ pub fn account_abstraction_remove_dispatchable_authentication_function(
     module_address: AccountAddress,
     module_name: Vec<u8>,
     function_name: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -2195,8 +2195,8 @@ pub fn account_abstraction_remove_dispatchable_authentication_function(
 
 /// Update dispatchable authenticator that disables account abstraction.
 /// Note: it is a private entry function that can only be called directly from transaction.
-pub fn account_abstraction_remove_dispatchable_authenticator() -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn account_abstraction_remove_dispatchable_authenticator() -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -5382,48 +5382,6 @@ mod decoder {
         payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayloadWrapper::EntryFunction(_script) = payload {
-            Some(EntryFunctionCall::AccountAbstractionRemoveDispatchableAuthenticator {})
-        } else {
-            None
-        }
-    }
-
-    pub fn account_abstraction_add_dispatchable_authentication_function(
-        payload: &TransactionPayloadWrapper,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
-            Some(
-                EntryFunctionCall::AccountAbstractionAddDispatchableAuthenticationFunction {
-                    module_address: bcs::from_bytes(script.args().get(0)?).ok()?,
-                    module_name: bcs::from_bytes(script.args().get(1)?).ok()?,
-                    function_name: bcs::from_bytes(script.args().get(2)?).ok()?,
-                },
-            )
-        } else {
-            None
-        }
-    }
-
-    pub fn account_abstraction_remove_dispatchable_authentication_function(
-        payload: &TransactionPayloadWrapper,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
-            Some(
-                EntryFunctionCall::AccountAbstractionRemoveDispatchableAuthenticationFunction {
-                    module_address: bcs::from_bytes(script.args().get(0)?).ok()?,
-                    module_name: bcs::from_bytes(script.args().get(1)?).ok()?,
-                    function_name: bcs::from_bytes(script.args().get(2)?).ok()?,
-                },
-            )
-        } else {
-            None
-        }
-    }
-
-    pub fn account_abstraction_remove_dispatchable_authenticator(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(_script) = payload {
             Some(EntryFunctionCall::AccountAbstractionRemoveDispatchableAuthenticator {})
         } else {
             None
