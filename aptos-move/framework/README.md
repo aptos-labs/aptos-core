@@ -50,13 +50,24 @@ To skip the Move prover tests, run:
 cargo test -- --skip prover
 ```
 
-To filter and run only the tests in specific packages (e.g., `aptos_stdlib`), run:
+To filter and run **all** the tests in specific packages (e.g., `aptos_stdlib`), run:
 
 ```
 cargo test -- aptos_stdlib --skip prover
 ```
 
 (See tests in `tests/move_unit_test.rs` to determine which filter to use; e.g., to run the tests in `aptos_framework` you must filter by `move_framework`.)
+
+To **filter by test name or module name** in a specific package (e.g., run the `test_empty_range_proof` in `aptos_stdlib::ristretto255_bulletproofs`), run:
+
+```
+TEST_FILTER="test_range_proof" cargo test -- aptos_stdlib --skip prover
+```
+
+Or, e.g., run all the Bulletproof tests:
+```
+TEST_FILTER="bulletproofs" cargo test -- aptos_stdlib --skip prover
+```
 
 Sometimes, Rust runs out of stack memory in dev build mode.  You can address this by either:
 1. Adjusting the stack size

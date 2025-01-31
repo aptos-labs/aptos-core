@@ -322,7 +322,7 @@ fn verify_range_proof(
     context.charge(
         BULLETPROOFS_BASE
             + BULLETPROOFS_PER_BYTE_RANGEPROOF_DESERIALIZE
-            * NumBytes::new(proof_bytes.len() as u64),
+                * NumBytes::new(proof_bytes.len() as u64),
     )?;
 
     let range_proof = match bulletproofs::RangeProof::from_bytes(proof_bytes) {
@@ -383,7 +383,6 @@ fn verify_batch_range_proof(
 
     Ok(smallvec![Value::bool(success)])
 }
-
 
 /// Charges base gas fee for verifying and deserializing a Bulletproof range proof.
 fn charge_gas(

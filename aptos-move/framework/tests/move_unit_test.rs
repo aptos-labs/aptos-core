@@ -14,7 +14,7 @@ use move_unit_test::UnitTestingConfig;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use tempfile::tempdir;
 
-fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
+fn run_tests_for_pkg(path_to_pkg: impl Into<String>, test_filter: Option<String>) {
     let pkg_path = path_in_crate(path_to_pkg);
     let compiler_config = CompilerConfig {
         known_attributes: extended_checks::get_all_attribute_names().clone(),
@@ -28,11 +28,14 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
         ..Default::default()
     };
 
+    let mut utc = UnitTestingConfig::default();
+    utc.filter = test_filter;
+
     let ok = run_move_unit_tests(
         &pkg_path,
         build_config.clone(),
         // TODO(Gas): double check if this is correct
-        UnitTestingConfig::default(),
+        utc,
         aptos_test_natives(),
         aptos_test_feature_flags_genesis(),
         /* gas limit */ Some(100_000),
@@ -62,25 +65,30 @@ pub fn aptos_test_natives() -> NativeFunctionTable {
 
 #[test]
 fn move_framework_unit_tests() {
-    run_tests_for_pkg("aptos-framework");
+    let test_filter = std::env::var("TEST_FILTER").ok();
+    run_tests_for_pkg("aptos-framework", test_filter);
 }
 
 #[test]
 fn move_aptos_stdlib_unit_tests() {
-    run_tests_for_pkg("aptos-stdlib");
+    let test_filter = std::env::var("TEST_FILTER").ok();
+    run_tests_for_pkg("aptos-stdlib", test_filter);
 }
 
 #[test]
 fn move_stdlib_unit_tests() {
-    run_tests_for_pkg("move-stdlib");
+    let test_filter = std::env::var("TEST_FILTER").ok();
+    run_tests_for_pkg("move-stdlib", test_filter);
 }
 
 #[test]
 fn move_token_unit_tests() {
-    run_tests_for_pkg("aptos-token");
+    let test_filter = std::env::var("TEST_FILTER").ok();
+    run_tests_for_pkg("aptos-token", test_filter);
 }
 
 #[test]
 fn move_token_objects_unit_tests() {
-    run_tests_for_pkg("aptos-token-objects");
+    let test_filter = std::env::var("TEST_FILTER").ok();
+    run_tests_for_pkg("aptos-token-objects", test_filter);
 }

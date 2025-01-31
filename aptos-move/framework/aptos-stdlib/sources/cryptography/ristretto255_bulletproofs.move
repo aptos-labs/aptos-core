@@ -29,7 +29,7 @@ module aptos_std::ristretto255_bulletproofs {
 
     /// The range proof system only supports proving ranges of type $[0, 2^b)$ where $b \in \{8, 16, 32, 64\}$.
     const E_RANGE_NOT_SUPPORTED: u64 = 2;
-    
+
     /// The range proof system only supports batch sizes of 1, 2, 4, 8, and 16.
     const E_BATCH_SIZE_NOT_SUPPORTED: u64 = 3;
 
@@ -124,9 +124,9 @@ module aptos_std::ristretto255_bulletproofs {
         )
     }
 
-    // Verifies a zero-knowledge range proof for a batch of commitments `comms` (each of the form 
-    /// `v * val_base + r * rand_base`), ensuring that all values `v` satisfy 
-    /// `v` in `[0, 2^num_bits)`. Only works for `num_bits` in `{8, 16, 32, 64}` and batch size 
+    // Verifies a zero-knowledge range proof for a batch of commitments `comms` (each of the form
+    /// `v * val_base + r * rand_base`), ensuring that all values `v` satisfy
+    /// `v` in `[0, 2^num_bits)`. Only works for `num_bits` in `{8, 16, 32, 64}` and batch size
     /// (length of the `comms`) in `{1, 2, 4, 8, 16}`.
     public fun verify_batch_range_proof(
         comms: &vector<pedersen::Commitment>,
@@ -164,9 +164,9 @@ module aptos_std::ristretto255_bulletproofs {
     /// The commitment is of the form `val * val_base + r * rand_base`.
     /// Returns both the commitment and the corresponding range proof. Only works for `num_bits` in `{8, 16, 32, 64}`.
     public fun prove_range(
-        val: &Scalar, r: &Scalar, 
+        val: &Scalar, r: &Scalar,
         val_base: &RistrettoPoint, rand_base: &RistrettoPoint,
-        num_bits: u64, dst: vector<u8>): (RangeProof, pedersen::Commitment) 
+        num_bits: u64, dst: vector<u8>): (RangeProof, pedersen::Commitment)
     {
         let (bytes, compressed_comm) = prove_range_internal(scalar_to_bytes(val), scalar_to_bytes(r), num_bits, dst, val_base, rand_base);
         let point = ristretto255::new_compressed_point_from_bytes(compressed_comm);
@@ -214,7 +214,7 @@ module aptos_std::ristretto255_bulletproofs {
     public fun prove_batch_range(
         vals: &vector<Scalar>, rs: &vector<Scalar>,
         val_base: &RistrettoPoint, rand_base: &RistrettoPoint,
-        num_bits: u64, dst: vector<u8>): (RangeProof, vector<pedersen::Commitment>) 
+        num_bits: u64, dst: vector<u8>): (RangeProof, vector<pedersen::Commitment>)
     {
         let vals = std::vector::map_ref(vals, |val| scalar_to_bytes(val));
         let rs = std::vector::map_ref(rs, |r| scalar_to_bytes(r));
@@ -234,7 +234,7 @@ module aptos_std::ristretto255_bulletproofs {
     //
     // Native functions
     //
-    
+
     /// Aborts with `error::invalid_argument(E_RANGE_NOT_SUPPORTED)` if an unsupported `num_bits` is provided.
     native fun verify_range_proof_internal(
         com: vector<u8>,
@@ -243,7 +243,7 @@ module aptos_std::ristretto255_bulletproofs {
         proof: vector<u8>,
         num_bits: u64,
         dst: vector<u8>): bool;
-    
+
     /// Aborts with `error::invalid_argument(E_RANGE_NOT_SUPPORTED)` if an unsupported `num_bits` is provided.
     /// Aborts with `error::invalid_argument(E_BATCH_SIZE_NOT_SUPPORTED)` if an unsupported batch size is provided.
     /// Aborts with `error::invalid_argument(E_VECTOR_LENGTHS_MISMATCH)` if the vector lengths of `comms` and `proof` do not match.
@@ -270,10 +270,10 @@ module aptos_std::ristretto255_bulletproofs {
         rand_base: &RistrettoPoint): (vector<u8>, vector<u8>);
 
     #[test_only]
-    /// Returns a tuple consisting of (1) a range proof for each value in `vals`, where each value is committed 
+    /// Returns a tuple consisting of (1) a range proof for each value in `vals`, where each value is committed
     /// with the corresponding randomness in `rs`, and (2) the corresponding commitments.
     ///
-    /// Each commitment has the form `val * val_base + r * rand_base`, where `val` and `r` are the corresponding 
+    /// Each commitment has the form `val * val_base + r * rand_base`, where `val` and `r` are the corresponding
     /// elements from `vals` and `rs`, respectively.
     ///
     /// Aborts with `error::invalid_argument(E_RANGE_NOT_SUPPORTED)` if an unsupported `num_bits` is provided.
@@ -372,7 +372,7 @@ module aptos_std::ristretto255_bulletproofs {
     #[expected_failure(abort_code = 0x030004, location = Self)]
     fun test_bulletproof_feature_disabled(fx: signer) {
         features::change_feature_flags_for_testing(&fx, vector[ ], vector[ features::get_bulletproofs_feature()]);
-        
+
         let v = ristretto255::new_scalar_from_u64(59);
         let r = ristretto255::new_scalar_from_bytes(A_BLINDER);
         let r = std::option::extract(&mut r);
@@ -387,7 +387,7 @@ module aptos_std::ristretto255_bulletproofs {
     #[expected_failure(abort_code = 0x030004, location = Self)]
     fun test_bulletproof_batch_feature_disabled(fx: signer) {
         features::change_feature_flags_for_testing(&fx, vector[ ], vector[ features::get_bulletproofs_batch_feature() ]);
-        
+
         let vs = vector[
             ristretto255::new_scalar_from_u64(59),
             ristretto255::new_scalar_from_u64(60),
@@ -404,6 +404,7 @@ module aptos_std::ristretto255_bulletproofs {
     }
 
     #[test(fx = @std)]
+    #[expected_failure(abort_code = 0x010001, location = Self)]
     fun test_empty_range_proof(fx: signer) {
         features::change_feature_flags_for_testing(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
 
