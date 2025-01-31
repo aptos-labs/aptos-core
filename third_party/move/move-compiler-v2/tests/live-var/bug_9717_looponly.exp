@@ -725,25 +725,25 @@ public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
 module cafe.vectors {
 
 
-entry public guess_flips_break2(Arg0: vector<u8>): u64 /* def_idx: 0 */ {
-L1:	loc0: u64
-L2:	loc1: &vector<u8>
+entry public guess_flips_break2(flips: vector<u8>): u64 /* def_idx: 0 */ {
+L1:	i: u64
+L2:	flipsref5: &vector<u8>
 B0:
 	0: LdU64(0)
-	1: StLoc[1](loc0: u64)
-	2: ImmBorrowLoc[0](Arg0: vector<u8>)
-	3: StLoc[2](loc1: &vector<u8>)
+	1: StLoc[1](i: u64)
+	2: ImmBorrowLoc[0](flips: vector<u8>)
+	3: StLoc[2](flipsref5: &vector<u8>)
 B1:
-	4: CopyLoc[1](loc0: u64)
-	5: CopyLoc[2](loc1: &vector<u8>)
+	4: CopyLoc[1](i: u64)
+	5: CopyLoc[2](flipsref5: &vector<u8>)
 	6: VecLen(2)
 	7: Lt
 	8: BrTrue(10)
 B2:
 	9: Branch(18)
 B3:
-	10: CopyLoc[2](loc1: &vector<u8>)
-	11: CopyLoc[1](loc0: u64)
+	10: CopyLoc[2](flipsref5: &vector<u8>)
+	11: CopyLoc[1](i: u64)
 	12: VecImmBorrow(2)
 	13: ReadRef
 	14: LdU8(0)
@@ -752,16 +752,16 @@ B3:
 B4:
 	17: Branch(18)
 B5:
-	18: MoveLoc[2](loc1: &vector<u8>)
+	18: MoveLoc[2](flipsref5: &vector<u8>)
 	19: VecLen(2)
 	20: Ret
 B6:
-	21: MoveLoc[1](loc0: u64)
+	21: MoveLoc[1](i: u64)
 	22: LdU64(1)
 	23: Add
-	24: StLoc[1](loc0: u64)
-	25: CopyLoc[2](loc1: &vector<u8>)
-	26: CopyLoc[1](loc0: u64)
+	24: StLoc[1](i: u64)
+	25: CopyLoc[2](flipsref5: &vector<u8>)
+	26: CopyLoc[1](i: u64)
 	27: VecImmBorrow(2)
 	28: ReadRef
 	29: LdU8(5)
