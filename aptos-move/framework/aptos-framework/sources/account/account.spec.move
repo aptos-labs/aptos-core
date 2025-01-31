@@ -106,8 +106,6 @@ spec aptos_framework::account {
 
     spec module {
         pragma verify = false;
-
-
     }
 
     /// Only the address `@aptos_framework` can call.

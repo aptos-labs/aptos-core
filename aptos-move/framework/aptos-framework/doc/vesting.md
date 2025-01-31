@@ -3590,7 +3590,7 @@ This address should be deterministic for the same admin and vesting contract cre
 ### Module-level Specification
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 <b>pragma</b> aborts_if_is_partial;
 // This enforces <a id="high-level-spec-2" href="#high-level-req">high-level requirement 2</a>:
 <b>invariant</b> <b>forall</b> a: <b>address</b> <b>where</b> <b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(a):

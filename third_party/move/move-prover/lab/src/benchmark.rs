@@ -20,13 +20,13 @@ use move_prover::{
 };
 use move_prover_bytecode_pipeline::options::ProverOptions;
 use std::{
+    collections::BTreeSet,
     fmt::Debug,
     fs::File,
     io::{LineWriter, Write},
     path::PathBuf,
     time::{Duration, Instant},
 };
-
 // ============================================================================================
 // Command line interface for running a benchmark
 
@@ -35,6 +35,7 @@ struct Runner {
     out: LineWriter<File>,
     error_writer: StandardStream,
     per_function: bool,
+    module_filter: BTreeSet<String>,
 }
 
 pub fn benchmark(args: &[String]) {
@@ -72,6 +73,13 @@ pub fn benchmark(args: &[String]) {
                 .help("whether the aptos-natives should be included."),
         )
         .arg(
+            Arg::new("module-filter")
+                .action(Append)
+                .num_args(1)
+                .value_name("MODULE_FILTER")
+                .help("filters benchmarking to functions of the given module. Can be repeated."),
+        )
+        .arg(
             Arg::new("dependencies")
                 .action(Append)
                 .long("dependency")
@@ -102,6 +110,7 @@ pub fn benchmark(args: &[String]) {
         vec![None]
     };
     let per_function = matches.contains_id("function");
+    let module_filter = get_vec("module-filter");
     let use_aptos_natives = matches.contains_id("aptos-natives");
 
     for config_spec in configs {
@@ -121,6 +130,7 @@ pub fn benchmark(args: &[String]) {
             &sources,
             &deps,
             per_function,
+            &module_filter,
             use_aptos_natives,
         ) {
             println!("ERROR: execution failed: {}", s);
@@ -136,6 +146,7 @@ fn run_benchmark(
     modules: &[String],
     dep_dirs: &[String],
     per_function: bool,
+    module_filter: &[String],
     use_aptos_natives: bool,
 ) -> anyhow::Result<()> {
     let mut options = if let Some(config_file) = config_file_opt {
@@ -188,6 +199,7 @@ fn run_benchmark(
         out,
         error_writer,
         per_function,
+        module_filter: module_filter.iter().cloned().collect(),
     };
     println!(
         "Starting benchmarking with config `{}`.\n\
@@ -200,7 +212,10 @@ fn run_benchmark(
 impl Runner {
     fn bench(&mut self, env: &GlobalEnv) -> anyhow::Result<()> {
         for module in env.get_modules() {
-            if module.is_target() {
+            if module.is_target()
+                && (self.module_filter.is_empty()
+                    || self.module_filter.contains(&module.get_full_name_str()))
+            {
                 if self.per_function {
                     for fun in module.get_functions() {
                         self.bench_function(fun)?;
@@ -233,6 +248,7 @@ impl Runner {
             duration.as_millis(),
             status
         )?;
+        self.out.flush()?;
 
         println!(" {:.3}s {}.", duration.as_secs_f64(), status);
         Ok(())
@@ -258,6 +274,7 @@ impl Runner {
             duration.as_millis(),
             status
         )?;
+        self.out.flush()?;
 
         println!("\x08\x08{:.3}s {}.", duration.as_secs_f64(), status);
         Ok(())

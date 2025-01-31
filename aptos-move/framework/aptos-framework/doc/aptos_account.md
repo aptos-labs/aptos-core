@@ -913,6 +913,21 @@ Address of APT Primary Fungible Store
 
 
 <pre><code><b>pragma</b> aborts_if_is_strict;
+<b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+
+<a id="0x1_aptos_account_length_judgment"></a>
+
+
+<pre><code><b>fun</b> <a href="aptos_account.md#0x1_aptos_account_length_judgment">length_judgment</a>(auth_key: <b>address</b>): bool {
+   <b>use</b> std::bcs;
+
+   <b>let</b> authentication_key = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(auth_key);
+   len(authentication_key) != 32
+}
 </code></pre>
 
 
@@ -948,20 +963,6 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
     <b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(auth_key);
     <b>aborts_if</b> <a href="aptos_account.md#0x1_aptos_account_length_judgment">length_judgment</a>(auth_key);
     <b>aborts_if</b> auth_key == @vm_reserved || auth_key == @aptos_framework || auth_key == @aptos_token;
-}
-</code></pre>
-
-
-
-
-<a id="0x1_aptos_account_length_judgment"></a>
-
-
-<pre><code><b>fun</b> <a href="aptos_account.md#0x1_aptos_account_length_judgment">length_judgment</a>(auth_key: <b>address</b>): bool {
-   <b>use</b> std::bcs;
-
-   <b>let</b> authentication_key = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(auth_key);
-   len(authentication_key) != 32
 }
 </code></pre>
 

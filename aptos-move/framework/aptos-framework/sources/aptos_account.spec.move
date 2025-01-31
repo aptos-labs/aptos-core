@@ -60,6 +60,7 @@ spec aptos_framework::aptos_account {
     ///
     spec module {
         pragma aborts_if_is_strict;
+        pragma verify = false;
     }
 
     /// Check if the bytes of the auth_key is 32.

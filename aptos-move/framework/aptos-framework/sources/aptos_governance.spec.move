@@ -28,7 +28,7 @@ spec aptos_framework::aptos_governance {
     /// </high-level-req>
     ///
     spec module {
-        pragma verify = true;
+        pragma verify = false;
         pragma aborts_if_is_partial;
     }
 

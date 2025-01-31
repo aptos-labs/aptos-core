@@ -2,6 +2,7 @@ spec aptos_framework::permissioned_signer {
 
     spec module {
         pragma verify = false;
+        /*
         axiom forall a: GrantedPermissionHandles:
             (
                 forall i in 0..len(a.active_handles):
@@ -9,6 +10,7 @@ spec aptos_framework::permissioned_signer {
                         i != j ==>
                             a.active_handles[i] != a.active_handles[j]
             );
+        */
     }
 
     spec fun spec_is_permissioned_signer(s: signer): bool;
