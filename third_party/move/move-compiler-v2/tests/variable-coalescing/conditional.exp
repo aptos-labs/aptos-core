@@ -150,25 +150,25 @@ fun m::test($t0: bool): u64 {
 module c0ffee.m {
 
 
-test(Arg0: bool): u64 /* def_idx: 0 */ {
-L1:	loc0: u64
-L2:	loc1: u64
+test(p: bool): u64 /* def_idx: 0 */ {
+L1:	x: u64
+L2:	y: u64
 B0:
 	0: LdU64(2)
-	1: StLoc[1](loc0: u64)
-	2: MoveLoc[0](Arg0: bool)
+	1: StLoc[1](x: u64)
+	2: MoveLoc[0](p: bool)
 	3: BrFalse(8)
 B1:
 	4: LdU64(3)
-	5: StLoc[2](loc1: u64)
+	5: StLoc[2](y: u64)
 B2:
-	6: MoveLoc[2](loc1: u64)
+	6: MoveLoc[2](y: u64)
 	7: Ret
 B3:
-	8: MoveLoc[1](loc0: u64)
+	8: MoveLoc[1](x: u64)
 	9: LdU64(1)
 	10: Add
-	11: StLoc[2](loc1: u64)
+	11: StLoc[2](y: u64)
 	12: Branch(6)
 }
 }

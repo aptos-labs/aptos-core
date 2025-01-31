@@ -678,29 +678,29 @@ struct R has key {
 	data: vector<u64>
 }
 
-f(Arg0: u8, Arg1: &vector<u64>): u64 /* def_idx: 0 */ {
-L2:	loc0: &vector<u64>
+f(k: u8, d: &vector<u64>): u64 /* def_idx: 0 */ {
+L2:	v: &vector<u64>
 B0:
-	0: MoveLoc[0](Arg0: u8)
+	0: MoveLoc[0](k: u8)
 	1: LdU8(0)
 	2: Eq
 	3: BrFalse(15)
 B1:
-	4: MoveLoc[1](Arg1: &vector<u64>)
+	4: MoveLoc[1](d: &vector<u64>)
 	5: Pop
 	6: LdConst[0](Address: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
 	7: ImmBorrowGlobal[0](R)
 	8: ImmBorrowField[0](R.data: vector<u64>)
-	9: StLoc[2](loc0: &vector<u64>)
+	9: StLoc[2](v: &vector<u64>)
 B2:
-	10: MoveLoc[2](loc0: &vector<u64>)
+	10: MoveLoc[2](v: &vector<u64>)
 	11: LdU64(0)
 	12: VecImmBorrow(1)
 	13: ReadRef
 	14: Ret
 B3:
-	15: MoveLoc[1](Arg1: &vector<u64>)
-	16: StLoc[2](loc0: &vector<u64>)
+	15: MoveLoc[1](d: &vector<u64>)
+	16: StLoc[2](v: &vector<u64>)
 	17: Branch(10)
 }
 }

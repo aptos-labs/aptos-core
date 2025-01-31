@@ -258,20 +258,20 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
 module 42.explicate_drop {
 
 
-drop_at_branch(Arg0: bool): u8 /* def_idx: 0 */ {
-L1:	loc0: u8
+drop_at_branch(x: bool): u8 /* def_idx: 0 */ {
+L1:	return: u8
 B0:
-	0: MoveLoc[0](Arg0: bool)
+	0: MoveLoc[0](x: bool)
 	1: BrFalse(6)
 B1:
 	2: LdU8(1)
-	3: StLoc[1](loc0: u8)
+	3: StLoc[1](return: u8)
 B2:
-	4: MoveLoc[1](loc0: u8)
+	4: MoveLoc[1](return: u8)
 	5: Ret
 B3:
 	6: LdU8(0)
-	7: StLoc[1](loc0: u8)
+	7: StLoc[1](return: u8)
 	8: Branch(4)
 }
 }

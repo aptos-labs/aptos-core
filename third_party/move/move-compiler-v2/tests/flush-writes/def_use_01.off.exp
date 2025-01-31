@@ -10,22 +10,22 @@ B0:
 	1: LdU64(1)
 	2: Ret
 }
-take1(Arg0: u64) /* def_idx: 1 */ {
+take1(_x: u64) /* def_idx: 1 */ {
 B0:
 	0: Ret
 }
-take2(Arg0: u64, Arg1: u64) /* def_idx: 2 */ {
+take2(_x: u64, _y: u64) /* def_idx: 2 */ {
 B0:
 	0: Ret
 }
 public test() /* def_idx: 3 */ {
-L0:	loc0: u64
+L0:	b: u64
 B0:
 	0: Call one_one(): u64 * u64
-	1: StLoc[0](loc0: u64)
-	2: CopyLoc[0](loc0: u64)
+	1: StLoc[0](b: u64)
+	2: CopyLoc[0](b: u64)
 	3: Call take1(u64)
-	4: MoveLoc[0](loc0: u64)
+	4: MoveLoc[0](b: u64)
 	5: Call take2(u64, u64)
 	6: Ret
 }

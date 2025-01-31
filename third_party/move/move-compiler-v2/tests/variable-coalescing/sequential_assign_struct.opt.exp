@@ -113,9 +113,9 @@ struct Foo has copy {
 	e: u64
 }
 
-sequential(Arg0: Foo): Foo /* def_idx: 0 */ {
+sequential(p: Foo): Foo /* def_idx: 0 */ {
 B0:
-	0: MoveLoc[0](Arg0: Foo)
+	0: MoveLoc[0](p: Foo)
 	1: Ret
 }
 }

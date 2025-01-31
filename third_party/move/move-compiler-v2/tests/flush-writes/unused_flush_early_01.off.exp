@@ -10,43 +10,43 @@ B0:
 	1: Ret
 }
 public test1(): u64 * u64 /* def_idx: 1 */ {
-L0:	loc0: u64
-L1:	loc1: u64
+L0:	z: u64
+L1:	y: u64
 B0:
 	0: Call one(): u64
 	1: Call one(): u64
 	2: Call one(): u64
-	3: StLoc[0](loc0: u64)
-	4: StLoc[1](loc1: u64)
+	3: StLoc[0](z: u64)
+	4: StLoc[1](y: u64)
 	5: Pop
-	6: MoveLoc[1](loc1: u64)
-	7: MoveLoc[0](loc0: u64)
+	6: MoveLoc[1](y: u64)
+	7: MoveLoc[0](z: u64)
 	8: Ret
 }
 public test2(): u64 * u64 /* def_idx: 2 */ {
-L0:	loc0: u64
-L1:	loc1: u64
+L0:	z: u64
+L1:	x: u64
 B0:
 	0: Call one(): u64
 	1: Call one(): u64
 	2: Call one(): u64
-	3: StLoc[0](loc0: u64)
+	3: StLoc[0](z: u64)
 	4: Pop
-	5: MoveLoc[0](loc0: u64)
+	5: MoveLoc[0](z: u64)
 	6: Ret
 }
 public test3(): u64 * u64 /* def_idx: 3 */ {
-L0:	loc0: u64
-L1:	loc1: u64
+L0:	z: u64
+L1:	x: u64
 B0:
 	0: Call one(): u64
 	1: Call one(): u64
 	2: Call one(): u64
-	3: StLoc[0](loc0: u64)
+	3: StLoc[0](z: u64)
 	4: Pop
-	5: StLoc[1](loc1: u64)
-	6: MoveLoc[0](loc0: u64)
-	7: MoveLoc[1](loc1: u64)
+	5: StLoc[1](x: u64)
+	6: MoveLoc[0](z: u64)
+	7: MoveLoc[1](x: u64)
 	8: Ret
 }
 }
