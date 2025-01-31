@@ -413,6 +413,7 @@ impl PipelinedBlock {
             pipeline_futs: Arc::new(Mutex::new(None)),
             pipeline_tx: Arc::new(Mutex::new(None)),
             pipeline_abort_handle: Arc::new(Mutex::new(None)),
+            block_qc: Arc::new(Default::default()),
         }
     }
 
