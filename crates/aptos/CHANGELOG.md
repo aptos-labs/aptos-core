@@ -7,6 +7,8 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 - Added a new option `aptos move compile --fail-on-warning` which fails the compilation if any warnings are found.
 - We now default to running extended checks when compiling test code (this was previously only done with the option `--check-test-code`, but this is no longer available). However, these checks can be now be skipped with `--skip-checks-on-test-code`.
 
+- Add beta simulate command to simulate any transaction from anyone
+
 ## [6.2.0]
 - Several compiler parsing bugs fixed, including in specifications for receiver style functions
 - Remove support for OpenSSL 1.x.x and Ubuntu 20.04, add warning appropriately
