@@ -69,6 +69,7 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
     move_resource::MoveResource,
+    value::MoveValue,
 };
 use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::{gas::UnmeteredGasMeter, resolver::ModuleResolver};
@@ -479,7 +480,9 @@ fn force_end_epoch(state_view: &SimulationStateView<impl StateView>) -> Result<(
         &MODULE_ID_APTOS_GOVERNANCE,
         IdentStr::new("force_end_epoch").unwrap(),
         vec![],
-        vec![bcs::to_bytes(&AccountAddress::ONE)?],
+        vec![MoveValue::Signer(AccountAddress::ONE)
+            .simple_serialize()
+            .unwrap()],
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
         &module_storage,
