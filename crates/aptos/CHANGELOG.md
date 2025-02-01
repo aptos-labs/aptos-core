@@ -4,6 +4,8 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+- Add beta simulate command to simulate any transaction from anyone
+
 ## [6.2.0]
 - Several compiler parsing bugs fixed, including in specifications for receiver style functions
 
