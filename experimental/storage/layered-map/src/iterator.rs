@@ -6,7 +6,7 @@ use aptos_drop_helper::ArcAsyncDrop;
 use std::sync::Arc;
 
 pub(crate) struct DescendantIterator<'a, K: ArcAsyncDrop, V: ArcAsyncDrop> {
-    root: Option<&'a NodeRef<K, V>>,
+    root: Option<NodeRef<K, V>>,
     base_layer: u64,
     current_leaf: Option<Box<dyn 'a + Iterator<Item = (K, V)>>>,
     ancestors: Vec<Arc<InternalNode<K, V>>>,
@@ -17,7 +17,7 @@ where
     K: ArcAsyncDrop + Clone,
     V: ArcAsyncDrop + Clone,
 {
-    pub fn new(root: &'a NodeRef<K, V>, base_layer: u64) -> Self {
+    pub fn new(root: NodeRef<K, V>, base_layer: u64) -> Self {
         Self {
             root: Some(root),
             base_layer,
@@ -58,7 +58,7 @@ where
             match &mut self.current_leaf {
                 None => {
                     if let Some(root) = self.root.take() {
-                        // Iterater not started yet, consume root and go down.
+                        // Iterator not started yet, consume root and go down.
                         self.current_leaf =
                             self.find_next_leaf(Some(root.get_strong(self.base_layer)));
                     } else if self.ancestors.is_empty() {

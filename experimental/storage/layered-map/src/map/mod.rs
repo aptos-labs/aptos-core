@@ -66,7 +66,7 @@ where
             foot = foot << 1 | bits.next().expect("bits exhausted") as usize;
         }
 
-        self.get_under_node(peak.expect_foot(foot, self.base_layer()), key, &mut bits)
+        self.get_under_node(peak.expect_foot(foot).get_strong(self.base_layer()), key, &mut bits)
     }
 
     fn get_under_node(
