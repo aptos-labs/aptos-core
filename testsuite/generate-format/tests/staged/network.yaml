@@ -4,6 +4,11 @@ BitVec:
     - inner: BYTES
 ChainId:
   NEWTYPESTRUCT: U8
+DirectSendAndMetadata:
+  STRUCT:
+    - serialized_message: BYTES
+    - message_wire_metadata:
+        TYPENAME: MessageWireMetadata
 DirectSendMsg:
   STRUCT:
     - protocol_id:
@@ -34,6 +39,17 @@ HandshakeMsg:
         TYPENAME: ChainId
     - network_id:
         TYPENAME: NetworkId
+MessageWireMetadata:
+  STRUCT:
+    - protocol_id:
+        TYPENAME: ProtocolId
+    - priority: U8
+    - application_send_time:
+        OPTION:
+          TYPENAME: SystemTime
+    - wire_send_time:
+        OPTION:
+          TYPENAME: SystemTime
 MessagingProtocolVersion:
   ENUM:
     0:
@@ -71,6 +87,18 @@ NetworkMessage:
       DirectSendMsg:
         NEWTYPE:
           TYPENAME: DirectSendMsg
+    4:
+      RpcRequestAndMetadata:
+        NEWTYPE:
+          TYPENAME: RpcRequestAndMetadata
+    5:
+      RpcResponseAndMetadata:
+        NEWTYPE:
+          TYPENAME: RpcResponseAndMetadata
+    6:
+      DirectSendAndMetadata:
+        NEWTYPE:
+          TYPENAME: DirectSendAndMetadata
 NotSupportedType:
   ENUM:
     0:
@@ -184,6 +212,8 @@ ProtocolId:
       ConsensusObserver: UNIT
     28:
       ConsensusObserverRpc: UNIT
+    29:
+      Unknown: UNIT
 ProtocolIdSet:
   NEWTYPESTRUCT:
     TYPENAME: BitVec
@@ -196,8 +226,24 @@ RpcRequest:
     - request_id: U32
     - priority: U8
     - raw_request: BYTES
+RpcRequestAndMetadata:
+  STRUCT:
+    - request_id: U32
+    - serialized_request: BYTES
+    - message_wire_metadata:
+        TYPENAME: MessageWireMetadata
 RpcResponse:
   STRUCT:
     - request_id: U32
     - priority: U8
     - raw_response: BYTES
+RpcResponseAndMetadata:
+  STRUCT:
+    - request_id: U32
+    - serialized_response: BYTES
+    - message_wire_metadata:
+        TYPENAME: MessageWireMetadata
+SystemTime:
+  STRUCT:
+    - secs_since_epoch: U64
+    - nanos_since_epoch: U32
