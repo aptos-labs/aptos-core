@@ -19,6 +19,21 @@ use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_sta
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::collections::{BTreeMap, HashMap};
 
+/// Allows requesting an immediate interrupt to ongoing transaction execution. For example, this
+/// allows an early return from a useless speculative execution when block execution has already
+/// halted (e.g. due to gas limit, committing only a block prefix).
+pub trait BlockSynchronizationKillSwitch {
+    fn interrupt_requested(&self) -> bool;
+}
+
+pub struct NoopBlockSynchronizationKillSwitch {}
+
+impl BlockSynchronizationKillSwitch for NoopBlockSynchronizationKillSwitch {
+    fn interrupt_requested(&self) -> bool {
+        false
+    }
+}
+
 /// Allows to query resources from the state.
 pub trait TResourceView {
     type Key;
@@ -204,7 +219,8 @@ pub trait StateStorageView {
 /// resolve AggregatorV2 via the state-view based default implementation, as it
 /// doesn't provide a value exchange functionality).
 pub trait TExecutorView<K, T, L, V>:
-    TResourceView<Key = K, Layout = L>
+    BlockSynchronizationKillSwitch
+    + TResourceView<Key = K, Layout = L>
     + TModuleView<Key = K>
     + TAggregatorV1View<Identifier = K>
     + TDelayedFieldView<Identifier = DelayedFieldID, ResourceKey = K, ResourceGroupTag = T>
@@ -213,7 +229,8 @@ pub trait TExecutorView<K, T, L, V>:
 }
 
 impl<A, K, T, L, V> TExecutorView<K, T, L, V> for A where
-    A: TResourceView<Key = K, Layout = L>
+    A: BlockSynchronizationKillSwitch
+        + TResourceView<Key = K, Layout = L>
         + TModuleView<Key = K>
         + TAggregatorV1View<Identifier = K>
         + TDelayedFieldView<Identifier = DelayedFieldID, ResourceKey = K, ResourceGroupTag = T>
@@ -290,6 +307,15 @@ where
 
     fn get_usage(&self) -> Result<StateStorageUsage, StateViewError> {
         self.get_usage().map_err(Into::into)
+    }
+}
+
+impl<S> BlockSynchronizationKillSwitch for S
+where
+    S: StateView,
+{
+    fn interrupt_requested(&self) -> bool {
+        false
     }
 }
 

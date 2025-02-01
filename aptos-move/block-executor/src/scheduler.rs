@@ -652,6 +652,10 @@ impl Scheduler {
 
         !self.has_halted.swap(true, Ordering::SeqCst)
     }
+
+    pub(crate) fn has_halted(&self) -> bool {
+        self.has_halted.load(Ordering::Relaxed)
+    }
 }
 
 impl TWaitForDependency for Scheduler {

@@ -228,6 +228,38 @@ fn resource_group_bcs_fallback() {
 }
 
 #[test]
+fn interrupt_requested() {
+    let transactions = Vec::from([MockTransaction::Abort, MockTransaction::InterruptRequested]);
+    let txn_provider = DefaultTxnProvider::new(transactions);
+    let mut guard = AptosModuleCacheManagerGuard::none();
+
+    let data_view = DeltaDataView::<KeyType<u32>> {
+        phantom: PhantomData,
+    };
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+    let block_executor = BlockExecutor::<
+        MockTransaction<KeyType<u32>, MockEvent>,
+        MockTask<KeyType<u32>, MockEvent>,
+        DeltaDataView<KeyType<u32>>,
+        NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
+        DefaultTxnProvider<MockTransaction<KeyType<u32>, MockEvent>>,
+    >::new(
+        BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
+        executor_thread_pool,
+        None,
+    );
+
+    // MockTransaction::InterruptRequested will only return if interrupt is requested (here, due
+    // to abort from the first transaction). O.w. the test will hang.
+    let _ = block_executor.execute_transactions_parallel(&txn_provider, &data_view, &mut guard);
+}
+
+#[test]
 fn block_output_err_precedence() {
     let incarnation: MockIncarnation<KeyType<u32>, MockEvent> = MockIncarnation::new(
         vec![KeyType::<u32>(1, false)],

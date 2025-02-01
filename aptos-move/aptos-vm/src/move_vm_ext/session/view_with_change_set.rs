@@ -23,8 +23,8 @@ use aptos_vm_types::{
     abstract_write_op::{AbstractResourceWriteOp, WriteWithDelayedFieldsOp},
     change_set::{randomly_check_layout_matches, VMChangeSet},
     resolver::{
-        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TModuleView,
-        TResourceGroupView, TResourceView,
+        BlockSynchronizationKillSwitch, ExecutorView, ResourceGroupSize, ResourceGroupView,
+        StateStorageView, TModuleView, TResourceGroupView, TResourceView,
     },
 };
 use bytes::Bytes;
@@ -173,6 +173,12 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
     ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
         self.base_executor_view
             .get_group_reads_needing_exchange(delayed_write_set_keys, skip)
+    }
+}
+
+impl<'r> BlockSynchronizationKillSwitch for ExecutorViewWithChangeSet<'r> {
+    fn interrupt_requested(&self) -> bool {
+        self.base_executor_view.interrupt_requested()
     }
 }
 
