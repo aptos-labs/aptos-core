@@ -43,7 +43,7 @@ impl ConsensusAlgorithmConfig {
         Self::JolteonV2 {
             main: ConsensusConfigV1::default(),
             quorum_store_enabled: true,
-            order_vote_enabled: false,
+            order_vote_enabled: true,
         }
     }
 
@@ -58,15 +58,6 @@ impl ConsensusAlgorithmConfig {
                 ..
             } => *quorum_store_enabled,
             ConsensusAlgorithmConfig::DAG(_) => true,
-        }
-    }
-
-    pub fn order_vote_enabled(&self) -> bool {
-        match self {
-            ConsensusAlgorithmConfig::JolteonV2 {
-                order_vote_enabled, ..
-            } => *order_vote_enabled,
-            _ => false,
         }
     }
 
@@ -247,14 +238,6 @@ impl OnChainConsensusConfig {
         }
     }
 
-    pub fn order_vote_enabled(&self) -> bool {
-        match &self {
-            OnChainConsensusConfig::V1(_config) => false,
-            OnChainConsensusConfig::V2(_) => false,
-            OnChainConsensusConfig::V3 { alg, .. } => alg.order_vote_enabled(),
-        }
-    }
-
     pub fn is_dag_enabled(&self) -> bool {
         match self {
             OnChainConsensusConfig::V1(_) => false,
@@ -300,7 +283,7 @@ impl OnChainConsensusConfig {
                 alg: ConsensusAlgorithmConfig::JolteonV2 {
                     main: config,
                     quorum_store_enabled: false,
-                    order_vote_enabled: false,
+                    order_vote_enabled: true,
                 },
                 vtxn: ValidatorTxnConfig::default_enabled(),
             },
@@ -308,7 +291,7 @@ impl OnChainConsensusConfig {
                 alg: ConsensusAlgorithmConfig::JolteonV2 {
                     main: config,
                     quorum_store_enabled: true,
-                    order_vote_enabled: false,
+                    order_vote_enabled: true,
                 },
                 vtxn: ValidatorTxnConfig::default_enabled(),
             },

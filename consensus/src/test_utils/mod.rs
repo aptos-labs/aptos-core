@@ -99,7 +99,6 @@ pub fn build_empty_tree() -> Arc<BlockStore> {
         Arc::new(SimulatedTimeService::new()),
         10,
         Arc::from(DirectMempoolPayloadManager::new()),
-        false,
         Arc::new(Mutex::new(PendingBlocks::new())),
         None,
     ))
