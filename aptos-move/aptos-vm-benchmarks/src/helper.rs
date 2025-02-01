@@ -7,7 +7,7 @@ use aptos_language_e2e_tests::{
     account::Account,
     executor::{ExecFuncTimerDynamicArgs, FakeExecutor, GasMeterType},
 };
-use aptos_types::{move_utils::MemberId, transaction::TransactionPayload};
+use aptos_types::{move_utils::MemberId, transaction::TransactionPayloadWrapper};
 use move_binary_format::CompiledModule;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
 use std::{fs::ReadDir, path::PathBuf, string::String, time::Instant};
@@ -16,7 +16,7 @@ use std::{fs::ReadDir, path::PathBuf, string::String, time::Instant};
 const PREFIX: &str = "benchmark";
 
 // generate a TransactionPayload for modules
-pub fn generate_module_payload(package: &BuiltPackage) -> TransactionPayload {
+pub fn generate_module_payload(package: &BuiltPackage) -> TransactionPayloadWrapper {
     // extract package data
     let code = package.extract_code();
     let metadata = package
@@ -34,7 +34,7 @@ pub fn generate_module_payload(package: &BuiltPackage) -> TransactionPayload {
 pub fn execute_module_txn(
     executor: &mut FakeExecutor,
     account: &Account,
-    payload: TransactionPayload,
+    payload: TransactionPayloadWrapper,
     sequence_number: u64,
 ) {
     // build and sign transaction

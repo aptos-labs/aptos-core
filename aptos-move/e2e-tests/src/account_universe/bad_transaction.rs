@@ -45,7 +45,14 @@ impl AUTransactionGen for SequenceNumberMismatchGen {
             self.seq
         };
 
-        let txn = empty_txn(sender.account(), seq, gas_costs::TXN_RESERVED, 0);
+        let txn = empty_txn(
+            sender.account(),
+            seq,
+            gas_costs::TXN_RESERVED,
+            0,
+            universe.use_txn_payload_v2_format,
+            false,  // "Sequence number mismatch" doesn't apply for orderless transactions
+        );
 
         (
             txn,
@@ -85,6 +92,8 @@ impl AUTransactionGen for InsufficientBalanceGen {
             sender.sequence_number,
             max_gas_unit,
             self.gas_unit_price,
+            universe.use_txn_payload_v2_format,
+            universe.use_orderless_transactions,
         );
 
         // TODO: Move such config to AccountUniverse
@@ -148,6 +157,7 @@ impl AUTransactionGen for InvalidAuthkeyGen {
             .transaction()
             .script(Script::new(EMPTY_SCRIPT.clone(), vec![], vec![]))
             .sequence_number(sender.sequence_number)
+            .upgrade_payload(universe.use_txn_payload_v2_format, universe.use_orderless_transactions)
             .raw()
             .sign(
                 &self.new_keypair.private_key,

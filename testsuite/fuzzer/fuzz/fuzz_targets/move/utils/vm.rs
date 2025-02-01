@@ -10,7 +10,7 @@ use aptos_framework::natives::code::{
     ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy,
 };
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
-use aptos_types::transaction::{ExecutionStatus, TransactionPayload, TransactionStatus};
+use aptos_types::transaction::{ExecutionStatus, TransactionPayloadWrapper, TransactionStatus};
 use arbitrary::Arbitrary;
 use libfuzzer_sys::Corpus;
 use move_binary_format::{
@@ -107,7 +107,7 @@ pub(crate) fn sort_by_deps(
     Ok(())
 }
 
-fn publish_transaction_payload(modules: &[CompiledModule]) -> TransactionPayload {
+fn publish_transaction_payload(modules: &[CompiledModule]) -> TransactionPayloadWrapper {
     let modules_metadatas: Vec<_> = modules
         .iter()
         .map(|cm| ModuleMetadata {

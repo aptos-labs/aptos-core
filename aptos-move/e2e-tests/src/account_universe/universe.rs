@@ -35,6 +35,9 @@ pub struct AccountUniverse {
     picker: AccountPicker,
     /// Whether to ignore any new accounts that transactions add to the universe.
     ignore_new_accounts: bool,
+    // TODO[Orderless]: Check if this is the best place to add these two bool fields
+    pub use_txn_payload_v2_format: bool,
+    pub use_orderless_transactions: bool,
 }
 
 /// Allows pairs of accounts to be uniformly randomly selected from an account universe.

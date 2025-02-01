@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 #[serde(default, deny_unknown_fields)]
 pub struct InternalIndexerDBConfig {
     pub enable_transaction: bool,
+    pub enable_transaction_summaries: bool,
     pub enable_event: bool,
     pub enable_event_v2_translation: bool,
     pub event_v2_translation_ignores_below_version: u64,
@@ -21,6 +22,7 @@ pub struct InternalIndexerDBConfig {
 impl InternalIndexerDBConfig {
     pub fn new(
         enable_transaction: bool,
+        enable_transaction_summaries: bool,
         enable_event: bool,
         enable_event_v2_translation: bool,
         event_v2_translation_ignores_below_version: u64,
@@ -29,6 +31,7 @@ impl InternalIndexerDBConfig {
     ) -> Self {
         Self {
             enable_transaction,
+            enable_transaction_summaries,
             enable_event,
             enable_event_v2_translation,
             event_v2_translation_ignores_below_version,
@@ -58,7 +61,10 @@ impl InternalIndexerDBConfig {
     }
 
     pub fn is_internal_indexer_db_enabled(&self) -> bool {
-        self.enable_transaction || self.enable_event || self.enable_statekeys
+        self.enable_transaction
+            || self.enable_transaction_summaries
+            || self.enable_event
+            || self.enable_statekeys
     }
 
     pub fn batch_size(&self) -> usize {
@@ -69,7 +75,9 @@ impl InternalIndexerDBConfig {
 impl Default for InternalIndexerDBConfig {
     fn default() -> Self {
         Self {
-            enable_transaction: false,
+            // TODO: Reset this to false when landing the code
+            enable_transaction: true,
+            enable_transaction_summaries: true,
             enable_event: false,
             enable_event_v2_translation: false,
             event_v2_translation_ignores_below_version: 0,
