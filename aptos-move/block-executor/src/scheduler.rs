@@ -59,7 +59,7 @@ pub enum DependencyStatus {
     // The parallel execution is halted.
     ExecutionHalted,
 }
-type DependencyCondvar = Arc<(Mutex<DependencyStatus>, Condvar)>;
+pub(crate) type DependencyCondvar = Arc<(Mutex<DependencyStatus>, Condvar)>;
 
 // Return value of the function wait_for_dependency
 #[derive(Debug)]
