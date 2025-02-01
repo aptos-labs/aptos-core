@@ -19,9 +19,11 @@ use std::{
     },
     time::Duration,
 };
+use sysinfo::{Pid, PidExt, ProcessExt, System, SystemExt};
 use tokio::{
     process::Command,
     sync::{broadcast, broadcast::Receiver, Semaphore},
+    time::interval,
 };
 
 #[derive(Debug, Clone)]
@@ -185,17 +187,75 @@ impl ProverTask for RunBoogieWithSeeds {
     }
 
     async fn run(&mut self, task_id: Self::TaskId, sem: Arc<Semaphore>) -> Self::TaskResult {
+        // Acquire the semaphore guard.
         let _guard = sem.acquire().await;
+
+        // Prepare the Boogie command arguments.
         let args = self
             .get_boogie_command(task_id)
             .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))?;
         debug!("running Boogie command with seed {}", task_id);
-        Command::new(&args[0])
+
+        // Spawn the Boogie process.
+        let child = Command::new(&args[0])
             .args(&args[1..])
             .kill_on_drop(true)
-            .output()
-            .await
+            .spawn()?;
+
+        // Retrieve the child's process id and convert it to a sysinfo::Pid.
+        let child_id = child.id().expect("Failed to get child process id");
+        let pid = Pid::from_u32(child_id);
+
+        // Create a new sysinfo System instance.
+        let mut sys = System::new_all();
+
+        // Variable to track the maximum memory usage observed (in KB).
+        let mut max_memory: u64 = 0;
+
+        // Set up an interval for polling every 500 milliseconds.
+        let mut poll_interval = interval(Duration::from_millis(500));
+
+        // Instead of calling `.output().await`, call `wait_with_output()` so we can poll concurrently.
+        let output_future = child.wait_with_output();
+        tokio::pin!(output_future);
+
+        // Poll until the process finishes.
+        let output = loop {
+            tokio::select! {
+                // On each tick, refresh process info for the given process.
+                _ = poll_interval.tick() => {
+                    sys.refresh_process(pid);
+                    if let Some(proc_info) = sys.process(pid) {
+                        let current_memory = proc_info.memory() / 1024 / 1024; // memory in MB
+                        if current_memory > max_memory {
+                            max_memory = current_memory;
+                        }
+                    }
+                }
+                // When the process completes, break out of the loop.
+                result = &mut output_future => {
+                    let output = result?;
+                    break output;
+                }
+            }
+        };
+
+        println!("Peak memory usage: {} MB", max_memory);
+        Ok(output)
     }
+
+    // async fn run(&mut self, task_id: Self::TaskId, sem: Arc<Semaphore>) -> Self::TaskResult {
+    //     let _guard = sem.acquire().await;
+    //     let args = self
+    //         .get_boogie_command(task_id)
+    //         .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))?;
+    //     debug!("running Boogie command with seed {}", task_id);
+    //     Command::new(&args[0])
+    //         .args(&args[1..])
+    //         .kill_on_drop(true)
+    //         .output()
+    //         .await
+    // }
 
     fn is_success(&self, task_result: &Self::TaskResult) -> bool {
         match task_result {

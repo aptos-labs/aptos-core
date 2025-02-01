@@ -11630,6 +11630,7 @@ dependencies = [
  "rand 0.7.3",
  "regex",
  "serde",
+ "sysinfo",
  "tera",
  "tokio",
 ]

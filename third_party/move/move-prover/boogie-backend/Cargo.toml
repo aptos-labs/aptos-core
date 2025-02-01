@@ -28,5 +28,6 @@ pretty = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+sysinfo = { workspace = true }
 tera = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
