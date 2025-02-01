@@ -98,13 +98,15 @@ the state. Currently, the only supported overrides are the following:
   1. Forcefully enable a feature flag (`--enable-features F1 F2 ...`).
   2. Forcefully disable a feature flag (`--disable-features F1 F2 ...`).
   3. Forcefully override the gas feature version (`--gas-feature-version V`).
+  4. Override existing on-chain packages (`--override-packages P1 P2 P3`). The paths to the
+     packages must be the path to the source directories.
 
 Feature flags should be spelled in capital letters, e.g., `ENABLE_LOADER_V2`. For the full list of
 available features, see [here](../../types/src/on_chain_config/aptos_features.rs).
 
-Overriding the feature flags can be very useful if you want to experiment with a new feature and
-check its performance as well as the gas usage. For example, if there is a new feature that makes
-MoveVM faster, overriding it for past transactions it is possible to see the execution performance
+Overriding the state can be very useful if you want to experiment with a new feature or Move code,
+and check its performance as well as the gas usage. For example, if there is a new feature that
+makes MoveVM faster, overriding it for past transactions it is possible to see the execution performance
 on historical workloads.
 
 #### Example
