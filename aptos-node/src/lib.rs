@@ -24,7 +24,11 @@ use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
-use aptos_types::{chain_id::ChainId, on_chain_config::OnChainJWKConsensusConfig};
+use aptos_types::{
+    chain_id::ChainId,
+    keyless::{Groth16VerificationKey, VERIFICATION_KEY_FOR_TESTING},
+    on_chain_config::OnChainJWKConsensusConfig,
+};
 use clap::Parser;
 use futures::channel::{mpsc, oneshot};
 use hex::{FromHex, FromHexError};
@@ -578,6 +582,21 @@ where
                     let config = OnChainJWKConsensusConfig::default_enabled();
                     println!("Flag `INITIALIZE_JWK_CONSENSUS` detected, will enable JWK Consensus for all default OIDC providers in genesis: {:?}", config);
                     Some(config)
+                }
+                _ => None,
+            };
+            genesis_config.keyless_groth16_vk = match env::var("INITIALIZE_KEYLESS_GROTH16_VK") {
+                Ok(val) if val.as_str() == "1" => {
+                    let vk = Groth16VerificationKey::from(VERIFICATION_KEY_FOR_TESTING.clone());
+                    println!("Flag `INITIALIZE_KEYLESS_GROTH16_VK` detected, will install the default keyless groth16 verification key:");
+                    println!("alpha_g1: {:?}", hex::encode(vk.alpha_g1.clone()));
+                    println!("beta_g2: {:?}", hex::encode(vk.beta_g2.clone()));
+                    println!("gamma_g2: {:?}", hex::encode(vk.gamma_g2.clone()));
+                    println!("delta_g2: {:?}", hex::encode(vk.delta_g2.clone()));
+                    let gamma_abc_g1 = vk.gamma_abc_g1.clone();
+                    println!("gamma_abc_g1_0: {:?}", hex::encode(gamma_abc_g1[0].clone()));
+                    println!("gamma_abc_g1_1: {:?}", hex::encode(gamma_abc_g1[1].clone()));
+                    Some(vk)
                 }
                 _ => None,
             };
