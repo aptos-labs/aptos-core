@@ -1,0 +1,14 @@
+[package]
+name = "fullnode-sync"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+aptos-logger = { path = "../crates/aptos-logger" }
+aptos-types = { path = "../types" }
+aptos-config = { path = "../config" }
+aptos-storage-interface = { path = "../storage/storage-interface" }
+aptos-state-sync-driver = { path = "../state-sync/state-sync-driver" }
+aptos-time-service = { path = "../crates/aptos-time-service" }
+tokio = { version = "1", features = ["full"] }
