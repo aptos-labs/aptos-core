@@ -68,13 +68,13 @@ enum Positional has drop {
 }
 
 test_common_access(): u8 /* def_idx: 0 */ {
-L0:	loc0: Positional
+L0:	x: Positional
 B0:
 	0: LdU8(42)
 	1: PackVariant[0](Positional/A)
-	2: StLoc[0](loc0: Positional)
+	2: StLoc[0](x: Positional)
 	3: LdU8(19)
-	4: MutBorrowLoc[0](loc0: Positional)
+	4: MutBorrowLoc[0](x: Positional)
 	5: MutBorrowVariantField[0](A._0|B._0: u8)
 	6: WriteRef
 	7: LdU8(20)

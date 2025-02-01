@@ -1157,44 +1157,44 @@ module 42.m {
 
 
 test_for_each_mut() /* def_idx: 0 */ {
-L0:	loc0: vector<u64>
-L1:	loc1: u64
-L2:	loc2: u64
-L3:	loc3: &mut vector<u64>
-L4:	loc4: u64
-L5:	loc5: &mut u64
+L0:	v: vector<u64>
+L1:	i: u64
+L2:	len: u64
+L3:	vr: &mut vector<u64>
+L4:	$t6: u64
+L5:	x: &mut u64
 B0:
 	0: LdConst[0](Vector(U64): [3, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0])
-	1: StLoc[0](loc0: vector<u64>)
+	1: StLoc[0](v: vector<u64>)
 	2: LdU64(0)
-	3: StLoc[1](loc1: u64)
-	4: ImmBorrowLoc[0](loc0: vector<u64>)
+	3: StLoc[1](i: u64)
+	4: ImmBorrowLoc[0](v: vector<u64>)
 	5: VecLen(1)
-	6: StLoc[2](loc2: u64)
-	7: MutBorrowLoc[0](loc0: vector<u64>)
-	8: StLoc[3](loc3: &mut vector<u64>)
+	6: StLoc[2](len: u64)
+	7: MutBorrowLoc[0](v: vector<u64>)
+	8: StLoc[3](vr: &mut vector<u64>)
 B1:
-	9: CopyLoc[1](loc1: u64)
-	10: CopyLoc[2](loc2: u64)
+	9: CopyLoc[1](i: u64)
+	10: CopyLoc[2](len: u64)
 	11: Lt
 	12: BrFalse(25)
 B2:
-	13: CopyLoc[3](loc3: &mut vector<u64>)
-	14: CopyLoc[1](loc1: u64)
+	13: CopyLoc[3](vr: &mut vector<u64>)
+	14: CopyLoc[1](i: u64)
 	15: VecMutBorrow(1)
-	16: StLoc[5](loc5: &mut u64)
+	16: StLoc[5](x: &mut u64)
 	17: LdU64(2)
-	18: MoveLoc[5](loc5: &mut u64)
+	18: MoveLoc[5](x: &mut u64)
 	19: WriteRef
-	20: MoveLoc[1](loc1: u64)
+	20: MoveLoc[1](i: u64)
 	21: LdU64(1)
 	22: Add
-	23: StLoc[1](loc1: u64)
+	23: StLoc[1](i: u64)
 	24: Branch(9)
 B3:
-	25: MoveLoc[3](loc3: &mut vector<u64>)
+	25: MoveLoc[3](vr: &mut vector<u64>)
 	26: Pop
-	27: MoveLoc[0](loc0: vector<u64>)
+	27: MoveLoc[0](v: vector<u64>)
 	28: LdConst[1](Vector(U64): [3, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0])
 	29: Eq
 	30: BrFalse(32)

@@ -448,22 +448,22 @@ struct R has key {
 	f: u64
 }
 
-public f(Arg0: R): R * u64 /* def_idx: 0 */ {
+public f(r: R): R * u64 /* def_idx: 0 */ {
 B0:
-	0: MoveLoc[0](Arg0: R)
+	0: MoveLoc[0](r: R)
 	1: LdU64(0)
 	2: Ret
 }
-public g(Arg0: &signer) /* def_idx: 1 */ {
-L1:	loc0: R
+public g(s: &signer) /* def_idx: 1 */ {
+L1:	r: R
 B0:
 	0: LdU64(1)
 	1: Pack[0](R)
 	2: Call f(R): R * u64
 	3: Pop
-	4: StLoc[1](loc0: R)
-	5: MoveLoc[0](Arg0: &signer)
-	6: MoveLoc[1](loc0: R)
+	4: StLoc[1](r: R)
+	5: MoveLoc[0](s: &signer)
+	6: MoveLoc[1](r: R)
 	7: MoveTo[0](R)
 	8: Ret
 }

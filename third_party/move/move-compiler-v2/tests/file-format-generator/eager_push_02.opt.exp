@@ -4,11 +4,11 @@
 module c0ffee.m {
 
 
-test(Arg0: u64, Arg1: u64): u64 /* def_idx: 0 */ {
+test(x: u64, y: u64): u64 /* def_idx: 0 */ {
 B0:
-	0: CopyLoc[0](Arg0: u64)
-	1: MoveLoc[1](Arg1: u64)
-	2: MoveLoc[0](Arg0: u64)
+	0: CopyLoc[0](x: u64)
+	1: MoveLoc[1](y: u64)
+	2: MoveLoc[0](x: u64)
 	3: Mul
 	4: Add
 	5: Ret

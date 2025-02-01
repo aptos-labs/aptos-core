@@ -80,20 +80,20 @@ struct Wrap {
 	f: u64
 }
 
-public make(Arg0: u64, Arg1: u64, Arg2: u64, Arg3: address, Arg4: u64): Wrap /* def_idx: 0 */ {
-L5:	loc0: &S
+public make(a: u64, b: u64, c: u64, d: address, e: u64): Wrap /* def_idx: 0 */ {
+L5:	ref: &S
 B0:
-	0: MoveLoc[3](Arg3: address)
+	0: MoveLoc[3](d: address)
 	1: ImmBorrowGlobal[0](S)
-	2: StLoc[5](loc0: &S)
-	3: MoveLoc[0](Arg0: u64)
-	4: MoveLoc[1](Arg1: u64)
-	5: MoveLoc[2](Arg2: u64)
-	6: CopyLoc[5](loc0: &S)
+	2: StLoc[5](ref: &S)
+	3: MoveLoc[0](a: u64)
+	4: MoveLoc[1](b: u64)
+	5: MoveLoc[2](c: u64)
+	6: CopyLoc[5](ref: &S)
 	7: ImmBorrowField[0](S.x: u64)
 	8: ReadRef
-	9: MoveLoc[4](Arg4: u64)
-	10: MoveLoc[5](loc0: &S)
+	9: MoveLoc[4](e: u64)
+	10: MoveLoc[5](ref: &S)
 	11: ImmBorrowField[1](S.y: u64)
 	12: ReadRef
 	13: Pack[1](Wrap)

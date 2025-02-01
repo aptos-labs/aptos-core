@@ -428,201 +428,201 @@ B0:
 	4: Add
 	5: Ret
 }
-test1(Arg0: u64): u64 /* def_idx: 1 */ {
-L1:	loc0: u64
-L2:	loc1: u64
-L3:	loc2: &mut u64
-L4:	loc3: u64
-L5:	loc4: u64
-L6:	loc5: u64
-L7:	loc6: u64
-L8:	loc7: u64
+test1(r: u64): u64 /* def_idx: 1 */ {
+L1:	$t3: u64
+L2:	$t5: u64
+L3:	tref: &mut u64
+L4:	y: u64
+L5:	$t15: u64
+L6:	$t23: u64
+L7:	$t28: u64
+L8:	$t33: u64
 B0:
-	0: CopyLoc[0](Arg0: u64)
+	0: CopyLoc[0](r: u64)
 	1: LdU64(4)
 	2: Lt
 	3: BrFalse(67)
 B1:
-	4: CopyLoc[0](Arg0: u64)
-	5: StLoc[1](loc0: u64)
+	4: CopyLoc[0](r: u64)
+	5: StLoc[1]($t3: u64)
 B2:
-	6: MutBorrowLoc[1](loc0: u64)
-	7: StLoc[3](loc2: &mut u64)
+	6: MutBorrowLoc[1]($t3: u64)
+	7: StLoc[3](tref: &mut u64)
 	8: LdU64(10)
-	9: MoveLoc[3](loc2: &mut u64)
+	9: MoveLoc[3](tref: &mut u64)
 	10: WriteRef
-	11: MoveLoc[0](Arg0: u64)
-	12: StLoc[4](loc3: u64)
-	13: MutBorrowLoc[4](loc3: u64)
-	14: StLoc[3](loc2: &mut u64)
-	15: CopyLoc[3](loc2: &mut u64)
+	11: MoveLoc[0](r: u64)
+	12: StLoc[4](y: u64)
+	13: MutBorrowLoc[4](y: u64)
+	14: StLoc[3](tref: &mut u64)
+	15: CopyLoc[3](tref: &mut u64)
 	16: ReadRef
 	17: LdU64(1)
 	18: Add
-	19: MoveLoc[3](loc2: &mut u64)
+	19: MoveLoc[3](tref: &mut u64)
 	20: WriteRef
-	21: MoveLoc[4](loc3: u64)
-	22: StLoc[2](loc1: u64)
-	23: CopyLoc[2](loc1: u64)
+	21: MoveLoc[4](y: u64)
+	22: StLoc[2]($t5: u64)
+	23: CopyLoc[2]($t5: u64)
 	24: LdU64(0)
 	25: Add
-	26: StLoc[5](loc4: u64)
-	27: MutBorrowLoc[5](loc4: u64)
-	28: StLoc[3](loc2: &mut u64)
-	29: CopyLoc[3](loc2: &mut u64)
+	26: StLoc[5]($t15: u64)
+	27: MutBorrowLoc[5]($t15: u64)
+	28: StLoc[3](tref: &mut u64)
+	29: CopyLoc[3](tref: &mut u64)
 	30: ReadRef
 	31: LdU64(2)
 	32: Add
-	33: MoveLoc[3](loc2: &mut u64)
+	33: MoveLoc[3](tref: &mut u64)
 	34: WriteRef
-	35: CopyLoc[2](loc1: u64)
-	36: StLoc[6](loc5: u64)
-	37: MutBorrowLoc[6](loc5: u64)
-	38: StLoc[3](loc2: &mut u64)
-	39: CopyLoc[3](loc2: &mut u64)
+	35: CopyLoc[2]($t5: u64)
+	36: StLoc[6]($t23: u64)
+	37: MutBorrowLoc[6]($t23: u64)
+	38: StLoc[3](tref: &mut u64)
+	39: CopyLoc[3](tref: &mut u64)
 	40: ReadRef
 	41: LdU64(4)
 	42: Add
-	43: MoveLoc[3](loc2: &mut u64)
+	43: MoveLoc[3](tref: &mut u64)
 	44: WriteRef
-	45: CopyLoc[2](loc1: u64)
-	46: StLoc[7](loc6: u64)
-	47: MutBorrowLoc[7](loc6: u64)
-	48: StLoc[3](loc2: &mut u64)
-	49: CopyLoc[3](loc2: &mut u64)
+	45: CopyLoc[2]($t5: u64)
+	46: StLoc[7]($t28: u64)
+	47: MutBorrowLoc[7]($t28: u64)
+	48: StLoc[3](tref: &mut u64)
+	49: CopyLoc[3](tref: &mut u64)
 	50: ReadRef
 	51: LdU64(8)
 	52: Add
-	53: MoveLoc[3](loc2: &mut u64)
+	53: MoveLoc[3](tref: &mut u64)
 	54: WriteRef
-	55: CopyLoc[2](loc1: u64)
-	56: StLoc[8](loc7: u64)
-	57: MutBorrowLoc[8](loc7: u64)
-	58: StLoc[3](loc2: &mut u64)
-	59: CopyLoc[3](loc2: &mut u64)
+	55: CopyLoc[2]($t5: u64)
+	56: StLoc[8]($t33: u64)
+	57: MutBorrowLoc[8]($t33: u64)
+	58: StLoc[3](tref: &mut u64)
+	59: CopyLoc[3](tref: &mut u64)
 	60: ReadRef
 	61: LdU64(16)
 	62: Add
-	63: MoveLoc[3](loc2: &mut u64)
+	63: MoveLoc[3](tref: &mut u64)
 	64: WriteRef
-	65: MoveLoc[2](loc1: u64)
+	65: MoveLoc[2]($t5: u64)
 	66: Ret
 B3:
 	67: LdU64(3)
-	68: StLoc[1](loc0: u64)
+	68: StLoc[1]($t3: u64)
 	69: Branch(6)
 }
-test1b(Arg0: S): u64 /* def_idx: 2 */ {
-L1:	loc0: S
-L2:	loc1: S
-L3:	loc2: &mut S
-L4:	loc3: S
-L5:	loc4: S
-L6:	loc5: S
-L7:	loc6: S
-L8:	loc7: S
-L9:	loc8: &mut u64
-L10:	loc9: S
-L11:	loc10: u64
-L12:	loc11: u64
-L13:	loc12: u64
+test1b(r: S): u64 /* def_idx: 2 */ {
+L1:	x: S
+L2:	$t5: S
+L3:	tref: &mut S
+L4:	$t13: S
+L5:	y: S
+L6:	$t19: S
+L7:	$t24: S
+L8:	z: S
+L9:	$t12: &mut u64
+L10:	a: S
+L11:	$t34: u64
+L12:	$t41: u64
+L13:	$t48: u64
 B0:
 	0: LdU64(3)
 	1: Pack[0](S)
-	2: StLoc[1](loc0: S)
-	3: ImmBorrowLoc[0](Arg0: S)
+	2: StLoc[1](x: S)
+	3: ImmBorrowLoc[0](r: S)
 	4: ImmBorrowField[0](S.f: u64)
 	5: ReadRef
 	6: LdU64(4)
 	7: Lt
 	8: BrFalse(91)
 B1:
-	9: CopyLoc[0](Arg0: S)
-	10: StLoc[2](loc1: S)
+	9: CopyLoc[0](r: S)
+	10: StLoc[2]($t5: S)
 B2:
-	11: MutBorrowLoc[2](loc1: S)
-	12: StLoc[3](loc2: &mut S)
+	11: MutBorrowLoc[2]($t5: S)
+	12: StLoc[3](tref: &mut S)
 	13: LdU64(10)
-	14: MoveLoc[3](loc2: &mut S)
+	14: MoveLoc[3](tref: &mut S)
 	15: ReadRef
-	16: StLoc[4](loc3: S)
-	17: MutBorrowLoc[4](loc3: S)
+	16: StLoc[4]($t13: S)
+	17: MutBorrowLoc[4]($t13: S)
 	18: MutBorrowField[0](S.f: u64)
 	19: WriteRef
-	20: MoveLoc[0](Arg0: S)
-	21: StLoc[5](loc4: S)
-	22: MutBorrowLoc[5](loc4: S)
-	23: StLoc[3](loc2: &mut S)
-	24: CopyLoc[3](loc2: &mut S)
+	20: MoveLoc[0](r: S)
+	21: StLoc[5](y: S)
+	22: MutBorrowLoc[5](y: S)
+	23: StLoc[3](tref: &mut S)
+	24: CopyLoc[3](tref: &mut S)
 	25: ReadRef
-	26: StLoc[6](loc5: S)
-	27: ImmBorrowLoc[6](loc5: S)
+	26: StLoc[6]($t19: S)
+	27: ImmBorrowLoc[6]($t19: S)
 	28: ImmBorrowField[0](S.f: u64)
 	29: ReadRef
 	30: LdU64(1)
 	31: Add
-	32: MoveLoc[3](loc2: &mut S)
+	32: MoveLoc[3](tref: &mut S)
 	33: ReadRef
-	34: StLoc[7](loc6: S)
-	35: MutBorrowLoc[7](loc6: S)
+	34: StLoc[7]($t24: S)
+	35: MutBorrowLoc[7]($t24: S)
 	36: MutBorrowField[0](S.f: u64)
 	37: WriteRef
-	38: MoveLoc[5](loc4: S)
-	39: StLoc[8](loc7: S)
-	40: MutBorrowLoc[8](loc7: S)
+	38: MoveLoc[5](y: S)
+	39: StLoc[8](z: S)
+	40: MutBorrowLoc[8](z: S)
 	41: MutBorrowField[0](S.f: u64)
-	42: StLoc[9](loc8: &mut u64)
-	43: CopyLoc[9](loc8: &mut u64)
+	42: StLoc[9]($t12: &mut u64)
+	43: CopyLoc[9]($t12: &mut u64)
 	44: ReadRef
 	45: LdU64(1)
 	46: Add
-	47: MoveLoc[9](loc8: &mut u64)
+	47: MoveLoc[9]($t12: &mut u64)
 	48: WriteRef
-	49: MoveLoc[8](loc7: S)
-	50: StLoc[10](loc9: S)
-	51: ImmBorrowLoc[10](loc9: S)
+	49: MoveLoc[8](z: S)
+	50: StLoc[10](a: S)
+	51: ImmBorrowLoc[10](a: S)
 	52: ImmBorrowField[0](S.f: u64)
 	53: ReadRef
-	54: StLoc[11](loc10: u64)
-	55: MutBorrowLoc[11](loc10: u64)
-	56: StLoc[9](loc8: &mut u64)
-	57: CopyLoc[9](loc8: &mut u64)
+	54: StLoc[11]($t34: u64)
+	55: MutBorrowLoc[11]($t34: u64)
+	56: StLoc[9]($t12: &mut u64)
+	57: CopyLoc[9]($t12: &mut u64)
 	58: ReadRef
 	59: LdU64(1)
 	60: Add
-	61: MoveLoc[9](loc8: &mut u64)
+	61: MoveLoc[9]($t12: &mut u64)
 	62: WriteRef
-	63: ImmBorrowLoc[10](loc9: S)
+	63: ImmBorrowLoc[10](a: S)
 	64: ImmBorrowField[0](S.f: u64)
 	65: ReadRef
-	66: StLoc[12](loc11: u64)
-	67: MutBorrowLoc[12](loc11: u64)
-	68: StLoc[9](loc8: &mut u64)
-	69: CopyLoc[9](loc8: &mut u64)
+	66: StLoc[12]($t41: u64)
+	67: MutBorrowLoc[12]($t41: u64)
+	68: StLoc[9]($t12: &mut u64)
+	69: CopyLoc[9]($t12: &mut u64)
 	70: ReadRef
 	71: LdU64(8)
 	72: Add
-	73: MoveLoc[9](loc8: &mut u64)
+	73: MoveLoc[9]($t12: &mut u64)
 	74: WriteRef
-	75: ImmBorrowLoc[10](loc9: S)
+	75: ImmBorrowLoc[10](a: S)
 	76: ImmBorrowField[0](S.f: u64)
 	77: ReadRef
-	78: StLoc[13](loc12: u64)
-	79: MutBorrowLoc[13](loc12: u64)
-	80: StLoc[9](loc8: &mut u64)
-	81: CopyLoc[9](loc8: &mut u64)
+	78: StLoc[13]($t48: u64)
+	79: MutBorrowLoc[13]($t48: u64)
+	80: StLoc[9]($t12: &mut u64)
+	81: CopyLoc[9]($t12: &mut u64)
 	82: ReadRef
 	83: LdU64(16)
 	84: Add
-	85: MoveLoc[9](loc8: &mut u64)
+	85: MoveLoc[9]($t12: &mut u64)
 	86: WriteRef
-	87: ImmBorrowLoc[10](loc9: S)
+	87: ImmBorrowLoc[10](a: S)
 	88: ImmBorrowField[0](S.f: u64)
 	89: ReadRef
 	90: Ret
 B3:
-	91: MoveLoc[1](loc0: S)
-	92: StLoc[2](loc1: S)
+	91: MoveLoc[1](x: S)
+	92: StLoc[2]($t5: S)
 	93: Branch(11)
 }
 public testb(): u64 /* def_idx: 3 */ {
