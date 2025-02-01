@@ -594,6 +594,7 @@ class WriteSetChange(_message.Message):
         TYPE_WRITE_MODULE: _ClassVar[WriteSetChange.Type]
         TYPE_WRITE_RESOURCE: _ClassVar[WriteSetChange.Type]
         TYPE_WRITE_TABLE_ITEM: _ClassVar[WriteSetChange.Type]
+        TYPE_WRITE_UNKNONWN: _ClassVar[WriteSetChange.Type]
     TYPE_UNSPECIFIED: WriteSetChange.Type
     TYPE_DELETE_MODULE: WriteSetChange.Type
     TYPE_DELETE_RESOURCE: WriteSetChange.Type
@@ -601,6 +602,7 @@ class WriteSetChange(_message.Message):
     TYPE_WRITE_MODULE: WriteSetChange.Type
     TYPE_WRITE_RESOURCE: WriteSetChange.Type
     TYPE_WRITE_TABLE_ITEM: WriteSetChange.Type
+    TYPE_WRITE_UNKNONWN: WriteSetChange.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
     DELETE_MODULE_FIELD_NUMBER: _ClassVar[int]
     DELETE_RESOURCE_FIELD_NUMBER: _ClassVar[int]
