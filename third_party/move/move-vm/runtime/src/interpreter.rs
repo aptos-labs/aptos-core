@@ -1541,6 +1541,7 @@ impl CallStack {
     }
 }
 
+#[allow(dead_code)]
 fn check_depth_of_type(resolver: &Resolver, ty: &Type) -> PartialVMResult<()> {
     let _timer = VM_TIMER.timer_with_label("Interpreter::check_depth_of_type");
 
@@ -1966,29 +1967,7 @@ impl Frame {
                         interpreter.operand_stack.push(field_ref)?;
                     },
                     Bytecode::Pack(sd_idx) => {
-                        let get_field_count_charge_gas_and_check_depth =
-                            || -> PartialVMResult<u16> {
-                                let field_count = resolver.field_count(*sd_idx);
-                                let struct_type = resolver.get_struct_ty(*sd_idx);
-                                check_depth_of_type(resolver, &struct_type)?;
-                                Ok(field_count)
-                            };
-
-                        let field_count = if RTCaches::caches_enabled() {
-                            let cached_field_count =
-                                &frame_cache.per_instruction_cache[self.pc as usize];
-                            if let PerInstructionCache::Pack(ref field_count) = cached_field_count {
-                                *field_count
-                            } else {
-                                let field_count = get_field_count_charge_gas_and_check_depth()?;
-                                frame_cache.per_instruction_cache[self.pc as usize] =
-                                    PerInstructionCache::Pack(field_count);
-                                field_count
-                            }
-                        } else {
-                            get_field_count_charge_gas_and_check_depth()?
-                        };
-
+                        let field_count = resolver.field_count(*sd_idx);
                         gas_meter.charge_pack(
                             false,
                             interpreter.operand_stack.last_n(field_count as usize)?,
@@ -2000,8 +1979,6 @@ impl Frame {
                     },
                     Bytecode::PackVariant(idx) => {
                         let info = resolver.get_struct_variant_at(*idx);
-                        let struct_type = resolver.create_struct_ty(&info.definition_struct_type);
-                        check_depth_of_type(resolver, &struct_type)?;
                         gas_meter.charge_pack_variant(
                             false,
                             interpreter
@@ -2030,10 +2007,9 @@ impl Frame {
                                     gas_meter.charge_create_ty(*ty_count)?;
                                 }
 
-                                let (ty, ty_count) =
+                                let (_, ty_count) =
                                     frame_cache.get_struct_type(*si_idx, resolver, ty_args)?;
                                 gas_meter.charge_create_ty(ty_count)?;
-                                check_depth_of_type(resolver, ty)?;
                                 Ok(resolver.field_instantiation_count(*si_idx))
                             };
 
@@ -2074,10 +2050,9 @@ impl Frame {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
 
-                        let (ty, ty_count) =
+                        let (_, ty_count) =
                             frame_cache.get_struct_variant_type(*si_idx, resolver, ty_args)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        check_depth_of_type(resolver, ty)?;
 
                         let info = resolver.get_struct_variant_instantiation_at(*si_idx);
                         gas_meter.charge_pack_variant(
@@ -2125,11 +2100,9 @@ impl Frame {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
 
-                        let (ty, ty_count) =
+                        let (_, ty_count) =
                             frame_cache.get_struct_type(*si_idx, resolver, ty_args)?;
                         gas_meter.charge_create_ty(ty_count)?;
-
-                        check_depth_of_type(resolver, ty)?;
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
 
@@ -2150,11 +2123,9 @@ impl Frame {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
 
-                        let (ty, ty_count) =
+                        let (_, ty_count) =
                             frame_cache.get_struct_variant_type(*si_idx, resolver, ty_args)?;
                         gas_meter.charge_create_ty(ty_count)?;
-
-                        check_depth_of_type(resolver, ty)?;
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
 
@@ -2451,7 +2422,6 @@ impl Frame {
                             self.function.ty_args(),
                         )?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        check_depth_of_type(resolver, ty)?;
                         gas_meter.charge_vec_pack(
                             make_ty!(ty),
                             interpreter.operand_stack.last_n(*num as usize)?,
