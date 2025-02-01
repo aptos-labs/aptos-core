@@ -120,6 +120,7 @@ pub enum FeatureFlag {
     ACCOUNT_ABSTRACTION = 85,
     /// Enables bytecode version v8
     VM_BINARY_FORMAT_V8 = 86,
+    BULLETPROOFS_BATCH_NATIVES = 87,
 }
 
 impl FeatureFlag {
