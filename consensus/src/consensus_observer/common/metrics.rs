@@ -18,6 +18,7 @@ pub const CREATED_SUBSCRIPTION_LABEL: &str = "created_subscription";
 pub const ORDERED_BLOCK_ENTRIES_LABEL: &str = "ordered_block_entries";
 pub const ORDERED_BLOCK_LABEL: &str = "ordered_block";
 pub const PENDING_BLOCK_ENTRIES_LABEL: &str = "pending_block_entries";
+pub const ORDERED_BLOCK_WITH_WINDOW_LABEL: &str = "ordered_block_with_window";
 pub const PENDING_BLOCKS_LABEL: &str = "pending_blocks";
 pub const STORED_PAYLOADS_LABEL: &str = "stored_payloads";
 
@@ -48,6 +49,16 @@ pub static OBSERVER_DROPPED_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "consensus_observer_dropped_messages",
         "Counters related to dropped (direct send) messages by the consensus observer",
+        &["message_type", "network_id"]
+    )
+    .unwrap()
+});
+
+/// Counter for tracking invalid (direct send) messages by the consensus observer
+pub static OBSERVER_INVALID_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "consensus_observer_invalid_messages",
+        "Counters related to invalid messages by the consensus observer",
         &["message_type", "network_id"]
     )
     .unwrap()
