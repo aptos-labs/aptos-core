@@ -37,10 +37,10 @@ fn base_coin_type(market_id: u64) -> &'static str {
 }
 
 fn quote_coin_type(market_id: u64) -> &'static str {
-    if market_id < 30 {
-        if market_id % 3 == 0 {
+    if (market_id - 1) < 30 {
+        if (market_id-1) % 3 == 0 {
             "QC"
-        } else if market_id % 3 == 1 {
+        } else if (market_id-1) % 3 == 1 {
             "QBC"
         } else {
             "QCC"
