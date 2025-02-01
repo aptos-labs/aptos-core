@@ -82,7 +82,10 @@ fn spawn_shared_fut<
     async move {
         match join_handle.await {
             Ok(Ok(res)) => Ok(res),
-            Ok(Err(e)) => Err(TaskError::PropagatedError(Box::new(e))),
+            Ok(e @ Err(TaskError::PropagatedError(_))) => e,
+            Ok(Err(e @ TaskError::InternalError(_) | e @ TaskError::JoinError(_))) => {
+                Err(TaskError::PropagatedError(Box::new(e)))
+            },
             Err(e) => Err(TaskError::JoinError(Arc::new(e))),
         }
     }
@@ -151,7 +154,7 @@ impl Tracker {
             .with_label_values(&[self.name, "work_time"])
             .observe(work_time.as_secs_f64());
         info!(
-            "[Pipeline] Block {} {} {} finishes {}, waits {}, takes {}",
+            "[Pipeline] Block {} {} {} finishes {}, waits {}ms, takes {}ms",
             self.block_id,
             self.epoch,
             self.round,

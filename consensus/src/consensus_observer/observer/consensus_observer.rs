@@ -266,10 +266,37 @@ impl ConsensusObserver {
     async fn finalize_ordered_block(&mut self, ordered_block: OrderedBlock) {
         info!(
             LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                "Forwarding ordered blocks to the execution pipeline: {}",
-                ordered_block.proof_block_info()
+                "Forwarding ordered blocks to the execution pipeline: {}. New pipeline enabled: {}",
+                ordered_block.proof_block_info(),
+                self.pipeline_enabled()
             ))
         );
+
+        // If the pipeline is enabled, send the ordered blocks to the pipeline.
+        // Note: we still want to call finalize_order() below as the buffer manager
+        // differentiates based on whether the futures are present or not.
+        if self.pipeline_enabled() {
+            for block in ordered_block.blocks() {
+                // Create the commit callback (to be called after the execution pipeline)
+                let commit_callback = self.active_observer_state.create_commit_callback(
+                    self.ordered_block_store.clone(),
+                    self.block_payload_store.clone(),
+                );
+
+                // Send the ordered block to the execution pipeline
+                if let Some(pipeline_futs) = self.get_last_pipeline_futs() {
+                    self.pipeline_builder()
+                        .build(block, pipeline_futs, commit_callback);
+                } else {
+                    warn!(
+                        LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                            "Parent block's pipeline futures for ordered block is missing! Ignoring: {:?}",
+                            ordered_block.proof_block_info()
+                        ))
+                    );
+                }
+            }
+        }
 
         // Create the commit callback (to be called after the execution pipeline)
         let commit_callback = self
@@ -354,17 +381,19 @@ impl ConsensusObserver {
         }
     }
 
-    /// Returns the last block's pipeline futures, should only be called when pipeline is enabled
-    fn get_last_pipeline_futs(&self) -> PipelineFutures {
+    /// Returns the last block's pipeline futures (should only be called when pipeline is enabled)
+    fn get_last_pipeline_futs(&self) -> Option<PipelineFutures> {
         if let Some(last_ordered_block) = self.ordered_block_store.lock().get_last_ordered_block() {
-            last_ordered_block
-                .pipeline_futs()
-                .expect("Pipeline futures should exist when enabled")
+            let result = last_ordered_block.pipeline_futs();
+            if result.is_none() {
+                warn!("last_ordered_block: {:?}", last_ordered_block);
+            }
+            result
         } else {
-            self.pipeline_builder().build_root(
+            Some(self.pipeline_builder().build_root(
                 StateComputeResult::new_dummy(),
                 self.active_observer_state.root().clone(),
-            )
+            ))
         }
     }
 
@@ -779,19 +808,6 @@ impl ConsensusObserver {
                 metrics::ORDERED_BLOCK_LABEL,
             );
 
-            if self.pipeline_enabled() {
-                for block in ordered_block.blocks() {
-                    let commit_callback = self.active_observer_state.create_commit_callback(
-                        self.ordered_block_store.clone(),
-                        self.block_payload_store.clone(),
-                    );
-                    self.pipeline_builder().build(
-                        block,
-                        self.get_last_pipeline_futs(),
-                        commit_callback,
-                    );
-                }
-            }
             // Insert the ordered block into the pending blocks
             self.ordered_block_store
                 .lock()
@@ -1008,6 +1024,7 @@ impl ConsensusObserver {
                 None,
                 rand_msg_rx,
                 0,
+                self.pipeline_enabled(),
             )
             .await;
         if self.pipeline_enabled() {
