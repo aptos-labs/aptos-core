@@ -8,6 +8,9 @@ use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Default Window Size for Execution Pool
+pub const DEFAULT_WINDOW_SIZE: usize = 1usize;
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum ConsensusAlgorithmConfig {
     Jolteon {
@@ -192,14 +195,21 @@ pub enum OnChainConsensusConfig {
         alg: ConsensusAlgorithmConfig,
         vtxn: ValidatorTxnConfig,
     },
+    V4 {
+        alg: ConsensusAlgorithmConfig,
+        vtxn: ValidatorTxnConfig,
+        // Execution pool block window
+        window_size: usize,
+    },
 }
 
 /// The public interface that exposes all values with safe fallback.
 impl OnChainConsensusConfig {
     pub fn default_for_genesis() -> Self {
-        OnChainConsensusConfig::V3 {
+        OnChainConsensusConfig::V4 {
             alg: ConsensusAlgorithmConfig::default_for_genesis(),
             vtxn: ValidatorTxnConfig::default_for_genesis(),
+            window_size: DEFAULT_WINDOW_SIZE,
         }
     }
 
@@ -209,7 +219,9 @@ impl OnChainConsensusConfig {
             OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
                 config.exclude_round
             },
-            OnChainConsensusConfig::V3 { alg, .. } => alg.leader_reputation_exclude_round(),
+            OnChainConsensusConfig::V3 { alg, .. } | OnChainConsensusConfig::V4 { alg, .. } => {
+                alg.leader_reputation_exclude_round()
+            },
         }
     }
 
@@ -225,7 +237,9 @@ impl OnChainConsensusConfig {
             OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
                 config.max_failed_authors_to_store
             },
-            OnChainConsensusConfig::V3 { alg, .. } => alg.max_failed_authors_to_store(),
+            OnChainConsensusConfig::V3 { alg, .. } | OnChainConsensusConfig::V4 { alg, .. } => {
+                alg.max_failed_authors_to_store()
+            },
         }
     }
 
@@ -235,7 +249,9 @@ impl OnChainConsensusConfig {
             OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
                 &config.proposer_election_type
             },
-            OnChainConsensusConfig::V3 { alg, .. } => alg.proposer_election_type(),
+            OnChainConsensusConfig::V3 { alg, .. } | OnChainConsensusConfig::V4 { alg, .. } => {
+                alg.proposer_election_type()
+            },
         }
     }
 
@@ -243,7 +259,9 @@ impl OnChainConsensusConfig {
         match &self {
             OnChainConsensusConfig::V1(_config) => false,
             OnChainConsensusConfig::V2(_) => true,
-            OnChainConsensusConfig::V3 { alg, .. } => alg.quorum_store_enabled(),
+            OnChainConsensusConfig::V3 { alg, .. } | OnChainConsensusConfig::V4 { alg, .. } => {
+                alg.quorum_store_enabled()
+            },
         }
     }
 
@@ -251,7 +269,19 @@ impl OnChainConsensusConfig {
         match &self {
             OnChainConsensusConfig::V1(_config) => false,
             OnChainConsensusConfig::V2(_) => false,
-            OnChainConsensusConfig::V3 { alg, .. } => alg.order_vote_enabled(),
+            OnChainConsensusConfig::V3 { alg, .. } | OnChainConsensusConfig::V4 { alg, .. } => {
+                alg.order_vote_enabled()
+            },
+        }
+    }
+
+    /// Window Size was not introduced until OnChainConsensusConfig V4
+    pub fn window_size(&self) -> usize {
+        match &self {
+            OnChainConsensusConfig::V1(_) => DEFAULT_WINDOW_SIZE,
+            OnChainConsensusConfig::V2(_) => DEFAULT_WINDOW_SIZE,
+            OnChainConsensusConfig::V3 { .. } => DEFAULT_WINDOW_SIZE,
+            OnChainConsensusConfig::V4 { window_size, .. } => window_size.to_owned(),
         }
     }
 
@@ -259,13 +289,17 @@ impl OnChainConsensusConfig {
         match self {
             OnChainConsensusConfig::V1(_) => false,
             OnChainConsensusConfig::V2(_) => false,
-            OnChainConsensusConfig::V3 { alg, .. } => alg.is_dag_enabled(),
+            OnChainConsensusConfig::V3 { alg, .. } | OnChainConsensusConfig::V4 { alg, .. } => {
+                alg.is_dag_enabled()
+            },
         }
     }
 
     pub fn unwrap_dag_config_v1(&self) -> &DagConsensusConfigV1 {
         match &self {
-            OnChainConsensusConfig::V3 { alg, .. } => alg.unwrap_dag_config_v1(),
+            OnChainConsensusConfig::V3 { alg, .. } | OnChainConsensusConfig::V4 { alg, .. } => {
+                alg.unwrap_dag_config_v1()
+            },
             _ => unreachable!("not a dag config"),
         }
     }
@@ -275,7 +309,9 @@ impl OnChainConsensusConfig {
             OnChainConsensusConfig::V1(_) | OnChainConsensusConfig::V2(_) => {
                 ValidatorTxnConfig::default_disabled()
             },
-            OnChainConsensusConfig::V3 { vtxn, .. } => vtxn.clone(),
+            OnChainConsensusConfig::V3 { vtxn, .. } | OnChainConsensusConfig::V4 { vtxn, .. } => {
+                vtxn.clone()
+            },
         }
     }
 
@@ -288,7 +324,7 @@ impl OnChainConsensusConfig {
             OnChainConsensusConfig::V1(_) | OnChainConsensusConfig::V2(_) => {
                 // vtxn not supported. No-op.
             },
-            OnChainConsensusConfig::V3 { vtxn, .. } => {
+            OnChainConsensusConfig::V3 { vtxn, .. } | OnChainConsensusConfig::V4 { vtxn, .. } => {
                 *vtxn = ValidatorTxnConfig::V0;
             },
         }
@@ -316,10 +352,23 @@ impl OnChainConsensusConfig {
                 vtxn: ValidatorTxnConfig::V0,
                 alg,
             } => OnChainConsensusConfig::V3 {
-                alg,
                 vtxn: ValidatorTxnConfig::default_enabled(),
+                alg,
+            },
+            OnChainConsensusConfig::V4 {
+                vtxn: ValidatorTxnConfig::V0,
+                alg,
+                window_size,
+            } => OnChainConsensusConfig::V4 {
+                vtxn: ValidatorTxnConfig::default_enabled(),
+                alg,
+                window_size,
             },
             item @ OnChainConsensusConfig::V3 {
+                vtxn: ValidatorTxnConfig::V1 { .. },
+                ..
+            } => item,
+            item @ OnChainConsensusConfig::V4 {
                 vtxn: ValidatorTxnConfig::V1 { .. },
                 ..
             } => item,
