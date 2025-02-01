@@ -469,12 +469,15 @@ impl BlockTransactionPayload {
     pub fn new_quorum_store_inline_hybrid(
         transactions: Vec<SignedTransaction>,
         proofs: Vec<ProofOfStore>,
-        limit: Option<u64>,
+        transaction_limit: Option<u64>,
+        gas_limit: Option<u64>,
         inline_batches: Vec<BatchInfo>,
     ) -> Self {
         let payload_with_proof = PayloadWithProof::new(transactions, proofs);
-        let proof_with_limit = PayloadWithProofAndLimit::new(payload_with_proof, limit);
-        Self::QuorumStoreInlineHybrid(proof_with_limit, inline_batches)
+        let proof_with_limits = TransactionsWithProof::TransactionsWithProofAndLimits(
+            TransactionsWithProofAndLimits::new(payload_with_proof, transaction_limit, gas_limit),
+        );
+        Self::QuorumStoreInlineHybridV2(proof_with_limits, inline_batches)
     }
 
     pub fn new_opt_quorum_store(
@@ -591,6 +594,7 @@ impl BlockTransactionPayload {
                 inline_batches,
                 proof_with_data,
                 max_txns_to_execute,
+                _block_gas_limit,
             ) => {
                 // Verify the batches in the requested block
                 self.verify_batches(&proof_with_data.proofs)?;
@@ -600,6 +604,8 @@ impl BlockTransactionPayload {
 
                 // Verify the transaction limit
                 self.verify_transaction_limit(*max_txns_to_execute)?;
+
+                // TODO: verify the block gas limit?
             },
             Payload::OptQuorumStore(opt_qs_payload) => {
                 // Verify the batches in the requested block
@@ -946,10 +952,10 @@ mod test {
     use aptos_consensus_types::{
         block::Block,
         block_data::{BlockData, BlockType},
-        common::{Author, ProofWithData, ProofWithDataWithTxnLimit},
+        common::{Author, ProofWithData, ProofWithDataWithLimits},
         payload::{
-            BatchPointer, InlineBatch, OptBatches, OptQuorumStorePayload, PayloadExecutionLimit,
-            ProofBatches,
+            BatchPointer, BlockExecutionLimits, InlineBatch, OptBatches, OptQuorumStorePayload,
+            PayloadExecutionLimit, ProofBatches,
         },
         proof_of_store::BatchId,
         quorum_cert::QuorumCert,
@@ -1019,6 +1025,7 @@ mod test {
         // Create an empty transaction payload with no proofs
         let proofs = vec![];
         let transaction_limit = Some(10);
+        let gas_limit = Some(10_000);
         let transaction_payload = BlockTransactionPayload::new_in_quorum_store_with_limit(
             vec![],
             proofs.clone(),
@@ -1027,12 +1034,13 @@ mod test {
 
         // Create a quorum store payload with a single proof
         let batch_info = create_batch_info();
-        let proof_with_data = ProofWithDataWithTxnLimit::new(
+        let proof_with_data = ProofWithDataWithLimits::new(
             ProofWithData::new(vec![ProofOfStore::new(
                 batch_info,
                 AggregateSignature::empty(),
             )]),
             transaction_limit,
+            gas_limit,
         );
         let ordered_payload = Payload::InQuorumStoreWithLimit(proof_with_data);
 
@@ -1044,7 +1052,7 @@ mod test {
 
         // Create a quorum store payload with no proofs and no transaction limit
         let proof_with_data =
-            ProofWithDataWithTxnLimit::new(ProofWithData::new(proofs.clone()), None);
+            ProofWithDataWithLimits::new(ProofWithData::new(proofs.clone()), None, None);
         let ordered_payload = Payload::InQuorumStoreWithLimit(proof_with_data);
 
         // Verify the transaction payload and ensure it fails (the transaction limit doesn't match)
@@ -1055,7 +1063,7 @@ mod test {
 
         // Create a quorum store payload with no proofs and the correct limit
         let proof_with_data =
-            ProofWithDataWithTxnLimit::new(ProofWithData::new(proofs), transaction_limit);
+            ProofWithDataWithLimits::new(ProofWithData::new(proofs), transaction_limit, gas_limit);
         let ordered_payload = Payload::InQuorumStoreWithLimit(proof_with_data);
 
         // Verify the transaction payload and ensure it passes
@@ -1069,11 +1077,13 @@ mod test {
         // Create an empty transaction payload with no proofs and no inline batches
         let proofs = vec![];
         let transaction_limit = Some(100);
+        let gas_limit = Some(10_000);
         let inline_batches = vec![];
         let transaction_payload = BlockTransactionPayload::new_quorum_store_inline_hybrid(
             vec![],
             proofs.clone(),
             transaction_limit,
+            gas_limit,
             inline_batches.clone(),
         );
 
@@ -1088,6 +1098,7 @@ mod test {
             inline_batches.clone(),
             proof_with_data,
             transaction_limit,
+            gas_limit,
         );
 
         // Verify the transaction payload and ensure it fails (the batch infos don't match)
@@ -1099,7 +1110,7 @@ mod test {
         // Create a quorum store payload with no transaction limit
         let proof_with_data = ProofWithData::new(vec![]);
         let ordered_payload =
-            Payload::QuorumStoreInlineHybrid(inline_batches.clone(), proof_with_data, None);
+            Payload::QuorumStoreInlineHybrid(inline_batches.clone(), proof_with_data, None, None);
 
         // Verify the transaction payload and ensure it fails (the transaction limit doesn't match)
         let error = transaction_payload
@@ -1113,6 +1124,7 @@ mod test {
             vec![(create_batch_info(), vec![])],
             proof_with_data,
             transaction_limit,
+            gas_limit,
         );
 
         // Verify the transaction payload and ensure it fails (the inline batches don't match)
@@ -1124,7 +1136,7 @@ mod test {
         // Create an empty quorum store payload
         let proof_with_data = ProofWithData::new(vec![]);
         let ordered_payload =
-            Payload::QuorumStoreInlineHybrid(vec![], proof_with_data, transaction_limit);
+            Payload::QuorumStoreInlineHybrid(vec![], proof_with_data, transaction_limit, gas_limit);
 
         // Verify the transaction payload and ensure it passes
         transaction_payload
@@ -1215,7 +1227,10 @@ mod test {
             Vec::<InlineBatch>::new().into(),
             Vec::new().into(),
             proof_with_data,
-            PayloadExecutionLimit::MaxTransactionsToExecute(100),
+            PayloadExecutionLimit::Limits(BlockExecutionLimits {
+                max_txns: Some(100),
+                max_gas: Some(10_000),
+            }),
         ));
 
         // Verify the transaction payload and ensure it passes
@@ -1237,7 +1252,10 @@ mod test {
             inline_batches,
             opt_batches,
             proofs.clone().into(),
-            PayloadExecutionLimit::MaxTransactionsToExecute(100),
+            PayloadExecutionLimit::Limits(BlockExecutionLimits {
+                max_txns: Some(100),
+                max_gas: Some(10_000),
+            }),
         ));
 
         let transaction_payload = BlockTransactionPayload::new_opt_quorum_store(
@@ -1685,6 +1703,7 @@ mod test {
             vec![],
             proofs.clone(),
             None,
+            None,
             vec![],
         );
 
@@ -1757,6 +1776,7 @@ mod test {
         let transaction_payload = BlockTransactionPayload::new_quorum_store_inline_hybrid(
             signed_transactions.to_vec(),
             proofs.to_vec(),
+            None,
             None,
             inline_batches.to_vec(),
         );
