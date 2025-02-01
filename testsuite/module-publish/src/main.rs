@@ -131,13 +131,13 @@ use std::collections::HashMap;"#,
         ));
     }
 
-    for (package_name, additional_package) in additional_packages() {
-        packages.push(write_package(
-            &mut generic_mod,
-            base_dir.join(additional_package),
-            package_name,
-        ));
-    }
+    // for (package_name, additional_package) in additional_packages() {
+    //     packages.push(write_package(
+    //         &mut generic_mod,
+    //         base_dir.join(additional_package),
+    //         package_name,
+    //     ));
+    // }
 
     write_accessors(&mut generic_mod, packages);
 
