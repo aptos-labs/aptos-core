@@ -416,13 +416,15 @@ impl ConsensusObserver {
 
         // Verify the block payload digests
         if let Err(error) = block_payload.verify_payload_digests() {
+            // Log the error and update the invalid message counter
             error!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Failed to verify block payload digests! Ignoring block: {:?}. Error: {:?}",
-                    block_payload.block(),
+                    "Failed to verify block payload digests! Ignoring block: {:?}, from peer: {:?}. Error: {:?}",
+                    block_payload.block(), peer_network_id,
                     error
                 ))
             );
+            increment_invalid_message_counter(&peer_network_id, metrics::BLOCK_PAYLOAD_LABEL);
             return;
         }
 
@@ -431,12 +433,14 @@ impl ConsensusObserver {
         let verified_payload = if block_epoch == epoch_state.epoch {
             // Verify the block proof signatures
             if let Err(error) = block_payload.verify_payload_signatures(&epoch_state) {
+                // Log the error and update the invalid message counter
                 error!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Failed to verify block payload signatures! Ignoring block: {:?}. Error: {:?}",
-                        block_payload.block(), error
+                        "Failed to verify block payload signatures! Ignoring block: {:?}, from peer: {:?}. Error: {:?}",
+                        block_payload.block(), peer_network_id, error
                     ))
                 );
+                increment_invalid_message_counter(&peer_network_id, metrics::BLOCK_PAYLOAD_LABEL);
                 return;
             }
 
@@ -492,13 +496,16 @@ impl ConsensusObserver {
         if commit_epoch == epoch_state.epoch {
             // Verify the commit decision
             if let Err(error) = commit_decision.verify_commit_proof(&epoch_state) {
+                // Log the error and update the invalid message counter
                 error!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Failed to verify commit decision! Ignoring: {:?}, Error: {:?}",
+                        "Failed to verify commit decision! Ignoring: {:?}, from peer: {:?}. Error: {:?}",
                         commit_decision.proof_block_info(),
+                        peer_network_id,
                         error
                     ))
                 );
+                increment_invalid_message_counter(&peer_network_id, metrics::COMMIT_DECISION_LABEL);
                 return;
             }
 
@@ -606,12 +613,8 @@ impl ConsensusObserver {
             .subscription_manager
             .verify_message_for_subscription(peer_network_id)
         {
-            // Increment the rejected message counter
-            metrics::increment_counter(
-                &metrics::OBSERVER_REJECTED_MESSAGES,
-                message.get_label(),
-                &peer_network_id,
-            );
+            // Update the rejected message counter
+            increment_rejected_message_counter(&peer_network_id, &message);
 
             // Log the error and return
             warn!(
@@ -624,11 +627,7 @@ impl ConsensusObserver {
         }
 
         // Increment the received message counter
-        metrics::increment_counter(
-            &metrics::OBSERVER_RECEIVED_MESSAGES,
-            message.get_label(),
-            &peer_network_id,
-        );
+        increment_received_message_counter(&peer_network_id, &message);
 
         // Process the message based on the type
         match message {
@@ -670,13 +669,16 @@ impl ConsensusObserver {
     ) {
         // Verify the ordered blocks before processing
         if let Err(error) = ordered_block.verify_ordered_blocks() {
+            // Log the error and update the invalid message counter
             error!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Failed to verify ordered blocks! Ignoring: {:?}, Error: {:?}",
+                    "Failed to verify ordered blocks! Ignoring: {:?}, from peer: {:?}. Error: {:?}",
                     ordered_block.proof_block_info(),
+                    peer_network_id,
                     error
                 ))
             );
+            increment_invalid_message_counter(&peer_network_id, metrics::ORDERED_BLOCK_LABEL);
             return;
         };
 
@@ -733,13 +735,16 @@ impl ConsensusObserver {
         let epoch_state = self.get_epoch_state();
         if ordered_block.proof_block_info().epoch() == epoch_state.epoch {
             if let Err(error) = ordered_block.verify_ordered_proof(&epoch_state) {
-                warn!(
+                // Log the error and update the invalid message counter
+                error!(
                     LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                        "Failed to verify ordered proof! Ignoring: {:?}, Error: {:?}",
+                        "Failed to verify ordered proof! Ignoring: {:?}, from peer: {:?}. Error: {:?}",
                         ordered_block.proof_block_info(),
+                        peer_network_id,
                         error
                     ))
                 );
+                increment_invalid_message_counter(&peer_network_id, metrics::ORDERED_BLOCK_LABEL);
                 return;
             }
         } else {
@@ -759,13 +764,16 @@ impl ConsensusObserver {
             .lock()
             .verify_payloads_against_ordered_block(&ordered_block)
         {
+            // Log the error and update the invalid message counter
             error!(
                 LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                    "Failed to verify block payloads against ordered block! Ignoring: {:?}, Error: {:?}",
+                    "Failed to verify block payloads against ordered block! Ignoring: {:?}, from peer: {:?}. Error: {:?}",
                     ordered_block.proof_block_info(),
+                    peer_network_id,
                     error
                 ))
             );
+            increment_invalid_message_counter(&peer_network_id, metrics::ORDERED_BLOCK_LABEL);
             return;
         }
 
@@ -779,6 +787,7 @@ impl ConsensusObserver {
                 metrics::ORDERED_BLOCK_LABEL,
             );
 
+            // If the new pipeline is enabled, build the pipeline for the blocks
             if self.pipeline_enabled() {
                 for block in ordered_block.blocks() {
                     let commit_callback = self.active_observer_state.create_commit_callback(
@@ -792,6 +801,7 @@ impl ConsensusObserver {
                     );
                 }
             }
+
             // Insert the ordered block into the pending blocks
             self.ordered_block_store
                 .lock()
@@ -1148,12 +1158,8 @@ fn update_metrics_for_dropped_block_payload_message(
     peer_network_id: PeerNetworkId,
     block_payload: &BlockPayload,
 ) {
-    // Increment the dropped message counter
-    metrics::increment_counter(
-        &metrics::OBSERVER_DROPPED_MESSAGES,
-        metrics::BLOCK_PAYLOAD_LABEL,
-        &peer_network_id,
-    );
+    // Update the dropped message counter
+    increment_dropped_message_counter(&peer_network_id, metrics::BLOCK_PAYLOAD_LABEL);
 
     // Log the dropped block payload message
     debug!(
@@ -1171,12 +1177,8 @@ fn update_metrics_for_dropped_commit_decision_message(
     peer_network_id: PeerNetworkId,
     commit_decision: &CommitDecision,
 ) {
-    // Increment the dropped message counter
-    metrics::increment_counter(
-        &metrics::OBSERVER_DROPPED_MESSAGES,
-        metrics::COMMITTED_BLOCKS_LABEL,
-        &peer_network_id,
-    );
+    // Update the dropped message counter
+    increment_dropped_message_counter(&peer_network_id, metrics::COMMITTED_BLOCKS_LABEL);
 
     // Log the dropped commit decision message
     debug!(
@@ -1194,12 +1196,8 @@ fn update_metrics_for_dropped_ordered_block_message(
     peer_network_id: PeerNetworkId,
     ordered_block: &OrderedBlock,
 ) {
-    // Increment the dropped message counter
-    metrics::increment_counter(
-        &metrics::OBSERVER_DROPPED_MESSAGES,
-        metrics::ORDERED_BLOCK_LABEL,
-        &peer_network_id,
-    );
+    // Update the dropped message counter
+    increment_dropped_message_counter(&peer_network_id, metrics::ORDERED_BLOCK_LABEL);
 
     // Log the dropped ordered block message
     debug!(
@@ -1230,5 +1228,47 @@ fn update_metrics_for_ordered_block_message(
         &metrics::OBSERVER_RECEIVED_MESSAGE_ROUNDS,
         metrics::ORDERED_BLOCK_LABEL,
         ordered_block.proof_block_info().round(),
+    );
+}
+
+/// Increments the dropped message counter for the given peer and message
+fn increment_dropped_message_counter(peer_network_id: &PeerNetworkId, message_label: &str) {
+    metrics::increment_counter(
+        &metrics::OBSERVER_DROPPED_MESSAGES,
+        message_label,
+        peer_network_id,
+    );
+}
+
+/// Increments the invalid message counter for the given peer and message
+fn increment_invalid_message_counter(peer_network_id: &PeerNetworkId, message_label: &str) {
+    metrics::increment_counter(
+        &metrics::OBSERVER_INVALID_MESSAGES,
+        message_label,
+        peer_network_id,
+    );
+}
+
+/// Increments the received message counter for the given peer and message
+fn increment_received_message_counter(
+    peer_network_id: &PeerNetworkId,
+    message: &ConsensusObserverDirectSend,
+) {
+    metrics::increment_counter(
+        &metrics::OBSERVER_RECEIVED_MESSAGES,
+        message.get_label(),
+        peer_network_id,
+    );
+}
+
+/// Increments the rejected message counter for the given peer and message
+fn increment_rejected_message_counter(
+    peer_network_id: &PeerNetworkId,
+    message: &ConsensusObserverDirectSend,
+) {
+    metrics::increment_counter(
+        &metrics::OBSERVER_REJECTED_MESSAGES,
+        message.get_label(),
+        peer_network_id,
     );
 }
