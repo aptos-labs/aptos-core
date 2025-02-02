@@ -241,7 +241,7 @@ impl BuiltPackage {
                 additional_named_addresses: options.named_addresses.clone(),
                 architecture: None,
                 generate_abis: options.with_abis,
-                generate_docs: false,
+                generate_docs: options.with_docs,
                 generate_move_model: true,
                 full_model_generation: options.check_test_code,
                 install_dir: options.install_dir.clone(),
