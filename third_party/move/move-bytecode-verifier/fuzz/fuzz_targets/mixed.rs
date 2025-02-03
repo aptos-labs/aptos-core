@@ -5,14 +5,14 @@
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use move_binary_format::file_format::{
-    empty_module, AbilitySet, Bytecode, CodeUnit, Constant, FieldDefinition, FunctionDefinition,
+    empty_module, Bytecode, CodeUnit, Constant, FieldDefinition, FunctionDefinition,
     FunctionHandle, FunctionHandleIndex, IdentifierIndex, ModuleHandleIndex, Signature,
     SignatureIndex, SignatureToken,
     SignatureToken::{Address, Bool},
     StructDefinition, StructFieldInformation, StructHandle, StructHandleIndex, TypeSignature,
     Visibility,
 };
-use move_core_types::{account_address::AccountAddress, ident_str};
+use move_core_types::{ability::AbilitySet, account_address::AccountAddress, ident_str};
 
 #[derive(Arbitrary, Debug)]
 struct Mixed {

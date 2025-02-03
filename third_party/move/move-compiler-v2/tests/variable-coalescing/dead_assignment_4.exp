@@ -243,8 +243,7 @@ public fun m::test1(): u64 {
 public fun m::test2($t0: u64): u64 {
      var $t1: u64 [unused]
      var $t2: u64 [unused]
-  0: $t0 := move($t0)
-  1: return $t0
+  0: return $t0
 }
 
 
@@ -267,7 +266,7 @@ public fun m::test4($t0: u64): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 
 

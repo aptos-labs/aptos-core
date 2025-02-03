@@ -32,8 +32,8 @@ error: data invariant does not hold
    =         common = <redacted>
    =     at tests/sources/functional/enum.move:37: test_data_invariant
    =         <redacted> = <redacted>
-   =         z = <redacted>
    =     at tests/sources/functional/enum.move:38: test_data_invariant
+   =         z = <redacted>
    =     at tests/sources/functional/enum.move:17
    =     at tests/sources/functional/enum.move:18
 

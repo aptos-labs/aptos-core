@@ -178,6 +178,8 @@ fn main() {
         EntryPoints::IncGlobalMilestoneAggV2 { milestone_every: 1 },
         EntryPoints::IncGlobalMilestoneAggV2 { milestone_every: 2 },
         EntryPoints::EmitEvents { count: 1000 },
+        EntryPoints::APTTransferWithPermissionedSigner,
+        EntryPoints::APTTransferWithMasterSigner,
         // long vectors with small elements
         EntryPoints::VectorTrimAppend {
             // baseline, only vector creation
@@ -247,6 +249,22 @@ fn main() {
             len: 100,
             repeats: 100,
             map_type: MapType::SimpleMap,
+        },
+        EntryPoints::MapInsertRemove {
+            len: 100,
+            repeats: 100,
+            map_type: MapType::BigOrderedMap {
+                inner_max_degree: 4,
+                leaf_max_degree: 4,
+            },
+        },
+        EntryPoints::MapInsertRemove {
+            len: 100,
+            repeats: 100,
+            map_type: MapType::BigOrderedMap {
+                inner_max_degree: 1024,
+                leaf_max_degree: 1024,
+            },
         },
         EntryPoints::MapInsertRemove {
             len: 1000,

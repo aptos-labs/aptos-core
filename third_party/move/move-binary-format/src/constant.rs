@@ -20,6 +20,7 @@ fn sig_to_ty(sig: &SignatureToken) -> Option<MoveTypeLayout> {
         SignatureToken::Reference(_)
         | SignatureToken::MutableReference(_)
         | SignatureToken::Struct(_)
+        | SignatureToken::Function(..)
         | SignatureToken::TypeParameter(_)
         | SignatureToken::StructInstantiation(_, _) => None,
     }

@@ -117,6 +117,9 @@ pub enum FeatureFlag {
     ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE = 83,
     /// AIP-103 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-103.md)
     PERMISSIONED_SIGNER = 84,
+    ACCOUNT_ABSTRACTION = 85,
+    /// Enables bytecode version v8
+    VM_BINARY_FORMAT_V8 = 86,
 }
 
 impl FeatureFlag {
@@ -200,6 +203,8 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_LOADER_V2,
             FeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES,
             FeatureFlag::PERMISSIONED_SIGNER,
+            FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE,
+            FeatureFlag::ACCOUNT_ABSTRACTION,
         ]
     }
 }
@@ -273,6 +278,10 @@ impl Features {
 
     pub fn is_storage_slot_metadata_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::STORAGE_SLOT_METADATA)
+    }
+
+    pub fn is_account_abstraction_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ACCOUNT_ABSTRACTION)
     }
 
     pub fn is_module_event_enabled(&self) -> bool {
@@ -365,7 +374,9 @@ impl Features {
     }
 
     pub fn get_max_binary_format_version(&self) -> u32 {
-        if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7) {
+        if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V8) {
+            file_format_common::VERSION_8
+        } else if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7) {
             file_format_common::VERSION_7
         } else if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
             file_format_common::VERSION_6
@@ -413,13 +424,13 @@ mod test {
     #[test]
     fn test_min_max_binary_format() {
         // Ensure querying max binary format implementation is correct and checks
-        // versions 5 to 7.
+        // versions 5 to 8.
         assert_eq!(
             file_format_common::VERSION_5,
             file_format_common::VERSION_MIN
         );
         assert_eq!(
-            file_format_common::VERSION_7,
+            file_format_common::VERSION_8,
             file_format_common::VERSION_MAX
         );
     }

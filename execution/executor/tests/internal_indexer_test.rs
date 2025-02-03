@@ -152,10 +152,10 @@ fn test_db_indexer_data() {
     // assert the data matches the expected data
     let version = internal_indexer_db.get_persisted_version().unwrap();
     assert_eq!(version, None);
-    let mut start_version = version.map_or(0, |v| v + 1);
-    while start_version < total_version {
-        start_version = db_indexer.process_a_batch(start_version).unwrap();
-    }
+    let start_version = version.map_or(0, |v| v + 1);
+    db_indexer
+        .process_a_batch(start_version, total_version)
+        .unwrap();
     // wait for the commit to finish
     thread::sleep(Duration::from_millis(100));
     // indexer has process all the transactions
@@ -237,12 +237,14 @@ fn test_db_indexer_data() {
         ident_str!("features"),
         ident_str!("from_bcs"),
         ident_str!("pool_u64"),
+        ident_str!("auth_data"),
         ident_str!("secp256k1"),
         ident_str!("timestamp"),
         ident_str!("type_info"),
         ident_str!("aggregator"),
         ident_str!("aptos_coin"),
         ident_str!("aptos_hash"),
+        ident_str!("bcs_stream"),
         ident_str!("big_vector"),
         ident_str!("bit_vector"),
         ident_str!("capability"),
@@ -258,6 +260,7 @@ fn test_db_indexer_data() {
         ident_str!("gas_schedule"),
         ident_str!("managed_coin"),
         ident_str!("math_fixed64"),
+        ident_str!("rate_limiter"),
         ident_str!("ristretto255"),
         ident_str!("smart_vector"),
         ident_str!("string_utils"),
@@ -292,6 +295,7 @@ fn test_db_indexer_data() {
         ident_str!("randomness_config"),
         ident_str!("table_with_length"),
         ident_str!("aggregator_factory"),
+        ident_str!("account_abstraction"),
         ident_str!("governance_proposal"),
         ident_str!("optional_aggregator"),
         ident_str!("permissioned_signer"),
@@ -303,6 +307,7 @@ fn test_db_indexer_data() {
         ident_str!("object_code_deployment"),
         ident_str!("primary_fungible_store"),
         ident_str!("transaction_validation"),
+        ident_str!("permissioned_delegation"),
         ident_str!("storage_slots_allocator"),
         ident_str!("randomness_api_v0_config"),
         ident_str!("randomness_config_seqnum"),

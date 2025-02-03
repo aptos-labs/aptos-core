@@ -188,13 +188,12 @@ fun m::test($t0: u64): u64 {
  12: $t3 := move($t5)
  13: goto 2
  14: label L3
- 15: $t2 := move($t2)
- 16: return $t2
+ 15: return $t2
 }
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 
 

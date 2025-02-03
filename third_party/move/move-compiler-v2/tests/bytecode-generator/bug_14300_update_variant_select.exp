@@ -180,7 +180,7 @@ fun m::update_non_common_field(): u32 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 815.m {
 enum CommonFields has drop {
  Foo{

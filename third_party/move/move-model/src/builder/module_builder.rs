@@ -38,7 +38,7 @@ use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_binary_format::{
     access::ModuleAccess,
-    file_format::{Ability, AbilitySet, Constant, Visibility},
+    file_format::{Constant, Visibility},
     CompiledModule,
 };
 use move_bytecode_source_map::source_map::SourceMap;
@@ -48,6 +48,7 @@ use move_compiler::{
     parser::ast as PA,
     shared::{unique_map::UniqueMap, Identifier, Name},
 };
+use move_core_types::ability::{Ability, AbilitySet};
 use move_ir_types::{
     ast::ConstantName,
     location::{sp, Spanned},

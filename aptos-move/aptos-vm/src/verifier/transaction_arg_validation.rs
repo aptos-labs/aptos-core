@@ -6,7 +6,7 @@
 //! TODO: we should not only validate the types but also the actual values, e.g.
 //! for strings whether they consist of correct characters.
 
-use crate::{move_vm_ext::SessionExt, VMStatus};
+use crate::{aptos_vm::SerializedSigners, move_vm_ext::SessionExt, VMStatus};
 use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 use move_binary_format::{
     errors::{Location, PartialVMError},
@@ -18,7 +18,6 @@ use move_core_types::{
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::ModuleId,
-    value::MoveValue,
     vm_status::StatusCode,
 };
 use move_vm_metrics::{Timer, VM_TIMER};
@@ -103,10 +102,10 @@ pub(crate) fn get_allowed_structs(
 /// 3. check arg types are allowed after signers
 ///
 /// after validation, add senders and non-signer arguments to generate the final args
-pub fn validate_combine_signer_and_txn_args(
+pub(crate) fn validate_combine_signer_and_txn_args(
     session: &mut SessionExt,
     module_storage: &impl AptosModuleStorage,
-    senders: Vec<AccountAddress>,
+    serialized_signers: &SerializedSigners,
     args: Vec<Vec<u8>>,
     func: &LoadedFunction,
     are_struct_constructors_enabled: bool,
@@ -161,7 +160,8 @@ pub fn validate_combine_signer_and_txn_args(
     // signers actually passed is matching first to maintain backward compatibility before
     // moving on to the validation of non-signer args.
     // the number of txn senders should be the same number of signers
-    if signer_param_cnt > 0 && senders.len() != signer_param_cnt {
+    let sender_signers = serialized_signers.senders();
+    if signer_param_cnt > 0 && sender_signers.len() != signer_param_cnt {
         return Err(VMStatus::error(
             StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
             None,
@@ -185,16 +185,15 @@ pub fn validate_combine_signer_and_txn_args(
     let combined_args = if signer_param_cnt == 0 {
         args
     } else {
-        senders
-            .into_iter()
-            .map(|s| MoveValue::Signer(s).simple_serialize().unwrap())
-            .chain(args)
-            .collect()
+        sender_signers.into_iter().chain(args).collect()
     };
     Ok(combined_args)
 }
 
-// Return whether the argument is valid/allowed and whether it needs construction.
+/// Returns true if the argument is valid (that is, it is a primitive type or a struct with a
+/// known constructor function). Otherwise, (for structs without constructors, signers or
+/// references) returns false. An error is returned in cases when a struct type is encountered and
+/// its name cannot be queried for some reason.
 pub(crate) fn is_valid_txn_arg(
     session: &SessionExt,
     module_storage: &impl AptosModuleStorage,
@@ -206,12 +205,21 @@ pub(crate) fn is_valid_txn_arg(
     match ty {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
         Vector(inner) => is_valid_txn_arg(session, module_storage, inner, allowed_structs),
-        Struct { idx, .. } | StructInstantiation { idx, .. } => session
-            .fetch_struct_ty_by_idx(*idx, module_storage)
-            .is_some_and(|st| {
-                let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
-                allowed_structs.contains_key(&full_name)
-            }),
+        Struct { .. } | StructInstantiation { .. } => {
+            // Note: Original behavior was to return false even if the module loading fails (e.g.,
+            //       if struct does not exist. This preserves it.
+            session
+                .get_struct_name(ty, module_storage)
+                .ok()
+                .flatten()
+                .is_some_and(|(module_id, identifier)| {
+                    allowed_structs.contains_key(&format!(
+                        "{}::{}",
+                        module_id.short_str_lossless(),
+                        identifier
+                    ))
+                })
+        },
         Signer | Reference(_) | MutableReference(_) | TyParam(_) => false,
     }
 }
@@ -344,12 +352,16 @@ pub(crate) fn recursively_construct_arg(
                 len -= 1;
             }
         },
-        Struct { idx, .. } | StructInstantiation { idx, .. } => {
-            let st = session
-                .fetch_struct_ty_by_idx(*idx, module_storage)
+        Struct { .. } | StructInstantiation { .. } => {
+            let (module_id, identifier) = session
+                .get_struct_name(ty, module_storage)
+                .map_err(|_| {
+                    // Note: The original behaviour was to map all errors to an invalid signature
+                    //       error, here we want to preserve it for now.
+                    invalid_signature()
+                })?
                 .ok_or_else(invalid_signature)?;
-
-            let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
+            let full_name = format!("{}::{}", module_id.short_str_lossless(), identifier);
             let constructor = allowed_structs
                 .get(&full_name)
                 .ok_or_else(invalid_signature)?;

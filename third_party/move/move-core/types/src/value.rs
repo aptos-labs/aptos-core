@@ -2,10 +2,16 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+// The below is to deal with a strange problem with derive(Dearbitrary), which creates warnings
+// of unused variables in derived code which cannot be turned off by applying the attribute
+// just at the type in question. (Here, MoveStructLayout.)
+#![allow(unused_variables)]
+
 use crate::{
     account_address::AccountAddress,
+    ident_str,
     identifier::Identifier,
-    language_storage::{StructTag, TypeTag},
+    language_storage::{ModuleId, StructTag, TypeTag},
     u256,
 };
 use anyhow::{anyhow, bail, Result as AResult};
@@ -133,7 +139,10 @@ pub enum MoveValue {
 
 /// A layout associated with a named field
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
 pub struct MoveFieldLayout {
     pub name: Identifier,
     pub layout: MoveTypeLayout,
@@ -146,14 +155,20 @@ impl MoveFieldLayout {
 }
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
 pub struct MoveVariantLayout {
     pub name: Identifier,
     pub fields: Vec<MoveFieldLayout>,
 }
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
 pub enum MoveStructLayout {
     /// The representation used by the MoveVM for plain structs
     Runtime(Vec<MoveTypeLayout>),
@@ -173,15 +188,47 @@ pub enum MoveStructLayout {
 
 /// Used to distinguish between aggregators ans snapshots.
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
 pub enum IdentifierMappingKind {
     Aggregator,
     Snapshot,
     DerivedString,
 }
 
+impl IdentifierMappingKind {
+    /// If the struct identifier has a special mapping, return it.
+    pub fn from_ident(
+        module_id: &ModuleId,
+        struct_id: &Identifier,
+    ) -> Option<IdentifierMappingKind> {
+        if module_id.address().eq(&AccountAddress::ONE)
+            && module_id.name().eq(ident_str!("aggregator_v2"))
+        {
+            let ident_str = struct_id.as_ident_str();
+            if ident_str.eq(ident_str!("Aggregator")) {
+                Some(IdentifierMappingKind::Aggregator)
+            } else if ident_str.eq(ident_str!("AggregatorSnapshot")) {
+                Some(IdentifierMappingKind::Snapshot)
+            } else if ident_str.eq(ident_str!("DerivedStringSnapshot")) {
+                Some(IdentifierMappingKind::DerivedString)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary),
+    derive(dearbitrary::Dearbitrary)
+)]
 pub enum MoveTypeLayout {
     #[serde(rename(serialize = "bool", deserialize = "bool"))]
     Bool,
@@ -829,7 +876,7 @@ impl fmt::Display for MoveTypeLayout {
             U256 => write!(f, "u256"),
             Address => write!(f, "address"),
             Vector(typ) => write!(f, "vector<{}>", typ),
-            Struct(s) => write!(f, "{}", s),
+            Struct(s) => fmt::Display::fmt(s, f),
             Signer => write!(f, "signer"),
             // TODO[agg_v2](cleanup): consider printing the tag as well.
             Native(_, typ) => write!(f, "native<{}>", typ),

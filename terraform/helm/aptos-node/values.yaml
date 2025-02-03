@@ -94,6 +94,7 @@ validator:
   podAnnotations:
     # Determines which log levels are retained by the Vector pipeline
     # aptos.dev/min-log-level-to-retain: warn
+  useConsensusHealthCheckAsStartupProbe: false # once https://github.com/aptos-labs/aptos-core/pull/15512 is rolled out to all networks (at the time of writing (dec 21 2024) it's only in devnet) we can remove this flag and always add this probe
 
 fullnode:
   # -- Specify fullnode groups by `name` and number of `replicas`

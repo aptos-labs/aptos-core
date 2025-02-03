@@ -38,14 +38,16 @@ public fun m::test() {
      # live vars: $t0, $t1
   1: m::take1($t1)
      # live vars: $t0, $t1
-  2: m::take2($t0, $t1)
+  2: $t0 := move($t0)
+     # live vars: $t0, $t1
+  3: m::take2($t0, $t1)
      # live vars:
-  3: return ()
+  4: return ()
 }
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 
 

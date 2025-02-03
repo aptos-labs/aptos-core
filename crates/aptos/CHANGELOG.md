@@ -4,6 +4,17 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+- Remove FFI support from Aptos CLI
+
+## [6.0.3] - 2025/01/27
+- Update the processors used by localnet to 1.26.
+
+## [6.0.2] - 2025/01/24
+- Fix `aptos workspace run` so it does not panic when writing to closed stdout/stderr, allowing it to finish its graceful shutdown sequence when used as a child process.
+
+## [6.0.1] - 2025/01/17
+- Update Hasura metadata to include `entry_function_contract_address`, `entry_function_module_name`, and `entry_function_function_name` in `user_transactions` table.
+
 ## [6.0.0] - 2025/01/14
 - Set Compiler v2 as the default compiler and Move 2 as the default language version.
 - Add new `--move-1` flag to use Compiler v1 and Move 1.

@@ -59,9 +59,7 @@ fun m::foo($t0: &mut u64, $t1: u64): &mut u64 {
      # live vars: $t0, $t1
   0: write_ref($t0, $t1)
      # live vars: $t0
-  1: $t0 := move($t0)
-     # live vars: $t0
-  2: return $t0
+  1: return $t0
 }
 
 
@@ -105,7 +103,7 @@ public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 struct S {
 	x: u64,

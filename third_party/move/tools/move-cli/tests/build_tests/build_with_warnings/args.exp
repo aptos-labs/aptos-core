@@ -7,7 +7,7 @@ warning: Unused parameter `x`. Consider removing or prefixing with an underscore
   │                ^
 
 Command `disassemble --package Test --name m`:
-// Move bytecode v7
+// Move bytecode v8
 module 42.m {
 
 

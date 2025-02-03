@@ -8,6 +8,9 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V31:
+///    - Gas charging for modules used in type tags
+///
 /// - V22
 ///    - Gas parameters for enums
 ///    - Gas parameters for new native function `bcs::serialized_size`
@@ -69,7 +72,7 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_26;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_27;
 
 pub mod gas_feature_versions {
     pub const RELEASE_V1_8: u64 = 11;
@@ -90,4 +93,8 @@ pub mod gas_feature_versions {
     pub const RELEASE_V1_23: u64 = 27;
     pub const RELEASE_V1_24: u64 = 28;
     pub const RELEASE_V1_26: u64 = 30;
+    pub const RELEASE_V1_27: u64 = 31;
+    pub const RELEASE_V1_28: u64 = 32;
+    pub const RELEASE_V1_29: u64 = 33;
+    pub const RELEASE_V1_30: u64 = 34;
 }

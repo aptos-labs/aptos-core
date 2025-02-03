@@ -4,7 +4,8 @@
 use move_binary_format::file_format::*;
 use move_bytecode_verifier::dependencies;
 use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode,
+    ability::AbilitySet, account_address::AccountAddress, identifier::Identifier,
+    vm_status::StatusCode,
 };
 
 fn mk_script_function_module() -> CompiledModule {

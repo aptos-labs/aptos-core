@@ -7,13 +7,15 @@ use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
     file_format::{
-        AbilitySet, CodeOffset, CodeUnit, ConstantPoolIndex, FunctionDefinitionIndex, LocalIndex,
-        MemberCount, ModuleHandleIndex, SignatureIndex, StructDefinition, StructDefinitionIndex,
-        TableIndex, VariantIndex,
+        CodeOffset, CodeUnit, ConstantPoolIndex, FunctionDefinitionIndex, LocalIndex, MemberCount,
+        ModuleHandleIndex, SignatureIndex, StructDefinition, StructDefinitionIndex, TableIndex,
+        VariantIndex,
     },
 };
 use move_command_line_common::files::FileHash;
-use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+use move_core_types::{
+    ability::AbilitySet, account_address::AccountAddress, identifier::Identifier,
+};
 use move_ir_types::{
     ast::{ConstantName, ModuleIdent, ModuleName, NopLabel},
     location::Loc,
@@ -205,7 +207,7 @@ impl FunctionSourceMap {
     /// Remap the code map based on the given `remap`.
     /// If `remap[i] == j`, then the code location associated with code offset `j`
     /// will now be associated with code offset `i`.
-    pub fn remap_code_map(&mut self, remap: Vec<CodeOffset>) {
+    pub fn remap_code_map(&mut self, remap: &[CodeOffset]) {
         let mut prev_loc = None;
         let new_code_map = remap
             .iter()
@@ -393,7 +395,7 @@ impl SourceMap {
     pub fn remap_code_map(
         &mut self,
         fdef_idx: FunctionDefinitionIndex,
-        remap: Vec<CodeOffset>,
+        remap: &[CodeOffset],
     ) -> Result<()> {
         let func_entry = self
             .function_map

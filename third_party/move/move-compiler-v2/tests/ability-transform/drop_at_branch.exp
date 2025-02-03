@@ -254,7 +254,7 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 42.explicate_drop {
 
 

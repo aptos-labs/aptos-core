@@ -56,7 +56,7 @@ fun reference_conversion::use_it(): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 42.reference_conversion {
 
 

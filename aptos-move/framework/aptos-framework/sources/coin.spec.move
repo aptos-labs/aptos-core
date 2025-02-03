@@ -60,6 +60,7 @@ spec aptos_framework::coin {
     ///
     spec module {
         pragma verify = true;
+        pragma aborts_if_is_partial;
         global supply<CoinType>: num;
         global aggregate_supply<CoinType>: num;
         apply TotalSupplyTracked<CoinType> to *<CoinType> except
@@ -324,7 +325,7 @@ spec aptos_framework::coin {
         aborts_if coin_store.frozen;
     }
 
-    spec force_deposit<CoinType>(account_addr: address, coin: Coin<CoinType>) {
+    spec deposit_for_gas_fee<CoinType>(account_addr: address, coin: Coin<CoinType>) {
         // TODO(fa_migration)
         pragma verify = false;
         modifies global<CoinStore<CoinType>>(account_addr);

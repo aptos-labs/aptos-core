@@ -42,7 +42,7 @@ use uuid::Uuid;
 async fn run_all_services(timeout: u64) -> Result<()> {
     let test_dir = tempfile::tempdir()?;
     let test_dir = test_dir.path();
-    println!("Created test directory: {}", test_dir.display());
+    no_panic_println!("Created test directory: {}", test_dir.display());
 
     let instance_id = Uuid::new_v4();
 
@@ -56,10 +56,10 @@ async fn run_all_services(timeout: u64) -> Result<()> {
             tokio::select! {
                 res = tokio::signal::ctrl_c() => {
                     res.unwrap();
-                    println!("\nCtrl-C received. Shutting down services. This may take a while.\n");
+                    no_panic_println!("\nCtrl-C received. Shutting down services. This may take a while.\n");
                 }
                 _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
-                    println!("\nTimeout reached. Shutting down services. This may take a while.\n");
+                    no_panic_println!("\nTimeout reached. Shutting down services. This may take a while.\n");
                 }
             }
 
@@ -132,7 +132,7 @@ async fn run_all_services(timeout: u64) -> Result<()> {
         )
     };
     let clean_up_all = async move {
-        eprintln!("Running shutdown steps");
+        no_panic_eprintln!("Running shutdown steps");
         fut_indexer_api_clean_up.await;
         fut_postgres_clean_up.await;
     };
@@ -144,9 +144,9 @@ async fn run_all_services(timeout: u64) -> Result<()> {
         }
         res = all_services_up => {
             match res.context("one or more services failed to start") {
-                Ok(_) => println!("ALL SERVICES UP"),
+                Ok(_) => no_panic_println!("ALL SERVICES UP"),
                 Err(err) => {
-                    eprintln!("\nOne or more services failed to start, will run shutdown steps\n");
+                    no_panic_eprintln!("\nOne or more services failed to start, will run shutdown steps\n");
                     clean_up_all.await;
 
                     return Err(err)
@@ -160,40 +160,40 @@ async fn run_all_services(timeout: u64) -> Result<()> {
     tokio::select! {
         _ = shutdown.cancelled() => (),
         res = fut_node_finish => {
-            eprintln!("Node exited unexpectedly");
+            no_panic_eprintln!("Node exited unexpectedly");
             if let Err(err) = res {
-                eprintln!("Error: {}", err);
+                no_panic_eprintln!("Error: {}", err);
             }
         }
         res = fut_faucet_finish => {
-            eprintln!("Faucet exited unexpectedly");
+            no_panic_eprintln!("Faucet exited unexpectedly");
             if let Err(err) = res {
-                eprintln!("Error: {}", err);
+                no_panic_eprintln!("Error: {}", err);
             }
         }
         res = fut_postgres_finish => {
-            eprintln!("Postgres exited unexpectedly");
+            no_panic_eprintln!("Postgres exited unexpectedly");
             if let Err(err) = res {
-                eprintln!("Error: {}", err);
+                no_panic_eprintln!("Error: {}", err);
             }
         }
         res = fut_any_processor_finish => {
-            eprintln!("One of the processors exited unexpectedly");
+            no_panic_eprintln!("One of the processors exited unexpectedly");
             if let Err(err) = res {
-                eprintln!("Error: {}", err);
+                no_panic_eprintln!("Error: {}", err);
             }
         }
         res = fut_indexer_api_finish => {
-            eprintln!("Indexer API exited unexpectedly");
+            no_panic_eprintln!("Indexer API exited unexpectedly");
             if let Err(err) = res {
-                eprintln!("Error: {}", err);
+                no_panic_eprintln!("Error: {}", err);
             }
         }
     }
 
     clean_up_all.await;
 
-    println!("Finished running all services");
+    no_panic_println!("Finished running all services");
 
     Ok(())
 }

@@ -4,7 +4,12 @@
 
 use crate::{check_bounds::BoundsChecker, errors::*, file_format::*, file_format_common::*};
 use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, metadata::Metadata, state::VMState,
+    ability::{Ability, AbilitySet},
+    account_address::AccountAddress,
+    function::ClosureMask,
+    identifier::Identifier,
+    metadata::Metadata,
+    state::VMState,
     vm_status::StatusCode,
 };
 use serde::Serialize;
@@ -319,6 +324,10 @@ fn load_struct_variant_inst_index(
         cursor,
         TABLE_INDEX_MAX,
     )?))
+}
+
+fn load_closure_mask(cursor: &mut VersionedCursor) -> BinaryLoaderResult<ClosureMask> {
+    Ok(ClosureMask::new(read_uleb_internal(cursor, u64::MAX)?))
 }
 
 fn load_constant_pool_index(cursor: &mut VersionedCursor) -> BinaryLoaderResult<ConstantPoolIndex> {
@@ -1131,6 +1140,13 @@ fn load_signature_token(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Sign
             arity: usize,
             ty_args: Vec<SignatureToken>,
         },
+        Function {
+            abilities: AbilitySet,
+            arg_count: usize,
+            result_count: usize,
+            args: Vec<SignatureToken>,
+            results: Vec<SignatureToken>,
+        },
     }
 
     impl TypeBuilder {
@@ -1157,6 +1173,30 @@ fn load_signature_token(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Sign
                         }
                     }
                 },
+                T::Function {
+                    abilities,
+                    arg_count,
+                    result_count,
+                    mut args,
+                    mut results,
+                } => {
+                    if args.len() < arg_count {
+                        args.push(tok)
+                    } else {
+                        results.push(tok)
+                    }
+                    if args.len() == arg_count && results.len() == result_count {
+                        T::Saturated(SignatureToken::Function(args, results, abilities))
+                    } else {
+                        T::Function {
+                            abilities,
+                            arg_count,
+                            result_count,
+                            args,
+                            results,
+                        }
+                    }
+                },
                 _ => unreachable!("invalid type constructor application"),
             }
         }
@@ -1177,8 +1217,9 @@ fn load_signature_token(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Sign
 
     let mut read_next = || {
         if let Ok(byte) = cursor.read_u8() {
-            match S::from_u8(byte)? {
-                S::U16 | S::U32 | S::U256 if (cursor.version() < VERSION_6) => {
+            let ser_type = S::from_u8(byte)?;
+            match ser_type {
+                S::U16 | S::U32 | S::U256 if cursor.version() < VERSION_6 => {
                     return Err(
                         PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
                             "u16, u32, u256 integers not supported in bytecode version {}",
@@ -1186,10 +1227,17 @@ fn load_signature_token(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Sign
                         )),
                     );
                 },
+                S::FUNCTION if cursor.version() < VERSION_8 => {
+                    return Err(
+                        PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
+                            "function types not supported in bytecode version {}",
+                            cursor.version()
+                        )),
+                    );
+                },
                 _ => (),
             };
-
-            Ok(match S::from_u8(byte)? {
+            Ok(match ser_type {
                 S::BOOL => T::Saturated(SignatureToken::Bool),
                 S::U8 => T::Saturated(SignatureToken::U8),
                 S::U16 => T::Saturated(SignatureToken::U16),
@@ -1222,6 +1270,25 @@ fn load_signature_token(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Sign
                 S::TYPE_PARAMETER => {
                     let idx = load_type_parameter_index(cursor)?;
                     T::Saturated(SignatureToken::TypeParameter(idx))
+                },
+                S::FUNCTION => {
+                    // The legacy ability set position is only for older bytecode versions,
+                    // still choosing StructTypeParameters matches what functions can have.
+                    let abilities =
+                        load_ability_set(cursor, AbilitySetPosition::StructTypeParameters)?;
+                    let arg_count = load_type_parameter_count(cursor)?;
+                    let result_count = load_type_parameter_count(cursor)?;
+                    if arg_count + result_count == 0 {
+                        T::Saturated(SignatureToken::Function(vec![], vec![], abilities))
+                    } else {
+                        T::Function {
+                            abilities,
+                            arg_count,
+                            result_count,
+                            args: vec![],
+                            results: vec![],
+                        }
+                    }
                 },
             })
         } else {
@@ -1646,6 +1713,16 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
                     )),
                 );
             },
+            Opcodes::PACK_CLOSURE | Opcodes::PACK_CLOSURE_GENERIC | Opcodes::CALL_CLOSURE
+                if cursor.version() < VERSION_8 =>
+            {
+                return Err(
+                    PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
+                        "Closure operations not available before bytecode version {}",
+                        VERSION_8
+                    )),
+                );
+            },
             _ => {},
         };
 
@@ -1745,6 +1822,15 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
             Opcodes::TEST_VARIANT_GENERIC => {
                 Bytecode::TestVariantGeneric(load_struct_variant_inst_index(cursor)?)
             },
+            Opcodes::PACK_CLOSURE => Bytecode::PackClosure(
+                load_function_handle_index(cursor)?,
+                load_closure_mask(cursor)?,
+            ),
+            Opcodes::PACK_CLOSURE_GENERIC => Bytecode::PackClosureGeneric(
+                load_function_inst_index(cursor)?,
+                load_closure_mask(cursor)?,
+            ),
+            Opcodes::CALL_CLOSURE => Bytecode::CallClosure(load_signature_index(cursor)?),
             Opcodes::READ_REF => Bytecode::ReadRef,
             Opcodes::WRITE_REF => Bytecode::WriteRef,
             Opcodes::ADD => Bytecode::Add,
@@ -2011,7 +2097,12 @@ impl Opcodes {
             0x55 => Ok(Opcodes::UNPACK_VARIANT_GENERIC),
             0x56 => Ok(Opcodes::TEST_VARIANT),
             0x57 => Ok(Opcodes::TEST_VARIANT_GENERIC),
-            _ => Err(PartialVMError::new(StatusCode::UNKNOWN_OPCODE)),
+            // Since bytecode version 8
+            0x58 => Ok(Opcodes::PACK_CLOSURE),
+            0x59 => Ok(Opcodes::PACK_CLOSURE_GENERIC),
+            0x5A => Ok(Opcodes::CALL_CLOSURE),
+            _ => Err(PartialVMError::new(StatusCode::UNKNOWN_OPCODE)
+                .with_message(format!("code {:X}", value))),
         }
     }
 }

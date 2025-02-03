@@ -124,6 +124,7 @@ module aptos_framework::delegation_pool {
     use aptos_framework::aptos_governance;
     use aptos_framework::coin;
     use aptos_framework::event::{Self, EventHandle, emit};
+    use aptos_framework::permissioned_signer;
     use aptos_framework::stake;
     use aptos_framework::stake::get_operator;
     use aptos_framework::staking_config;
@@ -214,6 +215,9 @@ module aptos_framework::delegation_pool {
 
     /// Cannot unlock the accumulated active stake of NULL_SHAREHOLDER(0x0).
     const ECANNOT_UNLOCK_NULL_SHAREHOLDER: u64 = 27;
+
+    /// Signer does not have permission to perform delegation logic.
+    const ENO_DELEGATION_PERMISSION: u64 = 28;
 
     const MAX_U64: u64 = 18446744073709551615;
 
@@ -344,6 +348,11 @@ module aptos_framework::delegation_pool {
     /// evicted later by the pool owner.
     struct DelegationPoolAllowlisting has key {
         allowlist: SmartTable<address, bool>,
+    }
+
+    enum DelegationPermission has copy, drop, store {
+        DelegationPoolManagementPermission,
+        StakeManagementPermission,
     }
 
     #[event]
@@ -832,6 +841,29 @@ module aptos_framework::delegation_pool {
         allowlist
     }
 
+    /// Permissions
+    inline fun check_delegation_pool_management_permission(s: &signer) {
+        assert!(
+            permissioned_signer::check_permission_exists(s, DelegationPermission::DelegationPoolManagementPermission {}),
+            error::permission_denied(ENO_DELEGATION_PERMISSION),
+        );
+    }
+
+    public fun grant_delegation_pool_management_permission(master: &signer, permissioned_signer: &signer) {
+        permissioned_signer::authorize_unlimited(master, permissioned_signer, DelegationPermission::DelegationPoolManagementPermission {})
+    }
+
+    inline fun check_stake_management_permission(s: &signer) {
+        assert!(
+            permissioned_signer::check_permission_exists(s, DelegationPermission::StakeManagementPermission {}),
+            error::permission_denied(ENO_DELEGATION_PERMISSION),
+        );
+    }
+
+    public fun grant_stake_management_permission(master: &signer, permissioned_signer: &signer) {
+        permissioned_signer::authorize_unlimited(master, permissioned_signer, DelegationPermission::StakeManagementPermission {})
+    }
+
     /// Initialize a delegation pool of custom fixed `operator_commission_percentage`.
     /// A resource account is created from `owner` signer and its supplied `delegation_pool_creation_seed`
     /// to host the delegation pool resource and own the underlying stake pool.
@@ -841,6 +873,7 @@ module aptos_framework::delegation_pool {
         operator_commission_percentage: u64,
         delegation_pool_creation_seed: vector<u8>,
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        check_delegation_pool_management_permission(owner);
         assert!(features::delegation_pools_enabled(), error::invalid_state(EDELEGATION_POOLS_DISABLED));
         let owner_address = signer::address_of(owner);
         assert!(!owner_cap_exists(owner_address), error::already_exists(EOWNER_CAP_ALREADY_EXISTS));
@@ -941,6 +974,7 @@ module aptos_framework::delegation_pool {
         voting_power: u64,
         should_pass: bool
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        check_stake_management_permission(voter);
         assert_partial_governance_voting_enabled(pool_address);
         // synchronize delegation and stake pools before any user operation.
         synchronize_delegation_pool(pool_address);
@@ -1001,6 +1035,7 @@ module aptos_framework::delegation_pool {
         metadata_hash: vector<u8>,
         is_multi_step_proposal: bool,
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        check_stake_management_permission(voter);
         assert_partial_governance_voting_enabled(pool_address);
 
         // synchronize delegation and stake pools before any user operation
@@ -1293,6 +1328,7 @@ module aptos_framework::delegation_pool {
         owner: &signer,
         new_operator: address
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        check_delegation_pool_management_permission(owner);
         let pool_address = get_owned_pool_address(signer::address_of(owner));
         // synchronize delegation and stake pools before any user operation
         // ensure the old operator is paid its uncommitted commission rewards
@@ -1308,6 +1344,7 @@ module aptos_framework::delegation_pool {
         operator: &signer,
         new_beneficiary: address
     ) acquires BeneficiaryForOperator {
+        check_stake_management_permission(operator);
         assert!(features::operator_beneficiary_change_enabled(), std::error::invalid_state(
             EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED
         ));
@@ -1333,6 +1370,7 @@ module aptos_framework::delegation_pool {
         owner: &signer,
         new_commission_percentage: u64
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        check_delegation_pool_management_permission(owner);
         assert!(features::commission_change_delegation_pool_enabled(), error::invalid_state(
             ECOMMISSION_RATE_CHANGE_NOT_SUPPORTED
         ));
@@ -1378,6 +1416,7 @@ module aptos_framework::delegation_pool {
         owner: &signer,
         new_voter: address
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        check_delegation_pool_management_permission(owner);
         // No one can change delegated_voter once the partial governance voting feature is enabled.
         assert!(
             !features::delegation_pool_partial_governance_voting_enabled(),
@@ -1396,6 +1435,7 @@ module aptos_framework::delegation_pool {
         pool_address: address,
         new_voter: address
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        check_stake_management_permission(delegator);
         assert_partial_governance_voting_enabled(pool_address);
 
         // synchronize delegation and stake pools before any user operation
@@ -1453,6 +1493,7 @@ module aptos_framework::delegation_pool {
     public entry fun enable_delegators_allowlisting(
         owner: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool {
+        check_delegation_pool_management_permission(owner);
         assert!(
             features::delegation_pool_allowlisting_enabled(),
             error::invalid_state(EDELEGATORS_ALLOWLISTING_NOT_SUPPORTED)
@@ -1471,6 +1512,7 @@ module aptos_framework::delegation_pool {
     public entry fun disable_delegators_allowlisting(
         owner: &signer,
     ) acquires DelegationPoolOwnership, DelegationPoolAllowlisting {
+        check_delegation_pool_management_permission(owner);
         let pool_address = get_owned_pool_address(signer::address_of(owner));
         assert_allowlisting_enabled(pool_address);
 
@@ -1486,6 +1528,7 @@ module aptos_framework::delegation_pool {
         owner: &signer,
         delegator_address: address,
     ) acquires DelegationPoolOwnership, DelegationPoolAllowlisting {
+        check_delegation_pool_management_permission(owner);
         let pool_address = get_owned_pool_address(signer::address_of(owner));
         assert_allowlisting_enabled(pool_address);
 
@@ -1501,6 +1544,7 @@ module aptos_framework::delegation_pool {
         owner: &signer,
         delegator_address: address,
     ) acquires DelegationPoolOwnership, DelegationPoolAllowlisting {
+        check_delegation_pool_management_permission(owner);
         let pool_address = get_owned_pool_address(signer::address_of(owner));
         assert_allowlisting_enabled(pool_address);
 
@@ -1516,6 +1560,7 @@ module aptos_framework::delegation_pool {
         owner: &signer,
         delegator_address: address,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolAllowlisting {
+        check_delegation_pool_management_permission(owner);
         let pool_address = get_owned_pool_address(signer::address_of(owner));
         assert_allowlisting_enabled(pool_address);
         assert!(
@@ -1540,6 +1585,7 @@ module aptos_framework::delegation_pool {
         pool_address: address,
         amount: u64
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolAllowlisting {
+        check_stake_management_permission(delegator);
         // short-circuit if amount to add is 0 so no event is emitted
         if (amount == 0) { return };
 
@@ -1597,6 +1643,7 @@ module aptos_framework::delegation_pool {
         pool_address: address,
         amount: u64
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        check_stake_management_permission(delegator);
         // short-circuit if amount to unlock is 0 so no event is emitted
         if (amount == 0) { return };
 
@@ -1658,6 +1705,7 @@ module aptos_framework::delegation_pool {
         pool_address: address,
         amount: u64
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolAllowlisting {
+        check_stake_management_permission(delegator);
         // short-circuit if amount to reactivate is 0 so no event is emitted
         if (amount == 0) { return };
 
@@ -1708,6 +1756,7 @@ module aptos_framework::delegation_pool {
         pool_address: address,
         amount: u64
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        check_stake_management_permission(delegator);
         assert!(amount > 0, error::invalid_argument(EWITHDRAW_ZERO_STAKE));
         // synchronize delegation and stake pools before any user operation
         synchronize_delegation_pool(pool_address);

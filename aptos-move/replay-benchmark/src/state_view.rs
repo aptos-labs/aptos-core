@@ -6,9 +6,11 @@ use aptos_types::state_store::{
     StateView, StateViewResult, TStateView,
 };
 use parking_lot::Mutex;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Represents the read-set obtained when executing transactions.
+#[derive(Serialize, Deserialize)]
 pub(crate) struct ReadSet {
     data: HashMap<StateKey, StateValue>,
 }

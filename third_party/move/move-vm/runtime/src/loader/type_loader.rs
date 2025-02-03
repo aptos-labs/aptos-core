@@ -2,9 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::{
-    binary_views::BinaryIndexedView, errors::PartialVMResult, file_format::SignatureToken,
+    binary_views::BinaryIndexedView,
+    errors::{PartialVMError, PartialVMResult},
+    file_format::SignatureToken,
 };
-use move_vm_types::loaded_data::runtime_types::{AbilityInfo, StructNameIndex, Type};
+use move_core_types::vm_status::StatusCode;
+use move_vm_types::loaded_data::{
+    runtime_types::{AbilityInfo, Type},
+    struct_name_indexing::StructNameIndex,
+};
 use triomphe::Arc as TriompheArc;
 
 /// Converts a signature token into the in memory type representation used by the MoveVM.
@@ -27,6 +33,11 @@ pub fn intern_type(
         SignatureToken::Vector(inner_tok) => {
             let inner_type = intern_type(module, inner_tok, struct_name_table)?;
             Type::Vector(TriompheArc::new(inner_type))
+        },
+        SignatureToken::Function(..) => {
+            // TODO(#15664): implement closures
+            return Err(PartialVMError::new(StatusCode::UNIMPLEMENTED_FUNCTIONALITY)
+                .with_message("function types in the type loader".to_owned()));
         },
         SignatureToken::Reference(inner_tok) => {
             let inner_type = intern_type(module, inner_tok, struct_name_table)?;

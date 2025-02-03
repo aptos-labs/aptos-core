@@ -11,6 +11,26 @@ use std::{
     sync::Arc,
 };
 
+/// Custom macro to allow writing to stdout while ignoring any errors.
+/// This is to allow handling of closed stdout (e.g. in case of a broken pipe).
+#[macro_export]
+macro_rules! no_panic_println {
+    ($($arg:tt)*) => {{
+        use std::io::Write;
+        let _ = writeln!(std::io::stdout(), $($arg)*);
+    }};
+}
+
+/// Custom macro to allow writing to stderr while ignoring any errors.
+/// This is to allow handling of closed stderr (e.g. in case of a broken pipe).
+#[macro_export]
+macro_rules! no_panic_eprintln {
+    ($($arg:tt)*) => {{
+        use std::io::Write;
+        let _ = writeln!(std::io::stderr(), $($arg)*);
+    }};
+}
+
 /// An wrapper to ensure propagation of chain of errors.
 pub(crate) struct ArcError(Arc<anyhow::Error>);
 

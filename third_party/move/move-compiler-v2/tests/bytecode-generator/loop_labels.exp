@@ -76,7 +76,7 @@ fun test::f1() {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 815.test {
 
 

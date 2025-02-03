@@ -203,7 +203,7 @@ fun operators::order($t0: u64, $t1: u64): bool {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 42.operators {
 
 

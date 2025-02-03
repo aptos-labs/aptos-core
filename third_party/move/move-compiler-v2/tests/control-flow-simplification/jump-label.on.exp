@@ -84,7 +84,7 @@ fun test::foo<#0>(): 0x1::string::String {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 42.test {
 use 0000000000000000000000000000000000000000000000000000000000000001::string;
 

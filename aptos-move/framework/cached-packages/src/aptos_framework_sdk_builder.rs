@@ -165,6 +165,41 @@ pub enum EntryFunctionCall {
     /// authority of the new authentication key.
     AccountSetOriginatingAddress {},
 
+    /// Add dispatchable authentication function that enables account abstraction via this function.
+    /// Note: it is a private entry function that can only be called directly from transaction.
+    AccountAbstractionAddAuthenticationFunction {
+        module_address: AccountAddress,
+        module_name: Vec<u8>,
+        function_name: Vec<u8>,
+    },
+
+    AccountAbstractionAddDispatchableAuthenticationFunction {
+        _module_address: AccountAddress,
+        _module_name: Vec<u8>,
+        _function_name: Vec<u8>,
+    },
+
+    /// Remove dispatchable authentication function that enables account abstraction via this function.
+    /// Note: it is a private entry function that can only be called directly from transaction.
+    AccountAbstractionRemoveAuthenticationFunction {
+        module_address: AccountAddress,
+        module_name: Vec<u8>,
+        function_name: Vec<u8>,
+    },
+
+    /// Remove dispatchable authenticator so that all dispatchable authentication functions will be removed as well.
+    /// After calling this function, the account is not abstracted at all.
+    /// Note: it is a private entry function that can only be called directly from transaction.
+    AccountAbstractionRemoveAuthenticator {},
+
+    AccountAbstractionRemoveDispatchableAuthenticationFunction {
+        _module_address: AccountAddress,
+        _module_name: Vec<u8>,
+        _function_name: Vec<u8>,
+    },
+
+    AccountAbstractionRemoveDispatchableAuthenticator {},
+
     /// Batch version of APT transfer.
     AptosAccountBatchTransfer {
         recipients: Vec<AccountAddress>,
@@ -1225,6 +1260,46 @@ impl EntryFunctionCall {
                 cap_update_table,
             ),
             AccountSetOriginatingAddress {} => account_set_originating_address(),
+            AccountAbstractionAddAuthenticationFunction {
+                module_address,
+                module_name,
+                function_name,
+            } => account_abstraction_add_authentication_function(
+                module_address,
+                module_name,
+                function_name,
+            ),
+            AccountAbstractionAddDispatchableAuthenticationFunction {
+                _module_address,
+                _module_name,
+                _function_name,
+            } => account_abstraction_add_dispatchable_authentication_function(
+                _module_address,
+                _module_name,
+                _function_name,
+            ),
+            AccountAbstractionRemoveAuthenticationFunction {
+                module_address,
+                module_name,
+                function_name,
+            } => account_abstraction_remove_authentication_function(
+                module_address,
+                module_name,
+                function_name,
+            ),
+            AccountAbstractionRemoveAuthenticator {} => account_abstraction_remove_authenticator(),
+            AccountAbstractionRemoveDispatchableAuthenticationFunction {
+                _module_address,
+                _module_name,
+                _function_name,
+            } => account_abstraction_remove_dispatchable_authentication_function(
+                _module_address,
+                _module_name,
+                _function_name,
+            ),
+            AccountAbstractionRemoveDispatchableAuthenticator {} => {
+                account_abstraction_remove_dispatchable_authenticator()
+            },
             AptosAccountBatchTransfer {
                 recipients,
                 amounts,
@@ -2101,6 +2176,135 @@ pub fn account_set_originating_address() -> TransactionPayload {
             ident_str!("account").to_owned(),
         ),
         ident_str!("set_originating_address").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Add dispatchable authentication function that enables account abstraction via this function.
+/// Note: it is a private entry function that can only be called directly from transaction.
+pub fn account_abstraction_add_authentication_function(
+    module_address: AccountAddress,
+    module_name: Vec<u8>,
+    function_name: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account_abstraction").to_owned(),
+        ),
+        ident_str!("add_authentication_function").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&module_address).unwrap(),
+            bcs::to_bytes(&module_name).unwrap(),
+            bcs::to_bytes(&function_name).unwrap(),
+        ],
+    ))
+}
+
+pub fn account_abstraction_add_dispatchable_authentication_function(
+    _module_address: AccountAddress,
+    _module_name: Vec<u8>,
+    _function_name: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account_abstraction").to_owned(),
+        ),
+        ident_str!("add_dispatchable_authentication_function").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&_module_address).unwrap(),
+            bcs::to_bytes(&_module_name).unwrap(),
+            bcs::to_bytes(&_function_name).unwrap(),
+        ],
+    ))
+}
+
+/// Remove dispatchable authentication function that enables account abstraction via this function.
+/// Note: it is a private entry function that can only be called directly from transaction.
+pub fn account_abstraction_remove_authentication_function(
+    module_address: AccountAddress,
+    module_name: Vec<u8>,
+    function_name: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account_abstraction").to_owned(),
+        ),
+        ident_str!("remove_authentication_function").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&module_address).unwrap(),
+            bcs::to_bytes(&module_name).unwrap(),
+            bcs::to_bytes(&function_name).unwrap(),
+        ],
+    ))
+}
+
+/// Remove dispatchable authenticator so that all dispatchable authentication functions will be removed as well.
+/// After calling this function, the account is not abstracted at all.
+/// Note: it is a private entry function that can only be called directly from transaction.
+pub fn account_abstraction_remove_authenticator() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account_abstraction").to_owned(),
+        ),
+        ident_str!("remove_authenticator").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+pub fn account_abstraction_remove_dispatchable_authentication_function(
+    _module_address: AccountAddress,
+    _module_name: Vec<u8>,
+    _function_name: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account_abstraction").to_owned(),
+        ),
+        ident_str!("remove_dispatchable_authentication_function").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&_module_address).unwrap(),
+            bcs::to_bytes(&_module_name).unwrap(),
+            bcs::to_bytes(&_function_name).unwrap(),
+        ],
+    ))
+}
+
+pub fn account_abstraction_remove_dispatchable_authenticator() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account_abstraction").to_owned(),
+        ),
+        ident_str!("remove_dispatchable_authenticator").to_owned(),
         vec![],
         vec![],
     ))
@@ -5201,6 +5405,90 @@ mod decoder {
         }
     }
 
+    pub fn account_abstraction_add_authentication_function(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AccountAbstractionAddAuthenticationFunction {
+                    module_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    module_name: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    function_name: bcs::from_bytes(script.args().get(2)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn account_abstraction_add_dispatchable_authentication_function(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AccountAbstractionAddDispatchableAuthenticationFunction {
+                    _module_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    _module_name: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    _function_name: bcs::from_bytes(script.args().get(2)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn account_abstraction_remove_authentication_function(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AccountAbstractionRemoveAuthenticationFunction {
+                    module_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    module_name: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    function_name: bcs::from_bytes(script.args().get(2)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn account_abstraction_remove_authenticator(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::AccountAbstractionRemoveAuthenticator {})
+        } else {
+            None
+        }
+    }
+
+    pub fn account_abstraction_remove_dispatchable_authentication_function(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AccountAbstractionRemoveDispatchableAuthenticationFunction {
+                    _module_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    _module_name: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    _function_name: bcs::from_bytes(script.args().get(2)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn account_abstraction_remove_dispatchable_authenticator(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::AccountAbstractionRemoveDispatchableAuthenticator {})
+        } else {
+            None
+        }
+    }
+
     pub fn aptos_account_batch_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosAccountBatchTransfer {
@@ -6968,6 +7256,30 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "account_set_originating_address".to_string(),
             Box::new(decoder::account_set_originating_address),
+        );
+        map.insert(
+            "account_abstraction_add_authentication_function".to_string(),
+            Box::new(decoder::account_abstraction_add_authentication_function),
+        );
+        map.insert(
+            "account_abstraction_add_dispatchable_authentication_function".to_string(),
+            Box::new(decoder::account_abstraction_add_dispatchable_authentication_function),
+        );
+        map.insert(
+            "account_abstraction_remove_authentication_function".to_string(),
+            Box::new(decoder::account_abstraction_remove_authentication_function),
+        );
+        map.insert(
+            "account_abstraction_remove_authenticator".to_string(),
+            Box::new(decoder::account_abstraction_remove_authenticator),
+        );
+        map.insert(
+            "account_abstraction_remove_dispatchable_authentication_function".to_string(),
+            Box::new(decoder::account_abstraction_remove_dispatchable_authentication_function),
+        );
+        map.insert(
+            "account_abstraction_remove_dispatchable_authenticator".to_string(),
+            Box::new(decoder::account_abstraction_remove_dispatchable_authenticator),
         );
         map.insert(
             "aptos_account_batch_transfer".to_string(),

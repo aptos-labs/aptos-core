@@ -46,6 +46,7 @@ derive_more = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
+itertools = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-unit-test = { workspace = true, optional = true }

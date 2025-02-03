@@ -1,39 +1,111 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{data_manager::DataManager, metadata_manager::MetadataManager};
 use aptos_protos::indexer::v1::{
     grpc_manager_server::GrpcManager, service_info::Info, GetDataServiceForRequestRequest,
     GetDataServiceForRequestResponse, GetTransactionsRequest, HeartbeatRequest, HeartbeatResponse,
     TransactionsResponse,
 };
+use rand::{thread_rng, Rng};
+use std::sync::Arc;
 use tonic::{Request, Response, Status};
+
+const MAX_SIZE_BYTES_FROM_CACHE: usize = 20 * (1 << 20);
 
 pub struct GrpcManagerService {
     chain_id: u64,
+    metadata_manager: Arc<MetadataManager>,
+    data_manager: Arc<DataManager>,
 }
 
 impl GrpcManagerService {
-    pub(crate) fn new(chain_id: u64) -> Self {
-        Self { chain_id }
+    pub(crate) fn new(
+        chain_id: u64,
+        metadata_manager: Arc<MetadataManager>,
+        data_manager: Arc<DataManager>,
+    ) -> Self {
+        Self {
+            chain_id,
+            metadata_manager,
+            data_manager,
+        }
     }
 
     async fn handle_heartbeat(
         &self,
-        _address: String,
-        _info: Info,
+        address: String,
+        info: Info,
     ) -> anyhow::Result<Response<HeartbeatResponse>> {
-        // TODO(grao): Implement.
-        todo!()
+        self.metadata_manager.handle_heartbeat(address, info)?;
+
+        Ok(Response::new(HeartbeatResponse {
+            known_latest_version: Some(self.metadata_manager.get_known_latest_version()),
+        }))
     }
 
-    fn pick_live_data_service(&self, _starting_version: u64) -> Option<String> {
-        // TODO(grao): Implement.
-        todo!()
+    fn pick_data_service_from_candidate(candidates: Vec<(String, usize)>) -> Option<String> {
+        if candidates.is_empty() {
+            return None;
+        }
+
+        // TODO(grao): This is a magic number, consider a different algorithm here.
+        let capacity = std::cmp::max(candidates.iter().map(|c| c.1).max().unwrap() + 2, 20);
+
+        let total_capacity: usize = candidates.iter().map(|c| capacity - c.1).sum();
+
+        let mut rng = thread_rng();
+        let pick = rng.gen_range(0, total_capacity);
+
+        let mut cumulative_weight = 0;
+        for candidate in candidates {
+            cumulative_weight += capacity - candidate.1;
+            if pick < cumulative_weight {
+                return Some(candidate.0);
+            }
+        }
+
+        unreachable!();
     }
 
-    async fn pick_historical_data_service(&self, _starting_version: u64) -> Option<String> {
-        // TODO(grao): Implement.
-        todo!()
+    fn pick_live_data_service(&self, starting_version: u64) -> Option<String> {
+        let mut candidates = vec![];
+        for candidate in self.metadata_manager.get_live_data_services_info() {
+            if let Some(info) = candidate.1.back().as_ref() {
+                // TODO(grao): Handle the case when the requested starting version is beyond the
+                // latest version.
+                if info.min_servable_version.is_none()
+                    || starting_version < info.min_servable_version.unwrap()
+                {
+                    continue;
+                }
+                // TODO(grao): Validate the data at the metadata manager side to make sure
+                // stream_info is always available.
+                let num_active_streams = info.stream_info.as_ref().unwrap().active_streams.len();
+                candidates.push((candidate.0, num_active_streams));
+            }
+        }
+
+        Self::pick_data_service_from_candidate(candidates)
+    }
+
+    async fn pick_historical_data_service(&self, starting_version: u64) -> Option<String> {
+        let file_store_version = self.data_manager.get_file_store_version().await;
+        if starting_version >= file_store_version {
+            return None;
+        }
+
+        let mut candidates = vec![];
+        for candidate in self.metadata_manager.get_historical_data_services_info() {
+            if let Some(info) = candidate.1.back().as_ref() {
+                // TODO(grao): Validate the data at the metadata manager side to make sure
+                // stream_info is always available.
+                let num_active_streams = info.stream_info.as_ref().unwrap().active_streams.len();
+                candidates.push((candidate.0, num_active_streams));
+            }
+        }
+
+        Self::pick_data_service_from_candidate(candidates)
     }
 }
 
@@ -62,9 +134,12 @@ impl GrpcManager for GrpcManagerService {
         &self,
         request: Request<GetTransactionsRequest>,
     ) -> Result<Response<TransactionsResponse>, Status> {
-        let _request = request.into_inner();
-        let transactions = vec![];
-        // TODO(grao): Implement.
+        let request = request.into_inner();
+        let transactions = self
+            .data_manager
+            .get_transactions(request.starting_version(), MAX_SIZE_BYTES_FROM_CACHE)
+            .await
+            .map_err(|e| Status::internal(format!("{e}")))?;
 
         Ok(Response::new(TransactionsResponse {
             transactions,

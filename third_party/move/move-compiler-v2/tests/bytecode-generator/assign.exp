@@ -98,7 +98,7 @@ fun assign::assign_struct($t0: &mut 0x42::assign::S) {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 42.assign {
 struct T has drop {
 	h: u64

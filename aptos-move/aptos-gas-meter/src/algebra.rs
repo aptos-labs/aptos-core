@@ -13,7 +13,7 @@ use move_core_types::{
     gas_algebra::{InternalGas, InternalGasUnit},
     vm_status::StatusCode,
 };
-use std::fmt::Debug;
+use std::{fmt::Debug, ops::AddAssign};
 
 /// Base gas algebra implementation that tracks the gas usage using its internal counters.
 ///
@@ -289,5 +289,15 @@ impl GasAlgebra for StandardGasAlgebra {
 
     fn storage_fee_used(&self) -> Fee {
         self.storage_fee_used
+    }
+
+    // Reset the initial gas balance to reflect the new balance with the change carried over.
+    fn inject_balance(&mut self, extra_balance: impl Into<Gas>) -> PartialVMResult<()> {
+        let extra_unit = extra_balance
+            .into()
+            .to_unit_with_params(&self.vm_gas_params.txn);
+        self.initial_balance.add_assign(extra_unit);
+        self.balance.add_assign(extra_unit);
+        Ok(())
     }
 }

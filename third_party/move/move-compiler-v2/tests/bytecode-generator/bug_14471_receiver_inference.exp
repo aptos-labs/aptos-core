@@ -107,7 +107,7 @@ public fun m::add_when_missing($t0: address, $t1: u64) {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module 815.m {
 struct MyMap has key {
 	table: Table<address, ValueWrap>

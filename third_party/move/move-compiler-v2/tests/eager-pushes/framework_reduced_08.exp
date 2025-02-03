@@ -55,9 +55,7 @@ fun m::bar($t0: &u64, $t1: u64) {
 fun m::foo($t0: &u64, $t1: u64): &u64 {
      var $t2: &u64 [unused]
      # live vars: $t0, $t1
-  0: $t0 := move($t0)
-     # live vars: $t0
-  1: return $t0
+  0: return $t0
 }
 
 
@@ -101,7 +99,7 @@ public fun m::test($t0: &0xc0ffee::m::S, $t1: u64) {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v7
+// Move bytecode v8
 module c0ffee.m {
 struct S {
 	x: u64,

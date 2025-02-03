@@ -4,18 +4,17 @@
 
 #![allow(clippy::non_canonical_partial_ord_impl)]
 
+use crate::loaded_data::struct_name_indexing::StructNameIndex;
 use derivative::Derivative;
 use itertools::Itertools;
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        Ability, AbilitySet, SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex,
-        VariantIndex,
+        SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex, VariantIndex,
     },
 };
-#[cfg(test)]
-use move_core_types::account_address::AccountAddress;
 use move_core_types::{
+    ability::{Ability, AbilitySet},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
@@ -133,8 +132,6 @@ pub struct StructType {
     pub phantom_ty_params_mask: SmallBitVec,
     pub abilities: AbilitySet,
     pub ty_params: Vec<StructTypeParameter>,
-    pub name: Identifier,
-    pub module: ModuleId,
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
@@ -249,19 +246,14 @@ impl StructType {
     #[cfg(test)]
     pub fn for_test() -> StructType {
         Self {
-            idx: StructNameIndex(0),
+            idx: StructNameIndex::new(0),
             layout: StructLayout::Single(vec![]),
             phantom_ty_params_mask: SmallBitVec::new(),
             abilities: AbilitySet::EMPTY,
             ty_params: vec![],
-            name: Identifier::new("Foo").unwrap(),
-            module: ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap()),
         }
     }
 }
-
-#[derive(Debug, Copy, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct StructNameIndex(pub usize);
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StructIdentifier {
@@ -622,6 +614,10 @@ impl Type {
                 AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
                     ty.abilities()?
                 ])
+                .map_err(|e| {
+                    PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION)
+                        .with_message(e.to_string())
+                })
             },
             Type::Struct { ability, .. } => Ok(ability.base_ability_set),
             Type::StructInstantiation {
@@ -642,6 +638,10 @@ impl Type {
                     phantom_ty_args_mask.iter(),
                     type_argument_abilities,
                 )
+                .map_err(|e| {
+                    PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION)
+                        .with_message(e.to_string())
+                })
             },
         }
     }
@@ -743,7 +743,7 @@ impl fmt::Display for Type {
             Address => f.write_str("address"),
             Signer => f.write_str("signer"),
             Vector(et) => write!(f, "vector<{}>", et),
-            Struct { idx, ability: _ } => write!(f, "s#{}", idx.0),
+            Struct { idx, ability: _ } => write!(f, "s#{}", idx),
             StructInstantiation {
                 idx,
                 ty_args,
@@ -751,7 +751,7 @@ impl fmt::Display for Type {
             } => write!(
                 f,
                 "s#{}<{}>",
-                idx.0,
+                idx,
                 ty_args.iter().map(|t| t.to_string()).join(",")
             ),
             Reference(t) => write!(f, "&{}", t),
@@ -1213,7 +1213,7 @@ mod unit_tests {
 
     fn struct_instantiation_ty_for_test(ty_args: Vec<Type>) -> Type {
         Type::StructInstantiation {
-            idx: StructNameIndex(0),
+            idx: StructNameIndex::new(0),
             ability: AbilityInfo::struct_(AbilitySet::EMPTY),
             ty_args: TriompheArc::new(ty_args),
         }
@@ -1221,7 +1221,7 @@ mod unit_tests {
 
     fn struct_ty_for_test() -> Type {
         Type::Struct {
-            idx: StructNameIndex(0),
+            idx: StructNameIndex::new(0),
             ability: AbilityInfo::struct_(AbilitySet::EMPTY),
         }
     }
@@ -1364,7 +1364,7 @@ mod unit_tests {
 
     #[test]
     fn test_create_struct_ty() {
-        let idx = StructNameIndex(0);
+        let idx = StructNameIndex::new(0);
         let ability_info = AbilityInfo::struct_(AbilitySet::EMPTY);
 
         // Limits are not relevant here.

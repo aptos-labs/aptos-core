@@ -96,6 +96,42 @@ impl TypeTag {
             Struct(s) => s.to_canonical_string(),
         }
     }
+
+    pub fn struct_tag(&self) -> Option<&StructTag> {
+        use TypeTag::*;
+        match self {
+            Struct(struct_tag) => Some(struct_tag.as_ref()),
+            Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | Vector(_) => None,
+        }
+    }
+
+    pub fn preorder_traversal_iter(&self) -> impl Iterator<Item = &TypeTag> {
+        TypeTagPreorderTraversalIter { stack: vec![self] }
+    }
+}
+
+struct TypeTagPreorderTraversalIter<'a> {
+    stack: Vec<&'a TypeTag>,
+}
+
+impl<'a> Iterator for TypeTagPreorderTraversalIter<'a> {
+    type Item = &'a TypeTag;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        use TypeTag::*;
+
+        match self.stack.pop() {
+            Some(ty) => {
+                match ty {
+                    Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 => (),
+                    Vector(ty) => self.stack.push(ty),
+                    Struct(struct_tag) => self.stack.extend(struct_tag.type_args.iter().rev()),
+                }
+                Some(ty)
+            },
+            None => None,
+        }
+    }
 }
 
 impl FromStr for TypeTag {
@@ -361,7 +397,27 @@ mod tests {
         collections::hash_map::DefaultHasher,
         hash::{Hash, Hasher},
         mem,
+        str::FromStr,
     };
+
+    #[test]
+    fn test_tag_iter() {
+        let tag = TypeTag::from_str("vector<0x1::a::A<u8, 0x2::b::B, vector<vector<0x3::c::C>>>>")
+            .unwrap();
+        let actual_tags = tag.preorder_traversal_iter().collect::<Vec<_>>();
+        let expected_tags = [
+            tag.clone(),
+            TypeTag::from_str("0x1::a::A<u8, 0x2::b::B, vector<vector<0x3::c::C>>>").unwrap(),
+            TypeTag::from_str("u8").unwrap(),
+            TypeTag::from_str("0x2::b::B").unwrap(),
+            TypeTag::from_str("vector<vector<0x3::c::C>>").unwrap(),
+            TypeTag::from_str("vector<0x3::c::C>").unwrap(),
+            TypeTag::from_str("0x3::c::C").unwrap(),
+        ];
+        for (actual_tag, expected_tag) in actual_tags.into_iter().zip(expected_tags) {
+            assert_eq!(actual_tag, &expected_tag);
+        }
+    }
 
     #[test]
     fn test_type_tag_serde() {

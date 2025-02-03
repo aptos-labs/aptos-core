@@ -25,6 +25,10 @@ The script includes several functions to manage and execute fuzz tests:
     ```bash
     ./fuzz.sh build-oss-fuzz <target_dir>
     ```
+- `cmin`: Distillate corpora
+    ```bash
+    ./fuzz.sh cmin <fuzz_target> [corpora_directory]
+    ```
 - `coverage`: Generates coverage report in HTML format
     ```bash
     ./fuzz.sh coverage <fuzz_target>
@@ -123,6 +127,13 @@ The CSV file is structured as follows:
 - Column 1: Module name  
 - Column 2: Module address  
 - Column 3: Base64-encoded bytecode of the module
+
+## Debug Crashes
+Flamegraph and GDB are integrated into fuzz.sh for advanced metrics and debugging. A more rudimentary option is also available: since we have symbolized binaries, we can directly use the stack trace produced by the fuzzer. However, for INVARIANT_VIOLATIONS, the stack trace is incorrect. To obtain the correct stack trace, you can use the following command:
+```bash
+DEBUG_VM_STATUS=<status_reported_by_the_fuzzer> ./fuzz.sh run <fuzzer_target> <test_case>
+```
+This command is selective, so only the specified, comma-separated statuses will trigger the panic in PartialVMError.
 
 ## References
 - [Rust Fuzz Book](https://rust-fuzz.github.io/book/)

@@ -102,7 +102,7 @@ where
     check_errors(&env, emitter, "checking errors")?;
 
     if options.experiment_on(Experiment::STOP_BEFORE_STACKLESS_BYTECODE) {
-        std::process::exit(0)
+        std::process::exit(if env.has_warnings() { 1 } else { 0 })
     }
 
     // Run code generator
@@ -140,7 +140,7 @@ where
     check_errors(&env, emitter, "stackless-bytecode analysis errors")?;
 
     if options.experiment_on(Experiment::STOP_BEFORE_FILE_FORMAT) {
-        std::process::exit(0)
+        std::process::exit(if env.has_warnings() { 1 } else { 0 })
     }
 
     let modules_and_scripts = run_file_format_gen(&mut env, &targets);
