@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, harness::MoveHarness};
+use crate::{assert_success, harness::MoveHarness, ReplayProtectionType};
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
 use std::path::PathBuf;
@@ -18,6 +18,7 @@ pub fn initialize(path: PathBuf) -> (MoveHarness, Account) {
         str::parse("0x1::aggregator_test::initialize").unwrap(),
         vec![],
         vec![],
+        ReplayProtectionType::SequenceNumber,
     ));
     (harness, account)
 }
@@ -27,6 +28,7 @@ pub fn check(
     account: &Account,
     index: u64,
     expected: u128,
+    replay_protection_type: ReplayProtectionType,
 ) -> SignedTransaction {
     harness.create_entry_function(
         account,
@@ -36,10 +38,11 @@ pub fn check(
             bcs::to_bytes(&index).unwrap(),
             bcs::to_bytes(&expected).unwrap(),
         ],
+        replay_protection_type,
     )
 }
 
-pub fn new(harness: &mut MoveHarness, account: &Account, index: u64) -> SignedTransaction {
+pub fn new(harness: &mut MoveHarness, account: &Account, index: u64, replay_protection_type: ReplayProtectionType) -> SignedTransaction {
     harness.create_entry_function(
         account,
         str::parse("0x1::aggregator_test::new").unwrap(),
@@ -48,6 +51,7 @@ pub fn new(harness: &mut MoveHarness, account: &Account, index: u64) -> SignedTr
             bcs::to_bytes(&index).unwrap(),
             bcs::to_bytes(&u128::MAX).unwrap(),
         ],
+        replay_protection_type,
     )
 }
 
@@ -56,6 +60,7 @@ pub fn add(
     account: &Account,
     index: u64,
     value: u128,
+    replay_protection_type: ReplayProtectionType,
 ) -> SignedTransaction {
     harness.create_entry_function(
         account,
@@ -65,6 +70,7 @@ pub fn add(
             bcs::to_bytes(&index).unwrap(),
             bcs::to_bytes(&value).unwrap(),
         ],
+        replay_protection_type,
     )
 }
 
@@ -73,6 +79,7 @@ pub fn sub(
     account: &Account,
     index: u64,
     value: u128,
+    replay_protection_type: ReplayProtectionType,
 ) -> SignedTransaction {
     harness.create_entry_function(
         account,
@@ -82,6 +89,7 @@ pub fn sub(
             bcs::to_bytes(&index).unwrap(),
             bcs::to_bytes(&value).unwrap(),
         ],
+        replay_protection_type,
     )
 }
 
@@ -91,6 +99,7 @@ pub fn sub_add(
     index: u64,
     a: u128,
     b: u128,
+    replay_protection_type: ReplayProtectionType,
 ) -> SignedTransaction {
     harness.create_entry_function(
         account,
@@ -101,24 +110,27 @@ pub fn sub_add(
             bcs::to_bytes(&a).unwrap(),
             bcs::to_bytes(&b).unwrap(),
         ],
+        replay_protection_type,
     )
 }
 
-pub fn destroy(harness: &mut MoveHarness, account: &Account, index: u64) -> SignedTransaction {
+pub fn destroy(harness: &mut MoveHarness, account: &Account, index: u64, replay_protection_type: ReplayProtectionType) -> SignedTransaction {
     harness.create_entry_function(
         account,
         str::parse("0x1::aggregator_test::destroy").unwrap(),
         vec![],
         vec![bcs::to_bytes(&index).unwrap()],
+        replay_protection_type,
     )
 }
 
-pub fn materialize(harness: &mut MoveHarness, account: &Account, index: u64) -> SignedTransaction {
+pub fn materialize(harness: &mut MoveHarness, account: &Account, index: u64, replay_protection_type: ReplayProtectionType) -> SignedTransaction {
     harness.create_entry_function(
         account,
         str::parse("0x1::aggregator_test::materialize").unwrap(),
         vec![],
         vec![bcs::to_bytes(&index).unwrap()],
+        replay_protection_type,
     )
 }
 
@@ -127,6 +139,7 @@ pub fn materialize_and_add(
     account: &Account,
     index: u64,
     value: u128,
+    replay_protection_type: ReplayProtectionType,
 ) -> SignedTransaction {
     harness.create_entry_function(
         account,
@@ -136,6 +149,7 @@ pub fn materialize_and_add(
             bcs::to_bytes(&index).unwrap(),
             bcs::to_bytes(&value).unwrap(),
         ],
+        replay_protection_type,
     )
 }
 
@@ -144,6 +158,7 @@ pub fn materialize_and_sub(
     account: &Account,
     index: u64,
     value: u128,
+    replay_protection_type: ReplayProtectionType,
 ) -> SignedTransaction {
     harness.create_entry_function(
         account,
@@ -153,6 +168,7 @@ pub fn materialize_and_sub(
             bcs::to_bytes(&index).unwrap(),
             bcs::to_bytes(&value).unwrap(),
         ],
+        replay_protection_type,
     )
 }
 
@@ -161,6 +177,7 @@ pub fn add_and_materialize(
     account: &Account,
     index: u64,
     value: u128,
+    replay_protection_type: ReplayProtectionType,
 ) -> SignedTransaction {
     harness.create_entry_function(
         account,
@@ -170,6 +187,7 @@ pub fn add_and_materialize(
             bcs::to_bytes(&index).unwrap(),
             bcs::to_bytes(&value).unwrap(),
         ],
+        replay_protection_type,
     )
 }
 
@@ -178,6 +196,7 @@ pub fn sub_and_materialize(
     account: &Account,
     index: u64,
     value: u128,
+    replay_protection_type: ReplayProtectionType,
 ) -> SignedTransaction {
     harness.create_entry_function(
         account,
@@ -187,5 +206,6 @@ pub fn sub_and_materialize(
             bcs::to_bytes(&index).unwrap(),
             bcs::to_bytes(&value).unwrap(),
         ],
+        replay_protection_type,
     )
 }

@@ -9,7 +9,7 @@ use aptos_language_e2e_tests::{
     account::Account,
     executor::{ExecFuncTimerDynamicArgs, FakeExecutor, GasMeterType},
 };
-use aptos_types::transaction::TransactionPayload;
+use aptos_types::transaction::TransactionPayloadWrapper;
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
@@ -27,7 +27,7 @@ const PREFIX: &str = "calibrate_";
 /// ### Arguments
 ///
 /// * `package` - Built Move package
-pub fn generate_module_payload(package: &BuiltPackage) -> TransactionPayload {
+pub fn generate_module_payload(package: &BuiltPackage) -> TransactionPayloadWrapper {
     // extract package data
     let code = package.extract_code();
     let metadata = package
@@ -52,7 +52,7 @@ pub fn generate_module_payload(package: &BuiltPackage) -> TransactionPayload {
 pub fn execute_module_txn(
     executor: &mut FakeExecutor,
     account: &Account,
-    payload: TransactionPayload,
+    payload: TransactionPayloadWrapper,
     sequence_number: u64,
 ) {
     // build and sign transaction

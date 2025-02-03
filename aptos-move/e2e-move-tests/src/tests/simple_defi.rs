@@ -7,7 +7,7 @@ use aptos_framework::BuildOptions;
 use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
-    transaction::{EntryFunction, TransactionPayload},
+    transaction::{EntryFunction, TransactionPayloadWrapper},
 };
 use move_core_types::{ident_str, language_storage::ModuleId, parser::parse_struct_tag};
 use serde::{Deserialize, Serialize};
@@ -146,7 +146,7 @@ fn run_exchange_function(
     amount: u64,
     sequence_number: u64,
 ) {
-    let exchange_payload = TransactionPayload::EntryFunction(EntryFunction::new(
+    let exchange_payload = TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             create_resource_address(
                 AccountAddress::from_hex_literal("0xcafe").unwrap(),

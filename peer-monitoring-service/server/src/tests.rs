@@ -617,6 +617,9 @@ pub fn create_mock_db_reader() -> MockDatabaseReader {
 mod database_mock {
     use super::*;
     use aptos_storage_interface::Result;
+    use aptos_types::{
+        indexer::indexer_db_reader::IndexedTransactionSummary, transaction::ReplayProtector,
+    };
 
     mock! {
         pub DatabaseReader {}
@@ -690,12 +693,12 @@ mod database_mock {
             fn get_account_transaction(
                 &self,
                 address: AccountAddress,
-                seq_num: u64,
+                replay_protector: ReplayProtector,
                 include_events: bool,
                 ledger_version: Version,
             ) -> Result<Option<TransactionWithProof>>;
 
-            fn get_account_transactions(
+            fn get_ordered_account_transactions(
                 &self,
                 address: AccountAddress,
                 seq_num: u64,
@@ -703,6 +706,15 @@ mod database_mock {
                 include_events: bool,
                 ledger_version: Version,
             ) -> Result<AccountTransactionsWithProof>;
+
+            fn get_account_all_transaction_summaries(
+                &self,
+                address: AccountAddress,
+                start_seq_num: Option<u64>,
+                end_seq_num: Option<u64>,
+                limit: u64,
+                ledger_version: Version,
+            ) -> Result<Vec<IndexedTransactionSummary>>;
 
             fn get_state_proof_with_ledger_info(
                 &self,

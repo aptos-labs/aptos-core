@@ -42,7 +42,7 @@ impl NativeTransaction {
         match &txn.expect_valid() {
             aptos_types::transaction::Transaction::UserTransaction(user_txn) => {
                 match user_txn.payload() {
-                    aptos_types::transaction::TransactionPayload::EntryFunction(f) => {
+                    aptos_types::transaction::TransactionPayloadWrapper::EntryFunction(f) => {
                         match (
                             *f.module().address(),
                             f.module().name().as_str(),

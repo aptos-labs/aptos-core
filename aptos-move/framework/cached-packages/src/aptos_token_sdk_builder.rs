@@ -17,7 +17,7 @@
 #![allow(clippy::get_first)]
 use aptos_types::{
     account_address::AccountAddress,
-    transaction::{EntryFunction, TransactionPayload},
+    transaction::{EntryFunction, TransactionPayloadWrapper},
 };
 use move_core_types::{
     ident_str,
@@ -29,8 +29,8 @@ type Bytes = Vec<u8>;
 /// Structured representation of a call into a known Move entry function.
 /// ```ignore
 /// impl EntryFunctionCall {
-///     pub fn encode(self) -> TransactionPayload { .. }
-///     pub fn decode(&TransactionPayload) -> Option<EntryFunctionCall> { .. }
+///     pub fn encode(self) -> TransactionPayloadWrapper { .. }
+///     pub fn decode(&TransactionPayloadWrapper) -> Option<EntryFunctionCall> { .. }
 /// }
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -169,8 +169,8 @@ pub enum EntryFunctionCall {
 }
 
 impl EntryFunctionCall {
-    /// Build an Aptos `TransactionPayload` from a structured object `EntryFunctionCall`.
-    pub fn encode(self) -> TransactionPayload {
+    /// Build an Aptos `TransactionPayloadWrapper` from a structured object `EntryFunctionCall`.
+    pub fn encode(self) -> TransactionPayloadWrapper {
         use EntryFunctionCall::*;
         match self {
             TokenBurn {
@@ -337,9 +337,9 @@ impl EntryFunctionCall {
         }
     }
 
-    /// Try to recognize an Aptos `TransactionPayload` and convert it into a structured object `EntryFunctionCall`.
-    pub fn decode(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    /// Try to recognize an Aptos `TransactionPayloadWrapper` and convert it into a structured object `EntryFunctionCall`.
+    pub fn decode(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             match SCRIPT_FUNCTION_DECODER_MAP.get(&format!(
                 "{}_{}",
                 script.module().name(),
@@ -361,8 +361,8 @@ pub fn token_burn(
     name: Vec<u8>,
     property_version: u64,
     amount: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -390,8 +390,8 @@ pub fn token_burn_by_creator(
     name: Vec<u8>,
     property_version: u64,
     amount: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -418,8 +418,8 @@ pub fn token_create_collection_script(
     uri: Vec<u8>,
     maximum: u64,
     mutate_setting: Vec<bool>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -454,8 +454,8 @@ pub fn token_create_token_script(
     property_keys: Vec<Vec<u8>>,
     property_values: Vec<Vec<u8>>,
     property_types: Vec<Vec<u8>>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -489,8 +489,8 @@ pub fn token_direct_transfer_script(
     name: Vec<u8>,
     property_version: u64,
     amount: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -510,8 +510,8 @@ pub fn token_direct_transfer_script(
     ))
 }
 
-pub fn token_initialize_token_script() -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn token_initialize_token_script() -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -531,8 +531,8 @@ pub fn token_mint_script(
     collection: Vec<u8>,
     name: Vec<u8>,
     amount: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -564,8 +564,8 @@ pub fn token_mutate_token_properties(
     keys: Vec<Vec<u8>>,
     values: Vec<Vec<u8>>,
     types: Vec<Vec<u8>>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -589,8 +589,8 @@ pub fn token_mutate_token_properties(
     ))
 }
 
-pub fn token_opt_in_direct_transfer(opt_in: bool) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+pub fn token_opt_in_direct_transfer(opt_in: bool) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -613,8 +613,8 @@ pub fn token_transfer_with_opt_in(
     token_property_version: u64,
     to: AccountAddress,
     amount: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -645,8 +645,8 @@ pub fn token_coin_swap_list_token_for_swap(
     _token_amount: u64,
     _min_coin_per_token: u64,
     _locked_until_secs: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -674,8 +674,8 @@ pub fn token_transfers_cancel_offer_script(
     collection: Vec<u8>,
     name: Vec<u8>,
     property_version: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -701,8 +701,8 @@ pub fn token_transfers_claim_script(
     collection: Vec<u8>,
     name: Vec<u8>,
     property_version: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -729,8 +729,8 @@ pub fn token_transfers_offer_script(
     name: Vec<u8>,
     property_version: u64,
     amount: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
+) -> TransactionPayloadWrapper {
+    TransactionPayloadWrapper::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -752,8 +752,8 @@ pub fn token_transfers_offer_script(
 }
 mod decoder {
     use super::*;
-    pub fn token_burn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn token_burn(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenBurn {
                 creators_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 collection: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -766,8 +766,8 @@ mod decoder {
         }
     }
 
-    pub fn token_burn_by_creator(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn token_burn_by_creator(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenBurnByCreator {
                 owner: bcs::from_bytes(script.args().get(0)?).ok()?,
                 collection: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -781,9 +781,9 @@ mod decoder {
     }
 
     pub fn token_create_collection_script(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenCreateCollectionScript {
                 name: bcs::from_bytes(script.args().get(0)?).ok()?,
                 description: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -796,8 +796,10 @@ mod decoder {
         }
     }
 
-    pub fn token_create_token_script(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn token_create_token_script(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenCreateTokenScript {
                 collection: bcs::from_bytes(script.args().get(0)?).ok()?,
                 name: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -818,8 +820,10 @@ mod decoder {
         }
     }
 
-    pub fn token_direct_transfer_script(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn token_direct_transfer_script(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenDirectTransferScript {
                 creators_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 collection: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -833,17 +837,17 @@ mod decoder {
     }
 
     pub fn token_initialize_token_script(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(_script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(_script) = payload {
             Some(EntryFunctionCall::TokenInitializeTokenScript {})
         } else {
             None
         }
     }
 
-    pub fn token_mint_script(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn token_mint_script(payload: &TransactionPayloadWrapper) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenMintScript {
                 token_data_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 collection: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -856,9 +860,9 @@ mod decoder {
     }
 
     pub fn token_mutate_token_properties(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenMutateTokenProperties {
                 token_owner: bcs::from_bytes(script.args().get(0)?).ok()?,
                 creator: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -875,8 +879,10 @@ mod decoder {
         }
     }
 
-    pub fn token_opt_in_direct_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn token_opt_in_direct_transfer(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenOptInDirectTransfer {
                 opt_in: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -885,8 +891,10 @@ mod decoder {
         }
     }
 
-    pub fn token_transfer_with_opt_in(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn token_transfer_with_opt_in(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenTransferWithOptIn {
                 creator: bcs::from_bytes(script.args().get(0)?).ok()?,
                 collection_name: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -901,9 +909,9 @@ mod decoder {
     }
 
     pub fn token_coin_swap_list_token_for_swap(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenCoinSwapListTokenForSwap {
                 coin_type: script.ty_args().get(0)?.clone(),
                 _creators_address: bcs::from_bytes(script.args().get(0)?).ok()?,
@@ -920,9 +928,9 @@ mod decoder {
     }
 
     pub fn token_transfers_cancel_offer_script(
-        payload: &TransactionPayload,
+        payload: &TransactionPayloadWrapper,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenTransfersCancelOfferScript {
                 receiver: bcs::from_bytes(script.args().get(0)?).ok()?,
                 creator: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -935,8 +943,10 @@ mod decoder {
         }
     }
 
-    pub fn token_transfers_claim_script(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn token_transfers_claim_script(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenTransfersClaimScript {
                 sender: bcs::from_bytes(script.args().get(0)?).ok()?,
                 creator: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -949,8 +959,10 @@ mod decoder {
         }
     }
 
-    pub fn token_transfers_offer_script(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
+    pub fn token_transfers_offer_script(
+        payload: &TransactionPayloadWrapper,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayloadWrapper::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenTransfersOfferScript {
                 receiver: bcs::from_bytes(script.args().get(0)?).ok()?,
                 creator: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -968,7 +980,7 @@ mod decoder {
 type EntryFunctionDecoderMap = std::collections::HashMap<
     String,
     Box<
-        dyn Fn(&TransactionPayload) -> Option<EntryFunctionCall>
+        dyn Fn(&TransactionPayloadWrapper) -> Option<EntryFunctionCall>
             + std::marker::Sync
             + std::marker::Send,
     >,
