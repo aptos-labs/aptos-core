@@ -138,6 +138,7 @@ pub enum FeatureFlag {
     PermissionedSigner,
     AccountAbstraction,
     VMBinaryFormatV8,
+    UpgradeFeePayerToConcurrentFaStore,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -367,6 +368,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::PermissionedSigner => AptosFeatureFlag::PERMISSIONED_SIGNER,
             FeatureFlag::AccountAbstraction => AptosFeatureFlag::ACCOUNT_ABSTRACTION,
+            FeatureFlag::UpgradeFeePayerToConcurrentFaStore => {
+                AptosFeatureFlag::UPGRADE_FEE_PAYER_TO_CONCURRENT_FA_STORE
+            },
         }
     }
 }
@@ -523,6 +527,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::PERMISSIONED_SIGNER => FeatureFlag::PermissionedSigner,
             AptosFeatureFlag::ACCOUNT_ABSTRACTION => FeatureFlag::AccountAbstraction,
+            AptosFeatureFlag::UPGRADE_FEE_PAYER_TO_CONCURRENT_FA_STORE => {
+                FeatureFlag::UpgradeFeePayerToConcurrentFaStore
+            },
         }
     }
 }

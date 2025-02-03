@@ -566,12 +566,14 @@ module aptos_framework::transaction_validation {
                 );
             };
 
+            let upgrade_to_concurrent = features::is_upgrade_fee_payer_to_concurrent_fa_store_enabled() && (account_addr != gas_payer);
+
             if (transaction_fee_amount > storage_fee_refunded) {
                 let burn_amount = transaction_fee_amount - storage_fee_refunded;
-                transaction_fee::burn_fee(gas_payer, burn_amount, account_addr != gas_payer);
+                transaction_fee::burn_fee(gas_payer, burn_amount, upgrade_to_concurrent);
             } else if (transaction_fee_amount < storage_fee_refunded) {
                 let mint_amount = storage_fee_refunded - transaction_fee_amount;
-                transaction_fee::mint_and_refund(gas_payer, mint_amount, account_addr != gas_payer);
+                transaction_fee::mint_and_refund(gas_payer, mint_amount, upgrade_to_concurrent);
             };
         };
 
@@ -701,10 +703,11 @@ module aptos_framework::transaction_validation {
                     error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
                 );
             };
+            let upgrade_to_concurrent = features::is_upgrade_fee_payer_to_concurrent_fa_store_enabled() && (account_addr != gas_payer_address);
 
             if (transaction_fee_amount > storage_fee_refunded) {
                 let burn_amount = transaction_fee_amount - storage_fee_refunded;
-                transaction_fee::burn_fee(gas_payer_address, burn_amount, account_addr != gas_payer_address);
+                transaction_fee::burn_fee(gas_payer_address, burn_amount, upgrade_to_concurrent);
                 permissioned_signer::check_permission_consume(
                     &gas_payer,
                     (burn_amount as u256),
@@ -712,7 +715,7 @@ module aptos_framework::transaction_validation {
                 );
             } else if (transaction_fee_amount < storage_fee_refunded) {
                 let mint_amount = storage_fee_refunded - transaction_fee_amount;
-                transaction_fee::mint_and_refund(gas_payer_address, mint_amount, account_addr != gas_payer_address);
+                transaction_fee::mint_and_refund(gas_payer_address, mint_amount, upgrade_to_concurrent);
                 permissioned_signer::increase_limit(
                     &gas_payer,
                     (mint_amount as u256),

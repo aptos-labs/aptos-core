@@ -120,6 +120,7 @@ pub enum FeatureFlag {
     ACCOUNT_ABSTRACTION = 85,
     /// Enables bytecode version v8
     VM_BINARY_FORMAT_V8 = 86,
+    UPGRADE_FEE_PAYER_TO_CONCURRENT_FA_STORE = 87,
 }
 
 impl FeatureFlag {
@@ -205,6 +206,7 @@ impl FeatureFlag {
             FeatureFlag::PERMISSIONED_SIGNER,
             FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE,
             FeatureFlag::ACCOUNT_ABSTRACTION,
+            FeatureFlag::UPGRADE_FEE_PAYER_TO_CONCURRENT_FA_STORE,
         ]
     }
 }

@@ -634,6 +634,14 @@ module std::features {
         is_enabled(ACCOUNT_ABSTRACTION)
     }
 
+    const UPGRADE_FEE_PAYER_TO_CONCURRENT_FA_STORE: u64 = 87;
+
+    public fun get_upgrade_fee_payer_to_concurrent_fa_store_feature(): u64 { UPGRADE_FEE_PAYER_TO_CONCURRENT_FA_STORE }
+
+    public fun is_upgrade_fee_payer_to_concurrent_fa_store_enabled(): bool acquires Features {
+        is_enabled(UPGRADE_FEE_PAYER_TO_CONCURRENT_FA_STORE)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

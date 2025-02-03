@@ -1075,12 +1075,14 @@ Called by the Adapter
             );
         };
 
+        <b>let</b> upgrade_to_concurrent = <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_upgrade_fee_payer_to_concurrent_fa_store_enabled">features::is_upgrade_fee_payer_to_concurrent_fa_store_enabled</a>() && (account_addr != gas_payer);
+
         <b>if</b> (transaction_fee_amount &gt; storage_fee_refunded) {
             <b>let</b> burn_amount = transaction_fee_amount - storage_fee_refunded;
-            <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(gas_payer, burn_amount, account_addr != gas_payer);
+            <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(gas_payer, burn_amount, upgrade_to_concurrent);
         } <b>else</b> <b>if</b> (transaction_fee_amount &lt; storage_fee_refunded) {
             <b>let</b> mint_amount = storage_fee_refunded - transaction_fee_amount;
-            <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(gas_payer, mint_amount, account_addr != gas_payer);
+            <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(gas_payer, mint_amount, upgrade_to_concurrent);
         };
     };
 
@@ -1307,10 +1309,11 @@ If there is no fee_payer, fee_payer = sender
                 <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ECANT_PAY_GAS_DEPOSIT">PROLOGUE_ECANT_PAY_GAS_DEPOSIT</a>),
             );
         };
+        <b>let</b> upgrade_to_concurrent = <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_upgrade_fee_payer_to_concurrent_fa_store_enabled">features::is_upgrade_fee_payer_to_concurrent_fa_store_enabled</a>() && (account_addr != gas_payer_address);
 
         <b>if</b> (transaction_fee_amount &gt; storage_fee_refunded) {
             <b>let</b> burn_amount = transaction_fee_amount - storage_fee_refunded;
-            <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(gas_payer_address, burn_amount, account_addr != gas_payer_address);
+            <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(gas_payer_address, burn_amount, upgrade_to_concurrent);
             <a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_consume">permissioned_signer::check_permission_consume</a>(
                 &gas_payer,
                 (burn_amount <b>as</b> u256),
@@ -1318,7 +1321,7 @@ If there is no fee_payer, fee_payer = sender
             );
         } <b>else</b> <b>if</b> (transaction_fee_amount &lt; storage_fee_refunded) {
             <b>let</b> mint_amount = storage_fee_refunded - transaction_fee_amount;
-            <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(gas_payer_address, mint_amount, account_addr != gas_payer_address);
+            <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(gas_payer_address, mint_amount, upgrade_to_concurrent);
             <a href="permissioned_signer.md#0x1_permissioned_signer_increase_limit">permissioned_signer::increase_limit</a>(
                 &gas_payer,
                 (mint_amount <b>as</b> u256),
