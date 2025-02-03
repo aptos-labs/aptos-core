@@ -499,7 +499,7 @@ module aptos_framework::native_bridge {
         set_bridge_transfer_id_to_inbound_nonce(bridge_transfer_id, nonce);
 
         // Mint to the recipient
-        mint(recipient, amount);
+        mint_internal(recipient, amount);
 
         // Emit the event
         let bridge_events = borrow_global_mut<BridgeEvents>(@aptos_framework);
@@ -525,7 +525,7 @@ module aptos_framework::native_bridge {
         let bridge_relayer = bridge_relayer();
         assert!(amount > bridge_fee, EINVALID_AMOUNT);
         let new_amount = amount - bridge_fee;
-        mint(bridge_relayer, bridge_fee);
+        mint_internal(bridge_relayer, bridge_fee);
         new_amount
     }
 
@@ -688,7 +688,7 @@ module aptos_framework::native_bridge {
         // Mint coins to the sender to ensure they have sufficient balance
         let account_balance = amount + 1;
         // Mint some coins
-        mint(sender_address, account_balance);
+        mint_internal(sender_address, account_balance);
 
         // Specify the recipient and transfer amount
         let recipient = ethereum::eth_address_20_bytes();
