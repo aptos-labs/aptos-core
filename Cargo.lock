@@ -2416,6 +2416,7 @@ name = "aptos-indexer-grpc-utils"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "aptos-in-memory-cache",
  "aptos-metrics-core",
  "aptos-protos 1.3.1",
  "async-trait",

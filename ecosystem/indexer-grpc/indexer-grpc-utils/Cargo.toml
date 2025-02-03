@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-metrics-core = { workspace = true }
+aptos-in-memory-cache = { workspace = true }
 aptos-protos = { workspace = true }
 async-trait = { workspace = true }
 backoff = { workspace = true }
