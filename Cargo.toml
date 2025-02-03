@@ -73,6 +73,7 @@ members = [
     "crates/aptos-genesis",
     "crates/aptos-github-client",
     "crates/aptos-id-generator",
+    "crates/aptos-in-memory-cache",
     "crates/aptos-infallible",
     "crates/aptos-inspection-service",
     "crates/aptos-jwk-consensus",
@@ -361,6 +362,7 @@ aptos-genesis = { path = "crates/aptos-genesis" }
 aptos-github-client = { path = "crates/aptos-github-client" }
 aptos-global-constants = { path = "config/global-constants" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
+aptos-in-memory-cache = { path = "crates/aptos-in-memory-cache" }
 aptos-indexer = { path = "crates/indexer" }
 aptos-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-cache-worker" }
 aptos-indexer-grpc-data-service = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service" }
@@ -608,6 +610,7 @@ fxhash = "0.2.1"
 getrandom = "0.2.2"
 gcp-bigquery-client = "0.16.8"
 get_if_addrs = "0.5.3"
+get-size = { version = "0.1.4", features = ["derive"] }
 git2 = "0.16.1"
 glob = "0.3.0"
 goldenfile = "1.5.2"
