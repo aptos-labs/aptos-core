@@ -8,7 +8,7 @@ COPY ./aptos-node /usr/local/bin/aptos-node
 COPY ./aptos-faucet-service /usr/local/bin/aptos-faucet-service
 COPY ./genesis.blob /opt/aptos/genesis/genesis.blob
 COPY ./waypoint.txt /opt/aptos/genesis/waypoint.txt
-
+COPY ./libvoidstar.so /usr/lib/libvoidstar.so
 # Copy the entrypoint script
 COPY ./entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh

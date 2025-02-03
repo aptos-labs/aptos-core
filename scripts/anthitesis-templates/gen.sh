@@ -1,8 +1,24 @@
 #!/bin/bash
+
+set -e
+
 # Build all binaries and framework
-cargo build --release -p aptos-node
 cargo run --package aptos-framework release --target mainnet
 cargo build --release -p aptos-faucet-service
+RUSTFLAGS=" \
+    -Ccodegen-units=1 \
+    -Cpasses=sancov-module \
+    -Cllvm-args=-sanitizer-coverage-level=3 \
+    -Cllvm-args=-sanitizer-coverage-trace-pc-guard \
+    -Clink-args=-Wl,--build-id  \
+    -L/usr/lib/libvoidstar.so \
+    -lvoidstar\
+    --cfg tokio_unstable \
+    -C link-arg=-fuse-ld=lld \
+    -C force-frame-pointers=yes \
+    -C force-unwind-tables=yes \
+    -C target-feature=+sse4.2 \
+    " cargo build --release -p aptos-node
 
 mkdir "$GENESIS_DIR"
 cp mainnet.mrb "$GENESIS_DIR/framework.mrb" 
@@ -45,7 +61,7 @@ for i in $(seq 1 "$NODE_COUNT"); do
   FULLNODE_HOST="$FULLNODE_IP:6182"
 
   # Check if this node requires a full-node configuration
-  if [[ " ${FULLNODE_NODES[@]} " =~ " $i " ]]; then
+  if [[ "${FULLNODE_NODES[*]}" =~ $i ]]; then
     FULLNODE_ARG="--full-node-host $FULLNODE_HOST"
   else
     FULLNODE_ARG=""
@@ -65,11 +81,11 @@ for i in $(seq 1 "$NODE_COUNT"); do
     rm -rf "validator_$i"
 
     # Check if this node requires a full-node configuration
-    if [[ " ${FULLNODE_NODES[@]} " =~ " $i " ]]; then
+    if [[ "${FULLNODE_NODES[*]}" =~ $i ]]; then
       
       # Read the required values from the generated files
-      FULL_NODE_NETWORK_KEY=$(yq eval '.full_node_network_public_key' "$VALIDATOR_DIR/public-keys.yaml")
-      ACCOUNT_ADDRESS=$(yq eval '.account_address' "$VALIDATOR_DIR/validator-full-node-identity.yaml")
+      FULL_NODE_NETWORK_KEY=$(yq '.full_node_network_public_key' "$VALIDATOR_DIR/public-keys.yaml")
+      ACCOUNT_ADDRESS=$(yq '.account_address' "$VALIDATOR_DIR/validator-full-node-identity.yaml")
       
       yq eval -n "
         .base.role = \"full_node\" |
@@ -79,8 +95,8 @@ for i in $(seq 1 "$NODE_COUNT"); do
         .full_node_networks[0].network_id = \"public\" |
         .full_node_networks[0].discovery_method = \"onchain\" |
         .full_node_networks[0].identity.type = \"from_config\" |
-        .full_node_networks[0].identity.key = \"$FULL_NODE_NETWORK_KEY\" |
-        .full_node_networks[0].identity.peer_id = \"$ACCOUNT_ADDRESS\" |
+        .full_node_networks[0].identity.key = $FULL_NODE_NETWORK_KEY |
+        .full_node_networks[0].identity.peer_id = $ACCOUNT_ADDRESS |
         .full_node_networks[0].listen_address = \"/ip4/0.0.0.0/tcp/6182\" |
         .full_node_networks[0].max_inbound_connections = 100 |
         .full_node_networks[0].mutual_authentication = false |
@@ -89,6 +105,26 @@ for i in $(seq 1 "$NODE_COUNT"); do
         .api.enabled = true |
         .api.address = \"0.0.0.0:8080\"
       " > "$GENESIS_DIR/validator_$i/validator.yaml"
+
+      # Generate the fullnode.yaml
+      yq eval -n "
+        .base.role = \"full_node\" |
+        .base.data_dir = \"/opt/aptos/data\" |
+        .base.waypoint.from_file = \"/opt/aptos/genesis/waypoint.txt\" |
+        .execution.genesis_file_location = \"/opt/aptos/genesis/genesis.blob\" |
+        .storage.rocksdb_configs.enable_storage_sharding = true |
+        .full_node_networks[0].network_id.private = \"vfn\" |
+        .full_node_networks[0].listen_address = \"/ip4/0.0.0.0/tcp/6181\" |
+        .full_node_networks[0].seeds.\"00000000000000000000000000000000d58bc7bb154b38039bc9096ce04e1237\".addresses[0] = \"/ip4/$VALIDATOR_IP/tcp/6181/noise-ik/f0274c2774519281a8332d0bb9d8101bd58bc7bb154b38039bc9096ce04e1237/handshake/0\" |
+        .full_node_networks[0].seeds.\"00000000000000000000000000000000d58bc7bb154b38039bc9096ce04e1237\".role = \"Validator\" |
+        .full_node_networks[1].network_id = \"public\" |
+        .full_node_networks[1].discovery_method = \"onchain\" |
+        .full_node_networks[1].listen_address = \"/ip4/0.0.0.0/tcp/6182\" |
+        .full_node_networks[1].identity.type = \"from_file\" |
+        .full_node_networks[1].identity.path = \"/opt/aptos/genesis/validator-full-node-identity.yaml\" |
+        .api.enabled = true |
+        .api.address = \"0.0.0.0:8080\"
+      " > "$GENESIS_DIR/validator_$i/fullnode.yaml"
       
     else
       yq eval -n "

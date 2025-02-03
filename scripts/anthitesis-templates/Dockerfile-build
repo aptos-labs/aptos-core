@@ -27,6 +27,9 @@ RUN apt update && apt install -y \
     python3-venv \
     yq
 
+# Get instrumentation library
+RUN wget https://storage.googleapis.com/anthithesis/libvoidstar.so -O /usr/lib/libvoidstar.so
+
 # Clone Aptos repository
 RUN git clone --single-branch -b $APTOS_BRANCH --depth=1 https://github.com/aptos-labs/aptos-core.git
 WORKDIR /aptos-core

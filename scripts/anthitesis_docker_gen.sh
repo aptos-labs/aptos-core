@@ -75,7 +75,7 @@ docker build \
     --build-arg APTOS_BRANCH="$APTOS_BRANCH" \
     --build-arg NODE_COUNT="$NODE_COUNT" \
     --build-arg NETWORK_IP="$NETWORK_IP" \
-    --build-arg FULLNODE_NODES="$FULLNODE_NODES" \
+    --build-arg FULLNODE_NODES="${FULLNODE_NODES[*]}" \
     --build-arg ROOT_KEY="$ROOT_KEY" \
     --build-arg CHAIN_ID="$CHAIN_ID" \
     --build-arg GENESIS_DIR=$GENESIS_DIR \
@@ -103,7 +103,19 @@ for i in $(seq 1 "$NODE_COUNT"); do
     SERVICES="$SERVICES .services.validator_$i.networks.custom_network.ipv4_address = \"$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+10+'"$i"')}')\" |"
     SERVICES="$SERVICES .services.validator_$i.restart = \"unless-stopped\" |"
     SERVICES="$SERVICES .services.validator_$i.expose = [6180, 6181, 9101, 8080]"
+
+    if [[ "${FULLNODE_NODES[*]}" =~ "$i" ]]; then
+      SERVICES="$SERVICES |"
+      SERVICES="$SERVICES .services.fullnode_$i.image = \"aptos/node:latest\" |"
+      SERVICES="$SERVICES .services.fullnode_$i.environment.ROLE = \"full_node\" |"
+      SERVICES="$SERVICES .services.fullnode_$i.environment.CONFIG_PATH = \"/opt/aptos/etc/fullnode.yaml\" |"
+      SERVICES="$SERVICES .services.fullnode_$i.volumes = [\"./validator_$i/fullnode.yaml:/opt/aptos/etc/fullnode.yaml\", \"./validator_$i/keys/validator-full-node-identity.yaml:/opt/aptos/genesis/validator-full-node-identity.yaml\"] |"
+      SERVICES="$SERVICES .services.fullnode_$i.networks.custom_network.ipv4_address = \"$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+20+'"$i"')}')\" |"
+      SERVICES="$SERVICES .services.fullnode_$i.restart = \"unless-stopped\" |"
+      SERVICES="$SERVICES .services.fullnode_$i.expose = [6182, 8080, 9101]"
+    fi
 done
+
 
 # NODE_URL is the first validator node for the faucet to connect to
 yq eval -n "
@@ -120,5 +132,7 @@ yq eval -n "
   .networks.custom_network.ipam.config[0].subnet = \"$NETWORK_IP/24\" |
   $SERVICES
 " > "$GENESIS_DIR/docker-compose.yaml"
+
+wget https://storage.googleapis.com/anthithesis/libvoidstar.so -O $GENESIS_DIR/libvoidstar.so
 
 echo "Enter $GENESIS_DIR and run docker build -t aptos/node:latest . && docker compose up --force-recreate"

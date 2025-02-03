@@ -13,6 +13,9 @@ if [ "$ROLE" = "faucet" ]; then
 elif [ "$ROLE" = "validator" ]; then
   echo "Starting aptos-node with config: ${CONFIG_PATH}"
   exec /usr/local/bin/aptos-node -f "${CONFIG_PATH}"
+elif [ "$ROLE" = "full_node" ]; then
+  echo "Starting aptos-node with config: ${CONFIG_PATH}"
+  exec /usr/local/bin/aptos-node -f "${CONFIG_PATH}"
 else
   echo "ERROR: Unknown ROLE: ${ROLE}"
   exit 1
