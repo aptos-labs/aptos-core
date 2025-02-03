@@ -28,6 +28,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     vm_status::{StatusCode, StatusType},
 };
+use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     debug_write, debug_writeln,
     gas::{GasMeter, SimpleInstruction},
@@ -45,7 +46,7 @@ use move_vm_types::{
 use std::{
     cell::RefCell,
     cmp::min,
-    collections::{btree_map, BTreeSet, VecDeque},
+    collections::{btree_map, BTreeSet, HashMap, VecDeque},
     fmt::Write,
     rc::Rc,
 };
@@ -1541,6 +1542,8 @@ impl CallStack {
 }
 
 fn check_depth_of_type(resolver: &Resolver, ty: &Type) -> PartialVMResult<()> {
+    let _timer = VM_TIMER.timer_with_label("Interpreter::check_depth_of_type");
+
     // Start at 1 since we always call this right before we add a new node to the value's depth.
     let max_depth = match resolver.vm_config().max_value_nest_depth {
         Some(max_depth) => max_depth,
@@ -1589,6 +1592,7 @@ fn check_depth_of_type_impl(
                 *idx,
                 resolver.module_store(),
                 resolver.module_storage(),
+                &mut HashMap::new(),
             )?;
             check_depth!(formula.solve(&[]))
         },
@@ -1606,6 +1610,7 @@ fn check_depth_of_type_impl(
                 *idx,
                 resolver.module_store(),
                 resolver.module_storage(),
+                &mut HashMap::new(),
             )?;
             check_depth!(formula.solve(&ty_arg_depths))
         },

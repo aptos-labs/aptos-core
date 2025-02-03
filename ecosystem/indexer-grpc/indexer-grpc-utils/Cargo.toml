@@ -19,6 +19,8 @@ aptos-protos = { workspace = true }
 async-trait = { workspace = true }
 backoff = { workspace = true }
 base64 = { workspace = true }
+build_html = { workspace = true }
+bytesize = { workspace = true }
 chrono = { workspace = true }
 cloud-storage = { workspace = true }
 dashmap = { workspace = true }
@@ -38,3 +40,4 @@ tokio-util = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
 url = { workspace = true }
+warp = { workspace = true }

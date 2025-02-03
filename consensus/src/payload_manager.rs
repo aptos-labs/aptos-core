@@ -504,7 +504,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
 
         Ok((
             transaction_payload.transactions(),
-            transaction_payload.limit(),
+            transaction_payload.transaction_limit(),
         ))
     }
 }
@@ -554,7 +554,7 @@ async fn get_transactions_for_observer(
     // Return the transactions and the transaction limit
     Ok((
         transaction_payload.transactions(),
-        transaction_payload.limit(),
+        transaction_payload.transaction_limit(),
     ))
 }
 

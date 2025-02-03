@@ -216,13 +216,6 @@ module aptos_framework::primary_fungible_store {
         dispatchable_fungible_asset::deposit(store, fa);
     }
 
-    /// Deposit fungible asset `fa` to the given account's primary store.
-    public(friend) fun force_deposit(owner: address, fa: FungibleAsset) acquires DeriveRefPod {
-        let metadata = fungible_asset::asset_metadata(&fa);
-        let store = ensure_primary_store_exists(owner, metadata);
-        fungible_asset::unchecked_deposit(object::object_address(&store), fa);
-    }
-
     /// Transfer `amount` of fungible asset from sender's primary store to receiver's primary store.
     public entry fun transfer<T: key>(
         sender: &signer,

@@ -348,7 +348,8 @@ B0:
 }
 write_local_via_ref_2(): S /* def_idx: 6 */ {
 L0:	loc0: S
-L1:	loc1: &mut u64
+L1:	loc1: u64
+L2:	loc2: &mut u64
 B0:
 	0: LdU64(0)
 	1: LdU64(0)
@@ -358,9 +359,9 @@ B0:
 	5: MutBorrowLoc[0](loc0: S)
 	6: MutBorrowField[1](S.g: T)
 	7: MutBorrowField[2](T.h: u64)
-	8: StLoc[1](loc1: &mut u64)
+	8: StLoc[2](loc2: &mut u64)
 	9: LdU64(42)
-	10: MoveLoc[1](loc1: &mut u64)
+	10: MoveLoc[2](loc2: &mut u64)
 	11: WriteRef
 	12: MoveLoc[0](loc0: S)
 	13: Ret

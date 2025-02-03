@@ -36,25 +36,25 @@ public fun m::test(): (u64, u64) {
      # live vars: $t2, $t3
   2: $t4 := m::one()
      # live vars: $t2, $t3, $t4
-  3: $t7 := 0
+  3: $t3 := move($t3)
+     # live vars: $t2, $t3, $t4
+  4: $t7 := 0
      # live vars: $t2, $t3, $t4, $t7
-  4: $t5 := ==($t3, $t7)
+  5: $t5 := ==($t3, $t7)
      # live vars: $t2, $t4, $t5
-  5: if ($t5) goto 8 else goto 6
+  6: if ($t5) goto 9 else goto 7
      # live vars: $t2, $t4
-  6: label L3
+  7: label L3
      # live vars: $t2, $t4
-  7: goto 10
+  8: goto 11
      # live vars: $t2, $t4
-  8: label L0
+  9: label L0
      # live vars: $t2, $t4
-  9: m::bar()
+ 10: m::bar()
      # live vars: $t2, $t4
- 10: label L2
+ 11: label L2
      # live vars: $t2, $t4
- 11: $t2 := move($t2)
-     # live vars: $t2, $t4
- 12: $t4 := move($t4)
+ 12: $t2 := move($t2)
      # live vars: $t2, $t4
  13: return ($t2, $t4)
 }

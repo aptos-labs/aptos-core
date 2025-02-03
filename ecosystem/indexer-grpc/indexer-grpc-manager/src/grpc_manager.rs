@@ -118,4 +118,12 @@ impl GrpcManager {
 
         Ok(())
     }
+
+    pub(crate) fn get_metadata_manager(&self) -> &MetadataManager {
+        &self.metadata_manager
+    }
+
+    pub(crate) fn get_data_manager(&self) -> &DataManager {
+        &self.data_manager
+    }
 }

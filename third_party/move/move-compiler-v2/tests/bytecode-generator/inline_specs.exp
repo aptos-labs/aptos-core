@@ -87,15 +87,13 @@ module 42.inline_specs {
 specs(): u64 /* def_idx: 0 */ {
 L0:	loc0: u64
 B0:
-	0: LdU64(0)
-	1: StLoc[0](loc0: u64)
-	2: Nop
-	3: MoveLoc[0](loc0: u64)
-	4: Call succ(u64): u64
-	5: StLoc[0](loc0: u64)
-	6: Nop
-	7: MoveLoc[0](loc0: u64)
-	8: Ret
+	0: Nop
+	1: LdU64(0)
+	2: Call succ(u64): u64
+	3: StLoc[0](loc0: u64)
+	4: Nop
+	5: MoveLoc[0](loc0: u64)
+	6: Ret
 }
 succ(Arg0: u64): u64 /* def_idx: 1 */ {
 B0:

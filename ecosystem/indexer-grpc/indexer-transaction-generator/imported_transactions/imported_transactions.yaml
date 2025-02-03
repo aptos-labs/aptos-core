@@ -32,6 +32,9 @@ mainnet:
     999929475: 999929475_coin_and_fa_transfers
     508365567: 508365567_fa_v1_events
     2186504987: 2186504987_coin_store_deletion_no_event
+    255894550: 255894550_storage_refund
+    1737056775: 1737056775_coin_transfer_burn_event
+    550582915: 550582915_multiple_transfer_event
 
     # token v2 processor
     1058723093: 1058723093_token_v1_mint_withdraw_deposit_events
@@ -48,6 +51,7 @@ mainnet:
     967255533: 967255533_token_v2_mutation_event
     578366445: 578366445_token_v2_burn_event_v2
     1080786089: 1080786089_token_v2_burn_event_v1
+    445585423: 445585423_token_mint_and_burn_event
 
     # default processor
     1845035942: 1845035942_default_current_table_items
@@ -95,3 +99,10 @@ mainnet:
     2200077591: 2200077591_account_restoration_single_ed25519
     2200077877: 2200077877_account_restoration_rotated_to_single_secp256k1
     2200077800: 2200077800_account_restoration_rotated_to_multi_key
+
+    # events processor
+    554229017: 554229017_events_with_no_event_size_info
+
+    # Fungible asset migration
+    1680592683: 1680592683_fa_migration_coin_info
+    1957950162: 1957950162_fa_migration_v2_store_only

@@ -18,6 +18,7 @@ aptos-indexer-grpc-server-framework = { workspace = true }
 aptos-indexer-grpc-utils = { workspace = true }
 aptos-protos = { workspace = true }
 async-trait = { workspace = true }
+build_html = { workspace = true }
 clap = { workspace = true }
 dashmap = { workspace = true }
 futures = { workspace = true }
@@ -29,6 +30,7 @@ tokio = { workspace = true }
 tokio-scoped = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
+warp = { workspace = true }
 
 [dev-dependencies]
 aptos-config = { workspace = true }

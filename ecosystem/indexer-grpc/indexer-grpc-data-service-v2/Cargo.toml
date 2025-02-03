@@ -18,10 +18,12 @@ aptos-indexer-grpc-server-framework = { workspace = true }
 aptos-indexer-grpc-utils = { workspace = true }
 aptos-protos = { workspace = true }
 async-trait = { workspace = true }
+build_html = { workspace = true }
 clap = { workspace = true }
 dashmap = { workspace = true }
 futures = { workspace = true }
 once_cell = { workspace = true }
+prost = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
@@ -31,10 +33,7 @@ tonic = { workspace = true }
 tonic-reflection = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
-
-[dev-dependencies]
-aptos-config = { workspace = true }
-serde_json = { workspace = true }
+warp = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 jemallocator = { workspace = true }

@@ -235,6 +235,13 @@ impl MetadataManager {
             .unwrap()
     }
 
+    pub(crate) fn get_fullnodes_info(&self) -> HashMap<String, VecDeque<FullnodeInfo>> {
+        self.fullnodes
+            .iter()
+            .map(|entry| (entry.key().clone(), entry.value().recent_states.clone()))
+            .collect()
+    }
+
     pub(crate) fn get_live_data_services_info(
         &self,
     ) -> HashMap<GrpcAddress, VecDeque<LiveDataServiceInfo>> {

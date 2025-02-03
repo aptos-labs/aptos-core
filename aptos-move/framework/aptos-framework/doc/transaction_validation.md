@@ -889,10 +889,13 @@ Only called during genesis to initialize system resources for this module.
         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_map">vector::map</a>(secondary_signer_public_key_hashes, |x| <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(x)),
         is_simulation
     );
-    <b>assert</b>!(
-        fee_payer_public_key_hash == <a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(fee_payer_address),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY">PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY</a>),
-    )
+    <b>if</b> (!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_simulation_enhancement_enabled">features::transaction_simulation_enhancement_enabled</a>() ||
+        !<a href="transaction_validation.md#0x1_transaction_validation_skip_auth_key_check">skip_auth_key_check</a>(is_simulation, &<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(fee_payer_public_key_hash))) {
+        <b>assert</b>!(
+            fee_payer_public_key_hash == <a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(fee_payer_address),
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY">PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY</a>),
+        )
+    }
 }
 </code></pre>
 

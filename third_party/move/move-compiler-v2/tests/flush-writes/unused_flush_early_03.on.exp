@@ -41,59 +41,61 @@ public fun m::test1() {
      # live vars:
   0: ($t0, $t1, $t2) := m::foo()
      # live vars: $t0, $t1, $t2
-  1: $t5 := 0
-     # live vars: $t0, $t1, $t2, $t5
-  2: $t3 := ==($t0, $t5)
-     # live vars: $t1, $t2, $t3
-  3: if ($t3) goto 6 else goto 4
-     # live vars: $t1, $t2
-  4: label L9
-     # live vars: $t1, $t2
-  5: goto 8
-     # live vars: $t1, $t2
-  6: label L0
-     # live vars: $t1, $t2
-  7: m::bar()
-     # live vars: $t1, $t2
-  8: label L2
-     # live vars: $t1, $t2
-  9: $t1 := move($t1)
-     # live vars: $t1, $t2
- 10: $t0 := 0
+  1: $t0 := move($t0)
      # live vars: $t0, $t1, $t2
- 11: $t3 := ==($t1, $t0)
+  2: $t5 := 0
+     # live vars: $t0, $t1, $t2, $t5
+  3: $t3 := ==($t0, $t5)
+     # live vars: $t1, $t2, $t3
+  4: if ($t3) goto 7 else goto 5
+     # live vars: $t1, $t2
+  5: label L9
+     # live vars: $t1, $t2
+  6: goto 9
+     # live vars: $t1, $t2
+  7: label L0
+     # live vars: $t1, $t2
+  8: m::bar()
+     # live vars: $t1, $t2
+  9: label L2
+     # live vars: $t1, $t2
+ 10: $t1 := move($t1)
+     # live vars: $t1, $t2
+ 11: $t0 := 0
+     # live vars: $t0, $t1, $t2
+ 12: $t3 := ==($t1, $t0)
      # live vars: $t2, $t3
- 12: if ($t3) goto 15 else goto 13
+ 13: if ($t3) goto 16 else goto 14
      # live vars: $t2
- 13: label L10
+ 14: label L10
      # live vars: $t2
- 14: goto 17
+ 15: goto 18
      # live vars: $t2
- 15: label L3
+ 16: label L3
      # live vars: $t2
- 16: m::bar()
+ 17: m::bar()
      # live vars: $t2
- 17: label L5
+ 18: label L5
      # live vars: $t2
- 18: $t2 := move($t2)
+ 19: $t2 := move($t2)
      # live vars: $t2
- 19: $t0 := 0
+ 20: $t0 := 0
      # live vars: $t0, $t2
- 20: $t3 := ==($t2, $t0)
+ 21: $t3 := ==($t2, $t0)
      # live vars: $t3
- 21: if ($t3) goto 24 else goto 22
+ 22: if ($t3) goto 25 else goto 23
      # live vars:
- 22: label L11
+ 23: label L11
      # live vars:
- 23: goto 26
+ 24: goto 27
      # live vars:
- 24: label L6
+ 25: label L6
      # live vars:
- 25: m::bar()
+ 26: m::bar()
      # live vars:
- 26: label L8
+ 27: label L8
      # live vars:
- 27: return ()
+ 28: return ()
 }
 
 
