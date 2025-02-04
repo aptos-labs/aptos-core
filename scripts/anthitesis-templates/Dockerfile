@@ -1,7 +1,7 @@
 FROM debian:stable
 
 # Install common dependencies
-RUN apt-get update && apt-get install -y libdw1 libssl-dev openssl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y libdw1 libssl-dev openssl curl && rm -rf /var/lib/apt/lists/*
 
 # Copy both the aptos-node and aptos-faucet-service into the container
 COPY ./aptos-node /usr/local/bin/aptos-node
@@ -19,5 +19,7 @@ ENV CONFIG_PATH="/opt/aptos/etc/validator.yaml"
 ENV MINT_KEY="/opt/aptos/etc/mint.key"
 ENV NODE_URL="http://127.0.0.1:8080"
 ENV CHAIN_ID="TESTING"
+ENV NODE_COUNT="1"
+ENV NETWORK_IP="127.0.0.1"
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

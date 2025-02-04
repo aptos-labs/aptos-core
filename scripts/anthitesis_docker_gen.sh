@@ -88,6 +88,7 @@ echo "Genesis blob and waypoint generated in $GENESIS_DIR."
 
 # Entrypoint and Dockerfile copy
 cp scripts/anthitesis-templates/entrypoint.sh $GENESIS_DIR/entrypoint.sh
+cp scripts/anthitesis-templates/healthcheck.sh $GENESIS_DIR/healthcheck.sh
 cp scripts/anthitesis-templates/Dockerfile $GENESIS_DIR/Dockerfile
 
 # Generate docker-compose.yaml using yq
@@ -128,6 +129,12 @@ yq eval -n "
   .services.faucet.networks.custom_network.ipv4_address = \"$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+30)}')\" |
   .services.faucet.restart = \"unless-stopped\" |
   .services.faucet.expose = [8080] |
+  .services.healthcheck.image = \"aptos/node:latest\" |
+  .services.healthcheck.environment.ROLE = \"healthcheck\" |
+  .services.healthcheck.environment.NODE_COUNT = \"$NODE_COUNT\" |
+  .services.healthcheck.environment.NETWORK_IP = \"$NETWORK_IP\" |
+  .services.healthcheck.volumes = [\"./healthcheck.sh:/usr/local/bin/healthcheck.sh\"] |
+  .services.healthcheck.networks.custom_network.ipv4_address = \"$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+50)}')\" |
   .networks.custom_network.driver = \"bridge\" |
   .networks.custom_network.ipam.config[0].subnet = \"$NETWORK_IP/24\" |
   $SERVICES

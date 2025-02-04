@@ -16,6 +16,11 @@ elif [ "$ROLE" = "validator" ]; then
 elif [ "$ROLE" = "full_node" ]; then
   echo "Starting aptos-node with config: ${CONFIG_PATH}"
   exec /usr/local/bin/aptos-node -f "${CONFIG_PATH}"
+elif [ "$ROLE" = "healthcheck" ]; then
+  echo "Starting aptos-healthcheck"
+  sleep 10
+  chmod +x /usr/local/bin/healthcheck.sh
+  exec /usr/local/bin/healthcheck.sh "$NODE_COUNT" "$NETWORK_IP"
 else
   echo "ERROR: Unknown ROLE: ${ROLE}"
   exit 1
