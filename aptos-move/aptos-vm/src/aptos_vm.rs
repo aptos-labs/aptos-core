@@ -2345,6 +2345,11 @@ impl AptosVM {
                         // The known Move function failure and type resolution failure could be a result of speculative execution. Use speculative logger.
                         StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION
                         | StatusCode::TYPE_RESOLUTION_FAILURE => {
+                            println!(
+                                "[aptos_vm] Transaction breaking known Move function failure. txn: {:?}, status: {:?}",
+                                bcs::to_bytes::<SignedTransaction>(txn),
+                                vm_status,
+                            );
                             speculative_error!(
                                 log_context,
                                 format!(
