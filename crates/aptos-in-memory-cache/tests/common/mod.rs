@@ -95,7 +95,7 @@ impl<C: SizedCache<NotATransaction> + 'static> Cache<usize, NotATransaction> for
     }
 
     fn total_size(&self) -> usize {
-        self.cache.total_size() as usize
+        self.cache.total_size()
     }
 }
 
