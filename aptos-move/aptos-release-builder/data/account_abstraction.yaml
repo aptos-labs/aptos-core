@@ -1,0 +1,16 @@
+---
+remote_endpoint: ~
+name: "AIP-104 Account Abstraction"
+proposals:
+  - name: account_abstraction
+    metadata:
+      title: "Enable Account Abstraction"
+      description: "Enables AIP-104"
+      source_code_url: "https://github.com/aptos-labs/aptos-core/pull/15219"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-104.md"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - account_abstraction
+          disabled: [ ]
