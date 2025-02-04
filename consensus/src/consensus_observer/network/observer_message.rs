@@ -671,7 +671,8 @@ impl BlockTransactionPayload {
 
         // Get the inline batches in the payload
         let inline_batches: Vec<&BatchInfo> = match self {
-            BlockTransactionPayload::QuorumStoreInlineHybrid(_, inline_batches) => {
+            BlockTransactionPayload::QuorumStoreInlineHybrid(_, inline_batches)
+            | BlockTransactionPayload::QuorumStoreInlineHybridV2(_, inline_batches) => {
                 inline_batches.iter().map(|batch_info| batch_info).collect()
             },
             _ => {
