@@ -90,6 +90,7 @@ echo "Genesis blob and waypoint generated in $GENESIS_DIR."
 cp scripts/anthitesis-templates/entrypoint.sh $GENESIS_DIR/entrypoint.sh
 cp scripts/anthitesis-templates/healthcheck.sh $GENESIS_DIR/healthcheck.sh
 cp scripts/anthitesis-templates/Dockerfile $GENESIS_DIR/Dockerfile
+cp scripts/anthitesis-templates/Dockerfile-config $GENESIS_DIR/Dockerfile-config
 
 # Generate docker-compose.yaml using yq
 SERVICES=""
@@ -143,3 +144,4 @@ yq eval -n "
 wget https://storage.googleapis.com/anthithesis/libvoidstar.so -O $GENESIS_DIR/libvoidstar.so
 
 echo "Enter $GENESIS_DIR and run docker build -t aptos/node:latest . && docker compose up --force-recreate"
+echo "If you want to upload on the infra run: docker build -f Dockerfile-config -t aptos/config:latest ." 
