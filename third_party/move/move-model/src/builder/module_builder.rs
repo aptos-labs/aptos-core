@@ -5,8 +5,9 @@
 use crate::{
     ast::{
         AccessSpecifier, Address, Attribute, AttributeValue, Condition, ConditionKind, Exp,
-        ExpData, FriendDecl, ModuleName, Operation, PropertyBag, PropertyValue, QualifiedSymbol,
-        Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, TempIndex, UseDecl, Value,
+        ExpData, FriendDecl, ModuleName, Operation, Pattern, PropertyBag, PropertyValue,
+        QualifiedSymbol, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, TempIndex,
+        UseDecl, Value,
     },
     builder::{
         exp_builder::ExpTranslator,
@@ -18,10 +19,9 @@ use crate::{
     constant_folder::ConstantFolder,
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     intrinsics::process_intrinsic_declaration,
-    model,
     model::{
-        EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, FunctionLoc, Loc,
-        ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId,
+        self, EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, FunctionLoc,
+        Loc, ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId,
         SpecFunId, SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind,
     },
     options::ModelBuilderOptions,
@@ -124,8 +124,31 @@ pub enum SpecBlockContext<'a> {
     FunctionCodeV2(
         QualifiedSymbol,                                  // function name
         BTreeMap<Symbol, (Loc, Type, Option<TempIndex>)>, // local variables
+        Option<(Pattern, Type)>,                          // for lambda
     ),
     Schema(QualifiedSymbol),
+}
+
+impl<'a> SpecBlockContext<'a> {
+    pub fn allow_old(&self) -> bool {
+        use SpecBlockContext::*;
+        match self {
+            FunctionCode(_, _) => false,
+            FunctionCodeV2(_, _, _) => false, // TODO(tengzhang): add support of old(..) to spec of lambda expression
+            _ => true,
+        }
+    }
+
+    pub fn name(&self) -> Option<&QualifiedSymbol> {
+        use SpecBlockContext::*;
+        match self {
+            Struct(name, ..)
+            | FunctionCode(name, ..)
+            | FunctionCodeV2(name, ..)
+            | Schema(name, ..) => Some(name),
+            _ => None,
+        }
+    }
 }
 
 impl<'a> fmt::Display for SpecBlockContext<'a> {
@@ -1960,7 +1983,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
                 et
             },
-            FunctionCodeV2(name, locals) => {
+            FunctionCodeV2(name, locals, from_lambda) => {
                 let entry = &self
                     .parent
                     .fun_table
@@ -1975,6 +1998,22 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 et.enter_scope();
                 for (sym, (loc, type_, index)) in locals {
                     et.define_local(loc, *sym, type_.clone(), None, *index)
+                }
+
+                if from_lambda.is_some() && matches!(kind, ConditionKind::Ensures) {
+                    let (_, ty) = from_lambda.clone().unwrap();
+                    et.enter_scope();
+                    if let Type::Tuple(ts) = &ty {
+                        for (i, ty) in ts.iter().enumerate() {
+                            let name: Symbol = et.symbol_pool().make(&format!("result_{}", i + 1));
+                            let oper = Some(Operation::Result(i));
+                            et.define_local(loc, name, ty.clone(), oper, None);
+                        }
+                    } else {
+                        let name = et.symbol_pool().make("result");
+                        let oper = Some(Operation::Result(0));
+                        et.define_local(loc, name, ty.clone(), oper, None);
+                    }
                 }
                 et
             },
@@ -2140,7 +2179,15 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 let entry = self.parent.fun_table.get(name).expect("function defined");
                 cond.kind.allowed_on_fun_decl(entry.visibility)
             },
-            FunctionCode(..) | FunctionCodeV2(..) => cond.kind.allowed_on_fun_impl(),
+            FunctionCode(..) => cond.kind.allowed_on_fun_impl(),
+            FunctionCodeV2(.., from_lambda) => {
+                if from_lambda.is_some() {
+                    cond.kind.allowed_on_lambda_spec()
+                } else {
+                    cond.kind.allowed_on_fun_impl()
+                }
+            },
+
             Schema(_) => true,
         };
         if !ok {
@@ -2198,7 +2245,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 true // continue visit, note all problematic subexprs
             };
             cond.exp.visit_post_order(&mut visitor);
-        } else if let FunctionCode(name, _) | FunctionCodeV2(name, _) = context {
+        } else if !context.allow_old() {
+            let name = context.name().expect("should have name");
             // Restrict accesses to function arguments only for `old(..)` in in-spec block
             let entry = self.parent.fun_table.get(name).expect("function defined");
             let mut visitor = |e: &ExpData| {
@@ -2516,7 +2564,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         use ConditionKind::*;
         use EA::SpecConditionKind_ as PK;
         let converted = match &kind.value {
-            PK::Assert => Assert,
+            PK::Assert => Assert(None),
             PK::Assume => Assume,
             PK::Decreases => Decreases,
             PK::Modifies => Modifies,

@@ -301,7 +301,7 @@ impl FatLoopBuilder {
                 assert!(matches!(bytecode, Bytecode::Label(_, _)));
             } else {
                 match bytecode {
-                    Bytecode::Prop(attr_id, PropKind::Assert, exp)
+                    Bytecode::Prop(attr_id, PropKind::Assert(_), exp)
                         if asserts_as_invariants.contains(attr_id) =>
                     {
                         invariants.insert(code_offset, (*attr_id, exp.clone()));
