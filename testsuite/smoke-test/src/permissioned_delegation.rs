@@ -26,9 +26,9 @@ async fn test_permissioned_delegation() {
     info.create_user_account(account2.public_key())
         .await
         .unwrap();
-    let account1_private_key = account1.private_key().clone();
-    let account1_public_key = account1.public_key().clone();
-    let idx = cli.add_account_to_cli(account1_private_key.clone());
+    let account2_private_key = account2.private_key().clone();
+    let account2_public_key = account2.public_key().clone();
+    let idx = cli.add_account_to_cli(account1.private_key().clone());
 
     assert_eq!(
         Some(true),
@@ -67,7 +67,7 @@ async fn test_permissioned_delegation() {
     }}
     }}
     "#,
-        hex::encode(account1_public_key.to_bytes()),
+        hex::encode(account2_public_key.to_bytes()),
         u64::max_value(),
     );
     assert_eq!(
@@ -85,10 +85,10 @@ async fn test_permissioned_delegation() {
         func_info,
         Arc::new(move |x: &[u8]| {
             let mut authenticator = vec![];
-            authenticator.extend(bcs::to_bytes(&account1_public_key.to_bytes().to_vec()).unwrap());
+            authenticator.extend(bcs::to_bytes(&account2_public_key.to_bytes().to_vec()).unwrap());
             authenticator.extend(
                 bcs::to_bytes(
-                    &account1_private_key
+                    &account2_private_key
                         .sign_arbitrary_message(x)
                         .to_bytes()
                         .to_vec(),
