@@ -84,7 +84,7 @@ module aptos_framework::account_abstraction {
         account: &signer,
     ) acquires DispatchableAuthenticator {
         assert!(!is_permissioned_signer(account), error::permission_denied(ENOT_MASTER_SIGNER));
-        let addr = signer::address_of(account);
+        let addr = signer::address_of_unpermissioned(account);
         let resource_addr = resource_addr(addr);
         if (exists<DispatchableAuthenticator>(resource_addr)) {
             move_from<DispatchableAuthenticator>(resource_addr);
@@ -103,7 +103,7 @@ module aptos_framework::account_abstraction {
         auth_function: FunctionInfo,
         is_add: bool,
     ) acquires DispatchableAuthenticator {
-        let addr = signer::address_of(account);
+        let addr = signer::address_of_unpermissioned(account);
         let resource_addr = resource_addr(addr);
         let dispatcher_auth_function_info = function_info::new_function_info_from_address(
             @aptos_framework,
@@ -174,7 +174,9 @@ module aptos_framework::account_abstraction {
         func_info: FunctionInfo,
         signing_data: AbstractionAuthData,
     ): signer acquires DispatchableAuthenticator {
-        let master_signer_addr = signer::address_of(&account);
+        // We can call signer::address_of here as the account is passed in by VM directly so it will
+        // always be a master signer.
+        let master_signer_addr = signer::address_of_unpermissioned(&account);
         let func_infos = dispatchable_authenticator_internal(master_signer_addr);
         assert!(ordered_map::contains(func_infos, &func_info), error::not_found(EFUNCTION_INFO_EXISTENCE));
         function_info::load_module_from_function(&func_info);
@@ -198,7 +200,7 @@ module aptos_framework::account_abstraction {
     entry fun test_dispatchable_authenticator(
         bob: &signer,
     ) acquires DispatchableAuthenticator {
-        let bob_addr = signer::address_of(bob);
+        let bob_addr = signer::address_of_unpermissioned(bob);
         create_account_for_test(bob_addr);
         assert!(!using_dispatchable_authenticator(bob_addr), 0);
         add_authentication_function(

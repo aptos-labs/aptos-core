@@ -258,7 +258,7 @@ module aptos_framework::object {
     /// Create a new named object and return the ConstructorRef. Named objects can be queried globally
     /// by knowing the user generated seed used to create them. Named objects cannot be deleted.
     public fun create_named_object(creator: &signer, seed: vector<u8>): ConstructorRef {
-        let creator_address = signer::address_of(creator);
+        let creator_address = signer::address_of_unpermissioned(creator);
         let obj_addr = create_object_address(&creator_address, seed);
         create_object_internal(creator_address, obj_addr, false)
     }
@@ -302,7 +302,7 @@ module aptos_framework::object {
     /// doesn't have the same bottlenecks.
     public fun create_object_from_account(creator: &signer): ConstructorRef {
         let guid = account::create_guid(creator);
-        create_object_from_guid(signer::address_of(creator), guid)
+        create_object_from_guid(signer::address_of_unpermissioned(creator), guid)
     }
 
     #[deprecated]
@@ -314,7 +314,7 @@ module aptos_framework::object {
     /// doesn't have the same bottlenecks.
     public fun create_object_from_object(creator: &signer): ConstructorRef acquires ObjectCore {
         let guid = create_guid(creator);
-        create_object_from_guid(signer::address_of(creator), guid)
+        create_object_from_guid(signer::address_of_unpermissioned(creator), guid)
     }
 
     fun create_object_from_guid(creator_address: address, guid: guid::GUID): ConstructorRef {
@@ -395,7 +395,7 @@ module aptos_framework::object {
 
     /// Create a guid for the object, typically used for events
     public fun create_guid(object: &signer): guid::GUID acquires ObjectCore {
-        let addr = signer::address_of(object);
+        let addr = signer::address_of_unpermissioned(object);
         let object_data = borrow_global_mut<ObjectCore>(addr);
         guid::create(addr, &mut object_data.guid_creation_num)
     }
@@ -545,7 +545,7 @@ module aptos_framework::object {
         object: address,
         to: address,
     ) acquires ObjectCore {
-        let owner_address = signer::address_of(owner);
+        let owner_address = signer::address_of_unpermissioned(owner);
         assert!(
             permissioned_signer::check_permission_exists(owner, TransferPermission { object }),
             error::permission_denied(EOBJECT_NOT_TRANSFERRABLE)
@@ -645,7 +645,7 @@ module aptos_framework::object {
         );
 
         let TombStone { original_owner: original_owner_addr } = move_from<TombStone>(object_addr);
-        assert!(original_owner_addr == signer::address_of(original_owner), error::permission_denied(ENOT_OBJECT_OWNER));
+        assert!(original_owner_addr == signer::address_of_unpermissioned(original_owner), error::permission_denied(ENOT_OBJECT_OWNER));
         transfer_raw_inner(object_addr, original_owner_addr);
     }
 
@@ -752,7 +752,7 @@ module aptos_framework::object {
     /// This only works for objects directly owned and for simplicity does not apply to indirectly owned objects.
     /// Original owners can reclaim burnt objects any time in the future by calling unburn.
     public fun burn_object<T: key>(owner: &signer, object: Object<T>) acquires ObjectCore {
-        let original_owner = signer::address_of(owner);
+        let original_owner = signer::address_of_unpermissioned(owner);
         assert!(is_owner(object, original_owner), error::permission_denied(ENOT_OBJECT_OWNER));
         let object_addr = object.inner;
         move_to(&create_signer(object_addr), TombStone { original_owner });
@@ -822,7 +822,7 @@ module aptos_framework::object {
         hero: Object<Hero>,
         weapon: Object<Weapon>,
     ) acquires Hero, ObjectCore {
-        transfer(owner, weapon, signer::address_of(owner));
+        transfer(owner, weapon, signer::address_of_unpermissioned(owner));
         let hero = borrow_global_mut<Hero>(object_address(&hero));
         option::extract(&mut hero.weapon);
         event::emit_event(
@@ -936,7 +936,7 @@ module aptos_framework::object {
 
         // Owner should be able to reclaim.
         unburn(creator, hero);
-        assert!(owner(hero) == signer::address_of(creator), 0);
+        assert!(owner(hero) == signer::address_of_unpermissioned(creator), 0);
         // Object still frozen.
         assert!(!ungated_transfer_allowed(hero), 0);
     }
@@ -950,7 +950,7 @@ module aptos_framework::object {
 
         // Owner should be not be able to burn weapon directly.
         assert!(owner(weapon) == object_address(&hero), 0);
-        assert!(owns(weapon, signer::address_of(creator)), 0);
+        assert!(owns(weapon, signer::address_of_unpermissioned(creator)), 0);
         burn_object(creator, weapon);
     }
 
@@ -995,17 +995,17 @@ module aptos_framework::object {
         transfer(creator, obj7, object_address(&obj8));
         transfer(creator, obj8, object_address(&obj9));
 
-        assert!(owns(obj9, signer::address_of(creator)), 1);
-        assert!(owns(obj8, signer::address_of(creator)), 1);
-        assert!(owns(obj7, signer::address_of(creator)), 1);
-        assert!(owns(obj6, signer::address_of(creator)), 1);
-        assert!(owns(obj5, signer::address_of(creator)), 1);
-        assert!(owns(obj4, signer::address_of(creator)), 1);
-        assert!(owns(obj3, signer::address_of(creator)), 1);
-        assert!(owns(obj2, signer::address_of(creator)), 1);
+        assert!(owns(obj9, signer::address_of_unpermissioned(creator)), 1);
+        assert!(owns(obj8, signer::address_of_unpermissioned(creator)), 1);
+        assert!(owns(obj7, signer::address_of_unpermissioned(creator)), 1);
+        assert!(owns(obj6, signer::address_of_unpermissioned(creator)), 1);
+        assert!(owns(obj5, signer::address_of_unpermissioned(creator)), 1);
+        assert!(owns(obj4, signer::address_of_unpermissioned(creator)), 1);
+        assert!(owns(obj3, signer::address_of_unpermissioned(creator)), 1);
+        assert!(owns(obj2, signer::address_of_unpermissioned(creator)), 1);
 
         // Calling `owns` should fail as the nesting is too deep.
-        assert!(owns(obj1, signer::address_of(creator)), 1);
+        assert!(owns(obj1, signer::address_of_unpermissioned(creator)), 1);
     }
 
     #[test(creator = @0x123)]
@@ -1051,7 +1051,7 @@ module aptos_framework::object {
         // This creates a cycle (self-loop) in ownership.
         transfer(creator, obj1, object_address(&obj1));
         // This should fails as the ownership is cyclic.
-        let _ = owns(obj1, signer::address_of(creator));
+        let _ = owns(obj1, signer::address_of_unpermissioned(creator));
     }
 
     #[test(creator = @0x123)]

@@ -38,7 +38,7 @@ module aptos_framework::managed_coin {
         account: &signer,
         amount: u64,
     ) acquires Capabilities {
-        let account_addr = signer::address_of(account);
+        let account_addr = signer::address_of_unpermissioned(account);
 
         assert!(
             exists<Capabilities<CoinType>>(account_addr),
@@ -81,7 +81,7 @@ module aptos_framework::managed_coin {
         dst_addr: address,
         amount: u64,
     ) acquires Capabilities {
-        let account_addr = signer::address_of(account);
+        let account_addr = signer::address_of_unpermissioned(account);
 
         assert!(
             exists<Capabilities<CoinType>>(account_addr),
@@ -111,7 +111,7 @@ module aptos_framework::managed_coin {
     public fun remove_caps<CoinType>(
         account: &signer
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) acquires Capabilities {
-        let account_addr = signer::address_of(account);
+        let account_addr = signer::address_of_unpermissioned(account);
         assert!(
             exists<Capabilities<CoinType>>(account_addr),
             error::not_found(ENO_CAPABILITIES),
@@ -145,11 +145,11 @@ module aptos_framework::managed_coin {
         destination: signer,
         mod_account: signer
     ) acquires Capabilities {
-        let source_addr = signer::address_of(&source);
-        let destination_addr = signer::address_of(&destination);
+        let source_addr = signer::address_of_unpermissioned(&source);
+        let destination_addr = signer::address_of_unpermissioned(&destination);
         aptos_framework::account::create_account_for_test(source_addr);
         aptos_framework::account::create_account_for_test(destination_addr);
-        aptos_framework::account::create_account_for_test(signer::address_of(&mod_account));
+        aptos_framework::account::create_account_for_test(signer::address_of_unpermissioned(&mod_account));
         aggregator_factory::initialize_aggregator_factory_for_test(&mod_account);
         aptos_framework::coin::create_coin_conversion_map(&framework);
 
@@ -179,7 +179,7 @@ module aptos_framework::managed_coin {
         assert!(coin::balance<FakeMoney>(source_addr) == 40, 3);
         assert!(coin::balance<FakeMoney>(destination_addr) == 20, 4);
 
-        coin::transfer<FakeMoney>(&source, signer::address_of(&mod_account), 40);
+        coin::transfer<FakeMoney>(&source, signer::address_of_unpermissioned(&mod_account), 40);
         burn<FakeMoney>(&mod_account, 40);
 
         assert!(coin::balance<FakeMoney>(source_addr) == 0, 1);
@@ -189,7 +189,7 @@ module aptos_framework::managed_coin {
 
         // Destroy mint capabilities
         destroy_caps<FakeMoney>(&mod_account);
-        assert!(!exists<Capabilities<FakeMoney>>(signer::address_of(&mod_account)), 3);
+        assert!(!exists<Capabilities<FakeMoney>>(signer::address_of_unpermissioned(&mod_account)), 3);
     }
 
     #[test(source = @0xa11ce, destination = @0xb0b, mod_account = @0x1)]
@@ -198,11 +198,11 @@ module aptos_framework::managed_coin {
         destination: signer,
         mod_account: signer
     ) acquires Capabilities {
-        let source_addr = signer::address_of(&source);
-        let destination_addr = signer::address_of(&destination);
+        let source_addr = signer::address_of_unpermissioned(&source);
+        let destination_addr = signer::address_of_unpermissioned(&destination);
         aptos_framework::account::create_account_for_test(source_addr);
         aptos_framework::account::create_account_for_test(destination_addr);
-        aptos_framework::account::create_account_for_test(signer::address_of(&mod_account));
+        aptos_framework::account::create_account_for_test(signer::address_of_unpermissioned(&mod_account));
         aggregator_factory::initialize_aggregator_factory_for_test(&mod_account);
 
         initialize<FakeMoney>(
@@ -216,7 +216,7 @@ module aptos_framework::managed_coin {
 
         // Remove capabilities
         let (burn_cap, freeze_cap, mint_cap) = remove_caps<FakeMoney>(&mod_account);
-        assert!(!exists<Capabilities<FakeMoney>>(signer::address_of(&mod_account)), 3);
+        assert!(!exists<Capabilities<FakeMoney>>(signer::address_of_unpermissioned(&mod_account)), 3);
         coin::destroy_mint_cap(mint_cap);
         coin::destroy_freeze_cap(freeze_cap);
         coin::destroy_burn_cap(burn_cap);
@@ -229,11 +229,11 @@ module aptos_framework::managed_coin {
         destination: signer,
         mod_account: signer,
     ) acquires Capabilities {
-        let source_addr = signer::address_of(&source);
+        let source_addr = signer::address_of_unpermissioned(&source);
 
         aptos_framework::account::create_account_for_test(source_addr);
-        aptos_framework::account::create_account_for_test(signer::address_of(&destination));
-        aptos_framework::account::create_account_for_test(signer::address_of(&mod_account));
+        aptos_framework::account::create_account_for_test(signer::address_of_unpermissioned(&destination));
+        aptos_framework::account::create_account_for_test(signer::address_of_unpermissioned(&mod_account));
         aggregator_factory::initialize_aggregator_factory_for_test(&mod_account);
 
         initialize<FakeMoney>(&mod_account, b"Fake money", b"FMD", 1, true);
@@ -251,11 +251,11 @@ module aptos_framework::managed_coin {
         destination: signer,
         mod_account: signer,
     ) acquires Capabilities {
-        let source_addr = signer::address_of(&source);
+        let source_addr = signer::address_of_unpermissioned(&source);
 
         aptos_framework::account::create_account_for_test(source_addr);
-        aptos_framework::account::create_account_for_test(signer::address_of(&destination));
-        aptos_framework::account::create_account_for_test(signer::address_of(&mod_account));
+        aptos_framework::account::create_account_for_test(signer::address_of_unpermissioned(&destination));
+        aptos_framework::account::create_account_for_test(signer::address_of_unpermissioned(&mod_account));
         aggregator_factory::initialize_aggregator_factory_for_test(&mod_account);
 
         initialize<FakeMoney>(&mod_account, b"Fake money", b"FMD", 1, true);

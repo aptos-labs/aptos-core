@@ -70,7 +70,7 @@ module aptos_framework::reconfiguration {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         // assert it matches `new_epoch_event_key()`, otherwise the event can't be recognized
-        assert!(account::get_guid_next_creation_num(signer::address_of(aptos_framework)) == 2, error::invalid_state(EINVALID_GUID_FOR_EVENT));
+        assert!(account::get_guid_next_creation_num(signer::address_of_unpermissioned(aptos_framework)) == 2, error::invalid_state(EINVALID_GUID_FOR_EVENT));
         move_to<Configuration>(
             aptos_framework,
             Configuration {
@@ -95,7 +95,7 @@ module aptos_framework::reconfiguration {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         assert!(!reconfiguration_enabled(), error::invalid_state(ECONFIGURATION));
-        DisableReconfiguration {} = move_from<DisableReconfiguration>(signer::address_of(aptos_framework));
+        DisableReconfiguration {} = move_from<DisableReconfiguration>(signer::address_of_unpermissioned(aptos_framework));
     }
 
     fun reconfiguration_enabled(): bool {

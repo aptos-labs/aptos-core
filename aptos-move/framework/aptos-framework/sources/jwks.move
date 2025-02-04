@@ -179,11 +179,11 @@ module aptos_framework::jwks {
     /// reusing `PatchedJWKs { jwks: AllProviderJWKs }`, which is a JWK-consensus-specific struct.
     public fun patch_federated_jwks(jwk_owner: &signer, patches: vector<Patch>) acquires FederatedJWKs {
         // Prevents accidental calls in 0x1::jwks that install federated JWKs at the Aptos framework address.
-        assert!(!system_addresses::is_aptos_framework_address(signer::address_of(jwk_owner)),
+        assert!(!system_addresses::is_aptos_framework_address(signer::address_of_unpermissioned(jwk_owner)),
             error::invalid_argument(EINSTALL_FEDERATED_JWKS_AT_APTOS_FRAMEWORK)
         );
 
-        let jwk_addr = signer::address_of(jwk_owner);
+        let jwk_addr = signer::address_of_unpermissioned(jwk_owner);
         if (!exists<FederatedJWKs>(jwk_addr)) {
             move_to(jwk_owner, FederatedJWKs { jwks: AllProvidersJWKs { entries: vector[] } });
         };

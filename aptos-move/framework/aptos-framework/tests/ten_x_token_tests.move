@@ -41,7 +41,7 @@ module aptos_framework::ten_x_token_tests {
         let metadata = object::convert<TestToken, Metadata>(token_object);
 
         ten_x_token::initialize(creator, &creator_ref);
-        let creator_address = signer::address_of(creator);
+        let creator_address = signer::address_of_unpermissioned(creator);
 
         let fa = fungible_asset::mint(&mint, 100);
         primary_fungible_store::deposit(creator_address, fa);

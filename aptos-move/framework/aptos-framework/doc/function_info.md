@@ -130,7 +130,7 @@ Creates a new function info from names.
     function_name: String,
 ): <a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a> {
     <a href="function_info.md#0x1_function_info_new_function_info_from_address">new_function_info_from_address</a>(
-        <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(module_signer),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of_unpermissioned">signer::address_of_unpermissioned</a>(module_signer),
         module_name,
         function_name,
     )

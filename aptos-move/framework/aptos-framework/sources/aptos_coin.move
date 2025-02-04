@@ -56,7 +56,7 @@ module aptos_framework::aptos_coin {
     }
 
     public fun has_mint_capability(account: &signer): bool {
-        exists<MintCapStore>(signer::address_of(account))
+        exists<MintCapStore>(signer::address_of_unpermissioned(account))
     }
 
     /// Only called during genesis to destroy the aptos framework account's mint capability once all initial validators
@@ -82,7 +82,7 @@ module aptos_framework::aptos_coin {
             18446744073709551615,
             &mint_cap,
         );
-        coin::deposit<AptosCoin>(signer::address_of(core_resources), coins);
+        coin::deposit<AptosCoin>(signer::address_of_unpermissioned(core_resources), coins);
 
         move_to(core_resources, MintCapStore { mint_cap });
         move_to(core_resources, Delegations { inner: vector::empty() });
@@ -95,7 +95,7 @@ module aptos_framework::aptos_coin {
         dst_addr: address,
         amount: u64,
     ) acquires MintCapStore {
-        let account_addr = signer::address_of(account);
+        let account_addr = signer::address_of_unpermissioned(account);
 
         assert!(
             exists<MintCapStore>(account_addr),
@@ -122,7 +122,7 @@ module aptos_framework::aptos_coin {
     /// Only callable in tests and testnets where the core resources account exists.
     /// Claim the delegated mint capability and destroy the delegated token.
     public entry fun claim_mint_capability(account: &signer) acquires Delegations, MintCapStore {
-        let maybe_index = find_delegation(signer::address_of(account));
+        let maybe_index = find_delegation(signer::address_of_unpermissioned(account));
         assert!(option::is_some(&maybe_index), EDELEGATION_NOT_FOUND);
         let idx = *option::borrow(&maybe_index);
         let delegations = &mut borrow_global_mut<Delegations>(@core_resources).inner;

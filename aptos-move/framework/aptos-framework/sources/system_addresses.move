@@ -12,7 +12,7 @@ module aptos_framework::system_addresses {
     const ENOT_FRAMEWORK_RESERVED_ADDRESS: u64 = 4;
 
     public fun assert_core_resource(account: &signer) {
-        assert_core_resource_address(signer::address_of(account))
+        assert_core_resource_address(signer::address_of_unpermissioned(account))
     }
 
     public fun assert_core_resource_address(addr: address) {
@@ -25,13 +25,13 @@ module aptos_framework::system_addresses {
 
     public fun assert_aptos_framework(account: &signer) {
         assert!(
-            is_aptos_framework_address(signer::address_of(account)),
+            is_aptos_framework_address(signer::address_of_unpermissioned(account)),
             error::permission_denied(ENOT_APTOS_FRAMEWORK_ADDRESS),
         )
     }
 
     public fun assert_framework_reserved_address(account: &signer) {
-        assert_framework_reserved(signer::address_of(account));
+        assert_framework_reserved(signer::address_of_unpermissioned(account));
     }
 
     public fun assert_framework_reserved(addr: address) {
@@ -67,7 +67,7 @@ module aptos_framework::system_addresses {
 
     /// Return true if `addr` is a reserved address for the VM to call system modules.
     public fun is_vm(account: &signer): bool {
-        is_vm_address(signer::address_of(account))
+        is_vm_address(signer::address_of_unpermissioned(account))
     }
 
     /// Return true if `addr` is a reserved address for the VM to call system modules.

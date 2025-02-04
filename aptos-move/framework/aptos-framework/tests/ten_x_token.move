@@ -16,7 +16,7 @@ module 0xcafe::ten_x_token {
     }
 
     public fun initialize(account: &signer, constructor_ref: &ConstructorRef) {
-        assert!(signer::address_of(account) == @0xcafe, 1);
+        assert!(signer::address_of_unpermissioned(account) == @0xcafe, 1);
         let balance_ref = fungible_asset::generate_raw_balance_ref(constructor_ref);
         let supply_ref = fungible_asset::generate_raw_supply_ref(constructor_ref);
         move_to<BalanceStore>(account, BalanceStore { balance_ref, supply_ref });

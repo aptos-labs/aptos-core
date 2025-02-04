@@ -381,7 +381,7 @@ module aptos_framework::staking_contract {
         assert!(principal >= min_stake_required, error::invalid_argument(EINSUFFICIENT_STAKE_AMOUNT));
 
         // Initialize Store resource if this is the first time the staker has delegated to anyone.
-        let staker_address = signer::address_of(staker);
+        let staker_address = signer::address_of_unpermissioned(staker);
         if (!exists<Store>(staker_address)) {
             move_to(staker, new_staking_contracts_holder(staker));
         };
@@ -403,7 +403,7 @@ module aptos_framework::staking_contract {
         stake::add_stake_with_cap(&owner_cap, coins);
 
         // Create the contract record.
-        let pool_address = signer::address_of(&stake_pool_signer);
+        let pool_address = signer::address_of_unpermissioned(&stake_pool_signer);
         simple_map::add(staking_contracts, operator, StakingContract {
             principal,
             pool_address,
@@ -429,7 +429,7 @@ module aptos_framework::staking_contract {
 
     /// Add more stake to an existing staking contract.
     public entry fun add_stake(staker: &signer, operator: address, amount: u64) acquires Store {
-        let staker_address = signer::address_of(staker);
+        let staker_address = signer::address_of_unpermissioned(staker);
         assert_staking_contract_exists(staker_address, operator);
 
         let store = borrow_global_mut<Store>(staker_address);
@@ -453,7 +453,7 @@ module aptos_framework::staking_contract {
 
     /// Convenient function to allow the staker to update the voter address in a staking contract they made.
     public entry fun update_voter(staker: &signer, operator: address, new_voter: address) acquires Store {
-        let staker_address = signer::address_of(staker);
+        let staker_address = signer::address_of_unpermissioned(staker);
         assert_staking_contract_exists(staker_address, operator);
 
         let store = borrow_global_mut<Store>(staker_address);
@@ -474,7 +474,7 @@ module aptos_framework::staking_contract {
 
     /// Convenient function to allow the staker to reset their stake pool's lockup period to start now.
     public entry fun reset_lockup(staker: &signer, operator: address) acquires Store {
-        let staker_address = signer::address_of(staker);
+        let staker_address = signer::address_of_unpermissioned(staker);
         assert_staking_contract_exists(staker_address, operator);
 
         let store = borrow_global_mut<Store>(staker_address);
@@ -501,7 +501,7 @@ module aptos_framework::staking_contract {
             error::invalid_argument(EINVALID_COMMISSION_PERCENTAGE),
         );
 
-        let staker_address = signer::address_of(staker);
+        let staker_address = signer::address_of_unpermissioned(staker);
         assert!(exists<Store>(staker_address), error::not_found(ENO_STAKING_CONTRACT_FOUND_FOR_STAKER));
 
         let store = borrow_global_mut<Store>(staker_address);
@@ -546,7 +546,7 @@ module aptos_framework::staking_contract {
         staker: address,
         operator: address
     ) acquires Store, BeneficiaryForOperator {
-        let account_addr = signer::address_of(account);
+        let account_addr = signer::address_of_unpermissioned(account);
         assert!(
             account_addr == staker || account_addr == operator || account_addr == beneficiary_for_operator(operator),
             error::unauthenticated(ENOT_STAKER_OR_OPERATOR_OR_BENEFICIARY)
@@ -617,7 +617,7 @@ module aptos_framework::staking_contract {
         // Short-circuit if amount is 0.
         if (amount == 0) return;
 
-        let staker_address = signer::address_of(staker);
+        let staker_address = signer::address_of_unpermissioned(staker);
         assert_staking_contract_exists(staker_address, operator);
 
         let store = borrow_global_mut<Store>(staker_address);
@@ -663,7 +663,7 @@ module aptos_framework::staking_contract {
 
     /// Unlock all accumulated rewards since the last recorded principals.
     public entry fun unlock_rewards(staker: &signer, operator: address) acquires Store, BeneficiaryForOperator {
-        let staker_address = signer::address_of(staker);
+        let staker_address = signer::address_of_unpermissioned(staker);
         assert_staking_contract_exists(staker_address, operator);
 
         // Calculate how much rewards belongs to the staker after commission is paid.
@@ -678,7 +678,7 @@ module aptos_framework::staking_contract {
         old_operator: address,
         new_operator: address,
     ) acquires Store, BeneficiaryForOperator {
-        let staker_address = signer::address_of(staker);
+        let staker_address = signer::address_of_unpermissioned(staker);
         assert_staking_contract_exists(staker_address, old_operator);
 
         let commission_percentage = commission_percentage(staker_address, old_operator);
@@ -692,7 +692,7 @@ module aptos_framework::staking_contract {
         new_operator: address,
         new_commission_percentage: u64,
     ) acquires Store, BeneficiaryForOperator {
-        let staker_address = signer::address_of(staker);
+        let staker_address = signer::address_of_unpermissioned(staker);
         assert_staking_contract_exists(staker_address, old_operator);
 
         // Merging two existing staking contracts is too complex as we'd need to merge two separate stake pools.
@@ -744,7 +744,7 @@ module aptos_framework::staking_contract {
         ));
         // The beneficiay address of an operator is stored under the operator's address.
         // So, the operator does not need to be validated with respect to a staking pool.
-        let operator_addr = signer::address_of(operator);
+        let operator_addr = signer::address_of_unpermissioned(operator);
         let old_beneficiary = beneficiary_for_operator(operator_addr);
         if (exists<BeneficiaryForOperator>(operator_addr)) {
             borrow_global_mut<BeneficiaryForOperator>(operator_addr).beneficiary_for_operator = new_beneficiary;
@@ -877,7 +877,7 @@ module aptos_framework::staking_contract {
     ): (signer, SignerCapability, OwnerCapability) {
         // Generate a seed that will be used to create the resource account that hosts the staking contract.
         let seed = create_resource_account_seed(
-            signer::address_of(staker), operator, contract_creation_seed);
+            signer::address_of_unpermissioned(staker), operator, contract_creation_seed);
 
         let (stake_pool_signer, stake_pool_signer_cap) = account::create_resource_account(staker, seed);
         stake::initialize_stake_owner(&stake_pool_signer, 0, operator, voter);
@@ -984,11 +984,11 @@ module aptos_framework::staking_contract {
             1000000
         );
 
-        let staker_address = signer::address_of(staker);
+        let staker_address = signer::address_of_unpermissioned(staker);
         if (!account::exists_at(staker_address)) {
             account::create_account_for_test(staker_address);
         };
-        let operator_address = signer::address_of(operator);
+        let operator_address = signer::address_of_unpermissioned(operator);
         if (!account::exists_at(operator_address)) {
             account::create_account_for_test(operator_address);
         };
@@ -1005,7 +1005,7 @@ module aptos_framework::staking_contract {
         commission: u64,
     ) acquires Store {
         setup(aptos_framework, staker, operator, amount);
-        let operator_address = signer::address_of(operator);
+        let operator_address = signer::address_of_unpermissioned(operator);
 
         // Voter is initially set to operator but then updated to be staker.
         create_staking_contract(staker, operator_address, operator_address, amount, commission, vector::empty<u8>());
@@ -1020,8 +1020,8 @@ module aptos_framework::staking_contract {
         operator: &signer
     ) acquires Store, BeneficiaryForOperator {
         setup_staking_contract(aptos_framework, staker, operator, INITIAL_BALANCE, 10);
-        let staker_address = signer::address_of(staker);
-        let operator_address = signer::address_of(operator);
+        let staker_address = signer::address_of_unpermissioned(staker);
+        let operator_address = signer::address_of_unpermissioned(operator);
         assert_staking_contract_exists(staker_address, operator_address);
         assert_staking_contract(staker_address, operator_address, INITIAL_BALANCE, 10);
 
@@ -1123,8 +1123,8 @@ module aptos_framework::staking_contract {
     public entry fun test_operator_cannot_request_same_commission_multiple_times(
         aptos_framework: &signer, staker: &signer, operator: &signer) acquires Store, BeneficiaryForOperator {
         setup_staking_contract(aptos_framework, staker, operator, INITIAL_BALANCE, 10);
-        let staker_address = signer::address_of(staker);
-        let operator_address = signer::address_of(operator);
+        let staker_address = signer::address_of_unpermissioned(staker);
+        let operator_address = signer::address_of_unpermissioned(operator);
         let pool_address = stake_pool_address(staker_address, operator_address);
 
         // Operator joins the validator set.
@@ -1151,8 +1151,8 @@ module aptos_framework::staking_contract {
     public entry fun test_unlock_rewards(
         aptos_framework: &signer, staker: &signer, operator: &signer) acquires Store, BeneficiaryForOperator {
         setup_staking_contract(aptos_framework, staker, operator, INITIAL_BALANCE, 10);
-        let staker_address = signer::address_of(staker);
-        let operator_address = signer::address_of(operator);
+        let staker_address = signer::address_of_unpermissioned(staker);
+        let operator_address = signer::address_of_unpermissioned(operator);
         let pool_address = stake_pool_address(staker_address, operator_address);
 
         // Operator joins the validator set.
@@ -1182,7 +1182,7 @@ module aptos_framework::staking_contract {
         operator: &signer,
     ) acquires Store {
         setup_staking_contract(aptos_framework, staker, operator, INITIAL_BALANCE, 10);
-        let operator_address = signer::address_of(operator);
+        let operator_address = signer::address_of_unpermissioned(operator);
         stake::mint(staker, INITIAL_BALANCE);
         create_staking_contract(staker, operator_address, operator_address, INITIAL_BALANCE, 10, vector::empty<u8>());
     }
@@ -1214,8 +1214,8 @@ module aptos_framework::staking_contract {
         operator: &signer,
     ) acquires Store {
         setup_staking_contract(aptos_framework, staker, operator, INITIAL_BALANCE, 10);
-        let staker_address = signer::address_of(staker);
-        let operator_address = signer::address_of(operator);
+        let staker_address = signer::address_of_unpermissioned(staker);
+        let operator_address = signer::address_of_unpermissioned(operator);
 
         // Voter is initially set to operator but then updated to be staker.
         let pool_address = stake_pool_address(staker_address, operator_address);
@@ -1231,8 +1231,8 @@ module aptos_framework::staking_contract {
         operator: &signer,
     ) acquires Store {
         setup_staking_contract(aptos_framework, staker, operator, INITIAL_BALANCE, 10);
-        let staker_address = signer::address_of(staker);
-        let operator_address = signer::address_of(operator);
+        let staker_address = signer::address_of_unpermissioned(staker);
+        let operator_address = signer::address_of_unpermissioned(operator);
         let pool_address = stake_pool_address(staker_address, operator_address);
 
         let origin_lockup_expiration = stake::get_lockup_secs(pool_address);
@@ -1248,11 +1248,11 @@ module aptos_framework::staking_contract {
         operator_2: &signer,
     ) acquires Store, BeneficiaryForOperator {
         setup_staking_contract(aptos_framework, staker, operator_1, INITIAL_BALANCE, 10);
-        account::create_account_for_test(signer::address_of(operator_2));
+        account::create_account_for_test(signer::address_of_unpermissioned(operator_2));
         stake::mint(operator_2, INITIAL_BALANCE);
-        let staker_address = signer::address_of(staker);
-        let operator_1_address = signer::address_of(operator_1);
-        let operator_2_address = signer::address_of(operator_2);
+        let staker_address = signer::address_of_unpermissioned(staker);
+        let operator_1_address = signer::address_of_unpermissioned(operator_1);
+        let operator_2_address = signer::address_of_unpermissioned(operator_2);
 
         // Join validator set and earn some rewards.
         let pool_address = stake_pool_address(staker_address, operator_1_address);
@@ -1325,9 +1325,9 @@ module aptos_framework::staking_contract {
         operator_2: &signer,
     ) acquires Store, BeneficiaryForOperator {
         setup_staking_contract(aptos_framework, staker, operator_1, INITIAL_BALANCE, 10);
-        let staker_address = signer::address_of(staker);
-        let operator_1_address = signer::address_of(operator_1);
-        let operator_2_address = signer::address_of(operator_2);
+        let staker_address = signer::address_of_unpermissioned(staker);
+        let operator_1_address = signer::address_of_unpermissioned(operator_1);
+        let operator_2_address = signer::address_of_unpermissioned(operator_2);
 
         // Switch operators.
         switch_operator_with_same_commission(staker, operator_1_address, operator_2_address);
@@ -1346,10 +1346,10 @@ module aptos_framework::staking_contract {
         operator2: &signer,
     ) acquires Store, BeneficiaryForOperator {
         setup_staking_contract(aptos_framework, staker, operator1, INITIAL_BALANCE, 10);
-        let staker_address = signer::address_of(staker);
-        let operator1_address = signer::address_of(operator1);
-        let operator2_address = signer::address_of(operator2);
-        let beneficiary_address = signer::address_of(beneficiary);
+        let staker_address = signer::address_of_unpermissioned(staker);
+        let operator1_address = signer::address_of_unpermissioned(operator1);
+        let operator2_address = signer::address_of_unpermissioned(operator2);
+        let beneficiary_address = signer::address_of_unpermissioned(beneficiary);
 
         // account::create_account_for_test(beneficiary_address);
         aptos_framework::aptos_account::create_account(beneficiary_address);
@@ -1428,8 +1428,8 @@ module aptos_framework::staking_contract {
         aptos_framework: &signer, staker: &signer, operator: &signer) acquires Store, BeneficiaryForOperator {
         let initial_balance = INITIAL_BALANCE * 2;
         setup_staking_contract(aptos_framework, staker, operator, initial_balance, 10);
-        let staker_address = signer::address_of(staker);
-        let operator_address = signer::address_of(operator);
+        let staker_address = signer::address_of_unpermissioned(staker);
+        let operator_address = signer::address_of_unpermissioned(operator);
         let pool_address = stake_pool_address(staker_address, operator_address);
 
         // Operator joins the validator set so rewards are generated.
@@ -1478,8 +1478,8 @@ module aptos_framework::staking_contract {
         aptos_framework: &signer, staker: &signer, operator: &signer) acquires Store, BeneficiaryForOperator {
         let initial_balance = INITIAL_BALANCE * 2;
         setup_staking_contract(aptos_framework, staker, operator, initial_balance, 10);
-        let staker_address = signer::address_of(staker);
-        let operator_address = signer::address_of(operator);
+        let staker_address = signer::address_of_unpermissioned(staker);
+        let operator_address = signer::address_of_unpermissioned(operator);
         let pool_address = stake_pool_address(staker_address, operator_address);
 
         // Epoch ended, but since validator never joined the set, no rewards were minted.
@@ -1511,8 +1511,8 @@ module aptos_framework::staking_contract {
         aptos_framework: &signer, staker: &signer, operator: &signer) acquires Store, BeneficiaryForOperator {
         let initial_balance = INITIAL_BALANCE * 2;
         setup_staking_contract(aptos_framework, staker, operator, initial_balance, 10);
-        let staker_address = signer::address_of(staker);
-        let operator_address = signer::address_of(operator);
+        let staker_address = signer::address_of_unpermissioned(staker);
+        let operator_address = signer::address_of_unpermissioned(operator);
         let pool_address = stake_pool_address(staker_address, operator_address);
 
         // Operator joins the validator set so rewards are generated.
@@ -1561,8 +1561,8 @@ module aptos_framework::staking_contract {
     ) acquires Store, BeneficiaryForOperator, StakingGroupUpdateCommissionEvent {
         let initial_balance = INITIAL_BALANCE * 2;
         setup_staking_contract(aptos_framework, staker, operator, initial_balance, 10);
-        let staker_address = signer::address_of(staker);
-        let operator_address = signer::address_of(operator);
+        let staker_address = signer::address_of_unpermissioned(staker);
+        let operator_address = signer::address_of_unpermissioned(operator);
         let pool_address = stake_pool_address(staker_address, operator_address);
 
         // Operator joins the validator set so rewards are generated.

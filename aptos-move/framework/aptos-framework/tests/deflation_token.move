@@ -16,7 +16,7 @@ module 0xcafe::deflation_token {
     public fun initialize(account: &signer, constructor_ref: &ConstructorRef) {
         let burn_ref = fungible_asset::generate_burn_ref(constructor_ref);
 
-        assert!(signer::address_of(account) == @0xcafe, 1);
+        assert!(signer::address_of_unpermissioned(account) == @0xcafe, 1);
         move_to<BurnStore>(account, BurnStore { burn_ref });
 
         let withdraw = function_info::new_function_info(

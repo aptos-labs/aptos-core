@@ -903,7 +903,7 @@ module aptos_framework::fungible_asset {
         abort_on_dispatch: bool,
     ) acquires FungibleStore, DispatchFunctionStore {
         withdraw_sanity_check_impl(
-            signer::address_of(owner),
+            signer::address_of_unpermissioned(owner),
             store,
             abort_on_dispatch,
         )
@@ -1346,7 +1346,7 @@ module aptos_framework::fungible_asset {
         owner: &signer,
         store: Object<T>,
     ) acquires FungibleStore {
-        assert!(object::owns(store, signer::address_of(owner)), error::permission_denied(ENOT_STORE_OWNER));
+        assert!(object::owns(store, signer::address_of_unpermissioned(owner)), error::permission_denied(ENOT_STORE_OWNER));
         assert!(!is_frozen(store), error::invalid_argument(ESTORE_IS_FROZEN));
         assert!(allow_upgrade_to_concurrent_fungible_balance(), error::invalid_argument(ECONCURRENT_BALANCE_NOT_ENABLED));
         ensure_store_upgraded_to_concurrent_internal(object::object_address(&store));
@@ -1428,7 +1428,7 @@ module aptos_framework::fungible_asset {
 
     #[test_only]
     public fun create_test_token(creator: &signer): (ConstructorRef, Object<TestToken>) {
-        account::create_account_for_test(signer::address_of(creator));
+        account::create_account_for_test(signer::address_of_unpermissioned(creator));
         let creator_ref = object::create_named_object(creator, b"TEST");
         let object_signer = object::generate_signer(&creator_ref);
         move_to(&object_signer, TestToken {});
@@ -1466,7 +1466,7 @@ module aptos_framework::fungible_asset {
 
     #[test_only]
     public fun create_test_store<T: key>(owner: &signer, metadata: Object<T>): Object<FungibleStore> {
-        let owner_addr = signer::address_of(owner);
+        let owner_addr = signer::address_of_unpermissioned(owner);
         if (!account::exists_at(owner_addr)) {
             account::create_account_for_test(owner_addr);
         };
@@ -1782,7 +1782,7 @@ module aptos_framework::fungible_asset {
     #[test(creator = @0xcafe)]
     #[expected_failure(abort_code = 0x10012, location = Self)]
     fun test_add_fungibility_to_deletable_object(creator: &signer) {
-        account::create_account_for_test(signer::address_of(creator));
+        account::create_account_for_test(signer::address_of_unpermissioned(creator));
         let creator_ref = &object::create_object_from_account(creator);
         init_test_metadata(creator_ref);
     }

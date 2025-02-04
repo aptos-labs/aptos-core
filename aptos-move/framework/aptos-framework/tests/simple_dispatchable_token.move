@@ -10,7 +10,7 @@ module 0xcafe::simple_token {
     use std::string;
 
     public fun initialize(account: &signer, constructor_ref: &ConstructorRef) {
-        assert!(signer::address_of(account) == @0xcafe, 1);
+        assert!(signer::address_of_unpermissioned(account) == @0xcafe, 1);
 
         let withdraw = function_info::new_function_info(
             account,

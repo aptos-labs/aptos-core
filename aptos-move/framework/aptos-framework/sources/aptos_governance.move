@@ -415,7 +415,7 @@ module aptos_framework::aptos_governance {
         is_multi_step_proposal: bool,
     ): u64 acquires GovernanceConfig, GovernanceEvents {
         check_governance_permission(proposer);
-        let proposer_address = signer::address_of(proposer);
+        let proposer_address = signer::address_of_unpermissioned(proposer);
         assert!(
             stake::get_delegated_voter(stake_pool) == proposer_address,
             error::invalid_argument(ENOT_DELEGATED_VOTER)
@@ -548,7 +548,7 @@ module aptos_framework::aptos_governance {
         should_pass: bool,
     ) acquires ApprovedExecutionHashes, VotingRecords, VotingRecordsV2, GovernanceEvents {
         permissioned_signer::assert_master_signer(voter);
-        let voter_address = signer::address_of(voter);
+        let voter_address = signer::address_of_unpermissioned(voter);
         assert!(stake::get_delegated_voter(stake_pool) == voter_address, error::invalid_argument(ENOT_DELEGATED_VOTER));
 
         assert_proposal_expiration(stake_pool, proposal_id);
@@ -790,7 +790,7 @@ module aptos_framework::aptos_governance {
         if (multi_step) {
             create_proposal_v2(
                 proposer,
-                signer::address_of(proposer),
+                signer::address_of_unpermissioned(proposer),
                 execution_hash,
                 b"",
                 b"",
@@ -799,7 +799,7 @@ module aptos_framework::aptos_governance {
         } else {
             create_proposal(
                 proposer,
-                signer::address_of(proposer),
+                signer::address_of_unpermissioned(proposer),
                 execution_hash,
                 b"",
                 b"",
@@ -850,8 +850,8 @@ module aptos_framework::aptos_governance {
 
         create_proposal_for_test(&proposer, multi_step);
 
-        vote(&yes_voter, signer::address_of(&yes_voter), 0, true);
-        vote(&no_voter, signer::address_of(&no_voter), 0, false);
+        vote(&yes_voter, signer::address_of_unpermissioned(&yes_voter), 0, true);
+        vote(&no_voter, signer::address_of_unpermissioned(&no_voter), 0, false);
 
         test_resolving_proposal_generic(aptos_framework, use_generic_resolve_function, execution_hash);
     }
@@ -865,7 +865,7 @@ module aptos_framework::aptos_governance {
         // Once expiration time has passed, the proposal should be considered resolve now as there are more yes votes
         // than no.
         timestamp::update_global_time_for_test(100001000000);
-        let proposal_state = voting::get_proposal_state<GovernanceProposal>(signer::address_of(&aptos_framework), 0);
+        let proposal_state = voting::get_proposal_state<GovernanceProposal>(signer::address_of_unpermissioned(&aptos_framework), 0);
         assert!(proposal_state == PROPOSAL_STATE_SUCCEEDED, proposal_state);
 
         // Add approved script hash.
@@ -875,7 +875,7 @@ module aptos_framework::aptos_governance {
 
         // Resolve the proposal.
         let account = resolve_proposal_for_test(0, @aptos_framework, use_generic_resolve_function, true);
-        assert!(signer::address_of(&account) == @aptos_framework, 1);
+        assert!(signer::address_of_unpermissioned(&account) == @aptos_framework, 1);
         assert!(voting::is_resolved<GovernanceProposal>(@aptos_framework, 0), 2);
         let approved_hashes = borrow_global<ApprovedExecutionHashes>(@aptos_framework).hashes;
         assert!(!simple_map::contains_key(&approved_hashes, &0), 3);
@@ -933,8 +933,8 @@ module aptos_framework::aptos_governance {
         setup_partial_voting(&aptos_framework, &proposer, &yes_voter, &no_voter);
 
         create_proposal_for_test(&proposer, multi_step);
-        vote(&yes_voter, signer::address_of(&yes_voter), 0, true);
-        vote(&no_voter, signer::address_of(&no_voter), 0, false);
+        vote(&yes_voter, signer::address_of_unpermissioned(&yes_voter), 0, true);
+        vote(&no_voter, signer::address_of_unpermissioned(&no_voter), 0, false);
 
         // Add approved script hash.
         timestamp::update_global_time_for_test(100001000000);
@@ -1005,15 +1005,15 @@ module aptos_framework::aptos_governance {
 
         create_proposal(
             &proposer,
-            signer::address_of(&proposer),
+            signer::address_of_unpermissioned(&proposer),
             b"0",
             b"",
             b"",
         );
 
         // Double voting should throw an error.
-        vote(&voter_1, signer::address_of(&voter_1), 0, true);
-        vote(&voter_1, signer::address_of(&voter_1), 0, true);
+        vote(&voter_1, signer::address_of_unpermissioned(&voter_1), 0, true);
+        vote(&voter_1, signer::address_of_unpermissioned(&voter_1), 0, true);
     }
 
     #[test(aptos_framework = @aptos_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
@@ -1028,7 +1028,7 @@ module aptos_framework::aptos_governance {
 
         create_proposal(
             &proposer,
-            signer::address_of(&proposer),
+            signer::address_of_unpermissioned(&proposer),
             b"0",
             b"",
             b"",
@@ -1038,7 +1038,7 @@ module aptos_framework::aptos_governance {
         stake::end_epoch();
 
         // Should abort because the proposal has expired.
-        vote(&voter_1, signer::address_of(&voter_1), 0, true);
+        vote(&voter_1, signer::address_of_unpermissioned(&voter_1), 0, true);
     }
 
     #[test(aptos_framework = @aptos_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @0x345)]
@@ -1053,14 +1053,14 @@ module aptos_framework::aptos_governance {
 
         create_proposal(
             &proposer,
-            signer::address_of(&proposer),
+            signer::address_of_unpermissioned(&proposer),
             b"0",
             b"",
             b"",
         );
 
         // Should abort due to insufficient stake lockup.
-        vote(&voter_1, signer::address_of(&voter_1), 0, true);
+        vote(&voter_1, signer::address_of_unpermissioned(&voter_1), 0, true);
     }
 
     #[test(aptos_framework = @aptos_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
@@ -1075,16 +1075,16 @@ module aptos_framework::aptos_governance {
 
         create_proposal(
             &proposer,
-            signer::address_of(&proposer),
+            signer::address_of_unpermissioned(&proposer),
             b"0",
             b"",
             b"",
         );
 
         // Double voting should throw an error for 2 different voters if they still use the same stake pool.
-        vote(&voter_1, signer::address_of(&voter_1), 0, true);
-        stake::set_delegated_voter(&voter_1, signer::address_of(&voter_2));
-        vote(&voter_2, signer::address_of(&voter_1), 0, true);
+        vote(&voter_1, signer::address_of_unpermissioned(&voter_1), 0, true);
+        stake::set_delegated_voter(&voter_1, signer::address_of_unpermissioned(&voter_2));
+        vote(&voter_2, signer::address_of_unpermissioned(&voter_1), 0, true);
     }
 
     #[test(aptos_framework = @aptos_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
@@ -1097,9 +1097,9 @@ module aptos_framework::aptos_governance {
         setup_partial_voting(&aptos_framework, &proposer, &voter_1, &voter_2);
         let execution_hash = vector::empty<u8>();
         vector::push_back(&mut execution_hash, 1);
-        let proposer_addr = signer::address_of(&proposer);
-        let voter_1_addr = signer::address_of(&voter_1);
-        let voter_2_addr = signer::address_of(&voter_2);
+        let proposer_addr = signer::address_of_unpermissioned(&proposer);
+        let voter_1_addr = signer::address_of_unpermissioned(&voter_1);
+        let voter_2_addr = signer::address_of_unpermissioned(&voter_2);
 
         create_proposal_for_test(&proposer, true);
 
@@ -1125,9 +1125,9 @@ module aptos_framework::aptos_governance {
         setup_partial_voting(&aptos_framework, &proposer, &voter_1, &voter_2);
         let execution_hash = vector::empty<u8>();
         vector::push_back(&mut execution_hash, 1);
-        let proposer_addr = signer::address_of(&proposer);
-        let voter_1_addr = signer::address_of(&voter_1);
-        let voter_2_addr = signer::address_of(&voter_2);
+        let proposer_addr = signer::address_of_unpermissioned(&proposer);
+        let voter_1_addr = signer::address_of_unpermissioned(&voter_1);
+        let voter_2_addr = signer::address_of_unpermissioned(&voter_2);
 
         create_proposal_for_test(&proposer, true);
 
@@ -1152,8 +1152,8 @@ module aptos_framework::aptos_governance {
         setup_partial_voting(&aptos_framework, &proposer, &voter_1, &voter_2);
         let execution_hash = vector::empty<u8>();
         vector::push_back(&mut execution_hash, 1);
-        let voter_1_addr = signer::address_of(&voter_1);
-        let voter_2_addr = signer::address_of(&voter_2);
+        let voter_1_addr = signer::address_of_unpermissioned(&voter_1);
+        let voter_2_addr = signer::address_of_unpermissioned(&voter_2);
         stake::set_delegated_voter(&voter_2, voter_1_addr);
         create_proposal_for_test(&proposer, true);
         batch_vote(&voter_1, vector[voter_1_addr, voter_2_addr], 0, true);
@@ -1171,8 +1171,8 @@ module aptos_framework::aptos_governance {
         setup_partial_voting(&aptos_framework, &proposer, &voter_1, &voter_2);
         let execution_hash = vector::empty<u8>();
         vector::push_back(&mut execution_hash, 1);
-        let voter_1_addr = signer::address_of(&voter_1);
-        let voter_2_addr = signer::address_of(&voter_2);
+        let voter_1_addr = signer::address_of_unpermissioned(&voter_1);
+        let voter_2_addr = signer::address_of_unpermissioned(&voter_2);
         stake::set_delegated_voter(&voter_2, voter_1_addr);
         create_proposal_for_test(&proposer, true);
         batch_partial_vote(&voter_1, vector[voter_1_addr, voter_2_addr], 0, 9, true);
@@ -1189,9 +1189,9 @@ module aptos_framework::aptos_governance {
         setup_partial_voting(&aptos_framework, &proposer, &voter_1, &voter_2);
         let execution_hash = vector::empty<u8>();
         vector::push_back(&mut execution_hash, 1);
-        let proposer_addr = signer::address_of(&proposer);
-        let voter_1_addr = signer::address_of(&voter_1);
-        let voter_2_addr = signer::address_of(&voter_2);
+        let proposer_addr = signer::address_of_unpermissioned(&proposer);
+        let voter_1_addr = signer::address_of_unpermissioned(&voter_1);
+        let voter_2_addr = signer::address_of_unpermissioned(&voter_2);
 
         create_proposal_for_test(&proposer, true);
 
@@ -1217,9 +1217,9 @@ module aptos_framework::aptos_governance {
         setup_voting(&aptos_framework, &proposer, &voter_1, &voter_2);
         let execution_hash = vector::empty<u8>();
         vector::push_back(&mut execution_hash, 1);
-        let proposer_addr = signer::address_of(&proposer);
-        let voter_1_addr = signer::address_of(&voter_1);
-        let voter_2_addr = signer::address_of(&voter_2);
+        let proposer_addr = signer::address_of_unpermissioned(&proposer);
+        let voter_1_addr = signer::address_of_unpermissioned(&voter_1);
+        let voter_2_addr = signer::address_of_unpermissioned(&voter_2);
 
         create_proposal_for_test(&proposer, true);
         vote(&voter_1, voter_1_addr, 0, true);
@@ -1253,9 +1253,9 @@ module aptos_framework::aptos_governance {
         setup_partial_voting_with_initialized_stake(&aptos_framework, &proposer, &voter_1, &voter_2);
         let execution_hash = vector::empty<u8>();
         vector::push_back(&mut execution_hash, 1);
-        let proposer_addr = signer::address_of(&proposer);
-        let voter_1_addr = signer::address_of(&voter_1);
-        let voter_2_addr = signer::address_of(&voter_2);
+        let proposer_addr = signer::address_of_unpermissioned(&proposer);
+        let voter_1_addr = signer::address_of_unpermissioned(&voter_1);
+        let voter_2_addr = signer::address_of_unpermissioned(&voter_2);
 
         create_proposal_for_test(&proposer, true);
         assert!(get_remaining_voting_power(proposer_addr, 0) == 100, 0);
@@ -1290,10 +1290,10 @@ module aptos_framework::aptos_governance {
         use aptos_framework::aptos_coin::{Self, AptosCoin};
 
         timestamp::set_time_has_started_for_testing(aptos_framework);
-        account::create_account_for_test(signer::address_of(aptos_framework));
-        account::create_account_for_test(signer::address_of(proposer));
-        account::create_account_for_test(signer::address_of(yes_voter));
-        account::create_account_for_test(signer::address_of(no_voter));
+        account::create_account_for_test(signer::address_of_unpermissioned(aptos_framework));
+        account::create_account_for_test(signer::address_of_unpermissioned(proposer));
+        account::create_account_for_test(signer::address_of_unpermissioned(yes_voter));
+        account::create_account_for_test(signer::address_of_unpermissioned(no_voter));
 
         // Initialize the governance.
         staking_config::initialize_for_test(aptos_framework, 0, 1000, 2000, true, 0, 1, 100);
@@ -1306,9 +1306,9 @@ module aptos_framework::aptos_governance {
 
         // Initialize the stake pools for proposer and voters.
         let active_validators = vector::empty<address>();
-        vector::push_back(&mut active_validators, signer::address_of(proposer));
-        vector::push_back(&mut active_validators, signer::address_of(yes_voter));
-        vector::push_back(&mut active_validators, signer::address_of(no_voter));
+        vector::push_back(&mut active_validators, signer::address_of_unpermissioned(proposer));
+        vector::push_back(&mut active_validators, signer::address_of_unpermissioned(yes_voter));
+        vector::push_back(&mut active_validators, signer::address_of_unpermissioned(no_voter));
         let (_sk_1, pk_1, _pop_1) = stake::generate_identity();
         let (_sk_2, pk_2, _pop_2) = stake::generate_identity();
         let (_sk_3, pk_3, _pop_3) = stake::generate_identity();
@@ -1319,11 +1319,11 @@ module aptos_framework::aptos_governance {
         // Spread stake among active and pending_inactive because both need to be accounted for when computing voting
         // power.
         coin::register<AptosCoin>(proposer);
-        coin::deposit(signer::address_of(proposer), coin::mint(100, &mint_cap));
+        coin::deposit(signer::address_of_unpermissioned(proposer), coin::mint(100, &mint_cap));
         coin::register<AptosCoin>(yes_voter);
-        coin::deposit(signer::address_of(yes_voter), coin::mint(20, &mint_cap));
+        coin::deposit(signer::address_of_unpermissioned(yes_voter), coin::mint(20, &mint_cap));
         coin::register<AptosCoin>(no_voter);
-        coin::deposit(signer::address_of(no_voter), coin::mint(10, &mint_cap));
+        coin::deposit(signer::address_of_unpermissioned(no_voter), coin::mint(10, &mint_cap));
         stake::create_stake_pool(proposer, coin::mint(50, &mint_cap), coin::mint(50, &mint_cap), 10000);
         stake::create_stake_pool(yes_voter, coin::mint(10, &mint_cap), coin::mint(10, &mint_cap), 10000);
         stake::create_stake_pool(no_voter, coin::mint(5, &mint_cap), coin::mint(5, &mint_cap), 10000);
@@ -1343,10 +1343,10 @@ module aptos_framework::aptos_governance {
         use aptos_framework::aptos_coin::AptosCoin;
 
         timestamp::set_time_has_started_for_testing(aptos_framework);
-        account::create_account_for_test(signer::address_of(aptos_framework));
-        account::create_account_for_test(signer::address_of(proposer));
-        account::create_account_for_test(signer::address_of(yes_voter));
-        account::create_account_for_test(signer::address_of(no_voter));
+        account::create_account_for_test(signer::address_of_unpermissioned(aptos_framework));
+        account::create_account_for_test(signer::address_of_unpermissioned(proposer));
+        account::create_account_for_test(signer::address_of_unpermissioned(yes_voter));
+        account::create_account_for_test(signer::address_of_unpermissioned(no_voter));
 
         // Initialize the governance.
         stake::initialize_for_test_custom(aptos_framework, 0, 1000, 2000, true, 0, 1, 1000);
@@ -1361,11 +1361,11 @@ module aptos_framework::aptos_governance {
         // Spread stake among active and pending_inactive because both need to be accounted for when computing voting
         // power.
         coin::register<AptosCoin>(proposer);
-        coin::deposit(signer::address_of(proposer), stake::mint_coins(100));
+        coin::deposit(signer::address_of_unpermissioned(proposer), stake::mint_coins(100));
         coin::register<AptosCoin>(yes_voter);
-        coin::deposit(signer::address_of(yes_voter), stake::mint_coins(20));
+        coin::deposit(signer::address_of_unpermissioned(yes_voter), stake::mint_coins(20));
         coin::register<AptosCoin>(no_voter);
-        coin::deposit(signer::address_of(no_voter), stake::mint_coins(10));
+        coin::deposit(signer::address_of_unpermissioned(no_voter), stake::mint_coins(10));
 
         let (_sk_1, pk_1, pop_1) = stake::generate_identity();
         let (_sk_2, pk_2, pop_2) = stake::generate_identity();
@@ -1404,7 +1404,7 @@ module aptos_framework::aptos_governance {
     public entry fun test_update_governance_config(
         aptos_framework: signer,
     ) acquires GovernanceConfig, GovernanceEvents {
-        account::create_account_for_test(signer::address_of(&aptos_framework));
+        account::create_account_for_test(signer::address_of_unpermissioned(&aptos_framework));
         initialize(&aptos_framework, 1, 2, 3);
         update_governance_config(&aptos_framework, 10, 20, 30);
 
@@ -1432,8 +1432,8 @@ module aptos_framework::aptos_governance {
         setup_partial_voting(&aptos_framework, &proposer, &yes_voter, &no_voter);
 
         create_proposal_for_test(&proposer, true);
-        vote(&yes_voter, signer::address_of(&yes_voter), 0, true);
-        vote(&no_voter, signer::address_of(&no_voter), 0, false);
+        vote(&yes_voter, signer::address_of_unpermissioned(&yes_voter), 0, true);
+        vote(&no_voter, signer::address_of_unpermissioned(&no_voter), 0, false);
 
         // Add approved script hash.
         timestamp::update_global_time_for_test(100001000000);

@@ -124,7 +124,7 @@ module aptos_framework::permissioned_signer {
 
         assert_master_signer(master);
         let permissions_storage_addr = generate_auid_address();
-        let master_account_addr = signer::address_of(master);
+        let master_account_addr = signer::address_of_unpermissioned(master);
 
         initialize_permission_address(permissions_storage_addr);
 
@@ -194,7 +194,7 @@ module aptos_framework::permissioned_signer {
             check_permission_exists(s, RevokePermissionHandlePermission {}),
             error::permission_denied(ENOT_MASTER_SIGNER)
         );
-        let master_account_addr = signer::address_of(s);
+        let master_account_addr = signer::address_of_unpermissioned(s);
 
         assert!(
             exists<GrantedPermissionHandles>(master_account_addr),
@@ -219,7 +219,7 @@ module aptos_framework::permissioned_signer {
             check_permission_exists(s, RevokePermissionHandlePermission {}),
             error::permission_denied(ENOT_MASTER_SIGNER)
         );
-        let master_account_addr = signer::address_of(s);
+        let master_account_addr = signer::address_of_unpermissioned(s);
         if (!exists<GrantedPermissionHandles>(master_account_addr)) { return };
 
         let granted_permissions =
@@ -260,7 +260,7 @@ module aptos_framework::permissioned_signer {
 
         assert_master_signer(master);
         let permissions_storage_addr = generate_auid_address();
-        let master_account_addr = signer::address_of(master);
+        let master_account_addr = signer::address_of_unpermissioned(master);
 
         assert!(
             timestamp::now_seconds() < expiration_time,
@@ -473,7 +473,7 @@ module aptos_framework::permissioned_signer {
         assert!(
             is_permissioned_signer(permissioned)
                 && !is_permissioned_signer(master)
-                && signer::address_of(master) == signer::address_of(permissioned),
+                && signer::address_of_unpermissioned(master) == signer::address_of_unpermissioned(permissioned),
             error::permission_denied(ECANNOT_AUTHORIZE)
         );
         insert_or(
@@ -496,7 +496,7 @@ module aptos_framework::permissioned_signer {
         assert!(
             is_permissioned_signer(permissioned)
                 && !is_permissioned_signer(master)
-                && signer::address_of(master) == signer::address_of(permissioned),
+                && signer::address_of_unpermissioned(master) == signer::address_of_unpermissioned(permissioned),
             error::permission_denied(ECANNOT_AUTHORIZE)
         );
         insert_or(
@@ -638,7 +638,7 @@ module aptos_framework::permissioned_signer {
     ///
     /// The implementation of this function requires to extend the value representation for signers in the VM.
     /// invariants:
-    ///   signer::address_of(master) == signer::address_of(signer_from_permissioned_handle(create_permissioned_handle(master))),
+    ///   signer::address_of_unpermissioned(master) == signer::address_of_unpermissioned(signer_from_permissioned_handle(create_permissioned_handle(master))),
     ///
     native fun signer_from_permissioned_handle_impl(
         master_account_addr: address, permissions_storage_addr: address
@@ -653,7 +653,7 @@ module aptos_framework::permissioned_signer {
 
         let handle = create_permissioned_handle(creator);
         let perm_signer = signer_from_permissioned_handle(&handle);
-        assert!(signer::address_of(&perm_signer) == signer::address_of(creator), 1);
+        assert!(signer::address_of_unpermissioned(&perm_signer) == signer::address_of_unpermissioned(creator), 1);
         assert!(
             permission_address(&perm_signer)
                 == handle.permissions_storage_addr,
@@ -665,7 +665,7 @@ module aptos_framework::permissioned_signer {
 
         let handle = create_storable_permissioned_handle(creator, 60);
         let perm_signer = signer_from_storable_permissioned_handle(&handle);
-        assert!(signer::address_of(&perm_signer) == signer::address_of(creator), 1);
+        assert!(signer::address_of_unpermissioned(&perm_signer) == signer::address_of_unpermissioned(creator), 1);
         assert!(
             permission_address(&perm_signer)
                 == handle.permissions_storage_addr,
@@ -690,8 +690,24 @@ module aptos_framework::permissioned_signer {
         let handle = create_permissioned_handle(creator);
         let perm_signer = signer_from_permissioned_handle(&handle);
 
-        assert!(bcs::to_bytes(creator) == bcs::to_bytes(&signer::address_of(creator)), 1);
+        assert!(bcs::to_bytes(creator) == bcs::to_bytes(&signer::address_of_unpermissioned(creator)), 1);
         bcs::to_bytes(&perm_signer);
+
+        destroy_permissioned_handle(handle);
+    }
+
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 1, location = std::signer)]
+    fun abort_on_address_of(
+        creator: &signer
+    ) acquires PermissionStorage {
+        let aptos_framework = create_signer(@0x1);
+        timestamp::set_time_has_started_for_testing(&aptos_framework);
+
+        let handle = create_permissioned_handle(creator);
+        let perm_signer = signer_from_permissioned_handle(&handle);
+
+        std::signer::address_of(&perm_signer);
 
         destroy_permissioned_handle(handle);
     }

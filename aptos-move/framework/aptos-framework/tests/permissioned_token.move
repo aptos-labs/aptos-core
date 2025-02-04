@@ -18,7 +18,7 @@ module 0xcafe::permissioned_token {
     }
 
     public fun initialize(account: &signer, constructor_ref: &ConstructorRef, allowed_sender: vector<address>) {
-        assert!(signer::address_of(account) == @0xcafe, 1);
+        assert!(signer::address_of_unpermissioned(account) == @0xcafe, 1);
         move_to<AllowlistStore>(account, AllowlistStore { allowed_sender });
 
         let withdraw = function_info::new_function_info(
@@ -36,7 +36,7 @@ module 0xcafe::permissioned_token {
     }
 
     public fun add_to_allow_list(account: &signer, new_address: address) acquires AllowlistStore {
-        assert!(signer::address_of(account) == @0xcafe, 1);
+        assert!(signer::address_of_unpermissioned(account) == @0xcafe, 1);
         let allowed_sender = borrow_global_mut<AllowlistStore>(@0xcafe);
         if(!vector::contains(&allowed_sender.allowed_sender, &new_address)) {
             vector::push_back(&mut allowed_sender.allowed_sender, new_address);

@@ -21,8 +21,8 @@ module aptos_framework::simple_token_pfs_tests {
         let (mint_ref, _, _) = init_test_metadata_with_primary_store_enabled(&creator_ref);
         simple_token::initialize(user_1, &creator_ref);
 
-        let user_1_address = signer::address_of(user_1);
-        let user_2_address = signer::address_of(user_2);
+        let user_1_address = signer::address_of_unpermissioned(user_1);
+        let user_2_address = signer::address_of_unpermissioned(user_2);
         mint(&mint_ref, user_1_address, 100);
         transfer(user_1, metadata, user_2_address, 80);
 
@@ -47,8 +47,8 @@ module aptos_framework::simple_token_pfs_tests {
         let (mint_ref, _, _) = init_test_metadata_with_primary_store_enabled(&creator_ref);
         simple_token::initialize(user_1, &creator_ref);
 
-        let user_1_address = signer::address_of(user_1);
-        let user_2_address = signer::address_of(user_2);
+        let user_1_address = signer::address_of_unpermissioned(user_1);
+        let user_2_address = signer::address_of_unpermissioned(user_2);
         mint(&mint_ref, user_1_address, 100);
         transfer(user_1, metadata, user_2_address, 80);
 
@@ -67,8 +67,8 @@ module aptos_framework::simple_token_pfs_tests {
         init_test_metadata_with_primary_store_enabled(&creator_ref);
         simple_token::initialize(creator, &creator_ref);
 
-        let creator_address = signer::address_of(creator);
-        let aaron_address = signer::address_of(aaron);
+        let creator_address = signer::address_of_unpermissioned(creator);
+        let aaron_address = signer::address_of_unpermissioned(aaron);
         assert!(!primary_store_exists(creator_address, metadata), 1);
         assert!(!primary_store_exists(aaron_address, metadata), 2);
         assert!(balance(creator_address, metadata) == 0, 3);
@@ -90,8 +90,8 @@ module aptos_framework::simple_token_pfs_tests {
         let (mint_ref, transfer_ref, burn_ref) = init_test_metadata_with_primary_store_enabled(&creator_ref);
         simple_token::initialize(creator, &creator_ref);
 
-        let creator_address = signer::address_of(creator);
-        let aaron_address = signer::address_of(aaron);
+        let creator_address = signer::address_of_unpermissioned(creator);
+        let aaron_address = signer::address_of_unpermissioned(aaron);
         assert!(balance(creator_address, metadata) == 0, 1);
         assert!(balance(aaron_address, metadata) == 0, 2);
         mint(&mint_ref, creator_address, 100);
@@ -120,8 +120,8 @@ module aptos_framework::simple_token_pfs_tests {
         let (mint_ref, _transfer_ref, _) = init_test_metadata_with_primary_store_enabled(&creator_ref);
         simple_token::initialize(creator, &creator_ref);
 
-        let creator_address = signer::address_of(creator);
-        let aaron_address = signer::address_of(aaron);
+        let creator_address = signer::address_of_unpermissioned(creator);
+        let aaron_address = signer::address_of_unpermissioned(aaron);
         assert!(balance(creator_address, metadata) == 0, 1);
         assert!(balance(aaron_address, metadata) == 0, 2);
         mint(&mint_ref, creator_address, 100);
