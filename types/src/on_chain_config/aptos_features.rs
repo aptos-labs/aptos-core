@@ -152,7 +152,7 @@ impl FeatureFlag {
             FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
             FeatureFlag::LIMIT_VM_TYPE_SIZE,
             FeatureFlag::ABORT_IF_MULTISIG_PAYLOAD_MISMATCH,
-            FeatureFlag::GOVERNED_GAS_POOL,
+            // FeatureFlag::GOVERNED_GAS_POOL, // governed gas pool should be voted in
         ]
     }
 }

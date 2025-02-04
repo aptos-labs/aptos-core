@@ -5,20 +5,25 @@
 
 
 
+-  [Struct `BridgeConfigRelayerUpdated`](#0x1_native_bridge_BridgeConfigRelayerUpdated)
+-  [Struct `BridgeFeeChangedEvent`](#0x1_native_bridge_BridgeFeeChangedEvent)
+-  [Struct `BridgeInsuranceBudgetDividerChangedEvent`](#0x1_native_bridge_BridgeInsuranceBudgetDividerChangedEvent)
+-  [Struct `BridgeInsuranceFundChangedEvent`](#0x1_native_bridge_BridgeInsuranceFundChangedEvent)
+-  [Struct `BridgeTransferInitiatedEvent`](#0x1_native_bridge_BridgeTransferInitiatedEvent)
+-  [Struct `BridgeTransferCompletedEvent`](#0x1_native_bridge_BridgeTransferCompletedEvent)
+-  [Resource `BridgeEvents`](#0x1_native_bridge_BridgeEvents)
 -  [Resource `AptosCoinBurnCapability`](#0x1_native_bridge_AptosCoinBurnCapability)
 -  [Resource `AptosCoinMintCapability`](#0x1_native_bridge_AptosCoinMintCapability)
 -  [Resource `AptosFABurnCapabilities`](#0x1_native_bridge_AptosFABurnCapabilities)
 -  [Resource `AptosFAMintCapabilities`](#0x1_native_bridge_AptosFAMintCapabilities)
--  [Struct `BridgeTransferInitiatedEvent`](#0x1_native_bridge_BridgeTransferInitiatedEvent)
--  [Struct `BridgeTransferCompletedEvent`](#0x1_native_bridge_BridgeTransferCompletedEvent)
--  [Resource `BridgeEvents`](#0x1_native_bridge_BridgeEvents)
 -  [Resource `Nonce`](#0x1_native_bridge_Nonce)
+-  [Resource `OutboundRateLimitBudget`](#0x1_native_bridge_OutboundRateLimitBudget)
+-  [Resource `InboundRateLimitBudget`](#0x1_native_bridge_InboundRateLimitBudget)
 -  [Resource `SmartTableWrapper`](#0x1_native_bridge_SmartTableWrapper)
 -  [Struct `OutboundTransfer`](#0x1_native_bridge_OutboundTransfer)
 -  [Resource `BridgeConfig`](#0x1_native_bridge_BridgeConfig)
--  [Struct `BridgeConfigRelayerUpdated`](#0x1_native_bridge_BridgeConfigRelayerUpdated)
--  [Struct `BridgeFeeChangedEvent`](#0x1_native_bridge_BridgeFeeChangedEvent)
 -  [Constants](#@Constants_0)
+-  [Function `initialize`](#0x1_native_bridge_initialize)
 -  [Function `normalize_u64_to_32_bytes`](#0x1_native_bridge_normalize_u64_to_32_bytes)
 -  [Function `is_inbound_nonce_set`](#0x1_native_bridge_is_inbound_nonce_set)
 -  [Function `create_details`](#0x1_native_bridge_create_details)
@@ -26,14 +31,18 @@
 -  [Function `set_bridge_transfer_id_to_inbound_nonce`](#0x1_native_bridge_set_bridge_transfer_id_to_inbound_nonce)
 -  [Function `assert_valid_bridge_transfer_id`](#0x1_native_bridge_assert_valid_bridge_transfer_id)
 -  [Function `bridge_transfer_id`](#0x1_native_bridge_bridge_transfer_id)
+-  [Function `bridge_relayer`](#0x1_native_bridge_bridge_relayer)
+-  [Function `insurance_fund`](#0x1_native_bridge_insurance_fund)
+-  [Function `insurance_budget_divider`](#0x1_native_bridge_insurance_budget_divider)
+-  [Function `bridge_fee`](#0x1_native_bridge_bridge_fee)
 -  [Function `get_bridge_transfer_details_from_nonce`](#0x1_native_bridge_get_bridge_transfer_details_from_nonce)
 -  [Function `get_inbound_nonce_from_bridge_transfer_id`](#0x1_native_bridge_get_inbound_nonce_from_bridge_transfer_id)
 -  [Function `increment_and_get_nonce`](#0x1_native_bridge_increment_and_get_nonce)
--  [Function `initialize`](#0x1_native_bridge_initialize)
 -  [Function `store_aptos_coin_burn_cap`](#0x1_native_bridge_store_aptos_coin_burn_cap)
 -  [Function `store_aptos_coin_mint_cap`](#0x1_native_bridge_store_aptos_coin_mint_cap)
+-  [Function `mint_to`](#0x1_native_bridge_mint_to)
 -  [Function `mint`](#0x1_native_bridge_mint)
--  [Function `mint_from`](#0x1_native_bridge_mint_from)
+-  [Function `mint_internal`](#0x1_native_bridge_mint_internal)
 -  [Function `burn_from`](#0x1_native_bridge_burn_from)
 -  [Function `burn`](#0x1_native_bridge_burn)
 -  [Function `burn_internal`](#0x1_native_bridge_burn_internal)
@@ -42,9 +51,11 @@
 -  [Function `charge_bridge_fee`](#0x1_native_bridge_charge_bridge_fee)
 -  [Function `update_bridge_relayer`](#0x1_native_bridge_update_bridge_relayer)
 -  [Function `update_bridge_fee`](#0x1_native_bridge_update_bridge_fee)
--  [Function `bridge_relayer`](#0x1_native_bridge_bridge_relayer)
--  [Function `bridge_fee`](#0x1_native_bridge_bridge_fee)
+-  [Function `update_insurance_fund`](#0x1_native_bridge_update_insurance_fund)
+-  [Function `update_insurance_budget_divider`](#0x1_native_bridge_update_insurance_budget_divider)
 -  [Function `assert_is_caller_relayer`](#0x1_native_bridge_assert_is_caller_relayer)
+-  [Function `assert_outbound_rate_limit_budget_not_exceeded`](#0x1_native_bridge_assert_outbound_rate_limit_budget_not_exceeded)
+-  [Function `assert_inbound_rate_limit_budget_not_exceeded`](#0x1_native_bridge_assert_inbound_rate_limit_budget_not_exceeded)
 -  [Function `test_normalize_u64_to_32_bytes_helper`](#0x1_native_bridge_test_normalize_u64_to_32_bytes_helper)
 
 
@@ -1376,6 +1387,36 @@ Stores the mint capability for AptosCoin.
 
 </details>
 
+<a id="0x1_native_bridge_mint_to"></a>
+
+## Function `mint_to`
+
+Mints a specified amount of AptosCoin to a recipient's address.
+
+@param core_resource The signer representing the core resource account.
+@param recipient The address of the recipient to mint coins to.
+@param amount The amount of AptosCoin to mint.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_mint_to">mint_to</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipient: <b>address</b>, amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_mint_to">mint_to</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipient: <b>address</b>, amount: u64) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_AptosCoinMintCapability">AptosCoinMintCapability</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <a href="native_bridge.md#0x1_native_bridge_mint_internal">mint_internal</a>(recipient, amount);
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_native_bridge_mint"></a>
 
 ## Function `mint`
@@ -1399,10 +1440,7 @@ Mints a specified amount of AptosCoin to a recipient's address.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_mint">mint</a>(recipient: <b>address</b>, amount: u64) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_AptosCoinMintCapability">AptosCoinMintCapability</a> {
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_abort_native_bridge_enabled">features::abort_native_bridge_enabled</a>(), <a href="native_bridge.md#0x1_native_bridge_ENATIVE_BRIDGE_NOT_ENABLED">ENATIVE_BRIDGE_NOT_ENABLED</a>);
 
-    <a href="coin.md#0x1_coin_deposit">coin::deposit</a>(recipient, <a href="coin.md#0x1_coin_mint">coin::mint</a>(
-        amount,
-        &<b>borrow_global</b>&lt;<a href="native_bridge.md#0x1_native_bridge_AptosCoinMintCapability">AptosCoinMintCapability</a>&gt;(@aptos_framework).mint_cap
-    ));
+    <a href="native_bridge.md#0x1_native_bridge_mint_internal">mint_internal</a>(recipient, amount);
 }
 </code></pre>
 
@@ -1410,18 +1448,17 @@ Mints a specified amount of AptosCoin to a recipient's address.
 
 </details>
 
-<a id="0x1_native_bridge_mint_from"></a>
+<a id="0x1_native_bridge_mint_internal"></a>
 
-## Function `mint_from`
+## Function `mint_internal`
 
 Mints a specified amount of AptosCoin to a recipient's address.
 
-@param core_resource The signer representing the core resource account.
 @param recipient The address of the recipient to mint coins to.
 @param amount The amount of AptosCoin to mint.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_mint_from">mint_from</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipient: <b>address</b>, amount: u64)
+<pre><code><b>fun</b> <a href="native_bridge.md#0x1_native_bridge_mint_internal">mint_internal</a>(recipient: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -1430,9 +1467,11 @@ Mints a specified amount of AptosCoin to a recipient's address.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_mint_from">mint_from</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipient: <b>address</b>, amount: u64) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_AptosCoinMintCapability">AptosCoinMintCapability</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
-    <a href="native_bridge.md#0x1_native_bridge_mint">mint</a>(recipient, amount);
+<pre><code><b>fun</b> <a href="native_bridge.md#0x1_native_bridge_mint_internal">mint_internal</a>(recipient: <b>address</b>, amount: u64) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_AptosCoinMintCapability">AptosCoinMintCapability</a> {
+    <a href="coin.md#0x1_coin_deposit">coin::deposit</a>(recipient, <a href="coin.md#0x1_coin_mint">coin::mint</a>(
+        amount,
+        &<b>borrow_global</b>&lt;<a href="native_bridge.md#0x1_native_bridge_AptosCoinMintCapability">AptosCoinMintCapability</a>&gt;(@aptos_framework).mint_cap
+    ));
 }
 </code></pre>
 
@@ -1670,7 +1709,7 @@ Completes a bridge transfer on the destination chain.
     <a href="native_bridge.md#0x1_native_bridge_set_bridge_transfer_id_to_inbound_nonce">set_bridge_transfer_id_to_inbound_nonce</a>(bridge_transfer_id, nonce);
 
     // Mint <b>to</b> the recipient
-    <a href="native_bridge.md#0x1_native_bridge_mint">mint</a>(recipient, amount);
+    <a href="native_bridge.md#0x1_native_bridge_mint_internal">mint_internal</a>(recipient, amount);
 
     // Emit the <a href="event.md#0x1_event">event</a>
     <b>let</b> bridge_events = <b>borrow_global_mut</b>&lt;<a href="native_bridge.md#0x1_native_bridge_BridgeEvents">BridgeEvents</a>&gt;(@aptos_framework);
@@ -1716,7 +1755,7 @@ Charge bridge fee to the initiate bridge transfer.
     <b>let</b> bridge_relayer = <a href="native_bridge.md#0x1_native_bridge_bridge_relayer">bridge_relayer</a>();
     <b>assert</b>!(amount &gt; bridge_fee, <a href="native_bridge.md#0x1_native_bridge_EINVALID_AMOUNT">EINVALID_AMOUNT</a>);
     <b>let</b> new_amount = amount - bridge_fee;
-    <a href="native_bridge.md#0x1_native_bridge_mint">mint</a>(bridge_relayer, bridge_fee);
+    <a href="native_bridge.md#0x1_native_bridge_mint_internal">mint_internal</a>(bridge_relayer, bridge_fee);
     new_amount
 }
 </code></pre>

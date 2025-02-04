@@ -10,6 +10,7 @@
 -  [Function `primary_fungible_store_address`](#0x1_governed_gas_pool_primary_fungible_store_address)
 -  [Function `create_resource_account_seed`](#0x1_governed_gas_pool_create_resource_account_seed)
 -  [Function `initialize`](#0x1_governed_gas_pool_initialize)
+-  [Function `init_module`](#0x1_governed_gas_pool_init_module)
 -  [Function `governed_gas_signer`](#0x1_governed_gas_pool_governed_gas_signer)
 -  [Function `governed_gas_pool_address`](#0x1_governed_gas_pool_governed_gas_pool_address)
 -  [Function `fund`](#0x1_governed_gas_pool_fund)
@@ -174,6 +175,34 @@ Initializes the governed gas pool around a resource account creation seed.
     <b>move_to</b>(aptos_framework, <a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPool">GovernedGasPool</a>{
         signer_capability: governed_gas_pool_signer_cap,
     });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_governed_gas_pool_init_module"></a>
+
+## Function `init_module`
+
+Initialize the governed gas pool as a module
+@param aptos_framework The signer of the aptos_framework module.
+
+
+<pre><code><b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_init_module">init_module</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_init_module">init_module</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    // Initialize the governed gas pool
+    <b>let</b> seed : <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = b"aptos_framework::governed_gas_pool";
+    <a href="governed_gas_pool.md#0x1_governed_gas_pool_initialize">initialize</a>(aptos_framework, seed);
 }
 </code></pre>
 
