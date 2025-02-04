@@ -77,11 +77,11 @@ fun M::t0_u128() {
 ============ disassembled file-format ==================
 // Move bytecode v8
 module 8675309.M {
-struct R<Ty0: key> {
-	r: Ty0
+struct R<T: key> {
+	r: T
 }
-struct X<Ty0> has drop, key {
-	r: Ty0
+struct X<T> has drop, key {
+	r: T
 }
 
 t0() /* def_idx: 0 */ {

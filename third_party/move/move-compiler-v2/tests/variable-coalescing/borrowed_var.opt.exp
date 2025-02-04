@@ -148,17 +148,17 @@ module c0ffee.m {
 
 
 test() /* def_idx: 0 */ {
-L0:	loc0: u64
-L1:	loc1: &u64
-L2:	loc2: u64
+L0:	$t1: u64
+L1:	$t2: &u64
+L2:	$t4: u64
 B0:
 	0: LdU64(5)
-	1: StLoc[0](loc0: u64)
-	2: ImmBorrowLoc[0](loc0: u64)
+	1: StLoc[0]($t1: u64)
+	2: ImmBorrowLoc[0]($t1: u64)
 	3: Pop
 	4: LdU64(5)
-	5: StLoc[2](loc2: u64)
-	6: ImmBorrowLoc[2](loc2: u64)
+	5: StLoc[2]($t4: u64)
+	6: ImmBorrowLoc[2]($t4: u64)
 	7: ReadRef
 	8: LdU64(5)
 	9: Eq

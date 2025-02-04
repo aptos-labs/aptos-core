@@ -48,9 +48,8 @@ use codespan_reporting::{
 };
 pub use experiments::{Experiment, EXPERIMENTS};
 use log::{debug, info, log_enabled, Level};
-use move_binary_format::{binary_views::BinaryIndexedView, errors::VMError};
+use move_binary_format::errors::VMError;
 use move_bytecode_source_map::source_map::SourceMap;
-use move_command_line_common::files::FileHash;
 use move_compiler::{
     command_line,
     compiled_unit::{
@@ -62,7 +61,6 @@ use move_compiler::{
 };
 use move_core_types::vm_status::StatusType;
 use move_disassembler::disassembler::Disassembler;
-use move_ir_types::location;
 use move_model::{
     metadata::LanguageVersion,
     model::{GlobalEnv, Loc, MoveIrLoc},
@@ -515,14 +513,7 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
 pub fn disassemble_compiled_units(units: &[CompiledUnit]) -> anyhow::Result<String> {
     let disassembled_units: anyhow::Result<Vec<_>> = units
         .iter()
-        .map(|unit| {
-            let view = match unit {
-                CompiledUnit::Module(module) => BinaryIndexedView::Module(&module.module),
-                CompiledUnit::Script(script) => BinaryIndexedView::Script(&script.script),
-            };
-            Disassembler::from_view(view, location::Loc::new(FileHash::empty(), 0, 0))
-                .and_then(|d| d.disassemble())
-        })
+        .map(|unit| Disassembler::from_unit(unit).disassemble())
         .collect();
     Ok(disassembled_units?.concat())
 }

@@ -8,51 +8,51 @@ struct S {
 	f3: u8
 }
 
-pack1(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 0 */ {
+pack1(x: u8, y: u8, z: u8): S /* def_idx: 0 */ {
 B0:
-	0: MoveLoc[0](Arg0: u8)
-	1: MoveLoc[1](Arg1: u8)
-	2: MoveLoc[2](Arg2: u8)
+	0: MoveLoc[0](x: u8)
+	1: MoveLoc[1](y: u8)
+	2: MoveLoc[2](z: u8)
 	3: Pack[0](S)
 	4: Ret
 }
-pack2(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 1 */ {
+pack2(x: u8, y: u8, z: u8): S /* def_idx: 1 */ {
 B0:
-	0: MoveLoc[0](Arg0: u8)
-	1: MoveLoc[2](Arg2: u8)
-	2: MoveLoc[1](Arg1: u8)
+	0: MoveLoc[0](x: u8)
+	1: MoveLoc[2](z: u8)
+	2: MoveLoc[1](y: u8)
 	3: Pack[0](S)
 	4: Ret
 }
-pack3(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 2 */ {
+pack3(x: u8, y: u8, z: u8): S /* def_idx: 2 */ {
 B0:
-	0: MoveLoc[1](Arg1: u8)
-	1: MoveLoc[0](Arg0: u8)
-	2: MoveLoc[2](Arg2: u8)
+	0: MoveLoc[1](y: u8)
+	1: MoveLoc[0](x: u8)
+	2: MoveLoc[2](z: u8)
 	3: Pack[0](S)
 	4: Ret
 }
-pack4(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 3 */ {
+pack4(x: u8, y: u8, z: u8): S /* def_idx: 3 */ {
 B0:
-	0: MoveLoc[2](Arg2: u8)
-	1: MoveLoc[0](Arg0: u8)
-	2: MoveLoc[1](Arg1: u8)
+	0: MoveLoc[2](z: u8)
+	1: MoveLoc[0](x: u8)
+	2: MoveLoc[1](y: u8)
 	3: Pack[0](S)
 	4: Ret
 }
-pack5(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 4 */ {
+pack5(x: u8, y: u8, z: u8): S /* def_idx: 4 */ {
 B0:
-	0: MoveLoc[1](Arg1: u8)
-	1: MoveLoc[2](Arg2: u8)
-	2: MoveLoc[0](Arg0: u8)
+	0: MoveLoc[1](y: u8)
+	1: MoveLoc[2](z: u8)
+	2: MoveLoc[0](x: u8)
 	3: Pack[0](S)
 	4: Ret
 }
-pack6(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 5 */ {
+pack6(x: u8, y: u8, z: u8): S /* def_idx: 5 */ {
 B0:
-	0: MoveLoc[2](Arg2: u8)
-	1: MoveLoc[1](Arg1: u8)
-	2: MoveLoc[0](Arg0: u8)
+	0: MoveLoc[2](z: u8)
+	1: MoveLoc[1](y: u8)
+	2: MoveLoc[0](x: u8)
 	3: Pack[0](S)
 	4: Ret
 }
