@@ -800,10 +800,13 @@ impl Interpreter {
             ty,
             addr,
         )?;
+
+        let ty_tag = loader.type_to_type_tag(ty)?;
+
         self.operand_stack.push(res.map_err(|err| {
             err.with_message(format!(
                 "Failed to borrow global resource from {:?} {:?}",
-                addr, ty
+                addr, ty_tag
             ))
         })?)?;
         Ok(())
