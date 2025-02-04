@@ -636,9 +636,11 @@ module std::features {
     ///
     /// Genesis/tests should use `change_feature_flags_internal()` for feature vec initialization.
     ///
+    /// This can be used on testnet prior to successful DKG.
+    ///
     /// Governance proposals should use `change_feature_flags_for_next_epoch()` to enable/disable features.
-    public fun change_feature_flags(_framework: &signer, _enable: vector<u64>, _disable: vector<u64>) {
-        abort (error::invalid_state(EAPI_DISABLED))
+    public fun change_feature_flags(framework: &signer, enable: vector<u64>, disable: vector<u64>) {
+        change_feature_flags_internal(framework, enable, disable)
     }
 
     /// Update feature flags directly. Only used in genesis/tests.

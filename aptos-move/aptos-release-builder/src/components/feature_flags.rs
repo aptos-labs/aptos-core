@@ -185,9 +185,16 @@ pub fn generate_feature_upgrade_proposal(
             generate_features_blob(writer, &disabled);
             emitln!(writer, ";\n");
 
+            let update_method = if is_testnet {
+                "change_feature_flags"
+            } else {
+                "change_feature_flags_for_next_epoch"
+            };
+
             emitln!(
                 writer,
-                "features::change_feature_flags_for_next_epoch({}, enabled_blob, disabled_blob);",
+                "features::{}({}, enabled_blob, disabled_blob);",
+                update_method,
                 signer_arg
             );
             emitln!(writer, "aptos_governance::reconfigure({});", signer_arg);
