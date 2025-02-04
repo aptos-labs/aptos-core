@@ -801,7 +801,10 @@ impl Interpreter {
             addr,
         )?;
         self.operand_stack.push(res.map_err(|err| {
-            err.with_message(format!("Failed to borrow global resource from {:?}", addr))
+            err.with_message(format!(
+                "Failed to borrow global resource from {:?} {:?}",
+                addr, ty
+            ))
         })?)?;
         Ok(())
     }

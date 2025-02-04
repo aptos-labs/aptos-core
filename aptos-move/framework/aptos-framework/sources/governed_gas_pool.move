@@ -67,7 +67,7 @@ module aptos_framework::governed_gas_pool {
 
     /// Initialize the governed gas pool as a module
     /// @param aptos_framework The signer of the aptos_framework module.
-    public fun init_module(aptos_framework: &signer) {
+    fun init_module(aptos_framework: &signer) {
         // Initialize the governed gas pool
         let seed : vector<u8> = b"aptos_framework::governed_gas_pool";
         initialize(aptos_framework, seed);
