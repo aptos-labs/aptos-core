@@ -131,9 +131,9 @@ B0:
 	0: LdU64(0)
 	1: Abort
 }
-owner_correct(Arg0: Object): address /* def_idx: 1 */ {
+owner_correct(o: Object): address /* def_idx: 1 */ {
 B0:
-	0: ImmBorrowLoc[0](Arg0: Object)
+	0: ImmBorrowLoc[0](o: Object)
 	1: ImmBorrowField[0](Object.inner: address)
 	2: ReadRef
 	3: ImmBorrowGlobal[1](ObjectCore)
@@ -141,9 +141,9 @@ B0:
 	5: ReadRef
 	6: Ret
 }
-owner_read_ref_missing(Arg0: Object): address /* def_idx: 2 */ {
+owner_read_ref_missing(o: Object): address /* def_idx: 2 */ {
 B0:
-	0: ImmBorrowLoc[0](Arg0: Object)
+	0: ImmBorrowLoc[0](o: Object)
 	1: ImmBorrowField[0](Object.inner: address)
 	2: ReadRef
 	3: ImmBorrowGlobal[1](ObjectCore)
@@ -152,11 +152,11 @@ B0:
 	6: Ret
 }
 will_autoref(): address /* def_idx: 3 */ {
-L0:	loc0: Object
+L0:	$t1: Object
 B0:
 	0: Call make(): Object
-	1: StLoc[0](loc0: Object)
-	2: ImmBorrowLoc[0](loc0: Object)
+	1: StLoc[0]($t1: Object)
+	2: ImmBorrowLoc[0]($t1: Object)
 	3: ImmBorrowField[0](Object.inner: address)
 	4: ReadRef
 	5: Ret

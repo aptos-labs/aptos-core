@@ -121,14 +121,14 @@ module c0ffee.m {
 
 
 test(): u64 /* def_idx: 0 */ {
-L0:	loc0: u64
+L0:	t: u64
 B0:
 	0: LdU64(1)
 	1: LdU64(1)
 	2: Add
-	3: StLoc[0](loc0: u64)
+	3: StLoc[0](t: u64)
 	4: LdU64(2)
-	5: MoveLoc[0](loc0: u64)
+	5: MoveLoc[0](t: u64)
 	6: Add
 	7: Ret
 }
