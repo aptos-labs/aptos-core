@@ -5,25 +5,20 @@
 
 
 
--  [Struct `BridgeConfigRelayerUpdated`](#0x1_native_bridge_BridgeConfigRelayerUpdated)
--  [Struct `BridgeFeeChangedEvent`](#0x1_native_bridge_BridgeFeeChangedEvent)
--  [Struct `BridgeInsuranceBudgetDividerChangedEvent`](#0x1_native_bridge_BridgeInsuranceBudgetDividerChangedEvent)
--  [Struct `BridgeInsuranceFundChangedEvent`](#0x1_native_bridge_BridgeInsuranceFundChangedEvent)
--  [Struct `BridgeTransferInitiatedEvent`](#0x1_native_bridge_BridgeTransferInitiatedEvent)
--  [Struct `BridgeTransferCompletedEvent`](#0x1_native_bridge_BridgeTransferCompletedEvent)
--  [Resource `BridgeEvents`](#0x1_native_bridge_BridgeEvents)
 -  [Resource `AptosCoinBurnCapability`](#0x1_native_bridge_AptosCoinBurnCapability)
 -  [Resource `AptosCoinMintCapability`](#0x1_native_bridge_AptosCoinMintCapability)
 -  [Resource `AptosFABurnCapabilities`](#0x1_native_bridge_AptosFABurnCapabilities)
 -  [Resource `AptosFAMintCapabilities`](#0x1_native_bridge_AptosFAMintCapabilities)
+-  [Struct `BridgeTransferInitiatedEvent`](#0x1_native_bridge_BridgeTransferInitiatedEvent)
+-  [Struct `BridgeTransferCompletedEvent`](#0x1_native_bridge_BridgeTransferCompletedEvent)
+-  [Resource `BridgeEvents`](#0x1_native_bridge_BridgeEvents)
 -  [Resource `Nonce`](#0x1_native_bridge_Nonce)
--  [Resource `OutboundRateLimitBudget`](#0x1_native_bridge_OutboundRateLimitBudget)
--  [Resource `InboundRateLimitBudget`](#0x1_native_bridge_InboundRateLimitBudget)
 -  [Resource `SmartTableWrapper`](#0x1_native_bridge_SmartTableWrapper)
 -  [Struct `OutboundTransfer`](#0x1_native_bridge_OutboundTransfer)
 -  [Resource `BridgeConfig`](#0x1_native_bridge_BridgeConfig)
+-  [Struct `BridgeConfigRelayerUpdated`](#0x1_native_bridge_BridgeConfigRelayerUpdated)
+-  [Struct `BridgeFeeChangedEvent`](#0x1_native_bridge_BridgeFeeChangedEvent)
 -  [Constants](#@Constants_0)
--  [Function `initialize`](#0x1_native_bridge_initialize)
 -  [Function `normalize_u64_to_32_bytes`](#0x1_native_bridge_normalize_u64_to_32_bytes)
 -  [Function `is_inbound_nonce_set`](#0x1_native_bridge_is_inbound_nonce_set)
 -  [Function `create_details`](#0x1_native_bridge_create_details)
@@ -31,16 +26,14 @@
 -  [Function `set_bridge_transfer_id_to_inbound_nonce`](#0x1_native_bridge_set_bridge_transfer_id_to_inbound_nonce)
 -  [Function `assert_valid_bridge_transfer_id`](#0x1_native_bridge_assert_valid_bridge_transfer_id)
 -  [Function `bridge_transfer_id`](#0x1_native_bridge_bridge_transfer_id)
--  [Function `bridge_relayer`](#0x1_native_bridge_bridge_relayer)
--  [Function `insurance_fund`](#0x1_native_bridge_insurance_fund)
--  [Function `insurance_budget_divider`](#0x1_native_bridge_insurance_budget_divider)
--  [Function `bridge_fee`](#0x1_native_bridge_bridge_fee)
 -  [Function `get_bridge_transfer_details_from_nonce`](#0x1_native_bridge_get_bridge_transfer_details_from_nonce)
 -  [Function `get_inbound_nonce_from_bridge_transfer_id`](#0x1_native_bridge_get_inbound_nonce_from_bridge_transfer_id)
 -  [Function `increment_and_get_nonce`](#0x1_native_bridge_increment_and_get_nonce)
+-  [Function `initialize`](#0x1_native_bridge_initialize)
 -  [Function `store_aptos_coin_burn_cap`](#0x1_native_bridge_store_aptos_coin_burn_cap)
 -  [Function `store_aptos_coin_mint_cap`](#0x1_native_bridge_store_aptos_coin_mint_cap)
 -  [Function `mint`](#0x1_native_bridge_mint)
+-  [Function `mint_from`](#0x1_native_bridge_mint_from)
 -  [Function `burn_from`](#0x1_native_bridge_burn_from)
 -  [Function `burn`](#0x1_native_bridge_burn)
 -  [Function `burn_internal`](#0x1_native_bridge_burn_internal)
@@ -49,11 +42,9 @@
 -  [Function `charge_bridge_fee`](#0x1_native_bridge_charge_bridge_fee)
 -  [Function `update_bridge_relayer`](#0x1_native_bridge_update_bridge_relayer)
 -  [Function `update_bridge_fee`](#0x1_native_bridge_update_bridge_fee)
--  [Function `update_insurance_fund`](#0x1_native_bridge_update_insurance_fund)
--  [Function `update_insurance_budget_divider`](#0x1_native_bridge_update_insurance_budget_divider)
+-  [Function `bridge_relayer`](#0x1_native_bridge_bridge_relayer)
+-  [Function `bridge_fee`](#0x1_native_bridge_bridge_fee)
 -  [Function `assert_is_caller_relayer`](#0x1_native_bridge_assert_is_caller_relayer)
--  [Function `assert_outbound_rate_limit_budget_not_exceeded`](#0x1_native_bridge_assert_outbound_rate_limit_budget_not_exceeded)
--  [Function `assert_inbound_rate_limit_budget_not_exceeded`](#0x1_native_bridge_assert_inbound_rate_limit_budget_not_exceeded)
 -  [Function `test_normalize_u64_to_32_bytes_helper`](#0x1_native_bridge_test_normalize_u64_to_32_bytes_helper)
 
 
@@ -1419,6 +1410,36 @@ Mints a specified amount of AptosCoin to a recipient's address.
 
 </details>
 
+<a id="0x1_native_bridge_mint_from"></a>
+
+## Function `mint_from`
+
+Mints a specified amount of AptosCoin to a recipient's address.
+
+@param core_resource The signer representing the core resource account.
+@param recipient The address of the recipient to mint coins to.
+@param amount The amount of AptosCoin to mint.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_mint_from">mint_from</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipient: <b>address</b>, amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_mint_from">mint_from</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipient: <b>address</b>, amount: u64) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_AptosCoinMintCapability">AptosCoinMintCapability</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <a href="native_bridge.md#0x1_native_bridge_mint">mint</a>(recipient, amount);
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_native_bridge_burn_from"></a>
 
 ## Function `burn_from`
@@ -1431,7 +1452,7 @@ Burns a specified amount of AptosCoin from an address.
 @abort If the burn capability is not available.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn_from">burn_from</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, from: <b>address</b>, amount: u64)
+<pre><code><b>public</b> <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn_from">burn_from</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, from: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -1440,7 +1461,7 @@ Burns a specified amount of AptosCoin from an address.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn_from">burn_from</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, from: <b>address</b>, amount: u64) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_AptosCoinBurnCapability">AptosCoinBurnCapability</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="native_bridge.md#0x1_native_bridge_burn_from">burn_from</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, from: <b>address</b>, amount: u64) <b>acquires</b> <a href="native_bridge.md#0x1_native_bridge_AptosCoinBurnCapability">AptosCoinBurnCapability</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
     <a href="native_bridge.md#0x1_native_bridge_burn_internal">burn_internal</a>(from, amount);
 }

@@ -411,6 +411,16 @@ module aptos_framework::native_bridge {
     }
 
     /// Mints a specified amount of AptosCoin to a recipient's address.
+    /// 
+    /// @param core_resource The signer representing the core resource account.
+    /// @param recipient The address of the recipient to mint coins to.
+    /// @param amount The amount of AptosCoin to mint.
+    public fun mint_to(aptos_framework: &signer, recipient: address, amount: u64) acquires AptosCoinMintCapability {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        mint_internal(recipient, amount);
+    }
+
+    /// Mints a specified amount of AptosCoin to a recipient's address.
     ///
     /// @param recipient The address of the recipient to mint coins to.
     /// @param amount The amount of AptosCoin to mint.
@@ -418,11 +428,19 @@ module aptos_framework::native_bridge {
     public(friend) fun mint(recipient: address, amount: u64) acquires AptosCoinMintCapability {
         assert!(features::abort_native_bridge_enabled(), ENATIVE_BRIDGE_NOT_ENABLED);
 
+        mint_internal(recipient, amount);
+    }
+
+    /// Mints a specified amount of AptosCoin to a recipient's address.
+    /// 
+    /// @param recipient The address of the recipient to mint coins to.
+    /// @param amount The amount of AptosCoin to mint.
+    fun mint_internal(recipient: address, amount: u64) acquires AptosCoinMintCapability {
         coin::deposit(recipient, coin::mint(
             amount,
             &borrow_global<AptosCoinMintCapability>(@aptos_framework).mint_cap
         ));
-    }
+    } 
 
     /// Burns a specified amount of AptosCoin from an address.
     /// 
@@ -430,7 +448,7 @@ module aptos_framework::native_bridge {
     /// @param from The address from which to burn AptosCoin.
     /// @param amount The amount of AptosCoin to burn.
     /// @abort If the burn capability is not available.
-    public entry fun burn_from(aptos_framework: &signer, from: address, amount: u64) acquires AptosCoinBurnCapability {
+    public fun burn_from(aptos_framework: &signer, from: address, amount: u64) acquires AptosCoinBurnCapability {
         system_addresses::assert_aptos_framework(aptos_framework);
         burn_internal(from, amount);
     }
@@ -559,7 +577,7 @@ module aptos_framework::native_bridge {
         set_bridge_transfer_id_to_inbound_nonce(bridge_transfer_id, nonce);
 
         // Mint to the recipient
-        mint(recipient, amount);
+        mint_internal(recipient, amount);
 
         // Emit the event
         let bridge_events = borrow_global_mut<BridgeEvents>(@aptos_framework);
@@ -585,7 +603,7 @@ module aptos_framework::native_bridge {
         let bridge_relayer = bridge_relayer();
         assert!(amount > bridge_fee, EINVALID_AMOUNT);
         let new_amount = amount - bridge_fee;
-        mint(bridge_relayer, bridge_fee);
+        mint_internal(bridge_relayer, bridge_fee);
         new_amount
     }
 
@@ -857,7 +875,7 @@ module aptos_framework::native_bridge {
         // Mint coins to the sender to ensure they have sufficient balance
         let account_balance = amount + 1;
         // Mint some coins
-        mint(sender_address, account_balance);
+        mint_internal(sender_address, account_balance);
 
         // Specify the recipient and transfer amount
         let recipient = ethereum::eth_address_20_bytes();
