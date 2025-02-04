@@ -63,6 +63,7 @@ pub struct SpecFunDecl {
     pub is_recursive: RefCell<Option<bool>>,
     /// The instantiations for which this function is known to use generic type reflection.
     pub insts_using_generic_type_reflection: RefCell<BTreeMap<Vec<Type>, bool>>,
+    pub spec: RefCell<Spec>,
 }
 
 // =================================================================================================
@@ -105,7 +106,7 @@ impl Attribute {
 pub enum ConditionKind {
     LetPost(Symbol, Loc),
     LetPre(Symbol, Loc),
-    Assert,
+    Assert(Option<bool>),
     Assume,
     Decreases,
     AbortsIf,
@@ -132,7 +133,7 @@ impl ConditionKind {
         matches!(
             self,
             LetPost(..)
-                | Assert
+                | Assert(..)
                 | Assume
                 | Emits
                 | Ensures
@@ -165,8 +166,13 @@ impl ConditionKind {
         use ConditionKind::*;
         matches!(
             self,
-            Assert | Assume | Decreases | LoopInvariant | LetPost(..) | LetPre(..) | Update
+            Assert(..) | Assume | Decreases | LoopInvariant | LetPost(..) | LetPre(..) | Update
         )
+    }
+
+    pub fn allowed_on_lambda_spec(&self) -> bool {
+        use ConditionKind::*;
+        matches!(self, Requires | Ensures)
     }
 
     /// Returns true if this condition is allowed on a struct.
@@ -205,7 +211,15 @@ impl fmt::Display for ConditionKind {
         match self {
             LetPost(sym, _loc) => write!(f, "let({:?})", sym),
             LetPre(sym, _loc) => write!(f, "let old({:?})", sym),
-            Assert => write!(f, "assert"),
+            Assert(option) => {
+                if option.is_none() {
+                    write!(f, "assert")
+                } else if option.is_some_and(|lambda_requires| lambda_requires) {
+                    write!(f, "requires")
+                } else {
+                    write!(f, "ensures")
+                }
+            },
             Assume => write!(f, "assume"),
             Decreases => write!(f, "decreases"),
             AbortsIf => write!(f, "aborts_if"),
@@ -453,6 +467,8 @@ pub enum SpecBlockTarget {
     FunctionCode(ModuleId, FunId, usize),
     /// The block is associated with a specification schema.
     Schema(ModuleId, SchemaId, Vec<TypeParameter>),
+    /// The block is associated with a specification function.
+    SpecFunction(ModuleId, SpecFunId),
     /// The block is inline in an expression.
     Inline,
 }
@@ -641,7 +657,7 @@ pub enum ExpData {
     /// Represents an invocation of a function value, as a lambda.
     Invoke(NodeId, Exp, Vec<Exp>),
     /// Represents a lambda.
-    Lambda(NodeId, Pattern, Exp, LambdaCaptureKind),
+    Lambda(NodeId, Pattern, Exp, LambdaCaptureKind, Option<Exp>),
     /// Represents a quantified formula over multiple variables and ranges.
     Quant(
         NodeId,
@@ -791,6 +807,11 @@ impl ExpData {
             self,
             LocalVar(..) | Temporary(..) | Call(_, Operation::Select(..), _)
         )
+    }
+
+    pub fn is_temporary(&self) -> bool {
+        use ExpData::*;
+        matches!(self, Temporary(..))
     }
 
     /// Checks for different ways how an unit (void) value is represented. This
@@ -1441,7 +1462,12 @@ impl ExpData {
                     exp.visit_positions_impl(visitor)?;
                 }
             },
-            Lambda(_, _, body, _) => body.visit_positions_impl(visitor)?,
+            Lambda(_, _, body, _, spec_opt) => {
+                body.visit_positions_impl(visitor)?;
+                if let Some(spec) = spec_opt {
+                    spec.visit_positions_impl(visitor)?;
+                }
+            },
             Quant(_, _, ranges, triggers, condition, body) => {
                 for (_, range) in ranges {
                     range.visit_positions_impl(visitor)?;
@@ -3230,7 +3256,7 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     self.fmt_exps(args)
                 )
             },
-            Lambda(id, pat, body, capture_kind) => {
+            Lambda(id, pat, body, capture_kind, spec_opt) => {
                 if self.verbose {
                     write!(
                         f,
@@ -3258,6 +3284,9 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                         pat.display_for_exp(self),
                         body.display_cont(self)
                     )?;
+                }
+                if let Some(spec) = spec_opt {
+                    write!(f, "{}", spec.display_cont(self))?;
                 }
                 Ok(())
             },
