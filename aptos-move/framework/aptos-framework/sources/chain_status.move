@@ -43,6 +43,6 @@ module aptos_framework::chain_status {
 
     /// Helper function to assert genesis state.
     public fun assert_genesis() {
-        assert!(is_genesis(), error::invalid_state(ENOT_OPERATING));
+        assert!(is_genesis(), error::invalid_state(ENOT_GENESIS));
     }
 }

@@ -136,7 +136,7 @@ pub fn generate_gas_upgrade_proposal(
                 },
                 None => {
                     let update_method = if is_testnet {
-                        "set_gas_schedule"
+                        "set_for_next_epoch"
                     } else {
                         "set_for_next_epoch"
                     };

@@ -148,6 +148,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 
     async fn start_new_epoch(&mut self, payload: OnChainConfigPayload<P>) {
+        println!("Starting new epoch.");
         let validator_set: ValidatorSet = payload
             .get()
             .expect("failed to get ValidatorSet from payload");
@@ -239,6 +240,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 
     async fn on_new_epoch(&mut self, reconfig_notification: ReconfigNotification<P>) -> Result<()> {
+        println!("EpochManager received new epoch notification.");
         self.shutdown_current_processor().await;
         self.start_new_epoch(reconfig_notification.on_chain_configs)
             .await;
