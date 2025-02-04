@@ -157,6 +157,44 @@ impl QuorumStorePayloadManager {
         }
         receivers
     }
+
+    async fn get_transactions_quorum_store_inline_hybrid(
+        &self,
+        block: &Block,
+        inline_batches: &[(BatchInfo, Vec<SignedTransaction>)],
+        proof_with_data: &ProofWithData,
+        max_txns_to_execute: &Option<u64>,
+        block_gas_limit_override: &Option<u64>,
+    ) -> ExecutorResult<BlockTransactionPayload> {
+        let all_transactions = {
+            let mut all_txns = process_qs_payload(
+                proof_with_data,
+                self.batch_reader.clone(),
+                block,
+                &self.ordered_authors,
+            )
+            .await?;
+            all_txns.append(
+                &mut inline_batches
+                    .iter()
+                    // TODO: Can clone be avoided here?
+                    .flat_map(|(_batch_info, txns)| txns.clone())
+                    .collect(),
+            );
+            all_txns
+        };
+        let inline_batches = inline_batches
+            .iter()
+            .map(|(batch_info, _)| batch_info.clone())
+            .collect();
+        Ok(BlockTransactionPayload::new_quorum_store_inline_hybrid(
+            all_transactions,
+            proof_with_data.proofs.clone(),
+            *max_txns_to_execute,
+            *block_gas_limit_override,
+            inline_batches,
+        ))
+    }
 }
 
 #[async_trait]
@@ -182,7 +220,8 @@ impl TPayloadManager for QuorumStorePayloadManager {
                     .iter()
                     .map(|proof| proof.info().clone())
                     .collect::<Vec<_>>(),
-                Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _, _) => {
+                Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)
+                | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
                     inline_batches
                         .iter()
                         .map(|(batch_info, _)| batch_info.clone())
@@ -283,7 +322,8 @@ impl TPayloadManager for QuorumStorePayloadManager {
                     self.batch_reader.clone(),
                 );
             },
-            Payload::QuorumStoreInlineHybrid(_, proof_with_data, _, _) => {
+            Payload::QuorumStoreInlineHybrid(_, proof_with_data, _)
+            | Payload::QuorumStoreInlineHybridV2(_, proof_with_data, _) => {
                 request_txns_and_update_status(proof_with_data, self.batch_reader.clone());
             },
             Payload::DirectMempool(_) => {
@@ -317,7 +357,8 @@ impl TPayloadManager for QuorumStorePayloadManager {
             },
             Payload::InQuorumStore(_) => Ok(()),
             Payload::InQuorumStoreWithLimit(_) => Ok(()),
-            Payload::QuorumStoreInlineHybrid(inline_batches, proofs, _, _) => {
+            Payload::QuorumStoreInlineHybrid(inline_batches, proofs, _)
+            | Payload::QuorumStoreInlineHybridV2(inline_batches, proofs, _) => {
                 fn update_availability_metrics<'a>(
                     batch_reader: &Arc<dyn BatchReader>,
                     is_proof_label: &str,
@@ -426,36 +467,29 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 inline_batches,
                 proof_with_data,
                 max_txns_to_execute,
-                block_gas_limit_override,
             ) => {
-                let all_transactions = {
-                    let mut all_txns = process_qs_payload(
-                        proof_with_data,
-                        self.batch_reader.clone(),
-                        block,
-                        &self.ordered_authors,
-                    )
-                    .await?;
-                    all_txns.append(
-                        &mut inline_batches
-                            .iter()
-                            // TODO: Can clone be avoided here?
-                            .flat_map(|(_batch_info, txns)| txns.clone())
-                            .collect(),
-                    );
-                    all_txns
-                };
-                let inline_batches = inline_batches
-                    .iter()
-                    .map(|(batch_info, _)| batch_info.clone())
-                    .collect();
-                BlockTransactionPayload::new_quorum_store_inline_hybrid(
-                    all_transactions,
-                    proof_with_data.proofs.clone(),
-                    *max_txns_to_execute,
-                    *block_gas_limit_override,
+                self.get_transactions_quorum_store_inline_hybrid(
+                    block,
                     inline_batches,
+                    proof_with_data,
+                    max_txns_to_execute,
+                    &None,
                 )
+                .await?
+            },
+            Payload::QuorumStoreInlineHybridV2(
+                inline_batches,
+                proof_with_data,
+                execution_limits,
+            ) => {
+                self.get_transactions_quorum_store_inline_hybrid(
+                    block,
+                    inline_batches,
+                    proof_with_data,
+                    &execution_limits.max_txns_to_execute(),
+                    &execution_limits.block_gas_limit(),
+                )
+                .await?
             },
             Payload::OptQuorumStore(opt_qs_payload) => {
                 let opt_batch_txns = process_optqs_payload(

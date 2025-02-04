@@ -90,20 +90,24 @@ fn assert_payload_response(
             }
             assert_eq!(proofs.max_txns_to_execute, max_txns_from_block_to_execute);
         },
-        Payload::QuorumStoreInlineHybrid(
-            _inline_batches,
-            proofs,
-            max_txns_to_execute,
-            block_gas_limit,
-        ) => {
+        Payload::QuorumStoreInlineHybrid(_inline_batches, proofs, max_txns_to_execute) => {
             assert_eq!(proofs.proofs.len(), expected.len());
             for proof in proofs.proofs {
                 assert!(expected.contains(&proof));
             }
             assert_eq!(max_txns_to_execute, max_txns_from_block_to_execute);
-            assert_eq!(block_gas_limit, expected_block_gas_limit);
         },
-        // TODO: Check how to update this for Payload::QuorumStoreInlineHybrid
+        Payload::QuorumStoreInlineHybridV2(_inline_batches, proofs, execution_limits) => {
+            assert_eq!(proofs.proofs.len(), expected.len());
+            for proof in proofs.proofs {
+                assert!(expected.contains(&proof));
+            }
+            assert_eq!(
+                execution_limits.max_txns_to_execute(),
+                max_txns_from_block_to_execute
+            );
+            assert_eq!(execution_limits.block_gas_limit(), expected_block_gas_limit);
+        },
         _ => panic!("Unexpected variant"),
     }
 }
