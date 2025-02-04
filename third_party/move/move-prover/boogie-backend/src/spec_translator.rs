@@ -21,8 +21,8 @@ use itertools::Itertools;
 use log::{debug, info, warn};
 use move_model::{
     ast::{
-        Exp, ExpData, MemoryLabel, Operation, Pattern, QuantKind, SpecFunDecl, SpecVarDecl,
-        TempIndex, Value,
+        ConditionKind, Exp, ExpData, MemoryLabel, Operation, Pattern, QuantKind, SpecFunDecl,
+        SpecVarDecl, TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -434,6 +434,76 @@ impl<'env> SpecTranslator<'env> {
                         call,
                         type_check
                     );
+                }
+            }
+            // Generate axioms from the spec block attached to the spec function
+            let requires = fun
+                .spec
+                .borrow()
+                .conditions
+                .clone()
+                .into_iter()
+                .filter(|cond| cond.kind == ConditionKind::Requires)
+                .collect_vec();
+            let emit_requires = || {
+                emit!(self.writer, "(");
+                for (i, require) in requires.iter().enumerate() {
+                    if i > 0 {
+                        emitln!(self.writer, " && ");
+                    }
+                    for (j, exp) in require.all_exps().enumerate() {
+                        emit!(self.writer, "(");
+                        self.translate_exp(exp);
+                        emit!(self.writer, ")");
+                        if j > 0 {
+                            emitln!(self.writer, " && ");
+                        }
+                    }
+                }
+                emit!(self.writer, ")");
+            };
+            let emit_predicate = |exp| {
+                if !requires.is_empty() {
+                    emit!(self.writer, "(");
+                    emit_requires();
+                    emit!(self.writer, "==> ");
+                }
+                emit!(self.writer, "(");
+                self.translate_exp(exp);
+                emit!(self.writer, ")");
+                if !requires.is_empty() {
+                    emit!(self.writer, ")");
+                }
+            };
+            for cond in &fun.spec.borrow().conditions {
+                if cond.kind == ConditionKind::Ensures {
+                    let call = format!(
+                        "{}({})",
+                        boogie_name,
+                        fun.params
+                            .iter()
+                            .map(|Parameter(n, ..)| {
+                                format!("{}", n.display(module_env.symbol_pool()))
+                            })
+                            .join(", ")
+                    );
+                    //TODO(teng): currently spec function does not support tuple as return type
+                    for exp in cond.all_exps() {
+                        if !param_list.is_empty() {
+                            emitln!(
+                                self.writer,
+                                "axiom (forall {} ::\n(var $ret0 := {};",
+                                param_list,
+                                call,
+                            );
+                            emit_predicate(exp);
+                            emitln!(self.writer, "\n));");
+                        } else {
+                            emitln!(self.writer, "axiom (var $ret0 := {};", call,);
+                            emit_predicate(exp);
+                            emitln!(self.writer, "\n);");
+                        }
+                    }
                 }
             }
         } else {
