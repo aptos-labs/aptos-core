@@ -11,13 +11,15 @@ use crate::{
     live_data_service::in_memory_cache::InMemoryCache,
 };
 use aptos_protos::indexer::v1::{GetTransactionsRequest, TransactionsResponse};
+use aptos_transaction_filter::BooleanTransactionFilter;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tonic::{Request, Status};
 use tracing::info;
 use uuid::Uuid;
 
-static MAX_BYTES_PER_BATCH: usize = 20 * (1 << 20);
+const MAX_BYTES_PER_BATCH: usize = 20 * (1 << 20);
+const MAX_FILTER_SIZE: usize = 1000;
 
 pub struct LiveDataService<'a> {
     chain_id: u64,
@@ -77,6 +79,25 @@ impl<'a> LiveDataService<'a> {
                     continue;
                 }
 
+                let filter = if let Some(proto_filter) = request.transaction_filter {
+                    match BooleanTransactionFilter::new_from_proto(
+                        proto_filter,
+                        Some(MAX_FILTER_SIZE),
+                    ) {
+                        Ok(filter) => Some(filter),
+                        Err(e) => {
+                            let err = Err(Status::invalid_argument(format!(
+                                "Invalid transaction_filter: {e:?}."
+                            )));
+                            info!("Client error: {err:?}.");
+                            let _ = response_sender.blocking_send(err);
+                            continue;
+                        },
+                    }
+                } else {
+                    None
+                };
+
                 let max_num_transactions_per_batch = if let Some(batch_size) = request.batch_size {
                     batch_size as usize
                 } else {
@@ -94,6 +115,7 @@ impl<'a> LiveDataService<'a> {
                         ending_version,
                         max_num_transactions_per_batch,
                         MAX_BYTES_PER_BATCH,
+                        filter,
                         response_sender,
                     )
                     .await
@@ -117,6 +139,7 @@ impl<'a> LiveDataService<'a> {
         ending_version: Option<u64>,
         max_num_transactions_per_batch: usize,
         max_bytes_per_batch: usize,
+        filter: Option<BooleanTransactionFilter>,
         response_sender: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
     ) {
         info!(stream_id = id, "Start streaming, starting_version: {starting_version}, ending_version: {ending_version:?}.");
@@ -145,6 +168,7 @@ impl<'a> LiveDataService<'a> {
                     ending_version,
                     max_num_transactions_per_batch,
                     max_bytes_per_batch,
+                    &filter,
                 )
                 .await
             {

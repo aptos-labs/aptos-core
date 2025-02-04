@@ -26,6 +26,17 @@ pub struct TransactionRootFilter {
     pub txn_type: Option<TransactionType>,
 }
 
+impl From<aptos_protos::indexer::v1::TransactionRootFilter> for TransactionRootFilter {
+    fn from(proto_filter: aptos_protos::indexer::v1::TransactionRootFilter) -> Self {
+        Self {
+            success: proto_filter.success,
+            txn_type: proto_filter
+                .transaction_type
+                .map(|_| proto_filter.transaction_type()),
+        }
+    }
+}
+
 impl Filterable<Transaction> for TransactionRootFilter {
     #[inline]
     fn validate_state(&self) -> Result<(), FilterError> {
@@ -36,10 +47,10 @@ impl Filterable<Transaction> for TransactionRootFilter {
     }
 
     #[inline]
-    fn is_allowed(&self, item: &Transaction) -> bool {
+    fn matches(&self, item: &Transaction) -> bool {
         if !self
             .success
-            .is_allowed_opt(&item.info.as_ref().map(|i| i.success))
+            .matches_opt(&item.info.as_ref().map(|i| i.success))
         {
             return false;
         }
