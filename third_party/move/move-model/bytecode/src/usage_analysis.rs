@@ -227,7 +227,7 @@ impl<'a> TransferFunctions for MemoryUsageAnalysis<'a> {
                         .into_iter()
                         .map(|(usage, _)| usage),
                 ),
-                Assert => state.add_direct_asserted_iter(
+                Assert(_) => state.add_direct_asserted_iter(
                     exp.used_memory(self.cache.global_env())
                         .into_iter()
                         .map(|(usage, _)| usage),
