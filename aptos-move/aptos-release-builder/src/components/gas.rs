@@ -135,9 +135,15 @@ pub fn generate_gas_upgrade_proposal(
                     );
                 },
                 None => {
+                    let update_method = if is_testnet {
+                        "set_gas_schedule"
+                    } else {
+                        "set_for_next_epoch"
+                    };
                     emitln!(
                         writer,
-                        "gas_schedule::set_for_next_epoch({}, gas_schedule_blob);",
+                        "gas_schedule::{}({}, gas_schedule_blob);",
+                        update_method,
                         signer_arg
                     );
                 },
