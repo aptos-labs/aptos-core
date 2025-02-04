@@ -381,7 +381,7 @@ impl<'a> LambdaLifter<'a> {
                     && Self::exp_is_capturable(e2)
                     && Self::exp_is_capturable(e3)
             },
-            Lambda(_, _pat, _body, _capture_kind) => {
+            Lambda(_, _pat, _body, _capture_kind, _spec_opt) => {
                 // Maybe could test lambda_is_direct_curry(pat, body)
                 // and do something with it, but it is nontrivial.
                 false
