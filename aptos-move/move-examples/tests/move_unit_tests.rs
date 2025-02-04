@@ -94,6 +94,12 @@ fn test_veiled_coin() {
 }
 
 #[test]
+fn test_vector_pushback() {
+    let named_address = BTreeMap::new();
+    run_tests_for_pkg("vector_pushback", named_address);
+}
+
+#[test]
 fn test_common_account() {
     test_common("common_account");
 }
