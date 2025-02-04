@@ -1,12 +1,4 @@
 // -- Model dump before env processor pipeline:
-module 0x42::b {
-    struct MyOtherList {
-        len: u64,
-    }
-    public fun len(self: &MyOtherList): u64 {
-        select b::MyOtherList.len<&MyOtherList>(self)
-    }
-} // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
@@ -15,6 +7,14 @@ module 0x42::a {
         select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
+module 0x42::b {
+    struct MyOtherList {
+        len: u64,
+    }
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
+    }
+} // end 0x42::b
 module 0x42::c {
     use 0x42::a; // resolved as: 0x42::a
     use 0x42::b; // resolved as: 0x42::b
@@ -32,14 +32,6 @@ module 0x42::c {
 
 
 // -- Model dump after env processor unused checks:
-module 0x42::b {
-    struct MyOtherList {
-        len: u64,
-    }
-    public fun len(self: &MyOtherList): u64 {
-        select b::MyOtherList.len<&MyOtherList>(self)
-    }
-} // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
@@ -48,6 +40,14 @@ module 0x42::a {
         select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
+module 0x42::b {
+    struct MyOtherList {
+        len: u64,
+    }
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
+    }
+} // end 0x42::b
 module 0x42::c {
     use 0x42::a; // resolved as: 0x42::a
     use 0x42::b; // resolved as: 0x42::b
@@ -65,14 +65,6 @@ module 0x42::c {
 
 
 // -- Model dump after env processor type parameter check:
-module 0x42::b {
-    struct MyOtherList {
-        len: u64,
-    }
-    public fun len(self: &MyOtherList): u64 {
-        select b::MyOtherList.len<&MyOtherList>(self)
-    }
-} // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
@@ -81,6 +73,14 @@ module 0x42::a {
         select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
+module 0x42::b {
+    struct MyOtherList {
+        len: u64,
+    }
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
+    }
+} // end 0x42::b
 module 0x42::c {
     use 0x42::a; // resolved as: 0x42::a
     use 0x42::b; // resolved as: 0x42::b
@@ -98,14 +98,6 @@ module 0x42::c {
 
 
 // -- Model dump after env processor check recursive struct definition:
-module 0x42::b {
-    struct MyOtherList {
-        len: u64,
-    }
-    public fun len(self: &MyOtherList): u64 {
-        select b::MyOtherList.len<&MyOtherList>(self)
-    }
-} // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
@@ -114,6 +106,14 @@ module 0x42::a {
         select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
+module 0x42::b {
+    struct MyOtherList {
+        len: u64,
+    }
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
+    }
+} // end 0x42::b
 module 0x42::c {
     use 0x42::a; // resolved as: 0x42::a
     use 0x42::b; // resolved as: 0x42::b
@@ -131,14 +131,6 @@ module 0x42::c {
 
 
 // -- Model dump after env processor check cyclic type instantiation:
-module 0x42::b {
-    struct MyOtherList {
-        len: u64,
-    }
-    public fun len(self: &MyOtherList): u64 {
-        select b::MyOtherList.len<&MyOtherList>(self)
-    }
-} // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
@@ -147,6 +139,14 @@ module 0x42::a {
         select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
+module 0x42::b {
+    struct MyOtherList {
+        len: u64,
+    }
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
+    }
+} // end 0x42::b
 module 0x42::c {
     use 0x42::a; // resolved as: 0x42::a
     use 0x42::b; // resolved as: 0x42::b
@@ -164,14 +164,6 @@ module 0x42::c {
 
 
 // -- Model dump after env processor unused struct params check:
-module 0x42::b {
-    struct MyOtherList {
-        len: u64,
-    }
-    public fun len(self: &MyOtherList): u64 {
-        select b::MyOtherList.len<&MyOtherList>(self)
-    }
-} // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
@@ -180,6 +172,14 @@ module 0x42::a {
         select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
+module 0x42::b {
+    struct MyOtherList {
+        len: u64,
+    }
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
+    }
+} // end 0x42::b
 module 0x42::c {
     use 0x42::a; // resolved as: 0x42::a
     use 0x42::b; // resolved as: 0x42::b
@@ -197,14 +197,6 @@ module 0x42::c {
 
 
 // -- Model dump after env processor access and use check before inlining:
-module 0x42::b {
-    struct MyOtherList {
-        len: u64,
-    }
-    public fun len(self: &MyOtherList): u64 {
-        select b::MyOtherList.len<&MyOtherList>(self)
-    }
-} // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
@@ -213,6 +205,14 @@ module 0x42::a {
         select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
+module 0x42::b {
+    struct MyOtherList {
+        len: u64,
+    }
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
+    }
+} // end 0x42::b
 module 0x42::c {
     use 0x42::a; // resolved as: 0x42::a
     use 0x42::b; // resolved as: 0x42::b
@@ -230,14 +230,6 @@ module 0x42::c {
 
 
 // -- Model dump after env processor inlining:
-module 0x42::b {
-    struct MyOtherList {
-        len: u64,
-    }
-    public fun len(self: &MyOtherList): u64 {
-        select b::MyOtherList.len<&MyOtherList>(self)
-    }
-} // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
@@ -246,6 +238,14 @@ module 0x42::a {
         select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
+module 0x42::b {
+    struct MyOtherList {
+        len: u64,
+    }
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
+    }
+} // end 0x42::b
 module 0x42::c {
     use 0x42::a; // resolved as: 0x42::a
     use 0x42::b; // resolved as: 0x42::b
@@ -263,14 +263,6 @@ module 0x42::c {
 
 
 // -- Model dump after env processor access and use check after inlining:
-module 0x42::b {
-    struct MyOtherList {
-        len: u64,
-    }
-    public fun len(self: &MyOtherList): u64 {
-        select b::MyOtherList.len<&MyOtherList>(self)
-    }
-} // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
@@ -279,6 +271,14 @@ module 0x42::a {
         select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
+module 0x42::b {
+    struct MyOtherList {
+        len: u64,
+    }
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
+    }
+} // end 0x42::b
 module 0x42::c {
     use 0x42::a; // resolved as: 0x42::a
     use 0x42::b; // resolved as: 0x42::b
@@ -296,14 +296,6 @@ module 0x42::c {
 
 
 // -- Model dump after env processor acquires check:
-module 0x42::b {
-    struct MyOtherList {
-        len: u64,
-    }
-    public fun len(self: &MyOtherList): u64 {
-        select b::MyOtherList.len<&MyOtherList>(self)
-    }
-} // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
@@ -312,6 +304,14 @@ module 0x42::a {
         select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
+module 0x42::b {
+    struct MyOtherList {
+        len: u64,
+    }
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
+    }
+} // end 0x42::b
 module 0x42::c {
     use 0x42::a; // resolved as: 0x42::a
     use 0x42::b; // resolved as: 0x42::b
@@ -329,14 +329,6 @@ module 0x42::c {
 
 
 // -- Model dump after env processor simplifier:
-module 0x42::b {
-    struct MyOtherList {
-        len: u64,
-    }
-    public fun len(self: &MyOtherList): u64 {
-        select b::MyOtherList.len<&MyOtherList>(self)
-    }
-} // end 0x42::b
 module 0x42::a {
     struct MyList {
         len: u64,
@@ -345,6 +337,14 @@ module 0x42::a {
         select a::MyList.len<&MyList>(self)
     }
 } // end 0x42::a
+module 0x42::b {
+    struct MyOtherList {
+        len: u64,
+    }
+    public fun len(self: &MyOtherList): u64 {
+        select b::MyOtherList.len<&MyOtherList>(self)
+    }
+} // end 0x42::b
 module 0x42::c {
     use 0x42::a; // resolved as: 0x42::a
     use 0x42::b; // resolved as: 0x42::b
