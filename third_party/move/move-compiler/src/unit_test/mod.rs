@@ -166,6 +166,7 @@ impl<'a> fmt::Display for ExpectedMoveErrorDisplay<'a> {
             Location::Undefined => write!(f, " in an unknown location"),
             Location::Script => write!(f, " in the script"),
             Location::Module(id) => write!(f, " in the module {id}"),
+            Location::Constraint(constraint) => write!(f, " w.r.t. the constraint {constraint}"),
         }
     }
 }

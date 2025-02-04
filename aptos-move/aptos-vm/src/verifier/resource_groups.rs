@@ -22,7 +22,9 @@ fn metadata_validation_err(msg: &str) -> Result<(), VMError> {
 fn metadata_validation_error(msg: &str) -> VMError {
     PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
         .with_message(format!("metadata and code bundle mismatch: {}", msg))
-        .finish(Location::Undefined)
+        .finish(Location::Constraint(
+            "metadata must match code bundle".to_string(),
+        ))
 }
 
 /// Perform validation and upgrade checks on resource groups

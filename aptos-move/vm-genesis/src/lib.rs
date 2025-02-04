@@ -283,7 +283,17 @@ pub fn encode_genesis_change_set(
     initialize_jwk_consensus_config(&mut session, &jwk_consensus_config);
     initialize_jwks_resources(&mut session);
     initialize_keyless_accounts(&mut session, chain_id);
-    initialize_governed_gas_pool(&mut session);
+
+    // initialize governed gas pool only if feature is enabled
+    match &genesis_config.initial_features_override {
+        Some(features) => {
+            if features.is_enabled(FeatureFlag::GOVERNED_GAS_POOL) {
+                initialize_governed_gas_pool(&mut session);
+            }
+        },
+        None => {},
+    }
+
     set_genesis_end(&mut session);
 
     // Reconfiguration should happen after all on-chain invocations.

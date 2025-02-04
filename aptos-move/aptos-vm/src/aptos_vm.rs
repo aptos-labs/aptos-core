@@ -750,10 +750,11 @@ impl AptosVM {
             let module_id = traversal_context
                 .referenced_module_ids
                 .alloc(entry_fn.module().clone());
-            session.check_dependencies_and_charge_gas(gas_meter, traversal_context, [(
-                module_id.address(),
-                module_id.name(),
-            )])?;
+            session.check_dependencies_and_charge_gas(
+                gas_meter,
+                traversal_context,
+                [(module_id.address(), module_id.name())],
+            )?;
         }
 
         let function =
@@ -1318,7 +1319,14 @@ impl AptosVM {
                     )?;
                 } else {
                     return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
-                        .finish(Location::Undefined));
+                        .with_message(format!(
+                            "initializer not found in module '{}'",
+                            module.self_id().name()
+                        ))
+                        .finish(Location::Constraint(format!(
+                            "module must have an initializer function name '{}'",
+                            init_func_name
+                        ))));
                 }
             }
         }
@@ -1541,7 +1549,9 @@ impl AptosVM {
     fn metadata_validation_error(msg: &str) -> VMError {
         PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
             .with_message(format!("metadata and code bundle mismatch: {}", msg))
-            .finish(Location::Undefined)
+            .finish(Location::Constraint(
+                "metadata must match the code bundle".to_string(),
+            ))
     }
 
     fn validate_signed_transaction(
@@ -2335,6 +2345,11 @@ impl AptosVM {
                         // The known Move function failure and type resolution failure could be a result of speculative execution. Use speculative logger.
                         StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION
                         | StatusCode::TYPE_RESOLUTION_FAILURE => {
+                            println!(
+                                "[aptos_vm] Transaction breaking known Move function failure. txn: {:?}, status: {:?}",
+                                bcs::to_bytes::<SignedTransaction>(txn),
+                                vm_status,
+                            );
                             speculative_error!(
                                 log_context,
                                 format!(
