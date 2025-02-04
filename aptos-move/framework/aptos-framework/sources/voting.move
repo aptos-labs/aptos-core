@@ -208,7 +208,7 @@ module aptos_framework::voting {
 
     public fun register<ProposalType: store>(account: &signer) {
         check_vote_permission(account);
-        let addr = signer::address_of(account);
+        let addr = signer::address_of_unpermissioned(account);
         assert!(!exists<VotingForum<ProposalType>>(addr), error::already_exists(EVOTING_FORUM_ALREADY_REGISTERED));
 
         let voting_forum = VotingForum<ProposalType> {
@@ -793,7 +793,7 @@ module aptos_framework::voting {
     ): u64 acquires VotingForum {
         // Register voting forum and create a proposal.
         register<TestProposal>(governance);
-        let governance_address = signer::address_of(governance);
+        let governance_address = signer::address_of_unpermissioned(governance);
         let proposal = TestProposal {};
 
         // This works because our Move unit test extensions mock out the execution hash to be [1].
@@ -862,7 +862,7 @@ module aptos_framework::voting {
         is_multi_step: bool
     ) acquires VotingForum {
         account::create_account_for_test(@aptos_framework);
-        let governance_address = signer::address_of(governance);
+        let governance_address = signer::address_of_unpermissioned(governance);
         account::create_account_for_test(governance_address);
         register<TestProposal>(governance);
         let proposal = TestProposal {};
@@ -919,7 +919,7 @@ module aptos_framework::voting {
         timestamp::set_time_has_started_for_testing(aptos_framework);
 
         // Register voting forum and create a proposal.
-        let governance_address = signer::address_of(governance);
+        let governance_address = signer::address_of_unpermissioned(governance);
         account::create_account_for_test(governance_address);
         let proposal_id = create_test_proposal_generic(governance, option::none<u128>(), use_create_multi_step);
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_PENDING, 0);
@@ -982,7 +982,7 @@ module aptos_framework::voting {
         timestamp::set_time_has_started_for_testing(aptos_framework);
 
         // Register voting forum and create a proposal.
-        let governance_address = signer::address_of(governance);
+        let governance_address = signer::address_of_unpermissioned(governance);
         account::create_account_for_test(governance_address);
         let proposal_id = create_test_proposal_generic(governance, option::none<u128>(), is_multi_step);
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_PENDING, 0);
@@ -1024,7 +1024,7 @@ module aptos_framework::voting {
         timestamp::set_time_has_started_for_testing(aptos_framework);
 
         // Register voting forum and create a proposal.
-        let governance_address = signer::address_of(governance);
+        let governance_address = signer::address_of_unpermissioned(governance);
         account::create_account_for_test(governance_address);
         let proposal_id = create_test_proposal_generic(governance, option::some(100), is_multi_step);
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_PENDING, 0);
@@ -1087,7 +1087,7 @@ module aptos_framework::voting {
     ) acquires VotingForum {
         account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(aptos_framework);
-        let governance_address = signer::address_of(governance);
+        let governance_address = signer::address_of_unpermissioned(governance);
         account::create_account_for_test(governance_address);
         let proposal_id = create_test_proposal_generic(governance, option::some(100), is_multi_step);
         let proof = TestProposal {};
@@ -1127,7 +1127,7 @@ module aptos_framework::voting {
         timestamp::set_time_has_started_for_testing(aptos_framework);
 
         // Register voting forum and create a proposal.
-        let governance_address = signer::address_of(governance);
+        let governance_address = signer::address_of_unpermissioned(governance);
         account::create_account_for_test(governance_address);
         let proposal_id = create_test_proposal_generic(governance, option::none<u128>(), is_multi_step);
 
@@ -1163,7 +1163,7 @@ module aptos_framework::voting {
     ) acquires VotingForum {
         account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
-        let governance_address = signer::address_of(&governance);
+        let governance_address = signer::address_of_unpermissioned(&governance);
         account::create_account_for_test(governance_address);
         let proposal_id = create_test_proposal(&governance, option::none<u128>());
         // Voting period is over. Voting should now fail.
@@ -1183,7 +1183,7 @@ module aptos_framework::voting {
         timestamp::set_time_has_started_for_testing(&aptos_framework);
 
         // Register voting forum and create a proposal.
-        let governance_address = signer::address_of(&governance);
+        let governance_address = signer::address_of_unpermissioned(&governance);
         account::create_account_for_test(governance_address);
         let proposal_id = create_test_proposal_generic(&governance, option::some(100), true);
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_PENDING, 0);
@@ -1210,7 +1210,7 @@ module aptos_framework::voting {
         timestamp::set_time_has_started_for_testing(aptos_framework);
 
         // Register voting forum and create a proposal.
-        let governance_address = signer::address_of(governance);
+        let governance_address = signer::address_of_unpermissioned(governance);
         account::create_account_for_test(governance_address);
         let proposal_id = create_test_proposal_generic(governance, option::some(100), is_multi_step);
 
@@ -1249,7 +1249,7 @@ module aptos_framework::voting {
     ) acquires VotingForum {
         account::create_account_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(aptos_framework);
-        account::create_account_for_test(signer::address_of(governance));
+        account::create_account_for_test(signer::address_of_unpermissioned(governance));
         // This should fail.
         create_test_proposal_generic(governance, option::some(5), is_multi_step);
     }
@@ -1278,7 +1278,7 @@ module aptos_framework::voting {
         timestamp::set_time_has_started_for_testing(aptos_framework);
 
         // Register voting forum and create a proposal.
-        let governance_address = signer::address_of(governance);
+        let governance_address = signer::address_of_unpermissioned(governance);
         account::create_account_for_test(governance_address);
         let proposal_id = create_test_proposal_generic(governance, option::none<u128>(), true);
         assert!(get_proposal_state<TestProposal>(governance_address, proposal_id) == PROPOSAL_STATE_PENDING, 0);

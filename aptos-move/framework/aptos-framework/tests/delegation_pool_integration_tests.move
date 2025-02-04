@@ -67,7 +67,7 @@ module aptos_framework::delegation_pool_integration_tests {
         rewards_rate_denominator: u64,
         voting_power_increase_limit: u64,
     ) {
-        account::create_account_for_test(signer::address_of(aptos_framework));
+        account::create_account_for_test(signer::address_of_unpermissioned(aptos_framework));
         stake::initialize_for_test_custom(
             aptos_framework,
             minimum_stake,
@@ -85,7 +85,7 @@ module aptos_framework::delegation_pool_integration_tests {
     #[test_only]
     public fun mint_and_add_stake(account: &signer, amount: u64) {
         stake::mint(account, amount);
-        dp::add_stake(account, dp::get_owned_pool_address(signer::address_of(account)), amount);
+        dp::add_stake(account, dp::get_owned_pool_address(signer::address_of_unpermissioned(account)), amount);
     }
 
     #[test_only]
@@ -97,8 +97,8 @@ module aptos_framework::delegation_pool_integration_tests {
         should_join_validator_set: bool,
         should_end_epoch: bool,
     ) {
-        let validator_address = signer::address_of(validator);
-        if (!account::exists_at(signer::address_of(validator))) {
+        let validator_address = signer::address_of_unpermissioned(validator);
+        if (!account::exists_at(signer::address_of_unpermissioned(validator))) {
             account::create_account_for_test(validator_address);
         };
 
@@ -199,7 +199,7 @@ module aptos_framework::delegation_pool_integration_tests {
         initialize_test_validator(&pk, &pop, validator, 100 * ONE_APT, true, true);
 
         // Request to unlock 50 coins, which go to pending_inactive. Validator has 50 remaining in active.
-        let pool_address = dp::get_owned_pool_address(signer::address_of(validator));
+        let pool_address = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator));
         dp::unlock(validator, pool_address, 50 * ONE_APT);
         stake::assert_validator_state(pool_address, 50 * ONE_APT, 0, 0, 50 * ONE_APT, 0);
 
@@ -221,7 +221,7 @@ module aptos_framework::delegation_pool_integration_tests {
         initialize_test_validator(&pk_2, &pop_2, validator_2, 100 * ONE_APT, true, true);
 
         // Leave validator set so validator is in pending_inactive state.
-        stake::leave_validator_set(validator_1, dp::get_owned_pool_address(signer::address_of(validator_1)));
+        stake::leave_validator_set(validator_1, dp::get_owned_pool_address(signer::address_of_unpermissioned(validator_1)));
 
         // Add 9900 APT + 1 more. Total stake is 50 (active) + 50 (pending_inactive) + 9900 APT + 1 > 10000 so still exceeding max.
         mint_and_add_stake(validator_1, 9900 * ONE_APT + 1);
@@ -237,7 +237,7 @@ module aptos_framework::delegation_pool_integration_tests {
         initialize_test_validator(&pk, &pop, validator, 100 * ONE_APT, true, true);
 
         // Validator has a lockup now that they've joined the validator set.
-        let validator_address = signer::address_of(validator);
+        let validator_address = signer::address_of_unpermissioned(validator);
         let pool_address = dp::get_owned_pool_address(validator_address);
         assert!(stake::get_remaining_lockup_secs(pool_address) == LOCKUP_CYCLE_SECONDS, 1);
 
@@ -310,12 +310,12 @@ module aptos_framework::delegation_pool_integration_tests {
         initialize_test_validator(&pk_2, &pop_2, validator_2, 100 * ONE_APT, false, false);
 
         // Validator 1 needs to be in the set so validator 2's added stake counts against the limit.
-        stake::join_validator_set(validator_1, dp::get_owned_pool_address(signer::address_of(validator_1)));
+        stake::join_validator_set(validator_1, dp::get_owned_pool_address(signer::address_of_unpermissioned(validator_1)));
         end_epoch();
 
         // Validator 2 joins the validator set but their stake would lead to exceeding the voting power increase limit.
         // Therefore, this should fail.
-        stake::join_validator_set(validator_2, dp::get_owned_pool_address(signer::address_of(validator_2)));
+        stake::join_validator_set(validator_2, dp::get_owned_pool_address(signer::address_of_unpermissioned(validator_2)));
     }
 
     #[test(aptos_framework = @aptos_framework, validator_1 = @0x123, validator_2 = @0x234)]
@@ -341,7 +341,7 @@ module aptos_framework::delegation_pool_integration_tests {
         initialize_test_validator(&pk_2, &pop_2, validator_2, 100 * ONE_APT, false, false);
 
         // Add more stake while still pending_active.
-        let validator_2_address = dp::get_owned_pool_address(signer::address_of(validator_2));
+        let validator_2_address = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator_2));
         stake::join_validator_set(validator_2, validator_2_address);
         assert!(stake::get_validator_state(validator_2_address) == VALIDATOR_STATUS_PENDING_ACTIVE, 0);
         mint_and_add_stake(validator_2, 100 * ONE_APT);
@@ -388,7 +388,7 @@ module aptos_framework::delegation_pool_integration_tests {
         // Validator joins but epoch hasn't ended, so the validator is still pending_active.
         let (_sk, pk, pop) = generate_identity();
         initialize_test_validator(&pk, &pop, validator, 100 * ONE_APT, true, false);
-        let validator_address = dp::get_owned_pool_address(signer::address_of(validator));
+        let validator_address = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator));
         assert!(stake::get_validator_state(validator_address) == VALIDATOR_STATUS_PENDING_ACTIVE, 0);
 
         // Leave the validator set immediately.
@@ -417,7 +417,7 @@ module aptos_framework::delegation_pool_integration_tests {
         let (_sk, pk, pop) = generate_identity();
         initialize_test_validator(&pk, &pop, validator, 100 * ONE_APT, true, true);
 
-        let validator_address = dp::get_owned_pool_address(signer::address_of(validator));
+        let validator_address = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator));
         stake::assert_validator_state(validator_address, 100 * ONE_APT, 0, 0, 0, 0);
         end_epoch();
         stake::assert_validator_state(validator_address, 110 * ONE_APT, 0, 0, 0, 0);
@@ -471,7 +471,7 @@ module aptos_framework::delegation_pool_integration_tests {
         initialize_test_validator(&pk, &pop, validator, 100 * ONE_APT, true, true);
 
         // Unlock half of the coins.
-        let validator_address = dp::get_owned_pool_address(signer::address_of(validator));
+        let validator_address = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator));
         assert!(stake::get_remaining_lockup_secs(validator_address) == LOCKUP_CYCLE_SECONDS, 1);
         dp::unlock(validator, validator_address, 50 * ONE_APT);
         stake::assert_validator_state(validator_address, 50 * ONE_APT, 0, 0, 50 * ONE_APT, 0);
@@ -494,7 +494,7 @@ module aptos_framework::delegation_pool_integration_tests {
         initialize_for_test(aptos_framework);
         let (_sk, pk, pop) = generate_identity();
         initialize_test_validator(&pk, &pop, validator, 100 * ONE_APT, true, true);
-        let validator_address = dp::get_owned_pool_address(signer::address_of(validator));
+        let validator_address = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator));
         assert!(stake::get_remaining_lockup_secs(validator_address) == LOCKUP_CYCLE_SECONDS, 0);
 
         // One more epoch passes to generate rewards.
@@ -534,7 +534,7 @@ module aptos_framework::delegation_pool_integration_tests {
         initialize_test_validator(&pk, &pop, validator, 100 * ONE_APT, false, false);
 
         // Validator unlocks more stake than they have active. This should limit the unlock to 100.
-        let validator_address = dp::get_owned_pool_address(signer::address_of(validator));
+        let validator_address = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator));
         dp::unlock(validator, validator_address, 200 * ONE_APT);
     }
 
@@ -550,7 +550,7 @@ module aptos_framework::delegation_pool_integration_tests {
         stake::mint(validator, 900 * ONE_APT);
 
         // Validator unlocks stake.
-        let validator_address = dp::get_owned_pool_address(signer::address_of(validator));
+        let validator_address = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator));
         dp::unlock(validator, validator_address, 100 * ONE_APT);
         // Enough time has passed so the stake is fully unlocked.
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
@@ -560,7 +560,7 @@ module aptos_framework::delegation_pool_integration_tests {
         dp::withdraw(validator, validator_address, 200 * ONE_APT);
 
         // Receive back all coins with an extra 1 for rewards.
-        assert!(coin::balance<AptosCoin>(signer::address_of(validator)) == 100100000000, 2);
+        assert!(coin::balance<AptosCoin>(signer::address_of_unpermissioned(validator)) == 100100000000, 2);
         stake::assert_validator_state(validator_address, 0, 0, 0, 0, 0);
     }
 
@@ -574,7 +574,7 @@ module aptos_framework::delegation_pool_integration_tests {
         initialize_test_validator(&pk, &pop, validator, 100 * ONE_APT, true, true);
 
         // Validator unlocks stake, which gets moved into pending_inactive.
-        let validator_address = dp::get_owned_pool_address(signer::address_of(validator));
+        let validator_address = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator));
         dp::unlock(validator, validator_address, 50 * ONE_APT);
         stake::assert_validator_state(validator_address, 50 * ONE_APT, 0, 0, 50 * ONE_APT, 0);
 
@@ -593,7 +593,7 @@ module aptos_framework::delegation_pool_integration_tests {
         initialize_test_validator(&pk, &pop, validator, 100 * ONE_APT, true, true);
 
         // Validator tries to reactivate more than available pending_inactive stake, which should limit to 50.
-        let validator_address = dp::get_owned_pool_address(signer::address_of(validator));
+        let validator_address = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator));
         dp::unlock(validator, validator_address, 50 * ONE_APT);
         stake::assert_validator_state(validator_address, 50 * ONE_APT, 0, 0, 50 * ONE_APT, 0);
         dp::reactivate_stake(validator, validator_address, 51 * ONE_APT);
@@ -610,7 +610,7 @@ module aptos_framework::delegation_pool_integration_tests {
         initialize_test_validator(&pk, &pop, validator, 100 * ONE_APT, true, true);
 
         // Unlock enough coins that the remaining is not enough to meet the min required.
-        let validator_address = dp::get_owned_pool_address(signer::address_of(validator));
+        let validator_address = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator));
         assert!(stake::get_remaining_lockup_secs(validator_address) == LOCKUP_CYCLE_SECONDS, 1);
         dp::unlock(validator, validator_address, 50 * ONE_APT);
         stake::assert_validator_state(validator_address, 50 * ONE_APT, 0, 0, 50 * ONE_APT, 0);
@@ -641,7 +641,7 @@ module aptos_framework::delegation_pool_integration_tests {
         initialize_test_validator(&pk_2, &pop_2, validator_2, 100 * ONE_APT, true, true);
 
         // Leave the validator set while still having a lockup.
-        let validator_address = dp::get_owned_pool_address(signer::address_of(validator));
+        let validator_address = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator));
         assert!(stake::get_remaining_lockup_secs(validator_address) == LOCKUP_CYCLE_SECONDS, 0);
         stake::leave_validator_set(validator, validator_address);
         // Validator is in pending_inactive state but is technically still part of the validator set.
@@ -673,7 +673,7 @@ module aptos_framework::delegation_pool_integration_tests {
         // pending_inactive stake should not be inactivated
         stake::assert_validator_state(validator_address, 5100000001, 0, 0, 4999999999, 1);
         // delegator's stake should be in sync with states reported by stake pool
-        dp::assert_delegation(signer::address_of(validator), validator_address, 5100000001, 0, 4999999999);
+        dp::assert_delegation(signer::address_of_unpermissioned(validator), validator_address, 5100000001, 0, 4999999999);
 
         dp::withdraw(validator, validator_address, 4999999999);
         stake::assert_validator_state(validator_address, 5100000001, 0, 0, 0, 1);
@@ -693,7 +693,7 @@ module aptos_framework::delegation_pool_integration_tests {
         initialize_test_validator(&pk_2, &pop_2, validator_2, 100 * ONE_APT, true, true);
 
         // Leave the validator set while still having a lockup.
-        let validator_address = dp::get_owned_pool_address(signer::address_of(validator));
+        let validator_address = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator));
         assert!(stake::get_remaining_lockup_secs(validator_address) == LOCKUP_CYCLE_SECONDS, 0);
         stake::leave_validator_set(validator, validator_address);
         end_epoch();
@@ -734,7 +734,7 @@ module aptos_framework::delegation_pool_integration_tests {
         initialize_test_validator(&pk_2, &pop_2, validator_2, 100 * ONE_APT, true, true);
 
         // Validator 1 leaves the validator set. Epoch has not ended so they're still pending_inactive.
-        stake::leave_validator_set(validator_1, dp::get_owned_pool_address(signer::address_of(validator_1)));
+        stake::leave_validator_set(validator_1, dp::get_owned_pool_address(signer::address_of_unpermissioned(validator_1)));
         // Validator 1 adds more stake. This should not succeed as it should not count as a voting power increase.
         mint_and_add_stake(validator_1, 51 * ONE_APT);
     }
@@ -763,9 +763,9 @@ module aptos_framework::delegation_pool_integration_tests {
         initialize_test_validator(&pk_2, &pop_2, validator_2, 100 * ONE_APT, false, false);
         initialize_test_validator(&pk_3, &pop_3, validator_3, 100 * ONE_APT, false, false);
 
-        let validator_1_address = dp::get_owned_pool_address(signer::address_of(validator_1));
-        let validator_2_address = dp::get_owned_pool_address(signer::address_of(validator_2));
-        let validator_3_address = dp::get_owned_pool_address(signer::address_of(validator_3));
+        let validator_1_address = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator_1));
+        let validator_2_address = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator_2));
+        let validator_3_address = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator_3));
 
         // Validator 1 and 2 join the validator set.
         stake::join_validator_set(validator_2, validator_2_address);
@@ -829,7 +829,7 @@ module aptos_framework::delegation_pool_integration_tests {
 
         // Add stake when the validator is not yet activated.
         mint_and_add_stake(validator, 100 * ONE_APT);
-        let pool_address = dp::get_owned_pool_address(signer::address_of(validator));
+        let pool_address = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator));
         stake::assert_validator_state(pool_address, 100 * ONE_APT, 0, 0, 0, 0);
 
         // Join the validator set with enough stake.
@@ -846,7 +846,7 @@ module aptos_framework::delegation_pool_integration_tests {
         // Withdraw stake + rewards.
         stake::assert_validator_state(pool_address, 0, 101 * ONE_APT, 0, 0, 0);
         dp::withdraw(validator, pool_address, 101 * ONE_APT);
-        assert!(coin::balance<AptosCoin>(signer::address_of(validator)) == 101 * ONE_APT, 1);
+        assert!(coin::balance<AptosCoin>(signer::address_of_unpermissioned(validator)) == 101 * ONE_APT, 1);
         stake::assert_validator_state(pool_address, 0, 0, 0, 0, 0);
 
         // Operator can separately rotate consensus key.
@@ -918,7 +918,7 @@ module aptos_framework::delegation_pool_integration_tests {
         initialize_test_validator(&pk, &pop, validator, 100 * ONE_APT, false, false);
 
         // Bypass the check to join. This is the same function called during Genesis.
-        let validator_address = dp::get_owned_pool_address(signer::address_of(validator));
+        let validator_address = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator));
         stake::join_validator_set(validator, validator_address);
         end_epoch();
 
@@ -956,11 +956,11 @@ module aptos_framework::delegation_pool_integration_tests {
         initialize_test_validator(&pk_4, &pop_4, validator_4, 100 * ONE_APT, false, false);
         initialize_test_validator(&pk_5, &pop_5, validator_5, 100 * ONE_APT, false, false);
 
-        let v1_addr = dp::get_owned_pool_address(signer::address_of(validator_1));
-        let v2_addr = dp::get_owned_pool_address(signer::address_of(validator_2));
-        let v3_addr = dp::get_owned_pool_address(signer::address_of(validator_3));
-        let v4_addr = dp::get_owned_pool_address(signer::address_of(validator_4));
-        let v5_addr = dp::get_owned_pool_address(signer::address_of(validator_5));
+        let v1_addr = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator_1));
+        let v2_addr = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator_2));
+        let v3_addr = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator_3));
+        let v4_addr = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator_4));
+        let v5_addr = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator_5));
 
         stake::join_validator_set(validator_3, v3_addr);
         end_epoch();
@@ -1017,7 +1017,7 @@ module aptos_framework::delegation_pool_integration_tests {
         );
 
         // Call initialize_stake_owner, which only initializes the stake pool but not validator config.
-        let validator_address = signer::address_of(validator);
+        let validator_address = signer::address_of_unpermissioned(validator);
         account::create_account_for_test(validator_address);
         dp::initialize_delegation_pool(validator, 0, vector::empty<u8>());
         validator_address = dp::get_owned_pool_address(validator_address);
@@ -1045,7 +1045,7 @@ module aptos_framework::delegation_pool_integration_tests {
         );
 
         // Call initialize_stake_owner, which only initializes the stake pool but not validator config.
-        let validator_address = signer::address_of(validator);
+        let validator_address = signer::address_of_unpermissioned(validator);
         account::create_account_for_test(validator_address);
         dp::initialize_delegation_pool(validator, 0, vector::empty<u8>());
         validator_address = dp::get_owned_pool_address(validator_address);
@@ -1074,7 +1074,7 @@ module aptos_framework::delegation_pool_integration_tests {
         initialize_test_validator(&pk_2, &pop_2, validator_2, 100 * ONE_APT, true, true);
 
         // Remove validator 1 from the active validator set. Only validator 2 remains.
-        let validator_to_remove = dp::get_owned_pool_address(signer::address_of(validator_1));
+        let validator_to_remove = dp::get_owned_pool_address(signer::address_of_unpermissioned(validator_1));
         stake::remove_validators(aptos_framework, &vector[validator_to_remove]);
         assert!(stake::get_validator_state(validator_to_remove) == VALIDATOR_STATUS_PENDING_INACTIVE, 1);
     }

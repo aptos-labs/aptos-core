@@ -155,7 +155,7 @@ module aptos_framework::keyless_account {
             assert!(vector::length(option::borrow(&pk)) == 32, E_TRAINING_WHEELS_PK_WRONG_SIZE)
         };
 
-        let config = borrow_global_mut<Configuration>(signer::address_of(fx));
+        let config = borrow_global_mut<Configuration>(signer::address_of_unpermissioned(fx));
         config.training_wheels_pubkey = pk;
     }
 
@@ -164,7 +164,7 @@ module aptos_framework::keyless_account {
         system_addresses::assert_aptos_framework(fx);
         chain_status::assert_genesis();
 
-        let config = borrow_global_mut<Configuration>(signer::address_of(fx));
+        let config = borrow_global_mut<Configuration>(signer::address_of_unpermissioned(fx));
         config.max_exp_horizon_secs = max_exp_horizon_secs;
     }
 
@@ -173,7 +173,7 @@ module aptos_framework::keyless_account {
         system_addresses::assert_aptos_framework(fx);
         chain_status::assert_genesis();
 
-        let config = borrow_global_mut<Configuration>(signer::address_of(fx));
+        let config = borrow_global_mut<Configuration>(signer::address_of_unpermissioned(fx));
         config.override_aud_vals = vector[];
     }
 
@@ -182,7 +182,7 @@ module aptos_framework::keyless_account {
         system_addresses::assert_aptos_framework(fx);
         chain_status::assert_genesis();
 
-        let config = borrow_global_mut<Configuration>(signer::address_of(fx));
+        let config = borrow_global_mut<Configuration>(signer::address_of_unpermissioned(fx));
         vector::push_back(&mut config.override_aud_vals, aud);
     }
 
@@ -226,7 +226,7 @@ module aptos_framework::keyless_account {
         let config = if (config_buffer::does_exist<Configuration>()) {
             config_buffer::extract<Configuration>()
         } else {
-            *borrow_global<Configuration>(signer::address_of(fx))
+            *borrow_global<Configuration>(signer::address_of_unpermissioned(fx))
         };
 
         config.training_wheels_pubkey = pk;
@@ -242,7 +242,7 @@ module aptos_framework::keyless_account {
         let config = if (config_buffer::does_exist<Configuration>()) {
             config_buffer::extract<Configuration>()
         } else {
-            *borrow_global<Configuration>(signer::address_of(fx))
+            *borrow_global<Configuration>(signer::address_of_unpermissioned(fx))
         };
 
         config.max_exp_horizon_secs = max_exp_horizon_secs;
@@ -261,7 +261,7 @@ module aptos_framework::keyless_account {
         let config = if (config_buffer::does_exist<Configuration>()) {
             config_buffer::extract<Configuration>()
         } else {
-            *borrow_global<Configuration>(signer::address_of(fx))
+            *borrow_global<Configuration>(signer::address_of_unpermissioned(fx))
         };
 
         config.override_aud_vals = vector[];
@@ -279,7 +279,7 @@ module aptos_framework::keyless_account {
         let config = if (config_buffer::does_exist<Configuration>()) {
             config_buffer::extract<Configuration>()
         } else {
-            *borrow_global<Configuration>(signer::address_of(fx))
+            *borrow_global<Configuration>(signer::address_of_unpermissioned(fx))
         };
 
         vector::push_back(&mut config.override_aud_vals, aud);

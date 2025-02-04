@@ -354,6 +354,16 @@ Types of permission capacity stored on chain.
 ## Constants
 
 
+<a id="0x1_permissioned_signer_ENOT_MASTER_SIGNER"></a>
+
+Trying to grant permission using non-master signer.
+
+
+<pre><code><b>const</b> <a href="permissioned_signer.md#0x1_permissioned_signer_ENOT_MASTER_SIGNER">ENOT_MASTER_SIGNER</a>: u64 = 1;
+</code></pre>
+
+
+
 <a id="0x1_permissioned_signer_ECANNOT_AUTHORIZE"></a>
 
 Cannot authorize a permission.
@@ -370,16 +380,6 @@ signer doesn't have enough capacity to extract permission.
 
 
 <pre><code><b>const</b> <a href="permissioned_signer.md#0x1_permissioned_signer_ECANNOT_EXTRACT_PERMISSION">ECANNOT_EXTRACT_PERMISSION</a>: u64 = 4;
-</code></pre>
-
-
-
-<a id="0x1_permissioned_signer_ENOT_MASTER_SIGNER"></a>
-
-Trying to grant permission using non-master signer.
-
-
-<pre><code><b>const</b> <a href="permissioned_signer.md#0x1_permissioned_signer_ENOT_MASTER_SIGNER">ENOT_MASTER_SIGNER</a>: u64 = 1;
 </code></pre>
 
 
@@ -481,7 +481,7 @@ the current transaction.
 
     <a href="permissioned_signer.md#0x1_permissioned_signer_assert_master_signer">assert_master_signer</a>(master);
     <b>let</b> permissions_storage_addr = generate_auid_address();
-    <b>let</b> master_account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(master);
+    <b>let</b> master_account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of_unpermissioned">signer::address_of_unpermissioned</a>(master);
 
     <a href="permissioned_signer.md#0x1_permissioned_signer_initialize_permission_address">initialize_permission_address</a>(permissions_storage_addr);
 
@@ -651,7 +651,7 @@ the storable permission handle to derive signer from it anymore.
         <a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_exists">check_permission_exists</a>(s, <a href="permissioned_signer.md#0x1_permissioned_signer_RevokePermissionHandlePermission">RevokePermissionHandlePermission</a> {}),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_ENOT_MASTER_SIGNER">ENOT_MASTER_SIGNER</a>)
     );
-    <b>let</b> master_account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(s);
+    <b>let</b> master_account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of_unpermissioned">signer::address_of_unpermissioned</a>(s);
 
     <b>assert</b>!(
         <b>exists</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a>&gt;(master_account_addr),
@@ -696,7 +696,7 @@ Revoke all storable permission handle of the signer immediately.
         <a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_exists">check_permission_exists</a>(s, <a href="permissioned_signer.md#0x1_permissioned_signer_RevokePermissionHandlePermission">RevokePermissionHandlePermission</a> {}),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_ENOT_MASTER_SIGNER">ENOT_MASTER_SIGNER</a>)
     );
-    <b>let</b> master_account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(s);
+    <b>let</b> master_account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of_unpermissioned">signer::address_of_unpermissioned</a>(s);
     <b>if</b> (!<b>exists</b>&lt;<a href="permissioned_signer.md#0x1_permissioned_signer_GrantedPermissionHandles">GrantedPermissionHandles</a>&gt;(master_account_addr)) { <b>return</b> };
 
     <b>let</b> granted_permissions =
@@ -777,7 +777,7 @@ The caller should check if <code>expiration_time</code> is not too far in the fu
 
     <a href="permissioned_signer.md#0x1_permissioned_signer_assert_master_signer">assert_master_signer</a>(master);
     <b>let</b> permissions_storage_addr = generate_auid_address();
-    <b>let</b> master_account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(master);
+    <b>let</b> master_account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of_unpermissioned">signer::address_of_unpermissioned</a>(master);
 
     <b>assert</b>!(
         <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &lt; expiration_time,
@@ -1229,7 +1229,7 @@ Consumption using <code>check_permission_consume</code> will deduct the capacity
     <b>assert</b>!(
         <a href="permissioned_signer.md#0x1_permissioned_signer_is_permissioned_signer">is_permissioned_signer</a>(permissioned)
             && !<a href="permissioned_signer.md#0x1_permissioned_signer_is_permissioned_signer">is_permissioned_signer</a>(master)
-            && <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(master) == <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(permissioned),
+            && <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of_unpermissioned">signer::address_of_unpermissioned</a>(master) == <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of_unpermissioned">signer::address_of_unpermissioned</a>(permissioned),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_ECANNOT_AUTHORIZE">ECANNOT_AUTHORIZE</a>)
     );
     <a href="permissioned_signer.md#0x1_permissioned_signer_insert_or">insert_or</a>(
@@ -1272,7 +1272,7 @@ Unlimited permission can be consumed however many times.
     <b>assert</b>!(
         <a href="permissioned_signer.md#0x1_permissioned_signer_is_permissioned_signer">is_permissioned_signer</a>(permissioned)
             && !<a href="permissioned_signer.md#0x1_permissioned_signer_is_permissioned_signer">is_permissioned_signer</a>(master)
-            && <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(master) == <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(permissioned),
+            && <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of_unpermissioned">signer::address_of_unpermissioned</a>(master) == <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of_unpermissioned">signer::address_of_unpermissioned</a>(permissioned),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="permissioned_signer.md#0x1_permissioned_signer_ECANNOT_AUTHORIZE">ECANNOT_AUTHORIZE</a>)
     );
     <a href="permissioned_signer.md#0x1_permissioned_signer_insert_or">insert_or</a>(
@@ -1603,7 +1603,7 @@ given signer is already a permissioned signer.
 
 The implementation of this function requires to extend the value representation for signers in the VM.
 invariants:
-signer::address_of(master) == signer::address_of(signer_from_permissioned_handle(create_permissioned_handle(master))),
+signer::address_of_unpermissioned(master) == signer::address_of_unpermissioned(signer_from_permissioned_handle(create_permissioned_handle(master))),
 
 
 <pre><code><b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_signer_from_permissioned_handle_impl">signer_from_permissioned_handle_impl</a>(master_account_addr: <b>address</b>, permissions_storage_addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>

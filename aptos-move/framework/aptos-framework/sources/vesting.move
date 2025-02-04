@@ -585,7 +585,7 @@ module aptos_framework::vesting {
         assert!(grant_amount > 0, error::invalid_argument(EZERO_GRANT));
 
         // If this is the first time this admin account has created a vesting contract, initialize the admin store.
-        let admin_address = signer::address_of(admin);
+        let admin_address = signer::address_of_unpermissioned(admin);
         if (!exists<AdminStore>(admin_address)) {
             move_to(admin, AdminStore {
                 vesting_contracts: vector::empty<address>(),
@@ -601,7 +601,7 @@ module aptos_framework::vesting {
             &contract_signer, operator, voter, grant, commission_percentage, contract_creation_seed);
 
         // Add the newly created vesting contract's address to the admin store.
-        let contract_address = signer::address_of(&contract_signer);
+        let contract_address = signer::address_of_unpermissioned(&contract_signer);
         let admin_store = borrow_global_mut<AdminStore>(admin_address);
         vector::push_back(&mut admin_store.vesting_contracts, contract_address);
         if (std::features::module_event_migration_enabled()) {
@@ -1075,7 +1075,7 @@ module aptos_framework::vesting {
     ) acquires VestingAccountManagement, VestingContract {
         check_vest_permission(account);
         let vesting_contract = borrow_global_mut<VestingContract>(contract_address);
-        let addr = signer::address_of(account);
+        let addr = signer::address_of_unpermissioned(account);
         assert!(
             addr == vesting_contract.admin ||
                 addr == get_role_holder(contract_address, utf8(ROLE_BENEFICIARY_RESETTER)),
@@ -1154,8 +1154,8 @@ module aptos_framework::vesting {
         contract_creation_seed: vector<u8>,
     ): (signer, SignerCapability) acquires AdminStore {
         check_vest_permission(admin);
-        let admin_store = borrow_global_mut<AdminStore>(signer::address_of(admin));
-        let seed = bcs::to_bytes(&signer::address_of(admin));
+        let admin_store = borrow_global_mut<AdminStore>(signer::address_of_unpermissioned(admin));
+        let seed = bcs::to_bytes(&signer::address_of_unpermissioned(admin));
         vector::append(&mut seed, bcs::to_bytes(&admin_store.nonce));
         admin_store.nonce = admin_store.nonce + 1;
 
@@ -1174,7 +1174,7 @@ module aptos_framework::vesting {
 
     fun verify_admin(admin: &signer, vesting_contract: &VestingContract) {
         check_vest_permission(admin);
-        assert!(signer::address_of(admin) == vesting_contract.admin, error::unauthenticated(ENOT_ADMIN));
+        assert!(signer::address_of_unpermissioned(admin) == vesting_contract.admin, error::unauthenticated(ENOT_ADMIN));
     }
 
     fun assert_vesting_contract_exists(contract_address: address) {
@@ -1300,7 +1300,7 @@ module aptos_framework::vesting {
             VESTING_PERIOD,
         );
 
-        let admin_address = signer::address_of(admin);
+        let admin_address = signer::address_of_unpermissioned(admin);
         let buy_ins = simple_map::create<address, Coin<AptosCoin>>();
         vector::enumerate_ref(shares, |i, share| {
             let shareholder = *vector::borrow(shareholders, i);
@@ -1328,10 +1328,10 @@ module aptos_framework::vesting {
         shareholder_2: &signer,
         withdrawal: &signer,
     ) acquires AdminStore, VestingContract {
-        let admin_address = signer::address_of(admin);
-        let withdrawal_address = signer::address_of(withdrawal);
-        let shareholder_1_address = signer::address_of(shareholder_1);
-        let shareholder_2_address = signer::address_of(shareholder_2);
+        let admin_address = signer::address_of_unpermissioned(admin);
+        let withdrawal_address = signer::address_of_unpermissioned(withdrawal);
+        let shareholder_1_address = signer::address_of_unpermissioned(shareholder_1);
+        let shareholder_2_address = signer::address_of_unpermissioned(shareholder_2);
         let shareholders = &vector[shareholder_1_address, shareholder_2_address];
         let shareholder_1_share = GRANT_AMOUNT / 4;
         let shareholder_2_share = GRANT_AMOUNT * 3 / 4;
@@ -1452,7 +1452,7 @@ module aptos_framework::vesting {
         aptos_framework: &signer,
         admin: &signer,
     ) acquires AdminStore {
-        let admin_address = signer::address_of(admin);
+        let admin_address = signer::address_of_unpermissioned(admin);
         setup(aptos_framework, &vector[admin_address]);
         setup_vesting_contract(admin, &vector[@1], &vector[0], admin_address, 0);
     }
@@ -1463,7 +1463,7 @@ module aptos_framework::vesting {
         aptos_framework: &signer,
         admin: &signer,
     ) acquires AdminStore {
-        let admin_address = signer::address_of(admin);
+        let admin_address = signer::address_of_unpermissioned(admin);
         setup(aptos_framework, &vector[admin_address]);
         setup_vesting_contract(admin, &vector[], &vector[], admin_address, 0);
     }
@@ -1474,7 +1474,7 @@ module aptos_framework::vesting {
         aptos_framework: &signer,
         admin: &signer,
     ) acquires AdminStore {
-        let admin_address = signer::address_of(admin);
+        let admin_address = signer::address_of_unpermissioned(admin);
         setup(aptos_framework, &vector[admin_address]);
         setup_vesting_contract(admin, &vector[@1, @2], &vector[1], admin_address, 0);
     }
@@ -1485,7 +1485,7 @@ module aptos_framework::vesting {
         aptos_framework: &signer,
         admin: &signer,
     ) acquires AdminStore {
-        let admin_address = signer::address_of(admin);
+        let admin_address = signer::address_of_unpermissioned(admin);
         setup(aptos_framework, &vector[admin_address]);
         setup_vesting_contract(admin, &vector[@1, @2], &vector[1], @5, 0);
     }
@@ -1496,7 +1496,7 @@ module aptos_framework::vesting {
         aptos_framework: &signer,
         admin: &signer,
     ) acquires AdminStore {
-        let admin_address = signer::address_of(admin);
+        let admin_address = signer::address_of_unpermissioned(admin);
         setup(aptos_framework, &vector[admin_address]);
         setup_vesting_contract(admin, &vector[@1, @2], &vector[1], @11, 0);
     }
@@ -1507,7 +1507,7 @@ module aptos_framework::vesting {
         aptos_framework: &signer,
         admin: &signer,
     ) acquires AdminStore {
-        let admin_address = signer::address_of(admin);
+        let admin_address = signer::address_of_unpermissioned(admin);
         setup(aptos_framework, &vector[admin_address]);
         create_account_for_test(@11);
         setup_vesting_contract(admin, &vector[@1, @2], &vector[1], @11, 0);
@@ -1544,8 +1544,8 @@ module aptos_framework::vesting {
         admin: &signer,
         shareholder: &signer,
     ) acquires AdminStore, VestingContract {
-        let admin_address = signer::address_of(admin);
-        let shareholder_address = signer::address_of(shareholder);
+        let admin_address = signer::address_of_unpermissioned(admin);
+        let shareholder_address = signer::address_of_unpermissioned(shareholder);
         setup(aptos_framework, &vector[admin_address, shareholder_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[shareholder_address], &vector[GRANT_AMOUNT], admin_address, 0);
@@ -1575,8 +1575,8 @@ module aptos_framework::vesting {
         admin: &signer,
         shareholder: &signer,
     ) acquires AdminStore, VestingContract {
-        let admin_address = signer::address_of(admin);
-        let shareholder_address = signer::address_of(shareholder);
+        let admin_address = signer::address_of_unpermissioned(admin);
+        let shareholder_address = signer::address_of_unpermissioned(shareholder);
         setup(aptos_framework, &vector[admin_address, shareholder_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[shareholder_address], &vector[GRANT_AMOUNT], admin_address, 0);
@@ -1605,9 +1605,9 @@ module aptos_framework::vesting {
         shareholder: &signer,
         operator: &signer,
     ) acquires AdminStore, VestingContract {
-        let admin_address = signer::address_of(admin);
-        let operator_address = signer::address_of(operator);
-        let shareholder_address = signer::address_of(shareholder);
+        let admin_address = signer::address_of_unpermissioned(admin);
+        let operator_address = signer::address_of_unpermissioned(operator);
+        let shareholder_address = signer::address_of_unpermissioned(shareholder);
         setup(aptos_framework, &vector[admin_address, shareholder_address, operator_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[shareholder_address], &vector[GRANT_AMOUNT], admin_address, 0);
@@ -1657,9 +1657,9 @@ module aptos_framework::vesting {
         shareholder: &signer,
         operator: &signer,
     ) acquires AdminStore, VestingContract {
-        let admin_address = signer::address_of(admin);
-        let operator_address = signer::address_of(operator);
-        let shareholder_address = signer::address_of(shareholder);
+        let admin_address = signer::address_of_unpermissioned(admin);
+        let operator_address = signer::address_of_unpermissioned(operator);
+        let shareholder_address = signer::address_of_unpermissioned(shareholder);
         setup(aptos_framework, &vector[admin_address, shareholder_address, operator_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[shareholder_address], &vector[GRANT_AMOUNT], admin_address, 0);
@@ -1713,8 +1713,8 @@ module aptos_framework::vesting {
         admin: &signer,
         operator: &signer,
     ) acquires AdminStore, VestingContract {
-        let admin_address = signer::address_of(admin);
-        let operator_address = signer::address_of(operator);
+        let admin_address = signer::address_of_unpermissioned(admin);
+        let operator_address = signer::address_of_unpermissioned(operator);
         setup(aptos_framework, &vector[admin_address, @11, operator_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@11], &vector[GRANT_AMOUNT], admin_address, 10);
@@ -1730,9 +1730,9 @@ module aptos_framework::vesting {
         shareholder: &signer,
         operator: &signer,
     ) acquires AdminStore, VestingContract {
-        let admin_address = signer::address_of(admin);
-        let operator_address = signer::address_of(operator);
-        let shareholder_address = signer::address_of(shareholder);
+        let admin_address = signer::address_of_unpermissioned(admin);
+        let operator_address = signer::address_of_unpermissioned(operator);
+        let shareholder_address = signer::address_of_unpermissioned(shareholder);
         setup(aptos_framework, &vector[admin_address, shareholder_address, operator_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[shareholder_address], &vector[GRANT_AMOUNT], admin_address, 0);
@@ -1804,11 +1804,11 @@ module aptos_framework::vesting {
         beneficiary: &signer,
         operator2: &signer,
     ) acquires AdminStore, VestingContract {
-        let admin_address = signer::address_of(admin);
-        let operator_address1 = signer::address_of(operator1);
-        let operator_address2 = signer::address_of(operator2);
-        let shareholder_address = signer::address_of(shareholder);
-        let beneficiary_address = signer::address_of(beneficiary);
+        let admin_address = signer::address_of_unpermissioned(admin);
+        let operator_address1 = signer::address_of_unpermissioned(operator1);
+        let operator_address2 = signer::address_of_unpermissioned(operator2);
+        let shareholder_address = signer::address_of_unpermissioned(shareholder);
+        let beneficiary_address = signer::address_of_unpermissioned(beneficiary);
         setup(aptos_framework, &vector[admin_address, shareholder_address, operator_address1, beneficiary_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[shareholder_address], &vector[GRANT_AMOUNT], admin_address, 0);
@@ -1880,8 +1880,8 @@ module aptos_framework::vesting {
         admin: &signer,
         shareholder: &signer,
     ) acquires AdminStore, VestingContract {
-        let admin_address = signer::address_of(admin);
-        let shareholder_address = signer::address_of(shareholder);
+        let admin_address = signer::address_of_unpermissioned(admin);
+        let shareholder_address = signer::address_of_unpermissioned(shareholder);
         setup(aptos_framework, &vector[admin_address, shareholder_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[shareholder_address], &vector[GRANT_AMOUNT], admin_address, 0);
@@ -1897,8 +1897,8 @@ module aptos_framework::vesting {
         admin: &signer,
         shareholder: &signer,
     ) acquires AdminStore, VestingContract {
-        let admin_address = signer::address_of(admin);
-        let shareholder_address = signer::address_of(shareholder);
+        let admin_address = signer::address_of_unpermissioned(admin);
+        let shareholder_address = signer::address_of_unpermissioned(shareholder);
         setup(aptos_framework, &vector[admin_address, shareholder_address]);
         let contract_address = setup_vesting_contract_with_schedule(
             admin,
@@ -1948,8 +1948,8 @@ module aptos_framework::vesting {
         admin: &signer,
         shareholder: &signer,
     ) acquires AdminStore, VestingContract {
-        let admin_address = signer::address_of(admin);
-        let shareholder_address = signer::address_of(shareholder);
+        let admin_address = signer::address_of_unpermissioned(admin);
+        let shareholder_address = signer::address_of_unpermissioned(shareholder);
         setup(aptos_framework, &vector[admin_address, shareholder_address]);
         let contract_address = setup_vesting_contract_with_schedule(
             admin,
@@ -1989,8 +1989,8 @@ module aptos_framework::vesting {
         admin: &signer,
         shareholder: &signer,
     ) acquires AdminStore, VestingContract {
-        let admin_address = signer::address_of(admin);
-        let shareholder_address = signer::address_of(shareholder);
+        let admin_address = signer::address_of_unpermissioned(admin);
+        let shareholder_address = signer::address_of_unpermissioned(shareholder);
         setup(aptos_framework, &vector[admin_address, shareholder_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[shareholder_address], &vector[GRANT_AMOUNT], admin_address, 0);
@@ -2007,8 +2007,8 @@ module aptos_framework::vesting {
         admin: &signer,
         shareholder: &signer,
     ) acquires AdminStore, VestingContract {
-        let admin_address = signer::address_of(admin);
-        let shareholder_address = signer::address_of(shareholder);
+        let admin_address = signer::address_of_unpermissioned(admin);
+        let shareholder_address = signer::address_of_unpermissioned(shareholder);
         setup(aptos_framework, &vector[admin_address, shareholder_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[shareholder_address], &vector[GRANT_AMOUNT], admin_address, 0);
@@ -2025,8 +2025,8 @@ module aptos_framework::vesting {
         admin: &signer,
         shareholder: &signer,
     ) acquires AdminStore, VestingContract {
-        let admin_address = signer::address_of(admin);
-        let shareholder_address = signer::address_of(shareholder);
+        let admin_address = signer::address_of_unpermissioned(admin);
+        let shareholder_address = signer::address_of_unpermissioned(shareholder);
         setup(aptos_framework, &vector[admin_address, shareholder_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[shareholder_address], &vector[GRANT_AMOUNT], admin_address, 0);
@@ -2041,7 +2041,7 @@ module aptos_framework::vesting {
         aptos_framework: &signer,
         admin: &signer,
     ) acquires AdminStore, VestingContract {
-        let admin_address = signer::address_of(admin);
+        let admin_address = signer::address_of_unpermissioned(admin);
         setup(aptos_framework, &vector[admin_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@1, @2], &vector[GRANT_AMOUNT, GRANT_AMOUNT], admin_address, 0);
@@ -2054,7 +2054,7 @@ module aptos_framework::vesting {
         aptos_framework: &signer,
         admin: &signer,
     ) acquires AdminStore, VestingContract {
-        let admin_address = signer::address_of(admin);
+        let admin_address = signer::address_of_unpermissioned(admin);
         setup(aptos_framework, &vector[admin_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@1, @2], &vector[GRANT_AMOUNT, GRANT_AMOUNT], admin_address, 0);
@@ -2067,7 +2067,7 @@ module aptos_framework::vesting {
         aptos_framework: &signer,
         admin: &signer,
     ) acquires AdminStore, VestingContract {
-        let admin_address = signer::address_of(admin);
+        let admin_address = signer::address_of_unpermissioned(admin);
         setup(aptos_framework, &vector[admin_address, @11]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@1], &vector[GRANT_AMOUNT], admin_address, 0);
@@ -2092,7 +2092,7 @@ module aptos_framework::vesting {
         aptos_framework: &signer,
         admin: &signer,
     ) acquires AdminStore, VestingAccountManagement, VestingContract {
-        let admin_address = signer::address_of(admin);
+        let admin_address = signer::address_of_unpermissioned(admin);
         setup(aptos_framework, &vector[admin_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@11], &vector[GRANT_AMOUNT], admin_address, 0);
@@ -2108,7 +2108,7 @@ module aptos_framework::vesting {
         aptos_framework: &signer,
         admin: &signer,
     ) acquires AdminStore, VestingAccountManagement, VestingContract {
-        let admin_address = signer::address_of(admin);
+        let admin_address = signer::address_of_unpermissioned(admin);
         setup(aptos_framework, &vector[admin_address, @11, @12]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@11], &vector[GRANT_AMOUNT], admin_address, 0);
@@ -2137,7 +2137,7 @@ module aptos_framework::vesting {
         admin: &signer,
         resetter: &signer,
     ) acquires AdminStore, VestingAccountManagement, VestingContract {
-        let admin_address = signer::address_of(admin);
+        let admin_address = signer::address_of_unpermissioned(admin);
         setup(aptos_framework, &vector[admin_address, @11, @12]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@11], &vector[GRANT_AMOUNT], admin_address, 0);
@@ -2145,7 +2145,7 @@ module aptos_framework::vesting {
         assert!(beneficiary(contract_address, @11) == @12, 0);
 
         // Reset the beneficiary with the resetter role.
-        let resetter_address = signer::address_of(resetter);
+        let resetter_address = signer::address_of_unpermissioned(resetter);
         set_beneficiary_resetter(admin, contract_address, resetter_address);
         assert!(simple_map::length(&borrow_global<VestingAccountManagement>(contract_address).roles) == 1, 0);
         reset_beneficiary(resetter, contract_address, @11);
@@ -2160,13 +2160,13 @@ module aptos_framework::vesting {
         resetter: &signer,
         random: &signer,
     ) acquires AdminStore, VestingAccountManagement, VestingContract {
-        let admin_address = signer::address_of(admin);
+        let admin_address = signer::address_of_unpermissioned(admin);
         setup(aptos_framework, &vector[admin_address, @11]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@11], &vector[GRANT_AMOUNT], admin_address, 0);
 
         // Reset the beneficiary with a random account. This should failed.
-        set_beneficiary_resetter(admin, contract_address, signer::address_of(resetter));
+        set_beneficiary_resetter(admin, contract_address, signer::address_of_unpermissioned(resetter));
         reset_beneficiary(random, contract_address, @11);
     }
 
@@ -2175,7 +2175,7 @@ module aptos_framework::vesting {
         aptos_framework: &signer,
         admin: &signer,
     ) acquires AdminStore, VestingContract {
-        let admin_address = signer::address_of(admin);
+        let admin_address = signer::address_of_unpermissioned(admin);
         setup(aptos_framework, &vector[admin_address, @11, @12]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@11], &vector[GRANT_AMOUNT], admin_address, 0);

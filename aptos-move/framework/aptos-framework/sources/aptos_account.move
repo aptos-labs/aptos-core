@@ -178,7 +178,7 @@ module aptos_framework::aptos_account {
 
     /// Set whether `account` can receive direct transfers of coins that they have not explicitly registered to receive.
     public entry fun set_allow_direct_coin_transfers(account: &signer, allow: bool) acquires DirectTransferConfig {
-        let addr = signer::address_of(account);
+        let addr = signer::address_of_unpermissioned(account);
         if (exists<DirectTransferConfig>(addr)) {
             let direct_transfer_config = borrow_global_mut<DirectTransferConfig>(addr);
             // Short-circuit to avoid emitting an event if direct transfer config is not changing.
@@ -223,7 +223,7 @@ module aptos_framework::aptos_account {
 
     public(friend) fun register_apt(account_signer: &signer) {
         if (features::new_accounts_default_to_fa_apt_store_enabled()) {
-            ensure_primary_fungible_store_exists(signer::address_of(account_signer));
+            ensure_primary_fungible_store_exists(signer::address_of_unpermissioned(account_signer));
         } else {
             coin::register<AptosCoin>(account_signer);
         }
@@ -239,7 +239,7 @@ module aptos_framework::aptos_account {
     public(friend) entry fun fungible_transfer_only(
         source: &signer, to: address, amount: u64
     ) {
-        let sender_store = ensure_primary_fungible_store_exists(signer::address_of(source));
+        let sender_store = ensure_primary_fungible_store_exists(signer::address_of_unpermissioned(source));
         let recipient_store = ensure_primary_fungible_store_exists(to);
 
         // use internal APIs, as they skip:
@@ -303,8 +303,8 @@ module aptos_framework::aptos_account {
         let carol = from_bcs::to_address(x"00000000000000000000000000000000000000000000000000000000000ca501");
 
         let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(core);
-        create_account(signer::address_of(alice));
-        coin::deposit(signer::address_of(alice), coin::mint(10000, &mint_cap));
+        create_account(signer::address_of_unpermissioned(alice));
+        coin::deposit(signer::address_of_unpermissioned(alice), coin::mint(10000, &mint_cap));
         transfer(alice, bob, 500);
         assert!(coin::balance<AptosCoin>(bob) == 500, 0);
         transfer(alice, carol, 500);
@@ -323,8 +323,8 @@ module aptos_framework::aptos_account {
         let bob = from_bcs::to_address(x"0000000000000000000000000000000000000000000000000000000000000b0b");
 
         let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(core);
-        create_account(signer::address_of(alice));
-        coin::deposit(signer::address_of(alice), coin::mint(10000, &mint_cap));
+        create_account(signer::address_of_unpermissioned(alice));
+        coin::deposit(signer::address_of_unpermissioned(alice), coin::mint(10000, &mint_cap));
 
         let perm_handle = permissioned_signer::create_permissioned_handle(alice);
         let alice_perm_signer = permissioned_signer::signer_from_permissioned_handle(&perm_handle);
@@ -340,12 +340,12 @@ module aptos_framework::aptos_account {
     #[test(alice = @0xa11ce, core = @0x1)]
     public fun test_transfer_to_resource_account(alice: &signer, core: &signer) {
         let (resource_account, _) = account::create_resource_account(alice, vector[]);
-        let resource_acc_addr = signer::address_of(&resource_account);
+        let resource_acc_addr = signer::address_of_unpermissioned(&resource_account);
         let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(core);
         assert!(!coin::is_account_registered<AptosCoin>(resource_acc_addr), 0);
 
-        create_account(signer::address_of(alice));
-        coin::deposit(signer::address_of(alice), coin::mint(10000, &mint_cap));
+        create_account(signer::address_of_unpermissioned(alice));
+        coin::deposit(signer::address_of_unpermissioned(alice), coin::mint(10000, &mint_cap));
         transfer(alice, resource_acc_addr, 500);
         assert!(coin::balance<AptosCoin>(resource_acc_addr) == 500, 1);
 
@@ -356,12 +356,12 @@ module aptos_framework::aptos_account {
     #[test(from = @0x123, core = @0x1, recipient_1 = @0x124, recipient_2 = @0x125)]
     public fun test_batch_transfer(from: &signer, core: &signer, recipient_1: &signer, recipient_2: &signer) {
         let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(core);
-        create_account(signer::address_of(from));
-        let recipient_1_addr = signer::address_of(recipient_1);
-        let recipient_2_addr = signer::address_of(recipient_2);
+        create_account(signer::address_of_unpermissioned(from));
+        let recipient_1_addr = signer::address_of_unpermissioned(recipient_1);
+        let recipient_2_addr = signer::address_of_unpermissioned(recipient_2);
         create_account(recipient_1_addr);
         create_account(recipient_2_addr);
-        coin::deposit(signer::address_of(from), coin::mint(10000, &mint_cap));
+        coin::deposit(signer::address_of_unpermissioned(from), coin::mint(10000, &mint_cap));
         batch_transfer(
             from,
             vector[recipient_1_addr, recipient_2_addr],
@@ -383,11 +383,11 @@ module aptos_framework::aptos_account {
             10,
             true,
         );
-        create_account_for_test(signer::address_of(from));
-        create_account_for_test(signer::address_of(to));
-        deposit_coins(signer::address_of(from), coin::mint(1000, &mint_cap));
+        create_account_for_test(signer::address_of_unpermissioned(from));
+        create_account_for_test(signer::address_of_unpermissioned(to));
+        deposit_coins(signer::address_of_unpermissioned(from), coin::mint(1000, &mint_cap));
         // Recipient account did not explicit register for the coin.
-        let to_addr = signer::address_of(to);
+        let to_addr = signer::address_of_unpermissioned(to);
         transfer_coins<FakeCoin>(from, to_addr, 500);
         assert!(coin::balance<FakeCoin>(to_addr) == 500, 0);
 
@@ -407,12 +407,12 @@ module aptos_framework::aptos_account {
             10,
             true,
         );
-        create_account_for_test(signer::address_of(from));
-        let recipient_1_addr = signer::address_of(recipient_1);
-        let recipient_2_addr = signer::address_of(recipient_2);
+        create_account_for_test(signer::address_of_unpermissioned(from));
+        let recipient_1_addr = signer::address_of_unpermissioned(recipient_1);
+        let recipient_2_addr = signer::address_of_unpermissioned(recipient_2);
         create_account_for_test(recipient_1_addr);
         create_account_for_test(recipient_2_addr);
-        deposit_coins(signer::address_of(from), coin::mint(1000, &mint_cap));
+        deposit_coins(signer::address_of_unpermissioned(from), coin::mint(1000, &mint_cap));
         batch_transfer_coins<FakeCoin>(
             from,
             vector[recipient_1_addr, recipient_2_addr],
@@ -428,7 +428,7 @@ module aptos_framework::aptos_account {
 
     #[test(user = @0x123)]
     public fun test_set_allow_direct_coin_transfers(user: &signer) acquires DirectTransferConfig {
-        let addr = signer::address_of(user);
+        let addr = signer::address_of_unpermissioned(user);
         create_account_for_test(addr);
         set_allow_direct_coin_transfers(user, true);
         assert!(can_receive_direct_coin_transfers(addr), 0);
@@ -449,12 +449,12 @@ module aptos_framework::aptos_account {
             10,
             true,
         );
-        create_account_for_test(signer::address_of(from));
-        create_account_for_test(signer::address_of(to));
+        create_account_for_test(signer::address_of_unpermissioned(from));
+        create_account_for_test(signer::address_of_unpermissioned(to));
         set_allow_direct_coin_transfers(from, true);
-        deposit_coins(signer::address_of(from), coin::mint(1000, &mint_cap));
+        deposit_coins(signer::address_of_unpermissioned(from), coin::mint(1000, &mint_cap));
         // Recipient account did not explicit register for the coin.
-        let to_addr = signer::address_of(to);
+        let to_addr = signer::address_of_unpermissioned(to);
         transfer_coins<FakeCoin>(from, to_addr, 500);
         assert!(coin::balance<FakeCoin>(to_addr) == 500, 0);
 
@@ -475,12 +475,12 @@ module aptos_framework::aptos_account {
             10,
             true,
         );
-        create_account_for_test(signer::address_of(from));
-        create_account_for_test(signer::address_of(to));
+        create_account_for_test(signer::address_of_unpermissioned(from));
+        create_account_for_test(signer::address_of_unpermissioned(to));
         set_allow_direct_coin_transfers(from, false);
-        deposit_coins(signer::address_of(from), coin::mint(1000, &mint_cap));
+        deposit_coins(signer::address_of_unpermissioned(from), coin::mint(1000, &mint_cap));
         // This should fail as the to account has explicitly opted out of receiving arbitrary coins.
-        transfer_coins<FakeCoin>(from, signer::address_of(to), 500);
+        transfer_coins<FakeCoin>(from, signer::address_of_unpermissioned(to), 500);
 
         coin::destroy_burn_cap(burn_cap);
         coin::destroy_mint_cap(mint_cap);
@@ -497,7 +497,7 @@ module aptos_framework::aptos_account {
         aptos_coin::ensure_initialized_with_apt_fa_metadata_for_test();
 
         let apt_metadata = object::address_to_object<Metadata>(@aptos_fungible_asset);
-        let user_addr = signer::address_of(user);
+        let user_addr = signer::address_of_unpermissioned(user);
         assert!(primary_fungible_store_address(user_addr) == primary_fungible_store::primary_store_address(user_addr, apt_metadata), 1);
 
         ensure_primary_fungible_store_exists(user_addr);

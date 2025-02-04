@@ -121,7 +121,7 @@ module aptos_framework::transaction_fee {
         system_addresses::assert_aptos_framework(aptos_framework);
         let AptosCoinCapabilities {
             burn_cap,
-        } = move_from<AptosCoinCapabilities>(signer::address_of(aptos_framework));
+        } = move_from<AptosCoinCapabilities>(signer::address_of_unpermissioned(aptos_framework));
         let burn_ref = coin::convert_and_take_paired_burn_ref(burn_cap);
         move_to(aptos_framework, AptosFABurnCapabilities { burn_ref });
     }

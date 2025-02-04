@@ -136,7 +136,7 @@ module aptos_framework::primary_fungible_store {
         fungible_asset::grant_permission_by_address(
             master,
             permissioned,
-            primary_store_address_inlined(signer::address_of(permissioned), metadata),
+            primary_store_address_inlined(signer::address_of_unpermissioned(permissioned), metadata),
             amount
         );
     }
@@ -149,7 +149,7 @@ module aptos_framework::primary_fungible_store {
         fungible_asset::grant_permission_by_address(
             master,
             permissioned,
-            object::create_user_derived_object_address(signer::address_of(permissioned), @aptos_fungible_asset),
+            object::create_user_derived_object_address(signer::address_of_unpermissioned(permissioned), @aptos_fungible_asset),
             amount
         );
     }
@@ -185,7 +185,7 @@ module aptos_framework::primary_fungible_store {
 
     /// Withdraw `amount` of fungible asset from the given account's primary store.
     public fun withdraw<T: key>(owner: &signer, metadata: Object<T>, amount: u64): FungibleAsset acquires DeriveRefPod {
-        let store = ensure_primary_store_exists(signer::address_of(owner), metadata);
+        let store = ensure_primary_store_exists(signer::address_of_unpermissioned(owner), metadata);
         // Check if the store object has been burnt or not. If so, unburn it first.
         may_be_unburn(owner, store);
         dispatchable_fungible_asset::withdraw(owner, store, amount)
@@ -207,12 +207,12 @@ module aptos_framework::primary_fungible_store {
             owner,
             fungible_asset::amount(&fa),
             primary_store_address_inlined(
-                signer::address_of(owner),
+                signer::address_of_unpermissioned(owner),
                 fungible_asset::metadata_from_asset(&fa),
             )
         );
         let metadata = fungible_asset::asset_metadata(&fa);
-        let store = ensure_primary_store_exists(signer::address_of(owner), metadata);
+        let store = ensure_primary_store_exists(signer::address_of_unpermissioned(owner), metadata);
         dispatchable_fungible_asset::deposit(store, fa);
     }
 
@@ -223,7 +223,7 @@ module aptos_framework::primary_fungible_store {
         recipient: address,
         amount: u64,
     ) acquires DeriveRefPod {
-        let sender_store = ensure_primary_store_exists(signer::address_of(sender), metadata);
+        let sender_store = ensure_primary_store_exists(signer::address_of_unpermissioned(sender), metadata);
         // Check if the sender store object has been burnt or not. If so, unburn it first.
         may_be_unburn(sender, sender_store);
         let recipient_store = ensure_primary_store_exists(recipient, metadata);
@@ -239,7 +239,7 @@ module aptos_framework::primary_fungible_store {
         amount: u64,
         expected: u64,
     ) acquires DeriveRefPod {
-        let sender_store = ensure_primary_store_exists(signer::address_of(sender), metadata);
+        let sender_store = ensure_primary_store_exists(signer::address_of_unpermissioned(sender), metadata);
         // Check if the sender store object has been burnt or not. If so, unburn it first.
         may_be_unburn(sender, sender_store);
         let recipient_store = ensure_primary_store_exists(recipient, metadata);
@@ -338,8 +338,8 @@ module aptos_framework::primary_fungible_store {
     fun test_default_behavior(creator: &signer, aaron: &signer) acquires DeriveRefPod {
         let (creator_ref, metadata) = create_test_token(creator);
         init_test_metadata_with_primary_store_enabled(&creator_ref);
-        let creator_address = signer::address_of(creator);
-        let aaron_address = signer::address_of(aaron);
+        let creator_address = signer::address_of_unpermissioned(creator);
+        let aaron_address = signer::address_of_unpermissioned(aaron);
         assert!(!primary_store_exists(creator_address, metadata), 1);
         assert!(!primary_store_exists(aaron_address, metadata), 2);
         assert!(balance(creator_address, metadata) == 0, 3);
@@ -359,8 +359,8 @@ module aptos_framework::primary_fungible_store {
     ) acquires DeriveRefPod {
         let (creator_ref, metadata) = create_test_token(creator);
         let (mint_ref, transfer_ref, burn_ref) = init_test_metadata_with_primary_store_enabled(&creator_ref);
-        let creator_address = signer::address_of(creator);
-        let aaron_address = signer::address_of(aaron);
+        let creator_address = signer::address_of_unpermissioned(creator);
+        let aaron_address = signer::address_of_unpermissioned(aaron);
         assert!(balance(creator_address, metadata) == 0, 1);
         assert!(balance(aaron_address, metadata) == 0, 2);
         mint(&mint_ref, creator_address, 100);
@@ -387,8 +387,8 @@ module aptos_framework::primary_fungible_store {
     ) acquires DeriveRefPod {
         let (creator_ref, metadata) = create_test_token(creator);
         let (mint_ref, _transfer_ref, _) = init_test_metadata_with_primary_store_enabled(&creator_ref);
-        let creator_address = signer::address_of(creator);
-        let aaron_address = signer::address_of(aaron);
+        let creator_address = signer::address_of_unpermissioned(creator);
+        let aaron_address = signer::address_of_unpermissioned(aaron);
         assert!(balance(creator_address, metadata) == 0, 1);
         assert!(balance(aaron_address, metadata) == 0, 2);
         mint(&mint_ref, creator_address, 100);
@@ -406,8 +406,8 @@ module aptos_framework::primary_fungible_store {
     ) acquires DeriveRefPod {
         let (creator_ref, metadata) = create_test_token(user_1);
         let (mint_ref, _, _) = init_test_metadata_with_primary_store_enabled(&creator_ref);
-        let user_1_address = signer::address_of(user_1);
-        let user_2_address = signer::address_of(user_2);
+        let user_1_address = signer::address_of_unpermissioned(user_1);
+        let user_2_address = signer::address_of_unpermissioned(user_2);
         mint(&mint_ref, user_1_address, 100);
         transfer(user_1, metadata, user_2_address, 80);
 
@@ -430,8 +430,8 @@ module aptos_framework::primary_fungible_store {
     ) acquires DeriveRefPod {
         let (creator_ref, metadata) = create_test_token(user_1);
         let (mint_ref, _, _) = init_test_metadata_with_primary_store_enabled(&creator_ref);
-        let user_1_address = signer::address_of(user_1);
-        let user_2_address = signer::address_of(user_2);
+        let user_1_address = signer::address_of_unpermissioned(user_1);
+        let user_2_address = signer::address_of_unpermissioned(user_2);
         mint(&mint_ref, user_1_address, 100);
         transfer(user_1, metadata, user_2_address, 80);
 
@@ -451,8 +451,8 @@ module aptos_framework::primary_fungible_store {
     ) acquires DeriveRefPod {
         let (creator_ref, metadata) = create_test_token(creator);
         let (mint_ref, _transfer_ref, _burn_ref) = init_test_metadata_with_primary_store_enabled(&creator_ref);
-        let creator_address = signer::address_of(creator);
-        let aaron_address = signer::address_of(aaron);
+        let creator_address = signer::address_of_unpermissioned(creator);
+        let aaron_address = signer::address_of_unpermissioned(aaron);
         assert!(balance(creator_address, metadata) == 0, 1);
         assert!(balance(aaron_address, metadata) == 0, 2);
         mint(&mint_ref, creator_address, 100);

@@ -40,7 +40,7 @@ module aptos_framework::staking_proxy {
 
     public entry fun set_vesting_contract_operator(owner: &signer, old_operator: address, new_operator: address) {
         check_stake_proxy_permission(owner);
-        let owner_address = signer::address_of(owner);
+        let owner_address = signer::address_of_unpermissioned(owner);
         let vesting_contracts = &vesting::vesting_contracts(owner_address);
         vector::for_each_ref(vesting_contracts, |vesting_contract| {
             let vesting_contract = *vesting_contract;
@@ -53,7 +53,7 @@ module aptos_framework::staking_proxy {
 
     public entry fun set_staking_contract_operator(owner: &signer, old_operator: address, new_operator: address) {
         check_stake_proxy_permission(owner);
-        let owner_address = signer::address_of(owner);
+        let owner_address = signer::address_of_unpermissioned(owner);
         if (staking_contract::staking_contract_exists(owner_address, old_operator)) {
             let current_commission_percentage = staking_contract::commission_percentage(owner_address, old_operator);
             staking_contract::switch_operator(owner, old_operator, new_operator, current_commission_percentage);
@@ -62,7 +62,7 @@ module aptos_framework::staking_proxy {
 
     public entry fun set_stake_pool_operator(owner: &signer, new_operator: address) {
         check_stake_proxy_permission(owner);
-        let owner_address = signer::address_of(owner);
+        let owner_address = signer::address_of_unpermissioned(owner);
         if (stake::stake_pool_exists(owner_address)) {
             stake::set_operator(owner, new_operator);
         };
@@ -70,7 +70,7 @@ module aptos_framework::staking_proxy {
 
     public entry fun set_vesting_contract_voter(owner: &signer, operator: address, new_voter: address) {
         check_stake_proxy_permission(owner);
-        let owner_address = signer::address_of(owner);
+        let owner_address = signer::address_of_unpermissioned(owner);
         let vesting_contracts = &vesting::vesting_contracts(owner_address);
         vector::for_each_ref(vesting_contracts, |vesting_contract| {
             let vesting_contract = *vesting_contract;
@@ -82,7 +82,7 @@ module aptos_framework::staking_proxy {
 
     public entry fun set_staking_contract_voter(owner: &signer, operator: address, new_voter: address) {
         check_stake_proxy_permission(owner);
-        let owner_address = signer::address_of(owner);
+        let owner_address = signer::address_of_unpermissioned(owner);
         if (staking_contract::staking_contract_exists(owner_address, operator)) {
             staking_contract::update_voter(owner, operator, new_voter);
         };
@@ -90,7 +90,7 @@ module aptos_framework::staking_proxy {
 
     public entry fun set_stake_pool_voter(owner: &signer, new_voter: address) {
         check_stake_proxy_permission(owner);
-        if (stake::stake_pool_exists(signer::address_of(owner))) {
+        if (stake::stake_pool_exists(signer::address_of_unpermissioned(owner))) {
             stake::set_delegated_voter(owner, new_voter);
         };
     }
@@ -112,10 +112,10 @@ module aptos_framework::staking_proxy {
         operator_2: &signer,
         new_operator: &signer,
     ) {
-        let owner_address = signer::address_of(owner);
-        let operator_1_address = signer::address_of(operator_1);
-        let operator_2_address = signer::address_of(operator_2);
-        let new_operator_address = signer::address_of(new_operator);
+        let owner_address = signer::address_of_unpermissioned(owner);
+        let operator_1_address = signer::address_of_unpermissioned(operator_1);
+        let operator_2_address = signer::address_of_unpermissioned(operator_2);
+        let new_operator_address = signer::address_of_unpermissioned(new_operator);
         vesting::setup(
             aptos_framework, &vector[owner_address, operator_1_address, operator_2_address, new_operator_address]);
         staking_contract::setup_staking_contract(aptos_framework, owner, operator_1, INITIAL_BALANCE, 0);
@@ -157,10 +157,10 @@ module aptos_framework::staking_proxy {
         operator_2: &signer,
         new_operator: &signer,
     ) {
-        let owner_address = signer::address_of(owner);
-        let operator_1_address = signer::address_of(operator_1);
-        let operator_2_address = signer::address_of(operator_2);
-        let new_operator_address = signer::address_of(new_operator);
+        let owner_address = signer::address_of_unpermissioned(owner);
+        let operator_1_address = signer::address_of_unpermissioned(operator_1);
+        let operator_2_address = signer::address_of_unpermissioned(operator_2);
+        let new_operator_address = signer::address_of_unpermissioned(new_operator);
         vesting::setup(
             aptos_framework, &vector[owner_address, operator_1_address, operator_2_address, new_operator_address]);
         staking_contract::setup_staking_contract(aptos_framework, owner, operator_2, INITIAL_BALANCE, 0);
@@ -189,10 +189,10 @@ module aptos_framework::staking_proxy {
         operator_2: &signer,
         new_voter: &signer,
     ) {
-        let owner_address = signer::address_of(owner);
-        let operator_1_address = signer::address_of(operator_1);
-        let operator_2_address = signer::address_of(operator_2);
-        let new_voter_address = signer::address_of(new_voter);
+        let owner_address = signer::address_of_unpermissioned(owner);
+        let operator_1_address = signer::address_of_unpermissioned(operator_1);
+        let operator_2_address = signer::address_of_unpermissioned(operator_2);
+        let new_voter_address = signer::address_of_unpermissioned(new_voter);
         vesting::setup(
             aptos_framework, &vector[owner_address, operator_1_address, operator_2_address, new_voter_address]);
         staking_contract::setup_staking_contract(aptos_framework, owner, operator_1, INITIAL_BALANCE, 0);
@@ -234,10 +234,10 @@ module aptos_framework::staking_proxy {
         operator_2: &signer,
         new_voter: &signer,
     ) {
-        let owner_address = signer::address_of(owner);
-        let operator_1_address = signer::address_of(operator_1);
-        let operator_2_address = signer::address_of(operator_2);
-        let new_voter_address = signer::address_of(new_voter);
+        let owner_address = signer::address_of_unpermissioned(owner);
+        let operator_1_address = signer::address_of_unpermissioned(operator_1);
+        let operator_2_address = signer::address_of_unpermissioned(operator_2);
+        let new_voter_address = signer::address_of_unpermissioned(new_voter);
         vesting::setup(
             aptos_framework, &vector[owner_address, operator_1_address, operator_2_address, new_voter_address]);
         staking_contract::setup_staking_contract(aptos_framework, owner, operator_2, INITIAL_BALANCE, 0);

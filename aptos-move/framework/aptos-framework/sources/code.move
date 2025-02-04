@@ -155,7 +155,7 @@ module aptos_framework::code {
     fun initialize(aptos_framework: &signer, package_owner: &signer, metadata: PackageMetadata)
     acquires PackageRegistry {
         system_addresses::assert_aptos_framework(aptos_framework);
-        let addr = signer::address_of(package_owner);
+        let addr = signer::address_of_unpermissioned(package_owner);
         if (!exists<PackageRegistry>(addr)) {
             move_to(package_owner, PackageRegistry { packages: vector[metadata] })
         } else {
@@ -173,7 +173,7 @@ module aptos_framework::code {
             error::invalid_argument(EINCOMPATIBLE_POLICY_DISABLED),
         );
 
-        let addr = signer::address_of(owner);
+        let addr = signer::address_of_unpermissioned(owner);
         if (!exists<PackageRegistry>(addr)) {
             move_to(owner, PackageRegistry { packages: vector::empty() })
         };
@@ -232,7 +232,7 @@ module aptos_framework::code {
         let code_object_addr = object::object_address(&code_object);
         assert!(exists<PackageRegistry>(code_object_addr), error::not_found(ECODE_OBJECT_DOES_NOT_EXIST));
         assert!(
-            object::is_owner(code_object, signer::address_of(publisher)),
+            object::is_owner(code_object, signer::address_of_unpermissioned(publisher)),
             error::permission_denied(ENOT_PACKAGE_OWNER)
         );
 

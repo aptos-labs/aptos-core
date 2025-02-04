@@ -24,7 +24,7 @@ module aptos_framework::permissioned_signer_tests {
 
         assert!(permissioned_signer::is_permissioned_signer(&perm_signer), 1);
         assert!(!permissioned_signer::is_permissioned_signer(creator), 1);
-        assert!(signer::address_of(&perm_signer) == signer::address_of(creator), 1);
+        assert!(signer::address_of_unpermissioned(&perm_signer) == signer::address_of_unpermissioned(creator), 1);
 
         permissioned_signer::authorize_increase(creator, &perm_signer, 100, OnePermission {});
         assert!(
@@ -108,7 +108,7 @@ module aptos_framework::permissioned_signer_tests {
 
         assert!(permissioned_signer::is_permissioned_signer(&perm_signer), 1);
         assert!(!permissioned_signer::is_permissioned_signer(creator), 1);
-        assert!(signer::address_of(&perm_signer) == signer::address_of(creator), 1);
+        assert!(signer::address_of_unpermissioned(&perm_signer) == signer::address_of_unpermissioned(creator), 1);
 
         permissioned_signer::authorize_increase(creator, &perm_signer, 100, OnePermission {});
         assert!(

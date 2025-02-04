@@ -56,7 +56,7 @@ module aptos_framework::permissioned_delegation {
         expiration_time: u64,
     ): signer acquires RegisteredDelegations {
         assert!(!is_permissioned_signer(master), error::permission_denied(ENOT_MASTER_SIGNER));
-        let addr = signer::address_of(master);
+        let addr = signer::address_of_unpermissioned(master);
         if (!exists<RegisteredDelegations>(addr)) {
             move_to(master, RegisteredDelegations {
                 delegations: big_ordered_map::new_with_config(50, 20, false)
@@ -75,7 +75,7 @@ module aptos_framework::permissioned_delegation {
         key: DelegationKey,
     ) acquires RegisteredDelegations {
         assert!(!is_permissioned_signer(master), error::permission_denied(ENOT_MASTER_SIGNER));
-        let addr = signer::address_of(master);
+        let addr = signer::address_of_unpermissioned(master);
         let delegations = &mut borrow_global_mut<RegisteredDelegations>(addr).delegations;
         assert!(delegations.contains(&key), error::not_found(EDELEGATION_EXISTENCE));
         let delegation = delegations.remove(&key);
@@ -91,7 +91,7 @@ module aptos_framework::permissioned_delegation {
         key: DelegationKey,
     ): signer acquires RegisteredDelegations {
         assert!(!is_permissioned_signer(master), error::permission_denied(ENOT_MASTER_SIGNER));
-        let addr = signer::address_of(master);
+        let addr = signer::address_of_unpermissioned(master);
         let handle = get_storable_permissioned_handle(addr, key, false);
         permissioned_signer::signer_from_storable_permissioned_handle(handle)
     }
@@ -106,7 +106,7 @@ module aptos_framework::permissioned_delegation {
         account: signer,
         abstraction_auth_data: AbstractionAuthData
     ): signer acquires RegisteredDelegations {
-        let addr = signer::address_of(&account);
+        let addr = signer::address_of_unpermissioned(&account);
         let stream = bcs_stream::new(*auth_data::authenticator(&abstraction_auth_data));
         let public_key = new_unvalidated_public_key_from_bytes(
             bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x))

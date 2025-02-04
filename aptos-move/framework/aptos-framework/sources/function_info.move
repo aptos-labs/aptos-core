@@ -30,7 +30,7 @@ module aptos_framework::function_info {
         function_name: String,
     ): FunctionInfo {
         new_function_info_from_address(
-            signer::address_of(module_signer),
+            signer::address_of_unpermissioned(module_signer),
             module_name,
             function_name,
         )

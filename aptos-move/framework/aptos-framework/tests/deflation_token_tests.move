@@ -290,7 +290,7 @@ module 0xcafe::deflation_token_tests {
     fun test_register_on_non_metadata_object(
         creator: &signer,
     ) {
-        account::create_account_for_test(signer::address_of(creator));
+        account::create_account_for_test(signer::address_of_unpermissioned(creator));
         let creator_ref = object::create_named_object(creator, b"TEST");
          let withdraw = function_info::new_function_info(
             creator,
@@ -317,8 +317,8 @@ module 0xcafe::deflation_token_tests {
         let metadata = object::convert<TestToken, Metadata>(token_object);
 
         deflation_token::initialize(creator, &creator_ref);
-        let creator_address = signer::address_of(creator);
-        let aaron_address = signer::address_of(aaron);
+        let creator_address = signer::address_of_unpermissioned(creator);
+        let aaron_address = signer::address_of_unpermissioned(aaron);
         assert!(primary_fungible_store::balance(creator_address, metadata) == 0, 1);
         assert!(primary_fungible_store::balance(aaron_address, metadata) == 0, 2);
         primary_fungible_store::mint(&mint_ref, creator_address, 100);
