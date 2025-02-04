@@ -1,0 +1,38 @@
+Move prover returns: exiting with verification errors
+error: precondition of lambda expression does not hold
+   ┌─ tests/sources/functional/inline_lambda.move:49:13
+   │
+49 │             requires e > 1; // this does not verify
+   │             ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/inline_lambda.move:46: test_inline_fail_1
+   =         v = <redacted>
+   =     at tests/sources/functional/inline_lambda.move:47: test_inline_fail_1
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/inline_lambda.move:6: inline_1
+   =         i = <redacted>
+   =     at tests/sources/functional/inline_lambda.move:7: inline_1
+   =     at tests/sources/functional/inline_lambda.move:8: inline_1
+   =     at tests/sources/functional/inline_lambda.move:9: inline_1
+   =     at tests/sources/functional/inline_lambda.move:47: test_inline_fail_1
+   =         e = <redacted>
+   =     at tests/sources/functional/inline_lambda.move:49: test_inline_fail_1
+
+error: post-condition of lambda expression does not hold
+   ┌─ tests/sources/functional/inline_lambda.move:58:13
+   │
+58 │             ensures e != 2; // this does not verify
+   │             ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/inline_lambda.move:55: test_inline_fail_2
+   =         v = <redacted>
+   =     at tests/sources/functional/inline_lambda.move:56: test_inline_fail_2
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/inline_lambda.move:6: inline_1
+   =         i = <redacted>
+   =     at tests/sources/functional/inline_lambda.move:7: inline_1
+   =     at tests/sources/functional/inline_lambda.move:8: inline_1
+   =     at tests/sources/functional/inline_lambda.move:9: inline_1
+   =     at tests/sources/functional/inline_lambda.move:56: test_inline_fail_2
+   =         e = <redacted>
+   =     at tests/sources/functional/inline_lambda.move:58: test_inline_fail_2
