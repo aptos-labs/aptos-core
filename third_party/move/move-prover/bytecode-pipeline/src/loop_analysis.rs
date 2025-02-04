@@ -127,7 +127,7 @@ impl LoopAnalysisProcessor {
                                 LOOP_INVARIANT_BASE_FAILED,
                             );
                             builder.emit_with(|attr_id| {
-                                Bytecode::Prop(attr_id, PropKind::Assert, exp.clone())
+                                Bytecode::Prop(attr_id, PropKind::Assert(None), exp.clone())
                             });
                         }
 
@@ -256,7 +256,7 @@ impl LoopAnalysisProcessor {
                         }
                     }
                 },
-                Bytecode::Prop(_, PropKind::Assert, _)
+                Bytecode::Prop(_, PropKind::Assert(None), _)
                     if invariant_locs.contains(&(offset as CodeOffset)) =>
                 {
                     // skip it, as the invariant should have been added as an assert after the label
@@ -308,7 +308,9 @@ impl LoopAnalysisProcessor {
                     builder.get_loc(*attr_id),
                     LOOP_INVARIANT_INDUCTION_FAILED,
                 );
-                builder.emit_with(|attr_id| Bytecode::Prop(attr_id, PropKind::Assert, exp.clone()));
+                builder.emit_with(|attr_id| {
+                    Bytecode::Prop(attr_id, PropKind::Assert(None), exp.clone())
+                });
             }
 
             // stop the checking in proving mode (branch back to loop header for interpretation mode)
