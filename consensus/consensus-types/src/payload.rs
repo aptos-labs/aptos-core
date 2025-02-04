@@ -160,11 +160,12 @@ pub enum PayloadExecutionLimit {
 }
 
 impl PayloadExecutionLimit {
-    pub fn new(max_txns: Option<u64>, max_gas: Option<u64>) -> Self {
-        Self::TxnAndGasLimits(TxnAndGasLimits {
-            transaction_limit: max_txns,
-            gas_limit: max_gas,
-        })
+    pub fn new(max_txns: Option<u64>, _max_gas: Option<u64>) -> Self {
+        // TODO: on next release, start using TxnAndGasLimits
+        match max_txns {
+            Some(max_txns) => PayloadExecutionLimit::MaxTransactionsToExecute(max_txns),
+            None => PayloadExecutionLimit::None,
+        }
     }
 
     fn extend_options(o1: Option<u64>, o2: Option<u64>) -> Option<u64> {
