@@ -1,0 +1,12 @@
+Move prover returns: exiting with model building errors
+error: unsupported language construct
+    ┌─ tests/sources/functional/inline_lambda.move:164:9
+    │
+164 │ ╭         spec {
+165 │ │             // ensures e
+166 │ │             //requires z >= 1;
+167 │ │             //requires v == vector[1, 2, 3];
+    · │
+182 │ │             // assert false;
+183 │ │         }
+    │ ╰─────────^ Move 2.2 language construct is not enabled: Specs on function expressions

@@ -1310,7 +1310,7 @@ fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
         },
 
         Tok::Spec => {
-            let spec_block = parse_spec_block(vec![], context)?;
+            let spec_block = parse_spec_block(vec![], context, false)?;
             Exp_::Spec(spec_block)
         },
 
@@ -1400,7 +1400,7 @@ fn parse_spec_loop_invariant(context: &mut Context) -> Result<SequenceItem, Box<
     // Parse a loop invariant. Also validate that only `invariant`
     // properties are contained in the spec block. This is
     // transformed into `while ({spec { .. }; cond) body`.
-    let spec = parse_spec_block(vec![], context)?;
+    let spec = parse_spec_block(vec![], context, false)?;
     for member in &spec.value.members {
         match member.value {
             // Ok
@@ -1939,7 +1939,7 @@ fn at_start_of_exp(context: &mut Context) -> bool {
 
 // Parse the rest of a lambda expression, after already processing any capture designator (move/copy).
 //       LambdaRest =
-//                      <LambdaBindList> <Exp> <WithAbilities>
+//                      <LambdaBindList> <Exp> <WithAbilities> [<SpecBlock>]
 fn parse_lambda(
     context: &mut Context,
     start_loc: usize,
@@ -1967,8 +1967,30 @@ fn parse_lambda(
             "Abilities on function expressions",
         );
     }
+    let spec_opt = if context.tokens.peek() == Tok::Spec {
+        let spec_start = context.tokens.start_loc();
+        let spec = parse_spec_block(vec![], context, true)?;
+        let spec_end = context.tokens.previous_end_loc();
+        let loc: Loc = make_loc(context.tokens.file_hash(), spec_start, spec_end);
+        require_move_version(
+            LanguageVersion::V2_2,
+            context,
+            loc,
+            "Specs on function expressions",
+        );
+        let spec_exp = Exp::new(loc, Exp_::Spec(spec));
+        Some(Box::new(spec_exp))
+    } else {
+        None
+    };
 
-    Ok(Exp_::Lambda(bindings, body, capture_kind, abilities))
+    Ok(Exp_::Lambda(
+        bindings,
+        body,
+        capture_kind,
+        abilities,
+        spec_opt,
+    ))
 }
 
 // Parse an expression:
@@ -3547,7 +3569,7 @@ fn parse_module(
                         },
                         _ => {
                             // Regular spec block
-                            ModuleMember::Spec(parse_spec_block(attributes, context)?)
+                            ModuleMember::Spec(parse_spec_block(attributes, context, false)?)
                         },
                     }
                 },
@@ -3665,7 +3687,7 @@ fn parse_script(
     let mut specs = vec![];
     while context.tokens.peek() == Tok::NumSign || context.tokens.peek() == Tok::Spec {
         let attributes = parse_attributes(context)?;
-        specs.push(parse_spec_block(attributes, context)?);
+        specs.push(parse_spec_block(attributes, context, false)?);
     }
 
     if context.tokens.peek() != Tok::RBrace {
@@ -3706,6 +3728,7 @@ fn parse_script(
 fn parse_spec_block(
     attributes: Vec<Attributes>,
     context: &mut Context,
+    from_lambda: bool,
 ) -> Result<SpecBlock, Box<Diagnostic>> {
     context.tokens.match_doc_comments();
     let start_loc = context.tokens.start_loc();
@@ -3739,7 +3762,13 @@ fn parse_spec_block(
             let signature = parse_spec_target_signature_opt(&name.loc, context)?;
             SpecBlockTarget_::Member(name, signature)
         },
-        Tok::LBrace => SpecBlockTarget_::Code,
+        Tok::LBrace => {
+            if from_lambda {
+                SpecBlockTarget_::Lambda
+            } else {
+                SpecBlockTarget_::Code
+            }
+        },
         _ => {
             return Err(unexpected_token_error(
                 context.tokens,
@@ -3752,6 +3781,7 @@ fn parse_spec_block(
         target_start_loc,
         match target_ {
             SpecBlockTarget_::Code => target_start_loc,
+            SpecBlockTarget_::Lambda => target_start_loc,
             _ => context.tokens.previous_end_loc(),
         },
         target_,

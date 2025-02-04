@@ -941,7 +941,7 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
         EE::While(_, eb, el) => NE::While(exp(context, *eb), exp(context, *el)),
         EE::Loop(_, el) => NE::Loop(exp(context, *el)),
         EE::Block(seq) => NE::Block(sequence(context, seq)),
-        EE::Lambda(args, body, _lambda_capture_kind, _abilities) => {
+        EE::Lambda(args, body, _lambda_capture_kind, _abilities, _spec_opt) => {
             let bind_opt = bind_typed_list(context, args);
             match bind_opt {
                 None => {

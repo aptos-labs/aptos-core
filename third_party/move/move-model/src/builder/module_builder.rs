@@ -5,8 +5,9 @@
 use crate::{
     ast::{
         AccessSpecifier, Address, Attribute, AttributeValue, Condition, ConditionKind, Exp,
-        ExpData, FriendDecl, ModuleName, Operation, PropertyBag, PropertyValue, QualifiedSymbol,
-        Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, TempIndex, UseDecl, Value,
+        ExpData, FriendDecl, ModuleName, Operation, Pattern, PropertyBag, PropertyValue,
+        QualifiedSymbol, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, TempIndex,
+        UseDecl, Value,
     },
     builder::{
         exp_builder::ExpTranslator,
@@ -18,10 +19,9 @@ use crate::{
     constant_folder::ConstantFolder,
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     intrinsics::process_intrinsic_declaration,
-    model,
     model::{
-        EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, FunctionLoc, Loc,
-        ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId,
+        self, EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, FunctionLoc,
+        Loc, ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId,
         SpecFunId, SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind,
     },
     options::ModelBuilderOptions,
@@ -124,8 +124,40 @@ pub enum SpecBlockContext<'a> {
     FunctionCodeV2(
         QualifiedSymbol,                                  // function name
         BTreeMap<Symbol, (Loc, Type, Option<TempIndex>)>, // local variables
+        Option<(Pattern, Type)>,                          // for lambda
     ),
     Schema(QualifiedSymbol),
+}
+
+impl<'a> SpecBlockContext<'a> {
+    pub fn allow_old(&self) -> bool {
+        use SpecBlockContext::*;
+        match self {
+            FunctionCode(_, _) => false,
+            FunctionCodeV2(_, _, _) => false,
+            //TODO(tengzhang): change for lambda expression,
+            _ => true,
+        }
+    }
+
+    pub fn check_lambda(&self) -> bool {
+        use SpecBlockContext::*;
+        match self {
+            FunctionCodeV2(_, _, from_lambda) => from_lambda.is_some(),
+            _ => false,
+        }
+    }
+
+    pub fn name(&self) -> Option<&QualifiedSymbol> {
+        use SpecBlockContext::*;
+        match self {
+            Struct(name, ..)
+            | FunctionCode(name, ..)
+            | FunctionCodeV2(name, ..)
+            | Schema(name, ..) => Some(name),
+            _ => None,
+        }
+    }
 }
 
 impl<'a> fmt::Display for SpecBlockContext<'a> {
@@ -335,7 +367,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         target: &'pa EA::SpecBlockTarget,
     ) -> Option<SpecBlockContext<'pa>> {
         match &target.value {
-            EA::SpecBlockTarget_::Code => None,
+            EA::SpecBlockTarget_::Code | EA::SpecBlockTarget_::Lambda => None,
             EA::SpecBlockTarget_::Member(name, _) => {
                 let qsym = self.qualified_by_module_from_name(name);
                 if self.parent.fun_table.contains_key(&qsym) {
@@ -1248,7 +1280,20 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         spec_block: &EA::SpecBlock,
         context: SpecBlockContext,
     ) {
-        for member in &spec_block.value.members {
+        assert!(self.spec_block_lets.is_empty());
+        // Sort members so that lets are processed first. This is needed so that lets included
+        // from schemas are properly renamed on name clash.
+        let let_sorted_members = spec_block.value.members.iter().sorted_by(|m1, m2| {
+            let m1_is_let = matches!(m1.value, EA::SpecBlockMember_::Let { .. });
+            let m2_is_let = matches!(m2.value, EA::SpecBlockMember_::Let { .. });
+            match (m1_is_let, m2_is_let) {
+                (true, true) | (false, false) => std::cmp::Ordering::Equal,
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+            }
+        });
+
+        for member in let_sorted_members {
             let loc = &self.parent.env.to_loc(&member.loc);
             match &member.value {
                 EA::SpecBlockMember_::Condition {
@@ -1278,11 +1323,21 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 EA::SpecBlockMember_::Update { lhs, rhs } => {
                     self.def_ana_global_var_update(loc, &context, lhs, rhs)
                 },
+                EA::SpecBlockMember_::Let {
+                    name,
+                    post_state,
+                    def,
+                } => {
+                    if context.check_lambda() {
+                        self.def_ana_let(&context, loc, *post_state, name, def)
+                    }
+                },
                 _ => {
                     self.parent.error(loc, "item not allowed");
                 },
             }
         }
+        self.spec_block_lets.clear();
     }
 
     /// Validates whether a function signature provided with a spec block target matches the
@@ -1948,7 +2003,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
                 et
             },
-            FunctionCodeV2(name, locals) => {
+            FunctionCodeV2(name, locals, _from_lambda) => {
                 let entry = &self
                     .parent
                     .fun_table
@@ -1963,6 +2018,24 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 et.enter_scope();
                 for (sym, (loc, type_, index)) in locals {
                     et.define_local(loc, *sym, type_.clone(), None, *index)
+                }
+
+                if _from_lambda.is_some()
+                    && matches!(kind, ConditionKind::Ensures | ConditionKind::LetPost(..))
+                {
+                    let (_, ty) = _from_lambda.clone().unwrap();
+                    et.enter_scope();
+                    if let Type::Tuple(ts) = &ty {
+                        for (i, ty) in ts.iter().enumerate() {
+                            let name: Symbol = et.symbol_pool().make(&format!("result_{}", i + 1));
+                            //let oper: Option<Operation> = Some(Operation::Result(i));
+                            et.define_local(loc, name, ty.clone(), None, None);
+                        }
+                    } else {
+                        let name = et.symbol_pool().make("result");
+                        //let oper = Some(Operation::Result(0));
+                        et.define_local(loc, name, ty.clone(), None, None);
+                    }
                 }
                 et
             },
@@ -2128,7 +2201,15 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 let entry = self.parent.fun_table.get(name).expect("function defined");
                 cond.kind.allowed_on_fun_decl(entry.visibility)
             },
-            FunctionCode(..) | FunctionCodeV2(..) => cond.kind.allowed_on_fun_impl(),
+            FunctionCode(..) => cond.kind.allowed_on_fun_impl(),
+            FunctionCodeV2(.., from_lambda) => {
+                if from_lambda.is_some() {
+                    cond.kind.allowed_on_lambda_spec()
+                } else {
+                    cond.kind.allowed_on_fun_impl()
+                }
+            },
+
             Schema(_) => true,
         };
         if !ok {
@@ -2186,7 +2267,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 true // continue visit, note all problematic subexprs
             };
             cond.exp.visit_post_order(&mut visitor);
-        } else if let FunctionCode(name, _) | FunctionCodeV2(name, _) = context {
+        } else if !context.allow_old() {
+            let name = context.name().expect("should have name");
             // Restrict accesses to function arguments only for `old(..)` in in-spec block
             let entry = self.parent.fun_table.get(name).expect("function defined");
             let mut visitor = |e: &ExpData| {
@@ -2504,7 +2586,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         use ConditionKind::*;
         use EA::SpecConditionKind_ as PK;
         let converted = match &kind.value {
-            PK::Assert => Assert,
+            PK::Assert => Assert(None),
             PK::Assume => Assume,
             PK::Decreases => Decreases,
             PK::Modifies => Modifies,

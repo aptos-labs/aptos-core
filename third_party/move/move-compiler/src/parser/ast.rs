@@ -350,6 +350,7 @@ pub enum SpecBlockTarget_ {
     Module,
     Member(Name, Option<Box<FunctionSignature>>),
     Schema(Name, Vec<(Name, Vec<Ability>)>),
+    Lambda,
 }
 
 pub type SpecBlockTarget = Spanned<SpecBlockTarget_>;
@@ -717,7 +718,13 @@ pub enum Exp_ {
     // { seq }
     Block(Sequence),
     // | x1 [: t1], ..., xn [: tn] | e [ with <abilities> ]
-    Lambda(TypedBindList, Box<Exp>, LambdaCaptureKind, Vec<Ability>),
+    Lambda(
+        TypedBindList,
+        Box<Exp>,
+        LambdaCaptureKind,
+        Vec<Ability>,
+        Option<Box<Exp>>,
+    ),
     // forall/exists x1 : e1, ..., xn [{ t1, .., tk } *] [where cond]: en.
     Quant(
         QuantKind,
@@ -1404,7 +1411,7 @@ impl AstDebug for SpecBlock_ {
 impl AstDebug for SpecBlockTarget_ {
     fn ast_debug(&self, w: &mut AstWriter) {
         match self {
-            SpecBlockTarget_::Code => {},
+            SpecBlockTarget_::Code | SpecBlockTarget_::Lambda => {},
             SpecBlockTarget_::Module => w.write("module "),
             SpecBlockTarget_::Member(name, sign_opt) => {
                 w.write(name.value);
@@ -1935,7 +1942,7 @@ impl AstDebug for Exp_ {
                 e.ast_debug(w);
             },
             E::Block(seq) => w.block(|w| seq.ast_debug(w)),
-            E::Lambda(sp!(_, tbs), e, capture_kind, abilities) => {
+            E::Lambda(sp!(_, tbs), e, capture_kind, abilities, spec_opt) => {
                 if *capture_kind != LambdaCaptureKind::Default {
                     w.write(format!("{} ", capture_kind));
                 }
@@ -1949,6 +1956,11 @@ impl AstDebug for Exp_ {
                         ab_mod.ast_debug(w);
                         false
                     });
+                }
+                if let Some(s) = spec_opt {
+                    w.write("spec {");
+                    s.ast_debug(w);
+                    w.write("}");
                 }
             },
             E::Quant(kind, sp!(_, rs), trs, c_opt, e) => {

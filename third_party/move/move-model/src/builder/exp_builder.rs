@@ -91,6 +91,8 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     pub called_spec_funs: BTreeSet<(ModuleId, SpecFunId)>,
     /// A mapping from SpecId to SpecBlock (expansion ast)
     pub spec_block_map: BTreeMap<EA::SpecId, EA::SpecBlock>,
+    /// A mapping from SpecId to the parameter and return type of lambda
+    pub spec_lambda_map: BTreeMap<EA::SpecId, (Pattern, Type)>,
     /// A mapping from expression node id to associated placeholders which are to be processed
     /// after function body checking and all type inference is done.
     pub placeholder_map: BTreeMap<NodeId, ExpPlaceholder>,
@@ -163,6 +165,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             had_errors: RefCell::default(),
             called_spec_funs: BTreeSet::new(),
             spec_block_map: BTreeMap::new(),
+            spec_lambda_map: BTreeMap::new(),
             placeholder_map: BTreeMap::new(),
             insert_freeze: true,
             loop_stack: vec![],
@@ -1655,15 +1658,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 ExpData::LoopCont(id, nest, true)
             },
             EA::Exp_::Block(seq) => self.translate_seq(&loc, seq, expected_type, context),
-            EA::Exp_::Lambda(bindings, exp, capture_kind, abilities) => self.translate_lambda(
-                &loc,
-                bindings,
-                exp,
-                expected_type,
-                context,
-                Self::translate_lambda_capture_kind(*capture_kind),
-                AbilitySet::FUNCTIONS | self.parent.translate_abilities(abilities),
-            ),
+            EA::Exp_::Lambda(bindings, exp, capture_kind, abilities, spec_opt) => self
+                .translate_lambda(
+                    &loc,
+                    bindings,
+                    exp,
+                    expected_type,
+                    context,
+                    Self::translate_lambda_capture_kind(*capture_kind),
+                    AbilitySet::FUNCTIONS | self.parent.translate_abilities(abilities),
+                    spec_opt.as_deref(),
+                ),
             EA::Exp_::Quant(kind, ranges, triggers, condition, body) => self.translate_quant(
                 &loc,
                 *kind,
@@ -2063,7 +2068,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                             (*s, (l.clone(), t, *idx))
                                         })
                                         .collect();
-                                    self.translate_spec_block(&loc, locals, &block)
+                                    let mut lambda_info =
+                                        self.spec_lambda_map.get(spec_id).cloned();
+                                    if let Some((pat, ty)) = &lambda_info {
+                                        let nty: Type = subs.specialize_with_defaults(ty);
+                                        lambda_info = Some((pat.clone(), nty.clone()));
+                                        //println!("nty:{}", nty.display(&self.type_display_context()));
+                                    }
+                                    self.translate_spec_block(&loc, locals, &block, lambda_info)
                                 } else {
                                     self.bug(&loc, "unresolved spec anchor");
                                     Spec::default()
@@ -2301,6 +2313,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         loc: &Loc,
         locals: BTreeMap<Symbol, (Loc, Type, Option<TempIndex>)>,
         block: &EA::SpecBlock,
+        lambda_info: Option<(Pattern, Type)>,
     ) -> Spec {
         let fun_name = if let Some(name) = &self.fun_name {
             name.clone()
@@ -2309,7 +2322,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             return Spec::default();
         };
         // This uses a builder for inlined specification blocks stored in the state.
-        let context = SpecBlockContext::FunctionCodeV2(fun_name, locals);
+        // let from_lambda = block.value.target.value == EA::SpecBlockTarget_::Lambda;
+        let context = SpecBlockContext::FunctionCodeV2(fun_name, locals, lambda_info.clone());
         self.parent.inline_spec_builder = Spec {
             loc: Some(loc.clone()),
             ..Spec::default()
@@ -5243,6 +5257,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         context: &ErrorMessageContext,
         capture_kind: LambdaCaptureKind,
         abilities: AbilitySet,
+        spec_opt: Option<&EA::Exp>,
     ) -> ExpData {
         // Translate the argument list
         let arg_type = self.fresh_type_var();
@@ -5272,9 +5287,27 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             context,
         );
         let rbody = self.translate_exp(body, &ty);
-        self.exit_scope();
         let id = self.new_node_id_with_type_loc(&rty, loc);
-        ExpData::Lambda(id, pat, rbody.into_exp(), capture_kind, abilities)
+        let spec_ty = self.fresh_type_var();
+        let rbody_type = self.env().get_node_type(rbody.node_id());
+        if let Some(spec) = spec_opt {
+            if let EA::Exp_::Spec(id, ..) = spec.value {
+                self.spec_lambda_map
+                    .entry(id)
+                    .or_insert_with(|| (pat.clone(), rbody_type.clone()));
+            }
+        }
+        let spec_block_opt = spec_opt.map(|spec| self.translate_exp(spec, &spec_ty).into_exp());
+        self.exit_scope();
+
+        ExpData::Lambda(
+            id,
+            pat,
+            rbody.into_exp(),
+            capture_kind,
+            abilities,
+            spec_block_opt,
+        )
     }
 
     fn translate_quant(

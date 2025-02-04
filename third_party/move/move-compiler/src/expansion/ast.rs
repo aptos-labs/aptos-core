@@ -284,6 +284,7 @@ pub enum SpecBlockTarget_ {
     Module,
     Member(Name, Option<Box<FunctionSignature>>),
     Schema(Name, Vec<(Name, AbilitySet)>),
+    Lambda,
 }
 
 pub type SpecBlockTarget = Spanned<SpecBlockTarget_>;
@@ -507,7 +508,13 @@ pub enum Exp_ {
     While(Option<Label>, Box<Exp>, Box<Exp>),
     Loop(Option<Label>, Box<Exp>),
     Block(Sequence),
-    Lambda(TypedLValueList, Box<Exp>, LambdaCaptureKind, AbilitySet),
+    Lambda(
+        TypedLValueList,
+        Box<Exp>,
+        LambdaCaptureKind,
+        AbilitySet,
+        Option<Box<Exp>>,
+    ),
     Quant(
         QuantKind,
         LValueWithRangeList,
@@ -1172,6 +1179,7 @@ impl AstDebug for SpecBlockTarget_ {
     fn ast_debug(&self, w: &mut AstWriter) {
         match self {
             SpecBlockTarget_::Code => {},
+            SpecBlockTarget_::Lambda => {},
             SpecBlockTarget_::Module => w.write("module "),
             SpecBlockTarget_::Member(name, sign_opt) => {
                 w.write(name.value);
@@ -1692,7 +1700,7 @@ impl AstDebug for Exp_ {
                 }
             },
             E::Block(seq) => w.block(|w| seq.ast_debug(w)),
-            E::Lambda(sp!(_, bs), e, capture_kind, abilities) => {
+            E::Lambda(sp!(_, bs), e, capture_kind, abilities, spec_opt) => {
                 if *capture_kind != LambdaCaptureKind::Default {
                     w.write(format!(" {}", capture_kind));
                 }
@@ -1700,7 +1708,10 @@ impl AstDebug for Exp_ {
                 bs.ast_debug(w);
                 w.write("|");
                 e.ast_debug(w);
-                ability_constraints_ast_debug(w, abilities)
+                ability_constraints_ast_debug(w, abilities);
+                if let Some(spec) = spec_opt {
+                    spec.ast_debug(w);
+                }
             },
             E::Quant(kind, sp!(_, rs), trs, c_opt, e) => {
                 kind.ast_debug(w);

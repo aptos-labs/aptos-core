@@ -41,9 +41,13 @@ use crate::env_pipeline::rewrite_target::{
     RewriteState, RewriteTarget, RewriteTargets, RewritingScope,
 };
 use codespan_reporting::diagnostic::Severity;
+use itertools::Itertools;
 use log::trace;
 use move_model::{
-    ast::{Exp, ExpData, Operation, Pattern, Spec, SpecBlockTarget, TempIndex},
+    ast::{
+        Condition, ConditionKind, Exp, ExpData, Operation, Pattern, Spec, SpecBlockTarget,
+        TempIndex,
+    },
     exp_rewriter::ExpRewriterFunctions,
     metadata::LanguageVersion,
     model::{FunId, GlobalEnv, Loc, NodeId, Parameter, QualifiedId},
@@ -62,6 +66,7 @@ type QualifiedFunId = QualifiedId<FunId>;
 type CallSiteLocations = BTreeMap<(RewriteTarget, QualifiedFunId), BTreeSet<NodeId>>;
 
 const DEBUG: bool = false;
+const LAMBDA_TEMP_RESULT: &str = "$temp_result";
 
 // ======================================================================================
 // Entry
@@ -436,6 +441,73 @@ impl<'env> Inliner<'env> {
     }
 }
 
+struct LambdaSpecRewriter<'env> {
+    env: &'env GlobalEnv,
+    result_flag: bool,
+}
+
+impl<'env> LambdaSpecRewriter<'env> {
+    fn new(env: &'env GlobalEnv, result_flag: bool) -> Self {
+        LambdaSpecRewriter { env, result_flag }
+    }
+}
+
+impl<'env> ExpRewriterFunctions for LambdaSpecRewriter<'env> {
+    fn rewrite_condition(
+        &mut self,
+        _target: &SpecBlockTarget,
+        cond: &Condition,
+    ) -> Option<Condition> {
+        let mut new_cond = cond.clone();
+        if new_cond.kind == ConditionKind::Requires {
+            new_cond.kind = ConditionKind::Assert(Some(true));
+            Some(new_cond)
+        } else if new_cond.kind == ConditionKind::Ensures {
+            new_cond.kind = ConditionKind::Assert(Some(false));
+            Some(new_cond)
+        } else {
+            None
+        }
+    }
+
+    fn rewrite_local_var(&mut self, id: NodeId, sym: Symbol) -> Option<Exp> {
+        let parse_result = |input: &str| -> Option<usize> {
+            // If the input is exactly "result", return Some(0)
+            if input == "result" {
+                return Some(1);
+            }
+
+            // Check if the input starts with "result_"
+            if let Some(num_str) = input.strip_prefix("result_") {
+                // Try to parse the remaining part as a u32
+                if let Ok(num) = num_str.parse::<usize>() {
+                    // Only return Some(num) if the number is greater than 0
+                    if num > 0 {
+                        return Some(num);
+                    }
+                }
+            }
+            // If none of the conditions are met, return None
+            None
+        };
+        if self.result_flag {
+            let val = parse_result(&sym.display(self.env.symbol_pool()).to_string());
+            if val.is_none() {
+                None
+            } else {
+                let sym = self.env.symbol_pool().make(&format!(
+                    "{}_{}",
+                    LAMBDA_TEMP_RESULT,
+                    val.unwrap()
+                ));
+                Some(ExpData::LocalVar(id, sym).into())
+            }
+        } else {
+            None
+        }
+    }
+}
+
 /// `OuterInlinerRewriter` implements `ExpRewriterFunctions` to processing functions which may have
 /// inline function calls within them.  The only thing it rewrites are calls to inline functions; we
 /// use the ExpRewriterFunctions trait to find such calls and reconstruct the outer function to
@@ -776,6 +848,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             rewritten_body,
             params_pattern,
             rewritten_actuals,
+            None,
         )
     }
 
@@ -872,6 +945,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         body: Exp,
         pattern: Pattern,
         args: Vec<Exp>,
+        _spec_opt: Option<Exp>,
     ) -> Exp {
         // Process Body
         let body_node_id = body.as_ref().node_id();
@@ -881,7 +955,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             .clone()
             .inlined_from(call_site_loc);
 
-        let new_body_id = env.new_node(body_loc, body_type.clone());
+        let new_body_id = env.new_node(body_loc.clone(), body_type.clone());
 
         let pattern_type = env.get_node_type(pattern.node_id());
 
@@ -952,6 +1026,94 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
                 ExpData::Call(new_args_id, Operation::Tuple, rewritten_args).into_exp();
             Some(new_args_expr)
         };
+
+        if let Some(_spec) = _spec_opt {
+            //if !body_type.is_unit() {
+            let _ty_vec = if let Type::Tuple(tys) = body_type.clone() {
+                tys.clone()
+            } else {
+                vec![body_type.clone()]
+            };
+            let mut pat_vec = vec![];
+            let mut local_vars = vec![];
+            for (i, ty) in _ty_vec.iter().enumerate() {
+                let new_id = env.new_node(body_loc.clone(), ty.clone());
+                let sym = env
+                    .symbol_pool()
+                    .make(&format!("{}_{}", LAMBDA_TEMP_RESULT, i + 1));
+                let pat = Pattern::Var(new_id, sym);
+                pat_vec.push(pat);
+                let new_id_var = env.new_node(body_loc.clone(), ty.clone());
+                let var = ExpData::LocalVar(new_id_var, sym).into_exp();
+                local_vars.push(var);
+            }
+            let has_result = !local_vars.is_empty();
+            let tuple_pattern =
+                Pattern::Tuple(env.new_node(body_loc.clone(), body_type.clone()), pat_vec);
+            let ret_exp_opt = if !has_result {
+                None
+            } else if local_vars.len() == 1 {
+                Some(local_vars[0].clone())
+            } else {
+                let new_tuple_id = env.new_node(body_loc.clone(), body_type.clone());
+                Some(ExpData::Call(new_tuple_id, Operation::Tuple, local_vars).into_exp())
+            };
+            if let ExpData::SpecBlock(_, spec) = _spec.as_ref() {
+                let pre_conditions = spec
+                    .conditions
+                    .clone()
+                    .into_iter()
+                    .filter(|cond| matches!(cond.kind, ConditionKind::Requires))
+                    .collect_vec();
+                let post_conditions = spec
+                    .conditions
+                    .clone()
+                    .into_iter()
+                    .filter(|cond| matches!(cond.kind, ConditionKind::Ensures))
+                    .collect_vec();
+                let pre_spec = Spec {
+                    loc: None,
+                    conditions: pre_conditions,
+                    properties: BTreeMap::new(),
+                    on_impl: BTreeMap::new(),
+                    update_map: BTreeMap::new(),
+                };
+                let post_spec = Spec {
+                    loc: None,
+                    conditions: post_conditions,
+                    properties: BTreeMap::new(),
+                    on_impl: BTreeMap::new(),
+                    update_map: BTreeMap::new(),
+                };
+
+                let mut lambda_spec_rewriter = LambdaSpecRewriter::new(env, false);
+                let new_node_id_pre = env.new_node(body_loc.clone(), body_type.clone());
+                let pre_spec = ExpData::SpecBlock(new_node_id_pre, pre_spec);
+                let pre_spec = lambda_spec_rewriter.rewrite_exp(pre_spec.into());
+                lambda_spec_rewriter.result_flag = has_result;
+                let new_node_id_post = env.new_node(body_loc.clone(), body_type.clone());
+                let post_spec = ExpData::SpecBlock(new_node_id_post, post_spec);
+                let post_spec = lambda_spec_rewriter.rewrite_exp(post_spec.into());
+                let mut exp_with_spec = vec![post_spec];
+                if let Some(ret_exp) = ret_exp_opt {
+                    exp_with_spec.push(ret_exp);
+                }
+                let new_node_id = env.new_node(body_loc.clone(), body_type.clone());
+                let new_exp = ExpData::Sequence(new_node_id, exp_with_spec).into_exp();
+                let binding_block =
+                    ExpData::Block(new_body_id, tuple_pattern, Some(body.clone()), new_exp)
+                        .into_exp();
+                let pre_seq = vec![pre_spec, binding_block];
+                let new_node_id_2 = env.new_node(body_loc, body_type.clone());
+                let pre_new_exp = ExpData::Sequence(new_node_id_2, pre_seq).into_exp();
+                let new_body =
+                    ExpData::Block(new_body_id, pattern, optional_new_args_expr, pre_new_exp)
+                        .into_exp();
+                return new_body;
+                //let (pre_conditions, post_conditions) = spec.conditions.iter().partition(||)
+            }
+            //}
+        }
 
         let new_body = ExpData::Block(new_body_id, pattern, optional_new_args_expr, body);
         new_body.into_exp()
@@ -1166,7 +1328,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
         };
         let call_loc = self.env.get_node_loc(id);
         if let Some(lambda_target) = optional_lambda_target {
-            if let ExpData::Lambda(_, pat, body, _, _) = lambda_target.as_ref() {
+            if let ExpData::Lambda(_, pat, body, _, _, _spec_opt) = lambda_target.as_ref() {
                 let args_vec: Vec<Exp> = args.to_vec();
                 Some(InlinedRewriter::construct_inlined_call_expression(
                     self.env,
@@ -1174,6 +1336,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
                     body.clone(),
                     self.make_lambda_pattern_a_tuple(pat),
                     args_vec,
+                    _spec_opt.clone(),
                 ))
             } else {
                 self.env.diag(

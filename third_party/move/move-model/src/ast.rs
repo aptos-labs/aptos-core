@@ -105,7 +105,7 @@ impl Attribute {
 pub enum ConditionKind {
     LetPost(Symbol, Loc),
     LetPre(Symbol, Loc),
-    Assert,
+    Assert(Option<bool>),
     Assume,
     Decreases,
     AbortsIf,
@@ -132,7 +132,7 @@ impl ConditionKind {
         matches!(
             self,
             LetPost(..)
-                | Assert
+                | Assert(..)
                 | Assume
                 | Emits
                 | Ensures
@@ -165,7 +165,15 @@ impl ConditionKind {
         use ConditionKind::*;
         matches!(
             self,
-            Assert | Assume | Decreases | LoopInvariant | LetPost(..) | LetPre(..) | Update
+            Assert(..) | Assume | Decreases | LoopInvariant | LetPost(..) | LetPre(..) | Update
+        )
+    }
+
+    pub fn allowed_on_lambda_spec(&self) -> bool {
+        use ConditionKind::*;
+        matches!(
+            self,
+            Requires | Ensures | FunctionInvariant // TODO(tengzhang): support LetPost and LetPre
         )
     }
 
@@ -205,7 +213,15 @@ impl fmt::Display for ConditionKind {
         match self {
             LetPost(sym, _loc) => write!(f, "let({:?})", sym),
             LetPre(sym, _loc) => write!(f, "let old({:?})", sym),
-            Assert => write!(f, "assert"),
+            Assert(option) => {
+                if option.is_none() {
+                    write!(f, "assert")
+                } else if option.is_some_and(|lambda_requires| lambda_requires) {
+                    write!(f, "requires")
+                } else {
+                    write!(f, "ensures")
+                }
+            },
             Assume => write!(f, "assume"),
             Decreases => write!(f, "decreases"),
             AbortsIf => write!(f, "aborts_if"),
@@ -641,7 +657,14 @@ pub enum ExpData {
     /// Represents an invocation of a function value, as a lambda.
     Invoke(NodeId, Exp, Vec<Exp>),
     /// Represents a lambda.
-    Lambda(NodeId, Pattern, Exp, LambdaCaptureKind, AbilitySet),
+    Lambda(
+        NodeId,
+        Pattern,
+        Exp,
+        LambdaCaptureKind,
+        AbilitySet,
+        Option<Exp>,
+    ),
     /// Represents a quantified formula over multiple variables and ranges.
     Quant(
         NodeId,
@@ -1441,7 +1464,12 @@ impl ExpData {
                     exp.visit_positions_impl(visitor)?;
                 }
             },
-            Lambda(_, _, body, _, _) => body.visit_positions_impl(visitor)?,
+            Lambda(_, _, body, _, _, spec_opt) => {
+                body.visit_positions_impl(visitor)?;
+                if let Some(spec) = spec_opt {
+                    spec.visit_positions_impl(visitor)?;
+                }
+            },
             Quant(_, _, ranges, triggers, condition, body) => {
                 for (_, range) in ranges {
                     range.visit_positions_impl(visitor)?;
@@ -3251,7 +3279,7 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     self.fmt_exps(args)
                 )
             },
-            Lambda(id, pat, body, capture_kind, abilities) => {
+            Lambda(id, pat, body, capture_kind, abilities, spec_opt) => {
                 if self.verbose {
                     write!(
                         f,
@@ -3286,10 +3314,12 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                         .map(|a| a.to_string())
                         .reduce(|l, r| format!("{}, {}", l, r))
                         .unwrap_or_default();
-                    write!(f, " with {}", abilities_as_str)
-                } else {
-                    Ok(())
+                    write!(f, " with {}", abilities_as_str)?;
                 }
+                if let Some(spec) = spec_opt {
+                    write!(f, "{}", spec.display_cont(self))?;
+                }
+                Ok(())
             },
             Block(id, pat, binding, body) => {
                 if self.verbose {
