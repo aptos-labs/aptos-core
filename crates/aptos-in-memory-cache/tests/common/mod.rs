@@ -65,15 +65,13 @@ impl<C: SizedCache<NotATransaction> + 'static> TestCache<C> {
             cache.clone(),
         );
 
-        let cache = Self {
+        Self {
             metadata,
             cache,
             insert_notify,
             eviction_start: highest_key,
             eviction_task: task,
-        };
-
-        cache
+        }
     }
 }
 
