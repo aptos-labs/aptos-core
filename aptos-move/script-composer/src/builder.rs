@@ -34,8 +34,16 @@ use move_core_types::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{collections::BTreeMap, str::FromStr};
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, HashMap},
+    str::FromStr,
+};
 use wasm_bindgen::prelude::*;
+
+thread_local! {
+    static LOADED_MODULES: RefCell<BTreeMap<ModuleId, CompiledModule>> = const { RefCell::new(BTreeMap::new()) };
+}
 
 #[wasm_bindgen]
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Debug)]
@@ -61,7 +69,6 @@ struct BuilderCall {
 #[derive(Clone, Debug)]
 #[wasm_bindgen]
 pub struct TransactionComposer {
-    modules: BTreeMap<ModuleId, CompiledModule>,
     builder: CompiledScriptBuilder,
     calls: Vec<BuilderCall>,
     parameters: Vec<Vec<u8>>,
@@ -83,7 +90,6 @@ impl TransactionComposer {
 
         let builder = CompiledScriptBuilder::new(script);
         Self {
-            modules: BTreeMap::new(),
             builder,
             calls: vec![],
             parameters: vec![],
@@ -104,7 +110,6 @@ impl TransactionComposer {
 
         let builder = CompiledScriptBuilder::new(script);
         Self {
-            modules: BTreeMap::new(),
             builder,
             calls: vec![],
             parameters: vec![],
@@ -183,7 +188,7 @@ impl TransactionComposer {
 
 impl TransactionComposer {
     pub fn insert_module(&mut self, module: CompiledModule) {
-        self.modules.insert(module.self_id(), module);
+        LOADED_MODULES.with(|modules| modules.borrow_mut().insert(module.self_id(), module));
     }
 
     fn check_argument_compatibility(
@@ -240,21 +245,20 @@ impl TransactionComposer {
             .collect::<anyhow::Result<Vec<_>>>()?;
         let module = ModuleId::from_str(&module)?;
         let function = Identifier::new(function)?;
+        let call_idx = LOADED_MODULES.with(|modules| match modules.borrow().get(&module) {
+            Some(module_ref) => self
+                .builder
+                .import_call_by_name(function.as_ident_str(), module_ref)
+                .map_err(|err| anyhow!("Cannot import module {}: {:?}", module, err)),
+            None => Err(anyhow!("Module {} is not yet loaded", module)),
+        })?;
 
-        let target_module = match self.modules.get(&module) {
-            Some(module) => module,
-            None => {
-                bail!("Module {} is not yet loaded", module);
-            },
-        };
-
-        let call_idx = self
-            .builder
-            .import_call_by_name(function.as_ident_str(), target_module)?;
-        let type_arguments = ty_args
-            .iter()
-            .map(|ty| import_type_tag(&mut self.builder, ty, &self.modules))
-            .collect::<PartialVMResult<Vec<_>>>()?;
+        let type_arguments = LOADED_MODULES.with(|modules| {
+            ty_args
+                .iter()
+                .map(|ty| import_type_tag(&mut self.builder, ty, &modules.borrow()))
+                .collect::<PartialVMResult<Vec<_>>>()
+        })?;
 
         let mut arguments = vec![];
         let expected_args_ty = {
@@ -378,6 +382,7 @@ impl TransactionComposer {
         self.check_drop_at_end()?;
         let parameters_count = self.parameters_ty.len() as u16;
         let mut script = self.builder.into_script();
+        let mut instantiations = HashMap::new();
         for call in self.calls {
             for arg in call.arguments {
                 script.code.code.push(arg.to_instruction(parameters_count)?);
@@ -390,16 +395,21 @@ impl TransactionComposer {
                 if script.function_instantiations.len() >= TableIndex::MAX as usize {
                     bail!("Too many function instantiations");
                 }
-                let fi_idx =
-                    FunctionInstantiationIndex(script.function_instantiations.len() as u16);
-
                 let type_parameters = import_signature(&mut script, Signature(call.type_args))?;
 
-                script.function_instantiations.push(FunctionInstantiation {
+                let inst = FunctionInstantiation {
                     handle: call.call_idx,
                     type_parameters,
-                });
-                script.code.code.push(Bytecode::CallGeneric(fi_idx));
+                };
+                if let Some(idx) = instantiations.get(&inst) {
+                    script.code.code.push(Bytecode::CallGeneric(*idx));
+                } else {
+                    let fi_idx =
+                        FunctionInstantiationIndex(script.function_instantiations.len() as u16);
+                    script.function_instantiations.push(inst.clone());
+                    instantiations.insert(inst, fi_idx);
+                    script.code.code.push(Bytecode::CallGeneric(fi_idx));
+                }
             }
 
             // Storing return values
@@ -463,12 +473,9 @@ impl TransactionComposer {
 
         match bytes_result {
             Ok(bytes_hex) => {
-                self.modules.insert(
-                    module_id,
-                    CompiledModule::deserialize(
-                        hex::decode(bytes_hex.replace("0x", "").replace('\"', ""))?.as_slice(),
-                    )?,
-                );
+                self.insert_module(CompiledModule::deserialize(
+                    hex::decode(bytes_hex.replace("0x", "").replace('\"', ""))?.as_slice(),
+                )?);
                 Ok(())
             },
             Err(_message) => Ok(()),
@@ -629,10 +636,12 @@ impl From<CallArgumentWasm> for CallArgument {
 
 #[wasm_bindgen(js_class = "CallArgument")]
 impl CallArgumentWasm {
+    #[wasm_bindgen(js_name = newBytes)]
     pub fn new_bytes(bytes: Vec<u8>) -> Self {
         CallArgument::Raw(bytes).into()
     }
 
+    #[wasm_bindgen(js_name = newSigner)]
     pub fn new_signer(signer_idx: u16) -> Self {
         CallArgument::Signer(signer_idx).into()
     }
@@ -641,6 +650,7 @@ impl CallArgumentWasm {
         self.change_op_type(ArgumentOperation::Borrow)
     }
 
+    #[wasm_bindgen(js_name = borrowMut)]
     pub fn borrow_mut(&self) -> Result<Self, String> {
         self.change_op_type(ArgumentOperation::BorrowMut)
     }
