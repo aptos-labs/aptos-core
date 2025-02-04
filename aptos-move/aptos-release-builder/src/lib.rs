@@ -43,13 +43,13 @@ pub fn initialize_aptos_core_path(overriden_path: Option<PathBuf>) {
     };
 }
 
-pub(crate) fn aptos_core_path() -> PathBuf {
+pub fn aptos_core_path() -> PathBuf {
     APTOS_CORE_PATH
         .get_or_init(aptos_core_path_at_compile_time)
         .clone()
 }
 
-pub(crate) fn aptos_framework_path() -> PathBuf {
+pub fn aptos_framework_path() -> PathBuf {
     let mut path = aptos_core_path();
     path.push("aptos-move/framework/aptos-framework");
     path

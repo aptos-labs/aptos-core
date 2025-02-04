@@ -467,7 +467,7 @@ ark-groth16 = "0.4.0"
 ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
 
-aptos-moving-average = { git = "https://github.com/movementlabsxyz/aptos-indexer-processors" }
+aptos-moving-average = { git = "https://github.com/movementlabsxyz/aptos-indexer-processors", rev = "77a36245400250e7d8a854360194288d078681bc" }
 
 assert_approx_eq = "1.1.0"
 assert_unordered = "0.3.5"
@@ -481,7 +481,7 @@ base64 = "0.13.0"
 base64-url = "2.0.1"
 backoff = { version = "0.4.0", features = ["tokio"] }
 backtrace = "0.3.58"
-bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
+bcs = { git = "https://github.com/movementlabsxyz/bcs.git", rev = "bc16d2d39cabafaabd76173dd1b04b2aa170cf0c" }
 better_any = "0.1.1"
 bellman = { version = "0.13.1", default-features = false }
 bigdecimal = { version = "0.4.0", features = ["serde"] }

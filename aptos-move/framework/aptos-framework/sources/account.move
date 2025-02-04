@@ -22,6 +22,7 @@ module aptos_framework::account {
     friend aptos_framework::multisig_account;
     friend aptos_framework::resource_account;
     friend aptos_framework::transaction_validation;
+    friend aptos_framework::governed_gas_pool;  
 
     #[event]
     struct KeyRotation has drop, store {

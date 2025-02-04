@@ -129,10 +129,12 @@ return true.
 -  [Function `default_to_concurrent_fungible_balance_enabled`](#0x1_features_default_to_concurrent_fungible_balance_enabled)
 -  [Function `get_abort_if_multisig_payload_mismatch_feature`](#0x1_features_get_abort_if_multisig_payload_mismatch_feature)
 -  [Function `abort_if_multisig_payload_mismatch_enabled`](#0x1_features_abort_if_multisig_payload_mismatch_enabled)
--  [Function `get_native_bridge_feature`](#0x1_features_get_native_bridge_feature)
--  [Function `abort_native_bridge_enabled`](#0x1_features_abort_native_bridge_enabled)
 -  [Function `get_atomic_bridge_feature`](#0x1_features_get_atomic_bridge_feature)
 -  [Function `abort_atomic_bridge_enabled`](#0x1_features_abort_atomic_bridge_enabled)
+-  [Function `get_native_bridge_feature`](#0x1_features_get_native_bridge_feature)
+-  [Function `abort_native_bridge_enabled`](#0x1_features_abort_native_bridge_enabled)
+-  [Function `get_governed_gas_pool_feature`](#0x1_features_get_governed_gas_pool_feature)
+-  [Function `governed_gas_pool_enabled`](#0x1_features_governed_gas_pool_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -546,6 +548,18 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_FEE_PAYER_ENABLED">FEE_PAYER_ENABLED</a>: u64 = 22;
+</code></pre>
+
+
+
+<a id="0x1_features_GOVERNED_GAS_POOL"></a>
+
+Whether the Governed Gas Pool is used to capture gas fees
+
+Lifetime: permanent
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_GOVERNED_GAS_POOL">GOVERNED_GAS_POOL</a>: u64 = 73;
 </code></pre>
 
 
@@ -3180,6 +3194,52 @@ Lifetime: transient
 
 </details>
 
+<a id="0x1_features_get_atomic_bridge_feature"></a>
+
+## Function `get_atomic_bridge_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_atomic_bridge_feature">get_atomic_bridge_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_atomic_bridge_feature">get_atomic_bridge_feature</a>(): u64 { <a href="features.md#0x1_features_ATOMIC_BRIDGE">ATOMIC_BRIDGE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_abort_atomic_bridge_enabled"></a>
+
+## Function `abort_atomic_bridge_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_abort_atomic_bridge_enabled">abort_atomic_bridge_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_abort_atomic_bridge_enabled">abort_atomic_bridge_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_ATOMIC_BRIDGE">ATOMIC_BRIDGE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_features_get_native_bridge_feature"></a>
 
 ## Function `get_native_bridge_feature`
@@ -3226,13 +3286,14 @@ Lifetime: transient
 
 </details>
 
-<a id="0x1_features_get_atomic_bridge_feature"></a>
+<a id="0x1_features_get_governed_gas_pool_feature"></a>
 
-## Function `get_atomic_bridge_feature`
+## Function `get_governed_gas_pool_feature`
+
+Whether the Governed Gas Pool is enabled.
 
 
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_atomic_bridge_feature">get_atomic_bridge_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_governed_gas_pool_feature">get_governed_gas_pool_feature</a>(): u64
 </code></pre>
 
 
@@ -3241,20 +3302,20 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_atomic_bridge_feature">get_atomic_bridge_feature</a>(): u64 { <a href="features.md#0x1_features_ATOMIC_BRIDGE">ATOMIC_BRIDGE</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_governed_gas_pool_feature">get_governed_gas_pool_feature</a>(): u64 { <a href="features.md#0x1_features_GOVERNED_GAS_POOL">GOVERNED_GAS_POOL</a> }
 </code></pre>
 
 
 
 </details>
 
-<a id="0x1_features_abort_atomic_bridge_enabled"></a>
+<a id="0x1_features_governed_gas_pool_enabled"></a>
 
-## Function `abort_atomic_bridge_enabled`
+## Function `governed_gas_pool_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_abort_atomic_bridge_enabled">abort_atomic_bridge_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_governed_gas_pool_enabled">governed_gas_pool_enabled</a>(): bool
 </code></pre>
 
 
@@ -3263,8 +3324,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_abort_atomic_bridge_enabled">abort_atomic_bridge_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_ATOMIC_BRIDGE">ATOMIC_BRIDGE</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_governed_gas_pool_enabled">governed_gas_pool_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_GOVERNED_GAS_POOL">GOVERNED_GAS_POOL</a>)
 }
 </code></pre>
 
