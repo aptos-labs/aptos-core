@@ -12,7 +12,8 @@ type CacheEntry<T> = Arc<Mutex<Option<SizedCacheEntry<T>>>>;
 
 const DEFAULT_MAX_NUM_CACHE_ITEMS: usize = 1_000_000;
 
-/// A cache that uses a mutex to synchronize access to the cache entries.
+/// An in-memory cache that uses a mutex to synchronize access to the cache entries.
+/// The cache is designed with indexing use cases in mind and offers a deterministic FIFO eviction policy.
 #[derive(Debug)]
 pub struct SyncMutexCache<T: Send + Sync + Clone> {
     cache: Box<[CacheEntry<T>]>,
@@ -57,15 +58,14 @@ where
         lock.clone()
     }
 
-    fn insert_with_size(&self, key: usize, value: Arc<T>, size_in_bytes: usize) -> usize {
+    fn insert_with_size(&self, key: usize, value: T, size_in_bytes: usize) -> usize {
         let index = key % self.capacity;
         let arc = self.cache[index].clone();
         let mut lock = arc.lock();
 
         // Update cache size
-        if let Some(prev_value) = &*lock {
-            self.size
-                .fetch_sub(prev_value.size_in_bytes, Ordering::Relaxed);
+        if let Some(prev) = &*lock {
+            self.size.fetch_sub(prev.size_in_bytes, Ordering::Relaxed);
         }
 
         // Update cache entry
@@ -83,11 +83,10 @@ where
         let arc = self.cache[*key % self.capacity].clone();
         let mut lock = arc.lock();
 
-        // Update cache size & set value at key to none
-        if let Some(prev_value) = lock.take() {
-            self.size
-                .fetch_sub(prev_value.size_in_bytes, Ordering::Relaxed);
-            return Some(prev_value);
+        // Update the cache size and set the value at key to none
+        if let Some(prev) = lock.take() {
+            self.size.fetch_sub(prev.size_in_bytes, Ordering::Relaxed);
+            return Some(prev);
         }
         None
     }

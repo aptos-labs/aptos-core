@@ -19,32 +19,32 @@ mod tests {
         let key = 100;
         let value = NotATransaction::new(key as i64);
         cache.insert(key, value.clone());
-        assert_eq!(cache.get(&key).as_deref().cloned(), Some(value));
+        assert_eq!(cache.get(&key).clone(), Some(value));
 
         let key = 101;
         let value = NotATransaction::new(key as i64);
         cache.insert(key, value.clone());
-        assert_eq!(cache.get(&key).as_deref().cloned(), Some(value));
+        assert_eq!(cache.get(&key).clone(), Some(value));
 
         let key = 105;
         let value = NotATransaction::new(key as i64);
         cache.insert(key, value.clone());
-        assert_eq!(cache.get(&key).as_deref().cloned(), Some(value));
+        assert_eq!(cache.get(&key).clone(), Some(value));
 
         let key = 103;
         let value = NotATransaction::new(key as i64);
         cache.insert(key, value.clone());
-        assert_eq!(cache.get(&key).as_deref().cloned(), Some(value));
+        assert_eq!(cache.get(&key).clone(), Some(value));
 
         let key = 102;
         let value = NotATransaction::new(key as i64);
         cache.insert(key, value.clone());
-        assert_eq!(cache.get(&key).as_deref().cloned(), Some(value));
+        assert_eq!(cache.get(&key).clone(), Some(value));
 
         let key = 104;
         let value = NotATransaction::new(key as i64);
         cache.insert(key, value.clone());
-        assert_eq!(cache.get(&key).as_deref().cloned(), Some(value));
+        assert_eq!(cache.get(&key).clone(), Some(value));
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 10)]
@@ -54,32 +54,32 @@ mod tests {
         let key = 7;
         let value = NotATransaction::new(key as i64);
         cache.insert(key, value.clone());
-        assert_eq!(cache.get(&key).as_deref().cloned(), Some(value));
+        assert_eq!(cache.get(&key).clone(), Some(value));
 
         let key = 8;
         let value = NotATransaction::new(key as i64);
         cache.insert(key, value.clone());
-        assert_eq!(cache.get(&key).as_deref().cloned(), Some(value));
+        assert_eq!(cache.get(&key).clone(), Some(value));
 
         let key = 12;
         let value = NotATransaction::new(key as i64);
         cache.insert(key, value.clone());
-        assert_eq!(cache.get(&key).as_deref().cloned(), Some(value));
+        assert_eq!(cache.get(&key).clone(), Some(value));
 
         let key = 10;
         let value = NotATransaction::new(key as i64);
         cache.insert(key, value.clone());
-        assert_eq!(cache.get(&key).as_deref().cloned(), Some(value));
+        assert_eq!(cache.get(&key).clone(), Some(value));
 
         let key = 9;
         let value = NotATransaction::new(key as i64);
         cache.insert(key, value.clone());
-        assert_eq!(cache.get(&key).as_deref().cloned(), Some(value));
+        assert_eq!(cache.get(&key).clone(), Some(value));
 
         let key = 11;
         let value = NotATransaction::new(key as i64);
         cache.insert(key, value.clone());
-        assert_eq!(cache.get(&key).as_deref().cloned(), Some(value));
+        assert_eq!(cache.get(&key).clone(), Some(value));
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 10)]
