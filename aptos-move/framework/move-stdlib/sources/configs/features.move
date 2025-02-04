@@ -639,7 +639,7 @@ module std::features {
     /// This can be used on testnet prior to successful DKG.
     ///
     /// Governance proposals should use `change_feature_flags_for_next_epoch()` to enable/disable features.
-    public fun change_feature_flags(framework: &signer, enable: vector<u64>, disable: vector<u64>) {
+    public fun change_feature_flags(framework: &signer, enable: vector<u64>, disable: vector<u64>) acquires Features {
         change_feature_flags_internal(framework, enable, disable)
     }
 

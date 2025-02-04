@@ -148,7 +148,19 @@ pub fn generate_gas_upgrade_proposal(
                     );
                 },
             }
-            emitln!(writer, "aptos_governance::reconfigure({});", signer_arg);
+
+            let reconfig_method = if is_testnet {
+                "force_end_epoch"
+            } else {
+                "reconfigure"
+            };
+
+            emitln!(
+                writer,
+                "aptos_governance::{}({});",
+                reconfig_method,
+                signer_arg
+            );
         },
     );
 
