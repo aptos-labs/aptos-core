@@ -197,6 +197,13 @@ pub fn generate_feature_upgrade_proposal(
                 update_method,
                 signer_arg
             );
+
+            let reconfig_method = if is_testnet {
+                "force_end_epoch"
+            } else {
+                "reconfigure"
+            };
+
             emitln!(writer, "aptos_governance::reconfigure({});", signer_arg);
         },
     );
