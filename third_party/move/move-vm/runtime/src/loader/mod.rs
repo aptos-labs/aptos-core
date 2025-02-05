@@ -77,6 +77,7 @@ use move_vm_types::loaded_data::{
 };
 pub use script::Script;
 pub(crate) use script::ScriptCache;
+use crate::storage::ty_tag_converter::STRUCT_INSTANTIATION_CACHE;
 
 type ScriptHash = [u8; 32];
 
@@ -1490,17 +1491,24 @@ impl<'a> Resolver<'a> {
         instantiation: &[Type],
         ty_args: &[Type],
     ) -> PartialVMResult<Vec<Type>> {
+        if let Some(tys) = STRUCT_INSTANTIATION_CACHE.get_struct_instantiation(&struct_ty.idx, ty_args) {
+            return Ok(tys);
+        }
+
         let ty_builder = self.loader().ty_builder();
         let instantiation_tys = instantiation
             .iter()
             .map(|inst_ty| ty_builder.create_ty_with_subst(inst_ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
 
-        struct_ty
+        let tys = struct_ty
             .fields(variant)?
             .iter()
             .map(|(_, inst_ty)| ty_builder.create_ty_with_subst(inst_ty, &instantiation_tys))
-            .collect::<PartialVMResult<Vec<_>>>()
+            .collect::<PartialVMResult<Vec<_>>>()?;
+
+        STRUCT_INSTANTIATION_CACHE.insert_struct_instantiation(&struct_ty.idx, ty_args, &tys);
+        Ok(tys)
     }
 
     fn single_type_at(&self, idx: SignatureIndex) -> &Type {

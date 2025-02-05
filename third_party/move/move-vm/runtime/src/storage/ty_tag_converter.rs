@@ -11,6 +11,51 @@ use move_core_types::{
 use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndex};
 use parking_lot::RwLock;
 use std::hash::{Hash, Hasher};
+use std::sync::Arc;
+use lazy_static::lazy_static;
+
+pub struct StructInstantiationCache {
+    inner: RwLock<HashMap<StructKey, Vec<Type>>>,
+}
+
+impl StructInstantiationCache {
+    pub fn empty() -> Self {
+        Self {
+            inner: RwLock::new(HashMap::new())
+        }
+    }
+
+    pub fn get_struct_instantiation(&self, idx: &StructNameIndex, ty_args: &[Type]) -> Option<Vec<Type>> {
+        self.inner.read().get(&StructKeyRef { idx, ty_args} ).cloned()
+    }
+
+    pub fn insert_struct_instantiation(&self, idx: &StructNameIndex, ty_args: &[Type], fields: &Vec<Type>) {
+        if self
+            .inner
+            .read()
+            .contains_key(&StructKeyRef { idx, ty_args })
+        {
+            return;
+        }
+
+        let key = StructKey {
+            idx: *idx,
+            ty_args: ty_args.to_vec(),
+        };
+        let fields = fields.clone();
+
+        // Otherwise, we need to insert. We did the clones outside the lock, and also avoid the
+        // double insertion.
+        let mut cache = self.inner.write();
+        if let Entry::Vacant(entry) = cache.entry(key) {
+            entry.insert(fields);
+        }
+    }
+}
+
+lazy_static! {
+    pub static ref STRUCT_INSTANTIATION_CACHE: StructInstantiationCache = StructInstantiationCache::empty();
+}
 
 /// Key type for [TypeTagCache] that corresponds to a fully-instantiated struct.
 #[derive(Clone, Eq, PartialEq)]
