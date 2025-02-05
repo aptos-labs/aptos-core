@@ -789,7 +789,7 @@ impl ConsensusObserver {
         // Unpack the pending block
         let (peer_network_id, message_received_time, observed_ordered_block) =
             pending_block_with_metadata.into_parts();
-        let ordered_block = observed_ordered_block.consume_ordered_block();
+        let ordered_block = observed_ordered_block.ordered_block().clone();
 
         // Verify the ordered block proof
         let epoch_state = self.get_epoch_state();
@@ -850,7 +850,7 @@ impl ConsensusObserver {
             // Insert the ordered block into the pending blocks
             self.ordered_block_store
                 .lock()
-                .insert_ordered_block(ordered_block.clone());
+                .insert_ordered_block(observed_ordered_block.clone());
 
             // If state sync is not syncing to a commit, finalize the ordered blocks
             if !self.state_sync_manager.is_syncing_to_commit() {
@@ -1098,8 +1098,9 @@ impl ConsensusObserver {
 
         // Process all the newly ordered blocks
         let all_ordered_blocks = self.ordered_block_store.lock().get_all_ordered_blocks();
-        for (_, (ordered_block, commit_decision)) in all_ordered_blocks {
+        for (_, (observed_ordered_block, commit_decision)) in all_ordered_blocks {
             // Finalize the ordered block
+            let ordered_block = observed_ordered_block.consume_ordered_block();
             self.finalize_ordered_block(ordered_block).await;
 
             // If a commit decision is available, forward it to the execution pipeline
