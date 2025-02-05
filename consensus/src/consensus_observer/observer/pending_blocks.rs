@@ -7,7 +7,7 @@ use crate::consensus_observer::{
         metrics,
     },
     network::observer_message::OrderedBlock,
-    observer::payload_store::BlockPayloadStore,
+    observer::{execution_pool::ObservedOrderedBlock, payload_store::BlockPayloadStore},
 };
 use aptos_config::{config::ConsensusObserverConfig, network_id::PeerNetworkId};
 use aptos_infallible::Mutex;
@@ -24,34 +24,34 @@ use std::{
 pub struct PendingBlockWithMetadata {
     peer_network_id: PeerNetworkId, // The peer network ID of the block sender
     block_receipt_time: Instant,    // The time the block was received
-    ordered_block: OrderedBlock,    // The ordered block
+    observed_ordered_block: ObservedOrderedBlock, // The observed ordered block
 }
 
 impl PendingBlockWithMetadata {
     pub fn new(
         peer_network_id: PeerNetworkId,
         block_receipt_time: Instant,
-        ordered_block: OrderedBlock,
+        observed_ordered_block: ObservedOrderedBlock,
     ) -> Self {
         Self {
             peer_network_id,
             block_receipt_time,
-            ordered_block,
+            observed_ordered_block,
         }
     }
 
     /// Unpacks the block with metadata into its components
-    pub fn into_parts(self) -> (PeerNetworkId, Instant, OrderedBlock) {
+    pub fn into_parts(self) -> (PeerNetworkId, Instant, ObservedOrderedBlock) {
         (
             self.peer_network_id,
             self.block_receipt_time,
-            self.ordered_block,
+            self.observed_ordered_block,
         )
     }
 
     /// Returns a reference to the ordered block
     pub fn ordered_block(&self) -> &OrderedBlock {
-        &self.ordered_block
+        self.observed_ordered_block.ordered_block()
     }
 }
 
@@ -235,7 +235,9 @@ impl PendingBlockStore {
 mod test {
     use super::*;
     use crate::consensus_observer::{
-        network::observer_message::{BlockPayload, BlockTransactionPayload},
+        network::observer_message::{
+            BlockPayload, BlockTransactionPayload, ExecutionPoolWindow, OrderedBlockWithWindow,
+        },
         observer::payload_store::BlockPayloadStore,
     };
     use aptos_consensus_types::{
@@ -250,7 +252,7 @@ mod test {
         block_info::BlockInfo,
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     };
-    use rand::Rng;
+    use rand::{rngs::OsRng, Rng};
 
     #[test]
     fn test_clear_missing_blocks() {
@@ -525,14 +527,15 @@ mod test {
         // Insert the maximum number of pending blocks into the store
         let mut pending_blocks_with_metadata = vec![];
         for i in 0..max_num_pending_blocks {
-            // Create an ordered block
+            // Create an observed ordered block
             let ordered_block = create_ordered_block(0, 0, 1, i);
+            let observed_ordered_block = ObservedOrderedBlock::new(ordered_block.clone());
 
             // Create a pending block with metadata
             let pending_block_with_metadata = PendingBlockWithMetadata::new(
                 PeerNetworkId::random(),
                 Instant::now(),
-                ordered_block.clone(),
+                observed_ordered_block.clone(),
             );
 
             // Insert the ordered block into the pending block store
@@ -562,11 +565,12 @@ mod test {
                 expected_block_with_metadata.into_parts();
 
             // Remove the pending block from the store
+            let first_block = expected_ordered_block.ordered_block().first_block();
             let removed_block_with_metadata = pending_block_store
                 .lock()
                 .remove_ready_block(
-                    expected_ordered_block.first_block().epoch(),
-                    expected_ordered_block.first_block().round(),
+                    first_block.epoch(),
+                    first_block.round(),
                     block_payload_store.clone(),
                 )
                 .unwrap();
@@ -581,8 +585,8 @@ mod test {
                 expected_block_receipt_time
             );
             assert_eq!(
-                removed_block_with_metadata.ordered_block().clone(),
-                expected_ordered_block
+                removed_block_with_metadata.ordered_block(),
+                expected_ordered_block.ordered_block()
             );
         }
     }
@@ -912,11 +916,22 @@ mod test {
             let ordered_block =
                 create_ordered_block(epoch, starting_round, max_pipelined_blocks, i);
 
+            // Create an observed ordered block (the observed type is determined randomly)
+            let observed_ordered_block = if OsRng.gen::<u8>() % 2 == 0 {
+                ObservedOrderedBlock::new(ordered_block.clone())
+            } else {
+                let ordered_block_with_window = OrderedBlockWithWindow::new(
+                    ordered_block.clone(),
+                    ExecutionPoolWindow::new(vec![]),
+                );
+                ObservedOrderedBlock::new_with_window(ordered_block_with_window)
+            };
+
             // Create a pending block with metadata
             let pending_block_with_metadata = PendingBlockWithMetadata::new(
                 PeerNetworkId::random(),
                 Instant::now(),
-                ordered_block.clone(),
+                observed_ordered_block,
             );
 
             // Insert the ordered block into the pending block store
