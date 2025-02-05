@@ -102,7 +102,7 @@ pub fn run_benchmark<V>(
     connected_tx_grps: usize,
     clustered_txns_gen_config: Option<ClusteredTxnsGenConfig>,
     shuffle_connected_txns: bool,
-    foundational_txns: bool,
+    non_conflicting_txns: bool,
     hotspot_probability: Option<f32>,
     num_main_signer_accounts: usize,
     num_additional_dst_pool_accounts: usize,
@@ -216,7 +216,7 @@ pub fn run_benchmark<V>(
             connected_tx_grps,
             clustered_txns_gen_config,
             shuffle_connected_txns,
-            foundational_txns,
+            non_conflicting_txns,
             hotspot_probability,
         )
     };
@@ -705,7 +705,7 @@ mod tests {
             0,     /* connected txn groups in a block */
             None,
             false, /* shuffle the connected txns in a block */
-            false, /* is foundational_txns */
+            false, /* is non_conflicting_txns */
             None,  /* maybe_hotspot_probability */
             25,    /* num_main_signer_accounts */
             30,    /* num_dst_pool_accounts */

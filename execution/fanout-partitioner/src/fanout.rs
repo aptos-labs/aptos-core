@@ -71,7 +71,7 @@ impl BlockPartitioner for FanoutPartitioner {
         let compressed_graph = CompressedGraph::new(&transactions);
 
         if self.print_debug_stats {
-            println!("Senders: {}, accesses: {}", compressed_graph.sender_to_idx.len(), compressed_graph.access_to_idx.len());
+            info!("Senders: {}, accesses: {}", compressed_graph.sender_to_idx.len(), compressed_graph.access_to_idx.len());
         }
 
         if compressed_graph.are_all_txns_independent() {
@@ -318,7 +318,7 @@ impl FanoutPartitioner {
         let max_shard_weight = 1 + total_weight / num_shards as u32; // this can be higher like 1.2x
 
         if self.print_debug_stats {
-            println!("Total {} txns, to split across {} shards, with at most {} in each.", total_weight, num_shards, max_shard_weight);
+            info!("Total {} txns, to split across {} shards, with at most {} in each.", total_weight, num_shards, max_shard_weight);
         }
         let mut assigned = vec![UNASSIGNED_SHARD; any_vertex_end_index as usize];
         let mut cur_bucket_idx = 0;
@@ -373,7 +373,7 @@ impl FanoutPartitioner {
         }
 
         if self.print_debug_stats {
-            println!("Init shard sizes: {:?}", bucket_weights);
+            info!("Init shard sizes: {:?}", bucket_weights);
         }
         assigned
     }
@@ -730,7 +730,7 @@ impl FanoutPartitioner {
             if alone_gain > 0.0 && from_shard_weight.max(to_shard_weight) >= (from_shard_weight - sender_weight).max(to_shard_weight + sender_weight) {
 
                 if self.print_detailed_debug_stats && num_moves == 0 {
-                    println!("matched alone: {} {}=>{}: {}, all: {:?}", sender, from_shard, to_shard, gain,
+                    info!("matched alone: {} {}=>{}: {}, all: {:?}", sender, from_shard, to_shard, gain,
                         graph.edges.get_edges(sender).iter().map(|access| &*access_shards[graph.access_to_vec_index(*access)]).collect::<Vec<_>>()
                     );
                 }
@@ -760,11 +760,11 @@ impl FanoutPartitioner {
 
                 if pass_weight_check && !moved[*other_sender as usize] && total_gain > best_gain / 100.0 && rng.gen_bool(self.move_probability) {
                     if self.print_detailed_debug_stats && num_moves == 0 {
-                        println!("{} {}=>{}: {}, all: {:?}", sender, from_shard, to_shard, gain,
+                        info!("{} {}=>{}: {}, all: {:?}", sender, from_shard, to_shard, gain,
                             graph.edges.get_edges(sender).iter().map(|access| &*access_shards[graph.access_to_vec_index(*access)]).collect::<Vec<_>>()
                         );
 
-                        println!("matched from best queue, {} {}=>{}: {}, all: {:?}", other_sender, to_shard, from_shard, other_gain,
+                        info!("matched from best queue, {} {}=>{}: {}, all: {:?}", other_sender, to_shard, from_shard, other_gain,
                             graph.edges.get_edges(*other_sender).iter().map(|access| &*access_shards[graph.access_to_vec_index(*access)]).collect::<Vec<_>>()
                         );
                     }
@@ -797,11 +797,11 @@ impl FanoutPartitioner {
                 let total_gain = (gain + other_gain).into_inner();
                 if pass_weight_check && !moved[*other_sender as usize] && total_gain > best_gain / 100.0 && rng.gen_bool(self.move_probability) {
                     if self.print_detailed_debug_stats && num_moves == 0 {
-                        println!("{} {}=>{}: {}, all: {:?}", sender, from_shard, to_shard, gain,
+                        info!("{} {}=>{}: {}, all: {:?}", sender, from_shard, to_shard, gain,
                             graph.edges.get_edges(sender).iter().map(|access| &*access_shards[graph.access_to_vec_index(*access)]).collect::<Vec<_>>()
                         );
 
-                        println!("matched from least worst queue {} {}=>{}: {} (ll={}), all: {:?}", other_sender, to_shard, from_shard, other_gain, other_gain_lower_limit,
+                        info!("matched from least worst queue {} {}=>{}: {} (ll={}), all: {:?}", other_sender, to_shard, from_shard, other_gain, other_gain_lower_limit,
                             graph.edges.get_edges(*other_sender).iter().map(|access| &*access_shards[graph.access_to_vec_index(*access)]).collect::<Vec<_>>()
                         );
                     }
@@ -891,12 +891,12 @@ impl FanoutPartitioner {
             let cur = sum / (count as f32);
             if prev > cur {
                 if self.print_detailed_debug_stats {
-                    println!("Ending {} at {}, cur {}={}/{}. shard fill: {:?}", prev, transactions.len(), cur, sum, count, shard_fill);
+                    info!("Ending {} at {}, cur {}={}/{}. shard fill: {:?}", prev, transactions.len(), cur, sum, count, shard_fill);
                 }
 
                 if (last == 1.0 && last > cur) || (last > cur as f32 + 1.0 / num_shards as f32) {
                     if !self.print_detailed_debug_stats && self.print_debug_stats {
-                        println!("Ending {} at {}, cur {}={}/{}. shard fill: {:?}", prev, transactions.len(), cur, sum, count, shard_fill);
+                        info!("Ending {} at {}, cur {}={}/{}. shard fill: {:?}", prev, transactions.len(), cur, sum, count, shard_fill);
                     }
 
                     let fill_max = *shard_fill.iter().max().unwrap();
@@ -909,7 +909,7 @@ impl FanoutPartitioner {
                             transactions.push(cur_unconstrained.pop_front().unwrap());
                             shard_fill[shard as usize] += 1;
                             if cur_unconstrained.is_empty() && self.print_debug_stats {
-                                println!("Run out of unconstrained on {}", shard);
+                                info!("Run out of unconstrained on {}", shard);
                             }
                         }
                     }
@@ -921,7 +921,7 @@ impl FanoutPartitioner {
             }
             // if self.print_debug_stats {
             //     if transactions.len() % 10000 == 0 {
-            //         println!("running value {} at {}, cur {}={}/{}. shard fill: {:?}", prev, transactions.len(), cur, sum, count, shard_fill);
+            //         info!("running value {} at {}, cur {}={}/{}. shard fill: {:?}", prev, transactions.len(), cur, sum, count, shard_fill);
             //     }
             // }
 
@@ -929,7 +929,7 @@ impl FanoutPartitioner {
             shard_fill[shard as usize] += 1;
         }
         if self.print_debug_stats {
-            println!("Ending {} at {}. shard fill: {:?}", prev, transactions.len(), shard_fill);
+            info!("Ending {} at {}. shard fill: {:?}", prev, transactions.len(), shard_fill);
         }
 
         for shard in 0..num_shards {
@@ -938,7 +938,7 @@ impl FanoutPartitioner {
         }
 
         if self.print_debug_stats {
-            println!("Ending after top-up {} at {}. shard fill: {:?}", prev, transactions.len(), shard_fill);
+            info!("Ending after top-up {} at {}. shard fill: {:?}", prev, transactions.len(), shard_fill);
         }
 
         // transactions.sort_by_key(|txn| sender_to_shard_idxs[*compressed_graph.sender_to_idx.get(&txn.sender().unwrap()).unwrap() as usize]);

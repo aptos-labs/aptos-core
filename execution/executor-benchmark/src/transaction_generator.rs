@@ -283,7 +283,7 @@ impl TransactionGenerator {
         connected_tx_grps: usize,
         clustered_txns_gen_config: Option<ClusteredTxnsGenConfig>,
         shuffle_connected_txns: bool,
-        foundational_txns: bool,
+        non_conflicting_txns: bool,
         hotspot_probability: Option<f32>,
     ) -> usize {
         assert!(self.block_sender.is_some());
@@ -294,7 +294,7 @@ impl TransactionGenerator {
             connected_tx_grps,
             clustered_txns_gen_config,
             shuffle_connected_txns,
-            foundational_txns,
+            non_conflicting_txns,
             hotspot_probability,
         );
         num_transfer_blocks
@@ -801,14 +801,14 @@ impl TransactionGenerator {
         connected_tx_grps: usize,
         clustered_txns_gen_config: Option<ClusteredTxnsGenConfig>,
         shuffle_connected_txns: bool,
-        foundational_txns: bool,
+        non_conflicting_txns: bool,
         hotspot_probability: Option<f32>,
     ) {
         info!("Starting block generation.");
         info!("block_size={block_size}");
         info!("num_blocks={num_blocks}");
-        if foundational_txns {
-            info!("block_generation_mode=foundational_txns");
+        if non_conflicting_txns {
+            info!("block_generation_mode=non_conflicting_txns");
             self.gen_non_conflicting_self_transfer_transactions(block_size, num_blocks);
         } else if connected_tx_grps > 0 {
             info!("block_generation_mode=connected_tx_grps");

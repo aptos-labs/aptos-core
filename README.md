@@ -33,11 +33,11 @@ We spun up the nodes on a GCP data center. The specs are for the nodes are
 ```
   Shard ids start from 0 and go to num_shards - 1. For example, for 2 shards, the shard ids are 0 and 1.
 * On the coordinator node, run the relevant benchmark command.
-  * Foundational txns workload:
+  * Non-conflicting txns workload:
   ```
-     taskset -c 0-89,180-269 cargo run --profile performance -p aptos-executor-benchmark -- --block-size 500000 --enable-storage-sharding --foundational-txns --num-executor-shards NUM_SHARDS --connected-tx-grps 500000 --partitioner-version v3-fanout --remote-executor-addresses <shard_0_ip>:<shard_0_port> <shard_1_ip>:<shard_1_port> <shard_NUM_SHARDS-1_ip>:<shard_NUM_SHARDS-1_port> --coordinator-address <coord_ip>:<coord_port> --generate-then-execute --split-stages run-executor --data-dir ~/workspace/db_dirs/db --checkpoint-dir ~/workspace/db_dirs/chk --blocks 50 --main-signer-accounts 500001
+     taskset -c 0-89,180-269 cargo run --profile performance -p aptos-executor-benchmark -- --block-size 500000 --enable-storage-sharding --non-conflicting-txns --num-executor-shards NUM_SHARDS --connected-tx-grps 500000 --partitioner-version v3-fanout --remote-executor-addresses <shard_0_ip>:<shard_0_port> <shard_1_ip>:<shard_1_port> <shard_NUM_SHARDS-1_ip>:<shard_NUM_SHARDS-1_port> --coordinator-address <coord_ip>:<coord_port> --generate-then-execute --split-stages run-executor --data-dir ~/workspace/db_dirs/db --checkpoint-dir ~/workspace/db_dirs/chk --blocks 50 --main-signer-accounts 500001
   ```
-  * Multi DApp workload:
+  * Conflicting txns workload:
   ```
      taskset -c 0-89,180-269 cargo run --profile performance -p aptos-executor-benchmark -- --block-size 500000 --enable-storage-sharding --num-executor-shards NUM_SHARDS --partitioner-version v3-fanout --fanout-num-iterations 40 --num-clusters 400 --num-resource-addresses-per-cluster 5 --cluster-size-relative-std-dev 0.05 --mean-txns-per-user 5 --txns-per-user-relative-std-dev 0.5 --fraction-of-external-txns 0.001 --remote-executor-addresses <shard_0_ip>:<shard_0_port> <shard_1_ip>:<shard_1_port> <shard_NUM_SHARDS-1_ip>:<shard_NUM_SHARDS-1_port> --coordinator-address <coord_ip>:<coord_port> --generate-then-execute --split-stages run-executor --data-dir ~/workspace/db_dirs/db --checkpoint-dir ~/workspace/db_dirs/chk --blocks 50 --main-signer-accounts 1000001
   ```
