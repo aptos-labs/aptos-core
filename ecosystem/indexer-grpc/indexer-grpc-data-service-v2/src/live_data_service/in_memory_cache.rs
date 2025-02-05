@@ -6,6 +6,7 @@ use crate::{
     live_data_service::{data_manager::DataManager, fetch_manager::FetchManager},
 };
 use aptos_protos::transaction::v1::Transaction;
+use aptos_transaction_filter::{BooleanTransactionFilter, Filterable};
 use prost::Message;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -41,6 +42,7 @@ impl<'a> InMemoryCache<'a> {
         ending_version: u64,
         max_num_transactions_per_batch: usize,
         max_bytes_per_batch: usize,
+        filter: &Option<BooleanTransactionFilter>,
     ) -> Option<(Vec<Transaction>, usize)> {
         while starting_version >= self.data_manager.read().await.end_version {
             trace!("Reached head, wait...");
@@ -82,8 +84,10 @@ impl<'a> InMemoryCache<'a> {
             {
                 if let Some(transaction) = data_manager.get_data(version).as_ref() {
                     // NOTE: We allow 1 more txn beyond the size limit here, for simplicity.
-                    total_bytes += transaction.encoded_len();
-                    result.push(transaction.as_ref().clone());
+                    if filter.is_none() || filter.as_ref().unwrap().matches(transaction) {
+                        total_bytes += transaction.encoded_len();
+                        result.push(transaction.as_ref().clone());
+                    }
                     version += 1;
                 } else {
                     break;
