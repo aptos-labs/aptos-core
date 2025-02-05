@@ -36,6 +36,7 @@ Once modules are marked as immutable, they cannot be made mutable again.
 
 
 -  [Resource `ManagingRefs`](#0x1_object_code_deployment_ManagingRefs)
+-  [Enum Resource `SignerPermissions`](#0x1_object_code_deployment_SignerPermissions)
 -  [Struct `Publish`](#0x1_object_code_deployment_Publish)
 -  [Struct `Upgrade`](#0x1_object_code_deployment_Upgrade)
 -  [Struct `Freeze`](#0x1_object_code_deployment_Freeze)
@@ -43,6 +44,8 @@ Once modules are marked as immutable, they cannot be made mutable again.
 -  [Function `publish`](#0x1_object_code_deployment_publish)
 -  [Function `object_seed`](#0x1_object_code_deployment_object_seed)
 -  [Function `upgrade`](#0x1_object_code_deployment_upgrade)
+-  [Function `enable_signer_for_owner`](#0x1_object_code_deployment_enable_signer_for_owner)
+-  [Function `generate_signer`](#0x1_object_code_deployment_generate_signer)
 -  [Function `freeze_code_object`](#0x1_object_code_deployment_freeze_code_object)
 
 
@@ -85,6 +88,41 @@ Internal struct, attached to the object, that holds Refs we need to manage the c
 </dd>
 </dl>
 
+
+</details>
+
+<a id="0x1_object_code_deployment_SignerPermissions"></a>
+
+## Enum Resource `SignerPermissions`
+
+Define who can access the extend ref for other purposes, and manage it
+
+
+<pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
+enum <a href="object_code_deployment.md#0x1_object_code_deployment_SignerPermissions">SignerPermissions</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>Owner</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+</dl>
+
+
+</details>
+
+</details>
 
 </details>
 
@@ -345,6 +383,84 @@ Requires the publisher to be the owner of the <code>code_object</code>.
     <a href="code.md#0x1_code_publish_package_txn">code::publish_package_txn</a>(code_signer, metadata_serialized, <a href="code.md#0x1_code">code</a>);
 
     <a href="event.md#0x1_event_emit">event::emit</a>(<a href="object_code_deployment.md#0x1_object_code_deployment_Upgrade">Upgrade</a> { object_address: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(code_signer), });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_object_code_deployment_enable_signer_for_owner"></a>
+
+## Function `enable_signer_for_owner`
+
+Enables the ability to use the signer for the owner
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_enable_signer_for_owner">enable_signer_for_owner</a>(publisher: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, code_object: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="object_code_deployment.md#0x1_object_code_deployment_ManagingRefs">object_code_deployment::ManagingRefs</a>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_enable_signer_for_owner">enable_signer_for_owner</a>(
+    publisher: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    code_object: Object&lt;<a href="object_code_deployment.md#0x1_object_code_deployment_ManagingRefs">ManagingRefs</a>&gt;,
+) <b>acquires</b> <a href="object_code_deployment.md#0x1_object_code_deployment_ManagingRefs">ManagingRefs</a> {
+    <b>let</b> publisher_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(publisher);
+    <b>assert</b>!(
+        <a href="object.md#0x1_object_is_owner">object::is_owner</a>(code_object, publisher_address),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object_code_deployment.md#0x1_object_code_deployment_ENOT_CODE_OBJECT_OWNER">ENOT_CODE_OBJECT_OWNER</a>),
+    );
+
+    <b>let</b> code_object_address = <a href="object.md#0x1_object_object_address">object::object_address</a>(&code_object);
+    <b>let</b> extend_ref = &<b>borrow_global</b>&lt;<a href="object_code_deployment.md#0x1_object_code_deployment_ManagingRefs">ManagingRefs</a>&gt;(code_object_address).extend_ref;
+    <b>let</b> code_signer = &<a href="object.md#0x1_object_generate_signer_for_extending">object::generate_signer_for_extending</a>(extend_ref);
+    <b>move_to</b>(code_signer, SignerPermissions::Owner);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_object_code_deployment_generate_signer"></a>
+
+## Function `generate_signer`
+
+Generates a signer for the code object
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_generate_signer">generate_signer</a>(caller: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, code_object: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="object_code_deployment.md#0x1_object_code_deployment_SignerPermissions">object_code_deployment::SignerPermissions</a>&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_generate_signer">generate_signer</a>(
+    caller: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    code_object: Object&lt;<a href="object_code_deployment.md#0x1_object_code_deployment_SignerPermissions">SignerPermissions</a>&gt;
+): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="object_code_deployment.md#0x1_object_code_deployment_SignerPermissions">SignerPermissions</a>, <a href="object_code_deployment.md#0x1_object_code_deployment_ManagingRefs">ManagingRefs</a> {
+    <b>let</b> caller_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(caller);
+    <b>let</b> code_object_address = <a href="object.md#0x1_object_object_address">object::object_address</a>(&code_object);
+    <b>let</b> permissions = <b>borrow_global</b>&lt;<a href="object_code_deployment.md#0x1_object_code_deployment_SignerPermissions">SignerPermissions</a>&gt;(code_object_address);
+    match (permissions) {
+        (SignerPermissions::Owner) =&gt; {
+            <b>assert</b>!(
+                <a href="object.md#0x1_object_is_owner">object::is_owner</a>(code_object, caller_address),
+                <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object_code_deployment.md#0x1_object_code_deployment_ENOT_CODE_OBJECT_OWNER">ENOT_CODE_OBJECT_OWNER</a>),
+            );
+
+            <b>let</b> extend_ref = &<b>borrow_global</b>&lt;<a href="object_code_deployment.md#0x1_object_code_deployment_ManagingRefs">ManagingRefs</a>&gt;(code_object_address).extend_ref;
+            <a href="object.md#0x1_object_generate_signer_for_extending">object::generate_signer_for_extending</a>(extend_ref)
+        }
+    }
 }
 </code></pre>
 

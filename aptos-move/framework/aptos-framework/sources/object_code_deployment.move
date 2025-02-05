@@ -59,6 +59,12 @@ module aptos_framework::object_code_deployment {
         extend_ref: ExtendRef,
     }
 
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    /// Define who can access the extend ref for other purposes, and manage it
+    enum SignerPermissions has key {
+        Owner,
+    }
+
     #[event]
     /// Event emitted when code is published to an object.
     struct Publish has drop, store {
@@ -138,6 +144,44 @@ module aptos_framework::object_code_deployment {
         code::publish_package_txn(code_signer, metadata_serialized, code);
 
         event::emit(Upgrade { object_address: signer::address_of(code_signer), });
+    }
+
+    /// Enables the ability to use the signer for the owner
+    public entry fun enable_signer_for_owner(
+        publisher: &signer,
+        code_object: Object<ManagingRefs>,
+    ) acquires ManagingRefs {
+        let publisher_address = signer::address_of(publisher);
+        assert!(
+            object::is_owner(code_object, publisher_address),
+            error::permission_denied(ENOT_CODE_OBJECT_OWNER),
+        );
+
+        let code_object_address = object::object_address(&code_object);
+        let extend_ref = &borrow_global<ManagingRefs>(code_object_address).extend_ref;
+        let code_signer = &object::generate_signer_for_extending(extend_ref);
+        move_to(code_signer, SignerPermissions::Owner);
+    }
+
+    /// Generates a signer for the code object
+    public fun generate_signer(
+        caller: &signer,
+        code_object: Object<SignerPermissions>
+    ): signer acquires SignerPermissions, ManagingRefs {
+        let caller_address = signer::address_of(caller);
+        let code_object_address = object::object_address(&code_object);
+        let permissions = borrow_global<SignerPermissions>(code_object_address);
+        match (permissions) {
+            (SignerPermissions::Owner) => {
+                assert!(
+                    object::is_owner(code_object, caller_address),
+                    error::permission_denied(ENOT_CODE_OBJECT_OWNER),
+                );
+
+                let extend_ref = &borrow_global<ManagingRefs>(code_object_address).extend_ref;
+                object::generate_signer_for_extending(extend_ref)
+            }
+        }
     }
 
     /// Make an existing upgradable package immutable. Once this is called, the package cannot be made upgradable again.
