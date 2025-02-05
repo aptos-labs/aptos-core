@@ -235,9 +235,7 @@ impl PendingBlockStore {
 mod test {
     use super::*;
     use crate::consensus_observer::{
-        network::observer_message::{
-            BlockPayload, BlockTransactionPayload, ExecutionPoolWindow, OrderedBlockWithWindow,
-        },
+        network::observer_message::{BlockPayload, BlockTransactionPayload},
         observer::payload_store::BlockPayloadStore,
     };
     use aptos_consensus_types::{
@@ -252,7 +250,7 @@ mod test {
         block_info::BlockInfo,
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     };
-    use rand::{rngs::OsRng, Rng};
+    use rand::Rng;
 
     #[test]
     fn test_clear_missing_blocks() {
@@ -916,16 +914,9 @@ mod test {
             let ordered_block =
                 create_ordered_block(epoch, starting_round, max_pipelined_blocks, i);
 
-            // Create an observed ordered block (the observed type is determined randomly)
-            let observed_ordered_block = if OsRng.gen::<u8>() % 2 == 0 {
-                ObservedOrderedBlock::new(ordered_block.clone())
-            } else {
-                let ordered_block_with_window = OrderedBlockWithWindow::new(
-                    ordered_block.clone(),
-                    ExecutionPoolWindow::new(vec![]),
-                );
-                ObservedOrderedBlock::new_with_window(ordered_block_with_window)
-            };
+            // Create an observed ordered block
+            let observed_ordered_block =
+                ObservedOrderedBlock::new_for_testing(ordered_block.clone());
 
             // Create a pending block with metadata
             let pending_block_with_metadata = PendingBlockWithMetadata::new(
