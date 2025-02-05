@@ -10,24 +10,22 @@ impl serde::Serialize for ApiFilter {
     {
         use serde::ser::SerializeStruct;
         let mut len = 0;
-        if self.transaction_root_filter.is_some() {
-            len += 1;
-        }
-        if self.user_transaction_filter.is_some() {
-            len += 1;
-        }
-        if self.event_filter.is_some() {
+        if self.filter.is_some() {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("aptos.indexer.v1.APIFilter", len)?;
-        if let Some(v) = self.transaction_root_filter.as_ref() {
-            struct_ser.serialize_field("transactionRootFilter", v)?;
-        }
-        if let Some(v) = self.user_transaction_filter.as_ref() {
-            struct_ser.serialize_field("userTransactionFilter", v)?;
-        }
-        if let Some(v) = self.event_filter.as_ref() {
-            struct_ser.serialize_field("eventFilter", v)?;
+        if let Some(v) = self.filter.as_ref() {
+            match v {
+                api_filter::Filter::TransactionRootFilter(v) => {
+                    struct_ser.serialize_field("transactionRootFilter", v)?;
+                }
+                api_filter::Filter::UserTransactionFilter(v) => {
+                    struct_ser.serialize_field("userTransactionFilter", v)?;
+                }
+                api_filter::Filter::EventFilter(v) => {
+                    struct_ser.serialize_field("eventFilter", v)?;
+                }
+            }
         }
         struct_ser.end()
     }
@@ -95,35 +93,34 @@ impl<'de> serde::Deserialize<'de> for ApiFilter {
                 where
                     V: serde::de::MapAccess<'de>,
             {
-                let mut transaction_root_filter__ = None;
-                let mut user_transaction_filter__ = None;
-                let mut event_filter__ = None;
+                let mut filter__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::TransactionRootFilter => {
-                            if transaction_root_filter__.is_some() {
+                            if filter__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("transactionRootFilter"));
                             }
-                            transaction_root_filter__ = map.next_value()?;
+                            filter__ = map.next_value::<::std::option::Option<_>>()?.map(api_filter::Filter::TransactionRootFilter)
+;
                         }
                         GeneratedField::UserTransactionFilter => {
-                            if user_transaction_filter__.is_some() {
+                            if filter__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("userTransactionFilter"));
                             }
-                            user_transaction_filter__ = map.next_value()?;
+                            filter__ = map.next_value::<::std::option::Option<_>>()?.map(api_filter::Filter::UserTransactionFilter)
+;
                         }
                         GeneratedField::EventFilter => {
-                            if event_filter__.is_some() {
+                            if filter__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("eventFilter"));
                             }
-                            event_filter__ = map.next_value()?;
+                            filter__ = map.next_value::<::std::option::Option<_>>()?.map(api_filter::Filter::EventFilter)
+;
                         }
                     }
                 }
                 Ok(ApiFilter {
-                    transaction_root_filter: transaction_root_filter__,
-                    user_transaction_filter: user_transaction_filter__,
-                    event_filter: event_filter__,
+                    filter: filter__,
                 })
             }
         }

@@ -269,11 +269,12 @@ impl DataManager {
                 start_version,
                 /*retries=*/ 3,
                 /*max_files=*/ Some(1),
+                /*filter=*/ None,
                 tx,
             )
             .await;
 
-        if let Some((transactions, _)) = rx.recv().await {
+        if let Some((transactions, _, _)) = rx.recv().await {
             debug!(
                 "Transactions returned from filestore: [{start_version}, {}).",
                 transactions.last().unwrap().version
