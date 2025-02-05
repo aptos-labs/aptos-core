@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    flatten_perfect_tree::{FlattenPerfectTree, FptRef, FptRefMut},
+    flatten_perfect_tree::{FlattenPerfectTree, FptRef},
     metrics::TIMER,
     node::{CollisionCell, LeafContent, LeafNode, NodeRef, NodeStrongRef},
     utils::binary_tree_height,
@@ -11,7 +11,7 @@ use crate::{
 use aptos_drop_helper::ArcAsyncDrop;
 use aptos_metrics_core::TimerHelper;
 use itertools::Itertools;
-use std::collections::BTreeMap;
+use std::{cell::UnsafeCell, collections::BTreeMap};
 
 impl<K, V, S> LayeredMap<K, V, S>
 where
@@ -38,18 +38,19 @@ where
             .collect_vec();
 
         let height = Self::new_peak_height(self.top_layer.peak().num_leaves(), items.len());
-        let mut new_peak = FlattenPerfectTree::new_with_empty_nodes(height);
+        let new_peak = FlattenPerfectTree::new_with(height, || UnsafeCell::new(NodeRef::Empty));
         let builder = SubTreeBuilder {
             layer: self.top_layer.layer() + 1,
             base_layer: self.base_layer(),
             depth: 0,
             position_info: PositionInfo::new(self.top_layer.peak(), self.base_layer()),
-            output_position_info: OutputPositionInfo::new(new_peak.get_mut()),
+            output_position_info: OutputPositionInfo::new(new_peak.get_ref()),
             items: &items,
         };
         builder.build().finalize();
 
-        self.top_layer.spawn(new_peak, self.base_layer())
+        self.top_layer
+            .spawn(unsafe { new_peak.transmute() }, self.base_layer())
     }
 
     fn new_peak_height(previous_peak_feet: usize, items_in_new_layer: usize) -> usize {
@@ -93,15 +94,36 @@ impl<'a, K, V> Item<'a, K, V> {
     }
 }
 
-enum PositionInfo<'a, K, V> {
-    AbovePeakFeet(FptRef<'a, K, V>),
+pub trait NodeRefReader<K, V> {
+    fn get_strong_ref(&self, base_layer: u64) -> NodeStrongRef<K, V>;
+}
+
+impl<K, V> NodeRefReader<K, V> for NodeRef<K, V> {
+    fn get_strong_ref(&self, base_layer: u64) -> NodeStrongRef<K, V> {
+        self.get_strong(base_layer)
+    }
+}
+
+pub trait NodeRefWriter<K, V> {
+    fn overwrite(&self, node_ref: NodeRef<K, V>);
+}
+
+impl<K, V> NodeRefWriter<K, V> for UnsafeCell<NodeRef<K, V>> {
+    fn overwrite(&self, node_ref: NodeRef<K, V>) {
+        // The caller needs to guarantee that there's no other access to self during this call.
+        *unsafe { self.get().as_mut().expect("Null pointer") } = node_ref;
+    }
+}
+
+enum PositionInfo<'a, K, V, PeakFoot> {
+    AbovePeakFeet(FptRef<'a, PeakFoot>),
     PeakFootOrBelow(NodeStrongRef<K, V>),
 }
 
-impl<'a, K, V> PositionInfo<'a, K, V> {
-    fn new(peak: FptRef<'a, K, V>, base_layer: u64) -> Self {
+impl<'a, K, V, PeakFoot: NodeRefReader<K, V>> PositionInfo<'a, K, V, PeakFoot> {
+    fn new(peak: FptRef<'a, PeakFoot>, base_layer: u64) -> Self {
         if peak.num_leaves() == 1 {
-            Self::PeakFootOrBelow(peak.expect_single_node(base_layer))
+            Self::PeakFootOrBelow(peak.expect_single_node().get_strong_ref(base_layer))
         } else {
             Self::AbovePeakFeet(peak)
         }
@@ -126,8 +148,8 @@ impl<'a, K, V> PositionInfo<'a, K, V> {
                 let (left, right) = fpt.expect_sub_trees();
                 if left.is_single_node() {
                     (
-                        PeakFootOrBelow(left.expect_single_node(base_layer)),
-                        PeakFootOrBelow(right.expect_single_node(base_layer)),
+                        PeakFootOrBelow(left.expect_single_node().get_strong_ref(base_layer)),
+                        PeakFootOrBelow(right.expect_single_node().get_strong_ref(base_layer)),
                     )
                 } else {
                     (AbovePeakFeet(left), AbovePeakFeet(right))
@@ -141,18 +163,18 @@ impl<'a, K, V> PositionInfo<'a, K, V> {
     }
 }
 
-enum OutputPositionInfo<'a, K, V> {
-    AboveOrAtPeakFeet(FptRefMut<'a, K, V>),
-    BelowPeakFeet,
+enum OutputPositionInfo<'a, PeakFoot> {
+    InPeak(FptRef<'a, PeakFoot>),
+    BelowPeak,
 }
 
-impl<'a, K, V> OutputPositionInfo<'a, K, V> {
-    pub fn new(fpt_mut: FptRefMut<'a, K, V>) -> Self {
-        Self::AboveOrAtPeakFeet(fpt_mut)
+impl<'a, PeakFoot> OutputPositionInfo<'a, PeakFoot> {
+    pub fn new(fpt: FptRef<'a, PeakFoot>) -> Self {
+        Self::InPeak(fpt)
     }
 
     pub fn is_above_peak_feet(&self) -> bool {
-        if let OutputPositionInfo::AboveOrAtPeakFeet(fpt) = self {
+        if let OutputPositionInfo::InPeak(fpt) = self {
             !fpt.is_single_node()
         } else {
             false
@@ -160,73 +182,80 @@ impl<'a, K, V> OutputPositionInfo<'a, K, V> {
     }
 
     pub fn is_below_peak_feet(&self) -> bool {
-        matches!(self, OutputPositionInfo::BelowPeakFeet)
+        matches!(self, OutputPositionInfo::BelowPeak)
     }
 
     pub fn into_pending_build(
         self,
     ) -> (
-        PendingBuild<'a, K, V>,
-        OutputPositionInfo<'a, K, V>,
-        OutputPositionInfo<'a, K, V>,
+        PendingBuild<'a, PeakFoot>,
+        OutputPositionInfo<'a, PeakFoot>,
+        OutputPositionInfo<'a, PeakFoot>,
     ) {
         match self {
-            OutputPositionInfo::AboveOrAtPeakFeet(fpt_mut) => {
-                if fpt_mut.is_single_node() {
+            OutputPositionInfo::InPeak(fpt) => {
+                if fpt.is_single_node() {
                     (
-                        PendingBuild::FootOfPeak(fpt_mut.expect_into_single_node_mut()),
-                        OutputPositionInfo::BelowPeakFeet,
-                        OutputPositionInfo::BelowPeakFeet,
+                        PendingBuild::FootOfPeak(fpt.expect_single_node()),
+                        OutputPositionInfo::BelowPeak,
+                        OutputPositionInfo::BelowPeak,
                     )
                 } else {
-                    let (left, right) = fpt_mut.expect_into_sub_trees();
+                    let (left, right) = fpt.expect_sub_trees();
                     (
                         PendingBuild::AbovePeakFeet,
-                        OutputPositionInfo::AboveOrAtPeakFeet(left),
-                        OutputPositionInfo::AboveOrAtPeakFeet(right),
+                        OutputPositionInfo::InPeak(left),
+                        OutputPositionInfo::InPeak(right),
                     )
                 }
             },
-            OutputPositionInfo::BelowPeakFeet => (
-                PendingBuild::BelowPeakFeet,
-                OutputPositionInfo::BelowPeakFeet,
-                OutputPositionInfo::BelowPeakFeet,
+            OutputPositionInfo::BelowPeak => (
+                PendingBuild::BelowPeak,
+                OutputPositionInfo::BelowPeak,
+                OutputPositionInfo::BelowPeak,
             ),
         }
     }
 }
 
-enum PendingBuild<'a, K, V> {
+#[must_use = "Must seal PendingBuild."]
+enum PendingBuild<'a, PeakFoot> {
     AbovePeakFeet,
-    FootOfPeak(&'a mut NodeRef<K, V>),
-    BelowPeakFeet,
+    FootOfPeak(&'a PeakFoot),
+    BelowPeak,
 }
 
-impl<'a, K, V> PendingBuild<'a, K, V> {
-    fn seal_with_node(&mut self, node: NodeRef<K, V>) -> BuiltSubTree<K, V> {
+impl<'a, PeakFoot> PendingBuild<'a, PeakFoot> {
+    fn seal_with_node<K, V>(self, node: NodeRef<K, V>) -> BuiltSubTree<K, V>
+    where
+        PeakFoot: NodeRefWriter<K, V>,
+    {
         match self {
             PendingBuild::AbovePeakFeet => unreachable!("Trying to put node above peak feet."),
-            PendingBuild::FootOfPeak(ref_mut) => {
-                **ref_mut = node;
-                BuiltSubTree::InOrAtFootOfPeak
+            PendingBuild::FootOfPeak(foot) => {
+                foot.overwrite(node);
+                BuiltSubTree::InPeak
             },
-            PendingBuild::BelowPeakFeet => BuiltSubTree::BelowPeak(node),
+            PendingBuild::BelowPeak => BuiltSubTree::BelowPeak(node),
         }
     }
 
-    fn seal_with_children(
-        &mut self,
+    fn seal_with_children<K, V>(
+        self,
         left: BuiltSubTree<K, V>,
         right: BuiltSubTree<K, V>,
         layer: u64,
-    ) -> BuiltSubTree<K, V> {
+    ) -> BuiltSubTree<K, V>
+    where
+        PeakFoot: NodeRefWriter<K, V>,
+    {
         match (left, right) {
-            (BuiltSubTree::InOrAtFootOfPeak, BuiltSubTree::InOrAtFootOfPeak) => {
+            (BuiltSubTree::InPeak, BuiltSubTree::InPeak) => {
                 assert!(
                     matches!(self, PendingBuild::AbovePeakFeet),
                     "Expecting nodes."
                 );
-                BuiltSubTree::InOrAtFootOfPeak
+                BuiltSubTree::InPeak
             },
             (BuiltSubTree::BelowPeak(left), BuiltSubTree::BelowPeak(right)) => {
                 let internal_node = Self::merge_subtrees(left, right, layer);
@@ -236,7 +265,11 @@ impl<'a, K, V> PendingBuild<'a, K, V> {
         }
     }
 
-    fn merge_subtrees(left: NodeRef<K, V>, right: NodeRef<K, V>, layer: u64) -> NodeRef<K, V> {
+    fn merge_subtrees<K, V>(
+        left: NodeRef<K, V>,
+        right: NodeRef<K, V>,
+        layer: u64,
+    ) -> NodeRef<K, V> {
         use crate::node::NodeRef::*;
 
         match (&left, &right) {
@@ -250,7 +283,7 @@ impl<'a, K, V> PendingBuild<'a, K, V> {
 
 #[must_use = "Must finalize()"]
 enum BuiltSubTree<K, V> {
-    InOrAtFootOfPeak,
+    InPeak,
     BelowPeak(NodeRef<K, V>),
 }
 
@@ -259,27 +292,29 @@ impl<K, V> BuiltSubTree<K, V> {
         // note: need to carry height to assert more strongly
         // (that it's built all the way to the root)
         assert!(
-            matches!(self, BuiltSubTree::InOrAtFootOfPeak),
+            matches!(self, BuiltSubTree::InPeak),
             "Haven't reached the peak."
         );
     }
 }
 
-struct SubTreeBuilder<'a, K, V> {
+struct SubTreeBuilder<'a, K, V, PeakFoot, OutputPeakFoot> {
     /// the layer being built
     layer: u64,
     /// anything at this layer or earlier is assumed invisible
     base_layer: u64,
     depth: usize,
-    position_info: PositionInfo<'a, K, V>,
-    output_position_info: OutputPositionInfo<'a, K, V>,
+    position_info: PositionInfo<'a, K, V, PeakFoot>,
+    output_position_info: OutputPositionInfo<'a, OutputPeakFoot>,
     items: &'a [Item<'a, K, V>],
 }
 
-impl<'a, K, V> SubTreeBuilder<'a, K, V>
+impl<'a, K, V, PeakFoot, OutputPeakFoot> SubTreeBuilder<'a, K, V, PeakFoot, OutputPeakFoot>
 where
     K: ArcAsyncDrop + Key,
     V: ArcAsyncDrop + Value,
+    PeakFoot: NodeRefReader<K, V>,
+    OutputPeakFoot: NodeRefWriter<K, V>,
 {
     fn all_items_same_key_hash(&self) -> Option<KeyHash> {
         let items = &self.items;
@@ -344,7 +379,7 @@ where
             items,
         } = self;
 
-        let (mut pending_build, out_left, out_right) = output_position_info.into_pending_build();
+        let (pending_build, out_left, out_right) = output_position_info.into_pending_build();
         let (pos_left, pos_right) = position_info.children(depth, base_layer);
 
         let pivot = items.partition_point(|item| !item.key_hash.bit(depth));
@@ -370,7 +405,7 @@ where
     }
 
     fn terminate_with_node(self, node: NodeRef<K, V>) -> BuiltSubTree<K, V> {
-        let (mut pending_build, left, right) = self.output_position_info.into_pending_build();
+        let (pending_build, left, right) = self.output_position_info.into_pending_build();
         assert!(left.is_below_peak_feet() && right.is_below_peak_feet());
 
         pending_build.seal_with_node(node)

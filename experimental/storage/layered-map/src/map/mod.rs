@@ -66,7 +66,11 @@ where
             foot = foot << 1 | bits.next().expect("bits exhausted") as usize;
         }
 
-        self.get_under_node(peak.expect_foot(foot, self.base_layer()), key, &mut bits)
+        self.get_under_node(
+            peak.expect_leaf(foot).get_strong(self.base_layer()),
+            key,
+            &mut bits,
+        )
     }
 
     fn get_under_node(
@@ -111,7 +115,7 @@ where
     pub fn iter(&self) -> impl Iterator<Item = (K, V)> + '_ {
         self.top_layer
             .peak()
-            .into_feet_iter()
+            .into_leaf_iter()
             .flat_map(|node| DescendantIterator::new(node, self.base_layer()))
     }
 }
