@@ -43,3 +43,4 @@ We spun up the nodes on a GCP data center. The specs are for the nodes are
   ```
   
 ## Results
+The benchmark results from our experiments and the design can be found in this [blog](https://aptoslabs.medium.com/shardines-aptos-sharded-execution-engine-blazes-to-1m-tps-71c5f9b8bf60).
