@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y libdw1 libssl-dev openssl curl && rm -r
 # Copy both the aptos-node and aptos-faucet-service into the container
 COPY ./aptos-node /usr/local/bin/aptos-node
 COPY ./aptos-faucet-service /usr/local/bin/aptos-faucet-service
+COPY ./aptos /usr/local/bin/aptos
 COPY ./genesis.blob /opt/aptos/genesis/genesis.blob
 COPY ./waypoint.txt /opt/aptos/genesis/waypoint.txt
 COPY ./libvoidstar.so /usr/lib/libvoidstar.so

@@ -89,6 +89,7 @@ echo "Genesis blob and waypoint generated in $GENESIS_DIR."
 # Entrypoint and Dockerfile copy
 cp scripts/anthitesis-templates/entrypoint.sh $GENESIS_DIR/entrypoint.sh
 cp scripts/anthitesis-templates/healthcheck.sh $GENESIS_DIR/healthcheck.sh
+awk -v ip="$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+30)}')" '{gsub("<FAUCET_IP>", ip); print}' scripts/anthitesis-templates/singleton_driver_test1.sh > $GENESIS_DIR/singleton_driver_test1.sh
 cp scripts/anthitesis-templates/Dockerfile $GENESIS_DIR/Dockerfile
 cp scripts/anthitesis-templates/Dockerfile-config $GENESIS_DIR/Dockerfile-config
 
@@ -98,7 +99,9 @@ for i in $(seq 1 "$NODE_COUNT"); do
     if [ "$i" -gt 1 ]; then
         SERVICES="$SERVICES |"
     fi
-    SERVICES="$SERVICES .services.validator_$i.image = \"aptos/node:latest\" |"
+    SERVICES="$SERVICES .services.validator_$i.image = \"aptos-node:latest\" |"
+    SERVICES="$SERVICES .services.validator_$i.container_name = \"validator_$i\" |"
+    SERVICES="$SERVICES .services.validator_$i.hostname = \"validator_$i\" |"
     SERVICES="$SERVICES .services.validator_$i.environment.ROLE = \"validator\" |"
     SERVICES="$SERVICES .services.validator_$i.environment.CONFIG_PATH = \"/opt/aptos/etc/validator.yaml\" |"
     SERVICES="$SERVICES .services.validator_$i.volumes = [\"./validator_$i/validator.yaml:/opt/aptos/etc/validator.yaml\", \"./validator_$i/keys/validator-identity.yaml:/opt/aptos/genesis/validator-identity.yaml\"] |"
@@ -108,7 +111,9 @@ for i in $(seq 1 "$NODE_COUNT"); do
 
     if [[ "${FULLNODE_NODES[*]}" =~ "$i" ]]; then
       SERVICES="$SERVICES |"
-      SERVICES="$SERVICES .services.fullnode_$i.image = \"aptos/node:latest\" |"
+      SERVICES="$SERVICES .services.fullnode_$i.image = \"aptos-node:latest\" |"
+      SERVICES="$SERVICES .services.fullnode_$i.container_name = \"fullnode_$i\" |"
+      SERVICES="$SERVICES .services.fullnode_$i.hostname = \"fullnode_$i\" |"
       SERVICES="$SERVICES .services.fullnode_$i.environment.ROLE = \"full_node\" |"
       SERVICES="$SERVICES .services.fullnode_$i.environment.CONFIG_PATH = \"/opt/aptos/etc/fullnode.yaml\" |"
       SERVICES="$SERVICES .services.fullnode_$i.volumes = [\"./validator_$i/fullnode.yaml:/opt/aptos/etc/fullnode.yaml\", \"./validator_$i/keys/validator-full-node-identity.yaml:/opt/aptos/genesis/validator-full-node-identity.yaml\"] |"
@@ -121,7 +126,9 @@ done
 
 # NODE_URL is the first validator node for the faucet to connect to
 yq eval -n "
-  .services.faucet.image = \"aptos/node:latest\" |
+  .services.faucet.image = \"aptos-node:latest\" |
+  .services.faucet.container_name = \"faucet\" |
+  .services.faucet.hostname = \"faucet\" |
   .services.faucet.environment.ROLE = \"faucet\" |
   .services.faucet.environment.MINT_KEY = \"/opt/aptos/etc/mint.key\" |
   .services.faucet.environment.NODE_URL = \"http://$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+11)}'):8080\" |
@@ -130,18 +137,20 @@ yq eval -n "
   .services.faucet.networks.custom_network.ipv4_address = \"$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+30)}')\" |
   .services.faucet.restart = \"unless-stopped\" |
   .services.faucet.expose = [8080] |
-  .services.healthcheck.image = \"aptos/node:latest\" |
+  .services.healthcheck.image = \"aptos-node:latest\" |
+  .services.healthcheck.container_name = \"healthcheck\" |
+  .services.healthcheck.hostname = \"healthcheck\" |
   .services.healthcheck.environment.ROLE = \"healthcheck\" |
   .services.healthcheck.environment.NODE_COUNT = \"$NODE_COUNT\" |
   .services.healthcheck.environment.NETWORK_IP = \"$NETWORK_IP\" |
-  .services.healthcheck.volumes = [\"./healthcheck.sh:/usr/local/bin/healthcheck.sh\"] |
+  .services.healthcheck.volumes = [\"./healthcheck.sh:/usr/local/bin/healthcheck.sh\", \"./singleton_driver_test1.sh:/opt/antithesis/test/v1/quickstart/singleton_driver_test1.sh\"] |
   .services.healthcheck.networks.custom_network.ipv4_address = \"$(echo "$NETWORK_IP" | awk -F '.' '{print $1"."$2"."$3"."($4+50)}')\" |
   .networks.custom_network.driver = \"bridge\" |
   .networks.custom_network.ipam.config[0].subnet = \"$NETWORK_IP/24\" |
   $SERVICES
-" > "$GENESIS_DIR/docker-compose.yaml"
+" > "$GENESIS_DIR/docker-compose.yml"
 
 wget https://storage.googleapis.com/anthithesis/libvoidstar.so -O $GENESIS_DIR/libvoidstar.so
 
-echo "Enter $GENESIS_DIR and run docker build -t aptos/node:latest . && docker compose up --force-recreate"
-echo "If you want to upload on the infra run: docker build -f Dockerfile-config -t aptos/config:latest ." 
+echo "Enter $GENESIS_DIR and run docker build -t aptos-node:latest . && docker compose up --force-recreate"
+echo "If you want to upload on the infra run: docker build -f Dockerfile-config -t config:latest ." 

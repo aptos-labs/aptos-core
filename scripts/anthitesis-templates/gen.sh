@@ -5,6 +5,7 @@ set -e
 # Build all binaries and framework
 cargo run --package aptos-framework release --target mainnet
 cargo build --release -p aptos-faucet-service
+cargo build --package aptos --profile cli
 RUSTFLAGS=" \
     -Ccodegen-units=1 \
     -Cpasses=sancov-module \
@@ -24,6 +25,7 @@ mkdir "$GENESIS_DIR"
 cp mainnet.mrb "$GENESIS_DIR/framework.mrb" 
 cp target/release/aptos-node "$GENESIS_DIR/aptos-node"
 cp target/release/aptos-faucet-service "$GENESIS_DIR/aptos-faucet-service"
+cp target/cli/aptos "$GENESIS_DIR/aptos"
 
 # Generate layout file using yq
 yq eval -n "
