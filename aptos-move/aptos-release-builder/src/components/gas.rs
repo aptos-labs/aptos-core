@@ -135,14 +135,32 @@ pub fn generate_gas_upgrade_proposal(
                     );
                 },
                 None => {
+                    let update_method = if is_testnet {
+                        "set_for_next_epoch"
+                    } else {
+                        "set_for_next_epoch"
+                    };
                     emitln!(
                         writer,
-                        "gas_schedule::set_for_next_epoch({}, gas_schedule_blob);",
+                        "gas_schedule::{}({}, gas_schedule_blob);",
+                        update_method,
                         signer_arg
                     );
                 },
             }
-            emitln!(writer, "aptos_governance::reconfigure({});", signer_arg);
+
+            let reconfig_method = if is_testnet {
+                "force_end_epoch"
+            } else {
+                "reconfigure"
+            };
+
+            emitln!(
+                writer,
+                "aptos_governance::{}({});",
+                reconfig_method,
+                signer_arg
+            );
         },
     );
 
