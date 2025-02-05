@@ -29,7 +29,9 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::{
     module_and_script_storage::code_storage::AptosCodeStorage,
     module_write_set::ModuleWrite,
-    resolver::{ResourceGroupSize, TExecutorView, TResourceGroupView},
+    resolver::{
+        BlockSynchronizationKillSwitch, ResourceGroupSize, TExecutorView, TResourceGroupView,
+    },
     resource_group_adapter::{
         decrement_size_for_remove_tag, group_tagged_resource_size, increment_size_for_add_tag,
     },
@@ -853,7 +855,8 @@ where
         &self,
         view: &(impl TExecutorView<K, u32, MoveTypeLayout, ValueType>
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>
-              + AptosCodeStorage),
+              + AptosCodeStorage
+              + BlockSynchronizationKillSwitch),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error> {

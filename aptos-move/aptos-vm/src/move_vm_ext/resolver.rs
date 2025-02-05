@@ -5,8 +5,7 @@ use aptos_aggregator::resolver::{AggregatorV1Resolver, DelayedFieldResolver};
 use aptos_table_natives::TableResolver;
 use aptos_types::{on_chain_config::ConfigStorage, state_store::state_key::StateKey};
 use aptos_vm_types::resolver::{
-    BlockSynchronizationKillSwitch, ExecutorView, ResourceGroupSize, ResourceGroupView,
-    StateStorageView,
+    ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView,
 };
 use bytes::Bytes;
 use move_binary_format::errors::PartialVMResult;
@@ -52,9 +51,6 @@ pub trait ResourceGroupResolver {
 
 pub trait AsExecutorView {
     fn as_executor_view(&self) -> &dyn ExecutorView;
-
-    // TODO: remove once https://github.com/rust-lang/rust/issues/65991 stabilized.
-    fn as_block_synchronization_kill_switch(&self) -> &dyn BlockSynchronizationKillSwitch;
 }
 
 pub trait AsResourceGroupView {

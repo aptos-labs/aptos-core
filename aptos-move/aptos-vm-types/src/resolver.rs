@@ -219,8 +219,7 @@ pub trait StateStorageView {
 /// resolve AggregatorV2 via the state-view based default implementation, as it
 /// doesn't provide a value exchange functionality).
 pub trait TExecutorView<K, T, L, V>:
-    BlockSynchronizationKillSwitch
-    + TResourceView<Key = K, Layout = L>
+    TResourceView<Key = K, Layout = L>
     + TModuleView<Key = K>
     + TAggregatorV1View<Identifier = K>
     + TDelayedFieldView<Identifier = DelayedFieldID, ResourceKey = K, ResourceGroupTag = T>
@@ -229,8 +228,7 @@ pub trait TExecutorView<K, T, L, V>:
 }
 
 impl<A, K, T, L, V> TExecutorView<K, T, L, V> for A where
-    A: BlockSynchronizationKillSwitch
-        + TResourceView<Key = K, Layout = L>
+    A: TResourceView<Key = K, Layout = L>
         + TModuleView<Key = K>
         + TAggregatorV1View<Identifier = K>
         + TDelayedFieldView<Identifier = DelayedFieldID, ResourceKey = K, ResourceGroupTag = T>

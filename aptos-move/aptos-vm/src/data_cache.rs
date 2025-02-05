@@ -29,8 +29,7 @@ use aptos_vm_environment::{
 };
 use aptos_vm_types::{
     resolver::{
-        BlockSynchronizationKillSwitch, ExecutorView, ResourceGroupSize, ResourceGroupView,
-        StateStorageView, TResourceGroupView,
+        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TResourceGroupView,
     },
     resource_group_adapter::ResourceGroupAdapter,
 };
@@ -331,10 +330,6 @@ impl<'e, E: ExecutorView> StateStorageView for StorageAdapter<'e, E> {
 // Allows to extract the view from `StorageAdapter`.
 impl<'e, E: ExecutorView> AsExecutorView for StorageAdapter<'e, E> {
     fn as_executor_view(&self) -> &dyn ExecutorView {
-        self.executor_view
-    }
-
-    fn as_block_synchronization_kill_switch(&self) -> &dyn BlockSynchronizationKillSwitch {
         self.executor_view
     }
 }

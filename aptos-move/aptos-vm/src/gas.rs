@@ -23,19 +23,19 @@ use move_vm_runtime::ModuleStorage;
 const MAXIMUM_APPROVED_TRANSACTION_SIZE_LEGACY: u64 = 1024 * 1024;
 
 /// Gas meter used in the production (validator) setup.
-pub type ProdGasMeter<'a> = MemoryTrackedGasMeter<StandardGasMeter<StandardGasAlgebra<'a>>>;
+pub type ProdGasMeter<'a, T> = MemoryTrackedGasMeter<StandardGasMeter<StandardGasAlgebra<'a, T>>>;
 
 /// Creates a gas meter intended for executing transactions in the production.
 ///
 /// The current setup consists of the standard gas meter & algebra + the memory usage tracker.
-pub fn make_prod_gas_meter(
+pub fn make_prod_gas_meter<T: BlockSynchronizationKillSwitch>(
     gas_feature_version: u64,
     vm_gas_params: VMGasParameters,
     storage_gas_params: StorageGasParameters,
     is_approved_gov_script: bool,
     meter_balance: Gas,
-    block_synchronization_kill_switch: &dyn BlockSynchronizationKillSwitch,
-) -> ProdGasMeter {
+    block_synchronization_kill_switch: &T,
+) -> ProdGasMeter<T> {
     MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
         gas_feature_version,
         vm_gas_params,

@@ -19,7 +19,10 @@ use std::{fmt::Debug, ops::AddAssign};
 /// Base gas algebra implementation that tracks the gas usage using its internal counters.
 ///
 /// Abstract gas amounts are always evaluated to concrete values at the spot.
-pub struct StandardGasAlgebra<'a> {
+pub struct StandardGasAlgebra<'a, T>
+where
+    T: BlockSynchronizationKillSwitch,
+{
     feature_version: u64,
     vm_gas_params: VMGasParameters,
     storage_gas_params: StorageGasParameters,
@@ -47,17 +50,23 @@ pub struct StandardGasAlgebra<'a> {
     // limit being reached). Interrupting is a performance optimization, and requires checking
     // with proper granularity. Gas charging happens regularly but involves computation that
     // can amortize the cost of the check. Hence, currently kill switch is integrated here.
-    block_synchronization_kill_switch: &'a dyn BlockSynchronizationKillSwitch,
+    block_synchronization_kill_switch: &'a T,
+    // To control the performance overhead, kill switch is checked one out of (4) times in
+    // gas charging callback.
+    counter_for_kill_switch: usize,
 }
 
-impl<'a> StandardGasAlgebra<'a> {
+impl<'a, T> StandardGasAlgebra<'a, T>
+where
+    T: BlockSynchronizationKillSwitch,
+{
     pub fn new(
         gas_feature_version: u64,
         vm_gas_params: VMGasParameters,
         storage_gas_params: StorageGasParameters,
         is_approved_gov_script: bool,
         balance: impl Into<Gas>,
-        block_synchronization_kill_switch: &'a dyn BlockSynchronizationKillSwitch,
+        block_synchronization_kill_switch: &'a T,
     ) -> Self {
         let balance = balance.into().to_unit_with_params(&vm_gas_params.txn);
 
@@ -93,11 +102,15 @@ impl<'a> StandardGasAlgebra<'a> {
             num_dependencies: 0.into(),
             total_dependency_size: 0.into(),
             block_synchronization_kill_switch,
+            counter_for_kill_switch: 0,
         }
     }
 }
 
-impl StandardGasAlgebra<'_> {
+impl<T> StandardGasAlgebra<'_, T>
+where
+    T: BlockSynchronizationKillSwitch,
+{
     fn charge(&mut self, amount: InternalGas) -> (InternalGas, PartialVMResult<()>) {
         match self.balance.checked_sub(amount) {
             Some(new_balance) => {
@@ -116,7 +129,10 @@ impl StandardGasAlgebra<'_> {
     }
 }
 
-impl GasAlgebra for StandardGasAlgebra<'_> {
+impl<T> GasAlgebra for StandardGasAlgebra<'_, T>
+where
+    T: BlockSynchronizationKillSwitch,
+{
     fn feature_version(&self) -> u64 {
         self.feature_version
     }
@@ -175,7 +191,10 @@ impl GasAlgebra for StandardGasAlgebra<'_> {
         &mut self,
         abstract_amount: impl GasExpression<VMGasParameters, Unit = InternalGasUnit> + Debug,
     ) -> PartialVMResult<()> {
-        if self.block_synchronization_kill_switch.interrupt_requested() {
+        self.counter_for_kill_switch += 1;
+        if self.counter_for_kill_switch & 3 == 0
+            && self.block_synchronization_kill_switch.interrupt_requested()
+        {
             return Err(
                 PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
                     .with_message("Interrupted from block synchronization view".to_string()),
@@ -204,13 +223,6 @@ impl GasAlgebra for StandardGasAlgebra<'_> {
         &mut self,
         abstract_amount: impl GasExpression<VMGasParameters, Unit = InternalGasUnit>,
     ) -> PartialVMResult<()> {
-        if self.block_synchronization_kill_switch.interrupt_requested() {
-            return Err(
-                PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
-                    .with_message("Interrupted from block synchronization view".to_string()),
-            );
-        }
-
         let amount = abstract_amount.evaluate(self.feature_version, &self.vm_gas_params);
 
         let (actual, res) = self.charge(amount);

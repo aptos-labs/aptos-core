@@ -2198,24 +2198,18 @@ impl AptosVM {
 
     /// Main entrypoint for executing a user transaction that also allows the customization of the
     /// gas meter to be used.
-    pub fn execute_user_transaction_with_custom_gas_meter<'a, G, F>(
+    pub fn execute_user_transaction_with_custom_gas_meter<'a, C, G, F>(
         &self,
         resolver: &'a impl AptosMoveResolver,
-        code_storage: &impl AptosCodeStorage,
+        code_storage: &'a C,
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
         make_gas_meter: F,
     ) -> Result<(VMStatus, VMOutput, G), VMStatus>
     where
+        C: AptosCodeStorage + BlockSynchronizationKillSwitch,
         G: AptosGasMeter,
-        F: FnOnce(
-            u64,
-            VMGasParameters,
-            StorageGasParameters,
-            bool,
-            Gas,
-            &'a dyn BlockSynchronizationKillSwitch,
-        ) -> G,
+        F: FnOnce(u64, VMGasParameters, StorageGasParameters, bool, Gas, &'a C) -> G,
     {
         let txn_metadata = TransactionMetadata::new(txn);
 
@@ -2235,7 +2229,7 @@ impl AptosVM {
             self.storage_gas_params(log_context)?.clone(),
             is_approved_gov_script,
             initial_balance,
-            resolver.as_block_synchronization_kill_switch(),
+            code_storage,
         );
 
         let (status, output) = self.execute_user_transaction_impl(
@@ -2259,13 +2253,13 @@ impl AptosVM {
     pub fn execute_user_transaction_with_modified_gas_meter<'a, G, F>(
         &self,
         resolver: &'a impl AptosMoveResolver,
-        code_storage: &impl AptosCodeStorage,
+        code_storage: &'a (impl AptosCodeStorage + BlockSynchronizationKillSwitch),
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
         modify_gas_meter: F,
     ) -> Result<(VMStatus, VMOutput, G), VMStatus>
     where
-        F: FnOnce(ProdGasMeter<'a>) -> G,
+        F: FnOnce(ProdGasMeter<'a, NoopBlockSynchronizationKillSwitch>) -> G,
         G: AptosGasMeter,
     {
         self.execute_user_transaction_with_custom_gas_meter(
@@ -2295,7 +2289,7 @@ impl AptosVM {
     pub fn execute_user_transaction(
         &self,
         resolver: &impl AptosMoveResolver,
-        code_storage: &impl AptosCodeStorage,
+        code_storage: &(impl AptosCodeStorage + BlockSynchronizationKillSwitch),
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
@@ -2815,7 +2809,7 @@ impl AptosVM {
         &self,
         txn: &SignatureVerifiedTransaction,
         resolver: &impl AptosMoveResolver,
-        code_storage: &impl AptosCodeStorage,
+        code_storage: &(impl AptosCodeStorage + BlockSynchronizationKillSwitch),
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         assert!(!self.is_simulation, "VM has to be created for execution");
