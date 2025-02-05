@@ -651,6 +651,7 @@ lru = "0.7.5"
 lz4 = "1.25.0"
 maplit = "1.0.2"
 merlin = "3"
+memchr = "2.7.4"
 memory-stats = "1.0.0"
 mime = "0.3.16"
 mini-moka = { version = "0.10.3", features = ["sync"] }
