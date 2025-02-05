@@ -17,6 +17,7 @@ use crate::{
         },
         observer::{
             active_state::ActiveObserverState,
+            execution_pool::ObservedOrderedBlock,
             fallback_manager::ObserverFallbackManager,
             ordered_blocks::OrderedBlockStore,
             payload_store::BlockPayloadStore,
@@ -760,8 +761,12 @@ impl ConsensusObserver {
         update_metrics_for_ordered_block_message(peer_network_id, &ordered_block);
 
         // Create a new pending block with metadata
-        let pending_block_with_metadata =
-            PendingBlockWithMetadata::new(peer_network_id, message_received_time, ordered_block);
+        let observed_ordered_block = ObservedOrderedBlock::new(ordered_block);
+        let pending_block_with_metadata = PendingBlockWithMetadata::new(
+            peer_network_id,
+            message_received_time,
+            observed_ordered_block,
+        );
 
         // If all payloads exist, process the block. Otherwise, store it
         // in the pending block store and wait for the payloads to arrive.
@@ -782,8 +787,9 @@ impl ConsensusObserver {
         pending_block_with_metadata: PendingBlockWithMetadata,
     ) {
         // Unpack the pending block
-        let (peer_network_id, message_received_time, ordered_block) =
+        let (peer_network_id, message_received_time, observed_ordered_block) =
             pending_block_with_metadata.into_parts();
+        let ordered_block = observed_ordered_block.consume_ordered_block();
 
         // Verify the ordered block proof
         let epoch_state = self.get_epoch_state();
