@@ -100,6 +100,12 @@ fn test_vector_pushback() {
 }
 
 #[test]
+fn test_fixed_point64() {
+    let named_address = BTreeMap::new();
+    run_tests_for_pkg("fixed_point64", named_address);
+}
+
+#[test]
 fn test_common_account() {
     test_common("common_account");
 }
