@@ -163,11 +163,12 @@ pub(crate) trait LayoutConverterBase {
                 results,
                 abilities,
             } => {
+                *count += 1;
                 let mut identifier_mapping = false;
-                let mut to_list = |rcs: &[triomphe::Arc<Type>]| {
-                    rcs.iter()
-                        .map(|rc| {
-                            self.type_to_type_layout_impl(rc.as_ref(), count, depth + 1)
+                let mut to_list = |tys: &[Type]| {
+                    tys.iter()
+                        .map(|ety| {
+                            self.type_to_type_layout_impl(ety, count, depth + 1)
                                 .map(|(l, has)| {
                                     identifier_mapping |= has;
                                     l
@@ -339,11 +340,9 @@ pub(crate) trait LayoutConverterBase {
                 results,
                 abilities,
             } => {
-                let mut to_list = |rcs: &[triomphe::Arc<Type>]| {
-                    rcs.iter()
-                        .map(|rc| {
-                            self.type_to_fully_annotated_layout_impl(rc.as_ref(), count, depth + 1)
-                        })
+                let mut to_list = |tys: &[Type]| {
+                    tys.iter()
+                        .map(|ety| self.type_to_fully_annotated_layout_impl(ety, count, depth + 1))
                         .collect::<PartialVMResult<Vec<_>>>()
                 };
                 MoveTypeLayout::Function(MoveFunctionLayout(

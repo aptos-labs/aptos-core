@@ -515,16 +515,8 @@ impl Function {
     /// the parameter and result types.
     pub fn create_function_type(&self) -> Type {
         Type::Function {
-            args: self
-                .param_tys
-                .iter()
-                .map(|t| triomphe::Arc::new(t.clone()))
-                .collect(),
-            results: self
-                .return_tys
-                .iter()
-                .map(|t| triomphe::Arc::new(t.clone()))
-                .collect(),
+            args: self.param_tys.clone(),
+            results: self.return_tys.clone(),
             abilities: self.abilities(),
         }
     }

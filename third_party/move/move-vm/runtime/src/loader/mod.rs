@@ -1805,7 +1805,7 @@ impl LoaderV1 {
                 results,
                 abilities,
             } => {
-                let to_vec = |ts: &[triomphe::Arc<Type>],
+                let to_vec = |ts: &[Type],
                               gas_ctx: &mut PseudoGasContext|
                  -> PartialVMResult<Vec<TypeTag>> {
                     ts.iter()
@@ -1982,9 +1982,9 @@ impl Loader {
                 let mut inner = DepthFormula::normalize(
                     args.iter()
                         .chain(results)
-                        .map(|rc| {
+                        .map(|arg_ty| {
                             self.calculate_depth_of_type(
-                                rc.as_ref(),
+                                arg_ty,
                                 module_store,
                                 module_storage,
                                 visited_cache,
