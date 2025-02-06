@@ -762,7 +762,7 @@ impl ConsensusObserver {
 
         // Create a new pending block with metadata
         let observed_ordered_block = ObservedOrderedBlock::new(ordered_block);
-        let pending_block_with_metadata = PendingBlockWithMetadata::new(
+        let pending_block_with_metadata = PendingBlockWithMetadata::new_with_arc(
             peer_network_id,
             message_received_time,
             observed_ordered_block,
@@ -784,11 +784,11 @@ impl ConsensusObserver {
     /// has been sanity checked and that all payloads exist.
     async fn process_ordered_block(
         &mut self,
-        pending_block_with_metadata: PendingBlockWithMetadata,
+        pending_block_with_metadata: Arc<PendingBlockWithMetadata>,
     ) {
         // Unpack the pending block
         let (peer_network_id, message_received_time, observed_ordered_block) =
-            pending_block_with_metadata.into_parts();
+            pending_block_with_metadata.unpack();
         let ordered_block = observed_ordered_block.ordered_block().clone();
 
         // Verify the ordered block proof
