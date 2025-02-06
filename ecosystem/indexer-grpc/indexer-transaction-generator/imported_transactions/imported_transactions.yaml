@@ -35,6 +35,8 @@ mainnet:
     255894550: 255894550_storage_refund
     1737056775: 1737056775_coin_transfer_burn_event
     550582915: 550582915_multiple_transfer_event
+    2308282694: 2308282694_asset_type_v1_null
+    2308283617: 2308283617_asset_type_v1_null_2
 
     # token v2 processor
     1058723093: 1058723093_token_v1_mint_withdraw_deposit_events
