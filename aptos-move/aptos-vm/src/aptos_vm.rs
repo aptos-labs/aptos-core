@@ -38,7 +38,7 @@ use aptos_framework::{
     RuntimeModuleMetadataV1,
 };
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
-use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
+use aptos_gas_meter::{is_gas_metering_enabled, AptosGasMeter, AptosUnmeteredGasMeter, GasAlgebra};
 use aptos_gas_schedule::{
     gas_feature_versions::{RELEASE_V1_10, RELEASE_V1_27},
     AptosGasParameters, VMGasParameters,
@@ -2293,18 +2293,32 @@ impl AptosVM {
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
-        match self.execute_user_transaction_with_custom_gas_meter(
-            resolver,
-            code_storage,
-            txn,
-            log_context,
-            make_prod_gas_meter,
-        ) {
-            Ok((vm_status, vm_output, _gas_meter)) => (vm_status, vm_output),
-            Err(vm_status) => {
-                let vm_output = discarded_output(vm_status.status_code());
-                (vm_status, vm_output)
-            },
+        if cfg!(feature = "benchmark") && !is_gas_metering_enabled() {
+            let txn_metadata = TransactionMetadata::new(txn);
+            let is_approved_gov_script = is_approved_gov_script(resolver, txn, &txn_metadata);
+            self.execute_user_transaction_impl(
+                resolver,
+                code_storage,
+                txn,
+                txn_metadata,
+                is_approved_gov_script,
+                log_context,
+                &mut AptosUnmeteredGasMeter::new(),
+            )
+        } else {
+            match self.execute_user_transaction_with_custom_gas_meter(
+                resolver,
+                code_storage,
+                txn,
+                log_context,
+                make_prod_gas_meter,
+            ) {
+                Ok((vm_status, vm_output, _gas_meter)) => (vm_status, vm_output),
+                Err(vm_status) => {
+                    let vm_output = discarded_output(vm_status.status_code());
+                    (vm_status, vm_output)
+                },
+            }
         }
     }
 

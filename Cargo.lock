@@ -1989,6 +1989,7 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "move-vm-types",
+ "once_cell",
 ]
 
 [[package]]
@@ -3599,6 +3600,7 @@ dependencies = [
  "aptos-block-executor",
  "aptos-crypto",
  "aptos-framework",
+ "aptos-gas-meter",
  "aptos-gas-schedule",
  "aptos-logger",
  "aptos-move-debugger",

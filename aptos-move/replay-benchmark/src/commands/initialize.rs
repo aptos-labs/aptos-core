@@ -62,6 +62,13 @@ pub struct InitializeCommand {
         help = "List of space-separated paths to compiled / built packages with Move code"
     )]
     override_packages: Vec<String>,
+
+    #[clap(
+        long,
+        default_value_t = false,
+        help = "If true, checks if any transaction runs out of gas and if so, returns an error"
+    )]
+    assert_no_out_of_gas: bool,
 }
 
 impl InitializeCommand {
@@ -89,8 +96,13 @@ impl InitializeCommand {
         )?;
 
         let debugger = build_debugger(self.rest_api.rest_endpoint, self.rest_api.api_key)?;
-        let inputs =
-            InputOutputDiffGenerator::generate(debugger, override_config, txn_blocks).await?;
+        let inputs = InputOutputDiffGenerator::generate(
+            debugger,
+            override_config,
+            txn_blocks,
+            self.assert_no_out_of_gas,
+        )
+        .await?;
 
         let bytes = bcs::to_bytes(&inputs).map_err(|err| {
             anyhow!(
