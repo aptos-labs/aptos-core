@@ -26,7 +26,7 @@ module aptos_std::ristretto255_bulletproofs {
 
     /// There was an error deserializing the range proof.
     const E_DESERIALIZE_RANGE_PROOF: u64 = 1;
-    
+
     /// The committed value given to the prover is too large.
     const E_VALUE_OUTSIDE_RANGE: u64 = 2;
 
@@ -317,7 +317,7 @@ module aptos_std::ristretto255_bulletproofs {
         let comm_b = pedersen::new_commitment_from_bytes(B_COMM);
 
         let comms = vector[std::option::extract(&mut comm_a), std::option::extract(&mut comm_b)];
-        
+
         verify_batch_range_proof_pedersen(&comms, &range_proof_from_bytes(AB_BATCH_RANGE_PROOF_PEDERSEN), 10, A_DST);
     }
 
@@ -439,7 +439,7 @@ module aptos_std::ristretto255_bulletproofs {
 
         let blinder_a = ristretto255::new_scalar_from_bytes(A_BLINDER);
         let blinder_b = ristretto255::new_scalar_from_bytes(B_BLINDER);
-        
+
         let values = vector[std::option::extract(&mut value_a), value_b];
         let blinders = vector[std::option::extract(&mut blinder_a), std::option::extract(&mut blinder_b)];
 
