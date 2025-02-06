@@ -4,6 +4,10 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+## [6.1.1]
+- Added a new feature to `aptos workspace run`: The workspace server now listens for a "stop" command from
+stdin, which triggers a graceful shutdown when received.
+
 ## [6.1.0]
 - Remove FFI support from Aptos CLI.
 - Various compiler bug fixes.
