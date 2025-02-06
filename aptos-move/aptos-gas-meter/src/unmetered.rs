@@ -31,7 +31,9 @@ use once_cell::sync::OnceCell;
 use std::fmt::Debug;
 
 /// Gas algebra used by unmetered gas meter.
-pub struct UnmeteredGasAlgebra;
+pub struct UnmeteredGasAlgebra {
+    balance_internal: InternalGas,
+}
 
 impl GasAlgebra for UnmeteredGasAlgebra {
     fn feature_version(&self) -> u64 {
@@ -51,7 +53,7 @@ impl GasAlgebra for UnmeteredGasAlgebra {
     }
 
     fn balance_internal(&self) -> InternalGas {
-        InternalGas::zero()
+        self.balance_internal
     }
 
     fn check_consistency(&self) -> PartialVMResult<()> {
@@ -109,16 +111,23 @@ impl GasAlgebra for UnmeteredGasAlgebra {
 /// not charging gas because there is still some work done outside.
 pub struct AptosUnmeteredGasMeter {
     algebra: UnmeteredGasAlgebra,
+    // We need to use balance bounded by max amount of gas specified by transaction, because this
+    // invariant is checked by the VM.
+    balance: Gas,
+    gas_unit_scaling_factor: GasScalingFactor,
     // For sponsored account creation hack, we check the disk space pricing to calculate the
     // expected cost of account creation. For now, just use
     disk_pricing: DiskSpacePricing,
 }
 
 impl AptosUnmeteredGasMeter {
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
+    pub fn new(vm_gas_params: &VMGasParameters, max_gas_amount: u64) -> Self {
+        let balance: Gas = max_gas_amount.into();
+        let balance_internal = balance.to_unit_with_params(&vm_gas_params.txn);
         Self {
-            algebra: UnmeteredGasAlgebra,
+            algebra: UnmeteredGasAlgebra { balance_internal },
+            balance,
+            gas_unit_scaling_factor: vm_gas_params.txn.scaling_factor(),
             disk_pricing: DiskSpacePricing::V2,
         }
     }
@@ -126,7 +135,7 @@ impl AptosUnmeteredGasMeter {
 
 impl GasMeter for AptosUnmeteredGasMeter {
     fn balance_internal(&self) -> InternalGas {
-        InternalGas::zero()
+        self.algebra.balance_internal()
     }
 
     fn charge_simple_instr(&mut self, _instr: SimpleInstruction) -> PartialVMResult<()> {
@@ -448,11 +457,11 @@ impl AptosGasMeter for AptosUnmeteredGasMeter {
     }
 
     fn balance(&self) -> Gas {
-        Gas::zero()
+        self.balance
     }
 
     fn gas_unit_scaling_factor(&self) -> GasScalingFactor {
-        GasScalingFactor::one()
+        self.gas_unit_scaling_factor
     }
 
     fn execution_gas_used(&self) -> Gas {

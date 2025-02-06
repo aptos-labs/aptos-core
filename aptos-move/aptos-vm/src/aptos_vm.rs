@@ -2296,6 +2296,10 @@ impl AptosVM {
         if cfg!(feature = "benchmark") && !is_gas_metering_enabled() {
             let txn_metadata = TransactionMetadata::new(txn);
             let is_approved_gov_script = is_approved_gov_script(resolver, txn, &txn_metadata);
+            let vm_params = &self
+                .gas_params(log_context)
+                .expect("Gas parameters must exist when benchmarking")
+                .vm;
             self.execute_user_transaction_impl(
                 resolver,
                 code_storage,
@@ -2303,7 +2307,7 @@ impl AptosVM {
                 txn_metadata,
                 is_approved_gov_script,
                 log_context,
-                &mut AptosUnmeteredGasMeter::new(),
+                &mut AptosUnmeteredGasMeter::new(vm_params, txn.max_gas_amount()),
             )
         } else {
             match self.execute_user_transaction_with_custom_gas_meter(
