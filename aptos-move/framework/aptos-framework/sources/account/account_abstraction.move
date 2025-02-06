@@ -1,14 +1,20 @@
 module aptos_framework::account_abstraction {
+    use std::bcs;
+    use std::hash;
+    use aptos_std::from_bcs;
+
     use std::error;
     use std::option::{Self, Option};
     use std::signer;
     use std::string::{Self, String};
     use aptos_std::ordered_map::{Self, OrderedMap};
+    use aptos_std::big_ordered_map::{Self, BigOrderedMap};
     use aptos_framework::create_signer;
     use aptos_framework::event;
     use aptos_framework::function_info::{Self, FunctionInfo};
     use aptos_framework::object;
     use aptos_framework::auth_data::AbstractionAuthData;
+    use aptos_framework::system_addresses;
     use aptos_framework::permissioned_signer::is_permissioned_signer;
     #[test_only]
     use aptos_framework::account::create_account_for_test;
@@ -23,6 +29,8 @@ module aptos_framework::account_abstraction {
     const ENOT_MASTER_SIGNER: u64 = 4;
     const EINCONSISTENT_SIGNER_ADDRESS: u64 = 5;
     const EDEPRECATED_FUNCTION: u64 = 6;
+
+    const DOMAIN_ABSTRACTION_DERIVED_SCHEME: u8 = 5;
 
     const MAX_U64: u128 = 18446744073709551615;
 
@@ -43,6 +51,10 @@ module aptos_framework::account_abstraction {
     /// An integral part of Account Abstraction.
     enum DispatchableAuthenticator has key, copy, drop {
         V1 { auth_functions: OrderedMap<FunctionInfo, bool> }
+    }
+
+    enum DomainDispatchableAuthenticator has key {
+        V1 { auth_functions: BigOrderedMap<FunctionInfo, String> }
     }
 
     /// Add dispatchable authentication function that enables account abstraction via this function.
@@ -92,6 +104,27 @@ module aptos_framework::account_abstraction {
                 account: addr,
             });
         };
+    }
+
+    entry fun register_domain_with_authentication_function(
+        aptos_framework: &signer,
+        domain: String,
+        module_address: address,
+        module_name: String,
+        function_name: String,
+    ) acquires DomainDispatchableAuthenticator {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        if (!exists<DomainDispatchableAuthenticator>(@aptos_framework)) {
+            move_to(
+                aptos_framework,
+                DomainDispatchableAuthenticator::V1 { auth_functions: big_ordered_map::new() }
+            );
+        };
+
+        borrow_global_mut<DomainDispatchableAuthenticator>(@aptos_framework).auth_functions.add(
+            function_info::new_function_info_from_address(module_address, module_name, function_name),
+            domain,
+        );
     }
 
     inline fun resource_addr(source: address): address {
@@ -169,14 +202,33 @@ module aptos_framework::account_abstraction {
         &borrow_global<DispatchableAuthenticator>(resource_addr(addr)).auth_functions
     }
 
+    fun get_domain_address(domain: &String, authentication_key: &vector<u8>): address {
+        let bytes = bcs::to_bytes(domain);
+        bytes.append(bcs::to_bytes(authentication_key));
+        bytes.push_back(DOMAIN_ABSTRACTION_DERIVED_SCHEME);
+        from_bcs::to_address(hash::sha3_256(bytes))
+    }
+
     fun authenticate(
         account: signer,
         func_info: FunctionInfo,
         signing_data: AbstractionAuthData,
-    ): signer acquires DispatchableAuthenticator {
+    ): signer acquires DispatchableAuthenticator, DomainDispatchableAuthenticator {
         let master_signer_addr = signer::address_of(&account);
-        let func_infos = dispatchable_authenticator_internal(master_signer_addr);
-        assert!(ordered_map::contains(func_infos, &func_info), error::not_found(EFUNCTION_INFO_EXISTENCE));
+
+        if (signing_data.is_domain()) {
+            let domain = signing_data.domain_name();
+            assert!(master_signer_addr == get_domain_address(domain, signing_data.account_authentication_key()), error::invalid_state(EINCONSISTENT_SIGNER_ADDRESS));
+
+            assert!(using_dispatchable_authenticator(@aptos_framework), error::not_found(EDISPATCHABLE_AUTHENTICATOR_IS_NOT_USED));
+            let func_infos = &borrow_global<DomainDispatchableAuthenticator>(@aptos_framework).auth_functions;
+            assert!(func_infos.contains(&func_info), error::not_found(EFUNCTION_INFO_EXISTENCE));
+            assert!(func_infos.borrow(&func_info) == domain, error::not_found(EFUNCTION_INFO_EXISTENCE));
+        } else {
+            let func_infos = dispatchable_authenticator_internal(master_signer_addr);
+            assert!(ordered_map::contains(func_infos, &func_info), error::not_found(EFUNCTION_INFO_EXISTENCE));
+        };
+
         function_info::load_module_from_function(&func_info);
         let returned_signer = dispatchable_authenticate(account, signing_data, &func_info);
         // Returned signer MUST represent the same account address. Otherwise, it may break the invariant of Aptos blockchain!

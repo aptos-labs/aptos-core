@@ -482,6 +482,7 @@ pub enum Scheme {
     SingleKey = 2,
     MultiKey = 3,
     Abstraction = 4,
+    DeriveDomainAbstraction = 5,
     NoScheme = 250,
     /// Scheme identifier used to derive addresses (not the authentication key) of objects and
     /// resources accounts. This application serves to domain separate hashes. Without such
@@ -504,6 +505,7 @@ impl fmt::Display for Scheme {
             Scheme::MultiKey => "MultiKey",
             Scheme::NoScheme => "NoScheme",
             Scheme::Abstraction => "Abstraction",
+            Scheme::DeriveDomainAbstraction => "DeriveDomainAbstraction",
             Scheme::DeriveAuid => "DeriveAuid",
             Scheme::DeriveObjectAddressFromObject => "DeriveObjectAddressFromObject",
             Scheme::DeriveObjectAddressFromGuid => "DeriveObjectAddressFromGuid",
