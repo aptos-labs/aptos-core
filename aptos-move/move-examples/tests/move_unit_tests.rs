@@ -9,7 +9,7 @@ use aptos_types::{
 };
 use aptos_vm::natives;
 use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
-use move_package::CompilerConfig;
+use move_package::{source_package::std_lib::StdVersion, CompilerConfig};
 use move_unit_test::UnitTestingConfig;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use std::{collections::BTreeMap, path::PathBuf};
@@ -34,6 +34,7 @@ pub fn run_tests_for_pkg(
         move_package::BuildConfig {
             test_mode: true,
             install_dir: Some(tempdir().unwrap().path().to_path_buf()),
+            override_std: Some(StdVersion::Local(get_local_framework_path())),
             additional_named_addresses: named_addr,
             compiler_config: CompilerConfig {
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
@@ -66,6 +67,18 @@ pub fn aptos_test_natives() -> NativeFunctionTable {
         TimedFeaturesBuilder::enable_all().build(),
         Features::default(),
     )
+}
+
+/// Get the local framework path based on this source file's location.
+/// Note: If this source file is moved to a different location, this function
+/// may need to be updated.
+fn get_local_framework_path() -> String {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .map(|p| p.join("framework"))
+        .expect("framework path")
+        .to_string_lossy()
+        .to_string()
 }
 
 fn test_common(pkg: &str) {
