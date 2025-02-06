@@ -211,9 +211,12 @@ of transactions. Typically, you want to have the concurrency level to match the 
 multiple concurrency levels are provided, the benchmark reports the measurements for each level.
 This way it is possible to see how concurrency affects the runtime. 
 
-Finally, in order to differentiate between cold and warm starts, there is an option to skip the
-measurement for the first few blocks. By specifying `--num-block-to-skip N`, the tool will ignore
-measurements for the first `N` blocks (the blocks will still be executed as a "warm-up").
+In order to differentiate between cold and warm starts, there is an option to skip the measurement
+for the first few blocks. By specifying `--num-block-to-skip N`, the tool will ignore measurements
+for the first `N` blocks (the blocks will still be executed as a "warm-up").
+
+Execution can also be configured. By using `--disable-paranoid-mode`, the Move VM will not use
+runtime type checks, possible making execution faster.
 
 #### Example
 
