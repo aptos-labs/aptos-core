@@ -351,8 +351,9 @@ fn native_format_impl(
             out.push('}');
         },
         MoveTypeLayout::Function(_) => {
-            // TODO(#15664): The captured layouts are not decorated, do we actually and
-            //   if so, how, print this?
+            // Notice that we print the undecorated value representation,
+            // avoiding potential loading of the function to get full
+            // decorated type information.
             let (fun, args) = val.value_as::<Closure>()?.unpack();
             let data = context
                 .context

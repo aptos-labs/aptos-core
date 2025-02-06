@@ -1611,17 +1611,16 @@ fn check_depth_of_type_impl(
             check_depth!(formula.solve(&ty_arg_depths))
         },
         Type::Function { args, results, .. } => {
-            let mut ty_max = depth;
-            //for ty in args.iter().chain(results.iter()).map(|rc| rc.as_ref()) {
+            let mut ty_max_depth = depth;
             for ty in args.iter().chain(results) {
-                ty_max = ty_max.max(check_depth_of_type_impl(
+                ty_max_depth = ty_max_depth.max(check_depth_of_type_impl(
                     resolver,
                     ty,
                     max_depth,
                     check_depth!(1),
                 )?);
             }
-            ty_max
+            ty_max_depth
         },
         Type::TyParam(_) => {
             return Err(
